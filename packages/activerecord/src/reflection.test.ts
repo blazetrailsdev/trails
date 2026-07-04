@@ -2,6 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import {
   Base,
@@ -39,17 +40,25 @@ useHandlerTransactionalFixtures();
 describe("ReflectionTest", () => {
   function makeModels() {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Book extends Base {
+      declare title: string | null;
+      declare author_id: number | null;
+
       static {
         this.attribute("title", "string");
         this.attribute("author_id", "integer");
       }
     }
     class Chapter extends Base {
+      declare title: string | null;
+      declare book_id: number | null;
+
       static {
         this.attribute("title", "string");
         this.attribute("book_id", "integer");
@@ -67,6 +76,12 @@ describe("ReflectionTest", () => {
 
   it("scope chain does not interfere with hmt with polymorphic case", async () => {
     class ScHotel extends Base {
+      declare name: string | null;
+      declare departments: AssociationProxy<ScDept>;
+      declare chefs: AssociationProxy<Base>;
+      declare cakeDesigners: AssociationProxy<ScCake>;
+      declare drinkDesigners: AssociationProxy<ScDrink>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("departments", {
@@ -89,6 +104,9 @@ describe("ReflectionTest", () => {
       }
     }
     class ScDept extends Base {
+      declare hotel_id: number | null;
+      declare chefs: AssociationProxy<ScChef>;
+
       static {
         this.attribute("hotel_id", "integer");
         this.hasMany("chefs", {
@@ -98,6 +116,12 @@ describe("ReflectionTest", () => {
       }
     }
     class ScChef extends Base {
+      declare department_id: number | null;
+      declare employable_id: number | null;
+      declare employable_type: string | null;
+      declare employable: Base | null;
+      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
+
       static {
         this.attribute("department_id", "integer");
         this.attribute("employable_id", "integer");
@@ -138,6 +162,10 @@ describe("ReflectionTest", () => {
   });
   it("scope chain does not interfere with hmt with polymorphic case and subclass source", async () => {
     class SC2Hotel extends Base {
+      declare name: string | null;
+      declare chefLists: AssociationProxy<SC2ChefList>;
+      declare mocktailDesigners: AssociationProxy<SC2Mocktail>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("chefLists", {
@@ -153,6 +181,13 @@ describe("ReflectionTest", () => {
       }
     }
     class SC2ChefList extends Base {
+      declare employable_list_id: number | null;
+      declare employable_list_type: string | null;
+      declare employable_id: number | null;
+      declare employable_type: string | null;
+      declare employable: Base | null;
+      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
+
       static {
         this.attribute("employable_list_id", "integer");
         this.attribute("employable_list_type", "string");
@@ -190,6 +225,10 @@ describe("ReflectionTest", () => {
   });
   it("scope chain does not interfere with hmt with polymorphic and subclass source 2", async () => {
     class SC3Author extends Base {
+      declare name: string | null;
+      declare books: AssociationProxy<SC3Book>;
+      declare bestHardbacks: AssociationProxy<SC3BestHardback>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("books", {
@@ -205,6 +244,12 @@ describe("ReflectionTest", () => {
       }
     }
     class SC3Book extends Base {
+      declare author_id: number | null;
+      declare format_record_id: number | null;
+      declare format_record_type: string | null;
+      declare formatRecord: Base | null;
+      declare loadBelongsTo: (name: "formatRecord") => Promise<Base | null>;
+
       static {
         this.attribute("author_id", "integer");
         this.attribute("format_record_id", "integer");
@@ -243,6 +288,12 @@ describe("ReflectionTest", () => {
   });
   it("scope chain of polymorphic association does not leak into other hmt associations", async () => {
     class SC4Hotel extends Base {
+      declare name: string | null;
+      declare departments: AssociationProxy<SC4Dept>;
+      declare chefs: AssociationProxy<Base>;
+      declare drinkDesigners: AssociationProxy<SC4Drink>;
+      declare recipes: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("departments", {
@@ -260,6 +311,9 @@ describe("ReflectionTest", () => {
       }
     }
     class SC4Dept extends Base {
+      declare hotel_id: number | null;
+      declare chefs: AssociationProxy<SC4Chef>;
+
       static {
         this.attribute("hotel_id", "integer");
         this.hasMany("chefs", {
@@ -269,6 +323,13 @@ describe("ReflectionTest", () => {
       }
     }
     class SC4Chef extends Base {
+      declare department_id: number | null;
+      declare employable_id: number | null;
+      declare employable_type: string | null;
+      declare employable: Base | null;
+      declare recipes: AssociationProxy<SC4Recipe>;
+      declare loadBelongsTo: (name: "employable") => Promise<Base | null>;
+
       static {
         this.attribute("department_id", "integer");
         this.attribute("employable_id", "integer");
@@ -282,6 +343,9 @@ describe("ReflectionTest", () => {
     }
     class SC4Drink extends Base {}
     class SC4Recipe extends Base {
+      declare chef_id: number | null;
+      declare hotel_id: number | null;
+
       static {
         this.attribute("chef_id", "integer");
         this.attribute("hotel_id", "integer");
@@ -329,6 +393,10 @@ describe("ReflectionTest", () => {
   });
   it("has many through reflection", () => {
     class Subscriber extends Base {
+      declare name: string | null;
+      declare subscriptions: AssociationProxy<Subscription>;
+      declare subBooks: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("subscriptions", {});
@@ -340,6 +408,11 @@ describe("ReflectionTest", () => {
       }
     }
     class Subscription extends Base {
+      declare subscriber_id: number | null;
+      declare book_id: number | null;
+      declare subBook: SubBook | null;
+      declare loadBelongsTo: (name: "subBook") => Promise<SubBook | null>;
+
       static {
         this.attribute("subscriber_id", "integer");
         this.attribute("book_id", "integer");
@@ -350,6 +423,8 @@ describe("ReflectionTest", () => {
       }
     }
     class SubBook extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -366,6 +441,9 @@ describe("ReflectionTest", () => {
 
   it("has and belongs to many reflection", () => {
     class Category extends Base {
+      declare name: string | null;
+      declare habtmPosts: AssociationProxy<HabtmPost>;
+
       static {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("habtmPosts", {
@@ -374,6 +452,8 @@ describe("ReflectionTest", () => {
       }
     }
     class HabtmPost extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -387,6 +467,10 @@ describe("ReflectionTest", () => {
   });
   it("columns are returned in the order they were declared", () => {
     class Topic extends Base {
+      declare title: string | null;
+      declare author_name: string | null;
+      declare body: string | null;
+
       static {
         this.attribute("title", "string");
         this.attribute("author_name", "string");
@@ -411,6 +495,8 @@ describe("ReflectionTest", () => {
   });
   it("non existent types are identity types", () => {
     class Topic2 extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -423,11 +509,15 @@ describe("ReflectionTest", () => {
   });
   it("reflection klass for nested class name", async () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Book extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -441,11 +531,15 @@ describe("ReflectionTest", () => {
   });
   it("irregular reflection class name", async () => {
     class Person extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Address extends Base {
+      declare street: string | null;
+
       static {
         this.attribute("street", "string");
       }
@@ -458,11 +552,17 @@ describe("ReflectionTest", () => {
   });
   it("reflection klass with same demodularized different modularized name", async () => {
     class NestedUser extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class AdminUser extends Base {
+      declare name: string | null;
+      declare user: NestedUser | null;
+      declare loadHasOne: (name: "user") => Promise<NestedUser | null>;
+
       static {
         this.attribute("name", "string");
         this.hasOne("user", { className: "Nested::User" });
@@ -475,6 +575,9 @@ describe("ReflectionTest", () => {
   });
   it("reflection klass with same modularized name", async () => {
     class NestedNestedUser extends Base {
+      declare name: string | null;
+      declare nestedUsers: AssociationProxy<NestedNestedUser>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("nestedUsers", {});
@@ -486,6 +589,10 @@ describe("ReflectionTest", () => {
   });
   it("reflect on all autosave associations", () => {
     class Ship extends Base {
+      declare name: string | null;
+      declare parts: AssociationProxy<Part>;
+      declare crews: AssociationProxy<Crew>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("parts", { autosave: true });
@@ -493,11 +600,15 @@ describe("ReflectionTest", () => {
       }
     }
     class Part extends Base {
+      declare ship_id: number | null;
+
       static {
         this.attribute("ship_id", "integer");
       }
     }
     class Crew extends Base {
+      declare ship_id: number | null;
+
       static {
         this.attribute("ship_id", "integer");
       }
@@ -515,6 +626,9 @@ describe("ReflectionTest", () => {
     expect(ref.associationPrimaryKey).toBe("id");
     // Custom primary key
     class SpecialBook extends Base {
+      declare isbn: string | null;
+      declare author_id: number | null;
+
       static {
         this.attribute("isbn", "string");
         this.attribute("author_id", "integer");
@@ -533,6 +647,8 @@ describe("ReflectionTest", () => {
       }
     }
     class Owner extends Base {
+      declare no_pk_model_id: number | null;
+
       static {
         this.attribute("no_pk_model_id", "integer");
       }
@@ -545,6 +661,8 @@ describe("ReflectionTest", () => {
   });
   it("active record primary key raises when missing primary key", () => {
     class NoPkOwner extends Base {
+      declare targets: AssociationProxy<Target>;
+
       static {
         this._primaryKey = "";
         this.hasMany("targets", {});
@@ -558,6 +676,16 @@ describe("ReflectionTest", () => {
   });
   it("foreign type", () => {
     class Sponsor extends Base {
+      declare sponsorable_id: number | null;
+      declare sponsorable_type: string | null;
+      declare sponsor_club_id: number | null;
+      declare sponsorable: Base | null;
+      declare thing: Base | null;
+      declare sponsorClub: Base | null;
+      declare loadBelongsTo: ((name: "sponsorable") => Promise<Base | null>) &
+        ((name: "thing") => Promise<Base | null>) &
+        ((name: "sponsorClub") => Promise<Base | null>);
+
       static {
         this.attribute("sponsorable_id", "integer");
         this.attribute("sponsorable_type", "string");
@@ -583,11 +711,15 @@ describe("ReflectionTest", () => {
   });
   it("default association validation", () => {
     class Owner extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Pet extends Base {
+      declare owner_id: number | null;
+
       static {
         this.attribute("owner_id", "integer");
       }
@@ -600,11 +732,15 @@ describe("ReflectionTest", () => {
   });
   it("always validate association if explicit", () => {
     class Owner extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Pet extends Base {
+      declare owner_id: number | null;
+
       static {
         this.attribute("owner_id", "integer");
       }
@@ -617,11 +753,15 @@ describe("ReflectionTest", () => {
   });
   it("validate association if autosave", () => {
     class Owner extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Pet extends Base {
+      declare owner_id: number | null;
+
       static {
         this.attribute("owner_id", "integer");
       }
@@ -634,11 +774,15 @@ describe("ReflectionTest", () => {
   });
   it("never validate association if explicit", () => {
     class Owner extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Pet extends Base {
+      declare owner_id: number | null;
+
       static {
         this.attribute("owner_id", "integer");
       }
@@ -654,11 +798,15 @@ describe("ReflectionTest", () => {
   });
   it("class for class name", () => {
     class Firm extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Client extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -674,11 +822,15 @@ describe("ReflectionTest", () => {
   });
   it("class for source type", () => {
     class NsTag extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class NsPost extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -696,11 +848,16 @@ describe("ReflectionTest", () => {
   });
   it("join table with common prefix", () => {
     class CatalogCategory extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class CatalogProduct extends Base {
+      declare name: string | null;
+      declare catalogCategories: AssociationProxy<CatalogCategory>;
+
       static {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("catalogCategories", {
@@ -718,11 +875,16 @@ describe("ReflectionTest", () => {
 
   it("join table with different prefix", () => {
     class CatCategory extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class ContentPage extends Base {
+      declare name: string | null;
+      declare catCategories: AssociationProxy<CatCategory>;
+
       static {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("catCategories", {
@@ -739,11 +901,16 @@ describe("ReflectionTest", () => {
 
   it("join table can be overridden", () => {
     class JtCategory extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class JtProduct extends Base {
+      declare name: string | null;
+      declare jtCategories: AssociationProxy<JtCategory>;
+
       static {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("jtCategories", {
@@ -759,17 +926,25 @@ describe("ReflectionTest", () => {
   });
   it("includes accepts strings", async () => {
     class Hotel extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Department extends Base {
+      declare hotel_id: number | null;
+      declare name: string | null;
+
       static {
         this.attribute("hotel_id", "integer");
         this.attribute("name", "string");
       }
     }
     class Chef extends Base {
+      declare department_id: number | null;
+      declare name: string | null;
+
       static {
         this.attribute("department_id", "integer");
         this.attribute("name", "string");
@@ -803,6 +978,10 @@ describe("ReflectionTest", () => {
     // Mirrors Rails test/cases/reflection_test.rb: Hotel has_many :lost_items,
     // through: :departments; Department has no :lost_items assoc.
     class MsHotel extends Base {
+      declare name: string | null;
+      declare departments: AssociationProxy<MsDepartment>;
+      declare lostItems: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("departments", {
@@ -816,6 +995,8 @@ describe("ReflectionTest", () => {
       }
     }
     class MsDepartment extends Base {
+      declare hotel_id: number | null;
+
       static {
         this.attribute("hotel_id", "integer");
       }
@@ -840,12 +1021,19 @@ describe("ReflectionTest", () => {
 
   it("has one and belongs to should find inverse automatically", () => {
     class Car extends Base {
+      declare bulb: Bulb | null;
+      declare loadHasOne: (name: "bulb") => Promise<Bulb | null>;
+
       static {
         this.attribute("id", "integer");
         this.hasOne("bulb", {});
       }
     }
     class Bulb extends Base {
+      declare car_id: number | null;
+      declare car: Car | null;
+      declare loadBelongsTo: (name: "car") => Promise<Car | null>;
+
       static {
         this.attribute("id", "integer");
         this.attribute("car_id", "integer");
@@ -872,6 +1060,10 @@ describe("ReflectionTest", () => {
       }
     }
     class Rating extends Base {
+      declare comment_id: number | null;
+      declare comment: Comment | null;
+      declare loadBelongsTo: (name: "comment") => Promise<Comment | null>;
+
       static {
         this.attribute("id", "integer");
         this.attribute("comment_id", "integer");
@@ -894,6 +1086,10 @@ describe("ReflectionTest", () => {
       }
     }
     class Room extends Base {
+      declare owner_id: number | null;
+      declare owner: User | null;
+      declare loadBelongsTo: (name: "owner") => Promise<User | null>;
+
       static {
         this.attribute("id", "integer");
         this.attribute("owner_id", "integer");
@@ -910,6 +1106,9 @@ describe("ReflectionTest", () => {
 
   it("through association should not find inverse automatically", () => {
     class Doctor extends Base {
+      declare appointments: AssociationProxy<Appointment>;
+      declare patients: AssociationProxy<Base>;
+
       static {
         this.attribute("id", "integer");
         this.hasMany("appointments", {});
@@ -917,6 +1116,13 @@ describe("ReflectionTest", () => {
       }
     }
     class Appointment extends Base {
+      declare doctor_id: number | null;
+      declare patient_id: number | null;
+      declare doctor: Doctor | null;
+      declare patient: Patient | null;
+      declare loadBelongsTo: ((name: "doctor") => Promise<Doctor | null>) &
+        ((name: "patient") => Promise<Patient | null>);
+
       static {
         this.attribute("id", "integer");
         this.attribute("doctor_id", "integer");
@@ -940,6 +1146,9 @@ describe("ReflectionTest", () => {
 
   it("polymorphic belongs to should not find inverse automatically", () => {
     class Tag extends Base {
+      declare taggable_id: number | null;
+      declare taggable_type: string | null;
+
       static {
         this.attribute("id", "integer");
         this.attribute("taggable_id", "integer");
@@ -967,6 +1176,8 @@ describe("ReflectionTest", () => {
       }
     }
     class Child extends Base {
+      declare parent_id: number | null;
+
       static {
         this.attribute("id", "integer");
         this.attribute("parent_id", "integer");
@@ -990,6 +1201,10 @@ describe("ReflectionTest", () => {
         }
       }
       class Contract extends Base {
+        declare company_id: number | null;
+        declare company: Company | null;
+        declare loadBelongsTo: (name: "company") => Promise<Company | null>;
+
         static {
           this.attribute("id", "integer");
           this.attribute("company_id", "integer");
@@ -1013,6 +1228,10 @@ describe("ReflectionTest", () => {
         }
       }
       class Contract2 extends Base {
+        declare company2_id: number | null;
+        declare company2: Company2 | null;
+        declare loadBelongsTo: (name: "company2") => Promise<Company2 | null>;
+
         static automaticScopeInversing = true;
         static {
           this.attribute("id", "integer");
@@ -1035,6 +1254,8 @@ describe("ReflectionTest", () => {
     // Scopes on the inverse (belongs_to) side always block automatic detection,
     // even when automatic_scope_inversing is enabled
     class Publisher extends Base {
+      declare magazines: AssociationProxy<Magazine>;
+
       static automaticScopeInversing = true;
       static {
         this.attribute("id", "integer");
@@ -1042,6 +1263,8 @@ describe("ReflectionTest", () => {
       }
     }
     class Magazine extends Base {
+      declare publisher_id: number | null;
+
       static automaticScopeInversing = true;
       static {
         this.attribute("id", "integer");
@@ -1059,6 +1282,8 @@ describe("ReflectionTest", () => {
 
   it("human name", () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -1069,6 +1294,8 @@ describe("ReflectionTest", () => {
 
   it("column string type and limit", () => {
     class Article extends Base {
+      declare title: string | null;
+
       static {
         // Use a table absent from the canonical schema so columnsHash() falls
         // back to _attributeDefinitions instead of the DB schema cache.
@@ -1083,6 +1310,8 @@ describe("ReflectionTest", () => {
 
   it("column null not null", () => {
     class Article extends Base {
+      declare title: string | null;
+
       static {
         this._tableName = "refl_articles";
         this.attribute("title", "string");
@@ -1094,6 +1323,8 @@ describe("ReflectionTest", () => {
 
   it("human name for column", () => {
     class Article extends Base {
+      declare body_text: string | null;
+
       static {
         this._tableName = "refl_articles";
         this.attribute("body_text", "string");
@@ -1106,6 +1337,8 @@ describe("ReflectionTest", () => {
 
   it("integer columns", () => {
     class Article extends Base {
+      declare views: number | null;
+
       static {
         this._tableName = "refl_articles";
         this.attribute("views", "integer");
@@ -1118,6 +1351,8 @@ describe("ReflectionTest", () => {
 
   it("non existent columns return null object", () => {
     class Article extends Base {
+      declare title: string | null;
+
       static {
         this._tableName = "refl_articles";
         this.attribute("title", "string");
@@ -1130,11 +1365,15 @@ describe("ReflectionTest", () => {
 
   it("belongs to inferred foreign key from assoc name", () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Post extends Base {
+      declare author_id: number | null;
+
       static {
         this.attribute("author_id", "integer");
         Associations.belongsTo.call(this, "author", { className: "Author" });
@@ -1148,11 +1387,15 @@ describe("ReflectionTest", () => {
 
   it("reflections should return keys as strings", () => {
     class Comment extends Base {
+      declare post_id: number | null;
+
       static {
         this.attribute("post_id", "integer");
       }
     }
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         Associations.hasMany.call(this, "comments", { className: "Comment" });
@@ -1173,11 +1416,15 @@ describe("ReflectionTest", () => {
 
   it("collection association", () => {
     class Comment extends Base {
+      declare post_id: number | null;
+
       static {
         this.attribute("post_id", "integer");
       }
     }
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
         Associations.hasMany.call(this, "comments", { className: "Comment" });
@@ -1189,11 +1436,15 @@ describe("ReflectionTest", () => {
 
   it("foreign key", () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Post extends Base {
+      declare author_id: number | null;
+
       static {
         this.attribute("author_id", "integer");
         Associations.belongsTo.call(this, "author", { className: "Author" });
@@ -1205,11 +1456,15 @@ describe("ReflectionTest", () => {
 
   it("foreign key is inferred from model name", () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
     }
     class Comment extends Base {
+      declare post_id: number | null;
+
       static {
         this.attribute("post_id", "integer");
         Associations.belongsTo.call(this, "post", { className: "Post" });
@@ -1221,6 +1476,8 @@ describe("ReflectionTest", () => {
 
   it("reflection should not raise error when compared to other object", () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -1232,6 +1489,8 @@ describe("ReflectionTest", () => {
 
   it("reflect on missing source assocation", () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -1242,6 +1501,8 @@ describe("ReflectionTest", () => {
 
   it("active record primary key", () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -1251,6 +1512,9 @@ describe("ReflectionTest", () => {
 
   it("reflection klass not found with no class name option", () => {
     class Orphan extends Base {
+      declare name: string | null;
+      declare ghosts: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("ghosts", {});
@@ -1264,6 +1528,9 @@ describe("ReflectionTest", () => {
 
   it("reflection klass not found with pointer to non existent class name", () => {
     class Orphan2 extends Base {
+      declare name: string | null;
+      declare items: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("items", { className: "NonExistentModel" });
@@ -1276,11 +1543,15 @@ describe("ReflectionTest", () => {
 
   it("reflection klass requires ar subclass", () => {
     class Parent extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Child extends Base {
+      declare parent_id: number | null;
+
       static {
         this.attribute("parent_id", "integer");
       }
@@ -1307,12 +1578,17 @@ describe("ReflectionTest", () => {
 
   it("reflection klass with same demodularized name", async () => {
     class Project extends Base {
+      declare name: string | null;
+      declare tasks: AssociationProxy<Task>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("tasks", {});
       }
     }
     class Task extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -1325,6 +1601,9 @@ describe("ReflectionTest", () => {
 
   it("aggregation reflection", () => {
     class Customer extends Base {
+      declare address_street: string | null;
+      declare address_city: string | null;
+
       static {
         this.attribute("address_street", "string");
         this.attribute("address_city", "string");
@@ -1352,6 +1631,8 @@ describe("ReflectionTest", () => {
 
   it("aggregate reflection computes class raises NameError for missing class", () => {
     class Buyer extends Base {
+      declare balance: number | null;
+
       static {
         this.attribute("balance", "integer");
       }
@@ -1415,11 +1696,22 @@ describe("ReflectionTest", () => {
 
   it("chain", () => {
     class ReflCategory extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class ReflEssay extends Base {
+      declare name: string | null;
+      declare writer_id: number | null;
+      declare writer_type: string | null;
+      declare category_id: number | null;
+      declare category: ReflCategory | null;
+      declare writer: Base | null;
+      declare loadBelongsTo: ((name: "category") => Promise<ReflCategory | null>) &
+        ((name: "writer") => Promise<Base | null>);
+
       static {
         this.attribute("name", "string");
         this.attribute("writer_id", "integer");
@@ -1433,6 +1725,10 @@ describe("ReflectionTest", () => {
       }
     }
     class ReflAuthor extends Base {
+      declare name: string | null;
+      declare essays: AssociationProxy<ReflEssay>;
+      declare essayCategories: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("essays", {
@@ -1447,6 +1743,10 @@ describe("ReflectionTest", () => {
       }
     }
     class ReflOrganization extends Base {
+      declare name: string | null;
+      declare authors: AssociationProxy<ReflAuthor>;
+      declare authorEssayCategories: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("authors", {
@@ -1476,6 +1776,11 @@ describe("ReflectionTest", () => {
 
   it("nested?", () => {
     class NPost extends Base {
+      declare author_id: number | null;
+      declare comments: AssociationProxy<NComment>;
+      declare taggings: AssociationProxy<NTagging>;
+      declare tags: AssociationProxy<Base>;
+
       static {
         this.attribute("author_id", "integer");
         this.hasMany("comments", { className: "NComment" });
@@ -1484,12 +1789,23 @@ describe("ReflectionTest", () => {
       }
     }
     class NComment extends Base {
+      declare post_id: number | null;
+      declare post: NPost | null;
+      declare loadBelongsTo: (name: "post") => Promise<NPost | null>;
+
       static {
         this.attribute("post_id", "integer");
         this.belongsTo("post", { className: "NPost" });
       }
     }
     class NTagging extends Base {
+      declare post_id: number | null;
+      declare tag_id: number | null;
+      declare post: NPost | null;
+      declare tag: NTag | null;
+      declare loadBelongsTo: ((name: "post") => Promise<NPost | null>) &
+        ((name: "tag") => Promise<NTag | null>);
+
       static {
         this.attribute("post_id", "integer");
         this.attribute("tag_id", "integer");
@@ -1498,11 +1814,18 @@ describe("ReflectionTest", () => {
       }
     }
     class NTag extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class NAuthor extends Base {
+      declare name: string | null;
+      declare posts: AssociationProxy<NPost>;
+      declare comments: AssociationProxy<Base>;
+      declare tags: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("posts", { className: "NPost" });
@@ -1511,6 +1834,10 @@ describe("ReflectionTest", () => {
       }
     }
     class NCategory extends Base {
+      declare name: string | null;
+      declare posts: AssociationProxy<NPost>;
+      declare postComments: AssociationProxy<Base>;
+
       static {
         this.attribute("name", "string");
         this.hasAndBelongsToMany("posts", { className: "NPost" });
@@ -1542,6 +1869,9 @@ describe("ReflectionTest", () => {
     // Rails stubs klass on a has_many reflection; join_table derives from both
     // table names regardless of which side declares the association.
     class DjtCategory extends Base {
+      declare name: string | null;
+      declare products: AssociationProxy<DjtProduct>;
+
       static _tableName = "categories";
       static {
         this.attribute("name", "string");
@@ -1549,6 +1879,9 @@ describe("ReflectionTest", () => {
       }
     }
     class DjtProduct extends Base {
+      declare name: string | null;
+      declare categories: AssociationProxy<DjtCategory>;
+
       static _tableName = "products";
       static {
         this.attribute("name", "string");
@@ -1566,17 +1899,25 @@ describe("ReflectionTest", () => {
 
   it("includes accepts symbols", async () => {
     class Hotel extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Department extends Base {
+      declare hotel_id: number | null;
+      declare name: string | null;
+
       static {
         this.attribute("hotel_id", "integer");
         this.attribute("name", "string");
       }
     }
     class Chef extends Base {
+      declare department_id: number | null;
+      declare name: string | null;
+
       static {
         this.attribute("department_id", "integer");
         this.attribute("name", "string");
@@ -1602,6 +1943,8 @@ describe("ReflectionTest", () => {
 
   it("association primary key uses explicit primary key option as first priority", () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -1614,6 +1957,8 @@ describe("ReflectionTest", () => {
 
   it("belongs to reflection with query constraints infers correct foreign key", () => {
     class BlogPost extends Base {
+      declare blog_id: number | null;
+
       static _primaryKey: string | string[] = ["blog_id", "id"];
       static {
         this.attribute("blog_id", "integer");
@@ -1621,6 +1966,8 @@ describe("ReflectionTest", () => {
       }
     }
     class Comment extends Base {
+      declare blog_post_id: number | null;
+
       static {
         this.attribute("id", "integer");
         this.attribute("blog_post_id", "integer");
@@ -1641,6 +1988,10 @@ describe("ReflectionTest", () => {
   // Rails: test "columns"
   it("columns", () => {
     class Person extends Base {
+      declare name: string | null;
+      declare age: number | null;
+      declare active: boolean | null;
+
       static {
         this._tableName = "people";
         this.attribute("id", "integer");
@@ -1658,6 +2009,8 @@ describe("ReflectionTest", () => {
   // Rails: test "column_names"
   it("read attribute names", () => {
     class Person extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "people";
         this.attribute("id", "integer");

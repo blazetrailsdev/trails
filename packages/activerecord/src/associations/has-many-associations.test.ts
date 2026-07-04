@@ -2,6 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll } from "vitest";
 import { Notifications, throwAbort } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -337,6 +338,8 @@ describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
 
   it("should generate valid sql", () => {
     class Post extends Base {
+      declare title: string | null;
+
       static {
         this.attribute("title", "string");
       }
@@ -737,6 +740,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("destroy all", async () => {
     class DestroyAllAuthor extends Base {
+      declare name: string | null;
+      declare destroy_all_posts: AssociationProxy<DestroyAllPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -748,6 +754,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DestroyAllPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -769,6 +778,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("delete all with not yet loaded association collection", async () => {
     class DeleteAllUnloadedAuthor extends Base {
+      declare name: string | null;
+      declare delete_all_unloaded_posts: AssociationProxy<DeleteAllUnloadedPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -780,6 +792,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DeleteAllUnloadedPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -801,6 +816,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("depends and nullify", async () => {
     class NullifyAuthor extends Base {
+      declare name: string | null;
+      declare nullify_posts: AssociationProxy<NullifyPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -812,6 +830,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class NullifyPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -831,6 +852,9 @@ describe("HasManyAssociationsTest", () => {
     // Regression guard: the pre-ForeignAssociation.nullifiedOwnerAttributes
     // path only nulled the first FK column when `foreignKey` was an array.
     class CpkAuthor extends Base {
+      declare name: string | null;
+      declare cpk_posts: AssociationProxy<CpkPost>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("cpk_posts", {
@@ -842,6 +866,10 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class CpkPost extends Base {
+      declare tenant_id: number | null;
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this.attribute("tenant_id", "integer");
         this.attribute("author_id", "integer");
@@ -869,6 +897,9 @@ describe("HasManyAssociationsTest", () => {
     // not targets. Our equivalents are _associationInstances (singular)
     // and _collectionProxies (collection).
     class CacheAuthor extends Base {
+      declare name: string | null;
+      declare cache_posts: AssociationProxy<CachePost>;
+
       declare cachePosts: CollectionProxy<Base>;
       static {
         this._tableName = "authors";
@@ -880,6 +911,8 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class CachePost extends Base {
+      declare cache_author_id: number | null;
+
       static {
         this.attribute("cache_author_id", "integer");
       }
@@ -960,6 +993,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("clearing an association collection", async () => {
     class ClearAuthor extends Base {
+      declare name: string | null;
+      declare clear_posts: AssociationProxy<ClearPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -971,6 +1007,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ClearPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -992,6 +1031,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("clearing a dependent association collection", async () => {
     class ClearDepAuthor extends Base {
+      declare name: string | null;
+      declare clear_dep_posts: AssociationProxy<ClearDepPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1003,6 +1045,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ClearDepPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1273,6 +1318,8 @@ describe("HasManyAssociationsTest", () => {
 
   it("association with extend option", () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -1345,6 +1392,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("anonymous has many", async () => {
     class AnonAuthor extends Base {
+      declare name: string | null;
+      declare anon_posts: AssociationProxy<AnonPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1355,6 +1405,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class AnonPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1411,12 +1464,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("create from association should respect default scope", async () => {
     class DefScopeAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DefScopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1432,12 +1490,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("build and create from association should respect passed attributes over default scope", async () => {
     class AttrAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class AttrPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1452,12 +1515,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("build and create from association should respect unscope over default scope", async () => {
     class UnscopeAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class UnscopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1477,12 +1545,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("build from association should respect scope", async () => {
     class ScopeAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ScopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1498,12 +1571,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("build from association sets inverse instance", async () => {
     class InvAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InvPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1520,6 +1598,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("delete all on association is the same as not loaded", async () => {
     class DelAllAuthor extends Base {
+      declare name: string | null;
+      declare del_all_posts: AssociationProxy<DelAllPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1531,6 +1612,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DelAllPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1552,6 +1636,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("delete all on association with nil dependency is the same as not loaded", async () => {
     class NilDepAuthor extends Base {
+      declare name: string | null;
+      declare nil_dep_posts: AssociationProxy<NilDepPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1563,6 +1650,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class NilDepPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1581,6 +1671,10 @@ describe("HasManyAssociationsTest", () => {
   it("building the associated object with implicit sti base class", () => {
     // DependentFirm has_many :companies; Company has STI with type column
     class StiCompany extends Base {
+      declare name: string | null;
+      declare "type": string | null;
+      declare firm_id: number | null;
+
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
@@ -1593,6 +1687,8 @@ describe("HasManyAssociationsTest", () => {
     class StiClient extends StiCompany {}
     registerSubclass(StiClient);
     class StiAccount extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -1603,6 +1699,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(StiAccount);
 
     class DepFirm extends Base {
+      declare name: string | null;
+      declare stiCompanies: AssociationProxy<StiCompany>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("stiCompanies", {
@@ -1621,6 +1720,10 @@ describe("HasManyAssociationsTest", () => {
 
   it("building the associated object with explicit sti base class", () => {
     class StiCompany2 extends Base {
+      declare name: string | null;
+      declare "type": string | null;
+      declare firm_id: number | null;
+
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
@@ -1634,6 +1737,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(StiClient2);
 
     class DepFirm2 extends Base {
+      declare name: string | null;
+      declare stiCompany2s: AssociationProxy<StiCompany2>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("stiCompany2s", {
@@ -1652,6 +1758,10 @@ describe("HasManyAssociationsTest", () => {
 
   it("building the associated object with sti subclass", () => {
     class StiCompany3 extends Base {
+      declare name: string | null;
+      declare "type": string | null;
+      declare firm_id: number | null;
+
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
@@ -1665,6 +1775,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(StiClient3);
 
     class DepFirm3 extends Base {
+      declare name: string | null;
+      declare stiCompany3s: AssociationProxy<StiCompany3>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("stiCompany3s", {
@@ -1683,6 +1796,10 @@ describe("HasManyAssociationsTest", () => {
 
   it("building the associated object with an invalid type", () => {
     class StiCompany4 extends Base {
+      declare name: string | null;
+      declare "type": string | null;
+      declare firm_id: number | null;
+
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
@@ -1693,6 +1810,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(StiCompany4);
 
     class DepFirm4 extends Base {
+      declare name: string | null;
+      declare stiCompany4s: AssociationProxy<StiCompany4>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("stiCompany4s", {
@@ -1710,6 +1830,10 @@ describe("HasManyAssociationsTest", () => {
 
   it("building the associated object with an unrelated type", () => {
     class StiCompany5 extends Base {
+      declare name: string | null;
+      declare "type": string | null;
+      declare firm_id: number | null;
+
       static {
         this.attribute("name", "string");
         this.attribute("type", "string");
@@ -1718,6 +1842,8 @@ describe("HasManyAssociationsTest", () => {
     }
     enableSti(StiCompany5);
     class UnrelatedModel extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -1726,6 +1852,9 @@ describe("HasManyAssociationsTest", () => {
     registerModel(UnrelatedModel);
 
     class DepFirm5 extends Base {
+      declare name: string | null;
+      declare stiCompany5s: AssociationProxy<StiCompany5>;
+
       static {
         this.attribute("name", "string");
         this.hasMany("stiCompany5s", {
@@ -1781,12 +1910,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association protect foreign key", async () => {
     class ProtAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ProtPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1803,11 +1937,17 @@ describe("HasManyAssociationsTest", () => {
   // TODO: canonical posts has no status column
   it.skip("association enum works properly", async () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
     }
     class Post extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+      declare status: string | null;
+
       static {
         this.attribute("author_id", "integer");
         this.attribute("title", "string");
@@ -1834,12 +1974,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("finder method with dirty target", async () => {
     class FinderDirtyAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FinderDirtyPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1861,6 +2006,9 @@ describe("HasManyAssociationsTest", () => {
   // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
   it.skip("create resets cached counters", async () => {
     class CcResetAuthor extends Base {
+      declare name: string | null;
+      declare posts_count: number | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -1868,6 +2016,11 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class CcResetPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+      declare author: CcResetAuthor | null;
+      declare loadBelongsTo: (name: "author") => Promise<CcResetAuthor | null>;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1891,12 +2044,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("counting with counter sql", async () => {
     class CcSqlAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class CcSqlPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1940,12 +2098,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find many with merged options", async () => {
     class MergedAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class MergedPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1968,12 +2131,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find should append to association order", async () => {
     class AppOrdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class AppOrdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -1993,12 +2161,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dynamic find should respect association order", async () => {
     class DynOrdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DynOrdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2025,6 +2198,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("taking not found", async () => {
     class TakeNotFoundPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2057,12 +2233,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("cant save has many readonly association", async () => {
     class RoAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class RoPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2088,12 +2269,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("finding default orders", async () => {
     class DefOrdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DefOrdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2113,6 +2299,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("finding with different class name and order", async () => {
     class DiffNameAuthor extends Base {
+      declare name: string | null;
+      declare articles: AssociationProxy<DiffNameArticle>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2123,6 +2312,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DiffNameArticle extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2165,12 +2357,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("finding using primary key", async () => {
     class PkAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class PkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2187,12 +2384,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("update all on association accessed before save", async () => {
     class UpdAllAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class UpdAllPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2210,12 +2412,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("update all on association accessed before save with explicit foreign key", async () => {
     class UpdAllFkAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class UpdAllFkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2276,12 +2483,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find in batches", async () => {
     class FibAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FibPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2318,12 +2530,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find first after reset scope", async () => {
     class ResetAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ResetPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2343,12 +2560,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find first after reload", async () => {
     class ReloadAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ReloadPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2375,6 +2597,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("reload with query cache", async () => {
     class ReloadQcAuthor extends Base {
+      declare name: string | null;
+      declare reloadQcPosts: AssociationProxy<ReloadQcPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2385,6 +2610,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ReloadQcPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2408,6 +2636,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("reloading unloaded associations with query cache", async () => {
     class ReloadUlAuthor extends Base {
+      declare name: string | null;
+      declare reloadUlPosts: AssociationProxy<ReloadUlPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2418,6 +2649,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ReloadUlPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2483,12 +2717,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("find scoped grouped having", async () => {
     class GrpAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class GrpPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2562,6 +2801,8 @@ describe("HasManyAssociationsTest", () => {
   });
   it("create with bang on habtm when parent is new raises", async () => {
     class Author extends Base {
+      declare name: string | null;
+
       static {
         this.attribute("name", "string");
       }
@@ -2579,6 +2820,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("inverse on before validate", async () => {
     class InvValAuthor extends Base {
+      declare name: string | null;
+      declare inv_val_posts: AssociationProxy<InvValPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2589,6 +2833,11 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class InvValPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+      declare author: InvValAuthor | null;
+      declare loadBelongsTo: (name: "author") => Promise<InvValAuthor | null>;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2614,12 +2863,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("collection size with dirty target", async () => {
     class SizeDirtyAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class SizeDirtyPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2639,12 +2893,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("collection empty with dirty target", async () => {
     class EmptyDirtyAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class EmptyDirtyPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2663,12 +2922,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("collection size twice for regressions", async () => {
     class SizeTwiceAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class SizeTwicePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2694,12 +2958,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("build followed by save does not load target", async () => {
     class BuildSaveAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class BuildSavePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2721,12 +2990,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("build without loading association", async () => {
     class BuildNoLoadAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class BuildNoLoadPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2743,12 +3017,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("build many via block", async () => {
     class BuildManyBlockAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class BuildManyBlockPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2770,12 +3049,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("create without loading association", async () => {
     class CreateNoLoadAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class CreateNoLoadPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2800,12 +3084,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("create followed by save does not load target", async () => {
     class CreateSaveAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class CreateSavePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2831,6 +3120,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("clearing an exclusively dependent association collection", async () => {
     class ExclDepAuthor extends Base {
+      declare name: string | null;
+      declare excl_dep_posts: AssociationProxy<ExclDepPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2842,6 +3134,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ExclDepPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2861,6 +3156,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dependent association respects optional conditions on delete", async () => {
     class DcFirm extends Base {
+      declare name: string | null;
+      declare conditionalClients: AssociationProxy<DcClient>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -2873,6 +3171,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DcClient extends Base {
+      declare firm_id: number | null;
+      declare name: string | null;
+
       static {
         this._tableName = "companies";
         this.attribute("firm_id", "integer");
@@ -2897,6 +3198,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dependent association respects optional sanitized conditions on delete", async () => {
     class DsFirm extends Base {
+      declare name: string | null;
+      declare conditionalClients: AssociationProxy<DsClient>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -2909,6 +3213,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DsClient extends Base {
+      declare firm_id: number | null;
+      declare name: string | null;
+
       static {
         this._tableName = "companies";
         this.attribute("firm_id", "integer");
@@ -2925,6 +3232,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dependent association respects optional hash conditions on delete", async () => {
     class DhFirm extends Base {
+      declare name: string | null;
+      declare conditionalClients: AssociationProxy<DhClient>;
+
       static {
         this._tableName = "companies";
         this.attribute("name", "string");
@@ -2937,6 +3247,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DhClient extends Base {
+      declare firm_id: number | null;
+      declare name: string | null;
+
       static {
         this._tableName = "companies";
         this.attribute("firm_id", "integer");
@@ -2953,6 +3266,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("delete all association with primary key deletes correct records", async () => {
     class DelPkAuthor extends Base {
+      declare name: string | null;
+      declare del_pk_posts: AssociationProxy<DelPkPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -2964,6 +3280,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DelPkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -2990,6 +3309,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("clearing without initial access", async () => {
     class ClearNoAccessAuthor extends Base {
+      declare name: string | null;
+      declare clear_no_access_posts: AssociationProxy<ClearNoAccessPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3001,6 +3323,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ClearNoAccessPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3054,6 +3379,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("destroy all on association clears scope", async () => {
     class DestroyAllScopeAuthor extends Base {
+      declare name: string | null;
+      declare destroy_all_scope_posts: AssociationProxy<DestroyAllScopePost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3065,6 +3393,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DestroyAllScopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3086,12 +3417,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("destroy on association clears scope", async () => {
     class DestroyScopeAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DestroyScopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3112,12 +3448,17 @@ describe("HasManyAssociationsTest", () => {
 
   it("delete on association clears scope", async () => {
     class DeleteScopeAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DeleteScopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3137,6 +3478,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dependence for associations with hash condition", async () => {
     class HashCondAuthor extends Base {
+      declare name: string | null;
+      declare hash_cond_posts: AssociationProxy<HashCondPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3148,6 +3492,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class HashCondPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3164,6 +3511,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("three levels of dependence", async () => {
     class ThreeLvlTopic extends Base {
+      declare title: string | null;
+      declare replies: AssociationProxy<ThreeLvlReply>;
+
       static {
         this._tableName = "topics";
         this.attribute("title", "string");
@@ -3175,6 +3525,11 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ThreeLvlReply extends Base {
+      declare title: string | null;
+      declare content: string | null;
+      declare parent_id: number | null;
+      declare replies: AssociationProxy<ThreeLvlReply>;
+
       static {
         this._tableName = "topics";
         this.attribute("title", "string");
@@ -3200,6 +3555,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dependence with transaction support on failure", async () => {
     class DepTxAuthor extends Base {
+      declare name: string | null;
+      declare dep_tx_posts: AssociationProxy<DepTxPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3211,6 +3569,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DepTxPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3232,6 +3593,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("restrict with error with locale", async () => {
     class ReLocaleAuthor extends Base {
+      declare name: string | null;
+      declare re_locale_posts: AssociationProxy<ReLocalePost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3243,6 +3607,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ReLocalePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3267,12 +3634,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("included in collection for composite keys", async () => {
     class InclAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InclPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3291,12 +3663,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("adding array and collection", async () => {
     class ArrAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ArrPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3317,12 +3694,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("replace failure", async () => {
     class ReplFailAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ReplFailPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3344,12 +3726,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("transactions when replacing on persisted", async () => {
     class TxReplAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class TxReplPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3361,7 +3748,7 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await TxReplAuthor.create({ name: "Alice" });
     const author2 = await TxReplAuthor.create({ name: "Bob" });
     const post = await TxReplPost.create({ author_id: author1.id, title: "A", body: "body" });
-    post.author_id = author2.id;
+    post.author_id = author2.id as number;
     await post.save();
     const posts1 = await loadHasMany(author1, "tx_repl_posts", {
       className: "TxReplPost",
@@ -3376,12 +3763,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("transactions when replacing on new record", async () => {
     class TxReplNewAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class TxReplNewPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3397,12 +3789,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("get ids for unloaded associations does not load them", async () => {
     class UnloadedAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class UnloadedPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3426,12 +3823,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("ids reader cache not used for size when association is dirty", async () => {
     class DirtyIdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DirtyIdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3457,12 +3859,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("ids reader cache should be cleared when collection is deleted", async () => {
     class ClrIdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ClrIdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3487,12 +3894,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("get ids ignores include option", async () => {
     class GiiAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class GiiPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3512,12 +3924,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("get ids for ordered association", async () => {
     class OrdIdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OrdIdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3539,12 +3956,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("set ids for association on new record applies association correctly", async () => {
     class SetIdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class SetIdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3565,12 +3987,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("assign ids ignoring blanks", async () => {
     class BlankIdAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class BlankIdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3592,6 +4019,10 @@ describe("HasManyAssociationsTest", () => {
   });
   it("get ids for through", async () => {
     class ThrIdAuthor extends Base {
+      declare name: string | null;
+      declare thr_id_posts: AssociationProxy<ThrIdPost>;
+      declare thr_id_comments: AssociationProxy<Base>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3607,6 +4038,10 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ThrIdPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+      declare thr_id_comments: AssociationProxy<ThrIdComment>;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3618,6 +4053,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ThrIdComment extends Base {
+      declare post_id: number | null;
+      declare body: string | null;
+
       static {
         this._tableName = "comments";
         this.attribute("post_id", "integer");
@@ -3641,12 +4079,17 @@ describe("HasManyAssociationsTest", () => {
   it("modifying a through a has many should raise", async () => {
     // Through associations are read-only; modifying them directly should not be allowed
     class ThrModAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ThrModPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3665,12 +4108,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("associations order should be priority over throughs order", async () => {
     class OrdThrAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OrdThrPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3690,12 +4138,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dynamic find should respect association order for through", async () => {
     class DynThrAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DynThrPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3715,6 +4168,10 @@ describe("HasManyAssociationsTest", () => {
   });
   it("has many through respects hash conditions", async () => {
     class HcAuthor extends Base {
+      declare name: string | null;
+      declare hcPosts: AssociationProxy<HcPost>;
+      declare helloPostComments: AssociationProxy<Base>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3731,6 +4188,10 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class HcPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+      declare hcComments: AssociationProxy<HcComment>;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3742,6 +4203,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class HcComment extends Base {
+      declare post_id: number | null;
+      declare body: string | null;
+
       static {
         this._tableName = "comments";
         this.attribute("post_id", "integer");
@@ -3773,12 +4237,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("include checks if record exists if target not loaded", async () => {
     class InclAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InclPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3802,6 +4271,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("include returns false for non matching record to verify scoping", async () => {
     class InclScopeAuthor extends Base {
+      declare name: string | null;
+      declare inclScopePosts: AssociationProxy<InclScopePost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3812,6 +4284,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class InclScopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3829,12 +4304,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling first nth or last on association should not load association", async () => {
     class FnlAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FnlPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3855,12 +4335,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling first or last on loaded association should not fetch with query", async () => {
     class FlLoadAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FlLoadPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3882,12 +4367,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling first nth or last on existing record with build should load association", async () => {
     class FnlBuildAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FnlBuildPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3910,12 +4400,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling first nth or last on existing record with create should not load association", async () => {
     class FnlCreateAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FnlCreatePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3935,12 +4430,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling first nth or last on new record should not run queries", async () => {
     class FnlNewAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FnlNewPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3959,12 +4459,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling first or last with integer on association should not load association", async () => {
     class FlIntAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FlIntPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -3987,6 +4492,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling many should count instead of loading association", async () => {
     class ManyCountAuthor extends Base {
+      declare name: string | null;
+      declare manyCountPosts: AssociationProxy<ManyCountPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -3997,6 +4505,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ManyCountPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4016,6 +4527,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling many on loaded association should not use query", async () => {
     class ManyLoadAuthor extends Base {
+      declare name: string | null;
+      declare manyLoadPosts: AssociationProxy<ManyLoadPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4026,6 +4540,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ManyLoadPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4055,6 +4572,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("subsequent calls to many should use query", async () => {
     class ManySubAuthor extends Base {
+      declare name: string | null;
+      declare manySubPosts: AssociationProxy<ManySubPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4065,6 +4585,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ManySubPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4085,6 +4608,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling many should defer to collection if using a block", async () => {
     class ManyBlkAuthor extends Base {
+      declare name: string | null;
+      declare manyBlkPosts: AssociationProxy<ManyBlkPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4095,6 +4621,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ManyBlkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4116,6 +4645,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling none should count instead of loading association", async () => {
     class NoneCountAuthor extends Base {
+      declare name: string | null;
+      declare noneCountPosts: AssociationProxy<NoneCountPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4126,6 +4658,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class NoneCountPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4143,6 +4678,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling none on loaded association should not use query", async () => {
     class NoneLoadAuthor extends Base {
+      declare name: string | null;
+      declare noneLoadPosts: AssociationProxy<NoneLoadPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4153,6 +4691,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class NoneLoadPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4180,6 +4721,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling none should defer to collection if using a block", async () => {
     class NoneBlkAuthor extends Base {
+      declare name: string | null;
+      declare noneBlkPosts: AssociationProxy<NoneBlkPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4190,6 +4734,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class NoneBlkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4209,12 +4756,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling one should count instead of loading association", async () => {
     class OneCountAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OneCountPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4233,12 +4785,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling one on loaded association should not use query", async () => {
     class OneLoadAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OneLoadPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4257,12 +4814,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("subsequent calls to one should use query", async () => {
     class OneSubAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OneSubPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4287,12 +4849,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling one should defer to collection if using a block", async () => {
     class OneBlkAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OneBlkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4313,12 +4880,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling one should return false if zero", async () => {
     class OneZeroAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OneZeroPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4338,12 +4910,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("calling one should return false if more than one", async () => {
     class OneMultiAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OneMultiPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4365,12 +4942,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("joins with namespaced model should use correct type", async () => {
     class NsAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class NsPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4389,6 +4971,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association proxy transaction method starts transaction in association class", async () => {
     class TxProxyAuthor extends Base {
+      declare name: string | null;
+      declare tx_proxy_posts: AssociationProxy<TxProxyPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4399,6 +4984,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class TxProxyPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4413,12 +5001,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("creating using primary key", async () => {
     class PkAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class PkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4439,6 +5032,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("defining has many association with delete all dependency lazily evaluates target class", async () => {
     class LazyDelAuthor extends Base {
+      declare name: string | null;
+      declare lazy_del_posts: AssociationProxy<LazyDelPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4450,6 +5046,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class LazyDelPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4470,6 +5069,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("defining has many association with nullify dependency lazily evaluates target class", async () => {
     class LazyNullAuthor extends Base {
+      declare name: string | null;
+      declare lazy_null_posts: AssociationProxy<LazyNullPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4481,6 +5083,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class LazyNullPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4497,12 +5102,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("attributes are being set when initialized from has many association with where clause", async () => {
     class WhereInitAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class WhereInitPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4530,12 +5140,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("load target respects protected attributes", async () => {
     class ProtAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ProtPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4555,12 +5170,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("merging with custom attribute writer", async () => {
     class MergeAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class MergePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4577,12 +5197,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("dont call save callbacks twice on has many", async () => {
     class NoDblAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class NoDblPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4600,12 +5225,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association attributes are available to after initialize", async () => {
     class InitAttrAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InitAttrPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4622,12 +5252,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("attributes are set when initialized from has many null relationship", async () => {
     class NullRelAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class NullRelPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4650,12 +5285,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("collection association with private kernel method", async () => {
     class KernelAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class KernelPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4674,12 +5314,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association with or doesnt set inverse instance key", async () => {
     class OrAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class OrPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4698,12 +5343,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association with rewhere doesnt set inverse instance key", async () => {
     class RewhereAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class RewherePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4722,12 +5372,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("first_or_initialize adds the record to the association", async () => {
     class FoiAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FoiPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4749,12 +5404,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("first_or_create adds the record to the association", async () => {
     class FocAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FocPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4780,12 +5440,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("first_or_create! adds the record to the association", async () => {
     class FocBangAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class FocBangPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4814,6 +5479,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("delete_all, when not loaded, doesn't load the records", async () => {
     class NoLoadDelAuthor extends Base {
+      declare name: string | null;
+      declare no_load_del_posts: AssociationProxy<NoLoadDelPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4825,6 +5493,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class NoLoadDelPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4846,6 +5517,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association with extend option with multiple extensions", async () => {
     class ExtAuthor extends Base {
+      declare name: string | null;
+      declare ext_posts: AssociationProxy<ExtPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4856,6 +5530,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ExtPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4874,6 +5551,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("extend option affects per association", async () => {
     class ExtPerAuthor extends Base {
+      declare name: string | null;
+      declare ext_per_posts: AssociationProxy<ExtPerPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -4884,6 +5564,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class ExtPerPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4902,12 +5585,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("delete record with complex joins", async () => {
     class CjAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class CjPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4927,12 +5615,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("unscopes the default scope of associated model when used with include", async () => {
     class UsInclAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class UsInclPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4951,12 +5644,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("raises RecordNotDestroyed when replaced child can't be destroyed", async () => {
     class RndAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class RndPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4974,12 +5672,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("passes custom context validation to validate children", async () => {
     class CtxValAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class CtxValPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -4994,12 +5697,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association with instance dependent scope", async () => {
     class InstScopeAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InstScopePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5018,12 +5726,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("associations replace in memory when records have the same id", async () => {
     class ReplMemAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ReplMemPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5058,12 +5771,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("in memory replacement executes no queries", async () => {
     class InMemAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InMemPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5080,12 +5798,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("in memory replacements do not execute callbacks", async () => {
     class InMemCbAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InMemCbPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5097,17 +5820,22 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await InMemCbAuthor.create({ name: "Alice" });
     const author2 = await InMemCbAuthor.create({ name: "Bob" });
     const post = InMemCbPost.new({ author_id: author1.id, title: "A" });
-    post.author_id = author2.id;
+    post.author_id = author2.id as number;
     expect((post as any).author_id).toBe(Number(author2.id));
   });
   it("in memory replacements sets inverse instance", async () => {
     class InMemInvAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class InMemInvPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5122,12 +5850,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("reattach to new objects replaces inverse association and foreign key", async () => {
     class ReattachAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class ReattachPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5139,7 +5872,7 @@ describe("HasManyAssociationsTest", () => {
     const author1 = await ReattachAuthor.create({ name: "Alice" });
     const author2 = await ReattachAuthor.create({ name: "Bob" });
     const post = await ReattachPost.create({ author_id: author1.id, title: "A", body: "body" });
-    post.author_id = author2.id;
+    post.author_id = author2.id as number;
     await post.save();
     const reloaded = await ReattachPost.find(post.id!);
     expect((reloaded as any).author_id).toBe(Number(author2.id));
@@ -5156,12 +5889,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("association size calculation works with default scoped selects when not previously fetched", async () => {
     class SizeCalcAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class SizeCalcPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5178,12 +5916,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("prevent double firing the before save callback of new object when the parent association saved in the callback", async () => {
     class DblFireAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DblFirePost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5207,12 +5950,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("destroy with bang bubbles errors from associations", async () => {
     class DestroyBangAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class DestroyBangPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5228,12 +5976,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("ids reader memoization", async () => {
     class MemoAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class MemoPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5259,12 +6012,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("loading association in validate callback doesnt affect persistence", async () => {
     class LoadValAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class LoadValPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5285,12 +6043,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("create children could be rolled back by after save", async () => {
     class RollbackAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class RollbackPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5321,6 +6084,10 @@ describe("HasManyAssociationsTest", () => {
   it("has many association with same foreign key name", async () => {
     // Two hasMany associations with the same FK should both work
     class SameFkAuthor extends Base {
+      declare name: string | null;
+      declare posts: AssociationProxy<SameFkPost>;
+      declare published_posts: AssociationProxy<SameFkPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -5329,6 +6096,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class SameFkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5352,6 +6122,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("key ensuring owner was is not valid without dependent option", async () => {
     class KeyValAuthor extends Base {
+      declare name: string | null;
+      declare key_val_posts: AssociationProxy<KeyValPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -5362,6 +6135,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class KeyValPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5381,6 +6157,8 @@ describe("HasManyAssociationsTest", () => {
   });
   it("invalid key raises with message including all default options", async () => {
     class InvKeyAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -5397,6 +6175,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("key ensuring owner was is valid when dependent option is destroy async", async () => {
     class AsyncDepAuthor extends Base {
+      declare name: string | null;
+      declare async_dep_posts: AssociationProxy<AsyncDepPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -5408,6 +6189,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class AsyncDepPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5455,12 +6239,17 @@ describe("HasManyAssociationsTest", () => {
   });
   it("ids reader on preloaded association with composite primary key", async () => {
     class PreCpkAuthor extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
       }
     }
     class PreCpkPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -5482,6 +6271,9 @@ describe("HasManyAssociationsTest", () => {
   });
   it("delete all with option delete all", async () => {
     class DelAllOptAuthor extends Base {
+      declare name: string | null;
+      declare del_all_opt_posts: AssociationProxy<DelAllOptPost>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -5493,6 +6285,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class DelAllOptPost extends Base {
+      declare author_id: number | null;
+      declare title: string | null;
+
       static {
         this._tableName = "posts";
         this.attribute("author_id", "integer");
@@ -6008,6 +6803,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class AuthorWithErrorDestroyingAssociation extends Base {
+      declare name: string | null;
+      declare postsWithErrorDestroying: AssociationProxy<PostWithErrorDestroying>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -6038,6 +6836,9 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class AuthorWithErrorDestroyingAssociation2 extends Base {
+      declare name: string | null;
+      declare postsWithErrorDestroying2: AssociationProxy<PostWithErrorDestroying2>;
+
       static {
         this._tableName = "authors";
         this.attribute("name", "string");
@@ -6076,6 +6877,8 @@ describe("HasManyAssociationsTest", () => {
     // RecordNotDestroyed and rolls back the whole batch — an earlier, already
     // destroyed sibling is restored.
     class HaltingComment extends Base {
+      declare body: string | null;
+
       static {
         this._tableName = "comments";
         this.attribute("body", "string");
@@ -6085,6 +6888,10 @@ describe("HasManyAssociationsTest", () => {
       }
     }
     class PostWithHaltingComments extends Base {
+      declare title: string | null;
+      declare body: string | null;
+      declare haltingComments: AssociationProxy<HaltingComment>;
+
       static {
         this._tableName = "posts";
         this.attribute("title", "string");
