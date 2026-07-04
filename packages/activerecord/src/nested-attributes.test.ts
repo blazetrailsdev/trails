@@ -11,7 +11,13 @@
  * accommodations, not behavioral deviations.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
-import { Base, RecordNotFound, registerModel, TooManyRecords } from "./index.js";
+import {
+  Base,
+  RecordNotFound,
+  registerModel,
+  REJECT_ALL_BLANK_PROC,
+  TooManyRecords,
+} from "./index.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Human } from "./test-helpers/models/human.js";
@@ -91,6 +97,10 @@ describe("TestNestedAttributesInGeneral", () => {
 
   it("should add a proc to nested attributes options", () => {
     const configs = (Pirate as any)._nestedAttributeConfigs;
+    const rejectAllBlank = configs.find(
+      (c: any) => c.associationName === "birdsWithRejectAllBlank",
+    );
+    expect(rejectAllBlank.options.rejectIf).toBe(REJECT_ALL_BLANK_PROC);
     for (const name of ["parrots", "birds"]) {
       const cfg = configs.find((c: any) => c.associationName === name);
       expect(typeof cfg.options.rejectIf).toBe("function");

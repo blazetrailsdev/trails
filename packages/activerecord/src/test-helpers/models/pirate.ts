@@ -8,7 +8,7 @@ import type { Parrot } from "./parrot.js";
 import type { PriceEstimate } from "./price-estimate.js";
 import type { Ship } from "./ship.js";
 import type { Treasure } from "./treasure.js";
-import { isBlank, throwAbort } from "@blazetrails/activesupport";
+import { throwAbort } from "@blazetrails/activesupport";
 // vendor/rails/activerecord/test/models/pirate.rb
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
@@ -158,10 +158,6 @@ export class Pirate extends Base {
 // child is routed through the collection destroy on owner save.
 // `proc(&:empty?)` — reject when the attributes hash is empty.
 const rejectIfEmpty = (attrs: Record<string, unknown>) => Object.keys(attrs).length === 0;
-// `reject_if: :all_blank` — Rails' REJECT_ALL_BLANK_PROC: reject when every
-// attribute (other than `_destroy`) is blank.
-const rejectAllBlank = (attrs: Record<string, unknown>) =>
-  Object.entries(attrs).every(([key, value]) => key === "_destroy" || isBlank(value));
 
 acceptsNestedAttributesFor(Pirate, "parrots", { allowDestroy: true, rejectIf: rejectIfEmpty });
 acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true, rejectIf: rejectIfEmpty });
@@ -171,7 +167,7 @@ acceptsNestedAttributesFor(Pirate, "parrotsWithMethodCallbacks", { allowDestroy:
 acceptsNestedAttributesFor(Pirate, "parrotsWithProcCallbacks", { allowDestroy: true });
 acceptsNestedAttributesFor(Pirate, "birdsWithMethodCallbacks", { allowDestroy: true });
 acceptsNestedAttributesFor(Pirate, "birdsWithProcCallbacks", { allowDestroy: true });
-acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: rejectAllBlank });
+acceptsNestedAttributesFor(Pirate, "birdsWithRejectAllBlank", { rejectIf: "all_blank" });
 
 export class DestructivePirate extends Pirate {
   declare dependentShip: Ship | null;

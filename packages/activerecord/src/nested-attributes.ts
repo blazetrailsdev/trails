@@ -6,7 +6,7 @@ import {
   association as collectionProxyFor,
 } from "./associations.js";
 import { ActiveRecordError, UnknownAttributeError, RecordNotFound } from "./errors.js";
-import { singularize, camelize, underscore } from "@blazetrails/activesupport";
+import { singularize, camelize, underscore, isBlank } from "@blazetrails/activesupport";
 import { Table, UpdateManager } from "@blazetrails/arel";
 import {
   isMarkedForDestruction,
@@ -39,11 +39,22 @@ export function _destroy(this: Base): boolean {
   return isMarkedForDestruction(this);
 }
 
+/**
+ * Rails: `REJECT_ALL_BLANK_PROC = proc { |attributes| attributes.all? { |key,
+ * value| key == "_destroy" || value.blank? } }` (nested_attributes.rb:302).
+ * The shared proc `reject_if: :all_blank` resolves to — reject a record when
+ * every attribute other than `_destroy` is blank.
+ */
+export const REJECT_ALL_BLANK_PROC = (attributes: Record<string, unknown>): boolean =>
+  Object.entries(attributes).every(([key, value]) => key === "_destroy" || isBlank(value));
+
 interface NestedAttributeOptions {
   allowDestroy?: boolean;
   // The owner record is passed as a second argument so method-style predicates
   // (Rails `reject_if: :some_method`) can consult the owner (e.g. `persisted?`).
-  rejectIf?: (attrs: Record<string, unknown>, record: Base) => boolean;
+  // The string `"all_blank"` (Rails' `:all_blank` symbol) is resolved to the
+  // shared `REJECT_ALL_BLANK_PROC` in `acceptsNestedAttributesFor`.
+  rejectIf?: ((attrs: Record<string, unknown>, record: Base) => boolean) | "all_blank";
   // A string limit names a method/attribute on the owner (Rails `limit: :symbol`).
   limit?: number | string | ((...args: unknown[]) => number);
   updateOnly?: boolean;
@@ -89,6 +100,14 @@ export function acceptsNestedAttributesFor(
   associationName: string,
   options: NestedAttributeOptions = {},
 ): void {
+  // Rails: `options[:reject_if] = REJECT_ALL_BLANK_PROC if options[:reject_if] ==
+  // :all_blank` (nested_attributes.rb:355) — resolve the `:all_blank` symbol to
+  // the shared proc so `nested_attributes_options[name][:reject_if]` reads back
+  // as a Proc, and every downstream `call_reject_if` sees a callable.
+  if (options.rejectIf === "all_blank") {
+    options = { ...options, rejectIf: REJECT_ALL_BLANK_PROC };
+  }
+
   // Validate that the association exists
   const associations: any[] = (modelClass as any)._associations ?? [];
   const assocExists = associations.find((a: any) => a.name === associationName);
@@ -336,8 +355,11 @@ async function processNestedAttributes(record: Base): Promise<void> {
         continue;
       }
 
-      // Check rejectIf only for create/update, not destroy
-      if (config.options.rejectIf && config.options.rejectIf(attrs, record)) {
+      // Check rejectIf only for create/update, not destroy. The `"all_blank"`
+      // symbol is resolved to a proc at declaration time, so this is always a
+      // function here.
+      const rejectIf = config.options.rejectIf;
+      if (typeof rejectIf === "function" && rejectIf(attrs, record)) {
         continue;
       }
 
@@ -450,7 +472,9 @@ export function callRejectIf(
   const configs: NestedAttributeConfig[] =
     (record.constructor as any)._nestedAttributeConfigs ?? [];
   const rejectIf = configs.find((c) => c.associationName === associationName)?.options.rejectIf;
-  return rejectIf ? rejectIf(attributes, record) : false;
+  // `"all_blank"` is resolved to a proc in acceptsNestedAttributesFor, so a
+  // stored rejectIf is always a function here.
+  return typeof rejectIf === "function" ? rejectIf(attributes, record) : false;
 }
 
 /** @internal */
