@@ -873,17 +873,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * `internal_execute("BEGIN", allow_retry: true, materialize_transactions:
    * false)`. The `allow_retry` routes BEGIN through `with_raw_connection`'s
    * retry loop so a transaction opened on a severed connection reconnects and
-   * re-issues BEGIN (mysql2's own `internalExecute` has no retry loop, so we
-   * wrap it exactly as `beginIsolatedDbTransaction` does). Restoring the stack
-   * on reconnect is a no-op here — this frame isn't materialized until
+   * re-issues BEGIN. `internalExecute` now threads `allowRetry` into its own
+   * `withRawConnection` call, so this is a single call matching Rails
+   * abstract_mysql_adapter.rb:227 (no outer wrap). Restoring the stack on
+   * reconnect is a no-op here — this frame isn't materialized until
    * `super.materializeBang()` runs after this returns.
    */
   async beginDbTransaction(): Promise<void> {
     await this._ensureClient();
-    await this.withRawConnection({ allowRetry: true, materializeTransactions: false }, async () => {
-      await this.internalExecute("BEGIN", "TRANSACTION", { materializeTransactions: false });
-      this._inTransaction = true;
+    await this.internalExecute("BEGIN", "TRANSACTION", {
+      materializeTransactions: false,
+      allowRetry: true,
     });
+    this._inTransaction = true;
   }
 
   override isSavepointErrorsInvalidateTransactions(): boolean {
@@ -896,7 +898,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * TRANSACTION` applies only to the next transaction, so on a `ConnectionFailed`
    * the whole batch must be replayed — hence the loop re-runs both statements
    * after reconnecting (mirrors Rails' `execute_batch(allow_retry: true)`, which
-   * routes through `with_raw_connection` and retries the batch once).
+   * routes through `with_raw_connection` and retries the batch once). Unlike
+   * `beginDbTransaction` — a single statement that now threads `allowRetry`
+   * straight through `internalExecute` — this outer wrap is NOT redundant: it
+   * is what replays BOTH statements together, so the inner `internalExecute`
+   * calls run with `allowRetry: false` (the batch, not each leaf, retries).
    *
    * The reconnect goes through the full `reconnectBang({ restoreTransactions:
    * true })` lifecycle — re-enabling lazy transactions, clearing the statement
@@ -971,7 +977,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   override async internalExecute(
     sql: string,
     name: string = "SQL",
-    { materializeTransactions = true }: { materializeTransactions?: boolean } = {},
+    {
+      materializeTransactions = true,
+      allowRetry = false,
+    }: { materializeTransactions?: boolean; allowRetry?: boolean } = {},
   ): Promise<Mysql2RawResult> {
     sql = this.preprocessQuery(sql);
     if (materializeTransactions) {
@@ -989,24 +998,33 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       row_count: 0,
       transaction: txPublicInt.isOpen() ? txPublicInt : null,
     };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      try {
-        // Route the read path through the shared array-mode performQuery seam
-        // (rowsAsArray + single CALL/multi-result unwrap), mirroring Rails'
-        // internal_execute → raw_execute → cast_result. Array-mode rows keep
-        // duplicate column names that the old hash-keyed conn.query collapsed.
-        const conn = await this.getConn();
-        const rawResult = await mysql2PerformQuery.call(this as any, conn, driverSql, [], []);
-        payload.row_count = rawResult.affectedRows;
-        return rawResult;
-      } catch (e: any) {
-        const translated = await this._translateAndEnrich(e, driverSql, []);
-        payload.exception = translated;
-        payload.exception_object = translated;
-        this.invalidateTransaction(translated);
-        throw translated;
-      }
-    });
+    return Notifications.instrumentAsync("sql.active_record", payload, () =>
+      // materializeTransactions is handled above (not delegated to
+      // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
+      // SAVEPOINT — keeps its exact pre-existing materialize semantics and the
+      // loop's `finally dirtyCurrentTransaction()` does not fire on txn-control
+      // SQL. The leaf still gains the retry/verify/reconnect loop, so callers
+      // (beginDbTransaction/beginIsolatedDbTransaction) thread allowRetry in a
+      // single call — matching Rails abstract_mysql_adapter.rb:227.
+      this.withRawConnection({ materializeTransactions: false, allowRetry }, async (rawConn) => {
+        try {
+          // Route the read path through the shared array-mode performQuery seam
+          // (rowsAsArray + single CALL/multi-result unwrap), mirroring Rails'
+          // internal_execute → raw_execute → cast_result. Array-mode rows keep
+          // duplicate column names that the old hash-keyed conn.query collapsed.
+          const conn = rawConn as unknown as mysql.Connection;
+          const rawResult = await mysql2PerformQuery.call(this as any, conn, driverSql, [], []);
+          payload.row_count = rawResult.affectedRows;
+          return rawResult;
+        } catch (e: any) {
+          const translated = await this._translateAndEnrich(e, driverSql, []);
+          payload.exception = translated;
+          payload.exception_object = translated;
+          this.invalidateTransaction(translated);
+          throw translated;
+        }
+      }),
+    );
   }
 
   /**
