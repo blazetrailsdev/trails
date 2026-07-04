@@ -9,6 +9,7 @@ import {
   deepStringifyKeys,
   reverseMerge,
   assertValidKeys,
+  ArgumentError,
   slice,
   except,
   extractKeys,
@@ -111,6 +112,17 @@ describe("HashExtTest", () => {
     expect(() =>
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
     ).toThrow(/Unknown key: failore/);
+  });
+
+  it("assert_valid_keys — raises ArgumentError on unknown key", () => {
+    let error: unknown;
+    try {
+      assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]);
+    } catch (err) {
+      error = err;
+    }
+    expect(error).toBeInstanceOf(ArgumentError);
+    expect((error as Error).name).toBe("ArgumentError");
   });
 
   it("assert_valid_keys — includes valid keys in error message", () => {

@@ -354,6 +354,13 @@ describe("RelationTest", () => {
   // ArgumentError (merger.rb:7-12, relation_test.rb:164-166).
   it("merging a hash with unknown keys raises", () => {
     expect(() => CanonPost.all().merge({ omg: "lol" } as any)).toThrow();
+    let error: unknown;
+    try {
+      CanonPost.all().merge({ omg: "lol" } as any);
+    } catch (err) {
+      error = err;
+    }
+    expect((error as Error).name).toBe("ArgumentError");
   });
 
   it("merging nil or false raises", () => {
