@@ -5,6 +5,7 @@ import { Base } from "./index.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { DatabaseTasks } from "./tasks/database-tasks.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+import { SchemaMigration } from "./schema-migration.js";
 
 // Build a (minimal) DatabaseConfigurations whose `configsFor` returns the
 // supplied stubbed configs. Mirrors the production shape — production code
@@ -279,6 +280,18 @@ describe("TestDatabasesTest", () => {
         }),
       },
     ];
+
+    // This runs against the shared worker DB (Base.connection). Many other
+    // test files apply a version-"1" migration too, so version 1 may already be
+    // recorded in schema_migrations — in which case migrator.up() correctly
+    // no-ops and the log stays empty. Clear this version first so the migration
+    // actually runs, mirroring how Rails' migrator tests isolate
+    // schema_migrations state.
+    try {
+      await new SchemaMigration(adapter).deleteVersion("1");
+    } catch {
+      /* schema_migrations may not exist yet */
+    }
 
     await createAndMigrate([adapter], migrations);
     expect(log).toEqual(["up"]);
