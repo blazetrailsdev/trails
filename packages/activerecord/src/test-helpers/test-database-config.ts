@@ -36,11 +36,26 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
   if (mysqlUrl) {
     return { adapter: "mysql", envConfig: new UrlConfig("test", "primary", mysqlUrl) };
   }
-  const database = getEnv("AR_TEST_WORKER_DB") ?? ":memory:";
   return {
     adapter: "sqlite",
-    envConfig: new HashConfig("test", "primary", { adapter: "sqlite3", database, pool: 1 }),
+    envConfig: new HashConfig("test", "primary", sqliteHash()),
   };
+}
+
+/**
+ * Build the sqlite primary config hash. Mirrors Rails' primary test config,
+ * which leaves `pool` unset so `HashConfig#pool` defaults to 5
+ * (`hash_config.rb:72`). We only pin `pool: 1` on a bare `:memory:` primary
+ * (no `AR_TEST_WORKER_DB`): better-sqlite3 gives separate connections separate
+ * empty `:memory:` DBs (Rails' `in_memory_db?`). The file-backed per-worker
+ * clone lane shares the file across connections, so it inherits Rails' 5.
+ */
+function sqliteHash(): { adapter: string; database: string; pool?: number } {
+  const workerDb = getEnv("AR_TEST_WORKER_DB");
+  if (workerDb) {
+    return { adapter: "sqlite3", database: workerDb };
+  }
+  return { adapter: "sqlite3", database: ":memory:", pool: 1 };
 }
 
 /**
@@ -99,6 +114,5 @@ export async function establishFromTestConfig(): Promise<void> {
     await Base.establishConnection(mysqlUrl);
     return;
   }
-  const database = getEnv("AR_TEST_WORKER_DB") ?? ":memory:";
-  await Base.establishConnection({ adapter: "sqlite3", database, pool: 1 });
+  await Base.establishConnection(sqliteHash());
 }

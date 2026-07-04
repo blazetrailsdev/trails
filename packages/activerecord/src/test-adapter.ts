@@ -159,17 +159,11 @@ async function buildInTestPool(): Promise<ConnectionPool> {
 
   // Duplicate the primary config with a short checkout_timeout so pool-mechanics
   // tests don't stall on the shared primary — mirrors connection_pool_test.rb's
-  // `configuration_hash.merge(checkout_timeout: 0.2)`.
-  //
-  // We drop the primary's pinned `pool` size: trails' primary test config sets
-  // `pool: 1` (test-database-config.ts) — a trails deviation. Rails' primary
-  // test config leaves `pool` unset (HashConfig#pool defaults to 5,
-  // hash_config.rb:72), so connection_pool_test.rb's duplicate inherits a
-  // multi-connection pool. Dropping the pin lets the duplicate default to 5,
-  // giving the ported mechanics tests Rails' multi-connection shape.
-  const { pool: _primaryPoolSize, ...primaryHash } = src.configurationHash;
+  // `configuration_hash.merge(checkout_timeout: 0.2)`. The duplicate inherits
+  // the primary's pool size directly (Rails' default 5 on the file-backed lane),
+  // exactly like connection_pool_test.rb derives from `Base.connection_pool.db_config`.
   const dbConfig = new HashConfig(src.envName, src.name, {
-    ...primaryHash,
+    ...src.configurationHash,
     checkoutTimeout: 0.2,
   });
 

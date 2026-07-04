@@ -26,6 +26,22 @@ describe("buildTestDatabaseConfig", () => {
     expect(DatabaseTasks.resolveTask("sqlite3")).toBeDefined();
   });
 
+  it("inherits Rails' default pool size (5) on the file-backed lane", async () => {
+    vi.stubEnv("PG_TEST_URL", "");
+    vi.stubEnv("MYSQL_TEST_URL", "");
+    vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker.sqlite3");
+    const { envConfig } = await buildTestDatabaseConfig();
+    expect(envConfig.pool).toBe(5);
+  });
+
+  it("pins pool 1 on a bare :memory: primary", async () => {
+    vi.stubEnv("PG_TEST_URL", "");
+    vi.stubEnv("MYSQL_TEST_URL", "");
+    vi.stubEnv("AR_TEST_WORKER_DB", "");
+    const { envConfig } = await buildTestDatabaseConfig();
+    expect(envConfig.pool).toBe(1);
+  });
+
   it("picks postgres when PG_TEST_URL is set", async () => {
     vi.stubEnv("PG_TEST_URL", "postgresql://localhost/trails_test");
     const { adapter } = await buildTestDatabaseConfig();
