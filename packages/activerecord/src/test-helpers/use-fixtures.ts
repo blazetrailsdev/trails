@@ -6,7 +6,8 @@ import {
   throughJoinTableNames,
   type PreparedFixtureSet,
 } from "./define-fixtures.js";
-import { defineSchema, type Schema } from "./define-schema.js";
+import { type Schema } from "./define-schema.js";
+import { ensureCanonicalTables } from "./canonical-schema.js";
 import {
   fixtureRegistry,
   isJoinTableEntry,
@@ -84,10 +85,16 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
 
 export interface UseFixturesOpts {
   /**
-   * When set, `useFixtures` derives the minimal sub-schema for the requested sets
-   * from this schema (via {@link deriveFixtureSchema}) and creates those tables in a
-   * `beforeAll` — replacing a manual `defineSchema({ ...slice })` call. Pass the full
-   * canonical schema (e.g. `TEST_SCHEMA`); only the tables the fixtures touch are created.
+   * When set, `useFixtures` uses this schema only to pick *which* tables to lay
+   * (the names of the sets the fixtures touch), then creates them via
+   * {@link ensureCanonicalTables} in a `beforeAll` — replacing a manual
+   * `defineSchema({ ...slice })` call. Pass the full canonical schema (e.g.
+   * `TEST_SCHEMA`); only the tables the fixtures touch are created.
+   *
+   * NOTE: only the table *names* are honored, not their column shapes — each
+   * table is created in its full canonical shape from the registry, so a
+   * genuinely bespoke (non-canonical) shape passed here is ignored. The type
+   * still permits an arbitrary `Schema` object for the name-selection role.
    */
   schema?: Schema;
 }
@@ -271,11 +278,8 @@ function useTablelessFixtures(
   if (opts?.schema) {
     const fullSchema = opts.schema;
     beforeAll(async () => {
-      const sub: Schema = {};
-      for (const { table } of entries) {
-        if (table in fullSchema) sub[table] = fullSchema[table]!;
-      }
-      await defineSchema(getAdapter(), sub);
+      const names = entries.map((e) => e.table).filter((t) => t in fullSchema);
+      await ensureCanonicalTables(getAdapter(), names);
     });
   }
 
@@ -486,7 +490,7 @@ export function useFixtures(
     const fullSchema = opts.schema;
     beforeAll(async () => {
       if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
-      await defineSchema(getAdapter(), sliceSchema(fixtures, fullSchema));
+      await ensureCanonicalTables(getAdapter(), Object.keys(sliceSchema(fixtures, fullSchema)));
     });
   }
 
