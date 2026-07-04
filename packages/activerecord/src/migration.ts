@@ -2836,11 +2836,19 @@ export class Migrator {
     return this._useTransaction(migration);
   }
 
-  /** @internal Mirrors: ActiveRecord::Migrator#use_advisory_lock? */
+  /**
+   * @internal Mirrors: ActiveRecord::Migrator#use_advisory_lock?
+   *
+   * Rails gates solely on `connection.advisory_locks_enabled?`
+   * (`supports_advisory_locks? && @advisory_locks_enabled`), mirrored here by
+   * `isAdvisoryLocksEnabled()`. The `currentDatabase` requirement is enforced at
+   * the point it's actually needed — `_withAdvisoryLock` /
+   * `generateMigratorAdvisoryLockId`, which throw if an advisory-lock-capable
+   * adapter can't supply the DB name — rather than silently skipping the lock
+   * here (which Rails never does).
+   */
   isUseAdvisoryLock(): boolean {
-    return !!(
-      this._adapter.supportsAdvisoryLocks?.() && typeof this._adapter.currentDatabase === "function"
-    );
+    return !!this._adapter.isAdvisoryLocksEnabled?.();
   }
 
   /** @internal Mirrors: ActiveRecord::Migrator#with_advisory_lock */

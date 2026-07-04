@@ -401,4 +401,25 @@ describe("Migrator advisory lock wrapping", () => {
     const migrator = new Migrator(rawAdapter, []);
     await expect(migrator.migrate()).rejects.toThrow("must implement currentDatabase()");
   });
+
+  it("isUseAdvisoryLock does not depend on currentDatabase", async () => {
+    // Regression: the gate must mirror Rails' advisory_locks_enabled? only, and
+    // NOT return false (silently skipping the lock) merely because the adapter
+    // lacks a currentDatabase() function.
+    const adapter = {
+      isAdvisoryLocksEnabled: () => true,
+      // currentDatabase intentionally absent
+    } as unknown as DatabaseAdapter;
+    const migrator = new Migrator(adapter, []);
+    expect(migrator.isUseAdvisoryLock()).toBe(true);
+  });
+
+  it("isUseAdvisoryLock is false when advisory locks are disabled", async () => {
+    const adapter = {
+      isAdvisoryLocksEnabled: () => false,
+      currentDatabase: async () => "test_db",
+    } as unknown as DatabaseAdapter;
+    const migrator = new Migrator(adapter, []);
+    expect(migrator.isUseAdvisoryLock()).toBe(false);
+  });
 });
