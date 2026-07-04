@@ -243,7 +243,17 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     expect(outer).toBeInstanceOf(Nodes.OuterJoin);
     expect(outer).not.toBeInstanceOf(Nodes.InnerJoin);
     // The join targets the CTE table (`commented_posts`), left-joined onto posts.
-    expect((outer.left as Nodes.TableAlias | { name?: string }).name).toBe("commented_posts");
+    expect((outer.left as { name?: string }).name).toBe("commented_posts");
+
+    // buildWithJoinNode joins on `cte[model.foreign_key] = table[model.primary_key]`
+    // (query_methods.rb build_with_join_node): `commented_posts.post_id = posts.id`.
+    // Assert the full ON so the FK/PK wiring is locked, not just the node type.
+    const on = outer.right as unknown as { expr: Nodes.Equality };
+    const eq = on.expr as unknown as { left: any; right: any };
+    expect(eq.left.relation.name).toBe("commented_posts");
+    expect(eq.left.name).toBe("post_id");
+    expect(eq.right.relation.name).toBe("posts");
+    expect(eq.right.name).toBe("id");
   });
 
   it("raises when using block", () => {
