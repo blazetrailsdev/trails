@@ -137,25 +137,35 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     await CpkBook.create({ author_id: 1, id: 3, shop_id: 1, order_id: 200, title: "Gamma" });
   }
 
+  // Re-key a Map<Order record, value> by the order's `id` component, coercing
+  // both key and value to Number so the assertions are adapter-agnostic (MySQL /
+  // PG may hand back the composite-id components / aggregate as strings).
+  function byOrderId(result: Map<unknown, unknown>): Map<number | null, number> {
+    const out = new Map<number | null, number>();
+    for (const [order, n] of result) {
+      const key =
+        order === null
+          ? null
+          : Number((order as { _readAttribute(k: string): unknown })._readAttribute("id"));
+      out.set(key, Number(n));
+    }
+    return out;
+  }
+
   it("eager_load(:x).group(:composite_fk_belongs_to).count folds the eager JD", async () => {
     await seedBooksWithOrders();
     // group by the composite-FK belongs_to `order`, eager-loading the same
     // association: `walk` dedups the coinciding join so the grouped count keys
     // by the loaded Order records.
-    let result!: Map<InstanceType<typeof CpkOrder> | null, number>;
+    let result!: Map<unknown, unknown>;
     const sqls = await captureSql(async () => {
-      result = (await CpkBook.eagerLoad("order").group("order").count()) as Map<
-        InstanceType<typeof CpkOrder> | null,
-        number
-      >;
+      result = (await CpkBook.eagerLoad("order").group("order").count()) as Map<unknown, unknown>;
     });
     // The eager `order` JD coincides with the grouped belongs_to; `walk` dedups
     // it into a single LEFT OUTER JOIN rather than emitting a parallel join.
     const groupSql = sqls.find((s) => /GROUP BY/i.test(s)) ?? "";
     expect(groupSql).toMatch(/LEFT OUTER JOIN .*cpk_orders/i);
-    const counts = new Map<unknown, number>();
-    for (const [order, n] of result)
-      counts.set(order === null ? null : (order.id as unknown[])[1], n);
+    const counts = byOrderId(result);
     expect(counts.get(100)).toBe(2);
     expect(counts.get(200)).toBe(1);
   });
@@ -163,12 +173,10 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
   it("eager_load(:x).group(:composite_fk_belongs_to).sum folds the eager JD", async () => {
     await seedBooksWithOrders();
     const result = (await CpkBook.eagerLoad("order").group("order").sum("id")) as Map<
-      InstanceType<typeof CpkOrder> | null,
-      number
+      unknown,
+      unknown
     >;
-    const sums = new Map<unknown, number>();
-    for (const [order, n] of result)
-      sums.set(order === null ? null : (order.id as unknown[])[1], n);
+    const sums = byOrderId(result);
     expect(sums.get(100)).toBe(3); // book ids 1 + 2
     expect(sums.get(200)).toBe(3); // book id 3
   });
