@@ -521,17 +521,6 @@ function collectVisibleClassNames(node: ts.Node, out: Set<string>): void {
   }
 }
 
-/** Names of every class declaration anywhere in the file (any nesting depth). */
-function collectAllClassNames(sf: ts.SourceFile): Set<string> {
-  const out = new Set<string>();
-  const visit = (node: ts.Node): void => {
-    if (ts.isClassDeclaration(node) && node.name) out.add(node.name.text);
-    ts.forEachChild(node, visit);
-  };
-  visit(sf);
-  return out;
-}
-
 function collectTargets(
   info: ClassInfo,
   out: Set<string>,
@@ -769,15 +758,22 @@ async function main(): Promise<void> {
     // `attribute()` / association / enum calls — exactly its real surface.
     const underModelsDir = file.startsWith(modelsDirPrefix);
     // An association-target class name is "known" (resolves to a type in
-    // scope) when it is a registered model, `Base`, or a class declared
-    // anywhere in this file. A `classify`-d target satisfying none of these —
-    // e.g. `hasOne("otherThing")` in a throwaway test class with no
-    // `OtherThing` model — must not be baked verbatim (dangling TS2304); the
-    // synthesizer degrades it to `Base`. Over-approximating with every in-file
-    // class name is safe: it only ever suppresses an unnecessary fallback.
-    const fileClassNames = collectAllClassNames(sf);
-    const isKnownTarget = (name: string): boolean =>
-      name === "Base" || registry.has(name) || fileClassNames.has(name);
+    // scope at the declare's splice site) when it is a registered model,
+    // `Base`, a module-scope import/declaration, or a class lexically visible
+    // from the host class (same or enclosing block). A `classify`-d target
+    // satisfying none of these — e.g. `hasOne("otherThing")` in a throwaway
+    // test class with no `OtherThing` model — must not be baked verbatim
+    // (dangling TS2304); the synthesizer degrades it to `Base`. Visibility is
+    // scoped to the host (not a flat whole-file scan) so a same-named class in
+    // a SIBLING `describe`/`it` closure does not count as visible — mirrors
+    // `resolveAutoImports`' `moduleScope + collectVisibleClassNames` logic.
+    const moduleScope = collectNamesInScope(sf);
+    const isKnownTarget = (name: string, host: ClassInfo): boolean => {
+      if (name === "Base" || registry.has(name) || moduleScope.has(name)) return true;
+      const visible = new Set<string>();
+      collectVisibleClassNames(host.classDecl, visible);
+      return visible.has(name);
+    };
     const { text: virtualized } = virtualize(source, file, {
       isModelClass,
       prependImports,

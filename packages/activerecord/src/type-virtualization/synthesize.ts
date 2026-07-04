@@ -90,14 +90,22 @@ export interface SynthesizeOptions {
    * dangling name (TS2304). When the predicate reports the target unknown the
    * declare falls back to `Base` (always in scope), mirroring how `through:`
    * targets already degrade to `Base`. Omitted → every target is trusted.
+   *
+   * `host` is the class the declare is spliced into, so the predicate can
+   * scope visibility to that exact splice site (a class in a sibling
+   * `describe`/`it` closure is NOT visible and must not count as known).
    */
-  isKnownTarget?: (name: string) => boolean;
+  isKnownTarget?: (name: string, host: ClassInfo) => boolean;
 }
 
 export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
   const out: string[] = [];
   const aliases = opts.classNameAliases;
   const targets = opts.associationTargets;
+  // Bind the caller's predicate to THIS class — the declare's splice site —
+  // so target visibility is judged from where the declare actually lands,
+  // never from an ancestor's scope. Threaded as a plain `(name) => boolean`.
+  const isKnownTarget = boundKnownTarget(info, opts);
   // Subclass singular associations whose target isn't assignable to the
   // ancestor's (TS2416): suppress the property declare (loader overload kept).
   const conflictingSingulars = collectConflictingSingulars(info, opts);
@@ -130,7 +138,7 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
       aliases,
       targets,
       opts.attributesNullable ?? false,
-      opts.isKnownTarget,
+      isKnownTarget,
     )) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
         out.push(line.text);
@@ -138,13 +146,7 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
       }
     }
   }
-  for (const l of renderLoaderOverloads(
-    info,
-    aliases,
-    targets,
-    opts.ancestors,
-    opts.isKnownTarget,
-  )) {
+  for (const l of renderLoaderOverloads(info, aliases, targets, opts.ancestors, isKnownTarget)) {
     if (!info.existingMembers.has(l.declaredName)) {
       out.push(l.text);
       synthesizedInstanceNames.add(l.declaredName);
@@ -156,6 +158,20 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
     out.push(line);
   }
   return out;
+}
+
+/**
+ * Bind `opts.isKnownTarget` to `host` (the splice-site class), yielding a
+ * plain `(name) => boolean` threaded down the render helpers. `undefined`
+ * when the caller supplied no predicate (every target trusted verbatim).
+ */
+function boundKnownTarget(
+  host: ClassInfo,
+  opts: SynthesizeOptions,
+): ((name: string) => boolean) | undefined {
+  const predicate = opts.isKnownTarget;
+  if (!predicate) return undefined;
+  return (name: string) => predicate(name, host);
 }
 
 function renderSchemaColumnDeclares(
@@ -335,10 +351,13 @@ function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): 
   const targets = opts.associationTargets;
   const superNameOf = opts.superNameOf;
 
+  // Conflict detection compares the target as seen from `info`'s splice
+  // site, so bind the predicate to `info` (not each ancestor `host`).
+  const isKnownTarget = boundKnownTarget(info, opts);
   const target = (host: ClassInfo, call: AssociationCall): string =>
     call.options["polymorphic"] === "true"
       ? "Base"
-      : resolveTarget(host, call, aliases, targets, opts.isKnownTarget);
+      : resolveTarget(host, call, aliases, targets, isKnownTarget);
   // Effective inherited target per association, folded base→derived
   // (`ancestors` is nearest-first, so reverse). A suppressed ancestor override
   // (target not assignable to what it inherits) does NOT change the effective
@@ -438,8 +457,15 @@ function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[]
   // aware); re-declaring it here as an instance property is a TS2610 error.
   // Skip it, matching how renderSchemaColumnDeclares skips the `id` column.
   if (call.name === "id") return [];
-  const tsType = tsTypeFor(call.railsType);
   const memberName = renderDeclaredMemberName(call.name);
+  // An `*_id` integer attribute is a foreign key; widen it to accept a model
+  // `.id` (`PrimaryKeyValue`) assignment, exactly as the schema-column path
+  // does (see `isForeignKeyColumn`). `PrimaryKeyValue` already admits
+  // null/undefined, so the nullable wrapper is redundant here.
+  if (isForeignKeyColumn(call.name, call.railsType)) {
+    return [line(`declare ${memberName}: ${AR_IMPORT}.PrimaryKeyValue;`, call.name, false)];
+  }
+  const tsType = tsTypeFor(call.railsType);
   const rendered = nullable
     ? tsType.includes("|")
       ? `(${tsType}) | null`

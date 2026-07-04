@@ -157,6 +157,47 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare loadHasOne:.*name: "otherThing".*Promise<Base \| null>/);
   });
 
+  test("isKnownTarget is scoped to the splice-site host, not a flat file scan", () => {
+    // Two independent model classes each associate `widget`. The predicate
+    // only reports `Widget` known when the host is `A` — modeling `Widget`
+    // being visible in A's closure but NOT B's sibling closure. B's declare
+    // must degrade to Base even though the name is "known" for A.
+    const src =
+      "export class A extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("widget");\n' +
+      "  }\n" +
+      "}\n" +
+      "export class B extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("widget");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "ab.ts", {
+      isKnownTarget: (name, host) => name === "Base" || (name === "Widget" && host.name === "A"),
+    });
+    // A sees Widget; B does not — B falls back to Base.
+    expect(text).toMatch(/class A extends Base \{\s*declare widget: Widget \| null;/);
+    expect(text).toMatch(/class B extends Base \{\s*declare widget: Base \| null;/);
+  });
+
+  test("integer FK attribute() declare widens to PrimaryKeyValue", () => {
+    const src =
+      "export class Membership extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("club_id", "integer");\n' +
+      '    this.attribute("rank", "integer");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "membership.ts", { attributesNullable: true });
+    // FK attribute accepts a model `.id` (PrimaryKeyValue) assignment.
+    expect(text).toMatch(
+      /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    // Non-FK integer attribute keeps its (nullable) narrow type.
+    expect(text).toMatch(/declare rank: number \| null;/);
+  });
+
   test("isKnownTarget omitted: every target is trusted verbatim", () => {
     const src =
       "export class Thing extends Base {\n" +
