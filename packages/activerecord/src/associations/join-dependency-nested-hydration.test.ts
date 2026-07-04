@@ -5,15 +5,11 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency nested hydration", () => {
-  // Ride the canonical schema `fixtures({})` warms: the hand-built `tN_rN`
-  // hydration rows below track the canonical column order (see the model
-  // comments), so no bespoke schema is declared.
+  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
+  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // and no `tN_rN` offsets (or canonical-prefix column padding) are hardcoded.
   fixtures({});
 
-  // Canonical column order (schema.rb) drives the `tN_rN` hydration offsets so
-  // the hand-built rows survive the schema cache `fixtures({})` warms: `authors`
-  // is (id, name); `comments` is (id, post_id, body, …, author_id) with author_id
-  // at slot 8; `posts` is (id, author_id, title).
   // prettier-ignore
   class Author extends Base {
     static { this.attribute("id", "integer"); this.attribute("name", "string"); }
@@ -21,9 +17,8 @@ describe("JoinDependency nested hydration", () => {
   // prettier-ignore
   class Comment extends Base {
     static {
-      this.attribute("id", "integer"); this.attribute("post_id", "integer"); this.attribute("body", "string");
-      this.attribute("type", "string"); this.attribute("label", "integer"); this.attribute("tags_count", "integer");
-      this.attribute("children_count", "integer"); this.attribute("parent_id", "integer"); this.attribute("author_id", "integer");
+      this.attribute("id", "integer"); this.attribute("post_id", "integer");
+      this.attribute("body", "string"); this.attribute("author_id", "integer");
     }
   }
   // prettier-ignore
@@ -44,10 +39,17 @@ describe("JoinDependency nested hydration", () => {
     const jd = new JoinDependency(Post);
     jd.addNestedAssociation("comments.author");
 
-    // prettier-ignore
     const rows = [
-      { t0_r0: 1, t0_r2: "Post A", t1_r0: 10, t1_r1: 1, t1_r2: "Comment 1", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
-      { t0_r0: 1, t0_r2: "Post A", t1_r0: 11, t1_r1: 1, t1_r2: "Comment 2", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
+      jd.aliasedRow({
+        "": { id: 1, title: "Post A" },
+        comments: { id: 10, post_id: 1, body: "Comment 1", author_id: 42 },
+        "comments.author": { id: 42, name: "Alice" },
+      }),
+      jd.aliasedRow({
+        "": { id: 1, title: "Post A" },
+        comments: { id: 11, post_id: 1, body: "Comment 2", author_id: 42 },
+        "comments.author": { id: 42, name: "Alice" },
+      }),
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
@@ -78,10 +80,17 @@ describe("JoinDependency nested hydration", () => {
     const jd = new JoinDependency(Post);
     jd.addNestedAssociation("comments.author");
 
-    // prettier-ignore
     const rows = [
-      { t0_r0: 1, t0_r2: "Post A", t1_r0: 10, t1_r1: 1, t1_r2: "C1", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
-      { t0_r0: 2, t0_r2: "Post B", t1_r0: 20, t1_r1: 2, t1_r2: "C2", t1_r8: 42, t2_r0: 42, t2_r1: "Alice" },
+      jd.aliasedRow({
+        "": { id: 1, title: "Post A" },
+        comments: { id: 10, post_id: 1, body: "C1", author_id: 42 },
+        "comments.author": { id: 42, name: "Alice" },
+      }),
+      jd.aliasedRow({
+        "": { id: 2, title: "Post B" },
+        comments: { id: 20, post_id: 2, body: "C2", author_id: 42 },
+        "comments.author": { id: 42, name: "Alice" },
+      }),
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
@@ -95,7 +104,12 @@ describe("JoinDependency nested hydration", () => {
   it("nested records are not readonly by default when no reflection scope marks readonly", () => {
     const jd = new JoinDependency(Post);
     jd.addNestedAssociation("comments");
-    const rows = [{ t0_r0: 1, t0_r2: "Post A", t1_r0: 10, t1_r1: 1, t1_r2: "C1", t1_r8: null }];
+    const rows = [
+      jd.aliasedRow({
+        "": { id: 1, title: "Post A" },
+        comments: { id: 10, post_id: 1, body: "C1", author_id: null },
+      }),
+    ];
     const { parents } = jd.instantiateFromRows(rows);
     const comment = parents[0].association("comments").target[0];
     expect(comment._readonly).toBeFalsy();

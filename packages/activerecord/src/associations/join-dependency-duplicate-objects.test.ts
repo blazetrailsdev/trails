@@ -13,9 +13,9 @@ import { JoinDependency } from "./join-dependency.js";
 // so the raw-aliased key (seeded and looked up through the single `_nodeKey` path)
 // is the only thing under test.
 describe("JoinDependency dedupes duplicate join rows", () => {
-  // Ride the canonical schema `fixtures({})` warms: the hand-built `tN_rN`
-  // hydration rows below track the canonical column order (see the model
-  // comments), so no bespoke schema is declared.
+  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
+  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
   class Comment extends Base {
@@ -26,8 +26,6 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     }
   }
 
-  // Canonical `posts` column order (schema.rb): id, author_id, title — so `title`
-  // sits at the third hydration slot, matching the schema `fixtures({})` warms.
   class Post extends Base {
     static {
       this.attribute("id", "integer");
@@ -57,10 +55,11 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     jd.addAssociation("comments");
 
     // Same parent, same child, repeated join rows — must dedupe to one comment.
-    const rows = [
-      { t0_r0: 1, t0_r2: "foo", t1_r0: 10, t1_r1: 1, t1_r2: "hmm" },
-      { t0_r0: 1, t0_r2: "foo", t1_r0: 10, t1_r1: 1, t1_r2: "hmm" },
-    ];
+    const row = jd.aliasedRow({
+      "": { id: 1, title: "foo" },
+      comments: { id: 10, post_id: 1, body: "hmm" },
+    });
+    const rows = [row, { ...row }];
 
     const { parents } = jd.instantiateFromRows(rows);
 
@@ -77,8 +76,16 @@ describe("JoinDependency dedupes duplicate join rows", () => {
     // Two distinct parents share one post which has one comment; the post and the
     // comment must each be a single shared instance, exactly deduped.
     const rows = [
-      { t0_r0: 1, t0_r1: 5, t1_r0: 5, t1_r2: "foo", t2_r0: 10, t2_r1: 5, t2_r2: "lol" },
-      { t0_r0: 2, t0_r1: 5, t1_r0: 5, t1_r2: "foo", t2_r0: 10, t2_r1: 5, t2_r2: "lol" },
+      jd.aliasedRow({
+        "": { id: 1, post_id: 5 },
+        post: { id: 5, title: "foo" },
+        "post.comments": { id: 10, post_id: 5, body: "lol" },
+      }),
+      jd.aliasedRow({
+        "": { id: 2, post_id: 5 },
+        post: { id: 5, title: "foo" },
+        "post.comments": { id: 10, post_id: 5, body: "lol" },
+      }),
     ];
 
     const { parents } = jd.instantiateFromRows(rows);

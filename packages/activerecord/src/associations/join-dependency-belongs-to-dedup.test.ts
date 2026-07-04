@@ -5,9 +5,9 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
 
 describe("JoinDependency cross-parent belongsTo dedup", () => {
-  // Ride the canonical schema `fixtures({})` warms: the hand-built `tN_rN`
-  // hydration rows below track the canonical column order (see the model
-  // comments), so no bespoke schema is declared.
+  // Ride the canonical schema `fixtures({})` warms; the hydration rows below are
+  // built by column name via `jd.aliasedRow`, so no bespoke schema is declared
+  // and no `tN_rN` offsets are hardcoded.
   fixtures({});
 
   class Author extends Base {
@@ -17,9 +17,6 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     }
   }
 
-  // Canonical `posts` column order (schema.rb): id, author_id, title — the
-  // `tN_rN` hydration offsets below track this so the rows survive the schema
-  // cache `fixtures({})` warms.
   class Post extends Base {
     static {
       this.attribute("id", "integer");
@@ -42,9 +39,18 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     jd.addAssociation("author");
 
     const rows = [
-      { t0_r0: 1, t0_r1: 42, t0_r2: "Post A", t1_r0: 42, t1_r1: "Alice" },
-      { t0_r0: 2, t0_r1: 42, t0_r2: "Post B", t1_r0: 42, t1_r1: "Alice" },
-      { t0_r0: 3, t0_r1: 42, t0_r2: "Post C", t1_r0: 42, t1_r1: "Alice" },
+      jd.aliasedRow({
+        "": { id: 1, author_id: 42, title: "Post A" },
+        author: { id: 42, name: "Alice" },
+      }),
+      jd.aliasedRow({
+        "": { id: 2, author_id: 42, title: "Post B" },
+        author: { id: 42, name: "Alice" },
+      }),
+      jd.aliasedRow({
+        "": { id: 3, author_id: 42, title: "Post C" },
+        author: { id: 42, name: "Alice" },
+      }),
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
@@ -66,8 +72,14 @@ describe("JoinDependency cross-parent belongsTo dedup", () => {
     jd.addAssociation("author");
 
     const rows = [
-      { t0_r0: 1, t0_r1: 42, t0_r2: "Post A", t1_r0: 42, t1_r1: "Alice" },
-      { t0_r0: 2, t0_r1: 99, t0_r2: "Post B", t1_r0: 99, t1_r1: "Bob" },
+      jd.aliasedRow({
+        "": { id: 1, author_id: 42, title: "Post A" },
+        author: { id: 42, name: "Alice" },
+      }),
+      jd.aliasedRow({
+        "": { id: 2, author_id: 99, title: "Post B" },
+        author: { id: 99, name: "Bob" },
+      }),
     ];
 
     const { parents } = jd.instantiateFromRows(rows);
