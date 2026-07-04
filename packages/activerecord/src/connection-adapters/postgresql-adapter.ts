@@ -4933,8 +4933,6 @@ export function splitPgDefault(raw: string | null): { literal: unknown; fn: stri
   // Rails' extract_value_from_default (postgresql_adapter.rb:769) only allows
   // an optional ::bigint suffix and would misclassify this as a function default;
   // we go beyond Rails' implementation to match what money_test.rb:98 asserts.
-  // NOTE: both splitPgDefault and cleanRawPgExpression (schema-dumper.ts) must
-  // handle multi-cast chains; cleanRawPgExpression already used (+) for this.
   const parenNum = /^\((-?\d+(?:\.\d+)?)\)(?:::[\w"\s.]+)+$/.exec(raw);
   if (parenNum) return { literal: parenNum[1], fn: null };
   // N::type[::type2...] — bare numeric with one or more casts. PG normalizes

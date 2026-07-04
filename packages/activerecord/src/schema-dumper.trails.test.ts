@@ -1,13 +1,12 @@
 // Trails-only SchemaDumper cases with no 1:1 in Rails'
 // schema_dumper_test.rb. These unit-test trails-invented exported helpers
-// (cleanDefault / cleanRawPgExpression / formatColspecRaw / indexParts), the
-// adapter-introspection dump path (SchemaDumperAdapterTest), async header
-// ordering, and DSL-helper round-trips. Kept out of the Rails-mirrored
-// schema-dumper.test.ts so test:compare maps cleanly.
+// (formatColspecRaw / indexParts), the adapter-introspection dump path
+// (SchemaDumperAdapterTest), async header ordering, and DSL-helper
+// round-trips. Kept out of the Rails-mirrored schema-dumper.test.ts so
+// test:compare maps cleanly.
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
-import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -379,59 +378,6 @@ describe("SchemaDumper async header ordering", () => {
     const typesIdx = result.indexOf("TYPES");
     expect(schemasIdx).toBeLessThan(extensionsIdx);
     expect(extensionsIdx).toBeLessThan(typesIdx);
-  });
-});
-
-describe("cleanRawPgExpression", () => {
-  it("strips string type casts", () => {
-    expect(cleanRawPgExpression("'happy'::mood")).toBe("happy");
-    expect(cleanRawPgExpression("'192.168.1.1'::inet")).toBe("192.168.1.1");
-    expect(cleanRawPgExpression("'(12.2,13.3)'::point")).toBe("(12.2,13.3)");
-  });
-
-  it("unescapes doubled single-quotes", () => {
-    expect(cleanRawPgExpression("'it''s'::text")).toBe("it's");
-  });
-
-  it("strips numeric type casts", () => {
-    expect(cleanRawPgExpression("150.55::numeric")).toBe(150.55);
-    expect(cleanRawPgExpression("(150.55)::numeric")).toBe(150.55);
-  });
-
-  it("preserves expression defaults like nextval", () => {
-    const val = "nextval('seq_id_seq'::regclass)";
-    expect(cleanRawPgExpression(val)).toBe(val);
-  });
-
-  it("returns unrecognised strings unchanged", () => {
-    expect(cleanRawPgExpression("hello")).toBe("hello");
-  });
-});
-
-describe("cleanDefault", () => {
-  it("delegates raw PG cast expressions to cleanRawPgExpression", () => {
-    expect(cleanDefault("'happy'::mood")).toBe("happy");
-    expect(cleanDefault("'(12.2,13.3)'::point")).toBe("(12.2,13.3)");
-  });
-
-  it("coerces scalar booleans", () => {
-    expect(cleanDefault("true")).toBe(true);
-    expect(cleanDefault("false")).toBe(false);
-  });
-
-  it("coerces plain numeric strings", () => {
-    expect(cleanDefault("42")).toBe(42);
-    expect(cleanDefault("3.14")).toBe(3.14);
-  });
-
-  it("preserves bit-string patterns with leading zeros", () => {
-    expect(cleanDefault("00000011")).toBe("00000011");
-    expect(cleanDefault("0011")).toBe("0011");
-  });
-
-  it("returns null/undefined unchanged", () => {
-    expect(cleanDefault(null)).toBeNull();
-    expect(cleanDefault(undefined)).toBeUndefined();
   });
 });
 
