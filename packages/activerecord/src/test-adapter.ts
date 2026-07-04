@@ -67,7 +67,7 @@ export type TestDatabaseAdapter = DatabaseAdapter;
  *
  * @internal
  */
-export type SidecarAdapter = DatabaseAdapter & {
+export type LeasedTestAdapter = DatabaseAdapter & {
   transactionManager: TransactionManager;
   withinNewTransaction<T>(
     opts: { isolation?: string | null; joinable?: boolean },
@@ -196,7 +196,7 @@ async function buildInTestPool(): Promise<ConnectionPool> {
  * @internal
  */
 export async function createPooledTestAdapter(): Promise<{
-  adapter: SidecarAdapter;
+  adapter: LeasedTestAdapter;
   pool: ConnectionPool;
 }> {
   if (!_inTestPoolPromise) {
@@ -209,7 +209,7 @@ export async function createPooledTestAdapter(): Promise<{
   }
   const pool = await _inTestPoolPromise;
   _inTestPool = pool;
-  const adapter = (await pool.leaseConnection()) as SidecarAdapter;
+  const adapter = (await pool.leaseConnection()) as LeasedTestAdapter;
   return { adapter, pool };
 }
 

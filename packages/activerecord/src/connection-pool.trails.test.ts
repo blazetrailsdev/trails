@@ -24,7 +24,7 @@ import { PoolConfig } from "./connection-adapters/pool-config.js";
 import { SchemaReflection, BoundSchemaReflection } from "./connection-adapters/schema-cache.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { newRawTestAdapter, ambientPoolConfiguration, adapterType } from "./test-adapter.js";
-import type { SidecarAdapter } from "./test-adapter.js";
+import type { LeasedTestAdapter } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
@@ -262,10 +262,10 @@ it("clearReloadableConnections only disconnects reloadable adapters", async () =
 it("pin connection reuses leased connection and checks in on unpin", async () => {
   const pool = makeAmbientPool({ pool: 5 });
   try {
-    const leased = (await pool.leaseConnection()) as SidecarAdapter;
+    const leased = (await pool.leaseConnection()) as LeasedTestAdapter;
 
     await pool.pinConnectionBang();
-    const pinned = (await pool.checkout()) as SidecarAdapter;
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
     expect(pinned).toBe(leased);
     expect(leased.transactionManager.openTransactions).toBe(1);
     expect(leased.transactionManager.currentTransaction.joinable).toBe(false);
@@ -1016,7 +1016,7 @@ describe("checkout/checkin callbacks", () => {
   it("pinned checkout verifies on every handout (reconnect-on-drop) and skips query-cache wiring", async () => {
     const pool = makeAmbientPool({ pool: 5 });
     await pool.pinConnectionBang();
-    const pinned = (await pool.checkout()) as SidecarAdapter;
+    const pinned = (await pool.checkout()) as LeasedTestAdapter;
     const spy = vi.spyOn(pinned, "verifyBang");
     try {
       // Rails re-runs `verify!` on every pinned checkout (connection_pool.rb:554),
