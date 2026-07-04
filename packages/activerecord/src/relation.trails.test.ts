@@ -59,6 +59,22 @@ describe("RelationTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
 
+  // No like-named Rails test: relation_test.rb only covers the invalid-key path
+  // ("merging a hash with unknown keys raises"). This guards the positive
+  // HashMerger path — a valid VALUE_METHODS-keyed hash builds a fresh base
+  // Relation (via `_newRelation`) and dispatches each key to its value-method
+  // bang setter, then merges through Merger — so a regression to the old
+  // where-conditions behavior (or a missing base-class `_newRelation`) is caught.
+  it("merging a valid-key hash dispatches to value-methods", () => {
+    const rel = CanonPost.all().merge({ where: { title: "a" }, limit: 5, order: "id" } as any);
+    const sql = rel.toSql();
+    expect(sql).toContain("WHERE");
+    expect(sql).toContain("title");
+    expect(sql).toContain("LIMIT");
+    expect(sql.toLowerCase()).toContain("order by");
+    expect(CanonPost.all().merge({ readonly: true } as any).isReadonly).toBe(true);
+  });
+
   it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {
     class Post extends Base {
       static _tableName = "posts";

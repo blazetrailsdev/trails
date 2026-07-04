@@ -334,13 +334,11 @@ export class HashMerger {
     for (const [key, value] of Object.entries(this.hash)) {
       // `select` dispatches to `_select!` (Rails renames `:select` → `:_select`
       // to avoid Enumerable#select!); trails mirrors this with `_selectBang`.
-      // `reordering` is a VALUE_METHOD Rails writes with `reordering!` (a bare
-      // `@values[:reordering] = value`); trails exposes no such bang, so set the
-      // backing field directly (Merger doesn't propagate it, matching Rails).
-      if (key === "reordering") {
-        other._reordering = value;
-        continue;
-      }
+      // Every other key routes to its `#{key}!` value-method, exactly as Rails'
+      // `other.public_send("#{k}!", *v)`. Note `:reordering` is in VALUE_METHODS
+      // but Rails defines no `reordering!` (only `reorder!`, query_methods.rb:760),
+      // so `merge(reordering: ...)` raises there too — we let it fall through and
+      // fail the same way rather than inventing a working path.
       const method = key === "select" ? "_selectBang" : `${key}Bang`;
       if (Array.isArray(value)) {
         other[method](...value);
