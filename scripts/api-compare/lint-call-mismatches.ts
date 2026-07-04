@@ -7,7 +7,7 @@
  * (see SIGNIFICANT_CALLS in compare.ts). That artifact is advisory and never
  * affects the parity %, so on its own nothing stops new mismatches from
  * landing. This script turns it into a one-way ratchet, mirroring the
- * `eslint/*-exclude.json` baselines (require-canonical-schema, no-explicit-any,
+ * `eslint/*-exclude.json` baselines (no-explicit-any, rails-error-parity,
  * …): a committed baseline lists the currently-known mismatches keyed by
  * `tsFile + rubyName + call`, and CI fails on:
  *
