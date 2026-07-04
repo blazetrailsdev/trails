@@ -21,6 +21,10 @@ import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 
 interface JoinValueHost {
+  // Public Rails-mirrored accessor for `left_outer_joins_values`
+  // (relation.ts get leftOuterJoinsValues, ~:4578). `_namedInnerJoins` has no
+  // public accessor — it is a trails-internal storage split of `joins_values`
+  // for association-name specs, so it is read through the underscore field.
   leftOuterJoinsValues: unknown[];
   _namedInnerJoins: unknown[];
   toSql(): string;
