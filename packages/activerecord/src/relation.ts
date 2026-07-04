@@ -1968,14 +1968,11 @@ export class Relation<T extends Base> {
     // spawn.left_outer_joins! (query_methods.rb:883-887), so `leftJoins({})` /
     // `leftJoins([])` drop their blank specs instead of polluting join state.
     const specs = _qm.flattenedArgs(args).filter((s) => !_qm.isBlankArgument(s));
+    // Rails stores args verbatim (`left_outer_joins_values |= args`) and only
+    // raises for a non-Hash/Symbol/Array arg lazily at SQL-build time, in
+    // `build_join_buckets` (query_methods.rb:1828-1834) — not eagerly here. See
+    // `buildJoinBuckets` for the raise.
     for (const spec of specs) {
-      // Rails raises ArgumentError when a raw SQL string (containing spaces) is
-      // passed; association names are always single-word identifiers.
-      if (typeof spec === "string" && /\s/.test(spec)) {
-        throw argumentError(
-          "only associations and hashes are supported as arguments to leftOuterJoins",
-        );
-      }
       if (!rel._leftOuterJoinsValues.includes(spec as AssociationSpec)) {
         rel._leftOuterJoinsValues.push(spec as AssociationSpec);
       }
@@ -3587,6 +3584,7 @@ export class Relation<T extends Base> {
     // present the left-outer JD folds into the inner JD's join_constraints (Rails
     // build_join_buckets: stashed_left_joins.unshift), deduping a both-ways
     // association to a single INNER JOIN via `walk`.
+    _qm.assertValidLeftOuterJoinsBang(this._leftOuterJoinsValues);
     const promotedIncludes = this._includesToPromoteFromReferences();
     const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
     const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));

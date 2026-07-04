@@ -192,6 +192,30 @@ describe("RelationTest", () => {
     expect(rel.toSql()).toMatch(/LEFT OUTER JOIN/i);
   });
 
+  it("leftJoins stores an invalid non-Hash/Symbol/Array arg verbatim and raises lazily at build", () => {
+    class Author extends Base {
+      static {
+        this.tableName = "authors";
+        this.hasMany("posts", { className: "LazyRaisePost", foreignKey: "author_id" });
+      }
+    }
+    class Post extends Base {
+      static {
+        this.tableName = "posts";
+        this.attribute("author_id", "integer");
+      }
+    }
+    registerModel("LazyRaiseAuthor", Author);
+    registerModel("LazyRaisePost", Post);
+
+    // Rails stores args verbatim (`left_outer_joins_values |= args`) and only
+    // raises in build_join_buckets — for ANY non-Hash/Symbol/Array arg, not just
+    // a whitespace string. A bare Integer is neither, so building raises.
+    const rel = Author.leftJoins(5 as any);
+    expect((rel as any)._leftOuterJoinsValues).toContain(5);
+    expect(() => rel.toSql()).toThrow("only Hash, Symbol and Array are allowed");
+  });
+
   it("includes().references() + leftJoins(): no duplicate LEFT OUTER JOIN in SQL", () => {
     // Regression: includes promoted to eager load via references() causes
     // _buildEagerJoinManager to emit the LEFT OUTER JOIN. The pendingLeftOuter
