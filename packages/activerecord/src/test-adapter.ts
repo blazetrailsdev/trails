@@ -29,10 +29,10 @@ import { resetTestTables } from "./test-helpers/drop-all-tables.js";
 import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
 
-// process.env.PG_TEST_URL / MYSQL_TEST_URL are already worker-scoped by
+// PG_TEST_URL / MYSQL_TEST_URL are already worker-scoped by
 // test-setup-worker-db.ts (a setupFile that runs before this module loads).
-const PG_TEST_URL = process.env.PG_TEST_URL;
-const MYSQL_TEST_URL = process.env.MYSQL_TEST_URL;
+const PG_TEST_URL = getEnv("PG_TEST_URL");
+const MYSQL_TEST_URL = getEnv("MYSQL_TEST_URL");
 
 /** Which adapter backend is active. */
 export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
