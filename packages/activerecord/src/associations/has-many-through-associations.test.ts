@@ -1,6 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_many_through_associations_test.rb
  */
+import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
@@ -342,6 +343,9 @@ describe("HasManyThroughAssociationsTest", () => {
   it("ordered has many through", async () => {
     // Rails creates an anonymous person class with ordered posts
     class PersonPrime extends Base {
+      declare readers: AssociationProxy<Reader>;
+      declare posts: AssociationProxy<Post>;
+
       static {
         this._tableName = "people";
         this.hasMany("readers", { foreignKey: "person_id" });
@@ -382,6 +386,10 @@ describe("HasManyThroughAssociationsTest", () => {
   it("no pk join table append", async () => {
     // Rails: make_no_pk_hm_t creates anonymous models using lessons/lessons_students/students
     class NoPkLesson extends Base {
+      declare name: string | null;
+      declare lessonStudents: AssociationProxy<NoPkLessonStudent>;
+      declare students: AssociationProxy<Base>;
+
       static {
         this._tableName = "lessons";
         this.attribute("name", "string");
@@ -390,6 +398,11 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     class NoPkLessonStudent extends Base {
+      declare lesson_id: bigint | null;
+      declare student_id: bigint | null;
+      declare student: NoPkStudent | null;
+      declare loadBelongsTo: (name: "student") => Promise<NoPkStudent | null>;
+
       static {
         this._tableName = "lessons_students";
         this.attribute("lesson_id", "big_integer");
@@ -398,6 +411,8 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     class NoPkStudent extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "students";
         this.attribute("name", "string");
@@ -416,6 +431,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("no pk join table delete", async () => {
     class NoPkDelLesson extends Base {
+      declare name: string | null;
+      declare lessonStudents: AssociationProxy<NoPkDelLessonStudent>;
+      declare students: AssociationProxy<Base>;
+
       static {
         this._tableName = "lessons";
         this.attribute("name", "string");
@@ -427,6 +446,11 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     class NoPkDelLessonStudent extends Base {
+      declare lesson_id: bigint | null;
+      declare student_id: bigint | null;
+      declare student: NoPkDelStudent | null;
+      declare loadBelongsTo: (name: "student") => Promise<NoPkDelStudent | null>;
+
       static {
         this._tableName = "lessons_students";
         this.attribute("lesson_id", "big_integer");
@@ -435,6 +459,8 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     class NoPkDelStudent extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "students";
         this.attribute("name", "string");
@@ -462,6 +488,10 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("no pk join model callbacks", async () => {
     class NoPkCbLesson extends Base {
+      declare name: string | null;
+      declare lessonStudents: AssociationProxy<NoPkCbLessonStudent>;
+      declare students: AssociationProxy<Base>;
+
       static {
         this._tableName = "lessons";
         this.attribute("name", "string");
@@ -474,6 +504,11 @@ describe("HasManyThroughAssociationsTest", () => {
     }
     let afterDestroyCalled = false;
     class NoPkCbLessonStudent extends Base {
+      declare lesson_id: bigint | null;
+      declare student_id: bigint | null;
+      declare student: NoPkCbStudent | null;
+      declare loadBelongsTo: (name: "student") => Promise<NoPkCbStudent | null>;
+
       static {
         this._tableName = "lessons_students";
         this.attribute("lesson_id", "big_integer");
@@ -485,6 +520,8 @@ describe("HasManyThroughAssociationsTest", () => {
       }
     }
     class NoPkCbStudent extends Base {
+      declare name: string | null;
+
       static {
         this._tableName = "students";
         this.attribute("name", "string");
@@ -2373,6 +2410,12 @@ describe("HasManyThroughAssociationsTest", () => {
   // TS-only: insertRecord with validate false skips join record validation
   it("insertRecord with validate false skips join record validation", async () => {
     class IrpvTagging extends Base {
+      declare taggable_id: number | null;
+      declare taggable_type: string | null;
+      declare tag_id: number | null;
+      declare tag: Tag | null;
+      declare loadBelongsTo: (name: "tag") => Promise<Tag | null>;
+
       static {
         this._tableName = "taggings";
         this.attribute("taggable_id", "integer");
@@ -2390,6 +2433,11 @@ describe("HasManyThroughAssociationsTest", () => {
     const tag = await Tag.create({ name: "testjoin" });
 
     class IrpvPost extends Base {
+      declare title: string | null;
+      declare body: string | null;
+      declare irpvTaggings: AssociationProxy<IrpvTagging>;
+      declare irpvTags: AssociationProxy<Base>;
+
       static {
         this._tableName = "posts";
         this.attribute("title", "string");
