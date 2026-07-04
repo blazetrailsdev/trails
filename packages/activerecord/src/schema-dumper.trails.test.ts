@@ -187,7 +187,7 @@ describe("SchemaDumper trails-only cases", () => {
 describe("SchemaDumperAdapterTest", () => {
   // Ride the primary schema-loaded pool (`Base.connection`) instead of the
   // sidecar test pool.
-  fixtures({});
+  fixtures({}, { useTransactionalTests: false });
 
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;

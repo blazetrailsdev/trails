@@ -40,7 +40,7 @@ function withoutMethods<A extends object>(adapter: A, hidden: string[]): A {
 
 // Ride the primary schema-loaded pool (`Base.connection`) instead of the
 // sidecar test pool.
-fixtures({});
+fixtures({}, { useTransactionalTests: false });
 
 // The tables these tests create via MigrationContext leak into the shared
 // per-worker DB; drop them by name so they don't collide with sibling files.

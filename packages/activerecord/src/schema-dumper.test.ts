@@ -43,7 +43,7 @@ async function withPostgresqlDatetimeType(type: string, fn: () => Promise<void>)
 // table-building cases) so nothing `force`-recreates a canonical table out from
 // under the dump.
 describe("SchemaDumperTest", () => {
-  fixtures({});
+  fixtures({}, { useTransactionalTests: false });
 
   function canonicalSource(): SchemaSource {
     return Base.adapter as unknown as SchemaSource;

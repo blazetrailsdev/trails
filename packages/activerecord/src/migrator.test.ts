@@ -53,7 +53,7 @@ function sensors(count: number): { calls: Array<[string, number]>; migrations: M
 describe("MigratorTest", () => {
   // Rails' setup rides `ActiveRecord::Base.connection_pool`; `fixtures({})`
   // establishes the primary schema-loaded pool so `Base.connection` resolves.
-  fixtures({});
+  fixtures({}, { useTransactionalTests: false });
 
   let adapter: DatabaseAdapter;
 

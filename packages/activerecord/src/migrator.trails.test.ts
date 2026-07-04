@@ -45,7 +45,7 @@ function makeMigration(
 // test pool. Hoisted to file scope (not nested in the first describe) so every
 // describe in the file — including "Migrator advisory lock wrapping" below —
 // resolves `Base.connection` regardless of declaration/run order.
-fixtures({});
+fixtures({}, { useTransactionalTests: false });
 
 // `fixtures({})` shields the schema_migrations / ar_internal_metadata tables
 // from the global reset, so clear them before every test to keep each case's

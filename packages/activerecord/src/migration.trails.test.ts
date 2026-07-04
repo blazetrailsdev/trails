@@ -23,7 +23,7 @@ describe("MigrationTest", () => {
   // supplies the *distinct* adapter objects the override-routing identity checks
   // need (Rails builds a second connection from the primary config rather than
   // leasing a standing sidecar pool).
-  fixtures({});
+  fixtures({}, { useTransactionalTests: false });
 
   it("migration.connection returns _connectionOverride when set", async () => {
     class M extends Migration {

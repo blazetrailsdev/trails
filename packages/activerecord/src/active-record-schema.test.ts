@@ -21,7 +21,7 @@ afterAll(() => {
 
 describe("ActiveRecordSchemaTest", () => {
   // Ride the primary schema-loaded pool via `Base.connection`.
-  fixtures({});
+  fixtures({}, { useTransactionalTests: false });
 
   let adapter: DatabaseAdapter;
 
