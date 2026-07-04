@@ -95,24 +95,54 @@ export function sanitizeForMassAssignment(
  * `#update`/`#update!` (which iterate a raw writeAttribute loop) — so all
  * agree on the class and message text for the same input.
  *
- * NOTE: Rails checks `respond_to?(:each_pair)`, so a Ruby Date/Time/Struct
- * raises here; JS has no each_pair, so we approximate with "plain object"
- * (any non-null, non-array object). A Date passed here duck-types past the
- * guard and no-ops via Object.keys → {}. Tightening to reject non-plain
- * objects is a follow-up (no caller relies on it today).
+ * Rails checks `respond_to?(:each_pair)`, so a Ruby Date/Time/Struct raises
+ * here; JS has no `each_pair`, so we accept a plain object (prototype is
+ * `Object.prototype` or null) or a params-style wrapper that duck-types
+ * `permitted?`/`to_h` (ActionController::Parameters' analogue). A Date, Map,
+ * Set, or arbitrary class instance has no hash semantics and raises.
+ *
+ * KNOWN GAP: `HashWithIndifferentAccess` is a Hash subclass that Rails' guard
+ * admits (it inherits `Hash#each_pair`), but trails HWIA stores entries in a
+ * private `Map` — so it fails this proto/duck-type check AND the downstream
+ * `_assignAttributes` `Object.entries` loop can't read it either (a pre-existing
+ * silent no-op). Real HWIA mass-assignment is tracked separately in
+ * `assign-attributes-hwia-each-pair`; this guard does not regress it (it was
+ * never assigned before).
  */
 export function assertHashAttributes(attrs: unknown): asserts attrs is Record<string, unknown> {
-  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) {
+  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs) || !isHashLike(attrs)) {
     throw new ArgumentError(
       `When assigning attributes, you must pass a hash as an argument, ${typeNameForError(attrs)} passed.`,
     );
   }
 }
 
+/**
+ * A plain object (literal / `Object.create(null)`) has hash semantics, as does
+ * a params-style wrapper duck-typing `permitted`/`toH` — the trails analogue of
+ * `ActionController::Parameters`, which Rails admits via `respond_to?(:each_pair)`.
+ * Everything else (Date, Map, Set, arbitrary class instances) is rejected.
+ */
+function isHashLike(attrs: object): boolean {
+  const proto = Object.getPrototypeOf(attrs);
+  if (proto === Object.prototype || proto === null) return true;
+  const wrapper = attrs as PermittedAttributes;
+  // For the real ActionController::Parameters, `permitted` is a boolean getter
+  // (strong-parameters.ts:113), not a method, so `toH` is the load-bearing check
+  // that admits it here; the `permitted` function-probe covers other duck-typed
+  // wrappers. (sanitizeForMassAssignment has the same permitted-as-function
+  // assumption — tracked in `sanitize-mass-assignment-permitted-getter`.)
+  return typeof wrapper.permitted === "function" || typeof wrapper.toH === "function";
+}
+
 function typeNameForError(value: unknown): string {
   // Ruby: nil.class #=> NilClass (not "Null").
   if (value === null) return "NilClass";
   if (Array.isArray(value)) return "Array";
+  // Mirror Ruby's `value.class` name: a class instance (Date, Time, …) reports
+  // its constructor name, not the generic "Object" that `typeof` collapses to.
+  const ctorName = (value as { constructor?: { name?: string } } | undefined)?.constructor?.name;
+  if (ctorName) return ctorName;
   const t = typeof value;
   return t.charAt(0).toUpperCase() + t.slice(1);
 }
