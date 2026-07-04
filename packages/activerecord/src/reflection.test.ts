@@ -13,6 +13,7 @@ import {
   reflectOnAllAutosaveAssociations,
   ThroughReflection,
   AssociationReflection,
+  AggregateReflection,
   registerModel,
   modelRegistry,
   composedOf,
@@ -27,7 +28,7 @@ import {
 } from "./test-helpers/models/company-in-module.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 
-import { UnknownPrimaryKey } from "./errors.js";
+import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
@@ -1347,6 +1348,20 @@ describe("ReflectionTest", () => {
     expect(addr).toBeInstanceOf(Address);
     expect(addr.street).toBe("123 Main");
     expect(addr.city).toBe("Springfield");
+  });
+
+  it("aggregate reflection computes class raises NameError for missing class", () => {
+    class Buyer extends Base {
+      static {
+        this.attribute("balance", "integer");
+      }
+    }
+    // AggregateReflection backs composed_of; a string class_name pointing at a
+    // constant that isn't registered must raise NameError (Rails compute_type),
+    // matching AssociationReflection#computeClass so NameError-only rescues apply.
+    const ref = new AggregateReflection("balance", null, { className: "NoSuchMoney" }, Buyer);
+    expect(() => ref.klass).toThrow(NameError);
+    expect(() => ref.klass).toThrow(/not found in registry/);
   });
 
   it("association reflection in modules", async () => {

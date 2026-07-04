@@ -666,7 +666,11 @@ export class MacroReflection extends AbstractReflection {
     const lookupName = name.startsWith("::") ? name.slice(2) : name;
     const resolved = modelRegistry.get(lookupName);
     if (!resolved) {
-      throw new Error(
+      // Rails resolves both association and aggregation reflection classes
+      // through compute_type, which raises NameError for a missing constant
+      // (reflection.rb:495-508). Match AssociationReflection#computeClass so
+      // callers rescuing only NameError treat both paths uniformly.
+      throw new NameError(
         `Model '${lookupName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
       );
     }
