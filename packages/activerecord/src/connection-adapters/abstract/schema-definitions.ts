@@ -602,7 +602,11 @@ export class ReferenceDefinition {
     this.polymorphic = options.polymorphic ?? false;
     this.index = options.index !== false ? (options.index ?? true) : false;
     this.foreignKey = options.foreignKey ?? false;
-    this.type = options.type ?? "integer";
+    // Rails' ReferenceDefinition defaults `type: :bigint`
+    // (schema_definitions.rb:204) — the same class backs both `t.references`
+    // and `add_reference`, so the reference column lines up with the default
+    // `bigint` primary key of the table it points at.
+    this.type = options.type ?? "bigint";
     const { polymorphic: _, foreignKey: _fk, index: _idx, type: _t, ...rest } = options;
     this.options = rest;
   }
