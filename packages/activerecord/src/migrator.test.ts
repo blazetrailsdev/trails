@@ -20,7 +20,10 @@ const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pa
 // Rails: ActiveRecord::Migration.new(name, version) — a bare migration with
 // no-op up/down. Rails tolerates a nil version (e.g. `Migration.new("Chunky")`);
 // `Migrator#validate` checks duplicate names before ever reading versions, so a
-// version-less input is valid. Omit `version` to reproduce that nil case.
+// version-less input is valid. Omit `version` to reproduce that nil case. In
+// Rails the nil-version inputs are `Migration` instances (a disk-loaded
+// `MigrationProxy` always has a version), so the null cast faithfully models
+// passing a bare Migration where the proxy type is annotated.
 function migration(name: string, version?: number): MigrationProxy {
   return {
     version: version === undefined ? (null as unknown as string) : String(version),
