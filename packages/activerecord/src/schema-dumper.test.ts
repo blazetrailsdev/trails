@@ -8,7 +8,6 @@ import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
-import { dropAllTables } from "./test-helpers/drop-all-tables.js";
 import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
 
 // The first describe uses `fixtures({})` (canonical schema + reset shield);
@@ -325,18 +324,14 @@ describe("SchemaDumperTest", () => {
 // adapter tables / reflection fixes — tracked as follow-up stories under RFC 0048.
 describe("SchemaDumperTest", () => {
   let ctx: MigrationContext;
-  beforeEach(async () => {
+  beforeEach(() => {
+    // Each case builds its own bespoke tables and dumps only those — `ctx`
+    // dumps use MigrationContext's in-memory table set, and adapter dumps go
+    // through `SchemaDumper.dumpTableSchema(adapter, name)`, which introspects
+    // only the named table (no `tables()` enumeration of the ~330 canonical
+    // tables the truncate-reset preserves). So none of them enter the dump's
+    // output/timing: no empty-DB precondition (and no drop-all crutch) needed.
     ctx = new MigrationContext(Base.connection);
-    // These cases build bespoke tables and dump the whole schema; the global
-    // truncate-reset leaves the ~330 canonical tables in place (only clearing
-    // rows), which would make each full-schema dump introspect all of them and
-    // blow the per-test timeout. Drop to an empty DB so the dumps stay cheap and
-    // deterministic (the old drop-all reset contract these cases were written
-    // against). Carpet-bomb is intentional here: the tables to remove are the
-    // boot-laid canonical set this file did NOT create, so dropTable("…") of
-    // owned tables cannot express it.
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await dropAllTables(Base.connection);
   });
   afterEach(() => {
     SchemaDumper.ignoreTables = [];
@@ -419,13 +414,11 @@ describe("SchemaDumperTest", () => {
     await ss.addCheckConstraint("products", "price > discounted_price", {
       name: "products_price_check",
     });
-    const output = await SchemaDumper.dump(testAdapter);
+    const output = await SchemaDumper.dumpTableSchema(testAdapter, "products");
     expect(output).toContain("products_price_check");
     expect(output).toContain("t.checkConstraint");
   });
   itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
-    const { SchemaDumper: PgSchemaDumper } =
-      await import("./connection-adapters/postgresql/schema-dumper.js");
     const testAdapter = Base.connection;
     const testCtx = new MigrationContext(testAdapter);
     await testCtx.createTable("test_schema_exclusion", { id: false }, (t) => {
@@ -437,14 +430,12 @@ describe("SchemaDumperTest", () => {
       "daterange(start_date, end_date) WITH &&",
       { using: "gist", name: "test_schema_exclusion_date_overlap" },
     );
-    const output = await PgSchemaDumper.dump(testAdapter);
+    const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_exclusion");
     expect(output).toContain("addExclusionConstraint");
     expect(output).toContain("test_schema_exclusion_date_overlap");
     expect(output).toContain("daterange(start_date, end_date) WITH &&");
   });
   itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
-    const { SchemaDumper: PgSchemaDumper } =
-      await import("./connection-adapters/postgresql/schema-dumper.js");
     const testAdapter = Base.connection;
     const testCtx = new MigrationContext(testAdapter);
     await testCtx.createTable("test_schema_unique", {}, (t) => {
@@ -458,7 +449,7 @@ describe("SchemaDumperTest", () => {
       nullsNotDistinct: true,
       name: "test_schema_unique_position_2_nnd",
     });
-    const output = await PgSchemaDumper.dump(testAdapter);
+    const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_unique");
     expect(output).toContain("addUniqueConstraint");
     expect(output).toContain("test_schema_unique_position_1");
     expect(output).toContain("test_schema_unique_position_2_nnd");
@@ -468,8 +459,6 @@ describe("SchemaDumperTest", () => {
     "unique_constraints",
     "schema does not dump unique constraints as indexes",
     async () => {
-      const { SchemaDumper: PgSchemaDumper } =
-        await import("./connection-adapters/postgresql/schema-dumper.js");
       const testAdapter = Base.connection;
       const testCtx = new MigrationContext(testAdapter);
       await testCtx.createTable("test_uc_no_idx", {}, (t) => {
@@ -478,7 +467,7 @@ describe("SchemaDumperTest", () => {
       await (testAdapter as any).addUniqueConstraint("test_uc_no_idx", ["position"], {
         name: "test_uc_no_idx_position",
       });
-      const output = await PgSchemaDumper.dump(testAdapter);
+      const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_uc_no_idx");
       expect(output).toContain("addUniqueConstraint");
       // The backing index must not also appear as an addIndex call.
       expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
@@ -505,11 +494,11 @@ describe("SchemaDumperTest", () => {
     async () => {
       const adapter = Base.connection;
       const testCtx = new MigrationContext(adapter);
-      await testCtx.createTable("binary_fields", {}, (t) => {
+      await testCtx.createTable("binary_fields", { force: true }, (t) => {
         t.binary("var_binary", { limit: 255 });
         t.binary("var_binary_large", { limit: 4095 });
       });
-      const output = await SchemaDumper.dump(adapter);
+      const output = await SchemaDumper.dumpTableSchema(adapter, "binary_fields");
       expect(output).toMatch(/t\.binary\("var_binary", \{ limit: 255 \}\)/);
       expect(output).toMatch(/t\.binary\("var_binary_large", \{ limit: 4095 \}\)/);
     },
@@ -519,7 +508,7 @@ describe("SchemaDumperTest", () => {
     async () => {
       const bfAdapter = Base.connection;
       const bfCtx = new MigrationContext(bfAdapter);
-      await bfCtx.createTable("binary_fields", {}, (t) => {
+      await bfCtx.createTable("binary_fields", { force: true }, (t) => {
         t.binary("tiny_blob", { size: "tiny" });
         t.binary("normal_blob");
         t.binary("medium_blob", { size: "medium" });
@@ -529,7 +518,7 @@ describe("SchemaDumperTest", () => {
         t.text("medium_text", { size: "medium" });
         t.text("long_text", { size: "long" });
       });
-      const output = await SchemaDumper.dump(bfAdapter);
+      const output = await SchemaDumper.dumpTableSchema(bfAdapter, "binary_fields");
       expect(output).toMatch(/t\.binary\("tiny_blob", \{ size: "tiny" \}\)/);
       expect(output).toMatch(/t\.binary\("normal_blob"\)/);
       expect(output).toMatch(/t\.binary\("medium_blob", \{ size: "medium" \}\)/);
@@ -548,7 +537,7 @@ describe("SchemaDumperTest", () => {
       await testCtx.createTable("booleans", { force: true }, (t) => {
         t.boolean("has_fun", { default: false });
       });
-      const output = await SchemaDumper.dump(adapter);
+      const output = await SchemaDumper.dumpTableSchema(adapter, "booleans");
       expect(output).not.toMatch(/t\.boolean\("has_fun",.+limit: 1/);
     },
   );
@@ -567,7 +556,7 @@ describe("SchemaDumperTest", () => {
       using: "btree",
       name: "index_key_tests_on_pizza",
     });
-    const output = await SchemaDumper.dump(ktAdapter);
+    const output = await SchemaDumper.dumpTableSchema(ktAdapter, "key_tests");
     expect(output).toContain(
       'addIndex("key_tests", "awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
     );
@@ -590,24 +579,22 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")("schema dump includes limit on array type", async () => {
     const adapter = Base.connection;
     const testCtx = new MigrationContext(adapter);
-    await testCtx.createTable("bigint_array", {}, (t) => {
+    await testCtx.createTable("bigint_array", { force: true }, (t) => {
       (t as any).integer("big_int_data_points", { limit: 8, array: true });
     });
-    const output = await SchemaDumper.dump(adapter);
+    const output = await SchemaDumper.dumpTableSchema(adapter, "bigint_array");
     expect(output).toMatch(/t\.bigint\("big_int_data_points", \{ array: true \}\)/);
   });
   it.skipIf(adapterType !== "postgres")(
     "schema dump allows array of decimal defaults",
     async () => {
-      const { SchemaDumper: PgSchemaDumper } =
-        await import("./connection-adapters/postgresql/schema-dumper.js");
       const testAdapter = Base.connection;
       const testCtx = new MigrationContext(testAdapter);
-      await testCtx.createTable("bigint_array", {}, (t) => {
+      await testCtx.createTable("bigint_array", { force: true }, (t) => {
         t.integer("big_int_data_points", { limit: 8, array: true });
         t.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
       });
-      const output = await PgSchemaDumper.dump(testAdapter);
+      const output = await SchemaDumper.dumpTableSchema(testAdapter, "bigint_array");
       expect(output).toMatch(
         /t\.decimal\("decimal_array_default",\s*\{[^}]*default:\s*\["1\.23", "3\.45"\][^}]*array:\s*true/,
       );
@@ -620,7 +607,7 @@ describe("SchemaDumperTest", () => {
       (t as any).interval("time_interval");
       (t as any).interval("scaled_time_interval", { precision: 6 });
     });
-    const output = await SchemaDumper.dump(adapter);
+    const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_times");
     expect(output).toMatch(/t\.interval\("time_interval"\)/);
     expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
   });
@@ -630,22 +617,27 @@ describe("SchemaDumperTest", () => {
     await testCtx.createTable("postgresql_oids", {}, (t) => {
       (t as any).oid("obj_id");
     });
-    const output = await SchemaDumper.dump(adapter);
+    const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_oids");
     expect(output).toMatch(/t\.oid\("obj_id"\)/);
   });
   it.skipIf(adapterType !== "postgres")("schema dump includes extensions", async () => {
-    const { SchemaDumper: PgSchemaDumper } =
-      await import("./connection-adapters/postgresql/schema-dumper.js");
     const adapter = Base.connection;
     const original = (adapter as any).extensions;
+    // This asserts only the extensions header, but the dumper needs a table to
+    // dump. Dump a single throwaway table via `dumpTableSchema` (which does
+    // NOT enumerate the ~330 canonical tables the truncate-reset preserves)
+    // rather than a full dump, so the header stays cheap under CI fork load.
+    await new MigrationContext(adapter).createTable("schema_dump_probe", { force: true }, (t) => {
+      t.integer("x");
+    });
     try {
       (adapter as any).extensions = async () => ["hstore"];
-      let output = await PgSchemaDumper.dump(adapter);
+      let output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
       expect(output).toContain("These are extensions that must be enabled");
       expect(output).toMatch(/enableExtension\("hstore"\)/);
 
       (adapter as any).extensions = async () => [];
-      output = await PgSchemaDumper.dump(adapter);
+      output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
       expect(output).not.toContain("These are extensions that must be enabled");
       expect(output).not.toContain("enableExtension");
     } finally {
@@ -655,13 +647,14 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump includes extensions in alphabetic order",
     async () => {
-      const { SchemaDumper: PgSchemaDumper } =
-        await import("./connection-adapters/postgresql/schema-dumper.js");
       const adapter = Base.connection;
       const original = (adapter as any).extensions;
+      await new MigrationContext(adapter).createTable("schema_dump_probe", { force: true }, (t) => {
+        t.integer("x");
+      });
       try {
         (adapter as any).extensions = async () => ["uuid-ossp", "xml2", "hstore"];
-        const output = await PgSchemaDumper.dump(adapter);
+        const output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
         const enabled = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map((m) => m[1]);
         expect(enabled).toEqual(["hstore", "uuid-ossp", "xml2"]);
       } finally {
@@ -675,7 +668,7 @@ describe("SchemaDumperTest", () => {
     await testCtx.createTable("numeric_data", { force: true }, (t) => {
       t.float("temperature_with_limit", { limit: 24 });
     });
-    const output = await SchemaDumper.dump(adapter);
+    const output = await SchemaDumper.dumpTableSchema(adapter, "numeric_data");
     expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
   });
   it.skipIf(adapterType !== "postgres")(
@@ -683,8 +676,13 @@ describe("SchemaDumperTest", () => {
     async () => {
       const adapter = Base.connection;
       await (adapter as any).createEnum("enum_with_comma", ["value1", "value,2", "value3"]);
+      // Dump a throwaway table (not a full dump) so the enum-type header is
+      // emitted without introspecting the ~330 canonical tables.
+      await new MigrationContext(adapter).createTable("schema_dump_probe", { force: true }, (t) => {
+        t.integer("x");
+      });
       try {
-        const output = await SchemaDumper.dump(adapter);
+        const output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
         expect(output).toContain('createEnum("enum_with_comma", ["value1","value,2","value3"])');
       } finally {
         // drop-all-tables (per-test reset) does not drop enum types — clean up
@@ -819,7 +817,7 @@ describe("SchemaDumperTest", () => {
     "schema dump with timestamptz datetime format",
     async () => {
       await withPostgresqlDatetimeType("timestamptz", async () => {
-        await ctx.createTable("timestamps", {}, (t) => {
+        await ctx.createTable("timestamps", { force: true }, (t) => {
           t.datetime("this_should_remain_datetime");
           (t as any).timestamptz("this_is_an_alias_of_datetime");
           t.column("without_time_zone", "timestamp");
@@ -849,7 +847,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump when changing datetime type for an existing app",
     async () => {
-      await ctx.createTable("timestamps", {}, (t) => {
+      await ctx.createTable("timestamps", { force: true }, (t) => {
         t.datetime("default_format");
         t.column("without_time_zone", "timestamp");
         t.column("with_time_zone", "timestamptz");
@@ -871,7 +869,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t timestamptz",
     async () => {
-      await ctx.createTable("timestamps", {}, (t) => {
+      await ctx.createTable("timestamps", { force: true }, (t) => {
         t.datetime("default_format");
         t.datetime("without_time_zone");
         t.timestamp("also_without_time_zone");
@@ -932,17 +930,16 @@ describe("SchemaDumperTest", () => {
 describe("SchemaDumperDefaultsTest", () => {
   let ctx: MigrationContext;
   let adapter: TestDatabaseAdapter;
-  beforeEach(async () => {
+  beforeEach(() => {
     adapter = Base.connection;
     ctx = new MigrationContext(adapter);
-    // See SchemaDumperTest beforeEach: drop to an empty DB so full-schema dumps
-    // don't introspect the ~330 canonical tables the truncate-reset preserves.
-    // eslint-disable-next-line blazetrails/require-table-teardown
-    await dropAllTables(adapter);
+    // See SchemaDumperTest beforeEach: `ctx` dumps are scoped to the in-memory
+    // table set and the adapter case uses `dumpTableSchema`, so no empty-DB
+    // precondition is needed.
   });
 
   it("schema dump defaults with universally supported types", async () => {
-    await ctx.createTable("dump_defaults", {}, (t) => {
+    await ctx.createTable("dump_defaults", { force: true }, (t) => {
       t.string("string_with_default", { default: "Hello!" });
       t.date("date_with_default", { default: "2014-06-05" });
       t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
@@ -957,7 +954,7 @@ describe("SchemaDumperDefaultsTest", () => {
 
   // MySQL 8 strict mode forbids TEXT column defaults; MariaDB allowed them.
   itIfSupports("text_column_with_default", "schema dump with text column", async () => {
-    await ctx.createTable("dump_defaults", {}, (t) => {
+    await ctx.createTable("dump_defaults", { force: true }, (t) => {
       t.text("text_with_default", { default: "John" });
     });
     const output = SchemaDumper.dump(ctx);
@@ -1012,6 +1009,7 @@ afterAll(async () => {
   await ctx.dropTable("postgresql_oids", o);
   await ctx.dropTable("postgresql_times", o);
   await ctx.dropTable("posts", o);
+  await ctx.dropTable("schema_dump_probe", o);
   await ctx.dropTable("products", o);
   await ctx.dropTable("string_key_objects", o);
   await ctx.dropTable("temp_cache", o);

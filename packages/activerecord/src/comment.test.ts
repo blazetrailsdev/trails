@@ -9,6 +9,7 @@ import { MigrationContext } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { itIfSupports } from "./test-helpers/supports.js";
+import { SchemaDumper } from "./schema-dumper.js";
 
 describe("CommentTest", () => {
   // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
@@ -131,7 +132,6 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "schema dump with comments", async () => {
-    const { SchemaDumper } = await import("./schema-dumper.js");
     await ctx.addColumn("commenteds", "rating", "integer", {
       comment: "I am running out of imagination",
     });
@@ -139,7 +139,9 @@ describe("CommentTest", () => {
       comment: "Whoa, content describes itself!",
     });
     await ctx.changeColumn("commenteds", "obvious", "string", { comment: null as any });
-    const output = await SchemaDumper.dump(adapter);
+    // Scope to the table under assertion so the dump stays cheap on a cold
+    // schema cache (the truncate-reset leaves the ~330 canonical tables in place).
+    const output = await SchemaDumper.dumpTableSchema(adapter, "commenteds");
     expect(output).toMatch(/createTable.*"commenteds".*comment:\s*"A table with comment"/);
     expect(output).toMatch(
       /t\.\w+\("name"[^)]*\{[^}]*comment:\s*"Comment should help clarify the column purpose"/,
@@ -154,8 +156,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "schema dump omits blank comments", async () => {
-    const { SchemaDumper } = await import("./schema-dumper.js");
-    const output = await SchemaDumper.dump(adapter);
+    const output = await SchemaDumper.dumpTableSchema(adapter, "blank_comments");
     expect(output).toMatch(/createTable.*"blank_comments"/);
     expect(output).not.toMatch(/createTable.*"blank_comments".*comment:/);
     for (const field of ["space_comment", "empty_comment", "nil_comment", "absent_comment"]) {
@@ -200,8 +201,7 @@ describe("CommentTest", () => {
   });
 
   itIfSupports("comments", "schema dump with primary key comment", async () => {
-    const { SchemaDumper } = await import("./schema-dumper.js");
-    const output = await SchemaDumper.dump(adapter);
+    const output = await SchemaDumper.dumpTableSchema(adapter, "pk_commenteds");
     // Tight: the id hash must carry ONLY the comment (no limit/precision/scale/autoIncrement
     // leak), and the table comment must be separate. Catches the columnSpecForPrimaryKey
     // wrapping regression.
