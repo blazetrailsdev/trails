@@ -702,13 +702,19 @@ export abstract class Migration {
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    options?: { name?: string; ifExists?: boolean },
   ): Promise<void> {
     if (this._recording) {
-      this._recorder.record("removeCheckConstraint", [tableName, expressionOrOptions]);
+      // Rails records `remove_check_constraint(table, expression, **options)`;
+      // preserve the trailing options so invert_add_check_constraint's :name
+      // survives the round-trip and resolves the real constraint on replay.
+      const recordArgs: unknown[] = [tableName, expressionOrOptions];
+      if (options !== undefined) recordArgs.push(options);
+      this._recorder.record("removeCheckConstraint", recordArgs);
       return;
     }
     tableName = this._pt(tableName);
-    await this.schema.removeCheckConstraint(tableName, expressionOrOptions);
+    await this.schema.removeCheckConstraint(tableName, expressionOrOptions, options);
   }
   async validateCheckConstraint(
     tableName: string,

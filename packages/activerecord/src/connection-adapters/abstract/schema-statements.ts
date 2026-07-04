@@ -333,9 +333,15 @@ export class SchemaStatements {
         changeColumnComment?(t: string, c: string, comment: string | null): Promise<void>;
       };
       if (typeof commentAdapter.changeColumnComment === "function") {
-        for (const column of td.columns as Array<{ name: string; comment?: string | null }>) {
-          if (column.comment != null && String(column.comment).length > 0) {
-            await commentAdapter.changeColumnComment(name, column.name, column.comment);
+        // ColumnDefinition keeps the comment under `.options.comment` (Rails'
+        // `column.comment` reads through to the options hash).
+        for (const column of td.columns as Array<{
+          name: string;
+          options?: { comment?: string | null };
+        }>) {
+          const columnComment = column.options?.comment;
+          if (columnComment != null && String(columnComment).length > 0) {
+            await commentAdapter.changeColumnComment(name, column.name, columnComment);
           }
         }
       }
@@ -848,23 +854,32 @@ export class SchemaStatements {
   async removeCheckConstraint(
     tableName: string,
     expressionOrOptions?: string | { name?: string; ifExists?: boolean },
+    options: { name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
       typeof adapter.removeCheckConstraint === "function" &&
       adapter.removeCheckConstraint !== SchemaStatements.prototype.removeCheckConstraint
     ) {
-      return adapter.removeCheckConstraint(tableName, expressionOrOptions);
+      return adapter.removeCheckConstraint(tableName, expressionOrOptions, options);
     }
-    const ifExists =
-      typeof expressionOrOptions === "object" && expressionOrOptions?.ifExists === true;
-    let name: string;
+    // Mirrors Rails remove_check_constraint(table, expression = nil, **options):
+    // prefer an explicit :name (threaded from invert_add_check_constraint), else
+    // derive from the expression via the same hash add_check_constraint used, so
+    // the reversal drops the constraint under its real name.
+    let name: string | undefined;
+    let ifExists: boolean;
     if (typeof expressionOrOptions === "string") {
-      name = this._checkConstraintName(tableName, expressionOrOptions);
-    } else if (expressionOrOptions?.name) {
-      name = expressionOrOptions.name;
+      ifExists = options.ifExists === true;
+      name = options.name ?? this._checkConstraintName(tableName, expressionOrOptions);
     } else {
-      throw new Error("removeCheckConstraint requires either an expression or { name } option");
+      ifExists = (expressionOrOptions?.ifExists ?? options.ifExists) === true;
+      name = expressionOrOptions?.name ?? options.name;
+    }
+    if (!name) {
+      throw new ArgumentError(
+        "remove_check_constraint requires either an expression or { name } option",
+      );
     }
     const ifExistsSql = ifExists ? " IF EXISTS" : "";
     await this.adapter.executeMutation(
