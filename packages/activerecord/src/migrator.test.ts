@@ -17,11 +17,13 @@ import { fixtures } from "./test-helpers/fixtures.js";
 // trails equivalents live under test-helpers/migrations.
 const MIGRATIONS_ROOT = new URL("./test-helpers/migrations", import.meta.url).pathname;
 
-// Rails: ActiveRecord::Migration.new(name, version) — a bare migration proxy
-// with no-op up/down. trails requires a numeric version, so callers supply one.
-function migration(name: string, version: number): MigrationProxy {
+// Rails: ActiveRecord::Migration.new(name, version) — a bare migration with
+// no-op up/down. Rails tolerates a nil version (e.g. `Migration.new("Chunky")`);
+// `Migrator#validate` checks duplicate names before ever reading versions, so a
+// version-less input is valid. Omit `version` to reproduce that nil case.
+function migration(name: string, version?: number): MigrationProxy {
   return {
-    version: String(version),
+    version: version === undefined ? (null as unknown as string) : String(version),
     name,
     migration: () => ({ up: async () => {}, down: async () => {} }),
   };
@@ -85,7 +87,7 @@ describe("MigratorTest", () => {
 
   it("migrator with duplicate names", () => {
     expect(() => {
-      const list = [migration("Chunky", 1), migration("Chunky", 2)];
+      const list = [migration("Chunky"), migration("Chunky")];
       new Migrator(adapter, list);
     }).toThrow(/Multiple migrations have the name Chunky/);
   });

@@ -3126,10 +3126,21 @@ export class Migrator {
 
   /** @internal */
   private validate(migrations: MigrationProxy[]): void {
-    const versions = new Set<string>();
-    const names = new Set<string>();
     const validateTs = this.isValidateTimestamp();
 
+    // Rails' Migrator#validate checks duplicate names before touching
+    // versions, and tolerates a nil version. Mirror that ordering so a list of
+    // same-name, version-less migrations raises DuplicateMigrationNameError
+    // rather than being rejected for a missing version.
+    const names = new Set<string>();
+    for (const m of migrations) {
+      if (names.has(m.name)) {
+        throw new DuplicateMigrationNameError(m.name);
+      }
+      names.add(m.name);
+    }
+
+    const versions = new Set<string>();
     for (const m of migrations) {
       if (!m.version || !/^\d+$/.test(m.version)) {
         throw new MigrationError(
@@ -3143,11 +3154,7 @@ export class Migrator {
       if (versions.has(normalized)) {
         throw new DuplicateMigrationVersionError(m.version);
       }
-      if (names.has(m.name)) {
-        throw new DuplicateMigrationNameError(m.name);
-      }
       versions.add(normalized);
-      names.add(m.name);
     }
   }
 
