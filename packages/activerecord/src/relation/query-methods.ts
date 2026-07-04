@@ -2698,11 +2698,14 @@ export function selectAssociationList(
  * Rails only accepts Symbol/Hash/Array as a left-outer arg — a bare String is
  * not a Symbol, so `left_outer_joins("raw sql")` raises "only Hash, Symbol and
  * Array are allowed" lazily from build_join_buckets' block
- * (query_methods.rb:1830-1836). trails collapses Ruby Symbol and String to one
- * JS string type, so an association name and a raw SQL fragment are
- * indistinguishable by type; a raw fragment is a string containing whitespace,
- * which no association identifier has. Reject those (and any other non-spec
- * value) at build time, mirroring Rails' lazy raise point and message.
+ * (query_methods.rb:1830-1836) for anything its `select_association_list`
+ * (query_methods.rb:1810-1824) does not recognize as a spec or stash as a
+ * JoinDependency. trails collapses Ruby Symbol and String to one JS string
+ * type, so an association name and a raw SQL fragment are indistinguishable by
+ * type; a raw fragment is a string containing whitespace, which no association
+ * identifier has. Reject those (and any other non-spec value) at build time,
+ * mirroring Rails' lazy raise point and message. A JoinDependency is allowed
+ * through — `select_association_list` stashes it rather than raising.
  *
  * @internal
  */
@@ -2710,7 +2713,12 @@ export function assertValidLeftOuterJoinsBang(values: unknown[]): void {
   for (const v of values) {
     if (typeof v === "string") {
       if (/\s/.test(v)) throw argumentError("only Hash, Symbol and Array are allowed");
-    } else if (typeof v !== "symbol" && !Array.isArray(v) && !isPlainObject(v)) {
+    } else if (
+      typeof v !== "symbol" &&
+      !Array.isArray(v) &&
+      !isPlainObject(v) &&
+      !(v instanceof JoinDependency)
+    ) {
       throw argumentError("only Hash, Symbol and Array are allowed");
     }
   }
