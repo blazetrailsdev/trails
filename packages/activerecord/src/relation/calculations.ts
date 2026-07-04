@@ -579,7 +579,18 @@ async function groupedCompositeAssoc(
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const projections = groupNodes.map((n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])));
   const manager = table.project(...projections, aggNode.as("val"));
-  rel._applyJoinsToManager(manager);
+  // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
+  // into `joins_values` via `apply_join_dependency` before dispatching to the
+  // grouped calculation, regardless of key arity. Fold it into the shared
+  // `build_joins` port so the eager JD and any manual joins share ONE
+  // `AliasTracker` and dedup via `walk`, mirroring `singleAggregate`/
+  // `groupedAggregate`.
+  const allEagerCa = collectEagerSpecs(rel);
+  const eagerJdCa =
+    allEagerCa.length > 0
+      ? QueryMethodBangs.constructJoinDependency.call(rel as any, allEagerCa, Nodes.OuterJoin)
+      : undefined;
+  rel._applyJoinsToManager(manager, eagerJdCa);
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
   for (const n of groupNodes) manager.group(n);
@@ -779,6 +790,56 @@ export async function performCount(
         );
         const rows = result.toArray();
         return Number(rows[0]?.count ?? 0);
+      } else {
+        // Composite-PK eager count. Rails `calculate` (calculations.rb:231-238)
+        // sets `select_values = Array(model.primary_key)` and recurses with
+        // `distinct!`, counting over the multi-column PK. `COUNT(DISTINCT c1,
+        // c2)` isn't valid SQL on SQLite/PG, so a specific requested column is
+        // counted distinctly inline while `count(*)` wraps a DISTINCT-pk-columns
+        // subquery (mirroring the non-eager composite path). The eager JD folds
+        // through the shared `build_joins` port so one `AliasTracker` spans the
+        // manual joins AND the eager JD.
+        const makeEagerJd = (): JoinDependency =>
+          QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
+        const table = this._modelClass.arelTable;
+        if (column != null && column !== "*") {
+          const manager = table.project(
+            (aggregateColumn(this, column) as any).count(true).as("count"),
+          );
+          this._applyJoinsToManager(manager, makeEagerJd());
+          this._applyWheresToManager(manager, table);
+          applyFromToManager(this, manager);
+          const [rawSql, managerBinds] = compileManagerWithBinds(this, manager);
+          const [withCtes, ctedBinds] = prependCtes(this, rawSql, managerBinds);
+          const result = await this._conn().selectAll(
+            withCtes,
+            `${this._modelClass.name} Count`,
+            ctedBinds,
+          );
+          return Number(result.toArray()[0]?.count ?? 0);
+        }
+        const innerManager = table.project(...pk.map((c: string) => table.get(c)));
+        innerManager.distinct();
+        this._applyJoinsToManager(innerManager, makeEagerJd());
+        this._applyWheresToManager(innerManager, table);
+        applyFromToManager(this, innerManager);
+        if (this._limitValue !== null) innerManager.take(this._limitValue);
+        if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
+        const [innerSql, allInnerBinds] = compileManagerWithBinds(this, innerManager);
+        const countAll = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
+        const outerManager = table.project(countAll.as("count"));
+        outerManager.from(new Nodes.SqlLiteral(`(${innerSql}) AS subquery`));
+        const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
+        const [withCtes, ctedBinds] = prependCtes(this, outerSql, [
+          ...allInnerBinds,
+          ...outerBinds,
+        ]);
+        const result = await this._conn().selectAll(
+          withCtes,
+          `${this._modelClass.name} Count`,
+          ctedBinds,
+        );
+        return Number(result.toArray()[0]?.count ?? 0);
       }
     }
   }
