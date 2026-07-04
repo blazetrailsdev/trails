@@ -41855,20 +41855,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
-    "rubyName": "initialize",
-    "call": "assert_valid_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
     "rubyName": "merge",
     "call": "relation",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
