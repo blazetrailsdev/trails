@@ -113,7 +113,7 @@ describe("HashExtTest", () => {
     // callers can narrow on the type — assert both the message and the type.
     expect(() =>
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
-    ).toThrow(/Unknown key: failore/);
+    ).toThrow("Unknown key: :failore. Valid keys are: :failure, :funny");
     let error: unknown;
     try {
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]);
@@ -126,7 +126,7 @@ describe("HashExtTest", () => {
 
   it("assert_valid_keys — includes valid keys in error message", () => {
     expect(() => assertValidKeys({ failore: "stuff" }, ["failure"])).toThrow(
-      /Valid keys are: failure/,
+      "Unknown key: :failore. Valid keys are: :failure",
     );
   });
 
