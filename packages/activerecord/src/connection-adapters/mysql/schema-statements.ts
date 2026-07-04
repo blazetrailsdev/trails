@@ -507,10 +507,17 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
   // lookupCastType would report limit 53 for a FLOAT that should be 24. Rails
   // sidesteps this by reading `SHOW FULL FIELDS FROM`, which preserves the
   // declared type name. Source the declared type the same way on MariaDB and
-  // re-key the float-limit lookup off it. MySQL's information_schema already
-  // preserves the distinction, so skip the extra round-trip there.
+  // re-key the float-limit lookup off it (below). MySQL's information_schema
+  // already preserves the distinction, so skip the extra round-trip there — and
+  // even on MariaDB only pay for it when a float/double column is actually
+  // present (a masked FLOAT still reports DATA_TYPE "double", so gating on
+  // "float"|"double" catches it without a second query for every other table).
   const declaredTypes = new Map<string, string>();
-  if (this.isMariadb()) {
+  const hasFloatLike = rows.some((r) => {
+    const t = String((r.type ?? r.TYPE ?? r.DATA_TYPE ?? "") as string).toLowerCase();
+    return t === "float" || t === "double";
+  });
+  if (this.isMariadb() && hasFloatLike) {
     for (const f of await this.columnDefinitions(tableName)) {
       const fieldName = f["Field"];
       const fieldType = f["Type"];
@@ -536,13 +543,11 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     // Rails' fetch_type_metadata derives type AND limit from that one
     // lookup_cast_type(sql_type) (abstract/schema_statements.rb:1717), so an
     // emulated tinyint(1) gets type :boolean with limit nil — not the integer
-    // limit 1. The lone divergence is MariaDB, which normalizes a declared
-    // FLOAT's COLUMN_TYPE to "double" in information_schema (limit 53), whereas
-    // Rails reads SHOW FULL FIELDS where it stays "float" (limit 24). For that
-    // one type, re-key the limit on the declared type name — sourced from
-    // SHOW FULL FIELDS on MariaDB (declaredTypes), else the info_schema
-    // DATA_TYPE — to keep Rails' 24; every other registration yields the same
-    // fixed limit regardless of which key is used.
+    // limit 1. The lone divergence is the MariaDB FLOAT→DOUBLE normalization
+    // handled above: re-key the limit on the declared type name — the SHOW FULL
+    // FIELDS type when we fetched it (declaredTypes), else the info_schema
+    // COLUMN_TYPE — so a bare FLOAT keeps Rails' limit 24. Every other
+    // registration yields the same fixed limit regardless of which key is used.
     const declaredType = declaredTypes.get(name) ?? sqlType;
     const declaredBase = declaredType
       .replace(/\(.*\).*$/, "")
