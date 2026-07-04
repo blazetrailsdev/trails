@@ -196,8 +196,17 @@ export class SchemaDumper extends BaseSchemaDumper {
     return undefined;
   }
 
+  // Rails `schema_default` / `schema_expression` live in
+  // `connection_adapters/abstract/schema_dumper.rb`, so the ports stay in this
+  // file (the api:compare-mapped location). The base `SchemaDumper`
+  // (../../schema-dumper.ts) carries structurally-identical copies so its
+  // legacy `emitTable` default callsites route through the same cast-type path;
+  // these overrides keep the Rails-faithful body where it belongs. `_adapter`
+  // is a trails-only helper and lives solely on the base. Keep these two bodies
+  // in lockstep with the base copies — edit both.
+
   /** @internal */
-  protected schemaDefault(column: Column): string | undefined {
+  protected override schemaDefault(column: Column): string | undefined {
     if (!column.hasDefault && column.default === undefined) return undefined;
     if (column.default == null) return this.schemaExpression(column);
     const adapter = this._adapter();
@@ -220,13 +229,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected _adapter(): any {
-    const src = (this as any)._source;
-    return src?.adapter ?? src;
-  }
-
-  /** @internal */
-  protected schemaExpression(column: Column): string | undefined {
+  protected override schemaExpression(column: Column): string | undefined {
     // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
     // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
     if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
