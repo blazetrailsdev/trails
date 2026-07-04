@@ -2262,87 +2262,34 @@ export class MigrationContext {
   ): Promise<void> {
     const cols = Array.isArray(columns) ? columns : [columns];
     const unique = options?.unique ?? false;
-    // Rails derives the default name from `index_name_options`: an expression
-    // column (a String with non-word chars, e.g. "(lower(external_id))") is
-    // reduced to its `\w+` runs joined by "_", not the raw parenthesised SQL.
-    // Matching `addIndexOptions`/`indexNameOptions` keeps the name identical
-    // across the direct addIndex and schema dump/reload (loadSchema) paths.
-    const nameParts =
-      cols.length === 1 && /\W/.test(cols[0])
-        ? [cols[0].match(/\w+/g)?.join("_") ?? cols[0]]
-        : cols;
     const an = this._adapterName;
-    // Rails' PostgreSQL `index_name` strips the schema qualifier before deriving
-    // the default name (postgresql/schema_statements.rb), using the quote-aware
-    // `extract_schema_qualified_name`; a `my_schema.values` table indexes as
-    // `index_values_on_value` (created in `my_schema` via the schema-qualified
-    // table), keeping add/remove symmetric.
-    const [, nameTable] = this._splitSchemaQualified(table);
-    const indexName = options?.name ?? `index_${nameTable}_on_${nameParts.join("_and_")}`;
-    // MySQL FULLTEXT/SPATIAL indexes replace the UNIQUE keyword and ignore it.
-    const typeStr = an === "mysql" && options?.type ? `${options.type.toUpperCase()} ` : "";
-    const uniqueStr = !typeStr && unique ? "UNIQUE " : "";
-    const ifNotExistsStr = options?.ifNotExists ? "IF NOT EXISTS " : "";
-    const length = options?.length;
-    const lengthFor = (c: string): number | undefined =>
-      typeof length === "number" ? length : typeof length === "object" ? length[c] : undefined;
+    // Rails' `Migration` delegates the DDL — and the default index-name
+    // derivation (index_name → generate_index_name, incl. the identifier-length
+    // hash fallback) — to `connection.add_index`. Delegate rather than
+    // hand-rolling `CREATE INDEX`, so the name/DDL are the adapter's single
+    // Rails-faithful copy and long table+column combos get the `idx_on_...<hash>`
+    // form the direct `connection.add_index` path already produces.
+    await this.connection.addIndex(table, columns, options ?? {});
+    // Resolve the name the adapter used, for the in-memory `_indexes`
+    // bookkeeping the schema dump reads. `indexName` applies the same
+    // schema-strip (PostgreSQL) + expression-column reduction + hash fallback
+    // as the adapter's own `add_index_options`, so add/remove and the dump agree.
+    const indexName =
+      options?.name ?? this.connection.indexName(table, this.connection.indexNameOptions(cols));
     // Rails gates the sort-order suffix on `supports_index_sort_order?`
     // (abstract/schema_statements.rb#add_options_for_index_columns, via the
     // MySQL adapter's `super` call). PostgreSQL/SQLite always support it; MySQL
     // is version-gated (MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1), so older servers drop
-    // `DESC`/`ASC` from the DDL. The reconstruct path can run on a freshly-leased
-    // connection whose version is still cold (`supportsIndexSortOrder()` reads
-    // `_databaseVersion` synchronously and yields false when unset), so warm it
-    // first for MySQL — otherwise the gate is spuriously false and a genuinely
-    // descending canonical index round-trips ascending.
-    const conn = this.connection as unknown as {
-      getDatabaseVersion?(): Promise<unknown> | unknown;
-      supportsIndexSortOrder?(): boolean;
-    };
-    if (an === "mysql") await conn.getDatabaseVersion?.();
+    // `DESC`/`ASC` from the DDL. The delegated `addIndex` above has already warmed
+    // the cached database version, so `supportsIndexSortOrder()` reads true/false
+    // correctly here — the stored `orders` must match what the DDL persisted.
     const sortOrderSupported =
-      typeof conn.supportsIndexSortOrder === "function" ? conn.supportsIndexSortOrder() : true;
-    const colsStr = cols
-      .map((c) => {
-        const isExpr = /\W/.test(c);
-        let col = isExpr ? c : this.connection.quoteIdentifier(c);
-        // MySQL sub-part prefix length (`col(n)`) precedes the sort direction,
-        // matching the mysql SchemaCreation visitor (`col(n) DESC`). Length is a
-        // MySQL-only DDL feature; the sort order applies on every adapter that
-        // surfaces it (`sortOrderSupported`), so it must be emitted for MySQL too —
-        // Rails' companies indexes are `order: :desc` and MySQL/MariaDB persist
-        // that direction (SHOW KEYS `Collation = "D"`).
-        if (an === "mysql") {
-          const len = lengthFor(c);
-          if (len != null) col += `(${len})`;
-        }
-        const ord = options?.order?.[c];
-        if (ord && sortOrderSupported) col += ` ${ord.toUpperCase()}`;
-        return col;
-      })
-      .join(", ");
-    const usingStr =
-      an === "postgres" && options?.using && options.using !== "btree"
-        ? ` USING ${options.using}`
-        : "";
-    let sql = `CREATE ${typeStr}${uniqueStr}INDEX ${ifNotExistsStr}${this.connection.quoteIdentifier(indexName)} ON ${this.connection.quoteTableName(table)}${usingStr} (${colsStr})`;
-    // Clause order mirrors Rails' visit_CreateIndexDefinition
-    // (abstract/schema_creation.rb): INCLUDE → NULLS NOT DISTINCT → WHERE.
-    if (an === "postgres" && options?.include && options.include.length > 0)
-      sql += ` INCLUDE (${options.include.map((c) => this.connection.quoteIdentifier(c)).join(", ")})`;
-    if (an === "postgres" && options?.nullsNotDistinct) sql += " NULLS NOT DISTINCT";
-    if (an !== "mysql" && options?.where) sql += ` WHERE ${options.where}`;
+      typeof this.connection.supportsIndexSortOrder === "function"
+        ? this.connection.supportsIndexSortOrder()
+        : true;
+    const usingStored =
+      an === "postgres" && options?.using && options.using !== "btree" ? options.using : undefined;
     const comment = options?.comment?.trim() ? options.comment : undefined;
-    if (an === "mysql" && comment) sql += ` COMMENT ${this.connection.quote(comment)}`;
-    await this.connection.executeMutation(sql);
-    if (an === "postgres" && comment) {
-      // Rails emits an unqualified `COMMENT ON INDEX #{quote_column_name(index.name)}`
-      // (postgresql/schema_statements.rb:529-536), relying on search_path
-      // resolution — it never schema-qualifies this statement.
-      await this.connection.executeMutation(
-        `COMMENT ON INDEX ${this.connection.quoteIdentifier(indexName)} IS ${this.connection.quote(comment)}`,
-      );
-    }
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({
       columns: cols,
@@ -2355,7 +2302,7 @@ export class MigrationContext {
       // round-trip per adapter.
       where: an !== "mysql" ? options?.where : undefined,
       orders: sortOrderSupported ? options?.order : undefined,
-      using: usingStr ? options?.using : undefined,
+      using: usingStored,
       type: an === "mysql" ? options?.type : undefined,
       lengths: an === "mysql" ? options?.length : undefined,
       nullsNotDistinct: an === "postgres" ? options?.nullsNotDistinct : undefined,
@@ -2368,44 +2315,27 @@ export class MigrationContext {
     table: string,
     options: { column?: string | string[]; name?: string },
   ): Promise<void> {
-    // Rails' PostgreSQL `remove_index` derives the default name from the bare
-    // table and re-qualifies the `DROP INDEX` with the table's schema
-    // (postgresql/schema_statements.rb, via PostgreSQL::Name / quoted_scope). It
-    // also splits a schema off an explicit `:name`, using it when the table is
-    // unqualified and raising when the two schemas disagree — mirroring
-    // PostgreSQLAdapter#removeIndex, which this reimplements.
-    const [tableSchema, bareTable] = this._splitSchemaQualified(table);
-    let dropSchema = tableSchema;
-    let indexName = options.name;
-    if (indexName != null && this.connection.adapterName === "postgres") {
-      const [nameSchema, nameIdent] = this._splitSchemaQualified(indexName);
-      indexName = nameIdent;
-      if (!tableSchema) dropSchema = nameSchema;
-      if (nameSchema && tableSchema && nameSchema !== tableSchema) {
-        throw new ArgumentError(
-          `Index schema '${nameSchema}' does not match table schema '${tableSchema}'`,
-        );
-      }
+    // Rails' `Migration` delegates to `connection.remove_index`, which resolves
+    // the concrete index name (schema-split of an explicit `:name`, raising on a
+    // conflicting schema pair; else the bare-table default via generate_index_name)
+    // and drops it in the right schema. Delegate rather than reimplementing that
+    // name derivation — the adapter carries the single Rails-faithful copy.
+    await this.connection.removeIndex(table, options);
+    // Mirror the drop in the in-memory `_indexes` the schema dump reads. Resolve
+    // the stored name the way `addIndex` recorded it: an explicit `:name`
+    // verbatim (PostgreSQL may carry a schema qualifier, so match the bare form
+    // too), else the adapter-derived default from the columns.
+    let stored = options.name;
+    if (stored == null && options.column != null) {
+      stored = this.connection.indexName(table, this.connection.indexNameOptions(options.column));
     }
-    if (!indexName && options.column) {
-      const cols = Array.isArray(options.column) ? options.column : [options.column];
-      indexName = `index_${bareTable}_on_${cols.join("_and_")}`;
-    }
-    if (indexName) {
-      if (this.connection.adapterName === "mysql") {
-        await this.connection.executeMutation(`DROP INDEX \`${indexName}\` ON \`${table}\``);
-      } else if (dropSchema) {
-        await this.connection.executeMutation(
-          `DROP INDEX ${this.connection.quoteIdentifier(dropSchema)}.${this.connection.quoteIdentifier(indexName)}`,
-        );
-      } else {
-        await this.connection.executeMutation(`DROP INDEX "${indexName}"`);
-      }
+    if (stored != null) {
+      const [, bareName] = this._splitSchemaQualified(stored);
       const tableIndexes = this._indexes.get(table);
       if (tableIndexes) {
         this._indexes.set(
           table,
-          tableIndexes.filter((i) => i.name !== indexName),
+          tableIndexes.filter((i) => i.name !== stored && i.name !== bareName),
         );
       }
     }
