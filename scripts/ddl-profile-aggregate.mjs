@@ -15,7 +15,8 @@ if (dirs.length === 0) {
 const files = [];
 for (const d of dirs) {
   for (const f of fs.readdirSync(d)) {
-    if (f.endsWith(".json")) files.push(path.join(d, f));
+    // Skip the schema-repair dumps that share this dir (own aggregator).
+    if (f.endsWith(".json") && !f.startsWith("schema-repair-")) files.push(path.join(d, f));
   }
 }
 
