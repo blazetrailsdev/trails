@@ -236,10 +236,15 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
 
     const sql = (Post.from(subquery, "posts") as unknown as { toSql(): string }).toSql();
 
+    // Identifier quoting is dialect-specific (`"` on sqlite/pg, backticks on
+    // MariaDB/MySQL), so the quote char is optional in the match.
+    const q = `["\`]?`;
     expect(sql).toMatch(
-      /LEFT OUTER JOIN "?commented_posts"? ON "?commented_posts"?\."?post_id"? = "?posts"?\."?id"?/,
+      new RegExp(
+        `LEFT OUTER JOIN ${q}commented_posts${q} ON ${q}commented_posts${q}\\.${q}post_id${q} = ${q}posts${q}\\.${q}id${q}`,
+      ),
     );
-    expect(sql).not.toMatch(/INNER JOIN "?commented_posts"?/);
+    expect(sql).not.toMatch(new RegExp(`INNER JOIN ${q}commented_posts${q}`));
   });
 
   it("raises when using block", () => {
