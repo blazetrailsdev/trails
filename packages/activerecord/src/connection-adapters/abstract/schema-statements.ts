@@ -314,6 +314,11 @@ export class SchemaStatements {
     });
     if (definer) definer(td);
 
+    // Prime the cached database version before the visitor emits DDL: inline
+    // `t.index order:` runs through SchemaCreation's synchronous
+    // supportsIndexSortOrder gate, which yields false on a cold connection
+    // (mirrors addIndex's warm-up). Memoized → no-op when already warm.
+    await this.adapter.getDatabaseVersion?.();
     await this.adapter.executeMutation(this.schemaCreation.accept(td));
 
     // Rails: if supports_comments? && !supports_comments_in_create?

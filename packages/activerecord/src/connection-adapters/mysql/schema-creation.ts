@@ -53,6 +53,9 @@ export interface VisitorHostAdapter {
   supportsCheckConstraints?(): boolean;
   supportsForeignKeys?(): boolean;
   supportsIndexesInCreate?(): boolean;
+  /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1. Reads the cached version
+   * synchronously and yields false when cold — warm via `getDatabaseVersion`. */
+  supportsIndexSortOrder?(): boolean;
   isMariadb?(): boolean;
   /** Mirrors `SchemaStatements#isForeignKeysEnabled` (`adapter.config?.foreignKeys !== false`). */
   config?: { foreignKeys?: boolean };
@@ -301,10 +304,19 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const quotedMap = new Map<string, string>(
       o.columns.map((c) => [c, this.adapter.quoteIdentifier(c)]),
     );
-    addOptionsForIndexColumns(quotedMap, {
-      length: idx.lengths as Record<string, number> | number | undefined,
-      order: idx.orders as Record<string, string> | string | undefined,
-    });
+    // Host-less unit-test path (no adapter) has no sort-order flag; default to
+    // supported so pure DDL fixtures still emit DESC/ASC. When the adapter is
+    // threaded, honor its version gate — the createTable path warms
+    // getDatabaseVersion() upstream so this synchronous read isn't cold.
+    const sortOrderSupported = this._hostAdapter?.supportsIndexSortOrder?.() ?? true;
+    addOptionsForIndexColumns(
+      quotedMap,
+      {
+        length: idx.lengths as Record<string, number> | number | undefined,
+        order: idx.orders as Record<string, string> | string | undefined,
+      },
+      sortOrderSupported,
+    );
     return [...quotedMap.values()].join(", ");
   }
 
