@@ -501,12 +501,15 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
   // string, so this is a no-op after the first call.
   await this.getFullVersion();
 
-  // MariaDB normalizes a declared bare `FLOAT` to DOUBLE in
-  // information_schema.columns (both DATA_TYPE and COLUMN_TYPE come back
-  // "double"), collapsing the 0..24 vs 25..53 float-precision distinction so
-  // lookupCastType would report limit 53 for a FLOAT that should be 24. Rails
-  // sidesteps this by reading `SHOW FULL FIELDS FROM`, which preserves the
-  // declared type name. Source the declared type the same way on MariaDB and
+  // Rails always reads column types via `SHOW FULL FIELDS FROM`
+  // (column_definitions, abstract_mysql_adapter.rb:963) — trails' whole
+  // information_schema-based columns() is the pre-existing divergence. That
+  // divergence is invisible on MySQL but not on MariaDB, which normalizes a
+  // declared bare `FLOAT` to DOUBLE in information_schema.columns (both
+  // DATA_TYPE and COLUMN_TYPE come back "double"), collapsing the 0..24 vs
+  // 25..53 float-precision distinction so lookupCastType would report limit 53
+  // for a FLOAT that should be 24. So on MariaDB, fall back to Rails' source of
+  // truth — SHOW FULL FIELDS, which preserves the declared type name — and
   // re-key the float-limit lookup off it (below). MySQL's information_schema
   // already preserves the distinction, so skip the extra round-trip there — and
   // even on MariaDB only pay for it when a float/double column is actually
@@ -549,11 +552,12 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     // COLUMN_TYPE — so a bare FLOAT keeps Rails' limit 24. Every other
     // registration yields the same fixed limit regardless of which key is used.
     const declaredType = declaredTypes.get(name) ?? sqlType;
-    const declaredBase = declaredType
-      .replace(/\(.*\).*$/, "")
-      .trim()
-      .toLowerCase()
-      .split(/\s+/)[0];
+    // Grab only the leading type keyword (the identifier before any `(length)`
+    // or ` unsigned`/` zerofill` modifier). Matched positively rather than by
+    // stripping a `(...)` suffix so a type carrying quoted parens in its args
+    // (e.g. enum('a','b)')) can't confuse the extraction — the only key we act
+    // on is "float", but every column's declaredType flows through here.
+    const declaredBase = /^[a-z]+/.exec(declaredType.trim().toLowerCase())?.[0] ?? "";
     const limitType = declaredBase === "float" ? this.lookupCastType("float") : castType;
     const typeMapLimit = charLimitVal == null ? (limitType.limit ?? null) : null;
     // Map DATA_TYPE ("varchar") to the Rails semantic type ("string") via the type map.
