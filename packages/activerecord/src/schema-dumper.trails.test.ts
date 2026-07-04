@@ -4,11 +4,12 @@
 // adapter-introspection dump path (SchemaDumperAdapterTest), async header
 // ordering, and DSL-helper round-trips. Kept out of the Rails-mirrored
 // schema-dumper.test.ts so test:compare maps cleanly.
-import { describe, it, expect, beforeEach, afterAll } from "vitest";
+import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import { cleanDefault, cleanRawPgExpression } from "./schema-dumper.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { Base } from "./base.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("SchemaDumper trails-only cases", () => {
@@ -184,11 +185,15 @@ describe("SchemaDumper trails-only cases", () => {
 });
 
 describe("SchemaDumperAdapterTest", () => {
+  // Ride the primary schema-loaded pool (`Base.connection`) instead of the
+  // sidecar test pool.
+  fixtures({}, { useTransactionalTests: false });
+
   let adapter: DatabaseAdapter;
   let ctx: MigrationContext;
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
+    adapter = Base.connection;
     ctx = new MigrationContext(adapter);
   });
 
@@ -331,8 +336,10 @@ describe("SchemaDumperAdapterTest", () => {
 
   // Drop the real tables these adapter-backed tests create on the shared
   // per-worker DB so they don't collide with sibling files under parallel forks.
-  afterAll(async () => {
-    const cleanupCtx = new MigrationContext(await createTestAdapter());
+  // `fixtures({})` disables the global per-test reset, so drop them per test
+  // (not just in afterAll) to keep the shared-DB exposure window one test wide.
+  afterEach(async () => {
+    const cleanupCtx = new MigrationContext(Base.connection);
     const o = { ifExists: true } as const;
     await cleanupCtx.dropTable("barcodes", o);
     await cleanupCtx.dropTable("horses", o);

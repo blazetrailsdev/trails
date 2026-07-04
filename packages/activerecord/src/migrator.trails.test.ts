@@ -19,8 +19,11 @@ import { resetVersionRegistry } from "./migration/compatibility.js";
 import type { MigrationProxy } from "./migration.js";
 import { ExecutionStrategy, type MigrationLike } from "./migration/execution-strategy.js";
 import { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
-import { createTestAdapter } from "./test-adapter.js";
+import { Base } from "./base.js";
+import { SchemaMigration } from "./schema-migration.js";
+import { InternalMetadata } from "./internal-metadata.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 function makeMigration(
   version: string,
@@ -38,11 +41,27 @@ function makeMigration(
   };
 }
 
+// Ride the primary schema-loaded pool (`Base.connection`) instead of the sidecar
+// test pool. Hoisted to file scope (not nested in the first describe) so every
+// describe in the file — including "Migrator advisory lock wrapping" below —
+// resolves `Base.connection` regardless of declaration/run order.
+fixtures({}, { useTransactionalTests: false });
+
+// `fixtures({})` shields the schema_migrations / ar_internal_metadata tables
+// from the global reset, so clear them before every test to keep each case's
+// version + environment state fresh (mirrors Rails' setup/teardown, which
+// deletes all versions around every test). File-scoped because the advisory-lock
+// describe runs `migrate()` too and needs the same fresh version table.
+beforeEach(async () => {
+  await new SchemaMigration(Base.connection).dropTable();
+  await new InternalMetadata(Base.connection).dropTable();
+});
+
 describe("Migrator trails extensions", () => {
   let adapter: DatabaseAdapter;
 
-  beforeEach(async () => {
-    adapter = await createTestAdapter();
+  beforeEach(() => {
+    adapter = Base.connection;
   });
 
   it("stores environment after up migration", async () => {
@@ -188,7 +207,7 @@ describe("Migrator trails extensions", () => {
 
 describe("Migrator advisory lock wrapping", () => {
   it("acquires and releases advisory lock when adapter supports it", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -206,7 +225,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("throws ConcurrentMigrationError when lock cannot be acquired", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => false;
     adapter.releaseAdvisoryLock = async () => true;
@@ -216,7 +235,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("releases lock even when migration throws", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -238,14 +257,14 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("skips locking when adapter does not support advisory locks", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const migrator = new Migrator(adapter, [makeMigration("1", "M1")]);
     await migrator.migrate();
     expect(await migrator.currentVersion()).toBe(1);
   });
 
   it("wraps rollback in advisory lock", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -265,7 +284,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("wraps run in advisory lock", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -288,7 +307,7 @@ describe("Migrator advisory lock wrapping", () => {
   }
 
   async function lockableAdapter() {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const lockLog: string[] = [];
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => {
@@ -326,7 +345,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("raises ConcurrentMigrationError with RELEASE_LOCK_FAILED_MESSAGE when releaseAdvisoryLock returns false", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     addAdvisoryLockSupport(adapter);
     adapter.getAdvisoryLock = async () => true;
     adapter.releaseAdvisoryLock = async () => false;
@@ -337,7 +356,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("uses db-scoped lock ID matching Rails MIGRATOR_SALT * Zlib.crc32(dbName)", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const lockIds: unknown[] = [];
     adapter.supportsAdvisoryLocks = () => true;
     adapter.getAdvisoryLock = async (id) => {
@@ -354,7 +373,7 @@ describe("Migrator advisory lock wrapping", () => {
   });
 
   it("lock ID is deterministic for the same db name", async () => {
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const lockIds: bigint[] = [];
     adapter.supportsAdvisoryLocks = () => true;
     adapter.getAdvisoryLock = async (id) => {

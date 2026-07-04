@@ -1,27 +1,25 @@
-import { describe, it, expect, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
 import { MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
-import { createSidecarTestAdapter, createTestAdapter, adapterType } from "./test-adapter.js";
+import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { dumpAllTableSchema, dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
 import { dropAllTables } from "./test-helpers/drop-all-tables.js";
-import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
 
-async function freshCtx(): Promise<{ adapter: TestDatabaseAdapter; ctx: MigrationContext }> {
-  const adapter = await createTestAdapter();
-  const ctx = new MigrationContext(adapter);
-  return { adapter, ctx };
-}
-
-async function freshSidecarCtx(): Promise<{ adapter: DatabaseAdapter; ctx: MigrationContext }> {
-  const { adapter } = await createSidecarTestAdapter();
-  const ctx = new MigrationContext(adapter);
-  return { adapter, ctx };
-}
+// The first describe uses `fixtures({})` (canonical schema + reset shield);
+// the later bespoke-table describes deliberately keep the global per-test reset,
+// so they only need `Base.connection` *established*. Establish it at file scope
+// (idempotent — `fixtures({})` re-uses the same worker connection) so those
+// describes and the file-level afterAll don't depend on the first describe's
+// beforeAll having already run (e.g. when run in isolation via `-t`).
+beforeAll(async () => {
+  await establishFromTestConfig();
+});
 
 // Mirrors: ActiveRecord::TestCase#with_postgresql_datetime_type. Temporarily
 // flips PostgreSQLAdapter.datetimeType so :datetime resolves to :timestamptz.
@@ -39,13 +37,13 @@ async function withPostgresqlDatetimeType(type: string, fn: () => Promise<void>)
 // Faithful port of the Rails cases that dump the *standard loaded schema*
 // (`standard_dump` / `dump_table_schema "companies"`). Rails loads `schema.rb`;
 // we ride the canonical `TEST_SCHEMA` — the trails mirror of `schema.rb` —
-// which `setupFixtures()` materializes on the shared worker DB and shields from
+// which `fixtures({})` materializes on the shared worker DB and shields from
 // the per-test reset, so `Base.adapter` already carries every canonical table.
 // No per-test ad-hoc tables. Split into its own describe (no bespoke
 // table-building cases) so nothing `force`-recreates a canonical table out from
 // under the dump.
 describe("SchemaDumperTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   function canonicalSource(): SchemaSource {
     return Base.adapter as unknown as SchemaSource;
@@ -321,15 +319,14 @@ describe("SchemaDumperTest", () => {
 // (adapter-specific `defaults`/`bigint_array`/`binary_fields`/`key_tests`/… not
 // in `schema.rb`, decimal precision/integer limit that SQLite reflection can't
 // recover, table-name prefix/suffix migrations, etc.). Kept on the plain
-// per-test reset (no `setupFixtures()`) so their bespoke tables are dropped
+// per-test reset (no `fixtures({})`) so their bespoke tables are dropped
 // between tests. The `companies` index-dump cases have moved to the canonical
 // block above (RFC 0048 IndexSpec extension); the rest await the missing
 // adapter tables / reflection fixes — tracked as follow-up stories under RFC 0048.
 describe("SchemaDumperTest", () => {
   let ctx: MigrationContext;
   beforeEach(async () => {
-    const f = await freshCtx();
-    ctx = f.ctx;
+    ctx = new MigrationContext(Base.connection);
     // These cases build bespoke tables and dump the whole schema; the global
     // truncate-reset leaves the ~330 canonical tables in place (only clearing
     // rows), which would make each full-schema dump introspect all of them and
@@ -339,7 +336,7 @@ describe("SchemaDumperTest", () => {
     // boot-laid canonical set this file did NOT create, so dropTable("…") of
     // owned tables cannot express it.
     // eslint-disable-next-line blazetrails/require-table-teardown
-    await dropAllTables(f.adapter);
+    await dropAllTables(Base.connection);
   });
   afterEach(() => {
     SchemaDumper.ignoreTables = [];
@@ -349,7 +346,7 @@ describe("SchemaDumperTest", () => {
   it("dump schema information with empty versions", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
     await sm.deleteAllVersions();
@@ -360,7 +357,7 @@ describe("SchemaDumperTest", () => {
   it("dump schema information outputs lexically reverse ordered versions regardless of database order", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
     await sm.deleteAllVersions();
@@ -374,7 +371,7 @@ describe("SchemaDumperTest", () => {
   it("schema dump include migration version", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
-    const adapter = await createTestAdapter();
+    const adapter = Base.connection;
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
     await sm.recordVersion("20240601120000");
@@ -412,7 +409,8 @@ describe("SchemaDumperTest", () => {
   itIfSupports("check_constraints", "schema dumps check constraints", async () => {
     const { SchemaStatements } =
       await import("./connection-adapters/abstract/schema-statements.js");
-    const { adapter: testAdapter, ctx: testCtx } = await freshSidecarCtx();
+    const testAdapter = Base.connection;
+    const testCtx = new MigrationContext(testAdapter);
     await testCtx.createTable("products", { force: true }, (t) => {
       t.decimal("price");
       t.decimal("discounted_price");
@@ -428,7 +426,8 @@ describe("SchemaDumperTest", () => {
   itIfSupports("exclusion_constraints", "schema dumps exclusion constraints", async () => {
     const { SchemaDumper: PgSchemaDumper } =
       await import("./connection-adapters/postgresql/schema-dumper.js");
-    const { adapter: testAdapter, ctx: testCtx } = await freshSidecarCtx();
+    const testAdapter = Base.connection;
+    const testCtx = new MigrationContext(testAdapter);
     await testCtx.createTable("test_schema_exclusion", { id: false }, (t) => {
       t.date("start_date");
       t.date("end_date");
@@ -446,7 +445,8 @@ describe("SchemaDumperTest", () => {
   itIfSupports("unique_constraints", "schema dumps unique constraints", async () => {
     const { SchemaDumper: PgSchemaDumper } =
       await import("./connection-adapters/postgresql/schema-dumper.js");
-    const { adapter: testAdapter, ctx: testCtx } = await freshSidecarCtx();
+    const testAdapter = Base.connection;
+    const testCtx = new MigrationContext(testAdapter);
     await testCtx.createTable("test_schema_unique", {}, (t) => {
       t.integer("position_1");
       t.integer("position_2");
@@ -470,7 +470,8 @@ describe("SchemaDumperTest", () => {
     async () => {
       const { SchemaDumper: PgSchemaDumper } =
         await import("./connection-adapters/postgresql/schema-dumper.js");
-      const { adapter: testAdapter, ctx: testCtx } = await freshSidecarCtx();
+      const testAdapter = Base.connection;
+      const testCtx = new MigrationContext(testAdapter);
       await testCtx.createTable("test_uc_no_idx", {}, (t) => {
         t.integer("position");
       });
@@ -502,7 +503,8 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql binary fields",
     async () => {
-      const { adapter, ctx: testCtx } = await freshSidecarCtx();
+      const adapter = Base.connection;
+      const testCtx = new MigrationContext(adapter);
       await testCtx.createTable("binary_fields", {}, (t) => {
         t.binary("var_binary", { limit: 255 });
         t.binary("var_binary_large", { limit: 4095 });
@@ -515,7 +517,8 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql blob and text fields",
     async () => {
-      const { adapter: bfAdapter, ctx: bfCtx } = await freshCtx();
+      const bfAdapter = Base.connection;
+      const bfCtx = new MigrationContext(bfAdapter);
       await bfCtx.createTable("binary_fields", {}, (t) => {
         t.binary("tiny_blob", { size: "tiny" });
         t.binary("normal_blob");
@@ -540,7 +543,8 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "mysql")(
     "schema does not include limit for emulated mysql boolean fields",
     async () => {
-      const { adapter, ctx: testCtx } = await freshSidecarCtx();
+      const adapter = Base.connection;
+      const testCtx = new MigrationContext(adapter);
       await testCtx.createTable("booleans", { force: true }, (t) => {
         t.boolean("has_fun", { default: false });
       });
@@ -549,7 +553,8 @@ describe("SchemaDumperTest", () => {
     },
   );
   it.skipIf(adapterType !== "mysql")("schema dumps index type", async () => {
-    const { adapter: ktAdapter, ctx: ktCtx } = await freshCtx();
+    const ktAdapter = Base.connection;
+    const ktCtx = new MigrationContext(ktAdapter);
     await ktCtx.createTable("key_tests", {}, (t) => {
       t.string("awesome");
       t.string("pizza");
@@ -583,7 +588,8 @@ describe("SchemaDumperTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("schema dump includes limit on array type", async () => {
-    const { adapter, ctx: testCtx } = await freshSidecarCtx();
+    const adapter = Base.connection;
+    const testCtx = new MigrationContext(adapter);
     await testCtx.createTable("bigint_array", {}, (t) => {
       (t as any).integer("big_int_data_points", { limit: 8, array: true });
     });
@@ -595,7 +601,8 @@ describe("SchemaDumperTest", () => {
     async () => {
       const { SchemaDumper: PgSchemaDumper } =
         await import("./connection-adapters/postgresql/schema-dumper.js");
-      const { adapter: testAdapter, ctx: testCtx } = await freshSidecarCtx();
+      const testAdapter = Base.connection;
+      const testCtx = new MigrationContext(testAdapter);
       await testCtx.createTable("bigint_array", {}, (t) => {
         t.integer("big_int_data_points", { limit: 8, array: true });
         t.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
@@ -607,7 +614,8 @@ describe("SchemaDumperTest", () => {
     },
   );
   it.skipIf(adapterType !== "postgres")("schema dump interval type", async () => {
-    const { adapter, ctx: testCtx } = await freshSidecarCtx();
+    const adapter = Base.connection;
+    const testCtx = new MigrationContext(adapter);
     await testCtx.createTable("postgresql_times", {}, (t) => {
       (t as any).interval("time_interval");
       (t as any).interval("scaled_time_interval", { precision: 6 });
@@ -617,7 +625,8 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
   });
   it.skipIf(adapterType !== "postgres")("schema dump oid type", async () => {
-    const { adapter, ctx: testCtx } = await freshSidecarCtx();
+    const adapter = Base.connection;
+    const testCtx = new MigrationContext(adapter);
     await testCtx.createTable("postgresql_oids", {}, (t) => {
       (t as any).oid("obj_id");
     });
@@ -627,7 +636,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")("schema dump includes extensions", async () => {
     const { SchemaDumper: PgSchemaDumper } =
       await import("./connection-adapters/postgresql/schema-dumper.js");
-    const { adapter } = await freshSidecarCtx();
+    const adapter = Base.connection;
     const original = (adapter as any).extensions;
     try {
       (adapter as any).extensions = async () => ["hstore"];
@@ -648,7 +657,7 @@ describe("SchemaDumperTest", () => {
     async () => {
       const { SchemaDumper: PgSchemaDumper } =
         await import("./connection-adapters/postgresql/schema-dumper.js");
-      const { adapter } = await freshSidecarCtx();
+      const adapter = Base.connection;
       const original = (adapter as any).extensions;
       try {
         (adapter as any).extensions = async () => ["uuid-ossp", "xml2", "hstore"];
@@ -661,7 +670,8 @@ describe("SchemaDumperTest", () => {
     },
   );
   it.skipIf(adapterType !== "postgres")("schema dump include limit for float4 field", async () => {
-    const { adapter, ctx: testCtx } = await freshSidecarCtx();
+    const adapter = Base.connection;
+    const testCtx = new MigrationContext(adapter);
     await testCtx.createTable("numeric_data", { force: true }, (t) => {
       t.float("temperature_with_limit", { limit: 24 });
     });
@@ -671,7 +681,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump keeps enum intact if it contains comma",
     async () => {
-      const { adapter } = await freshSidecarCtx();
+      const adapter = Base.connection;
       await (adapter as any).createEnum("enum_with_comma", ["value1", "value,2", "value3"]);
       try {
         const output = await SchemaDumper.dump(adapter);
@@ -923,13 +933,12 @@ describe("SchemaDumperDefaultsTest", () => {
   let ctx: MigrationContext;
   let adapter: TestDatabaseAdapter;
   beforeEach(async () => {
-    const f = await freshCtx();
-    ctx = f.ctx;
-    adapter = f.adapter;
+    adapter = Base.connection;
+    ctx = new MigrationContext(adapter);
     // See SchemaDumperTest beforeEach: drop to an empty DB so full-schema dumps
     // don't introspect the ~330 canonical tables the truncate-reset preserves.
     // eslint-disable-next-line blazetrails/require-table-teardown
-    await dropAllTables(f.adapter);
+    await dropAllTables(adapter);
   });
 
   it("schema dump defaults with universally supported types", async () => {
@@ -979,12 +988,12 @@ describe("SchemaDumperDefaultsTest", () => {
 // real ad-hoc tables via MigrationContext on the shared per-worker DB; drop
 // every one they create, by name, so the leaked tables don't collide with
 // sibling files under parallel forks. The canonical tables the first describe
-// *rides* (accounts/authors/binaries/movies/…) are shielded by `setupFixtures`
+// *rides* (accounts/authors/binaries/movies/…) are shielded by `fixtures({})`
 // and are NOT dropped here. `companies`/`booleans`/`numeric_data`/`posts`/
 // `products` appear only because deferred cases still `force`-recreate them on
 // some adapters; the per-file schema repair restores the canonical shape after.
 afterAll(async () => {
-  const { ctx } = await freshCtx();
+  const ctx = new MigrationContext(Base.connection);
   const o = { ifExists: true } as const;
   await ctx.dropTable("bigint_array", o);
   await ctx.dropTable("binary_fields", o);
