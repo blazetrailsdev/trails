@@ -1,16 +1,6 @@
 import { beforeAll, afterAll } from "vitest";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { defineSchema, type Schema } from "./define-schema.js";
-import { TEST_SCHEMA } from "./test-schema.js";
-
-/**
- * Subset of {@link DefineSchemaOpts} exposed through this helper.
- * Files needing per-test schema mutation should call `defineSchema` directly
- * inside their own `beforeEach` rather than this helper.
- */
-export interface AdapterSuiteSchemaOpts {
-  dropExisting?: boolean;
-}
+import { loadCanonicalSchema } from "./canonical-schema.js";
 import {
   withTransactionalFixtures,
   type TransactionalFixturesAdapter,
@@ -20,19 +10,9 @@ export interface AdapterSuiteOptions<A extends TransactionalFixturesAdapter> {
   /** Builds the adapter once per file in `beforeAll`. */
   factory: () => A | Promise<A>;
   /**
-   * Schema to declare via {@link defineSchema}. Defaults to the canonical
-   * {@link TEST_SCHEMA} (mirror of `vendor/rails/activerecord/test/schema/schema.rb`)
-   * so fixture-driven tests resolve named rows without inlining their own
-   * mini-schemas. Pass an explicit object (or `{}`) to override — useful for
-   * adapter-specific suites (e.g. PG-only types created via raw DDL in
-   * {@link setup}).
-   */
-  schema?: Schema;
-  schemaOptions?: AdapterSuiteSchemaOpts;
-  /**
    * Extra DDL or raw setup (CREATE EXTENSION, CREATE FOREIGN TABLE, etc.)
-   * that isn't expressible via {@link defineSchema}. Runs after
-   * `defineSchema` and before `withTransactionalFixtures` opens its first
+   * that isn't expressible via the canonical schema. Runs after the canonical
+   * schema is laid and before `withTransactionalFixtures` opens its first
    * transaction, so DDL committed here is visible to every test and not
    * rolled back at the file boundary.
    *
@@ -61,7 +41,7 @@ export interface AdapterSuiteHandle<A extends TransactionalFixturesAdapter> {
  * Boilerplate-free wrapper around the canonical adapter-cluster test pattern:
  *
  * ```
- * beforeAll(() => adapter = factory(); defineSchema(adapter, schema); setup(adapter));
+ * beforeAll(() => adapter = factory(); loadCanonicalSchema(adapter); setup(adapter));
  * withTransactionalFixtures(() => adapter);
  * afterAll(() => teardown(adapter); adapter.close());
  * ```
@@ -74,7 +54,6 @@ export interface AdapterSuiteHandle<A extends TransactionalFixturesAdapter> {
  * @example
  *   const suite = setupAdapterSuite({
  *     factory: () => new PostgreSQLAdapter(PG_TEST_URL),
- *     schema: { users: { name: "string" } },
  *     setup: async (adapter) => {
  *       await adapter.exec(`CREATE EXTENSION IF NOT EXISTS citext`);
  *     },
@@ -93,11 +72,7 @@ export function setupAdapterSuite<A extends TransactionalFixturesAdapter>(
 
   beforeAll(async () => {
     adapter = await opts.factory();
-    await defineSchema(
-      adapter as unknown as DatabaseAdapter,
-      opts.schema ?? TEST_SCHEMA,
-      opts.schemaOptions,
-    );
+    await loadCanonicalSchema(adapter as unknown as DatabaseAdapter);
     if (opts.setup) await opts.setup(adapter);
   });
 

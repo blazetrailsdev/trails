@@ -127,10 +127,10 @@ export function driftedTables(physical: Map<string, Set<string>>, canonical: Sch
  * Restore the canonical shape of every table whose live layout has drifted from
  * `canonical`, returning the repaired table names (empty when nothing drifted).
  *
- * Each drifted table is dropped and recreated from `canonical[table]` via the
- * EXPLICIT-adapter `defineSchema` overload (no eager schema-cache warm; the next
- * read warms on demand). Run at file start, before any test code, so the DB the
- * file sees always matches `TEST_SCHEMA` regardless of what a sibling left.
+ * Each drifted table is dropped and recreated in its full canonical shape via
+ * {@link rebuildCanonicalTables} (no eager schema-cache warm; the next read warms
+ * on demand). Run at file start, before any test code, so the DB the file sees
+ * always matches the canonical schema regardless of what a sibling left.
  */
 export async function repairWorkerSchema(
   adapter: DatabaseAdapter,
@@ -142,9 +142,7 @@ export async function repairWorkerSchema(
   const drifted = driftedTables(physical, canonical);
   if (drifted.length === 0) return [];
 
-  const { defineSchema } = await import("./define-schema.js");
-  for (const table of drifted) {
-    await defineSchema(adapter, { [table]: canonical[table] }, { dropExisting: true });
-  }
+  const { rebuildCanonicalTables } = await import("./canonical-schema.js");
+  await rebuildCanonicalTables(adapter, drifted);
   return drifted;
 }
