@@ -53,6 +53,9 @@ export interface VisitorHostAdapter {
   supportsCheckConstraints?(): boolean;
   supportsForeignKeys?(): boolean;
   supportsIndexesInCreate?(): boolean;
+  /** Version-gated: MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1. Reads the cached version
+   * synchronously and yields false when cold — warm via `getDatabaseVersion`. */
+  supportsIndexSortOrder?(): boolean;
   isMariadb?(): boolean;
   /** Mirrors `SchemaStatements#isForeignKeysEnabled` (`adapter.config?.foreignKeys !== false`). */
   config?: { foreignKeys?: boolean };
@@ -84,6 +87,15 @@ export class SchemaCreation extends AbstractSchemaCreation {
    * `_mariadb` field so existing tests that set it directly continue to work. */
   protected isMariadb(): boolean {
     return this._hostAdapter?.isMariadb?.() ?? this._mariadb;
+  }
+
+  /** @internal Rails gates the index DESC/ASC suffix on `supports_index_sort_order?`
+   * (MariaDB >= 10.8.1 / MySQL >= 8.0.1). Consult the threaded adapter's version-gated
+   * flag; on the host-less unit-test path default to supported so pure DDL fixtures
+   * still emit the suffix. The base returns `adapterName !== "mysql"` (always false),
+   * so this override is what makes MySQL honor the version gate. */
+  protected override supportsIndexSortOrder(): boolean {
+    return this._hostAdapter?.supportsIndexSortOrder?.() ?? true;
   }
 
   /** @internal */
@@ -301,10 +313,16 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const quotedMap = new Map<string, string>(
       o.columns.map((c) => [c, this.adapter.quoteIdentifier(c)]),
     );
-    addOptionsForIndexColumns(quotedMap, {
-      length: idx.lengths as Record<string, number> | number | undefined,
-      order: idx.orders as Record<string, string> | string | undefined,
-    });
+    // The createTable path warms getDatabaseVersion() upstream so the version-gated
+    // supportsIndexSortOrder read isn't cold.
+    addOptionsForIndexColumns(
+      quotedMap,
+      {
+        length: idx.lengths as Record<string, number> | number | undefined,
+        order: idx.orders as Record<string, string> | string | undefined,
+      },
+      this.supportsIndexSortOrder(),
+    );
     return [...quotedMap.values()].join(", ");
   }
 

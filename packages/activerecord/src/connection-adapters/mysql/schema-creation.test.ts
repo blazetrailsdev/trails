@@ -78,6 +78,24 @@ describe("MySQL::SchemaCreation", () => {
     expect((sc as any).visitCreateIndexDefinition(def)).toContain("INPLACE");
   });
 
+  it("emits inline index sort order when the adapter supports it", () => {
+    const host = { supportsIndexSortOrder: () => true };
+    const withHost = new SchemaCreation(host as any);
+    const idx = new IndexDefinition("users", "idx", false, ["email"], {
+      orders: { email: "desc" },
+    });
+    expect((withHost as any).visitIndexDefinition(idx, false)).toBe("INDEX `idx` (`email` DESC)");
+  });
+
+  it("drops inline index sort order when the adapter version gate is unsupported", () => {
+    const host = { supportsIndexSortOrder: () => false };
+    const withHost = new SchemaCreation(host as any);
+    const idx = new IndexDefinition("users", "idx", false, ["email"], {
+      orders: { email: "desc" },
+    });
+    expect((withHost as any).visitIndexDefinition(idx, false)).toBe("INDEX `idx` (`email`)");
+  });
+
   it("addTableOptionsBang appends charset and collation", () => {
     const td = new TableDefinition("users", { adapterName: "mysql" });
     (td as any).charset = "utf8mb4";

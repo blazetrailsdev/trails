@@ -292,6 +292,16 @@ describe("MySQL::SchemaStatements", () => {
     expect(result.get("b")).toBe("`b` ASC");
   });
 
+  it("addOptionsForIndexColumns: drops order when sort order is unsupported", () => {
+    const cols = new Map([["name", "`name`"]]);
+    const result = addOptionsForIndexColumns(
+      cols,
+      { length: { name: 5 }, order: { name: "desc" } },
+      false,
+    );
+    expect(result.get("name")).toBe("`name`(5)");
+  });
+
   it("extractSchemaQualifiedName splits schema.table", () => {
     expect(extractSchemaQualifiedName("mydb.users")).toEqual(["mydb", "users"]);
     expect(extractSchemaQualifiedName("`mydb`.`users`")).toEqual(["mydb", "users"]);

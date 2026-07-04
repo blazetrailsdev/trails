@@ -343,9 +343,14 @@ export function addOptionsForIndexColumns(
     length?: Record<string, number> | number;
     order?: Record<string, string> | string;
   } = {},
+  sortOrderSupported = true,
 ): Map<string, string> {
   quotedColumns = addIndexLength(quotedColumns, options);
-  if (options.order) {
+  // Rails gates the DESC/ASC suffix on `supports_index_sort_order?`
+  // (abstract/schema_statements.rb add_options_for_index_columns via super);
+  // MariaDB < 10.8.1 / MySQL < 8.0.1 silently drop it. The visitor threads the
+  // gate in — the pure helper defaults to supported for host-less unit tests.
+  if (options.order && sortOrderSupported) {
     const orders = typeof options.order === "object" ? options.order : {};
     for (const [name, col] of quotedColumns) {
       const dir = typeof options.order === "string" ? options.order : orders[name];
