@@ -593,25 +593,19 @@ describe("MigrationTest", () => {
     ]).up(101);
     expect(await personColumnNames(adapter)).not.toContain("last_name");
 
-    // Removing a missing column with if_not_exists unset raises on every
-    // adapter in trails. Rails matches this on PG (`column ... does not exist`)
-    // and MySQL (`check that ... exists`), but on SQLite Rails removes columns
-    // via a table rebuild — copying every column except the dropped one — so a
-    // missing column is a no-op and `assert_nothing_raised` holds. trails'
-    // SchemaStatements emits a native `ALTER TABLE ... DROP COLUMN`, which
-    // SQLite 3.35+ rejects with "no such column" (same class of base-vs-adapter
-    // write-method divergence as the changeColumn rebuild path). Tracked-pending
-    // -convergence under 0023-surfaced-deviations story
-    // sqlite-remove-column-tolerate-missing; assert the current trails raise
-    // until the rebuild path lands.
+    // Removing a missing column with if_not_exists unset: SQLite removes
+    // columns via a table rebuild — copying every column except the dropped one
+    // — so a missing column is a no-op (`assert_nothing_raised`). PG and MySQL
+    // raise.
     const error = await new Migrator(adapter, [
       migrateProxy(102, (m) => m.removeColumn("people", "last_name")),
     ])
       .up(102)
       .catch((e) => e);
-    expect(error).toBeInstanceOf(Error);
-    expect(error.message).toMatch(
-      /no such column.*last_name|column "last_name" of relation "people" does not exist|check that.*exists/i,
+    expect(error?.message ?? "").toMatch(
+      adapterType === "sqlite"
+        ? /^$/
+        : /column "last_name" of relation "people" does not exist|check that.*exists/i,
     );
   });
 

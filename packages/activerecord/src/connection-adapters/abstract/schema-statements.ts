@@ -318,14 +318,27 @@ export class SchemaStatements {
 
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
-    if (
-      options.comment != null &&
-      options.comment.length > 0 &&
-      this.adapter.supportsComments?.() &&
-      !this.adapter.supportsCommentsInCreate?.() &&
-      typeof this.adapter.changeTableComment === "function"
-    ) {
-      await this.adapter.changeTableComment(name, options.comment);
+    if (this.adapter.supportsComments?.() && !this.adapter.supportsCommentsInCreate?.()) {
+      if (
+        options.comment != null &&
+        options.comment.length > 0 &&
+        typeof this.adapter.changeTableComment === "function"
+      ) {
+        await this.adapter.changeTableComment(name, options.comment);
+      }
+      // Mirrors Rails: adapters that can't inline column comments in CREATE
+      // emit a COMMENT ON COLUMN per column so inline `comment:` options
+      // round-trip through columns().
+      const commentAdapter = this.adapter as {
+        changeColumnComment?(t: string, c: string, comment: string | null): Promise<void>;
+      };
+      if (typeof commentAdapter.changeColumnComment === "function") {
+        for (const column of td.columns as Array<{ name: string; comment?: string | null }>) {
+          if (column.comment != null && String(column.comment).length > 0) {
+            await commentAdapter.changeColumnComment(name, column.name, column.comment);
+          }
+        }
+      }
     }
 
     if (!this.adapter.supportsIndexesInCreate?.()) {
@@ -401,6 +414,16 @@ export class SchemaStatements {
   ): Promise<void> {
     if (options.ifExists && !(await this.columnExists(tableName, columnName))) {
       return;
+    }
+    // SQLite rebuilds the table (alter_table) to drop a column so indexes that
+    // reference it are dropped instead of left dangling; delegate when the
+    // adapter supplies its own removeColumn (mirrors renameColumn's gate).
+    const adapter = this.adapter as any;
+    if (
+      typeof adapter.removeColumn === "function" &&
+      adapter.removeColumn !== SchemaStatements.prototype.removeColumn
+    ) {
+      return adapter.removeColumn(tableName, columnName, _type, options);
     }
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     await this.adapter.executeMutation(
@@ -693,6 +716,19 @@ export class SchemaStatements {
     toTable: string,
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
+    // SQLite can't ALTER TABLE ADD CONSTRAINT, so it rebuilds the table in its
+    // own addForeignKey override. When invoked through a SchemaStatements
+    // wrapper (this !== the adapter), delegate to that override. The
+    // `this !== adapter` guard keeps adapters that call `super` (e.g. PostgreSQL)
+    // from re-entering this gate and recursing.
+    const fkAdapter = this.adapter as any;
+    if (
+      this !== fkAdapter &&
+      typeof fkAdapter.addForeignKey === "function" &&
+      fkAdapter.addForeignKey !== SchemaStatements.prototype.addForeignKey
+    ) {
+      return fkAdapter.addForeignKey(fromTable, toTable, options);
+    }
     // Mirrors Rails' add_foreign_key short-circuit:
     //   return if options[:if_not_exists] == true &&
     //     foreign_key_exists?(from_table, to_table, **options.slice(:column))

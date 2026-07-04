@@ -307,7 +307,7 @@ describe("InvertibleMigrationTest", () => {
   // trails' changeTable `removeIndex` records no `column` info, so the migrate
   // reverse path throws "Cannot reverse removeIndex without column info".
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
-  it.skip("exception on removing index without column option", async () => {
+  it("exception on removing index without column option", async () => {
     const indexDefinition: [string, string[]] = ["horses", ["name", "color"]];
     const migration1 = new RemoveIndexMigration1();
     await migration1.migrate("up");
@@ -338,7 +338,7 @@ describe("InvertibleMigrationTest", () => {
   // migration's own direction, so a migration reverting a `revert` block (and
   // its `dropTable` reverse) is not yet direction-aware. Tracked-pending-
   // convergence under RFC 0023-surfaced-deviations (revert-direction semantics).
-  it.skip("migrate revert", async () => {
+  it("migrate revert", async () => {
     const migration = new InvertibleMigration();
     const revert = new InvertibleRevertMigration();
     await migration.migrate("up");
@@ -359,7 +359,7 @@ describe("InvertibleMigrationTest", () => {
     expect(await migration.connection.columnExists("horses", "remind_at")).toBe(true);
   });
 
-  it.skip("migrate revert by part", async () => {
+  it("migrate revert by part", async () => {
     await new InvertibleMigration().migrate("up");
     const received: symbol[] = [];
     const migration = new InvertibleByPartsMigration();
@@ -381,7 +381,7 @@ describe("InvertibleMigrationTest", () => {
     expect(await migration.connection.tableExists("new_horses")).toBe(false);
   });
 
-  it.skip("migrate revert whole migration", async () => {
+  it("migrate revert whole migration", async () => {
     const migration = new InvertibleMigration();
     for (const klass of [LegacyMigration, InvertibleMigration]) {
       const revert = new RevertWholeMigration(new klass());
@@ -395,7 +395,7 @@ describe("InvertibleMigrationTest", () => {
     }
   });
 
-  it.skip("migrate nested revert whole migration", async () => {
+  it("migrate nested revert whole migration", async () => {
     const revert = new NestedRevertWholeMigration(new InvertibleRevertMigration());
     await revert.migrate("down");
     expect(await revert.connection.tableExists("horses")).toBe(true);
@@ -427,11 +427,7 @@ describe("InvertibleMigrationTest", () => {
     expect(new Horse().readAttribute("name")).toBe("Sekitoba");
   });
 
-  // Column comments don't round-trip on trails yet: the inline `comment:` column
-  // option / changeColumnComment isn't reflected back through columns(), so
-  // columnsHash["name"].comment stays null (table comments, tested below, do
-  // work). Tracked-pending-convergence under RFC 0023-surfaced-deviations.
-  it.skip("migrate revert change column comment", async () => {
+  itIfSupports("comments", "migrate revert change column comment", async () => {
     const migration1 = new ChangeColumnComment1();
     await migration1.migrate("up");
     await resetHorse();
@@ -489,7 +485,7 @@ describe("InvertibleMigrationTest", () => {
   // path can recreate the table on reversal; trails' Migration#dropTable takes
   // no block and _reverseOperation throws IrreversibleMigration for dropTable.
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
-  it.skip("migrate revert drop table", async () => {
+  it("migrate revert drop table", async () => {
     const connection = await Base.leaseConnection();
     const migration1 = new InvertibleMigration();
     await migration1.migrate("up");
@@ -507,7 +503,7 @@ describe("InvertibleMigrationTest", () => {
   // ([sym, args, block]); the trails recorder records {cmd, args} without the
   // block, so a verbatim port needs block-tracking in CommandRecorder.
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
-  it.skip("revert order", async () => {
+  it("revert order", async () => {
     const block = (t: any) => t.string("name");
     const recorder = new CommandRecorder(await Base.leaseConnection());
     recorder.record("createTable", ["apples", block]);
@@ -574,7 +570,7 @@ describe("InvertibleMigrationTest", () => {
   // CommandRecorder change_table proxy has no `references`, and SQLite's
   // removeColumn rebuild can't drop a column an index still references.
   // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
-  it.skip("migrations can handle foreign keys to specific tables", async () => {
+  it("migrations can handle foreign keys to specific tables", async () => {
     const migration = new RevertCustomForeignKeyTable();
     await new InvertibleMigration().migrate("up");
     await migration.migrate("up");
@@ -646,7 +642,7 @@ describe("InvertibleMigrationTest", () => {
   // reverse names the constraint `fk_horses_parent_id`, which doesn't match the
   // hashed name addForeignKey created. Tracked-pending-convergence under
   // RFC 0023-surfaced-deviations.
-  it.skip("migrate revert add foreign key with invalid option", async () => {
+  it("migrate revert add foreign key with invalid option", async () => {
     await new InvertibleMigration().migrate("up");
     await new RevertForeignKeyWithInvalidOption().migrate("up");
 

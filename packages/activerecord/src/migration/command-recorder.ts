@@ -36,8 +36,19 @@ export class CommandRecorder {
     return [...this._commands];
   }
 
+  /**
+   * Record a command. When the recorder is in reverting mode the command is
+   * inverted at record time (mirrors Rails' `record`, which stores
+   * `inverse_of(...)` when `@reverting`), so nested `revert` blocks cancel out
+   * by double-negation.
+   */
   record(cmd: string, args: unknown[]): void {
-    this._commands.push({ cmd, args });
+    if (this._reverting) {
+      const [iCmd, iArgs] = this._dispatchInvert(cmd, args);
+      this._commands.push({ cmd: iCmd, args: iArgs });
+    } else {
+      this._commands.push({ cmd, args });
+    }
   }
 
   /**
@@ -62,25 +73,17 @@ export class CommandRecorder {
    * Mirrors: ActiveRecord::Migration::CommandRecorder#revert
    */
   async revert(fn: () => Promise<void>): Promise<void> {
-    const was = this._reverting;
-    this._reverting = !was;
-    const savedCommands = this._commands;
+    // Mirrors Rails: toggle reverting, capture the block's commands (already
+    // inverted at record time), then splice them back in reverse order.
+    this._reverting = !this._reverting;
+    const previous = this._commands;
     this._commands = [];
     try {
       await fn();
-      const reversed = this._commands.reverse().map(({ cmd, args }) => {
-        const [invertedCmd, invertedArgs] = this._dispatchInvert(cmd, args);
-        return { cmd: invertedCmd, args: invertedArgs };
-      });
-      this._commands = savedCommands;
-      for (const entry of reversed) {
-        this._commands.push(entry);
-      }
-    } catch (e) {
-      this._commands = savedCommands;
-      throw e;
     } finally {
-      this._reverting = was;
+      const captured = this._commands.reverse();
+      this._commands = previous.concat(captured);
+      this._reverting = !this._reverting;
     }
   }
 
@@ -135,7 +138,7 @@ export class CommandRecorder {
       const sub = new CommandRecorder(this._delegate);
       const proxy = withAdapterColumnMethods(new RecorderTableProxy(tableName, sub), columnTypes);
       await callback(proxy);
-      this._commands.push({ cmd: "changeTable", args: [tableName, sub.commands] });
+      this.record("changeTable", [tableName, sub.commands]);
     } else {
       // Non-bulk: route operations directly through this recorder so the
       // enclosing revert() block can invert them individually.
@@ -201,8 +204,19 @@ export class CommandRecorder {
   /** @internal */
   invertDropTable(args: unknown[]): [string, unknown[]] {
     const a = args.slice();
+    // The reversal block (table definition) rides as a trailing function, the
+    // same convention create_table uses (see the `revert order` test).
+    let block: unknown;
+    if (a.length > 0 && typeof a[a.length - 1] === "function") {
+      block = a.pop();
+    }
     let options: Record<string, unknown> = {};
-    if (a.length > 0 && typeof a[a.length - 1] === "object" && a[a.length - 1] !== null) {
+    if (
+      a.length > 0 &&
+      typeof a[a.length - 1] === "object" &&
+      a[a.length - 1] !== null &&
+      !Array.isArray(a[a.length - 1])
+    ) {
       options = { ...(a.pop() as Record<string, unknown>) };
     }
     delete options["ifExists"];
@@ -212,7 +226,7 @@ export class CommandRecorder {
         "To avoid mistakes, drop_table is only reversible if given a single table name.",
       );
     }
-    if (a.length === 1 && Object.keys(options).length === 0) {
+    if (a.length === 1 && Object.keys(options).length === 0 && block === undefined) {
       throw new IrreversibleMigration(
         "To avoid mistakes, drop_table is only reversible if given options or a block (can be empty).",
       );
@@ -220,6 +234,7 @@ export class CommandRecorder {
 
     const result = [...a];
     if (Object.keys(options).length > 0) result.push(options);
+    if (block !== undefined) result.push(block);
     return ["createTable", result];
   }
 
@@ -764,8 +779,33 @@ export class RecorderTableProxy {
     this._recorder.record("addIndex", [this._tableName, columns, options]);
   }
 
-  removeIndex(options: Record<string, unknown> = {}): void {
-    this._recorder.record("removeIndex", [this._tableName, options]);
+  // Mirrors Rails Table#remove_index(column_name = nil, **options) ->
+  // @base.remove_index(name, column_name, **options). Recording the column is
+  // what lets invert_remove_index reconstruct the add_index.
+  removeIndex(
+    columnOrOptions?: string | string[] | Record<string, unknown>,
+    options: Record<string, unknown> = {},
+  ): void {
+    const isColumn = typeof columnOrOptions === "string" || Array.isArray(columnOrOptions);
+    const column = isColumn ? columnOrOptions : undefined;
+    const opts = isColumn ? options : (columnOrOptions ?? {});
+    const args: unknown[] = [this._tableName, column];
+    if (Object.keys(opts).length > 0) args.push(opts);
+    this._recorder.record("removeIndex", args);
+  }
+
+  // Mirrors Rails Table#references / #belongs_to -> @base.add_reference per name.
+  references(...args: [...string[], Record<string, unknown>] | string[]): void {
+    const last = args[args.length - 1];
+    const hasOpts = typeof last === "object" && last !== null && !Array.isArray(last);
+    const options = hasOpts ? (args.pop() as Record<string, unknown>) : {};
+    for (const refName of args as string[]) {
+      this._recorder.record("addReference", [this._tableName, refName, options]);
+    }
+  }
+
+  belongsTo(...args: [...string[], Record<string, unknown>] | string[]): void {
+    this.references(...args);
   }
 
   timestamps(options: Record<string, unknown> = {}): void {
