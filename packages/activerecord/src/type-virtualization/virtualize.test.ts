@@ -226,6 +226,32 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare score_nullable: bigint \| null;/);
   });
 
+  test("schemaColumnsByTable widens integer FK columns to PrimaryKeyValue", () => {
+    const src = "export class Membership extends Base {}\n";
+    const { text } = virtualize(src, "membership.ts", {
+      schemaColumnsByTable: {
+        memberships: {
+          club_id: { type: "integer", null: true },
+          member_id: { type: "big_integer", null: false },
+          favorite_things_id: "integer", // legacy string shape is FK too
+          rank: { type: "integer", null: true }, // not an FK: name doesn't end in _id
+        },
+      },
+    });
+    // FK columns accept a model `.id` (PrimaryKeyValue) assignment.
+    expect(text).toMatch(
+      /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(
+      /declare member_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(
+      /declare favorite_things_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    // Non-FK integer column keeps its narrow type.
+    expect(text).toMatch(/declare rank: number \| null;/);
+  });
+
   test("schemaColumnsByTable mixing legacy string and rich shape in same table", () => {
     const src = "export class Post extends Base {}\n";
     const { text } = virtualize(src, "post.ts", {

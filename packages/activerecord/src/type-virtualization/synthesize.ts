@@ -159,13 +159,30 @@ function renderSchemaColumnDeclares(
     if (composedCols?.has(col)) continue;
     // Skip columns listed in `@trails-typegen skip-columns:` JSDoc.
     if (info.skipSchemaColumns.has(col)) continue;
-    const tsType = renderSchemaValueType(value);
+    const tsType = isForeignKeyColumn(col, value)
+      ? `${AR_IMPORT}.PrimaryKeyValue`
+      : renderSchemaValueType(value);
     // Emit a bracket-quoted declare for non-identifier / reserved-word
     // names (e.g. `declare "strange-col": string;`). TypeScript allows
     // string-literal class field names, so this is a valid declare.
     out.push(`${INDENT}declare ${renderDeclaredMemberName(col)}: ${tsType};`);
   }
   return out;
+}
+
+/**
+ * A schema column is treated as a foreign key when its name ends in `_id`
+ * and its type is an integer kind — the shape Rails uses for a `belongs_to`
+ * reference. Such columns are routinely assigned another record's `.id`
+ * accessor (`membership.club_id = club.id`), which is typed `PrimaryKeyValue`
+ * (a union that includes `undefined`). A narrow `number | null` declare would
+ * reject that legitimate assignment (TS2322), so FK columns are widened to
+ * `PrimaryKeyValue` — the exact type an id accessor yields.
+ */
+function isForeignKeyColumn(col: string, value: SchemaColumnValue): boolean {
+  if (col === "id" || !col.endsWith("_id")) return false;
+  const type = typeof value === "string" ? value : value.type;
+  return type === "integer" || type === "big_integer" || type === "bigint";
 }
 
 /**
