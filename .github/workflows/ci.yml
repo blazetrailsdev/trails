@@ -916,6 +916,18 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites). This suite is
+    # the CI critical path; vitest --shard splits the file set across two free
+    # hosted legs that run concurrently, roughly halving wall time. Each matrix
+    # leg gets its own fresh service container automatically. The `needs` graph
+    # keys on the job id (`postgres-tests`), so the `ci` aggregator sees one
+    # merged result for both legs — no allowlist change needed. The
+    # activerecord-cli E2E step is not sharded, so it runs on shard 1 only (see
+    # its per-step `if:`) to avoid a redundant double-run.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     services:
       # tmpfs: the data dir is mounted in RAM so Postgres' per-DDL fsync
       # traffic (WAL flushes + checkpoints) never hits disk. This suite is
@@ -961,12 +973,15 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/
+      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: postgresql
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
           AR_DB_FORKS: 8
-      - run: pnpm vitest run packages/activerecord-cli
+      # CLI E2E is not sharded — run it once, on shard 1 only, to avoid a
+      # redundant double-run across the two legs.
+      - if: ${{ matrix.shard == 1 }}
+        run: pnpm vitest run packages/activerecord-cli
         env:
           PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
 
@@ -1049,6 +1064,14 @@ jobs:
       needs.changes.outputs.activerecord_affected == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # 2-way file-level shard (RFC 0028 shard-ar-adapter-suites) — see the
+    # postgres-tests job above for the rationale. Each matrix leg gets its own
+    # fresh MariaDB service container; the `needs` graph keys on the job id, so
+    # the `ci` aggregator sees one merged result for both legs.
+    strategy:
+      fail-fast: false
+      matrix:
+        shard: [1, 2]
     services:
       mariadb:
         image: mariadb:11
@@ -1075,14 +1098,16 @@ jobs:
       # redundant double-run and keeps the CLI's subprocess tests out of this
       # large suite's worker scheduler (they otherwise starve its reporter RPC
       # / perturb fork scheduling — see trails-models-dump tests).
-      - run: pnpm vitest run packages/activerecord/
+      - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: mysql2
           MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
           AR_DB_FORKS: 8
       # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
-      - run: pnpm vitest run packages/activerecord-cli
+      # CLI E2E is not sharded — run it once, on shard 1 only.
+      - if: ${{ matrix.shard == 1 }}
+        run: pnpm vitest run packages/activerecord-cli
 
   website:
     name: Website
