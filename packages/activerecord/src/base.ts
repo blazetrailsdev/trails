@@ -243,7 +243,6 @@ import {
 } from "./core.js";
 import * as _Core from "./core.js";
 import * as _Persistence from "./persistence.js";
-import * as _Aggregations from "./aggregations.js";
 import * as _EnumModule from "./enum.js";
 import {
   collectingQueriesForExplain as _collectingQueriesForExplain,
@@ -4756,17 +4755,19 @@ include(Base, LockingPessimistic.InstanceMethods);
 include(Base, LockingOptimistic.InstanceMethods);
 include(Base, Timestamp.InstanceMethods);
 // TouchLater is included after Timestamp, so include()'s last-included-wins
-// ancestry lets TouchLater#touch (deferred-attr merge) override Timestamp#touch,
-// and Aggregations#reload (below) override Persistence#reload — no manual
-// prototype patching needed. Mirrors Ruby's include ordering.
+// ancestry lets TouchLater#touch (deferred-attr merge) override Timestamp#touch
+// — no manual prototype patching needed. Mirrors Ruby's include ordering.
+// Aggregations is NOT included here: mirroring Rails, it is mixed in lazily by
+// composed_of (see aggregations.ts includeAggregations), so models without a
+// composed_of declaration never carry its reload/initialize_dup overrides.
 include(Base, TouchLater.InstanceMethods);
-include(Base, _Aggregations.InstanceMethods);
 // Compose the initialize_dup chain. This stays hand-wired (not a last-wins
 // override) because Ruby builds it via module super-calls
-// (Core → Aggregations → Locking::Optimistic → Timestamp); trails has no super
-// chain across mixins, so invoke each module's hook explicitly in that order.
+// (Core → Locking::Optimistic → Timestamp); trails has no super chain across
+// mixins, so invoke each module's hook explicitly in that order. Aggregations'
+// initialize_dup slots in above this chain, wired by includeAggregations on
+// composed_of models only.
 (Base.prototype as any).initializeDup = function (this: Base, other: unknown): void {
-  _Aggregations.initializeDup.call(this, other);
   LockingOptimistic.initializeDup.call(this as any, other);
   Timestamp.initializeDup.call(this as any, other);
 };
