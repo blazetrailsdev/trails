@@ -121,18 +121,23 @@ export class IntegerType extends NumericValueType {
    * bignum like `9223372036854775807` (2^63-1) round-trips exactly. Routing a
    * `bigint` through `Number(value)` would round 2^63-1 up to 2^63 (the two
    * collapse to the same float64), so an in-range 8-byte value would then be
-   * wrongly rejected by `ensureInRange`. We therefore preserve the `bigint`
-   * unchanged (mirroring `BigIntegerType#castValue`) and let `isInRange`
-   * compare in BigInt space. `IntegerType` is `ValueType<number>`-backed, so
-   * the `bigint` is carried under a `number` cast — the same technique
-   * BigIntegerType uses.
+   * wrongly rejected by `ensureInRange`. But `IntegerType` is
+   * `ValueType<number>`-backed and downstream code (attribute reads, `===`
+   * comparisons, pluck/ids) expects a `number` — a driver-returned `16n` must
+   * stay `16`. So we only keep the `bigint` (carried under a `number` cast, the
+   * same technique `BigIntegerType#castValue` uses) when it exceeds the
+   * float64 safe-integer range; within it, `Number()` is exact and we return a
+   * plain `number`.
    */
   protected castValue(value: unknown): number | null {
     if (typeof value === "number") {
       if (isNaN(value)) return null;
       return Math.trunc(value);
     }
-    if (typeof value === "bigint") return value as unknown as number;
+    if (typeof value === "bigint") {
+      const num = Number(value);
+      return Number.isSafeInteger(num) ? num : (value as unknown as number);
+    }
     const parsed = parseInt(String(value), 10);
     return isNaN(parsed) ? null : parsed;
   }
