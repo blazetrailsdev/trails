@@ -89,6 +89,15 @@ export class SchemaCreation extends AbstractSchemaCreation {
     return this._hostAdapter?.isMariadb?.() ?? this._mariadb;
   }
 
+  /** @internal Rails gates the index DESC/ASC suffix on `supports_index_sort_order?`
+   * (MariaDB >= 10.8.1 / MySQL >= 8.0.1). Consult the threaded adapter's version-gated
+   * flag; on the host-less unit-test path default to supported so pure DDL fixtures
+   * still emit the suffix. The base returns `adapterName !== "mysql"` (always false),
+   * so this override is what makes MySQL honor the version gate. */
+  protected override supportsIndexSortOrder(): boolean {
+    return this._hostAdapter?.supportsIndexSortOrder?.() ?? true;
+  }
+
   /** @internal */
   override typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     if (options.array && type !== "primary_key") {
@@ -304,18 +313,15 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const quotedMap = new Map<string, string>(
       o.columns.map((c) => [c, this.adapter.quoteIdentifier(c)]),
     );
-    // Host-less unit-test path (no adapter) has no sort-order flag; default to
-    // supported so pure DDL fixtures still emit DESC/ASC. When the adapter is
-    // threaded, honor its version gate — the createTable path warms
-    // getDatabaseVersion() upstream so this synchronous read isn't cold.
-    const sortOrderSupported = this._hostAdapter?.supportsIndexSortOrder?.() ?? true;
+    // The createTable path warms getDatabaseVersion() upstream so the version-gated
+    // supportsIndexSortOrder read isn't cold.
     addOptionsForIndexColumns(
       quotedMap,
       {
         length: idx.lengths as Record<string, number> | number | undefined,
         order: idx.orders as Record<string, string> | string | undefined,
       },
-      sortOrderSupported,
+      this.supportsIndexSortOrder(),
     );
     return [...quotedMap.values()].join(", ");
   }
