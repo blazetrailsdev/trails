@@ -812,7 +812,7 @@ describe("SchemaDumperTest", () => {
     "schema dump with timestamptz datetime format",
     async () => {
       await withPostgresqlDatetimeType("timestamptz", async () => {
-        await ctx.createTable("timestamps", {}, (t) => {
+        await ctx.createTable("timestamps", { force: true }, (t) => {
           t.datetime("this_should_remain_datetime");
           (t as any).timestamptz("this_is_an_alias_of_datetime");
           t.column("without_time_zone", "timestamp");
@@ -842,7 +842,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump when changing datetime type for an existing app",
     async () => {
-      await ctx.createTable("timestamps", {}, (t) => {
+      await ctx.createTable("timestamps", { force: true }, (t) => {
         t.datetime("default_format");
         t.column("without_time_zone", "timestamp");
         t.column("with_time_zone", "timestamptz");
@@ -864,7 +864,7 @@ describe("SchemaDumperTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via create table and t timestamptz",
     async () => {
-      await ctx.createTable("timestamps", {}, (t) => {
+      await ctx.createTable("timestamps", { force: true }, (t) => {
         t.datetime("default_format");
         t.datetime("without_time_zone");
         t.timestamp("also_without_time_zone");
@@ -934,7 +934,7 @@ describe("SchemaDumperDefaultsTest", () => {
   });
 
   it("schema dump defaults with universally supported types", async () => {
-    await ctx.createTable("dump_defaults", {}, (t) => {
+    await ctx.createTable("dump_defaults", { force: true }, (t) => {
       t.string("string_with_default", { default: "Hello!" });
       t.date("date_with_default", { default: "2014-06-05" });
       t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
@@ -949,7 +949,7 @@ describe("SchemaDumperDefaultsTest", () => {
 
   // MySQL 8 strict mode forbids TEXT column defaults; MariaDB allowed them.
   itIfSupports("text_column_with_default", "schema dump with text column", async () => {
-    await ctx.createTable("dump_defaults", {}, (t) => {
+    await ctx.createTable("dump_defaults", { force: true }, (t) => {
       t.text("text_with_default", { default: "John" });
     });
     const output = SchemaDumper.dump(ctx);
