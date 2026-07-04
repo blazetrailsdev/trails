@@ -2130,3 +2130,36 @@ export async function rebuildCanonicalTables(
   }
   (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
 }
+
+/**
+ * Idempotently lay a named subset of canonical tables, creating each in its full
+ * canonical shape only when it is not already present — the no-drop counterpart
+ * to {@link rebuildCanonicalTables}. Use it against a shared, already-schema-
+ * loaded connection (e.g. `Base.connection`) where dropping an existing table
+ * would clobber data other suites rely on: existing tables are left untouched
+ * and only genuinely-missing ones are created. Throws on an unknown name for the
+ * same reason {@link rebuildCanonicalTables} does.
+ */
+export async function ensureCanonicalTables(
+  adapter: DatabaseAdapter,
+  names: readonly string[],
+): Promise<void> {
+  const registry = await buildCanonicalRegistry();
+  const wanted = new Set(names);
+  const known = new Set(registry.map((d) => d.name));
+  const unknown = [...wanted].filter((n) => !known.has(n));
+  if (unknown.length > 0) {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(`ensureCanonicalTables: unknown canonical table(s): ${unknown.join(", ")}`);
+  }
+  const defs = registry.filter((d) => wanted.has(d.name));
+  if (defs.length === 0) return;
+  const { ss, typeMap } = await prepareSchema(adapter);
+  let created = false;
+  for (const def of defs) {
+    if (await ss.tableExists(def.name)) continue;
+    await runTable(adapter, ss, typeMap, def);
+    created = true;
+  }
+  if (created) (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
+}

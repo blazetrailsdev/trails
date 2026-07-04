@@ -8,8 +8,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import type { TestDatabaseAdapter } from "../test-adapter.js";
 import { establishFromTestConfig } from "../test-helpers/test-database-config.js";
-import { defineSchema, type Schema } from "../test-helpers/define-schema.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+import { ensureCanonicalTables } from "../test-helpers/canonical-schema.js";
 import { Base } from "../index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
@@ -153,11 +152,11 @@ export const AUTHOR_NAME_LIMIT = 100;
  *   - `EncryptedTrafficLight` / `EncryptedTrafficLightWithStoreState` →
  *     `traffic_lights` (traffic_light_encrypted.rb)
  *
- * All already exist in the canonical `TEST_SCHEMA` with the Rails schema.rb
- * shape, so the fixtures name only canonical tables/columns. Under one-schema
- * mode the tables are already laid into the worker DB and this `defineSchema`
- * call is a canonical no-op; on the default path it lays the full canonical
- * shape once per lease.
+ * All already exist in the canonical schema with the Rails schema.rb shape, so
+ * the fixtures name only canonical tables/columns. Under one-schema mode the
+ * tables are already laid into the worker DB and this ensure-exists call is a
+ * no-op; on the default path it lays each missing canonical table once per
+ * lease. It never drops, so it is safe against the shared `Base.connection`.
  */
 const ENCRYPTION_CANONICAL_TABLES = [
   "posts",
@@ -167,11 +166,7 @@ const ENCRYPTION_CANONICAL_TABLES = [
 ] as const;
 
 export async function installEncryptionSchema(adapter: DatabaseAdapter): Promise<void> {
-  const schema: Schema = {};
-  for (const table of ENCRYPTION_CANONICAL_TABLES) {
-    schema[table] = TEST_SCHEMA[table as keyof typeof TEST_SCHEMA];
-  }
-  await defineSchema(adapter, schema);
+  await ensureCanonicalTables(adapter, ENCRYPTION_CANONICAL_TABLES);
 }
 
 /**

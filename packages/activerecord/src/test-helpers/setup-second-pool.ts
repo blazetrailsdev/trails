@@ -1,6 +1,6 @@
 import { Base } from "../base.js";
 import { registerModel } from "../associations.js";
-import { defineSchema, type Schema } from "./define-schema.js";
+import { rebuildCanonicalTables } from "./canonical-schema.js";
 import { ARUnit2Model } from "./models/arunit2-model.js";
 import { Course } from "./models/course.js";
 import { College } from "./models/college.js";
@@ -39,20 +39,6 @@ import { resolveSecondDatabaseConfig } from "./arunit2-config.js";
  *
  * @internal
  */
-const ARUNIT2_SCHEMA: Schema = {
-  colleges: { name: { type: "string", null: false } },
-  courses: { name: { type: "string", null: false }, college_id: "integer" },
-  professors: { name: { type: "string", null: false } },
-  courses_professors: {
-    columns: { course_id: "integer", professor_id: "integer" },
-    primaryKey: false,
-  },
-};
-
-const PRIMARY_SCHEMA: Schema = {
-  entrants: { name: { type: "string", null: false }, course_id: { type: "integer", null: false } },
-};
-
 /** @internal */
 export async function setupSecondPool(): Promise<void> {
   if (!ARUnit2Model.connectionClassQ()) {
@@ -73,6 +59,11 @@ export async function setupSecondPool(): Promise<void> {
   await ss.dropTable("colleges", { ifExists: true });
   await ss.dropTable("professors", { ifExists: true });
 
-  await defineSchema(arunit2, ARUNIT2_SCHEMA, { dropExisting: true });
-  await defineSchema(primary, PRIMARY_SCHEMA, { dropExisting: true });
+  await rebuildCanonicalTables(arunit2, [
+    "colleges",
+    "courses",
+    "professors",
+    "courses_professors",
+  ]);
+  await rebuildCanonicalTables(primary, ["entrants"]);
 }
