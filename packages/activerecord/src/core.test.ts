@@ -105,12 +105,15 @@ describe("CoreTest", () => {
     expect(first.fullInspect()).toMatch(/virtual_field: 1/);
   });
 
-  // Rails overrides `attribute_for_inspect` on a single instance and expects
-  // full_inspect to honor it. trails' inspectWithAttributes inlines
-  // formatForInspect instead of dispatching through the overridable
-  // attributeForInspect, so the override is bypassed.
-  // Tracked: 0023-surfaced-deviations/inspect-dispatch-overridable-attribute-for-inspect.
-  it.skip("inspect with overridden attribute for inspect", () => {});
+  it("inspect with overridden attribute for inspect", () => {
+    const topic = topics("first") as any;
+    const superAttributeForInspect = topic.attributeForInspect.bind(topic);
+    topic.attributeForInspect = (attrName: string) =>
+      attrName === "title"
+        ? JSON.stringify(topic.readAttribute("title").toUpperCase())
+        : superAttributeForInspect(attrName);
+    expect(topic.fullInspect()).toMatch(/title: "THE FIRST TOPIC"/);
+  });
 
   it("full inspect lists all attributes", async () => {
     // Rails full_inspect == inspect_with_attributes(all_attributes_for_inspect),

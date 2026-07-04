@@ -128,7 +128,11 @@ export async function prettyPrint(
           pp.text(attrName);
           pp.text(":");
           pp.breakable();
-          pp.text(attributeForInspect.call(this, attrName));
+          pp.text(
+            (this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(
+              attrName,
+            ),
+          );
         });
       },
     );
@@ -782,7 +786,10 @@ export function inspectWithAttributes(
   );
   const parts = attributesToList
     .filter((name) => knownKeys.has(name))
-    .map((name) => `${name}: ${formatForInspect.call(this, name, this.readAttribute(name))}`);
+    .map(
+      (name) =>
+        `${name}: ${(this as unknown as { attributeForInspect(attr: string): string }).attributeForInspect(name)}`,
+    );
   return `#<${ctor.name} ${parts.join(", ")}>`;
 }
 
