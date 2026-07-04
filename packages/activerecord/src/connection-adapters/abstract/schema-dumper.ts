@@ -196,9 +196,44 @@ export class SchemaDumper extends BaseSchemaDumper {
     return undefined;
   }
 
-  // `schemaDefault`, `_adapter`, and `schemaExpression` now live on the base
-  // `SchemaDumper` (../../schema-dumper.ts) so the base `emitTable` default
-  // callsites route through the same cast-type path; inherited here unchanged.
+  // Rails `schema_default` / `schema_expression` live in
+  // `connection_adapters/abstract/schema_dumper.rb`, so the ports stay in this
+  // file (the api:compare-mapped location). The base `SchemaDumper`
+  // (../../schema-dumper.ts) carries structurally-identical copies so its
+  // legacy `emitTable` default callsites route through the same cast-type path;
+  // these overrides keep the Rails-faithful body where it belongs. `_adapter`
+  // is a trails-only helper and lives solely on the base.
+
+  /** @internal */
+  protected override schemaDefault(column: Column): string | undefined {
+    if (!column.hasDefault && column.default === undefined) return undefined;
+    if (column.default == null) return this.schemaExpression(column);
+    const adapter = this._adapter();
+    if (adapter?.lookupCastTypeFromColumn) {
+      const type = adapter.lookupCastTypeFromColumn(column);
+      if (type != null && typeof type.deserialize === "function") {
+        const deserialized = type.deserialize(column.default);
+        if (deserialized == null) {
+          // column.default is already non-null (the `== null` guard above
+          // returned early). It may be a pre-deserialized JS value (e.g. []
+          // for a PG OID::Array column) that the scalar element type cannot
+          // deserialize. Apply typeCastForSchema directly on the original.
+          return type.typeCastForSchema(column.default);
+        }
+        return type.typeCastForSchema(deserialized);
+      }
+    }
+    if (typeof column.default === "string") return JSON.stringify(column.default);
+    return String(column.default);
+  }
+
+  /** @internal */
+  protected override schemaExpression(column: Column): string | undefined {
+    // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
+    // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
+    if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
+    return undefined;
+  }
 
   /** @internal */
   protected schemaCollation(column: Column): string | undefined {
