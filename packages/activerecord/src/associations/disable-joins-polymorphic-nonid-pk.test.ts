@@ -27,7 +27,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "../index.js";
+import { Base, registerModel, TableDefinition } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { setupFixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
@@ -68,11 +68,11 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   }
 
   beforeAll(async () => {
-    const conn = Base.connection as any;
-    await conn.createTable("dp_authors", { force: true }, (t: any) => {
+    const conn = Base.connection;
+    await conn.createTable("dp_authors", { force: true }, (t: TableDefinition) => {
       t.string("name");
     });
-    await conn.createTable("dp_galleries", { force: true }, (t: any) => {
+    await conn.createTable("dp_galleries", { force: true }, (t: TableDefinition) => {
       t.integer("dp_author_id");
       t.string("imageable_uuid");
       t.string("imageable_type");
@@ -80,14 +80,14 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
     await conn.createTable(
       "dp_non_id_photos",
       { primaryKey: "uuid", id: { type: "string" }, force: true },
-      (t: any) => {
+      (t: TableDefinition) => {
         t.string("title");
       },
     );
     await conn.createTable(
       "dp_non_id_articles",
       { primaryKey: "slug", id: { type: "string" }, force: true },
-      (t: any) => {
+      (t: TableDefinition) => {
         t.string("headline");
       },
     );
