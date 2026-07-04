@@ -258,7 +258,12 @@ const aggregationsIncluded = Symbol.for("@blazetrails/activerecord:aggregationsI
  */
 export function includeAggregations(modelClass: typeof Base): void {
   const proto = modelClass.prototype as Record<string | symbol, any>;
-  if (Object.prototype.hasOwnProperty.call(proto, aggregationsIncluded)) return;
+  // `unless self < Aggregations`: skip when the module already sits in the
+  // ancestry, whether from a prior composed_of on this class OR inherited from a
+  // superclass that declared one. A prototype-chain read (not hasOwnProperty)
+  // mirrors Ruby's ancestry check and stops a subclass from re-wrapping reload/
+  // initialize_dup (which would run the cache copy twice).
+  if (proto[aggregationsIncluded]) return;
   Object.defineProperty(proto, aggregationsIncluded, {
     value: true,
     configurable: true,
