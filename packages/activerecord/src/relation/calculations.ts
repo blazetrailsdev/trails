@@ -803,32 +803,49 @@ export async function performCount(
           QueryMethodBangs.constructJoinDependency.call(anyRel, allEager, Nodes.OuterJoin);
         const table = this._modelClass.arelTable;
         if (column != null && column !== "*") {
-          // Rails `build_count_subquery` (calculations.rb:662-678): a limit/offset
-          // over an eager-loaded count wraps a DISTINCT-column subquery so the
-          // limit constrains distinct column values before COUNT — rather than
-          // being silently dropped over the fanned LEFT OUTER JOIN. Only the
-          // no-limit case emits the flat `COUNT(DISTINCT col)`.
           if (this._limitValue !== null || this._offsetValue !== null) {
-            const innerManager = table.project(
-              (aggregateColumn(this, column) as any).as("count_column"),
+            // Rails `apply_join_dependency` (finder_methods.rb:463-478) routes an
+            // eager collection join + limit/offset through
+            // `distinct_relation_for_primary_key` (schema_statements.rb:1429-1452):
+            // materialize the limited DISTINCT pk TUPLES first (bounding which
+            // ROWS participate, joined+ordered), then re-count over
+            // `WHERE pk IN (tuples)` with the limit/offset cleared. So the limit
+            // constrains rows, and `COUNT(DISTINCT column)` runs across only those
+            // rows — NOT a `DISTINCT column ... LIMIT n` value list, which would
+            // truncate distinct values instead of rows.
+            const idSubquery = table.project(...pk.map((c: string) => table.get(c)));
+            idSubquery.distinct();
+            this._applyJoinsToManager(idSubquery, makeEagerJd());
+            this._applyWheresToManager(idSubquery, table);
+            this._applyOrderToManager(idSubquery, table);
+            applyFromToManager(this, idSubquery);
+            if (this._limitValue !== null) idSubquery.take(this._limitValue);
+            if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
+            const [idSql, idBinds] = compileManagerWithBinds(this, idSubquery);
+            const [idWithCtes, idCtedBinds] = prependCtes(this, idSql, [...idBinds]);
+            const idResult = await this._conn().selectAll(
+              idWithCtes,
+              `${this._modelClass.name} Ids`,
+              idCtedBinds,
             );
-            innerManager.distinct();
-            this._applyJoinsToManager(innerManager, makeEagerJd());
-            this._applyWheresToManager(innerManager, table);
-            applyFromToManager(this, innerManager);
-            if (this._limitValue !== null) innerManager.take(this._limitValue);
-            if (this._offsetValue !== null) innerManager.skip(this._offsetValue);
-            const [innerSql, allInnerBinds] = compileManagerWithBinds(this, innerManager);
-            const countCol = new Nodes.NamedFunction("COUNT", [
-              new Nodes.SqlLiteral("count_column"),
-            ]);
-            const outerManager = table.project(countCol.as("count"));
-            outerManager.from(new Nodes.SqlLiteral(`(${innerSql}) AS subquery_for_count`));
-            const [outerSql, outerBinds] = compileManagerWithBinds(this, outerManager);
-            const [withCtes, ctedBinds] = prependCtes(this, outerSql, [
-              ...allInnerBinds,
-              ...outerBinds,
-            ]);
+            const tuples = idResult.toArray().map((row) => pk.map((c) => row[c]));
+            // `pk IN ()` is invalid SQL — an empty limited set is a no-match → 0.
+            if (tuples.length === 0) return 0;
+
+            const countManager = table.project(
+              (aggregateColumn(this, column) as any).count(true).as("count"),
+            );
+            this._applyJoinsToManager(countManager, makeEagerJd());
+            this._applyWheresToManager(countManager, table);
+            applyFromToManager(this, countManager);
+            // Rails `distinct_relation_for_primary_key` restricts via
+            // `where!(pk.zip(limited_ids.transpose).to_h)` — a per-column `IN`
+            // (`author_id IN (...) AND id IN (...)`), not a tuple `IN`.
+            pk.forEach((c: string, i: number) => {
+              countManager.where(table.get(c).in(tuples.map((t) => t[i])));
+            });
+            const [countSql, countBinds] = compileManagerWithBinds(this, countManager);
+            const [withCtes, ctedBinds] = prependCtes(this, countSql, [...countBinds]);
             const result = await this._conn().selectAll(
               withCtes,
               `${this._modelClass.name} Count`,

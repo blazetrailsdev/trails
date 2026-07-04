@@ -77,28 +77,55 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     expect(await CpkBook.eagerLoad("chapters").count("cpk_books.revision")).toBe(2);
   });
 
-  it("eager_load(:assoc).limit(n).count(column) respects the limit via a DISTINCT-column subquery", async () => {
-    await seedBooksWithChapters();
-    await CpkBook.create({ author_id: 1, id: 3, title: "Gamma", revision: 3 });
+  async function seedBooksDuplicateRevisions(): Promise<void> {
+    await CpkAuthor.create({ id: 1, name: "Author One" });
+    // Two rows share revision 5; the third has 9. This distinguishes bounding
+    // ROWS (Rails) from bounding distinct VALUES: limit(2) by pk order picks
+    // books 1 & 2 (rev 5, 5) → COUNT(DISTINCT revision) = 1, whereas truncating
+    // the distinct value list {5, 9} to 2 would (wrongly) yield 2.
+    await CpkBook.create({ author_id: 1, id: 1, title: "Alpha", revision: 5 });
+    await CpkBook.create({ author_id: 1, id: 2, title: "Beta", revision: 5 });
+    await CpkBook.create({ author_id: 1, id: 3, title: "Gamma", revision: 9 });
+    // Chapters on book 1 fan the LEFT OUTER JOIN so the DISTINCT-pk id fetch
+    // must de-duplicate.
+    await CpkChapter.create({ author_id: 1, id: 10, book_id: 1, title: "ch-1" });
+    await CpkChapter.create({ author_id: 1, id: 11, book_id: 1, title: "ch-2" });
+  }
+
+  it("eager_load(:assoc).limit(n).count(column) bounds ROWS via a DISTINCT-pk id fetch, then re-counts", async () => {
+    await seedBooksDuplicateRevisions();
     let count = 0;
     const sqls = await captureSql(async () => {
-      count = (await CpkBook.eagerLoad("chapters").limit(2).count("cpk_books.revision")) as number;
+      count = (await CpkBook.eagerLoad("chapters")
+        .order("author_id", "id")
+        .limit(2)
+        .count("cpk_books.revision")) as number;
     });
-    // Rails `build_count_subquery` wraps `SELECT DISTINCT revision ... LIMIT 2`
-    // in an outer COUNT, so the limit caps the distinct column values counted (2
-    // of the 3 distinct revisions) rather than being silently dropped.
-    expect(count).toBe(2);
-    const countSql = sqls.find((s) => /count/i.test(s)) ?? "";
-    expect(countSql).toMatch(/subquery_for_count/i);
-    expect(countSql).toMatch(/LIMIT 2/i);
-    expect(countSql).toMatch(/DISTINCT/i);
+    // Rails `distinct_relation_for_primary_key` materializes the limited DISTINCT
+    // pk tuples (books 1 & 2) then re-counts COUNT(DISTINCT revision) over
+    // `WHERE pk IN (...)` — the two rows both have revision 5, so the answer is 1.
+    // Value-bounding (`DISTINCT revision LIMIT 2`) would wrongly return 2.
+    expect(count).toBe(2 - 1);
+    // A separate DISTINCT-pk id-materialization query runs before the count.
+    const idSql = sqls.find((s) => /DISTINCT.*cpk_books.*author_id/i.test(s) && /LIMIT 2/i.test(s));
+    expect(idSql).toBeTruthy();
+    // The recount restricts via per-column IN (author_id IN ... AND id IN ...),
+    // mirroring Rails' `where!(pk.zip(ids.transpose).to_h)`.
+    const countSql = sqls.find((s) => /COUNT\(DISTINCT/i.test(s)) ?? "";
+    expect(countSql).toMatch(/author_id.*IN/i);
+    expect(countSql).toMatch(/\bid\b.*IN/i);
   });
 
-  it("eager_load(:assoc).offset(n).count(column) respects the offset via the subquery", async () => {
-    await seedBooksWithChapters();
-    await CpkBook.create({ author_id: 1, id: 3, title: "Gamma", revision: 3 });
-    // 3 distinct revisions; offset(1) drops one → counts 2.
-    expect(await CpkBook.eagerLoad("chapters").offset(1).count("cpk_books.revision")).toBe(2);
+  it("eager_load(:assoc).offset(n).count(column) bounds ROWS via the id fetch", async () => {
+    await seedBooksDuplicateRevisions();
+    // order+offset(1) drops book 1 (rev 5); remaining rows are books 2 (rev 5)
+    // and 3 (rev 9) → COUNT(DISTINCT revision) = 2. Value-bounding would offset
+    // into the distinct value list {5, 9} and (wrongly) return 1.
+    const count = await CpkBook.eagerLoad("chapters")
+      .order("author_id", "id")
+      .offset(1)
+      .count("cpk_books.revision");
+    expect(count).toBe(2);
   });
 
   async function seedBooksWithOrders(): Promise<void> {
