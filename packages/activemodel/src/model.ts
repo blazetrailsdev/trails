@@ -148,8 +148,9 @@ function _validationOnToIf<TRecord extends object>(
  * Mirrors: ActiveSupport::XmlMini::TYPE_NAMES (by cast-type, not value class).
  */
 const XML_MINI_TYPE_NAMES: Record<string, string> = {
+  // BigIntegerType.type() returns "integer" (a bigint column's Rails
+  // `column.type` is :integer), so there is no separate "big_integer" key.
   integer: "integer",
-  big_integer: "integer",
   float: "float",
   decimal: "decimal",
   boolean: "boolean",
