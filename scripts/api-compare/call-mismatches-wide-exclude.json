@@ -28556,13 +28556,6 @@
     "package": "activerecord",
     "tsFile": "core.ts",
     "rubyName": "inspect_with_attributes",
-    "call": "attribute_for_inspect",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "inspect_with_attributes",
     "call": "filter_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
