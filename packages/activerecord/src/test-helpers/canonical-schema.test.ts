@@ -139,18 +139,13 @@ describe("ensureCanonicalTables", () => {
     }
   });
 
-  test("silently skips names outside the canonical registry", async () => {
+  test("throws on an unknown canonical table name", async () => {
     const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
     try {
       await loadCanonicalSchema(adapter);
-      await adapter.executeMutation("DROP TABLE topics");
-
-      // A non-canonical name is ignored, not thrown on — the canonical `topics`
-      // still gets created alongside it, and no bogus table appears.
-      await ensureCanonicalTables(adapter, ["topics", "not_a_real_table"]);
-      const names = await tableNames(adapter);
-      expect(names).toContain("topics");
-      expect(names).not.toContain("not_a_real_table");
+      await expect(ensureCanonicalTables(adapter, ["topics", "not_a_real_table"])).rejects.toThrow(
+        /unknown canonical table\(s\): not_a_real_table/,
+      );
     } finally {
       await (adapter as unknown as BetterSQLite3Adapter).close();
     }
