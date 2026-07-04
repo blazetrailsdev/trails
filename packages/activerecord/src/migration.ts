@@ -3132,15 +3132,21 @@ export class Migrator {
     // versions, and tolerates a nil version. Mirror that ordering so a list of
     // same-name, version-less migrations raises DuplicateMigrationNameError
     // rather than being rejected for a missing version.
-    const names = new Set<string>();
+    //
+    // Rails uses `group_by(&:name).find { |_, v| v.length > 1 }`, which reports
+    // the first *name* in first-occurrence order that has any duplicate — not
+    // the name whose repeat appears earliest. Count first, then walk the list
+    // in order to find the first duplicated name/version, to match that.
+    const nameCounts = new Map<string, number>();
     for (const m of migrations) {
-      if (names.has(m.name)) {
+      nameCounts.set(m.name, (nameCounts.get(m.name) ?? 0) + 1);
+    }
+    for (const m of migrations) {
+      if (nameCounts.get(m.name)! > 1) {
         throw new DuplicateMigrationNameError(m.name);
       }
-      names.add(m.name);
     }
 
-    const versions = new Set<string>();
     for (const m of migrations) {
       if (!m.version || !/^\d+$/.test(m.version)) {
         throw new MigrationError(
@@ -3150,11 +3156,17 @@ export class Migrator {
       if (validateTs && !this.isValidMigrationTimestamp(m.version)) {
         throw new InvalidMigrationTimestampError(m.version, m.name);
       }
+    }
+
+    const versionCounts = new Map<string, number>();
+    for (const m of migrations) {
       const normalized = String(BigInt(m.version));
-      if (versions.has(normalized)) {
+      versionCounts.set(normalized, (versionCounts.get(normalized) ?? 0) + 1);
+    }
+    for (const m of migrations) {
+      if (versionCounts.get(String(BigInt(m.version)))! > 1) {
         throw new DuplicateMigrationVersionError(m.version);
       }
-      versions.add(normalized);
     }
   }
 
