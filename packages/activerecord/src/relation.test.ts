@@ -6,6 +6,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Relation } from "./index.js";
+import { WhereClause } from "./relation/where-clause.js";
 import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
@@ -344,8 +345,10 @@ describe("RelationTest", () => {
   });
 
   it("merging an empty hash into a relation", () => {
+    // merge()'s type only accepts a Relation; Rails accepts a hash, so cast the
+    // empty hash to exercise the HashMerger empty-hash path (relation_test.rb:160).
     const merged = CanonPost.all().merge({} as any);
-    expect((merged as any)._whereClause.isEmpty()).toBe(true);
+    expect(merged._whereClause).toEqual(WhereClause.empty());
   });
 
   // Rails `Relation::HashMerger#initialize` validates keys with
