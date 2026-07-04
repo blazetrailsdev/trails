@@ -19,6 +19,7 @@ import {
   type ColumnOptions,
   type AddForeignKeyOptions,
   type AddIndexOptions,
+  type IdHashOptions,
 } from "./connection-adapters/abstract/schema-definitions.js";
 import {
   SchemaStatements,
@@ -393,7 +394,7 @@ export abstract class Migration {
     name: string,
     optionsOrFn?:
       | {
-          id?: boolean | "uuid";
+          id?: boolean | "uuid" | IdHashOptions;
           primaryKey?: string | string[] | false;
           force?: boolean | "cascade";
           ifNotExists?: boolean;
@@ -1831,7 +1832,7 @@ export class MigrationContext {
       primaryKey?: string | string[] | false;
       force?: boolean | "cascade";
       ifNotExists?: boolean;
-      id?: boolean | "uuid";
+      id?: boolean | "uuid" | IdHashOptions;
       default?: unknown;
       options?: string;
       comment?: string;
