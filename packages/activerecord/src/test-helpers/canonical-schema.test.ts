@@ -21,16 +21,25 @@ import { TEST_SCHEMA } from "./test-schema.js";
 // dumped DDL. The per-adapter transforms (serialIdType, DATETIME(6)) are shared
 // code imported from define-schema.ts, so PG/MySQL cannot diverge independently.
 
+// Reads sqlite_master through both the object-row and `{ columns, rows }`
+// array-row selectAll shapes — the BetterSQLite3Adapter returns the latter, so
+// naive `r.type`/`r.name`/`r.sql` access on the array rows yields undefined and
+// silently collapses every dump line to "undefined undefined: undefined".
 async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
   const res = (await adapter.selectAll(
     "SELECT type, name, sql FROM sqlite_master WHERE sql IS NOT NULL ORDER BY name, type, sql",
   )) as unknown;
-  const rows = (Array.isArray(res) ? res : ((res as { rows?: unknown[] }).rows ?? [])) as {
-    type: string;
-    name: string;
-    sql: string;
-  }[];
-  return rows.map((r) => `${r.type} ${r.name}: ${r.sql}`).join("\n");
+  let objectRows: { type: unknown; name: unknown; sql: unknown }[];
+  if (Array.isArray(res)) {
+    objectRows = res as { type: unknown; name: unknown; sql: unknown }[];
+  } else {
+    const { columns, rows } = res as { columns: string[]; rows: unknown[][] };
+    const t = columns.indexOf("type");
+    const n = columns.indexOf("name");
+    const s = columns.indexOf("sql");
+    objectRows = rows.map((row) => ({ type: row[t], name: row[n], sql: row[s] }));
+  }
+  return objectRows.map((r) => `${r.type} ${r.name}: ${r.sql}`).join("\n");
 }
 
 describe("loadCanonicalSchema", () => {
@@ -48,6 +57,10 @@ describe("loadCanonicalSchema", () => {
       // Sanity floor: the canonical schema is hundreds of tables + indexes, so a
       // silently-empty dump (both empty ⇒ trivially equal) can't pass this test.
       expect(expected.split("\n").length).toBeGreaterThan(300);
+      // Content floor: the dump must carry real DDL, not placeholder rows — a
+      // shape mismatch collapses every line to "undefined undefined: undefined".
+      expect(expected).not.toContain("undefined undefined: undefined");
+      expect(expected).toMatch(/table topics: CREATE TABLE "?topics"?/);
     } finally {
       await viaDefineSchema.close();
       await viaLoader.close();
