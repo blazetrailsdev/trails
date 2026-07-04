@@ -286,12 +286,13 @@ describe("TestDatabasesTest", () => {
     // recorded in schema_migrations — in which case migrator.up() correctly
     // no-ops and the log stays empty. Clear this version first so the migration
     // actually runs, mirroring how Rails' migrator tests isolate
-    // schema_migrations state.
-    try {
-      await new SchemaMigration(adapter).deleteVersion("1");
-    } catch {
-      /* schema_migrations may not exist yet */
-    }
+    // schema_migrations state. createTable is CREATE TABLE IF NOT EXISTS, so
+    // ensuring the table exists before the delete keeps both statements from
+    // erroring inside the fixtures transaction (a failed DELETE would poison
+    // the PG transaction with 25P02).
+    const schemaMigration = new SchemaMigration(adapter);
+    await schemaMigration.createTable();
+    await schemaMigration.deleteVersion("1");
 
     await createAndMigrate([adapter], migrations);
     expect(log).toEqual(["up"]);
