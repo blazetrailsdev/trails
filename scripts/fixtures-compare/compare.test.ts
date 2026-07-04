@@ -104,6 +104,11 @@ describe("compareValue", () => {
     expect(
       cmp({ ":symbol": "symbol", string: "string" }, { string: "string", ":symbol": "symbol" })[0],
     ).toBe(true);
+    // Positive: TS side stores the Ruby-HWIA-normalized "symbol" key (no colon),
+    // Rails YAML side parses ":symbol" — normalizeSymbolKey bridges the two.
+    expect(
+      cmp({ symbol: "symbol", string: "string" }, { ":symbol": "symbol", string: "string" })[0],
+    ).toBe(true);
     // Negative: different values must DIFF.
     expect(cmp({ a: 1 }, { a: 2 })[0]).toBe(false);
     // Negative: extra key on one side must DIFF.

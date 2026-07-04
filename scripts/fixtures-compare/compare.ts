@@ -397,14 +397,34 @@ function resolveEnumSymbol(table: string, attr: string, symbol: string): number 
   return map && Object.hasOwn(map, symbol) ? map[symbol] : undefined;
 }
 
-/** JSON.stringify with keys sorted at every nesting level — order-insensitive deep equality. */
+// Mirrors Ruby's HashWithIndifferentAccess key conversion for YAML-symbol keys:
+// a Ruby-symbol YAML key (`:symbol:`) parses to the Symbol `:symbol`, which HWIA
+// normalizes to the plain string "symbol" via `Symbol#to_s`. Our YAML parser
+// keeps the literal ":symbol" string, and the TS fixture stores the normalized
+// "symbol", so strip a single leading colon on `:word`-shaped keys before
+// comparing store/serialize hashes.
+//
+// Blanket-stripping every `:word` key (rather than scoping to known columns) is
+// safe: in YAML `:word:` is symbol syntax, so a `:word`-shaped key out of the
+// parser is *always* a Ruby-symbol artifact, never intentional string data — a
+// literal colon-prefixed key would require quoting (`":word":`), of which the
+// Rails fixture corpus has zero. Every `:word` key in the corpus (admin/users,
+// to_be_linked/users, naked/yml/trees) is a genuine symbol.
+function normalizeSymbolKey(key: string): string {
+  return SYMBOL_RE.test(key) ? key.slice(1) : key;
+}
+
+/**
+ * JSON.stringify with keys sorted at every nesting level (order-insensitive deep
+ * equality) and YAML-symbol keys normalized (`:foo` → `foo`, matching Ruby HWIA).
+ */
 function stableStringify(v: unknown): string {
   return JSON.stringify(v, (_key, val: unknown) => {
     if (val !== null && typeof val === "object" && !Array.isArray(val)) {
       return Object.fromEntries(
-        Object.entries(val as Record<string, unknown>).sort(([a], [b]) =>
-          a < b ? -1 : a > b ? 1 : 0,
-        ),
+        Object.entries(val as Record<string, unknown>)
+          .map(([k, value]) => [normalizeSymbolKey(k), value] as const)
+          .sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)),
       );
     }
     return val;
