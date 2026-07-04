@@ -17,6 +17,24 @@ export function resolveAssociationTarget(call: AssociationCall): string {
 export type ModelAssociationLookup = (className: string) => readonly AssociationCall[] | undefined;
 
 /**
+ * Whether a resolved plain (non-`through`) association target class NAME can be
+ * emitted as a bare reference in a synthesized `declare` — i.e. it is `Base`, a
+ * registered model (an `import type` will be added for it), or lexically visible
+ * from the declaring class. A name that is none of these — e.g.
+ * `classify("otherThing")` → `OtherThing` with no backing `OtherThing` model —
+ * is unresolvable; the caller pins it to `Base` so the synthesizer never emits
+ * a dangling reference (TS2304). Mirrors the `?? "Base"` fallback that
+ * `resolveThroughTarget` already gets for `through:` targets.
+ */
+export function isEmittableTargetName(
+  name: string,
+  isRegistered: (name: string) => boolean,
+  isVisible: (name: string) => boolean,
+): boolean {
+  return name === "Base" || isRegistered(name) || isVisible(name);
+}
+
+/**
  * Resolve a `has_many`/`has_one :x, through: :y` target by following Rails'
  * through→source reflection chain — the element type is the SOURCE class on the
  * through model (`Comment`), not `classify(name)` (`CommentsWithOrder`). `lookup`
