@@ -7,6 +7,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
+import { ForeignKeyDefinition } from "./schema-definitions.js";
 
 let adapter: AbstractSQLite3Adapter | undefined;
 
@@ -274,6 +275,30 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // raises ArgumentError promptly rather than recursing into a stack overflow.
     await expect(
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
+    ).rejects.toThrow(/no foreign key/i);
+  });
+
+  it("removeForeignKey ifExists probe matches on to_table only, not name (Rails)", async () => {
+    // Rails' remove_foreign_key checks existence with only the positional
+    // to_table, then resolves the exact constraint (with column/name) via
+    // foreign_key_for!. So an ifExists removal targeting an existing FK to
+    // `other` under the WRONG name must NOT short-circuit to a no-op — it
+    // finds the FK (name ignored for existence) and then raises from the
+    // resolution when the name doesn't match. If the ifExists probe wrongly
+    // sliced in `name`, this would silently no-op instead.
+    class FkStub extends StubAdapter {
+      isUseForeignKeys() {
+        return true;
+      }
+      foreignKeys(_table: string) {
+        return Promise.resolve([
+          new ForeignKeyDefinition("products", "other", "other_id", "id", "real_fk_name"),
+        ]);
+      }
+    }
+    const stub = new FkStub();
+    await expect(
+      stub.removeForeignKey("products", { name: "wrong_name", toTable: "other", ifExists: true }),
     ).rejects.toThrow(/no foreign key/i);
   });
 

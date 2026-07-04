@@ -802,11 +802,17 @@ export class SchemaStatements {
       toTable = toTableOrOptions;
       opts = { ...options };
     }
-    const lookup = { toTable, column: opts.column, name: opts.name };
-    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, lookup))) {
+    // Rails checks existence with only the positional to_table
+    // (`foreign_key_exists?(from_table, to_table)`), then resolves the exact
+    // constraint via foreign_key_for! using column/name too.
+    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, { toTable }))) {
       return;
     }
-    const fk = await this.foreignKeyForBang(fromTable, lookup);
+    const fk = await this.foreignKeyForBang(fromTable, {
+      toTable,
+      column: opts.column,
+      name: opts.name,
+    });
     await this.adapter.executeMutation(
       `ALTER TABLE ${this._qi(fromTable)} DROP CONSTRAINT ${this._qi(fk.name)}`,
     );

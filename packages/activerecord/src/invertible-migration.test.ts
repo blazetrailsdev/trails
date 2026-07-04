@@ -482,9 +482,7 @@ describe("InvertibleMigrationTest", () => {
   });
 
   // Rails' drop_table accepts a block (the table definition) so the migrate
-  // path can recreate the table on reversal; trails' Migration#dropTable takes
-  // no block and _reverseOperation throws IrreversibleMigration for dropTable.
-  // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
+  // path can recreate the table on reversal.
   it("migrate revert drop table", async () => {
     const connection = await Base.leaseConnection();
     const migration1 = new InvertibleMigration();
@@ -499,10 +497,9 @@ describe("InvertibleMigrationTest", () => {
     expect(await connection.tableExists("horses")).toBe(true);
   });
 
-  // Rails asserts the exact CommandRecorder#commands triples
-  // ([sym, args, block]); the trails recorder records {cmd, args} without the
-  // block, so a verbatim port needs block-tracking in CommandRecorder.
-  // Tracked-pending-convergence under RFC 0023-surfaced-deviations.
+  // Rails asserts the exact CommandRecorder#commands triples ([sym, args,
+  // block]); the trails recorder folds the block into the trailing arg of
+  // each {cmd, args} entry, so the assertion below matches that shape.
   it("revert order", async () => {
     const block = (t: any) => t.string("name");
     const recorder = new CommandRecorder(await Base.leaseConnection());

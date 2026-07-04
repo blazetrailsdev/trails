@@ -1049,11 +1049,10 @@ export abstract class Migration {
       // Nested: reuse the active recorder and just toggle its direction, so a
       // `revert` inside a reverting migration cancels by double-negation
       // (mirrors Rails `connection.revert(&block)` when connection is already a
-      // CommandRecorder — no fresh recorder, no replay).
+      // CommandRecorder — no fresh recorder, no replay, and no suppress_messages:
+      // Rails only suppresses in the outer branch).
       await this._recorder.revert(async () => {
-        await this.suppressMessages(async () => {
-          await fn();
-        });
+        await fn();
       });
       return;
     }
