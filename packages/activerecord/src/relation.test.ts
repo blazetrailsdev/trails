@@ -349,14 +349,10 @@ describe("RelationTest", () => {
     expect(merged.toSql()).toContain("SELECT");
   });
 
-  // it.fails (active, not skipped): Rails `Relation::HashMerger#initialize`
-  // validates keys with `assert_valid_keys(*Relation::VALUE_METHODS)`, so
-  // `merge(omg: "lol")` raises ArgumentError (merger.rb:7-12,
-  // relation_test.rb:164-166). trails' `merge(Hash)` instead treats the hash as
-  // `where` conditions (merger.ts HashMerger#merge → `relation.where(hash)`) and
-  // validates nothing, so it does not raise. Marked `it.fails` so CI tracks the
-  // mismatch and flips red once HashMerger gains key validation.
-  it.fails("merging a hash with unknown keys raises", () => {
+  // Rails `Relation::HashMerger#initialize` validates keys with
+  // `assert_valid_keys(*Relation::VALUE_METHODS)`, so `merge(omg: "lol")` raises
+  // ArgumentError (merger.rb:7-12, relation_test.rb:164-166).
+  it("merging a hash with unknown keys raises", () => {
     expect(() => CanonPost.all().merge({ omg: "lol" } as any)).toThrow();
   });
 

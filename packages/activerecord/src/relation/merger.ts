@@ -1,4 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
+import { assertValidKeys } from "@blazetrails/activesupport";
 
 import { arelColumns, constructJoinDependency, structuralUnionEq } from "./query-methods.js";
 
@@ -264,21 +265,82 @@ export class Merger {
 }
 
 /**
- * Merges a hash of conditions into a Relation by converting
- * the hash into where/having/etc. clauses first.
+ * Rails `Relation::VALUE_METHODS` (relation.rb:54-65) — the union of
+ * MULTI_VALUE_METHODS, SINGLE_VALUE_METHODS, and CLAUSE_METHODS — expressed as
+ * trails' camelCase keys. These are the only keys a hash `merge` accepts; each
+ * dispatches to the matching value-method bang setter on the built relation.
+ */
+const VALUE_METHODS = [
+  // MULTI_VALUE_METHODS
+  "includes",
+  "eagerLoad",
+  "preload",
+  "select",
+  "group",
+  "order",
+  "joins",
+  "leftOuterJoins",
+  "references",
+  "extending",
+  "unscope",
+  "optimizerHints",
+  "annotate",
+  "with",
+  // SINGLE_VALUE_METHODS
+  "limit",
+  "offset",
+  "lock",
+  "readonly",
+  "reordering",
+  "strictLoading",
+  "reverseOrder",
+  "distinct",
+  "createWith",
+  "skipQueryCache",
+  // CLAUSE_METHODS
+  "where",
+  "having",
+  "from",
+];
+
+/**
+ * Merges a hash of value-method directives into a Relation.
  *
- * Mirrors: ActiveRecord::Relation::HashMerger
+ * Mirrors: ActiveRecord::Relation::HashMerger. Rails validates the hash keys
+ * against `Relation::VALUE_METHODS` (raising ArgumentError on any unknown key),
+ * then builds a relation from the hash by dispatching each key to its
+ * value-method bang setter and merges that via `Merger`.
  */
 export class HashMerger {
   readonly relation: any;
   readonly hash: Record<string, unknown>;
 
   constructor(relation: any, hash: Record<string, unknown>) {
+    // Rails `HashMerger#initialize`: `hash.assert_valid_keys(*VALUE_METHODS)`.
+    assertValidKeys(hash, VALUE_METHODS);
     this.relation = relation;
     this.hash = hash;
   }
 
   merge(): any {
-    return this.relation.where(this.hash);
+    return new Merger(this.relation, this.buildOther()).merge();
+  }
+
+  // Rails `HashMerger#other`: build a fresh relation and apply each hash value
+  // to it via `public_send("#{k}!", *v)` so where-value interpolation etc.
+  // happens on the built relation rather than by directly merging raw values.
+  // `select` dispatches to `_select!` (Rails renames `:select` → `:_select` to
+  // avoid Enumerable#select!); trails mirrors this with `_selectBang`.
+  private buildOther(): any {
+    const other = this.relation._newRelation();
+    for (const [key, value] of Object.entries(this.hash)) {
+      const method = key === "select" ? "_selectBang" : `${key}Bang`;
+      if (Array.isArray(value)) {
+        other[method](...value);
+      } else {
+        other[method](value);
+      }
+    }
+    return other;
   }
 }
