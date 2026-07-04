@@ -109,6 +109,15 @@ export interface VirtualizeOptions extends WalkOptions {
    * for a column whose value is exposed as an aggregate object.
    */
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Predicate: does an association-target class name resolve to a type in
+   * scope where the declare is spliced? Forwarded to `synthesizeDeclares` so a
+   * plain association naming no in-scope model falls back to `Base` instead of
+   * emitting a dangling type reference. `host` is the class the declare is
+   * spliced into, so visibility is judged at the splice site. See
+   * {@link import("./synthesize.js").SynthesizeOptions.isKnownTarget}.
+   */
+  isKnownTarget?: (name: string, host: import("./walker.js").ClassInfo) => boolean;
 }
 
 export function virtualize(
@@ -147,6 +156,7 @@ export function virtualize(
       attributesNullable: options.attributesNullable,
       associationTargets: options.associationTargets,
       composedOfColumns: options.composedOfColumns,
+      isKnownTarget: options.isKnownTarget,
       ancestors: ancestorsOf.get(info),
       superNameOf,
     });

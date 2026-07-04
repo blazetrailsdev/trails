@@ -134,6 +134,82 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare safe: string;/);
   });
 
+  test("isKnownTarget: unknown plain association target falls back to Base", () => {
+    const src =
+      "export class Thing extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("otherThing");\n' +
+      '    this.hasMany("gadgets");\n' +
+      '    this.belongsTo("owner");\n' +
+      "  }\n" +
+      "}\n";
+    // Only `Owner` is a known target; `OtherThing` / `Gadget` name no model.
+    const { text } = virtualize(src, "thing.ts", {
+      isKnownTarget: (name) => name === "Base" || name === "Owner",
+    });
+    // Dangling names degrade to Base (in scope); known target is kept.
+    expect(text).toMatch(/declare otherThing: Base \| null;/);
+    expect(text).toMatch(/declare gadgets: .*AssociationProxy<Base>;/);
+    expect(text).toMatch(/declare owner: Owner \| null;/);
+    expect(text).not.toMatch(/OtherThing/);
+    expect(text).not.toMatch(/Gadget/);
+    // Loader overload for the unknown hasOne also degrades to Base.
+    expect(text).toMatch(/declare loadHasOne:.*name: "otherThing".*Promise<Base \| null>/);
+  });
+
+  test("isKnownTarget is scoped to the splice-site host, not a flat file scan", () => {
+    // Two independent model classes each associate `widget`. The predicate
+    // only reports `Widget` known when the host is `A` — modeling `Widget`
+    // being visible in A's closure but NOT B's sibling closure. B's declare
+    // must degrade to Base even though the name is "known" for A.
+    const src =
+      "export class A extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("widget");\n' +
+      "  }\n" +
+      "}\n" +
+      "export class B extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("widget");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "ab.ts", {
+      isKnownTarget: (name, host) => name === "Base" || (name === "Widget" && host.name === "A"),
+    });
+    // A sees Widget; B does not — B falls back to Base.
+    expect(text).toMatch(/class A extends Base \{\s*declare widget: Widget \| null;/);
+    expect(text).toMatch(/class B extends Base \{\s*declare widget: Base \| null;/);
+  });
+
+  test("integer FK attribute() declare widens to PrimaryKeyValue", () => {
+    const src =
+      "export class Membership extends Base {\n" +
+      "  static {\n" +
+      '    this.attribute("club_id", "integer");\n' +
+      '    this.attribute("rank", "integer");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "membership.ts", { attributesNullable: true });
+    // FK attribute accepts a model `.id` (PrimaryKeyValue) assignment.
+    expect(text).toMatch(
+      /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    // Non-FK integer attribute keeps its (nullable) narrow type.
+    expect(text).toMatch(/declare rank: number \| null;/);
+  });
+
+  test("isKnownTarget omitted: every target is trusted verbatim", () => {
+    const src =
+      "export class Thing extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("otherThing");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "thing.ts");
+    // No predicate → classify result emitted as-is (back-compat).
+    expect(text).toMatch(/declare otherThing: OtherThing \| null;/);
+  });
+
   test("schemaColumnsByTable doesn't collide with hasMany / belongsTo names", () => {
     const src =
       "export class Post extends Base {\n" +
@@ -224,6 +300,32 @@ describe("virtualize — deltas", () => {
     });
     expect(text).toMatch(/declare score: bigint;/);
     expect(text).toMatch(/declare score_nullable: bigint \| null;/);
+  });
+
+  test("schemaColumnsByTable widens integer FK columns to PrimaryKeyValue", () => {
+    const src = "export class Membership extends Base {}\n";
+    const { text } = virtualize(src, "membership.ts", {
+      schemaColumnsByTable: {
+        memberships: {
+          club_id: { type: "integer", null: true },
+          member_id: { type: "big_integer", null: false },
+          favorite_things_id: "integer", // legacy string shape is FK too
+          rank: { type: "integer", null: true }, // not an FK: name doesn't end in _id
+        },
+      },
+    });
+    // FK columns accept a model `.id` (PrimaryKeyValue) assignment.
+    expect(text).toMatch(
+      /declare club_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(
+      /declare member_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    expect(text).toMatch(
+      /declare favorite_things_id: import\("@blazetrails\/activerecord"\)\.PrimaryKeyValue;/,
+    );
+    // Non-FK integer column keeps its narrow type.
+    expect(text).toMatch(/declare rank: number \| null;/);
   });
 
   test("schemaColumnsByTable mixing legacy string and rich shape in same table", () => {

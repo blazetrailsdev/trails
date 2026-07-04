@@ -80,12 +80,32 @@ export interface SynthesizeOptions {
    * scalar type shadowing the aggregation object type.
    */
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Whether an association-target class name resolves to a type that is
+   * actually in scope where the declare will be spliced (in the model
+   * registry or lexically visible in-file). A plain (non-`through`)
+   * association whose `classify`-d target has no corresponding model — e.g.
+   * `hasOne("otherThing")` in a throwaway test class with no `OtherThing`
+   * model — would otherwise emit `declare otherThing: OtherThing | null`, a
+   * dangling name (TS2304). When the predicate reports the target unknown the
+   * declare falls back to `Base` (always in scope), mirroring how `through:`
+   * targets already degrade to `Base`. Omitted → every target is trusted.
+   *
+   * `host` is the class the declare is spliced into, so the predicate can
+   * scope visibility to that exact splice site (a class in a sibling
+   * `describe`/`it` closure is NOT visible and must not count as known).
+   */
+  isKnownTarget?: (name: string, host: ClassInfo) => boolean;
 }
 
 export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
   const out: string[] = [];
   const aliases = opts.classNameAliases;
   const targets = opts.associationTargets;
+  // Bind the caller's predicate to THIS class — the declare's splice site —
+  // so target visibility is judged from where the declare actually lands,
+  // never from an ancestor's scope. Threaded as a plain `(name) => boolean`.
+  const isKnownTarget = boundKnownTarget(info, opts);
   // Subclass singular associations whose target isn't assignable to the
   // ancestor's (TS2416): suppress the property declare (loader overload kept).
   const conflictingSingulars = collectConflictingSingulars(info, opts);
@@ -112,14 +132,21 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
     ) {
       continue;
     }
-    for (const line of renderCall(info, call, aliases, targets, opts.attributesNullable ?? false)) {
+    for (const line of renderCall(
+      info,
+      call,
+      aliases,
+      targets,
+      opts.attributesNullable ?? false,
+      isKnownTarget,
+    )) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
         out.push(line.text);
         if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
       }
     }
   }
-  for (const l of renderLoaderOverloads(info, aliases, targets, opts.ancestors)) {
+  for (const l of renderLoaderOverloads(info, aliases, targets, opts.ancestors, isKnownTarget)) {
     if (!info.existingMembers.has(l.declaredName)) {
       out.push(l.text);
       synthesizedInstanceNames.add(l.declaredName);
@@ -131,6 +158,20 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
     out.push(line);
   }
   return out;
+}
+
+/**
+ * Bind `opts.isKnownTarget` to `host` (the splice-site class), yielding a
+ * plain `(name) => boolean` threaded down the render helpers. `undefined`
+ * when the caller supplied no predicate (every target trusted verbatim).
+ */
+function boundKnownTarget(
+  host: ClassInfo,
+  opts: SynthesizeOptions,
+): ((name: string) => boolean) | undefined {
+  const predicate = opts.isKnownTarget;
+  if (!predicate) return undefined;
+  return (name: string) => predicate(name, host);
 }
 
 function renderSchemaColumnDeclares(
@@ -159,13 +200,30 @@ function renderSchemaColumnDeclares(
     if (composedCols?.has(col)) continue;
     // Skip columns listed in `@trails-typegen skip-columns:` JSDoc.
     if (info.skipSchemaColumns.has(col)) continue;
-    const tsType = renderSchemaValueType(value);
+    const tsType = isForeignKeyColumn(col, value)
+      ? `${AR_IMPORT}.PrimaryKeyValue`
+      : renderSchemaValueType(value);
     // Emit a bracket-quoted declare for non-identifier / reserved-word
     // names (e.g. `declare "strange-col": string;`). TypeScript allows
     // string-literal class field names, so this is a valid declare.
     out.push(`${INDENT}declare ${renderDeclaredMemberName(col)}: ${tsType};`);
   }
   return out;
+}
+
+/**
+ * A schema column is treated as a foreign key when its name ends in `_id`
+ * and its type is an integer kind — the shape Rails uses for a `belongs_to`
+ * reference. Such columns are routinely assigned another record's `.id`
+ * accessor (`membership.club_id = club.id`), which is typed `PrimaryKeyValue`
+ * (a union that includes `undefined`). A narrow `number | null` declare would
+ * reject that legitimate assignment (TS2322), so FK columns are widened to
+ * `PrimaryKeyValue` — the exact type an id accessor yields.
+ */
+function isForeignKeyColumn(col: string, value: SchemaColumnValue): boolean {
+  if (col === "id" || !col.endsWith("_id")) return false;
+  const type = typeof value === "string" ? value : value.type;
+  return type === "integer" || type === "big_integer" || type === "bigint";
 }
 
 /**
@@ -223,6 +281,7 @@ function renderLoaderOverloads(
   aliases: ReadonlyMap<string, string> | undefined,
   targets: ReadonlyMap<string, string> | undefined,
   ancestors: readonly ClassInfo[] | undefined,
+  isKnownTarget: ((name: string) => boolean) | undefined,
 ): RenderedLine[] {
   const belongsToOverloads: string[] = [];
   const hasOneOverloads: string[] = [];
@@ -236,7 +295,7 @@ function renderLoaderOverloads(
       const target =
         call.options["polymorphic"] === "true"
           ? "Base"
-          : resolveTarget(source, call, aliases, targets);
+          : resolveTarget(source, call, aliases, targets, isKnownTarget);
       const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
       const bucket = call.kind === "belongsTo" ? belongsToOverloads : hasOneOverloads;
       if (!bucket.includes(overload)) bucket.push(overload);
@@ -292,8 +351,13 @@ function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): 
   const targets = opts.associationTargets;
   const superNameOf = opts.superNameOf;
 
+  // Conflict detection compares the target as seen from `info`'s splice
+  // site, so bind the predicate to `info` (not each ancestor `host`).
+  const isKnownTarget = boundKnownTarget(info, opts);
   const target = (host: ClassInfo, call: AssociationCall): string =>
-    call.options["polymorphic"] === "true" ? "Base" : resolveTarget(host, call, aliases, targets);
+    call.options["polymorphic"] === "true"
+      ? "Base"
+      : resolveTarget(host, call, aliases, targets, isKnownTarget);
   // Effective inherited target per association, folded base→derived
   // (`ancestors` is nearest-first, so reverse). A suppressed ancestor override
   // (target not assignable to what it inherits) does NOT change the effective
@@ -368,16 +432,17 @@ function renderCall(
   aliases: ReadonlyMap<string, string> | undefined,
   targets: ReadonlyMap<string, string> | undefined,
   attributesNullable: boolean,
+  isKnownTarget: ((name: string) => boolean) | undefined,
 ): RenderedLine[] {
   switch (call.kind) {
     case "attribute":
       return renderAttribute(call, attributesNullable);
     case "hasMany":
     case "hasAndBelongsToMany":
-      return renderCollectionAssoc(info, call, aliases, targets);
+      return renderCollectionAssoc(info, call, aliases, targets, isKnownTarget);
     case "belongsTo":
     case "hasOne":
-      return renderSingularAssoc(info, call, aliases, targets);
+      return renderSingularAssoc(info, call, aliases, targets, isKnownTarget);
     case "scope":
       return renderScope(info, call);
     case "enum":
@@ -392,8 +457,15 @@ function renderAttribute(call: AttributeCall, nullable: boolean): RenderedLine[]
   // aware); re-declaring it here as an instance property is a TS2610 error.
   // Skip it, matching how renderSchemaColumnDeclares skips the `id` column.
   if (call.name === "id") return [];
-  const tsType = tsTypeFor(call.railsType);
   const memberName = renderDeclaredMemberName(call.name);
+  // An `*_id` integer attribute is a foreign key; widen it to accept a model
+  // `.id` (`PrimaryKeyValue`) assignment, exactly as the schema-column path
+  // does (see `isForeignKeyColumn`). `PrimaryKeyValue` already admits
+  // null/undefined, so the nullable wrapper is redundant here.
+  if (isForeignKeyColumn(call.name, call.railsType)) {
+    return [line(`declare ${memberName}: ${AR_IMPORT}.PrimaryKeyValue;`, call.name, false)];
+  }
+  const tsType = tsTypeFor(call.railsType);
   const rendered = nullable
     ? tsType.includes("|")
       ? `(${tsType}) | null`
@@ -407,6 +479,7 @@ function renderCollectionAssoc(
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
   targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
 ): RenderedLine[] {
   // Post-Phase-R.2: collection readers return an AssociationProxy,
   // not a plain `Target[]`. The proxy is awaitable — `await blog.posts`
@@ -414,7 +487,7 @@ function renderCollectionAssoc(
   // collections. Singular associations (belongsTo / hasOne) are
   // covered by `loadBelongsTo` / `loadHasOne` overloads rendered by
   // `renderLoaderOverloads` at the end of `synthesizeDeclares`.
-  const target = resolveTarget(info, call, aliases, targets);
+  const target = resolveTarget(info, call, aliases, targets, isKnownTarget);
   const memberName = renderDeclaredMemberName(call.name);
   return [
     line(`declare ${memberName}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
@@ -426,6 +499,7 @@ function renderSingularAssoc(
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
   targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
 ): RenderedLine[] {
   // `polymorphic: true` on belongsTo can't be narrowed statically — any
   // Base-rooted class could be on the other end. Fall back to `Base | null`.
@@ -433,7 +507,9 @@ function renderSingularAssoc(
   // `declare loadBelongsTo: ...` / `declare loadHasOne: ...` lines
   // by `renderLoaderOverloads` below.
   const target =
-    call.options["polymorphic"] === "true" ? "Base" : resolveTarget(info, call, aliases, targets);
+    call.options["polymorphic"] === "true"
+      ? "Base"
+      : resolveTarget(info, call, aliases, targets, isKnownTarget);
   const memberName = renderDeclaredMemberName(call.name);
   return [line(`declare ${memberName}: ${target} | null;`, call.name, false)];
 }
@@ -503,11 +579,18 @@ function resolveTarget(
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
   targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
 ): string {
   const override = targets?.get(`${info.name}#${call.name}`);
+  // A pre-resolved `through:` override already degrades to `Base` when
+  // unresolvable, so trust it as-is.
   if (override) return override;
   const target = resolveAssociationTarget(call);
-  return aliases?.get(target) ?? target;
+  const resolved = aliases?.get(target) ?? target;
+  // A plain association target that names no in-scope class would emit a
+  // dangling type reference; fall back to the always-visible `Base`.
+  if (isKnownTarget && !isKnownTarget(resolved)) return "Base";
+  return resolved;
 }
 
 function pascal(s: string): string {

@@ -625,6 +625,7 @@ const BUILTIN_IMPORT_FROM_MODELS_DIR: Record<string, string> = {
   AssociationProxy: "../../associations/collection-proxy.js",
   Relation: "../../relation.js",
   IPAddr: "../../connection-adapters/postgresql/oid/cidr.js",
+  PrimaryKeyValue: "../../base.js",
 };
 
 /** Builtin specifier recomputed relative to `fileDir`. */
@@ -756,6 +757,23 @@ async function main(): Promise<void> {
     // omit the schema map: declares then reflect only the class's explicit
     // `attribute()` / association / enum calls — exactly its real surface.
     const underModelsDir = file.startsWith(modelsDirPrefix);
+    // An association-target class name is "known" (resolves to a type in
+    // scope at the declare's splice site) when it is a registered model,
+    // `Base`, a module-scope import/declaration, or a class lexically visible
+    // from the host class (same or enclosing block). A `classify`-d target
+    // satisfying none of these — e.g. `hasOne("otherThing")` in a throwaway
+    // test class with no `OtherThing` model — must not be baked verbatim
+    // (dangling TS2304); the synthesizer degrades it to `Base`. Visibility is
+    // scoped to the host (not a flat whole-file scan) so a same-named class in
+    // a SIBLING `describe`/`it` closure does not count as visible — mirrors
+    // `resolveAutoImports`' `moduleScope + collectVisibleClassNames` logic.
+    const moduleScope = collectNamesInScope(sf);
+    const isKnownTarget = (name: string, host: ClassInfo): boolean => {
+      if (name === "Base" || registry.has(name) || moduleScope.has(name)) return true;
+      const visible = new Set<string>();
+      collectVisibleClassNames(host.classDecl, visible);
+      return visible.has(name);
+    };
     const { text: virtualized } = virtualize(source, file, {
       isModelClass,
       prependImports,
@@ -763,6 +781,7 @@ async function main(): Promise<void> {
       classNameAliases,
       associationTargets,
       composedOfColumns: composedOfColumns.size > 0 ? composedOfColumns : undefined,
+      isKnownTarget,
       // Baked attribute declares allow null assignment (Rails attributes
       // carry no NOT NULL constraint); the live tsc-plugin keeps bare `T`.
       attributesNullable: true,

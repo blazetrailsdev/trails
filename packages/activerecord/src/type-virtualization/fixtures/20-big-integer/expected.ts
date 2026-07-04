@@ -1,6 +1,6 @@
 export class Counter extends Base {
   declare hits: bigint;
-  declare user_id: bigint;
+  declare user_id: import("@blazetrails/activerecord").PrimaryKeyValue;
 
   static {
     this.attribute("hits", "big_integer");
