@@ -41,6 +41,16 @@ async function withPostgresqlDatetimeType(type: string, fn: () => Promise<void>)
 // No per-test ad-hoc tables. Split into its own describe (no bespoke
 // table-building cases) so nothing `force`-recreates a canonical table out from
 // under the dump.
+// Each full `standard_dump` introspects all ~330 canonical tables (the
+// truncate-based global reset in PR #4504 leaves them in place), running
+// ~4.1–4.8s on a single local PG worker — already near the 5s per-test vitest
+// default. Under CI's 6-worker PG fork load one contention spike tips them over.
+// Give only the genuine full-dump cases explicit headroom via the options form
+// `it(name, { timeout }, fn)` (keeps the callback as the last arg); the
+// single-table `dumpCanonicalTable` cases stay on the default timeout, the global
+// timeout is untouched, and the (Rails-matching) test names are unchanged.
+const FULL_DUMP_TIMEOUT_MS = 30_000;
+
 describe("SchemaDumperTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
@@ -65,7 +75,7 @@ describe("SchemaDumperTest", () => {
     ).supportsIndexSortOrder();
   }
 
-  it("schema dump", async () => {
+  it("schema dump", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
     expect(output).toMatch(/createTable\("accounts"/);
     expect(output).toMatch(/createTable\("authors"/);
@@ -78,24 +88,24 @@ describe("SchemaDumperTest", () => {
     expect(output).toMatch(/createTable\("authors",.*force:\s*"cascade"/);
   });
 
-  it("schema dump excludes sqlite sequence", async () => {
+  it("schema dump excludes sqlite sequence", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
     expect(output).not.toMatch(/createTable\("sqlite_sequence"/);
   });
 
-  it("schema dump includes camelcase table name", async () => {
+  it("schema dump includes camelcase table name", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
     expect(output).toMatch(/createTable\("CamelCase"/);
   });
 
-  it("types no line up", async () => {
+  it("types no line up", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
     const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
     for (const line of columnLines) {
       expect(line).not.toMatch(/\bt\.\w+\s{2,}/);
     }
   });
-  it("arguments no line up", async () => {
+  it("arguments no line up", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
     const columnLines = output.split("\n").filter((l) => /\bt\.\w+\(/.test(l));
     // no padding before option keys — each key is preceded by "{ " or ", ", never extra spaces
@@ -108,12 +118,12 @@ describe("SchemaDumperTest", () => {
     }
   });
 
-  it("no dump errors", async () => {
+  it("no dump errors", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     const output = await standardDump();
     expect(output).not.toContain("# Could not dump table");
   });
 
-  it("schema dump includes not null columns", async () => {
+  it("schema dump includes not null columns", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     // Rails: dump_all_table_schema([/^[^r]/]) — keep only tables starting with
     // `r`, then assert some column dumps `null: false`.
     const output = await standardDump([/^[^r]/]);
@@ -135,13 +145,17 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain('t.integer("id"');
   });
 
-  it("schema dump should honor nonstandard primary keys", async () => {
-    // Rails: standard_dump — canonical `movies` has `primary_key: "movieid"`.
-    const output = await standardDump();
-    const match = output.match(/createTable\("movies"(.*)/);
-    expect(match).not.toBeNull();
-    expect(match![1]).toMatch(/primaryKey: "movieid"/);
-  });
+  it(
+    "schema dump should honor nonstandard primary keys",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      // Rails: standard_dump — canonical `movies` has `primary_key: "movieid"`.
+      const output = await standardDump();
+      const match = output.match(/createTable\("movies"(.*)/);
+      expect(match).not.toBeNull();
+      expect(match![1]).toMatch(/primaryKey: "movieid"/);
+    },
+  );
 
   it("schema dump should use false as default", async () => {
     // Rails: dump_table_schema "booleans" — canonical `has_fun` default false.
@@ -168,7 +182,7 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toMatch(/float.*"temperature".*limit/);
   });
 
-  it("schema dump aliased types", async () => {
+  it("schema dump aliased types", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     // Rails: standard_dump — canonical `binaries.blob_data` (t.blob) dumps as
     // binary, `numeric_data.numeric_number` (t.numeric) dumps as decimal.
     const output = await standardDump();
@@ -183,15 +197,19 @@ describe("SchemaDumperTest", () => {
     expect(output).toContain(`t.decimal("decimal_number"${decimalTail}`);
   });
 
-  it("schema dump keeps id column when id is false and id column added", async () => {
-    // Rails: standard_dump — canonical `goofy_string_id` is `id: false` with a
-    // non-PK `id` string column.
-    const output = await standardDump();
-    const match = output.match(/createTable\("goofy_string_id"(.*)\n(.*)\n/);
-    expect(match).not.toBeNull();
-    expect(match![1]).toMatch(/id: false/);
-    expect(match![2]).toMatch(/t\.string\("id",.*null: false/);
-  });
+  it(
+    "schema dump keeps id column when id is false and id column added",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      // Rails: standard_dump — canonical `goofy_string_id` is `id: false` with a
+      // non-PK `id` string column.
+      const output = await standardDump();
+      const match = output.match(/createTable\("goofy_string_id"(.*)\n(.*)\n/);
+      expect(match).not.toBeNull();
+      expect(match![1]).toMatch(/id: false/);
+      expect(match![2]).toMatch(/t\.string\("id",.*null: false/);
+    },
+  );
 
   // Helper: grep the lone dumped `addIndex` line for `companies` matching `re`,
   // mirroring Rails' `dump_table_schema("companies").split(/\n/).grep(...).first`.
@@ -271,47 +289,65 @@ describe("SchemaDumperTest", () => {
     }
   });
 
-  it("schema dump includes decimal options", async () => {
+  it("schema dump includes decimal options", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     // Rails: dump_all_table_schema([/^[^n]/]) — keep only tables starting with
     // `n` (numeric_data), then assert the scaled decimal + default round-trips.
     const output = await standardDump([/^[^n]/]);
     expect(output).toMatch(/precision: 3,\s+scale: 2,\s+default: "2\.78"/);
   });
 
-  it("schema dump keeps large precision integer columns as decimal", async () => {
-    // Rails: standard_dump — canonical `numeric_data.atoms_in_universe` is a
-    // precision-55, scale-0 decimal, dumped without a scale option.
-    const output = await standardDump();
-    expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
-  });
+  it(
+    "schema dump keeps large precision integer columns as decimal",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      // Rails: standard_dump — canonical `numeric_data.atoms_in_universe` is a
+      // precision-55, scale-0 decimal, dumped without a scale option.
+      const output = await standardDump();
+      expect(output).toMatch(/t\.decimal\("atoms_in_universe",\s*\{[^}]*precision:\s*55/);
+    },
+  );
 
-  it("schema dump includes limit constraint for integer columns", async () => {
-    // Rails: dump_all_table_schema([/^(?!integer_limits)/]) with per-adapter
-    // `limit` expectations for `integer_limits.c_int_1..8`.
-    const output = await standardDump([/^(?!integer_limits)/]);
-    expect(output).toMatch(/"c_int_without_limit"(?!.*limit)/);
+  it(
+    "schema dump includes limit constraint for integer columns",
+    { timeout: FULL_DUMP_TIMEOUT_MS },
+    async () => {
+      // Rails: dump_all_table_schema([/^(?!integer_limits)/]) with per-adapter
+      // `limit` expectations for `integer_limits.c_int_1..8`.
+      const output = await standardDump([/^(?!integer_limits)/]);
+      expect(output).toMatch(/"c_int_without_limit"(?!.*limit)/);
 
-    // c_int_1..4: PostgreSQL rounds limit 1..2 → 2 bytes and drops it for the
-    // 4-byte 3..4; MySQL keeps 1..3 and drops the 4-byte 4; SQLite keeps 1..4.
-    const lowExpectations: RegExp[] =
-      adapterType === "postgres"
-        ? [/c_int_1.*limit: 2/, /c_int_2.*limit: 2/, /"c_int_3"(?!.*limit)/, /"c_int_4"(?!.*limit)/]
-        : adapterType === "mysql"
-          ? [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /"c_int_4"(?!.*limit)/]
-          : [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /c_int_4.*limit: 4/];
-    // c_int_5..8: only SQLite keeps them as limited integers; PG/MySQL widen to
-    // a bare bigint.
-    const highExpectations: RegExp[] =
-      adapterType === "sqlite"
-        ? [/c_int_5.*limit: 5/, /c_int_6.*limit: 6/, /c_int_7.*limit: 7/, /c_int_8.*limit: 8/]
-        : [
-            /t\.bigint\("c_int_5"\)/,
-            /t\.bigint\("c_int_6"\)/,
-            /t\.bigint\("c_int_7"\)/,
-            /t\.bigint\("c_int_8"\)/,
-          ];
-    for (const re of [...lowExpectations, ...highExpectations]) expect(output).toMatch(re);
-  });
+      // c_int_1..4: PostgreSQL rounds limit 1..2 → 2 bytes and drops it for the
+      // 4-byte 3..4; MySQL keeps 1..3 and drops the 4-byte 4; SQLite keeps 1..4.
+      const lowExpectations: RegExp[] =
+        adapterType === "postgres"
+          ? [
+              /c_int_1.*limit: 2/,
+              /c_int_2.*limit: 2/,
+              /"c_int_3"(?!.*limit)/,
+              /"c_int_4"(?!.*limit)/,
+            ]
+          : adapterType === "mysql"
+            ? [
+                /c_int_1.*limit: 1/,
+                /c_int_2.*limit: 2/,
+                /c_int_3.*limit: 3/,
+                /"c_int_4"(?!.*limit)/,
+              ]
+            : [/c_int_1.*limit: 1/, /c_int_2.*limit: 2/, /c_int_3.*limit: 3/, /c_int_4.*limit: 4/];
+      // c_int_5..8: only SQLite keeps them as limited integers; PG/MySQL widen to
+      // a bare bigint.
+      const highExpectations: RegExp[] =
+        adapterType === "sqlite"
+          ? [/c_int_5.*limit: 5/, /c_int_6.*limit: 6/, /c_int_7.*limit: 7/, /c_int_8.*limit: 8/]
+          : [
+              /t\.bigint\("c_int_5"\)/,
+              /t\.bigint\("c_int_6"\)/,
+              /t\.bigint\("c_int_7"\)/,
+              /t\.bigint\("c_int_8"\)/,
+            ];
+      for (const re of [...lowExpectations, ...highExpectations]) expect(output).toMatch(re);
+    },
+  );
 });
 
 // Deferred-convergence cases: still build ad-hoc, non-canonical tables
