@@ -1000,17 +1000,30 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        // materializeTransactions is handled above (not delegated to
-        // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
-        // SAVEPOINT — keeps its exact pre-existing materialize semantics and the
-        // loop's `finally dirtyCurrentTransaction()` does not fire on txn-control
-        // SQL. The leaf still gains the retry/verify/reconnect loop, so callers
-        // (beginDbTransaction/beginIsolatedDbTransaction) thread allowRetry in a
-        // single call — matching Rails abstract_mysql_adapter.rb:227. Error
-        // translation + invalidateTransaction live in the withRawConnection loop
-        // (abstract-adapter.ts) and the outer catch below — mirroring execute()
-        // and executeMutation() — so the block itself stays a bare leaf and does
-        // not double-translate or double-invalidate.
+        // materializeTransactions is run BEFORE the loop (above) and we pass
+        // `false` into withRawConnection — the same materialize-outside-the-loop
+        // split PostgreSQLAdapter#internalExecute uses (postgresql-adapter.ts),
+        // which this story converges mysql2 onto. The leaf still gains the
+        // retry/verify/reconnect loop, so callers thread allowRetry in a single
+        // call (matching Rails abstract_mysql_adapter.rb:227-239).
+        //
+        // Divergence note: because the flag is `false` here, the loop's
+        // `finally dirtyCurrentTransaction()` (abstract-adapter.ts) never fires
+        // for this leaf. In Rails, COMMIT/ROLLBACK pass materialize_transactions:
+        // true (abstract_mysql_adapter.rb:242-248) so with_raw_connection's
+        // `ensure dirty_current_transaction if materialize_transactions`
+        // (abstract_adapter.rb:1046) DOES dirty on commit/rollback. trails does
+        // not, but this is pre-existing and shared with PG, NOT introduced here:
+        // pre-this-PR mysql2 internalExecute used the direct getConn path with no
+        // withRawConnection, so it never dirtied on commit/rollback either. It is
+        // also inconsequential — commit/rollback run with allowRetry:false (no
+        // in-call reconnect/restore_transactions), and the frame is popped by the
+        // TransactionManager immediately after, so its dirty flag is never read.
+        //
+        // Error translation + invalidateTransaction live in the withRawConnection
+        // loop and the outer catch below — mirroring execute()/executeMutation()
+        // — so the block stays a bare leaf and does not double-translate or
+        // double-invalidate.
         return await this.withRawConnection(
           { materializeTransactions: false, allowRetry },
           async (rawConn) => {
