@@ -11,6 +11,7 @@ import {
   sanitizeForMassAssignment,
   SerializeCastValue,
   runAfterCallbacksOnProto,
+  assertHashAttributes,
 } from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -622,6 +623,7 @@ export async function update<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
 ): Promise<boolean | undefined> {
+  assertHashAttributes(attrs);
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -653,6 +655,7 @@ export async function updateBang<T extends UpdateRecord>(
   this: T,
   attrs: Record<string, unknown>,
 ): Promise<true | undefined> {
+  assertHashAttributes(attrs);
   assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
@@ -1013,6 +1016,7 @@ export function _reapplyNestedAttrSetters(
  * happen in a follow-up.)
  */
 export function assignAttributes(this: AttributeIO, attrs: Record<string, unknown>): void {
+  assertHashAttributes(attrs);
   // Mirrors ActiveModel::AttributeAssignment#assign_attributes: bail before
   // sanitizing so a blank strong-params object (always un-permitted) is a
   // no-op rather than raising, then unwrap/forbid via sanitize_for_mass_assignment.

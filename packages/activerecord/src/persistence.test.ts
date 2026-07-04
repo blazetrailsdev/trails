@@ -14,6 +14,7 @@ function isTemporalDatetime(v: unknown): boolean {
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { throwAbort, travel, travelBack } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import {
   Base,
   RecordNotFound,
@@ -767,19 +768,10 @@ describe("PersistenceTest", () => {
   });
 
   // Rails: test_update_parameters
-  // Rails raises ArgumentError for `update(nil)`; trails surfaces the same
-  // "raises on nil" behavior as a TypeError (Object.entries(null)), so the
-  // assertion checks that *something* is raised rather than the class.
   it("update parameters", async () => {
     const topic = await Topic.find(1);
     await topic.update({});
-    let raised = false;
-    try {
-      await topic.update(null as any);
-    } catch {
-      raised = true;
-    }
-    expect(raised).toBe(true);
+    await expect(topic.update(null as any)).rejects.toBeInstanceOf(ArgumentError);
   });
 
   // Rails: test_update_sti_type

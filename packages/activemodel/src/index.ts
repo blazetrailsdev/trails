@@ -22,6 +22,7 @@ export {
 export { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
 export {
   assignAttributes,
+  assertHashAttributes,
   attributeWriterMissing,
   sanitizeForMassAssignment,
   ArgumentError,
