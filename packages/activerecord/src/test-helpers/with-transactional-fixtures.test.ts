@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import {
   createPooledTestAdapter,
   _resetPooledTestAdapterForTests,
-  type SidecarAdapter,
+  type LeasedTestAdapter,
   type TestDatabaseAdapter,
 } from "../test-adapter.js";
 import { Base } from "../base.js";
@@ -117,9 +117,10 @@ describe("withTransactionalFixtures (schema-cache invalidation)", () => {
 });
 
 // Adapter-cluster files (adapters/postgresql/*.test.ts, etc.) construct a
-// raw DatabaseAdapter directly instead of going through createTestAdapter().
-// The helper must accept that shape — `transactionManager` lives on the
-// adapter itself via AbstractAdapter, not behind an `innerAdapter` wrapper.
+// raw DatabaseAdapter directly instead of leasing one from a pool (Base.connection
+// or createPooledTestAdapter()). The helper must accept that shape —
+// `transactionManager` lives on the adapter itself via AbstractAdapter, not
+// behind an `innerAdapter` wrapper.
 describe("withTransactionalFixtures (raw adapter)", () => {
   let adapter: AbstractSQLite3Adapter;
   const exec = (sql: string) => adapter.exec(sql);
@@ -218,7 +219,7 @@ describe("withTransactionalFixtures (invalidateSchemaCache: false)", () => {
 // / `unpinConnectionBang()` rather than the wrapper-direct TM begin/rollback.
 // This mirrors Rails test_fixtures.rb:177-184's pin/lease lifecycle exactly.
 describe("withTransactionalFixtures (pooled adapter)", () => {
-  let adapter: SidecarAdapter;
+  let adapter: LeasedTestAdapter;
   const exec = (sql: string) =>
     (adapter as unknown as { exec(s: string): Promise<void> }).exec(sql);
   const query = (sql: string) => adapter.execute(sql);
@@ -264,8 +265,8 @@ describe("withTransactionalFixtures (pooled adapter)", () => {
 describe("concurrency isolation: two concurrent transaction chains stay independent", () => {
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("chain B sees openTransactions=0 while chain A is mid-transaction", async () => {
-    const chainA = (await primaryAdapter()) as unknown as SidecarAdapter;
-    const chainB = (await primaryAdapter()) as unknown as SidecarAdapter;
+    const chainA = (await primaryAdapter()) as unknown as LeasedTestAdapter;
+    const chainB = (await primaryAdapter()) as unknown as LeasedTestAdapter;
 
     // Coordinate so chain B reads state WHILE chain A holds an open transaction.
     // Without coordination, chain B would read before chain A's async TM open,
@@ -321,7 +322,7 @@ describe("concurrency isolation: two concurrent transaction chains stay independ
 
   // Skipped at E3: AsyncContext filter removed; pool-backed isolation lands at E5.
   it.skip("currentTransaction() returns null for a chain outside any withinNewTransaction", async () => {
-    const adapter = (await primaryAdapter()) as unknown as SidecarAdapter;
+    const adapter = (await primaryAdapter()) as unknown as LeasedTestAdapter;
     // Pool-leased adapters return NullTransaction (not null) when no transaction
     // is open — NullTransaction is the Rails-correct sentinel for "no transaction".
     expect(adapter.openTransactions).toBe(0);

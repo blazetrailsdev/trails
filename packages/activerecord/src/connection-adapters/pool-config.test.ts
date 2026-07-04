@@ -1,6 +1,5 @@
-import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import { PoolConfig } from "./pool-config.js";
-import { _reestablishPooledTestPoolForTests } from "../test-adapter.js";
 import { ConnectionDescriptor } from "./abstract/connection-descriptor.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { SchemaReflection } from "./schema-cache.js";
@@ -166,13 +165,6 @@ describe("PoolConfig", () => {
   });
 
   describe("static discardPoolsBang", () => {
-    // discardPoolsBang iterates the global PoolConfig registry, which includes
-    // the shared pooled test adapter; real `discard!` nulls its connections
-    // terminally, so rebuild it before the next test's reset hook runs.
-    afterEach(async () => {
-      await _reestablishPooledTestPoolForTests();
-    });
-
     it("discards pools on all tracked instances", async () => {
       const c1 = new PoolConfig(makeDescriptor("a"), makeDbConfig("a"));
       const c2 = new PoolConfig(makeDescriptor("b"), makeDbConfig("b"));

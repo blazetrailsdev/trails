@@ -17,8 +17,9 @@ interface TxnHost {
 }
 
 /**
- * The helper accepts any `DatabaseAdapter` — pool-leased adapters from
- * `createTestAdapter()` and raw adapters constructed directly by test files
+ * The helper accepts any `DatabaseAdapter` — pool-leased adapters (e.g. from
+ * `Base.connection` or `createPooledTestAdapter()`) and raw adapters
+ * constructed directly by test files
  * (`new PostgreSQLAdapter(...)`, `new SQLite3Adapter(...)`, etc.). The
  * non-pooled path requires `transactionManager` at runtime, but the pooled
  * path (detected via `.pool.pinConnectionBang`) handles transactions through
