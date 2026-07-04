@@ -5,6 +5,7 @@
  */
 import { afterAll, beforeEach, expect } from "vitest";
 import { install, flush, setCurrentFile, setTestPathResolver } from "./test-helpers/ddl-profile.js";
+import { flushRepairMetrics } from "./test-helpers/schema-repair.js";
 
 await install();
 
@@ -23,4 +24,5 @@ beforeEach((ctx) => {
 // holds every record this worker saw.
 afterAll(() => {
   flush();
+  flushRepairMetrics();
 });

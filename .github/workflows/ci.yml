@@ -775,6 +775,8 @@ jobs:
         run: |
           node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
             | tee "${{ runner.temp }}/ddlprof/aggregate-sqlite.txt"
+          node scripts/schema-repair-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            | tee "${{ runner.temp }}/ddlprof/schema-repair-sqlite.txt"
       - name: Upload DDL profile (sqlite)
         if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
         uses: actions/upload-artifact@v4
@@ -1001,6 +1003,8 @@ jobs:
         run: |
           node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
             | tee "${{ runner.temp }}/ddlprof/aggregate-postgres.txt"
+          node scripts/schema-repair-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            | tee "${{ runner.temp }}/ddlprof/schema-repair-postgres.txt"
       - name: Upload DDL profile (postgres)
         if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
         uses: actions/upload-artifact@v4
@@ -1133,6 +1137,8 @@ jobs:
         run: |
           node scripts/ddl-profile-aggregate.mjs "${{ runner.temp }}/ddlprof" \
             | tee "${{ runner.temp }}/ddlprof/aggregate-maria.txt"
+          node scripts/schema-repair-aggregate.mjs "${{ runner.temp }}/ddlprof" \
+            | tee "${{ runner.temp }}/ddlprof/schema-repair-maria.txt"
       - name: Upload DDL profile (maria)
         if: always() && github.head_ref == 'ddl-profile-ci-run-085775'
         uses: actions/upload-artifact@v4

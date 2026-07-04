@@ -54,8 +54,13 @@ if ((adapter === "sqlite" && envConfig.database !== ":memory:") || pgExclusive |
 // This restores the canonical shape of exactly the tables a prior file mutated
 // (a no-op when none were). Gated by AR_DISABLE_SCHEMA_REPAIR as an escape hatch.
 if (process.env.AR_DISABLE_SCHEMA_REPAIR === undefined) {
-  const { repairWorkerSchema } = await import("./test-helpers/schema-repair.js");
+  const { repairWorkerSchema, recordRepairMetrics } =
+    await import("./test-helpers/schema-repair.js");
   const repaired = await repairWorkerSchema(Base.connection, TEST_SCHEMA);
+  // Fold this file's outcome into the worker's cumulative repair-frequency
+  // metrics (dumped per worker by the DDL-profile setup's afterAll flush when a
+  // measurement run configures an output dir; a cheap no-op otherwise).
+  recordRepairMetrics(repaired);
   // When repair actually fires, a prior file in this worker drifted these
   // canonical tables — the exact shared-DB flake source. Surface it with a
   // stable, greppable prefix so CI logs become an RFC-0019 burndown signal:

@@ -3,7 +3,12 @@ import { Base } from "../index.js";
 import { columnsOf } from "./define-schema.js";
 import { setupFixtures } from "./fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
-import { driftedTables, repairWorkerSchema } from "./schema-repair.js";
+import {
+  driftedTables,
+  repairWorkerSchema,
+  recordRepairMetrics,
+  repairMetricsSnapshot,
+} from "./schema-repair.js";
 
 /** The physical column set a canonical table has when undrifted (lowercased). */
 function canonicalCols(table: keyof typeof TEST_SCHEMA): Set<string> {
@@ -82,6 +87,25 @@ describe("schema-repair", () => {
     it("is a no-op when nothing drifted", async () => {
       const repaired = await repairWorkerSchema(Base.connection, TEST_SCHEMA);
       expect(repaired).toEqual([]);
+    });
+  });
+
+  describe("recordRepairMetrics (measurement)", () => {
+    // Metrics accumulate at module scope, so assert on deltas from a baseline
+    // rather than absolute values (a sibling file may have recorded already).
+    it("counts files seen, files repaired, and per-table drift frequency", () => {
+      const before = structuredClone(repairMetricsSnapshot());
+
+      recordRepairMetrics([]); // a clean file: seen, not repaired
+      recordRepairMetrics(["topics", "posts"]); // one file drifted two tables
+      recordRepairMetrics(["topics"]); // another file drifted one
+
+      const after = repairMetricsSnapshot();
+      expect(after.filesSeen - before.filesSeen).toBe(3);
+      expect(after.filesRepaired - before.filesRepaired).toBe(2);
+      expect(after.totalTablesRepaired - before.totalTablesRepaired).toBe(3);
+      expect((after.byTable.topics ?? 0) - (before.byTable.topics ?? 0)).toBe(2);
+      expect((after.byTable.posts ?? 0) - (before.byTable.posts ?? 0)).toBe(1);
     });
   });
 });

@@ -42,11 +42,75 @@
  * scratch table, so it is deliberately left out.
  */
 
+import { getFs } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import { columnsOf, type Schema } from "./define-schema.js";
 
 /** Tables the test harness must never touch — migration + environment state. */
 const PROTECTED_TABLES = new Set(["schema_migrations", "ar_internal_metadata"]);
+
+// ---------------------------------------------------------------------------
+// Repair-frequency metrics (measurement).
+//
+// How often does a file open onto a drifted shared DB and have to drop-recreate
+// a canonical table? That rate is the RFC-0019 burndown signal: a table that
+// keeps showing up here is a bespoke `defineSchema` that still needs converging.
+// Counters live at module scope and accumulate across every file a worker runs
+// (the same shared-fork module instance the DDL profiler relies on), then flush
+// to one JSON per worker via {@link flushRepairMetrics}. `record` is cheap and
+// unconditional; the flush only writes when an output dir is configured, so the
+// whole thing is dormant unless a measurement run asks for it.
+const metrics = {
+  filesSeen: 0,
+  filesRepaired: 0,
+  totalTablesRepaired: 0,
+  /** table name → number of files that had to repair it this worker. */
+  byTable: {} as Record<string, number>,
+};
+
+/**
+ * Fold one file's repair outcome into the worker's running metrics. Called once
+ * per file from `test-setup-dy.ts` with the list `repairWorkerSchema` returned
+ * (empty when nothing drifted). Always logs a stable, greppable per-file line
+ * when a repair fired unless silenced.
+ */
+export function recordRepairMetrics(repaired: string[]): void {
+  metrics.filesSeen += 1;
+  if (repaired.length === 0) return;
+  metrics.filesRepaired += 1;
+  metrics.totalTablesRepaired += repaired.length;
+  for (const t of repaired) metrics.byTable[t] = (metrics.byTable[t] ?? 0) + 1;
+}
+
+/** Snapshot of the worker's accumulated repair metrics. Exported for tests. */
+export function repairMetricsSnapshot(): typeof metrics {
+  return metrics;
+}
+
+/**
+ * Write the worker's accumulated repair metrics to one JSON file, mirroring the
+ * DDL profiler's per-worker dump so the same CI artifact upload collects both.
+ * No-op unless an output dir is set. Safe to call multiple times (overwrites
+ * cumulatively — a full-suite worker calls it after every file).
+ */
+export function flushRepairMetrics(): void {
+  const dir = process.env.SCHEMA_REPAIR_OUT_DIR ?? process.env.DDL_PROFILE_OUT_DIR;
+  if (!dir) return;
+  const workerId = process.env.VITEST_POOL_ID ?? process.env.VITEST_WORKER_ID ?? "1";
+  const adapter = process.env.ARCONN ?? "sqlite";
+  const out = `${dir}/schema-repair-${adapter}-w${workerId}-${process.pid}.json`;
+  const payload = {
+    adapter,
+    ...metrics,
+    repairRate: metrics.filesSeen > 0 ? metrics.filesRepaired / metrics.filesSeen : 0,
+  };
+  try {
+    getFs().mkdirSync(dir, { recursive: true });
+    getFs().writeFileSync(out, JSON.stringify(payload, null, 2));
+  } catch {
+    // Best-effort, exactly like the DDL profiler — never fail a test on a dump.
+  }
+}
 
 /**
  * Read every user table's column-name set in a single catalog query. Returns a
