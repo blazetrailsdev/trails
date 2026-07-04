@@ -84,31 +84,33 @@ describe("CacheIncrementDecrementBehavior", () => {
     expect(cache.decrement("quux", 100)).toBe(-100);
   });
 
-  // Rails coerces `amount` through `Integer()` (memory_store.rb:248), which
-  // raises FloatDomainError on NaN/Infinity rather than seeding a non-integer.
-  it("increment raises on a non-integer amount", () => {
+  // The seed path writes `Integer(amount)` (memory_store.rb:248), which raises
+  // FloatDomainError on NaN/Infinity rather than seeding a non-integer entry.
+  it("increment raises on a non-integer amount when seeding a missing key", () => {
     expect(() => cache.increment("foo", NaN)).toThrow();
     expect(() => cache.increment("foo", Infinity)).toThrow();
     // The raise fires before any write, so the key is never seeded.
     expect(cache.read("foo")).toBeNull();
   });
 
-  it("decrement raises on a non-integer amount", () => {
+  it("decrement raises on a non-integer amount when seeding a missing key", () => {
     expect(() => cache.decrement("foo", NaN)).toThrow();
     expect(() => cache.decrement("foo", Infinity)).toThrow();
     expect(cache.read("foo")).toBeNull();
   });
 
-  // `Integer(1.5) # => 1`: a finite fractional amount truncates toward zero, and
-  // the coerced integer — not the raw amount — is what both the seed write and
-  // the hit-path addition use.
-  it("increment coerces the amount once for seed and hit paths", () => {
-    // Seed path: return value equals the coerced integer, not the raw 1.5.
-    expect(cache.increment("frac", 1.5)).toBe(1);
+  // Rails seeds a missing key with `Integer(amount)` (so `1.5` writes `1`) but
+  // returns the raw `amount` (memory_store.rb:248-249).
+  it("increment seeds with the integer amount but returns the raw amount", () => {
+    expect(cache.increment("frac", 1.5)).toBe(1.5);
     expect(Number(cache.read("frac"))).toBe(1);
-    // Hit path: adds the coerced integer, keeping the value integral.
-    expect(cache.increment("frac", 2.9)).toBe(3);
-    expect(Number(cache.read("frac"))).toBe(3);
+  });
+
+  // The hit path never calls `Integer()` (memory_store.rb:251): it adds the raw
+  // `amount` to `entry.value.to_i` without truncation.
+  it("increment adds the raw amount on the hit path", () => {
+    cache.write("frac", 1, { raw: true });
+    expect(cache.increment("frac", 2.5)).toBe(3.5);
   });
 
   it("test_ttl_isnt_updated", async () => {

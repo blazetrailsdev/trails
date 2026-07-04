@@ -27,11 +27,10 @@ function toI(value: unknown): number {
   return 0;
 }
 
-// Mirrors Ruby `Integer(amount)` (memory_store.rb:248) over the numeric domain:
-// a finite number truncates toward zero (`Integer(1.5) # => 1`,
-// `Integer(-1.9) # => -1`), while NaN/Infinity raise the way Ruby's
-// `Integer(Float::NAN)`/`Integer(Float::INFINITY)` raise FloatDomainError —
-// rather than silently coercing to a non-integer.
+// Mirrors Ruby `Integer(amount)` over the numeric domain: a finite number
+// truncates toward zero (`Integer(1.5) # => 1`, `Integer(-1.9) # => -1`), while
+// NaN/Infinity raise the way Ruby's `Integer(Float::NAN)`/`Integer(Float::INFINITY)`
+// raise FloatDomainError — rather than silently coercing to a non-integer.
 function integer(amount: number): number {
   if (!Number.isFinite(amount)) {
     throw new ArgumentError(`invalid value for Integer(): ${amount}`);
@@ -133,19 +132,20 @@ export class MemoryStore extends Store implements CacheStore {
   // `increment("foo") # => 1`); on a hit it adds to entry.value.to_i, preserving
   // the entry's expiresAt/version.
   private modifyValue(name: string, amount: number, options?: CacheOptions): number {
-    // Rails coerces `amount = Integer(amount)` once (memory_store.rb:248) and
-    // threads that integer through the seed write, the return value, and the
-    // hit-path addition alike — so coerce up front rather than per-branch.
-    const coerced = integer(amount);
     const merged = this.mergedOptions(options);
     const key = this.normalizeKey(name, merged);
     const version = this.normalizeVersion(name, merged) ?? null;
     const entry = this.readEntry(key, merged);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
-      this.write(name, coerced, options);
-      return coerced;
+      // Rails seeds with `Integer(amount)` (raises on NaN/Infinity) but returns
+      // the raw `amount` (memory_store.rb:248-249), so `increment("foo", 1.5)`
+      // writes 1 yet returns 1.5.
+      this.write(name, integer(amount), options);
+      return amount;
     }
-    const num = toI(entry.value) + coerced;
+    // Hit path adds the raw `amount` — Rails never calls `Integer()` here
+    // (memory_store.rb:251), so no truncation and no NaN/Infinity raise.
+    const num = toI(entry.value) + amount;
     // Rails calls `write_entry(key, entry)` with no options (memory_store.rb:255),
     // so `unless_exist` never suppresses the hit-path rewrite; pass `{}` to match.
     this.writeEntry(
