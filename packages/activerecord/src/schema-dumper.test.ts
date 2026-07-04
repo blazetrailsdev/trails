@@ -327,9 +327,10 @@ describe("SchemaDumperTest", () => {
   beforeEach(() => {
     // Each case builds its own bespoke tables and dumps only those — `ctx`
     // dumps use MigrationContext's in-memory table set, and adapter dumps go
-    // through the scoped `dumpTableSchema(adapter, ...ownTables)` helper. So
-    // the ~330 canonical tables the truncate-reset preserves never enter the
-    // dump: no empty-DB precondition (and no drop-all crutch) is needed.
+    // through `SchemaDumper.dumpTableSchema(adapter, name)`, which introspects
+    // only the named table (no `tables()` enumeration of the ~330 canonical
+    // tables the truncate-reset preserves). So none of them enter the dump's
+    // output/timing: no empty-DB precondition (and no drop-all crutch) needed.
     ctx = new MigrationContext(Base.connection);
   });
   afterEach(() => {
@@ -413,7 +414,7 @@ describe("SchemaDumperTest", () => {
     await ss.addCheckConstraint("products", "price > discounted_price", {
       name: "products_price_check",
     });
-    const output = await dumpTableSchema(testAdapter as unknown as SchemaSource, "products");
+    const output = await SchemaDumper.dumpTableSchema(testAdapter, "products");
     expect(output).toContain("products_price_check");
     expect(output).toContain("t.checkConstraint");
   });
@@ -429,10 +430,7 @@ describe("SchemaDumperTest", () => {
       "daterange(start_date, end_date) WITH &&",
       { using: "gist", name: "test_schema_exclusion_date_overlap" },
     );
-    const output = await dumpTableSchema(
-      testAdapter as unknown as SchemaSource,
-      "test_schema_exclusion",
-    );
+    const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_exclusion");
     expect(output).toContain("addExclusionConstraint");
     expect(output).toContain("test_schema_exclusion_date_overlap");
     expect(output).toContain("daterange(start_date, end_date) WITH &&");
@@ -451,10 +449,7 @@ describe("SchemaDumperTest", () => {
       nullsNotDistinct: true,
       name: "test_schema_unique_position_2_nnd",
     });
-    const output = await dumpTableSchema(
-      testAdapter as unknown as SchemaSource,
-      "test_schema_unique",
-    );
+    const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_schema_unique");
     expect(output).toContain("addUniqueConstraint");
     expect(output).toContain("test_schema_unique_position_1");
     expect(output).toContain("test_schema_unique_position_2_nnd");
@@ -472,10 +467,7 @@ describe("SchemaDumperTest", () => {
       await (testAdapter as any).addUniqueConstraint("test_uc_no_idx", ["position"], {
         name: "test_uc_no_idx_position",
       });
-      const output = await dumpTableSchema(
-        testAdapter as unknown as SchemaSource,
-        "test_uc_no_idx",
-      );
+      const output = await SchemaDumper.dumpTableSchema(testAdapter, "test_uc_no_idx");
       expect(output).toContain("addUniqueConstraint");
       // The backing index must not also appear as an addIndex call.
       expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
@@ -506,7 +498,7 @@ describe("SchemaDumperTest", () => {
         t.binary("var_binary", { limit: 255 });
         t.binary("var_binary_large", { limit: 4095 });
       });
-      const output = await dumpTableSchema(adapter as unknown as SchemaSource, "binary_fields");
+      const output = await SchemaDumper.dumpTableSchema(adapter, "binary_fields");
       expect(output).toMatch(/t\.binary\("var_binary", \{ limit: 255 \}\)/);
       expect(output).toMatch(/t\.binary\("var_binary_large", \{ limit: 4095 \}\)/);
     },
@@ -526,7 +518,7 @@ describe("SchemaDumperTest", () => {
         t.text("medium_text", { size: "medium" });
         t.text("long_text", { size: "long" });
       });
-      const output = await dumpTableSchema(bfAdapter as unknown as SchemaSource, "binary_fields");
+      const output = await SchemaDumper.dumpTableSchema(bfAdapter, "binary_fields");
       expect(output).toMatch(/t\.binary\("tiny_blob", \{ size: "tiny" \}\)/);
       expect(output).toMatch(/t\.binary\("normal_blob"\)/);
       expect(output).toMatch(/t\.binary\("medium_blob", \{ size: "medium" \}\)/);
@@ -545,7 +537,7 @@ describe("SchemaDumperTest", () => {
       await testCtx.createTable("booleans", { force: true }, (t) => {
         t.boolean("has_fun", { default: false });
       });
-      const output = await dumpTableSchema(adapter as unknown as SchemaSource, "booleans");
+      const output = await SchemaDumper.dumpTableSchema(adapter, "booleans");
       expect(output).not.toMatch(/t\.boolean\("has_fun",.+limit: 1/);
     },
   );
@@ -564,7 +556,7 @@ describe("SchemaDumperTest", () => {
       using: "btree",
       name: "index_key_tests_on_pizza",
     });
-    const output = await dumpTableSchema(ktAdapter as unknown as SchemaSource, "key_tests");
+    const output = await SchemaDumper.dumpTableSchema(ktAdapter, "key_tests");
     expect(output).toContain(
       'addIndex("key_tests", "awesome", { name: "index_key_tests_on_awesome", type: "fulltext" })',
     );
@@ -590,7 +582,7 @@ describe("SchemaDumperTest", () => {
     await testCtx.createTable("bigint_array", { force: true }, (t) => {
       (t as any).integer("big_int_data_points", { limit: 8, array: true });
     });
-    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "bigint_array");
+    const output = await SchemaDumper.dumpTableSchema(adapter, "bigint_array");
     expect(output).toMatch(/t\.bigint\("big_int_data_points", \{ array: true \}\)/);
   });
   it.skipIf(adapterType !== "postgres")(
@@ -602,7 +594,7 @@ describe("SchemaDumperTest", () => {
         t.integer("big_int_data_points", { limit: 8, array: true });
         t.decimal("decimal_array_default", { array: true, default: [1.23, 3.45] });
       });
-      const output = await dumpTableSchema(testAdapter as unknown as SchemaSource, "bigint_array");
+      const output = await SchemaDumper.dumpTableSchema(testAdapter, "bigint_array");
       expect(output).toMatch(
         /t\.decimal\("decimal_array_default",\s*\{[^}]*default:\s*\["1\.23", "3\.45"\][^}]*array:\s*true/,
       );
@@ -615,7 +607,7 @@ describe("SchemaDumperTest", () => {
       (t as any).interval("time_interval");
       (t as any).interval("scaled_time_interval", { precision: 6 });
     });
-    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "postgresql_times");
+    const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_times");
     expect(output).toMatch(/t\.interval\("time_interval"\)/);
     expect(output).toMatch(/t\.interval\("scaled_time_interval", \{ precision: 6 \}\)/);
   });
@@ -625,22 +617,27 @@ describe("SchemaDumperTest", () => {
     await testCtx.createTable("postgresql_oids", {}, (t) => {
       (t as any).oid("obj_id");
     });
-    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "postgresql_oids");
+    const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_oids");
     expect(output).toMatch(/t\.oid\("obj_id"\)/);
   });
   it.skipIf(adapterType !== "postgres")("schema dump includes extensions", async () => {
     const adapter = Base.connection;
     const original = (adapter as any).extensions;
+    // This asserts only the extensions header, but the dumper needs a table to
+    // dump. Dump a single throwaway table via `dumpTableSchema` (which does
+    // NOT enumerate the ~330 canonical tables the truncate-reset preserves)
+    // rather than a full dump, so the header stays cheap under CI fork load.
+    await new MigrationContext(adapter).createTable("schema_dump_probe", { force: true }, (t) => {
+      t.integer("x");
+    });
     try {
-      // No bespoke table here — this asserts only the extensions header. Ignore
-      // every canonical table so the dump stays cheap on a cold schema cache.
       (adapter as any).extensions = async () => ["hstore"];
-      let output = await dumpAllTableSchema(adapter as unknown as SchemaSource, [/.*/]);
+      let output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
       expect(output).toContain("These are extensions that must be enabled");
       expect(output).toMatch(/enableExtension\("hstore"\)/);
 
       (adapter as any).extensions = async () => [];
-      output = await dumpAllTableSchema(adapter as unknown as SchemaSource, [/.*/]);
+      output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
       expect(output).not.toContain("These are extensions that must be enabled");
       expect(output).not.toContain("enableExtension");
     } finally {
@@ -652,9 +649,12 @@ describe("SchemaDumperTest", () => {
     async () => {
       const adapter = Base.connection;
       const original = (adapter as any).extensions;
+      await new MigrationContext(adapter).createTable("schema_dump_probe", { force: true }, (t) => {
+        t.integer("x");
+      });
       try {
         (adapter as any).extensions = async () => ["uuid-ossp", "xml2", "hstore"];
-        const output = await dumpAllTableSchema(adapter as unknown as SchemaSource, [/.*/]);
+        const output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
         const enabled = [...output.matchAll(/enableExtension\("(.+?)"\)/g)].map((m) => m[1]);
         expect(enabled).toEqual(["hstore", "uuid-ossp", "xml2"]);
       } finally {
@@ -668,7 +668,7 @@ describe("SchemaDumperTest", () => {
     await testCtx.createTable("numeric_data", { force: true }, (t) => {
       t.float("temperature_with_limit", { limit: 24 });
     });
-    const output = await dumpTableSchema(adapter as unknown as SchemaSource, "numeric_data");
+    const output = await SchemaDumper.dumpTableSchema(adapter, "numeric_data");
     expect(output).toMatch(/t\.float\("temperature_with_limit", \{ limit: 24 \}\)/);
   });
   it.skipIf(adapterType !== "postgres")(
@@ -676,8 +676,13 @@ describe("SchemaDumperTest", () => {
     async () => {
       const adapter = Base.connection;
       await (adapter as any).createEnum("enum_with_comma", ["value1", "value,2", "value3"]);
+      // Dump a throwaway table (not a full dump) so the enum-type header is
+      // emitted without introspecting the ~330 canonical tables.
+      await new MigrationContext(adapter).createTable("schema_dump_probe", { force: true }, (t) => {
+        t.integer("x");
+      });
       try {
-        const output = await dumpAllTableSchema(adapter as unknown as SchemaSource, [/.*/]);
+        const output = await SchemaDumper.dumpTableSchema(adapter, "schema_dump_probe");
         expect(output).toContain('createEnum("enum_with_comma", ["value1","value,2","value3"])');
       } finally {
         // drop-all-tables (per-test reset) does not drop enum types — clean up
@@ -1004,6 +1009,7 @@ afterAll(async () => {
   await ctx.dropTable("postgresql_oids", o);
   await ctx.dropTable("postgresql_times", o);
   await ctx.dropTable("posts", o);
+  await ctx.dropTable("schema_dump_probe", o);
   await ctx.dropTable("products", o);
   await ctx.dropTable("string_key_objects", o);
   await ctx.dropTable("temp_cache", o);
