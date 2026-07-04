@@ -101,16 +101,17 @@ package list, and the `declare` / associations / enums / schema reference, see
   matches our tests to Rails tests. If a test fails or the behavior doesn't
   match the name, fix the implementation — not the name. Read the
   corresponding Rails test first.
-- **Canonical tables only — no bespoke tables.** In AR tests, lay schema via
+- **Canonical tables only — no bespoke tables.** In AR tests, get the canonical
+  schema + fixtures through `fixtures({ ... })` (the endgame surface: one call
+  wires the handler, transactional fixtures, and the canonical schema); never
+  re-declare a table inline or invent a free table name. For lower-level setup,
   the canonical loader (`loadCanonicalSchema` / `rebuildCanonicalTables` in
-  `test-helpers/canonical-schema.ts`) or `useFixtures({ schema: TEST_SCHEMA })`;
-  never re-declare a table inline or invent a free table name. Prefer
-  `useHandlerFixtures` / `setupHandlerSuite` on the default canonical tables
-  (and the official models in `packages/activerecord/src/test-helpers/models/`).
-  Table, column, and model names must match Rails exactly. If a test needs
-  something the canonical schema lacks, add it to the canonical schema — do not
-  reach for a bespoke schema. (`defineSchema` is the retired trails invention
-  being removed by RFC 0059; don't reach for it in new tests.)
+  `test-helpers/canonical-schema.ts`) lays the schema directly. Use the official
+  models in `packages/activerecord/src/test-helpers/models/`. Table, column, and
+  model names must match Rails exactly. If a test needs something the canonical
+  schema lacks, add it to the canonical schema — do not reach for a bespoke
+  schema. (`defineSchema` is the retired trails invention being removed by RFC
+  0059; don't reach for it in new tests.)
 
 ## Module mixins (Ruby `include` → TypeScript)
 
