@@ -8,6 +8,20 @@ import { assertNoQueries } from "./testing/query-assertions.js";
 import { setupFixtures } from "./test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
 
+// Mirrors Rails' `retry_flaky_test` (secure_password_test.rb): retry the timing
+// assertion a few times before failing, so a single unlucky preemption spike
+// doesn't fail CI. Re-throws the last assertion error once retries are spent.
+async function retryFlakyTest(fn: () => Promise<void>, retryCount = 3): Promise<void> {
+  for (let attempt = 0; ; attempt++) {
+    try {
+      await fn();
+      return;
+    } catch (error) {
+      if (attempt >= retryCount) throw error;
+    }
+  }
+}
+
 describe("SecurePasswordTest", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
@@ -43,22 +57,43 @@ describe("SecurePasswordTest", () => {
   });
 
   it("authenticate_by takes the same amount of time regardless of whether record is found", async () => {
-    // Warm-up (mostly to ensure the DB connection is established)
+    // Warm-up both the found (verify) and not-found (decoy hash) paths so the
+    // first timed sample doesn't eat crypto/JIT init cost and the DB connection
+    // is established.
     await (User as any).authenticateBy({ token: user.token, password: PASSWORD });
+    await (User as any).authenticateBy({ token: "wrong", password: PASSWORD });
 
-    // Both the not-found path and the found-but-wrong-password path must run
-    // the password hash so a timing attacker can't distinguish them: the
-    // not-found run should not be substantially shorter than the
-    // wrong-password run.
-    const t0 = performance.now();
-    expect(await (User as any).authenticateBy({ token: user.token, password: "wrong" })).toBeNull();
-    const wrongPasswordMs = performance.now() - t0;
+    // Port of Rails' averaged + retried timing check
+    // (activerecord/test/cases/secure_password_test.rb): Rails sums 1000
+    // iterations to average out jitter and wraps the whole thing in
+    // retry_flaky_test. We can't afford 1000 DB round-trips per path, so we
+    // take the MINIMUM elapsed time over a handful of samples instead — the
+    // min reflects the true CPU cost of the hash and is immune to the
+    // GC/preemption spikes that make a single sample flaky (a preempted
+    // wrong-password run measuring ~30ms was the original flake). Both the
+    // not-found path and the found-but-wrong-password path must run the
+    // password hash so a timing attacker can't distinguish them: the not-found
+    // run must not be substantially shorter than the wrong-password run.
+    await retryFlakyTest(async () => {
+      const SAMPLES = 8;
+      let wrongPasswordMs = Infinity;
+      let notFoundMs = Infinity;
+      for (let i = 0; i < SAMPLES; i++) {
+        const t0 = performance.now();
+        expect(
+          await (User as any).authenticateBy({ token: user.token, password: "wrong" }),
+        ).toBeNull();
+        wrongPasswordMs = Math.min(wrongPasswordMs, performance.now() - t0);
 
-    const t1 = performance.now();
-    expect(await (User as any).authenticateBy({ token: "wrong", password: PASSWORD })).toBeNull();
-    const notFoundMs = performance.now() - t1;
+        const t1 = performance.now();
+        expect(
+          await (User as any).authenticateBy({ token: "wrong", password: PASSWORD }),
+        ).toBeNull();
+        notFoundMs = Math.min(notFoundMs, performance.now() - t1);
+      }
 
-    expect(notFoundMs).toBeGreaterThan(wrongPasswordMs * 0.3);
+      expect(notFoundMs).toBeGreaterThan(wrongPasswordMs * 0.3);
+    });
   });
 
   it("authenticate_by short circuits when password is nil", async () => {
