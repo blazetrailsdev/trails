@@ -127,6 +127,11 @@ function isHashLike(attrs: object): boolean {
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return true;
   const wrapper = attrs as PermittedAttributes;
+  // For the real ActionController::Parameters, `permitted` is a boolean getter
+  // (strong-parameters.ts:113), not a method, so `toH` is the load-bearing check
+  // that admits it here; the `permitted` function-probe covers other duck-typed
+  // wrappers. (sanitizeForMassAssignment has the same permitted-as-function
+  // assumption — tracked in `sanitize-mass-assignment-permitted-getter`.)
   return typeof wrapper.permitted === "function" || typeof wrapper.toH === "function";
 }
 
