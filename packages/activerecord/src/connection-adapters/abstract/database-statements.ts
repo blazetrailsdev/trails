@@ -122,7 +122,7 @@ export interface DatabaseStatementsHost {
     userTransaction?: unknown;
   };
   withinNewTransaction?<T>(opts: unknown, fn: (tx?: unknown) => Promise<T> | T): Promise<T>;
-  disableReferentialIntegrity?(fn: () => Promise<void>): Promise<void>;
+  disableReferentialIntegrity?(fn: () => Promise<void>, tables?: string[]): Promise<void>;
   /** @internal */
   executeBatch?(statements: string[], name?: string): Promise<void>;
   /** @internal */
@@ -695,7 +695,7 @@ export async function truncateTables(
     await this.disableReferentialIntegrity(async () => {
       executed = true;
       await doTruncate();
-    });
+    }, filtered);
     if (!executed) await doTruncate();
   } else {
     await doTruncate();
@@ -1125,6 +1125,10 @@ export async function insertFixturesSet(
     }
   };
 
+  // The wrapped block only touches the fixture tables and the delete targets, so
+  // scope the trigger toggle to that set rather than the whole catalog.
+  const affectedTables = [...new Set([...Object.keys(fixtureSet), ...tablesToDelete])];
+
   // Rails wraps fixture loading in a transaction with requires_new: true
   const doLoadInTransaction = async () => {
     if (this.disableReferentialIntegrity) {
@@ -1132,7 +1136,7 @@ export async function insertFixturesSet(
       await this.disableReferentialIntegrity(async () => {
         executed = true;
         await doInserts();
-      });
+      }, affectedTables);
       if (!executed) await doInserts();
     } else {
       await doInserts();
