@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/schema_test.rb
  */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
-import { describeIfMysql, isMariaDb, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
+import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Base } from "../../base.js";
 
 describeIfMysql("Mysql2Adapter", () => {
@@ -15,11 +15,10 @@ describeIfMysql("Mysql2Adapter", () => {
   });
 
   describe("SchemaTest", () => {
-    it.skipIf(isMariaDb)("float limits", async () => {
-      // BLOCKED on MariaDB: bare FLOAT is normalized to DOUBLE in information_schema.columns
-      // (column_type = 'double'), causing lookupCastType to return limit=53 rather than 24.
-      // Rails avoids this by using SHOW FULL FIELDS FROM which preserves the declared type name.
-      // Fix is a columns() refactor; tracked separately.
+    it("float limits", async () => {
+      // On MariaDB a bare FLOAT is normalized to DOUBLE in information_schema.columns
+      // (column_type = 'double'); columns() recovers the declared type via SHOW FULL
+      // FIELDS FROM (as Rails does) so the 0..24 vs 25..53 float-limit split holds.
       await adapter.createTable("mysql_doubles", { force: true }, (t: any) => {
         t.float("float_no_limit");
         t.float("float_short", { limit: 5 });
