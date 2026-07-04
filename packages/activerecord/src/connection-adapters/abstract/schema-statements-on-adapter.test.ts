@@ -269,11 +269,12 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // foreignKeys base path returns [] when adapter has no override
     const fks = await stub.foreignKeys("any_table");
     expect(fks).toEqual([]);
-    // removeForeignKey base path reaches SQL execution (which our stub no-ops) —
-    // it resolves without a stack overflow
+    // removeForeignKey base path resolves the real constraint via
+    // foreign_key_for! (Rails-faithful); against a stub with no foreign keys it
+    // raises ArgumentError promptly rather than recursing into a stack overflow.
     await expect(
       stub.removeForeignKey("products", { name: "fk_products_user_id" }),
-    ).resolves.toBeUndefined();
+    ).rejects.toThrow(/no foreign key/i);
   });
 
   it("validColumnDefinitionOptions includes ifExists (Rails OPTION_NAMES)", () => {

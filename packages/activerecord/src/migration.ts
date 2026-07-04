@@ -663,14 +663,20 @@ export abstract class Migration {
     toTableOrOptions?:
       | string
       | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
+    options?: { column?: string; name?: string; ifExists?: boolean },
   ): Promise<void> {
     if (this._recording) {
-      this._recorder.record("removeForeignKey", [fromTable, toTableOrOptions]);
+      // Rails records `remove_foreign_key(from_table, to_table, **options)`;
+      // preserve the trailing options so invert_add_foreign_key's column/name
+      // survive the round-trip and resolve the real constraint on replay.
+      const recordArgs: unknown[] = [fromTable, toTableOrOptions];
+      if (options !== undefined) recordArgs.push(options);
+      this._recorder.record("removeForeignKey", recordArgs);
       return;
     }
     fromTable = this._pt(fromTable);
     if (typeof toTableOrOptions === "string") toTableOrOptions = this._pt(toTableOrOptions);
-    await this.schema.removeForeignKey(fromTable, toTableOrOptions);
+    await this.schema.removeForeignKey(fromTable, toTableOrOptions, options);
   }
 
   async addCheckConstraint(

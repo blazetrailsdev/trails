@@ -780,32 +780,35 @@ export class SchemaStatements {
     toTableOrOptions?:
       | string
       | { column?: string; name?: string; toTable?: string; ifExists?: boolean },
+    options: { column?: string; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     const adapter = this.adapter as any;
     if (
       typeof adapter.removeForeignKey === "function" &&
       adapter.removeForeignKey !== SchemaStatements.prototype.removeForeignKey
     ) {
-      return adapter.removeForeignKey(fromTable, toTableOrOptions);
+      return adapter.removeForeignKey(fromTable, toTableOrOptions, options);
     }
-    const ifExists = typeof toTableOrOptions === "object" && toTableOrOptions?.ifExists === true;
-    let name: string;
-    if (typeof toTableOrOptions === "string") {
-      const column = this.foreignKeyColumnFor(toTableOrOptions);
-      name = `fk_${fromTable}_${column}`;
-    } else if (toTableOrOptions?.name) {
-      name = toTableOrOptions.name;
-    } else if (toTableOrOptions?.column) {
-      name = `fk_${fromTable}_${toTableOrOptions.column}`;
-    } else if (toTableOrOptions?.toTable) {
-      const column = this.foreignKeyColumnFor(toTableOrOptions.toTable);
-      name = `fk_${fromTable}_${column}`;
+    // Mirrors Rails remove_foreign_key(from_table, to_table = nil, **options):
+    // resolve the actual constraint via foreign_key_for! (matching column /
+    // name / to_table against the live foreign keys) rather than deriving a
+    // name, so a hashed `fk_rails_<hex>` name drops correctly.
+    let toTable: string | undefined;
+    let opts: { column?: string; name?: string; toTable?: string; ifExists?: boolean };
+    if (typeof toTableOrOptions === "object" && toTableOrOptions !== null) {
+      opts = { ...toTableOrOptions };
+      toTable = opts.toTable;
     } else {
-      throw new Error("removeForeignKey requires a target table or options");
+      toTable = toTableOrOptions;
+      opts = { ...options };
     }
-    const ifExistsSql = ifExists ? " IF EXISTS" : "";
+    const lookup = { toTable, column: opts.column, name: opts.name };
+    if (opts.ifExists === true && !(await this.foreignKeyExists(fromTable, lookup))) {
+      return;
+    }
+    const fk = await this.foreignKeyForBang(fromTable, lookup);
     await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(fromTable)} DROP CONSTRAINT${ifExistsSql} ${this._qi(name)}`,
+      `ALTER TABLE ${this._qi(fromTable)} DROP CONSTRAINT ${this._qi(fk.name)}`,
     );
   }
 
