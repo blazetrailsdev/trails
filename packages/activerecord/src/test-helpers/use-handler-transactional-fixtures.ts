@@ -4,7 +4,7 @@ import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 /**
  * Handler-resolved variant of {@link withTransactionalFixtures} for Phase D-1
  * test suites that bootstrap their adapter through `setupHandlerSuite()`
- * instead of constructing one directly via `createTestAdapter()`.
+ * instead of constructing one directly.
  *
  * `withTransactionalFixtures(() => Base.adapter)` opens a per-test
  * transaction in `beforeEach` (via the pool's fixture-pin slot, so it's
