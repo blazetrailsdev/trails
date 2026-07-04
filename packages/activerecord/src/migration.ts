@@ -3134,9 +3134,26 @@ export class Migrator {
 
   /** @internal */
   private validate(migrations: MigrationProxy[]): void {
-    const versions = new Set<string>();
-    const names = new Set<string>();
     const validateTs = this.isValidateTimestamp();
+
+    // Rails' Migrator#validate checks duplicate names before touching
+    // versions, and tolerates a nil version. Mirror that ordering so a list of
+    // same-name, version-less migrations raises DuplicateMigrationNameError
+    // rather than being rejected for a missing version.
+    //
+    // Rails uses `group_by(&:name).find { |_, v| v.length > 1 }`, which reports
+    // the first *name* in first-occurrence order that has any duplicate — not
+    // the name whose repeat appears earliest. Count first, then walk the list
+    // in order to find the first duplicated name/version, to match that.
+    const nameCounts = new Map<string, number>();
+    for (const m of migrations) {
+      nameCounts.set(m.name, (nameCounts.get(m.name) ?? 0) + 1);
+    }
+    for (const m of migrations) {
+      if (nameCounts.get(m.name)! > 1) {
+        throw new DuplicateMigrationNameError(m.name);
+      }
+    }
 
     for (const m of migrations) {
       if (!m.version || !/^\d+$/.test(m.version)) {
@@ -3147,15 +3164,17 @@ export class Migrator {
       if (validateTs && !this.isValidMigrationTimestamp(m.version)) {
         throw new InvalidMigrationTimestampError(m.version, m.name);
       }
+    }
+
+    const versionCounts = new Map<string, number>();
+    for (const m of migrations) {
       const normalized = String(BigInt(m.version));
-      if (versions.has(normalized)) {
+      versionCounts.set(normalized, (versionCounts.get(normalized) ?? 0) + 1);
+    }
+    for (const m of migrations) {
+      if (versionCounts.get(String(BigInt(m.version)))! > 1) {
         throw new DuplicateMigrationVersionError(m.version);
       }
-      if (names.has(m.name)) {
-        throw new DuplicateMigrationNameError(m.name);
-      }
-      versions.add(normalized);
-      names.add(m.name);
     }
   }
 
