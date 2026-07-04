@@ -85,10 +85,16 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
 
 export interface UseFixturesOpts {
   /**
-   * When set, `useFixtures` derives the minimal sub-schema for the requested sets
-   * from this schema (via {@link deriveFixtureSchema}) and creates those tables in a
-   * `beforeAll` — replacing a manual `defineSchema({ ...slice })` call. Pass the full
-   * canonical schema (e.g. `TEST_SCHEMA`); only the tables the fixtures touch are created.
+   * When set, `useFixtures` uses this schema only to pick *which* tables to lay
+   * (the names of the sets the fixtures touch), then creates them via
+   * {@link ensureCanonicalTables} in a `beforeAll` — replacing a manual
+   * `defineSchema({ ...slice })` call. Pass the full canonical schema (e.g.
+   * `TEST_SCHEMA`); only the tables the fixtures touch are created.
+   *
+   * NOTE: only the table *names* are honored, not their column shapes — each
+   * table is created in its full canonical shape from the registry, so a
+   * genuinely bespoke (non-canonical) shape passed here is ignored. The type
+   * still permits an arbitrary `Schema` object for the name-selection role.
    */
   schema?: Schema;
 }
