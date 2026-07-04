@@ -1012,13 +1012,26 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // for this leaf. In Rails, COMMIT/ROLLBACK pass materialize_transactions:
         // true (abstract_mysql_adapter.rb:242-248) so with_raw_connection's
         // `ensure dirty_current_transaction if materialize_transactions`
-        // (abstract_adapter.rb:1046) DOES dirty on commit/rollback. trails does
-        // not, but this is pre-existing and shared with PG, NOT introduced here:
+        // (abstract_adapter.rb:1046) fires on commit/rollback. trails does not,
+        // but this is pre-existing and shared with PG, NOT introduced here:
         // pre-this-PR mysql2 internalExecute used the direct getConn path with no
-        // withRawConnection, so it never dirtied on commit/rollback either. It is
-        // also inconsequential — commit/rollback run with allowRetry:false (no
-        // in-call reconnect/restore_transactions), and the frame is popped by the
-        // TransactionManager immediately after, so its dirty flag is never read.
+        // withRawConnection, so it never dirtied here either.
+        //
+        // The suppressed dirty has no observable effect on the COMMIT/ROLLBACK
+        // path: real COMMIT/ROLLBACK SQL is only ever issued by the bottom-of-
+        // stack RealTransaction (SavepointTransaction#commit/rollback issue
+        // RELEASE/ROLLBACK TO SAVEPOINT instead — transaction.ts:832,898), and
+        // TransactionManager#_commitTransactionInner pops the committing frame
+        // BEFORE calling transaction.commit() → commitDbTransaction()
+        // (transaction.ts:1108-1117). So by the time this COMMIT runs the stack
+        // is empty, currentTransaction is NULL_TRANSACTION, and
+        // dirtyCurrentTransaction() is a no-op — there is no parent frame to
+        // dirty. (Nested RELEASE/ROLLBACK TO SAVEPOINT, where a real parent frame
+        // does remain, go through createSavepoint/releaseSavepoint/
+        // rollbackToSavepoint below, whose materializeTransactions:false is
+        // likewise pre-existing and unchanged by this PR — Rails passes true
+        // there per savepoints.rb:11-20, a separate long-standing trails/PG
+        // deviation, not this story's scope.)
         //
         // Error translation + invalidateTransaction live in the withRawConnection
         // loop and the outer catch below — mirroring execute()/executeMutation()
