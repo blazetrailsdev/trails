@@ -436,6 +436,19 @@ export function cleanDefault(raw: unknown): unknown {
 }
 
 /**
+ * Wraps an already-formatted TS-DSL literal (the string returned by
+ * `schemaDefault` / `Type#typeCastForSchema`, e.g. `"42"`, `'"hello"'`,
+ * `'() => "now()"'`) so `formatColspec` / `formatOptions` emit it verbatim
+ * instead of re-serializing it with `JSON.stringify`. Mirrors how the
+ * `columnSpec`-routed emit path treats `prepareColumnOptions` values as raw
+ * text (see {@link SchemaDumper.formatColspecRaw}).
+ * @internal
+ */
+export class RawSchemaLiteral {
+  constructor(public readonly text: string) {}
+}
+
+/**
  * Bridges a DatabaseAdapter to the SchemaSource protocol. Not public —
  * used internally by `SchemaDumper.dump(adapter, ...)` /
  * `dumpWithVersion(adapter, ...)` so adapter dumps don't require
@@ -1009,10 +1022,58 @@ export class SchemaDumper {
         // `quoteDefaultExpression`, which routes function defaults to raw SQL.
         return { id: "uuid", default: () => fn };
       }
-      const literal = cleanDefault(column.default);
-      return { id: "uuid", default: literal == null ? null : literal };
+      // Route the literal default through the same `schemaDefault` cast-type
+      // path `columnSpec` uses (Rails `schema_default`) rather than the
+      // trails-invented `cleanDefault` regex. The result is already-formatted
+      // TS-DSL text, so wrap it so `formatOptions` emits it verbatim.
+      const def = this.schemaDefault(column);
+      return { id: "uuid", default: def == null ? null : new RawSchemaLiteral(def) };
     }
     return {};
+  }
+
+  /**
+   * Rails `schema_default` (abstract/schema_dumper.rb): drive the column's
+   * default through the adapter's cast type — `deserialize` then
+   * `typeCastForSchema` — so every dialect's default emission agrees. Falls
+   * back to a plain literal when no adapter cast type is in hand (the
+   * in-memory / mock-source dump path). Returns already-formatted TS-DSL text.
+   * @internal
+   */
+  protected schemaDefault(column: ColumnInfo & { hasDefault?: boolean }): string | undefined {
+    if (!column.hasDefault && column.default === undefined) return undefined;
+    if (column.default == null) return this.schemaExpression(column);
+    const adapter = this._adapter();
+    if (adapter?.lookupCastTypeFromColumn) {
+      const type = adapter.lookupCastTypeFromColumn(column);
+      if (type != null && typeof type.deserialize === "function") {
+        const deserialized = type.deserialize(column.default);
+        if (deserialized == null) {
+          // column.default is already non-null (the `== null` guard above
+          // returned early). It may be a pre-deserialized JS value (e.g. []
+          // for a PG OID::Array column) that the scalar element type cannot
+          // deserialize. Apply typeCastForSchema directly on the original.
+          return type.typeCastForSchema(column.default);
+        }
+        return type.typeCastForSchema(deserialized);
+      }
+    }
+    if (typeof column.default === "string") return JSON.stringify(column.default);
+    return String(column.default);
+  }
+
+  /** @internal */
+  protected _adapter(): any {
+    const src = (this as any)._source;
+    return src?.adapter ?? src;
+  }
+
+  /** @internal */
+  protected schemaExpression(column: ColumnInfo): string | undefined {
+    // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
+    // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
+    if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
+    return undefined;
   }
 
   /**
@@ -1105,9 +1166,13 @@ export class SchemaDumper {
         const fn = col.defaultFunction;
         colspec.default = () => fn;
       } else {
-        const cleanedDefault = cleanDefault(col.default);
-        if (cleanedDefault !== undefined && cleanedDefault !== null) {
-          colspec.default = cleanedDefault;
+        // Route through the same `schemaDefault` cast-type path `columnSpec`
+        // uses (Rails `schema_default`) instead of the trails-invented
+        // `cleanDefault` regex. The result is already-formatted TS-DSL text,
+        // so wrap it so `formatColspec` emits it verbatim.
+        const def = this.schemaDefault(col);
+        if (def !== undefined) {
+          colspec.default = new RawSchemaLiteral(def);
         }
       }
       // Serial/bigserial emit a bare shorthand — Rails' schema_limit /
@@ -1315,6 +1380,9 @@ export class SchemaDumper {
   formatColspec(colspec: Record<string, unknown>): string {
     return Object.entries(colspec)
       .map(([k, v]) => {
+        if (v instanceof RawSchemaLiteral) {
+          return `${k}: ${v.text}`;
+        }
         if (typeof v === "function") {
           return `${k}: () => ${JSON.stringify((v as () => unknown)())}`;
         }
@@ -1363,6 +1431,9 @@ export class SchemaDumper {
     return Object.entries(options)
       .map(([k, v]) => {
         const key = isIdent.test(k) ? k : JSON.stringify(k);
+        if (v instanceof RawSchemaLiteral) {
+          return `${key}: ${v.text}`;
+        }
         if (typeof v === "function") {
           // Emit as an arrow returning the SQL expression — mirrors Rails'
           // `-> { "fn()" }` syntax in dumped `schema.rb`.

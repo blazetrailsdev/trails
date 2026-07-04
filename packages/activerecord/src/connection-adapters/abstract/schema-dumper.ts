@@ -196,42 +196,9 @@ export class SchemaDumper extends BaseSchemaDumper {
     return undefined;
   }
 
-  /** @internal */
-  protected schemaDefault(column: Column): string | undefined {
-    if (!column.hasDefault && column.default === undefined) return undefined;
-    if (column.default == null) return this.schemaExpression(column);
-    const adapter = this._adapter();
-    if (adapter?.lookupCastTypeFromColumn) {
-      const type = adapter.lookupCastTypeFromColumn(column);
-      if (type != null && typeof type.deserialize === "function") {
-        const deserialized = type.deserialize(column.default);
-        if (deserialized == null) {
-          // column.default is already non-null (the `== null` guard above
-          // returned early). It may be a pre-deserialized JS value (e.g. []
-          // for a PG OID::Array column) that the scalar element type cannot
-          // deserialize. Apply typeCastForSchema directly on the original.
-          return type.typeCastForSchema(column.default);
-        }
-        return type.typeCastForSchema(deserialized);
-      }
-    }
-    if (typeof column.default === "string") return JSON.stringify(column.default);
-    return String(column.default);
-  }
-
-  /** @internal */
-  protected _adapter(): any {
-    const src = (this as any)._source;
-    return src?.adapter ?? src;
-  }
-
-  /** @internal */
-  protected schemaExpression(column: Column): string | undefined {
-    // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
-    // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
-    if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
-    return undefined;
-  }
+  // `schemaDefault`, `_adapter`, and `schemaExpression` now live on the base
+  // `SchemaDumper` (../../schema-dumper.ts) so the base `emitTable` default
+  // callsites route through the same cast-type path; inherited here unchanged.
 
   /** @internal */
   protected schemaCollation(column: Column): string | undefined {
