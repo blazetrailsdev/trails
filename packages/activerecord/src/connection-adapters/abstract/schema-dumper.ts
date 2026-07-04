@@ -202,7 +202,8 @@ export class SchemaDumper extends BaseSchemaDumper {
   // (../../schema-dumper.ts) carries structurally-identical copies so its
   // legacy `emitTable` default callsites route through the same cast-type path;
   // these overrides keep the Rails-faithful body where it belongs. `_adapter`
-  // is a trails-only helper and lives solely on the base.
+  // is a trails-only helper and lives solely on the base. Keep these two bodies
+  // in lockstep with the base copies — edit both.
 
   /** @internal */
   protected override schemaDefault(column: Column): string | undefined {

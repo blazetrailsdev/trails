@@ -1038,6 +1038,10 @@ export class SchemaDumper {
    * `typeCastForSchema` — so every dialect's default emission agrees. Falls
    * back to a plain literal when no adapter cast type is in hand (the
    * in-memory / mock-source dump path). Returns already-formatted TS-DSL text.
+   *
+   * NOTE: the connection-adapters abstract subclass carries a
+   * structurally-identical `override` copy (the api:compare-mapped location for
+   * Rails' `schema_default`); keep the two bodies in lockstep — edit both.
    * @internal
    */
   protected schemaDefault(column: ColumnInfo & { hasDefault?: boolean }): string | undefined {
