@@ -3,6 +3,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { generateModels, unqualify } from "./model-codegen.js";
 import type { IntrospectedTable } from "./model-codegen.js";
 import { ForeignKeyDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import { Base } from "./base.js";
 
 // Deterministic timestamp so header-line comparisons stay stable.
 const NOW = Temporal.Instant.from("2026-04-24T14:23:05.000Z");
@@ -152,6 +153,38 @@ describe("generateModels", () => {
     expect(out).toContain("SKIPPED v_users_summary: no primary key");
     expect(out).toContain("export class RealTable extends Base {");
     expect(out).not.toMatch(/export class VUsersSummary/);
+  });
+
+  it("skips the default bookkeeping tables (schema_migrations / ar_internal_metadata)", () => {
+    const out = generateModels(
+      [table("books"), table("schema_migrations"), table("ar_internal_metadata")],
+      { noHeader: true, now: NOW },
+    );
+    expect(out).toContain("export class Book extends Base {");
+    expect(out).not.toMatch(/export class SchemaMigration/);
+    expect(out).not.toMatch(/export class ArInternalMetadata/);
+  });
+
+  it("still ignores bookkeeping tables when their names are reconfigured on Base", () => {
+    const origSm = Base.schemaMigrationsTableName;
+    const origIm = Base.internalMetadataTableName;
+    const origPrefix = Base.tableNamePrefix;
+    Base.schemaMigrationsTableName = "my_migrations";
+    Base.internalMetadataTableName = "my_metadata";
+    Base.tableNamePrefix = "app_";
+    try {
+      const out = generateModels(
+        [table("books"), table("app_my_migrations"), table("app_my_metadata")],
+        { noHeader: true, now: NOW },
+      );
+      expect(out).toContain("export class Book extends Base {");
+      expect(out).not.toMatch(/export class AppMyMigrations/);
+      expect(out).not.toMatch(/export class AppMyMetadata/);
+    } finally {
+      Base.schemaMigrationsTableName = origSm;
+      Base.internalMetadataTableName = origIm;
+      Base.tableNamePrefix = origPrefix;
+    }
   });
 
   it("skips _tableName for irregular plural where round-trip works", () => {
