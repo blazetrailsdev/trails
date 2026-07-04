@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { getId } from "./primary-key.js";
+import { getId, idWas, idInDatabase, idBeforeTypeCast } from "./primary-key.js";
 
 // Unit tests for the `id` accessor's bigint normalization. On PG the driver
 // returns a table's default `bigint` id as a JS `bigint`, while `integer`-typed
@@ -38,6 +38,26 @@ describe("PrimaryKey#id bigint normalization", () => {
   it("passes through a null primary key", () => {
     const record = host("id", null);
     expect(getId.call(record)).toBeNull();
+  });
+
+  it("keeps id, idWas, and idInDatabase in lockstep for a bigint pk", () => {
+    // All three route through readPkWith and must agree on representation, so
+    // `record.id === record.idInDatabase` holds after a fresh PG load.
+    const record = {
+      constructor: { primaryKey: "id" },
+      id: 42n,
+      readAttribute: (_name: string) => 42n,
+      _readAttribute: (_name: string) => 42n,
+      attributeWas: (_name: string) => 42n,
+      attributeInDatabase: (_name: string) => 42n,
+      readAttributeBeforeTypeCast: (_name: string) => 42n,
+      _writeAttribute: () => {},
+    };
+    expect(getId.call(record)).toBe(42);
+    expect(idWas.call(record)).toBe(42);
+    expect(idInDatabase.call(record)).toBe(42);
+    expect(idBeforeTypeCast.call(record)).toBe(42);
+    expect(getId.call(record) === idInDatabase.call(record)).toBe(true);
   });
 
   it("normalizes each component of a composite primary key", () => {

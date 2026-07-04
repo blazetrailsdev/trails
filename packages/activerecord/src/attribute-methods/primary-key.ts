@@ -45,12 +45,18 @@ export function isPrimaryKeyValuesPresent(this: PrimaryKeyRecord): boolean {
 function readPkWith(record: PrimaryKeyRecord, method: string): unknown {
   const pk = (record.constructor as any).primaryKey;
   const fn = (record as any)[method];
+  // Normalize each read so `id`, `idWas`, `idInDatabase`, and
+  // `idBeforeTypeCast` agree on representation: without this a PG `bigint` PK
+  // makes `record.id` (number, via getId) diverge from `record.idInDatabase`
+  // (bigint) for the identical logical value. Rails treats all four as the
+  // same Integer (primary_key.rb:18-51); normalizeIntegerId keeps them in
+  // lockstep here. (idForDatabase stays raw — it feeds SQL binding.)
   if (typeof fn === "function") {
-    if (Array.isArray(pk)) return pk.map((k: string) => fn.call(record, k));
-    return fn.call(record, pk);
+    if (Array.isArray(pk)) return pk.map((k: string) => normalizeIntegerId(fn.call(record, k)));
+    return normalizeIntegerId(fn.call(record, pk));
   }
-  if (Array.isArray(pk)) return pk.map((k: string) => record._readAttribute(k));
-  return record._readAttribute(pk);
+  if (Array.isArray(pk)) return pk.map((k: string) => normalizeIntegerId(record._readAttribute(k)));
+  return normalizeIntegerId(record._readAttribute(pk));
 }
 
 export function idBeforeTypeCast(this: PrimaryKeyRecord): unknown {
