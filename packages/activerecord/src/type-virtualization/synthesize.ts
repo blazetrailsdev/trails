@@ -80,6 +80,18 @@ export interface SynthesizeOptions {
    * scalar type shadowing the aggregation object type.
    */
   composedOfColumns?: ReadonlyMap<string, ReadonlySet<string>>;
+  /**
+   * Whether an association-target class name resolves to a type that is
+   * actually in scope where the declare will be spliced (in the model
+   * registry or lexically visible in-file). A plain (non-`through`)
+   * association whose `classify`-d target has no corresponding model — e.g.
+   * `hasOne("otherThing")` in a throwaway test class with no `OtherThing`
+   * model — would otherwise emit `declare otherThing: OtherThing | null`, a
+   * dangling name (TS2304). When the predicate reports the target unknown the
+   * declare falls back to `Base` (always in scope), mirroring how `through:`
+   * targets already degrade to `Base`. Omitted → every target is trusted.
+   */
+  isKnownTarget?: (name: string) => boolean;
 }
 
 export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}): string[] {
@@ -112,14 +124,27 @@ export function synthesizeDeclares(info: ClassInfo, opts: SynthesizeOptions = {}
     ) {
       continue;
     }
-    for (const line of renderCall(info, call, aliases, targets, opts.attributesNullable ?? false)) {
+    for (const line of renderCall(
+      info,
+      call,
+      aliases,
+      targets,
+      opts.attributesNullable ?? false,
+      opts.isKnownTarget,
+    )) {
       if (!line.skipIfPresent || !memberPresent(info, line)) {
         out.push(line.text);
         if (!line.isStatic) synthesizedInstanceNames.add(line.declaredName);
       }
     }
   }
-  for (const l of renderLoaderOverloads(info, aliases, targets, opts.ancestors)) {
+  for (const l of renderLoaderOverloads(
+    info,
+    aliases,
+    targets,
+    opts.ancestors,
+    opts.isKnownTarget,
+  )) {
     if (!info.existingMembers.has(l.declaredName)) {
       out.push(l.text);
       synthesizedInstanceNames.add(l.declaredName);
@@ -240,6 +265,7 @@ function renderLoaderOverloads(
   aliases: ReadonlyMap<string, string> | undefined,
   targets: ReadonlyMap<string, string> | undefined,
   ancestors: readonly ClassInfo[] | undefined,
+  isKnownTarget: ((name: string) => boolean) | undefined,
 ): RenderedLine[] {
   const belongsToOverloads: string[] = [];
   const hasOneOverloads: string[] = [];
@@ -253,7 +279,7 @@ function renderLoaderOverloads(
       const target =
         call.options["polymorphic"] === "true"
           ? "Base"
-          : resolveTarget(source, call, aliases, targets);
+          : resolveTarget(source, call, aliases, targets, isKnownTarget);
       const overload = `((name: "${call.name}") => Promise<${target} | null>)`;
       const bucket = call.kind === "belongsTo" ? belongsToOverloads : hasOneOverloads;
       if (!bucket.includes(overload)) bucket.push(overload);
@@ -310,7 +336,9 @@ function collectConflictingSingulars(info: ClassInfo, opts: SynthesizeOptions): 
   const superNameOf = opts.superNameOf;
 
   const target = (host: ClassInfo, call: AssociationCall): string =>
-    call.options["polymorphic"] === "true" ? "Base" : resolveTarget(host, call, aliases, targets);
+    call.options["polymorphic"] === "true"
+      ? "Base"
+      : resolveTarget(host, call, aliases, targets, opts.isKnownTarget);
   // Effective inherited target per association, folded base→derived
   // (`ancestors` is nearest-first, so reverse). A suppressed ancestor override
   // (target not assignable to what it inherits) does NOT change the effective
@@ -385,16 +413,17 @@ function renderCall(
   aliases: ReadonlyMap<string, string> | undefined,
   targets: ReadonlyMap<string, string> | undefined,
   attributesNullable: boolean,
+  isKnownTarget: ((name: string) => boolean) | undefined,
 ): RenderedLine[] {
   switch (call.kind) {
     case "attribute":
       return renderAttribute(call, attributesNullable);
     case "hasMany":
     case "hasAndBelongsToMany":
-      return renderCollectionAssoc(info, call, aliases, targets);
+      return renderCollectionAssoc(info, call, aliases, targets, isKnownTarget);
     case "belongsTo":
     case "hasOne":
-      return renderSingularAssoc(info, call, aliases, targets);
+      return renderSingularAssoc(info, call, aliases, targets, isKnownTarget);
     case "scope":
       return renderScope(info, call);
     case "enum":
@@ -424,6 +453,7 @@ function renderCollectionAssoc(
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
   targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
 ): RenderedLine[] {
   // Post-Phase-R.2: collection readers return an AssociationProxy,
   // not a plain `Target[]`. The proxy is awaitable — `await blog.posts`
@@ -431,7 +461,7 @@ function renderCollectionAssoc(
   // collections. Singular associations (belongsTo / hasOne) are
   // covered by `loadBelongsTo` / `loadHasOne` overloads rendered by
   // `renderLoaderOverloads` at the end of `synthesizeDeclares`.
-  const target = resolveTarget(info, call, aliases, targets);
+  const target = resolveTarget(info, call, aliases, targets, isKnownTarget);
   const memberName = renderDeclaredMemberName(call.name);
   return [
     line(`declare ${memberName}: ${AR_IMPORT}.AssociationProxy<${target}>;`, call.name, false),
@@ -443,6 +473,7 @@ function renderSingularAssoc(
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
   targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
 ): RenderedLine[] {
   // `polymorphic: true` on belongsTo can't be narrowed statically — any
   // Base-rooted class could be on the other end. Fall back to `Base | null`.
@@ -450,7 +481,9 @@ function renderSingularAssoc(
   // `declare loadBelongsTo: ...` / `declare loadHasOne: ...` lines
   // by `renderLoaderOverloads` below.
   const target =
-    call.options["polymorphic"] === "true" ? "Base" : resolveTarget(info, call, aliases, targets);
+    call.options["polymorphic"] === "true"
+      ? "Base"
+      : resolveTarget(info, call, aliases, targets, isKnownTarget);
   const memberName = renderDeclaredMemberName(call.name);
   return [line(`declare ${memberName}: ${target} | null;`, call.name, false)];
 }
@@ -520,11 +553,18 @@ function resolveTarget(
   call: AssociationCall,
   aliases?: ReadonlyMap<string, string>,
   targets?: ReadonlyMap<string, string>,
+  isKnownTarget?: (name: string) => boolean,
 ): string {
   const override = targets?.get(`${info.name}#${call.name}`);
+  // A pre-resolved `through:` override already degrades to `Base` when
+  // unresolvable, so trust it as-is.
   if (override) return override;
   const target = resolveAssociationTarget(call);
-  return aliases?.get(target) ?? target;
+  const resolved = aliases?.get(target) ?? target;
+  // A plain association target that names no in-scope class would emit a
+  // dangling type reference; fall back to the always-visible `Base`.
+  if (isKnownTarget && !isKnownTarget(resolved)) return "Base";
+  return resolved;
 }
 
 function pascal(s: string): string {

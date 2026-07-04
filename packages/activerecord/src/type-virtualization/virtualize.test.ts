@@ -134,6 +134,41 @@ describe("virtualize — deltas", () => {
     expect(text).toMatch(/declare safe: string;/);
   });
 
+  test("isKnownTarget: unknown plain association target falls back to Base", () => {
+    const src =
+      "export class Thing extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("otherThing");\n' +
+      '    this.hasMany("gadgets");\n' +
+      '    this.belongsTo("owner");\n' +
+      "  }\n" +
+      "}\n";
+    // Only `Owner` is a known target; `OtherThing` / `Gadget` name no model.
+    const { text } = virtualize(src, "thing.ts", {
+      isKnownTarget: (name) => name === "Base" || name === "Owner",
+    });
+    // Dangling names degrade to Base (in scope); known target is kept.
+    expect(text).toMatch(/declare otherThing: Base \| null;/);
+    expect(text).toMatch(/declare gadgets: .*AssociationProxy<Base>;/);
+    expect(text).toMatch(/declare owner: Owner \| null;/);
+    expect(text).not.toMatch(/OtherThing/);
+    expect(text).not.toMatch(/Gadget/);
+    // Loader overload for the unknown hasOne also degrades to Base.
+    expect(text).toMatch(/declare loadHasOne:.*name: "otherThing".*Promise<Base \| null>/);
+  });
+
+  test("isKnownTarget omitted: every target is trusted verbatim", () => {
+    const src =
+      "export class Thing extends Base {\n" +
+      "  static {\n" +
+      '    this.hasOne("otherThing");\n' +
+      "  }\n" +
+      "}\n";
+    const { text } = virtualize(src, "thing.ts");
+    // No predicate → classify result emitted as-is (back-compat).
+    expect(text).toMatch(/declare otherThing: OtherThing \| null;/);
+  });
+
   test("schemaColumnsByTable doesn't collide with hasMany / belongsTo names", () => {
     const src =
       "export class Post extends Base {\n" +
