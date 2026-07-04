@@ -80,6 +80,12 @@ interface ReferentialIntegrityHost extends ReferentialIntegritySqlHost {
 // table is itself inserted/deleted/truncated — and those are the only tables the
 // wrapped block touches. Absent a scope, fall back to the whole catalog to
 // preserve the public `disable_referential_integrity` contract.
+//
+// The `scopedTables` parameter has no Rails counterpart (the method is zero-arg
+// in every adapter); it is a tracked deviation pending convergence — see RFC
+// 0060 story `converge-referential-integrity-zero-arg-shape` (hoist the
+// fixture-load flow to one block per set, matching Rails' insert_fixtures_set,
+// then drop the parameter).
 export async function disableReferentialIntegrity(
   this: ReferentialIntegrityHost,
   fn: () => Promise<void>,
@@ -99,21 +105,22 @@ export async function disableReferentialIntegrity(
   // errors (referential_integrity.rb:28-34).
   const tables = scopedTables ?? (await this.tables());
 
-  if (tables.length === 0) {
-    await fn();
-    return;
-  }
-
-  try {
-    await this.transaction(
-      async () => {
-        await this.execute(disableReferentialIntegritySql.call(this, tables).join(";"));
-      },
-      { requiresNew: true },
-    );
-  } catch (e) {
-    if (e instanceof ActiveRecordError) originalException = e as Error;
-    else throw e;
+  // An empty scope has no triggers to toggle, so skip both ALTER passes — but
+  // still route `fn()` through the shared catch below so an InvalidForeignKey it
+  // raises earns the missing-privileges warning Rails always prints
+  // (referential_integrity.rb:20-30), matching the non-empty path.
+  if (tables.length > 0) {
+    try {
+      await this.transaction(
+        async () => {
+          await this.execute(disableReferentialIntegritySql.call(this, tables).join(";"));
+        },
+        { requiresNew: true },
+      );
+    } catch (e) {
+      if (e instanceof ActiveRecordError) originalException = e as Error;
+      else throw e;
+    }
   }
 
   try {
@@ -129,6 +136,8 @@ export async function disableReferentialIntegrity(
     }
     throw e;
   }
+
+  if (tables.length === 0) return;
 
   try {
     await this.transaction(

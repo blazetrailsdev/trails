@@ -8,7 +8,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { disableReferentialIntegrity } from "./referential-integrity.js";
-import { StatementInvalid } from "../../errors.js";
+import { InvalidForeignKey, StatementInvalid } from "../../errors.js";
 
 interface FakeHost {
   quoteTableName(name: string): string;
@@ -92,6 +92,22 @@ describe("disableReferentialIntegrity", () => {
     expect(ran).toBe(true);
     expect(tablesCalls()).toBe(0);
     expect(executed).toHaveLength(0);
+  });
+
+  it("still warns and rethrows when an empty-scope block raises InvalidForeignKey", async () => {
+    const { host } = makeHost(["a", "b"]);
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const fkError = new InvalidForeignKey("boom", { sql: "", binds: [] });
+    try {
+      await expect(
+        disableReferentialIntegrity.call(host, async () => {
+          throw fkError;
+        }, []),
+      ).rejects.toBe(fkError);
+      expect(warn).toHaveBeenCalledOnce();
+    } finally {
+      warn.mockRestore();
+    }
   });
 
   it("swallows an enable-pass StatementInvalid when the block dropped a snapshotted table", async () => {
