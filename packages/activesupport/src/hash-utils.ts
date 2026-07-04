@@ -190,9 +190,15 @@ export function reverseMerge<T extends AnyObject>(obj: T, defaults: AnyObject): 
  */
 export function assertValidKeys(obj: AnyObject, validKeys: string[]): void {
   const validSet = new Set(validKeys);
+  // Rails builds the message with Symbol#inspect on each key, so keys carry a
+  // leading `:` (keys.rb:52). Our keys are strings, but we mirror the symbol
+  // rendering to match hash_ext_test.rb:254's exact expectation.
+  const inspect = (key: string): string => `:${key}`;
   for (const key of Object.keys(obj)) {
     if (!validSet.has(key)) {
-      throw new ArgumentError(`Unknown key: ${key}. Valid keys are: ${validKeys.join(", ")}`);
+      throw new ArgumentError(
+        `Unknown key: ${inspect(key)}. Valid keys are: ${validKeys.map(inspect).join(", ")}`,
+      );
     }
   }
 }

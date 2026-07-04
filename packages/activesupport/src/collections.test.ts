@@ -228,12 +228,12 @@ describe("assertValidKeys", () => {
   it("throws on unknown key", () => {
     expect(() =>
       assertValidKeys({ failore: "stuff", funny: "business" }, ["failure", "funny"]),
-    ).toThrow(/Unknown key: failore/);
+    ).toThrow("Unknown key: :failore. Valid keys are: :failure, :funny");
   });
 
   it("includes valid keys in error message", () => {
     expect(() => assertValidKeys({ failore: "stuff" }, ["failure"])).toThrow(
-      /Valid keys are: failure/,
+      "Unknown key: :failore. Valid keys are: :failure",
     );
   });
 });
