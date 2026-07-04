@@ -129,7 +129,7 @@ describe("DJAS — polymorphic belongsTo-through with non-id target PK", () => {
   });
 
   afterAll(async () => {
-    await (Base.connection as any).dropTable(
+    await Base.connection.dropTable(
       "dp_non_id_articles",
       "dp_non_id_photos",
       "dp_galleries",
