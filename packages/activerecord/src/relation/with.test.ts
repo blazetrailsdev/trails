@@ -4,8 +4,9 @@
  * Mirrors: activerecord/test/cases/relation/with_test.rb
  */
 import { describe, it, expect } from "vitest";
-import { sql as arelSql } from "@blazetrails/arel";
+import { sql as arelSql, Nodes } from "@blazetrails/arel";
 import "../index.js";
+import { buildJoinBuckets } from "./query-methods.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -31,6 +32,11 @@ const POSTS_WITH_TAGS_AND_MULTIPLE_COMMENTS = POSTS_WITH_MULTIPLE_COMMENTS.filte
 function toIds(ids: any[]): number[] {
   return ids.map((id) => Number(id));
 }
+
+// trails collapses Ruby Symbol and String to one JS string type; a genuine
+// Symbol is how a caller signals "association/CTE name" (vs a raw SQL fragment)
+// to the join partitioner (query_methods.ts `selectNamedJoins`).
+const cteSym = (name: string) => Symbol(name) as unknown as string;
 
 // ==========================================================================
 // WithTest — targets relation/with_test.rb
@@ -210,6 +216,34 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
         .filter((r: any) => r.readAttribute("has_comments") != null)
         .map((r: any) => Number(r.id)),
     ).toEqual(POSTS_WITH_COMMENTS);
+  });
+
+  it("with left joins routes a cte symbol to an outer join node", () => {
+    // Rails routes a symbol left-outer arg matching a `with(...)` CTE name to a
+    // `build_with_join_node(name, Arel::Nodes::OuterJoin)` join_node
+    // (query_methods.rb:1830-1836); a `joins(...)` CTE symbol instead builds an
+    // `Arel::Nodes::InnerJoin` (query_methods.rb:1854). trails mirrors the
+    // former in `buildJoinBuckets`' `selectNamedJoins` block — a `CTEJoin`
+    // becomes `buildWithJoinNode(name, Nodes.OuterJoin)`
+    // (query-methods.ts, buildJoinBuckets). Lock the OuterJoin routing at the
+    // join-plan level: the CTE arg must land in `join_node` as an OuterJoin (not
+    // an InnerJoin) against the CTE table. `buildJoinBuckets` is the subquery
+    // `from(relation)` builder, the only path that carries the CTEJoin block
+    // (the direct `_applyJoinsToManager` live path does not partition CTEs), so
+    // exercise it directly. (trails Symbol is `Symbol("name")`.)
+    const relation = Post.with({
+      commented_posts: Comment.select("post_id").distinct(),
+    }).leftOuterJoins(cteSym("commented_posts"));
+
+    const buckets = buildJoinBuckets.call(relation as any);
+    const joinNodes = buckets.join_node as Nodes.Node[];
+
+    expect(joinNodes.length).toBe(1);
+    const outer = joinNodes[0] as Nodes.OuterJoin;
+    expect(outer).toBeInstanceOf(Nodes.OuterJoin);
+    expect(outer).not.toBeInstanceOf(Nodes.InnerJoin);
+    // The join targets the CTE table (`commented_posts`), left-joined onto posts.
+    expect((outer.left as Nodes.TableAlias | { name?: string }).name).toBe("commented_posts");
   });
 
   it("raises when using block", () => {
