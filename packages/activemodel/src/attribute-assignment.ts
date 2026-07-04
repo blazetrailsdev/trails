@@ -8,13 +8,9 @@ interface PermittedAttributes {
 }
 
 export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
-  if (typeof newAttributes !== "object" || newAttributes === null || Array.isArray(newAttributes)) {
-    throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${typeNameForError(newAttributes)} passed.`,
-    );
-  }
+  assertHashAttributes(newAttributes);
 
-  const attrs = newAttributes as Record<string, unknown>;
+  const attrs = newAttributes;
   if (Object.keys(attrs).length === 0) return;
 
   const sanitized = sanitizeForMassAssignment(attrs);
@@ -91,8 +87,31 @@ export function sanitizeForMassAssignment(
   return attributes;
 }
 
+/**
+ * Enforces ActiveModel::AttributeAssignment#assign_attributes' guard
+ * (attribute_assignment.rb:29-30): a non-hash argument raises ArgumentError,
+ * not a raw TypeError. Shared by every entry point that mass-assigns —
+ * `Model#assignAttributes`, this module's `assignAttributes`, and ActiveRecord
+ * `#update`/`#update!` (which iterate a raw writeAttribute loop) — so all
+ * agree on the class and message text for the same input.
+ *
+ * NOTE: Rails checks `respond_to?(:each_pair)`, so a Ruby Date/Time/Struct
+ * raises here; JS has no each_pair, so we approximate with "plain object"
+ * (any non-null, non-array object). A Date passed here duck-types past the
+ * guard and no-ops via Object.keys → {}. Tightening to reject non-plain
+ * objects is a follow-up (no caller relies on it today).
+ */
+export function assertHashAttributes(attrs: unknown): asserts attrs is Record<string, unknown> {
+  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) {
+    throw new ArgumentError(
+      `When assigning attributes, you must pass a hash as an argument, ${typeNameForError(attrs)} passed.`,
+    );
+  }
+}
+
 function typeNameForError(value: unknown): string {
-  if (value === null) return "Null";
+  // Ruby: nil.class #=> NilClass (not "Null").
+  if (value === null) return "NilClass";
   if (Array.isArray(value)) return "Array";
   const t = typeof value;
   return t.charAt(0).toUpperCase() + t.slice(1);

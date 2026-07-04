@@ -11,7 +11,7 @@ import {
   sanitizeForMassAssignment,
   SerializeCastValue,
   runAfterCallbacksOnProto,
-  ArgumentError,
+  assertHashAttributes,
 } from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -607,26 +607,6 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<
     proto = Object.getPrototypeOf(proto);
   }
   self.writeAttribute(key, value);
-}
-
-/**
- * Mirrors ActiveModel::AttributeAssignment#assign_attributes' guard: a
- * non-hash argument raises ArgumentError, not a raw TypeError. update /
- * update! bypass Base#assignAttributes (raw writeAttribute loop), so they
- * must enforce the same contract here.
- */
-function assertHashAttributes(attrs: unknown): asserts attrs is Record<string, unknown> {
-  if (typeof attrs !== "object" || attrs === null || Array.isArray(attrs)) {
-    const cls =
-      attrs === null
-        ? "NilClass"
-        : Array.isArray(attrs)
-          ? "Array"
-          : ((attrs as { constructor?: { name?: string } })?.constructor?.name ?? typeof attrs);
-    throw new ArgumentError(
-      `When assigning attributes, you must pass a hash as an argument, ${cls} passed.`,
-    );
-  }
 }
 
 /**

@@ -72,6 +72,7 @@ import {
   _assignAttribute as attrAssignOne,
   sanitizeForMassAssignment as attrSanitize,
   attributeWriterMissing as defaultAttributeWriterMissing,
+  assertHashAttributes,
   ArgumentError,
 } from "./attribute-assignment.js";
 import { PresenceValidator } from "./validations/presence.js";
@@ -2251,22 +2252,8 @@ export class Model {
    * Mirrors: ActiveModel::AttributeAssignment#assign_attributes
    */
   assignAttributes(newAttributes: unknown): void {
-    if (
-      typeof newAttributes !== "object" ||
-      newAttributes === null ||
-      Array.isArray(newAttributes)
-    ) {
-      const t =
-        newAttributes === null
-          ? "Null"
-          : Array.isArray(newAttributes)
-            ? "Array"
-            : typeof newAttributes;
-      throw new ArgumentError(
-        `When assigning attributes, you must pass a hash as an argument, ${t.charAt(0).toUpperCase() + t.slice(1)} passed.`,
-      );
-    }
-    const attrs = newAttributes as Record<string, unknown>;
+    assertHashAttributes(newAttributes);
+    const attrs = newAttributes;
     if (Object.keys(attrs).length === 0) return;
     this._assignAttributes(this.sanitizeForMassAssignment(attrs));
   }
