@@ -1884,9 +1884,9 @@ export class Relation<T extends Base> {
     const flatArgs = _qm.flattenedArgs(args).filter((a) => !_qm.isBlankArgument(a));
     for (const arg of flatArgs) {
       // Arel join node — stored as-is to preserve type (mirrors Rails joins_values).
-      // Rails joins! uses |= (array union), deduplicating by eql?/hash — object
-      // identity for nodes, structural for strings/hashes. structuralUnionEq
-      // (=== first, then structural) matches both.
+      // Rails joins! uses |= (array union), deduplicating by eql?/hash —
+      // structural for nodes (Arel::Nodes::Binary#eql?), strings, and hashes
+      // alike. structuralUnionEq (=== first, then eql/structural) matches all.
       if (arg instanceof Nodes.Join) {
         if (!rel._joinValues.some((v) => _qm.structuralUnionEq(v, arg))) rel._joinValues.push(arg);
         continue;

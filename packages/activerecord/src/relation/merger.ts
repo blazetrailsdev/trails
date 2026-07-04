@@ -129,7 +129,10 @@ export class Merger {
     const otherNamed: unknown[] = this.other._namedInnerJoins ?? [];
     if (sameKlass) {
       for (const v of otherNamed) {
-        if (!rel._namedInnerJoins.includes(v)) rel._namedInnerJoins.push(v);
+        // joins_values |= dedups structurally-equal Hash specs (eql?/hash), so a
+        // same-klass merge folds an equal spec — not by JS reference identity.
+        if (!rel._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
+          rel._namedInnerJoins.push(v);
       }
     } else if (otherNamed.length > 0) {
       rel._namedInnerJoinDeps.push(

@@ -908,9 +908,11 @@ function unscopeBang(
 }
 
 function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): any {
-  // Rails joins! uses |= (array union), deduplicating by Ruby eql?/hash — which
-  // is structural for Hash specs and identity for Arel nodes. deepEqual mirrors
-  // that: === first (Arel node identity), then structural for plain objects.
+  // Rails joins! uses |= (array union), deduplicating by Ruby eql?/hash —
+  // structural for Hash specs, strings, and even Arel nodes (Arel::Nodes::Binary
+  // defines eql?/hash by class + members, arel/nodes/binary.rb:20-29).
+  // structuralUnionEq mirrors that: === first, then deepEqual (which delegates
+  // to a node's own eql for Arel nodes).
   for (const arg of args) {
     if (!this._joinValues.some((seen) => structuralUnionEq(seen, arg))) this._joinValues.push(arg);
   }
@@ -1054,10 +1056,12 @@ function uniqArray(arr: unknown[]): unknown[] {
 
 /**
  * Ruby `Array#|=` (and `uniq`) dedup by `eql?`/`hash` — structural for Hash
- * specs, identity for Arel nodes. This mirrors that for the join-value unions
- * (`joins_values`, `left_outer_joins_values`): {@link deepEqual} tests `===`
- * first (Arel node identity) then structural equality for plain-object specs,
- * so `leftJoins({ posts: "x" })` called twice folds to one entry as in Rails.
+ * specs, strings, and Arel nodes alike (Arel::Nodes::Binary, which Join extends,
+ * defines eql?/hash by class + members: arel/nodes/binary.rb:20-29). This mirrors
+ * that for the join-value unions (`joins_values`, `left_outer_joins_values`):
+ * {@link deepEqual} tests `===` first, then delegates to a node's own `eql`, and
+ * falls back to per-key structural equality for plain-object specs — so
+ * `leftJoins({ posts: "x" })` called twice folds to one entry as in Rails.
  * @internal
  */
 export function structuralUnionEq(a: unknown, b: unknown): boolean {
