@@ -42969,13 +42969,6 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_join_buckets",
-    "call": "build_with_join_node",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_join_buckets",
     "call": "concat",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
