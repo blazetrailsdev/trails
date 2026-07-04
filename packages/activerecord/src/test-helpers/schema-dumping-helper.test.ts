@@ -14,27 +14,32 @@ beforeAll(() => {
   adapter = Base.adapter;
 });
 
-// The bespoke `sdh_*` tables each test creates to exercise the dumper. This
-// suite runs under setupFixtures(), which opts out of the global truncation
-// reset, so nothing clears these between tests in-file — one test reuses
-// `sdh_kept` and would hit "table already exists" if left. Dropping only these
-// named bespoke tables (RFC 0060) replaces the old afterAll/afterEach
+// Track the bespoke `sdh_*` tables each test creates so afterEach can drop
+// exactly those. This suite runs under setupFixtures(), which opts out of the
+// global truncation reset, so nothing clears these between tests in-file — one
+// test reuses `sdh_kept` and would hit "table already exists" if left. Dropping
+// only the created tables (RFC 0060) replaces the old afterAll/afterEach
 // dropAllTables' ~330-table canonical DROP fan-out; any leak past the file is
-// swept by the next non-skip file's `resetTestTables`.
-const SDH_TABLES = ["sdh_kept", "sdh_other", "sdh_a", "sdh_b", "sdh_c", "sdh_keep", "sdh_skip"];
+// swept by the next non-skip file's `resetTestTables`. Deriving the drop set
+// from `createSdhTable` (rather than a hand-maintained list) keeps it correct
+// as tests are added or renamed.
+const createdTables = new Set<string>();
+async function createSdhTable(name: string, columns = "id INTEGER PRIMARY KEY"): Promise<void> {
+  createdTables.add(name);
+  await adapter.executeMutation(`CREATE TABLE ${name} (${columns})`);
+}
 
 describe("SchemaDumpingHelper", () => {
   afterEach(async () => {
-    for (const t of SDH_TABLES) {
+    for (const t of createdTables) {
       await adapter.executeMutation(`DROP TABLE IF EXISTS ${adapter.quoteTableName(t)}`);
     }
+    createdTables.clear();
   });
 
   it("dumps only the named table", async () => {
-    await adapter.executeMutation(
-      `CREATE TABLE sdh_kept (id INTEGER PRIMARY KEY, name varchar(255))`,
-    );
-    await adapter.executeMutation(`CREATE TABLE sdh_other (id INTEGER PRIMARY KEY)`);
+    await createSdhTable("sdh_kept", "id INTEGER PRIMARY KEY, name varchar(255)");
+    await createSdhTable("sdh_other");
 
     const output = await dumpTableSchema(adapter as unknown as SchemaSource, "sdh_kept");
 
@@ -43,9 +48,9 @@ describe("SchemaDumpingHelper", () => {
   });
 
   it("dumps multiple named tables and excludes the rest", async () => {
-    await adapter.executeMutation(`CREATE TABLE sdh_a (id INTEGER PRIMARY KEY)`);
-    await adapter.executeMutation(`CREATE TABLE sdh_b (id INTEGER PRIMARY KEY)`);
-    await adapter.executeMutation(`CREATE TABLE sdh_c (id INTEGER PRIMARY KEY)`);
+    await createSdhTable("sdh_a");
+    await createSdhTable("sdh_b");
+    await createSdhTable("sdh_c");
 
     const output = await dumpTableSchema(adapter as unknown as SchemaSource, "sdh_a", "sdh_c");
 
@@ -55,7 +60,7 @@ describe("SchemaDumpingHelper", () => {
   });
 
   it("restores SchemaDumper.ignoreTables after the dump", async () => {
-    await adapter.executeMutation(`CREATE TABLE sdh_kept (id INTEGER PRIMARY KEY)`);
+    await createSdhTable("sdh_kept");
     const before = SchemaDumper.ignoreTables;
 
     await dumpTableSchema(adapter as unknown as SchemaSource, "sdh_kept");
@@ -79,8 +84,8 @@ describe("SchemaDumpingHelper", () => {
   });
 
   it("dumpAllTableSchema honors the ignore list", async () => {
-    await adapter.executeMutation(`CREATE TABLE sdh_keep (id INTEGER PRIMARY KEY)`);
-    await adapter.executeMutation(`CREATE TABLE sdh_skip (id INTEGER PRIMARY KEY)`);
+    await createSdhTable("sdh_keep");
+    await createSdhTable("sdh_skip");
 
     const output = await dumpAllTableSchema(adapter as unknown as SchemaSource, ["sdh_skip"]);
 
