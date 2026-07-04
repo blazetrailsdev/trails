@@ -344,9 +344,8 @@ describe("RelationTest", () => {
   });
 
   it("merging an empty hash into a relation", () => {
-    const base = CanonPost.where({ title: "a" });
-    const merged = base.merge(CanonPost.all());
-    expect(merged.toSql()).toContain("SELECT");
+    const merged = CanonPost.all().merge({} as any);
+    expect((merged as any)._whereClause.isEmpty()).toBe(true);
   });
 
   // Rails `Relation::HashMerger#initialize` validates keys with
