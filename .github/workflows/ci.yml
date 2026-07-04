@@ -1529,6 +1529,10 @@ jobs:
                   ;;
                 sqlite-tests|postgres-tests|maria-tests)
                   # AR test skip is legitimate when no AR-affecting paths changed.
+                  # postgres-tests and maria-tests are 2-way `--shard` matrices;
+                  # GitHub collapses both legs into a single result under the job
+                  # id here, so this one case covers all four legs — do NOT add
+                  # per-leg names (they don't exist in the `needs` context).
                   [ "$AR_AFFECTED" = "false" ] && continue
                   ;;
                 actionpack-tests)
