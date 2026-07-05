@@ -275,26 +275,6 @@ export const SCOPED_SKIP_GROUPS: ScopedSkipGroup[] = [
   },
   {
     reason:
-      "Two `ActiveRecord::Delegation` names where exposing a real Relation method " +
-      "is actively harmful rather than merely unported: (1) `slice` — CollectionProxy " +
-      "already defines a synchronous, array-backed `slice(start, end): T[]` " +
-      "(collection-proxy.ts) over its eager `_target`; a `to: :records` async " +
-      "`slice` on the Relation base would be an incompatible override of that tested " +
-      "surface. (2) `name` — adding a `name: string` getter to the structurally-typed " +
-      "Relation collides with the ubiquitous `{ name }` object shape, silently " +
-      "flipping `Array#reduce` accumulator inference (e.g. " +
-      "`[...].reduce((r, p) => r.where(p), Model.unscoped())`) from Relation to " +
-      "`{ name }`. Both are reachable at runtime through the delegation Proxy. " +
-      "Both are reachable at runtime through the delegation Proxy, and the " +
-      "relation/delegation.rb module compare already credits trails counterparts " +
-      "(CollectionProxy#slice; delegation.ts' own name()), so the skip is scoped to " +
-      "relation.rb. Tracked for convergence by story " +
-      "relation-delegation-rails-named-methods.",
-    names: ["slice", "name"],
-    rubyFiles: ["relation.rb"],
-  },
-  {
-    reason:
       "Calculations#build_count_subquery is realized inline inside trails' " +
       "performCount (calculations.ts) — the limit/offset count path builds the " +
       "subquery there rather than as a separate named method.",
