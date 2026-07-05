@@ -24,6 +24,8 @@ import {
   // bespoke `Firm` remains today, but the alias keeps future conversions safe.
   Firm as HmFirm,
   Client,
+  NamespacedFirm,
+  NamespacedClient,
   DependentFirm,
   RestrictedWithExceptionFirm,
   RestrictedWithErrorFirm,
@@ -4940,33 +4942,26 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length === 1).toBe(false);
   });
   it("joins with namespaced model should use correct type", async () => {
-    class NsAuthor extends Base {
-      declare name: string | null;
+    // With storeFullStiClass on, the join to :clients must scope by the full STI
+    // name (type = 'Namespaced::Client'); if it demodulized to 'Client' the join
+    // would match no rows and num_clients would come back 0 instead of 1.
+    const old = Base.storeFullStiClass;
+    Base.storeFullStiClass = true;
+    try {
+      const firm = await NamespacedFirm.create({ name: "Some Company" });
+      await firm.clients.create({ name: "Some Client" });
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
+      const stats = (await NamespacedFirm.all()
+        .select(
+          `${NamespacedFirm.tableName}.id, COUNT(${NamespacedClient.tableName}.id) AS num_clients`,
+        )
+        .joins("clients")
+        .group(`${NamespacedFirm.tableName}.id`)
+        .find(firm.id)) as any;
+      expect(Number(stats.readAttribute("num_clients"))).toBe(1);
+    } finally {
+      Base.storeFullStiClass = old;
     }
-    class NsPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NsAuthor);
-    registerModel(NsPost);
-    const author = await NsAuthor.create({ name: "Alice" });
-    await NsPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts = await loadHasMany(author, "ns_posts", {
-      className: "NsPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
   });
   it("association proxy transaction method starts transaction in association class", async () => {
     class TxProxyAuthor extends Base {
