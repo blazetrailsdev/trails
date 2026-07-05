@@ -6,8 +6,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base, association, registerModel, enableSti, registerSubclass } from "../index.js";
 import { throwAbort } from "@blazetrails/activesupport";
 
-import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -53,8 +52,7 @@ function makeAuthorWithCallbacks(callbacks: any) {
 // The canonical `authors`/`posts` tables ride the boot-laid schema.
 // Used by the has_many callback describes below.
 function setupAuthorPostSuite(): void {
-  setupFixtures();
-  withTransactionalFixtures(() => Base.connection);
+  fixtures({});
 }
 
 // ==========================================================================
@@ -532,8 +530,7 @@ describe("AssociationCallbacksTest", () => {
 // (associations/callbacks_test.rb:105-111).
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
-  setupFixtures();
-  withTransactionalFixtures(() => Base.connection);
+  fixtures({});
   beforeAll(async () => {
     registerModel(Company);
     registerModel(Firm);

@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 
 const TABLE_NAME = "things";
@@ -14,7 +14,7 @@ const UNLOGGED = "u";
 const TEMPORARY = "t";
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   let connection: PostgreSQLAdapter;
   let previousCreateUnlogged: boolean;

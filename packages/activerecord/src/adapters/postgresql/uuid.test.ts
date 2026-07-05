@@ -8,7 +8,7 @@ import { SchemaDumper } from "../../schema-dumper.js";
 import { SchemaStatements } from "../../connection-adapters/abstract/schema-statements.js";
 import { RecordNotFound } from "../../errors.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base, registerModel } from "../../index.js";
 
 beforeAll(() => {
@@ -24,7 +24,7 @@ afterAll(() => {
 // in beforeAll) — a function-call default that createTable's typed builder
 // can't express. It is created via raw DDL below (mirroring Rails'
 // `@connection.create_table "uuid_data_type"`).
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

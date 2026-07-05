@@ -12,7 +12,7 @@ import {
   InverseOfAssociationRecursiveError,
 } from "../index.js";
 import { loadBelongsTo, loadHasOne, loadHasMany, setBelongsTo } from "../associations.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
@@ -1257,7 +1257,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 // dedicated `branches` table setup BrokenBranch needs without disturbing the
 // fixture-backed block above.
 describe("InverseBelongsToTests", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
   beforeAll(() => {
     [Branch, BrokenBranch].forEach((m) => registerModel(m));
   });

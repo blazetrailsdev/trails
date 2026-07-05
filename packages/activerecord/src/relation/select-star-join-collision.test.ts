@@ -28,7 +28,7 @@ import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 registerModel(Friendship);
 
 describe("SELECT * column collision in joined relations", () => {
-  // `fixtures` wires setupFixtures + transactional fixtures +
+  // `fixtures` wires the handler suite + transactional fixtures +
   // fixture seeding in one call; the canonical `people` / `friendships` tables
   // come from the template clone.
   const { people } = fixtures(["people", "friendships"]);

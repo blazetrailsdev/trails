@@ -23,7 +23,7 @@ const sym = (name: string) => Symbol(name) as unknown as string;
 // SelectTest — targets relation/select_test.rb
 // ==========================================================================
 describe("SelectTest", () => {
-  // `fixtures` wires `setupFixtures` internally. Mirrors Rails
+  // `fixtures` wires the handler suite internally. Mirrors Rails
   // `fixtures :posts, :comments`; the canonical `welcome` post
   // ("Welcome to the weblog") drives the `UPPER(title)` assertions and its
   // `greetings` comment ("Thank you for the welcome") drives the merge tests.
