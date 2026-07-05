@@ -202,6 +202,52 @@ describe("MigrationTest", () => {
     expect(idx?.name).toBe("index_users_on_lower_email");
   });
 
+  it("addIndex bookkeeping stores using per default_index_type?", async () => {
+    // Regression: MigrationContext#addIndex records `using` into `_indexes` for
+    // the schema dump. Rails stores `using` unconditionally (add_index_options);
+    // the dumper prints it only when `!default_index_type?(index)` — nil-only on
+    // the abstract adapter (so sqlite, which does not override, keeps a non-nil
+    // `using`), and nil-or-`:btree` on postgres/mysql. Mirror that per-adapter
+    // predicate here, not a postgres-only adapter-name check.
+    const ss = new SchemaStatements({} as unknown as DatabaseAdapter);
+    const makeStub = (an: "sqlite" | "mysql", defaultIndexType: (u?: string) => boolean) => ({
+      adapterName: an,
+      addIndex: async () => {},
+      indexName: (t: string, o: { column?: string | string[]; name?: string }) =>
+        ss.indexName(t, o),
+      indexNameOptions: (c: string | string[]) => ss.indexNameOptions(c),
+      addIndexOptions: (t: string, c: string | string[], o: Record<string, unknown>) =>
+        ss.addIndexOptions(t, c, o),
+      defaultIndexType,
+    });
+    // postgres/mysql: `using == :btree || using.nil?`; abstract/sqlite: `using.nil?`.
+    const mysqlDefault = (u?: string) => u === "btree" || u == null;
+    const sqliteDefault = (u?: string) => u == null;
+
+    const mysqlCtx = new MigrationContext(
+      makeStub("mysql", mysqlDefault) as unknown as DatabaseAdapter,
+    );
+    await mysqlCtx.addIndex("users", "email", { using: "hash" });
+    expect(mysqlCtx.indexes("users").find((i) => i.columns.includes("email"))?.using).toBe("hash");
+
+    const btreeCtx = new MigrationContext(
+      makeStub("mysql", mysqlDefault) as unknown as DatabaseAdapter,
+    );
+    await btreeCtx.addIndex("users", "email", { using: "btree" });
+    expect(
+      btreeCtx.indexes("users").find((i) => i.columns.includes("email"))?.using,
+    ).toBeUndefined();
+
+    // sqlite does NOT override default_index_type?, so a non-nil `using`
+    // round-trips (matches Rails: dumper prints `using:` whenever `using` is
+    // non-nil there).
+    const sqliteCtx = new MigrationContext(
+      makeStub("sqlite", sqliteDefault) as unknown as DatabaseAdapter,
+    );
+    await sqliteCtx.addIndex("users", "email", { using: "hash" });
+    expect(sqliteCtx.indexes("users").find((i) => i.columns.includes("email"))?.using).toBe("hash");
+  });
+
   it("_introspectColumns handles PG ARRAY + USER-DEFINED + datetime_precision rows", async () => {
     // Stub the adapter to feed PG-shaped catalog rows through the live
     // _introspectColumns code path (sqlite test adapter can't return them).

@@ -2306,10 +2306,12 @@ export class MigrationContext {
     // (version-gated on MySQL/MariaDB — the #4397 reconstruct parity, warmed
     // above via `getDatabaseVersion`), and `NULLS NOT DISTINCT` / covering
     // `INCLUDE` (Postgres). The `typeof` guards keep this resilient to the
-    // minimal stub adapters some tests pass. `using` has no adapter-level
-    // capability predicate (`supportsIndexUsing?` lives on the SchemaCreation),
-    // so it stays keyed on Postgres, where a non-default access method
-    // round-trips (the dumper drops the `btree` default).
+    // minimal stub adapters some tests pass. `using` follows the dumper's own
+    // gate — `!default_index_type?(index)` (schema_dumper.rb#indexes) — which is
+    // nil-only on the abstract adapter (so a non-default `using` on sqlite still
+    // round-trips) and nil-or-`btree` on Postgres/MySQL. Rails stores `using`
+    // unconditionally (`add_index_options`); only the dump is gated, so mirror
+    // that predicate here rather than an adapter-name check.
     const supportsPartialIndex =
       typeof this.connection.supportsPartialIndex === "function"
         ? this.connection.supportsPartialIndex()
@@ -2326,6 +2328,13 @@ export class MigrationContext {
       typeof this.connection.supportsIndexInclude === "function"
         ? this.connection.supportsIndexInclude()
         : false;
+    const usingStored =
+      idx.using != null &&
+      !(typeof this.connection.defaultIndexType === "function"
+        ? this.connection.defaultIndexType(idx.using)
+        : idx.using == null)
+        ? idx.using
+        : undefined;
     const comment = idx.comment?.trim() ? idx.comment : undefined;
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({
@@ -2334,7 +2343,7 @@ export class MigrationContext {
       name: idx.name,
       where: supportsPartialIndex ? idx.where : undefined,
       orders: supportsSortOrder ? _emptyOptionToUndefined(idx.orders) : undefined,
-      using: an === "postgres" && idx.using && idx.using !== "btree" ? idx.using : undefined,
+      using: usingStored,
       type: idx.type,
       lengths: _emptyOptionToUndefined(idx.lengths),
       nullsNotDistinct: supportsNullsNotDistinct ? idx.nullsNotDistinct : undefined,
