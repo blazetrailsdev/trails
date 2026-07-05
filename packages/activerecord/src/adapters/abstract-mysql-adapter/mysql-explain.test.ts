@@ -6,7 +6,6 @@ import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { fixtures, setupFixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
 import { registerModel } from "../../index.js";
@@ -28,9 +27,7 @@ describeIfMysql("Mysql2Adapter", () => {
 
   describe("MySQLExplainTest", () => {
     // mirrors Rails: fixtures :authors, :author_addresses
-    const { authors } = fixtures(["authors", "authorAddresses", "posts"], {
-      schema: canonicalSchema,
-    });
+    const { authors } = fixtures(["authors", "authorAddresses", "posts"]);
 
     // Mirror Rails' explain_option / expected_analyze_clause split exactly:
     //   supports_analyze?         = mariadb && version >= 10.1.0       → "ANALYZE"

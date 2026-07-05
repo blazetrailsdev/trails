@@ -7,7 +7,6 @@ import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Book } from "../test-helpers/models/book.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -15,7 +14,7 @@ import { Author } from "../test-helpers/models/author.js";
 describe("FieldOrderedValuesTest", () => {
   // Mirrors Rails `fixtures :posts`. The enum/string/nil book tests destroy_all
   // and create their own rows, so `books`/`authors` are defined (no fixtures).
-  fixtures(["posts"], { schema: canonicalSchema });
+  fixtures(["posts"]);
   registerModel(Author);
   registerModel(Book);
 

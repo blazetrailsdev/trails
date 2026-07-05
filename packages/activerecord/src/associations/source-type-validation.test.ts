@@ -32,7 +32,6 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
 // Local model classes for testing invalid through-association configurations.
@@ -81,7 +80,7 @@ function author() {
 }
 
 describe("ThroughReflection — checkValidityBang at first use", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   it("raises PolymorphicSourceError when source is polymorphic but sourceType is missing", () => {
     freshAssociations();

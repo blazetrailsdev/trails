@@ -14,7 +14,6 @@ import { Base, RecordNotFound } from "./index.js";
 import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Author } from "./test-helpers/models/author.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -78,9 +77,7 @@ async function logBinds(
 // unprepared, logging no binds (matching Rails).
 describe("BindParameterTest", () => {
   // Rails: `fixtures :topics, :authors, :author_addresses, :posts`.
-  fixtures(["topics", "authors", "authorAddresses", "posts"], {
-    schema: canonicalSchema,
-  });
+  fixtures(["topics", "authors", "authorAddresses", "posts"]);
 
   beforeAll(async () => {
     // A sibling file (e.g. coders/json.test.ts's SerializedTopic) physically

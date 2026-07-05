@@ -24,7 +24,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { captureSql } from "../testing/sql-capture.js";
 import type { Base } from "../index.js";
@@ -32,7 +31,7 @@ import type { Base } from "../index.js";
 describe("CpkBook eager count / aggregate build_joins fold", () => {
   // Rails creates CPK rows inline; ride the canonical, empty cpk tables and let
   // transactional rollback clean up each insert.
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   beforeAll(() => {
     [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) =>

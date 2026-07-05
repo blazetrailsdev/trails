@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
-import { resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
+import { resolveFixtureNames } from "./use-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
 import { registerModel } from "../associations.js";
 import { FixtureSet } from "./fixture-set.js";
@@ -13,7 +13,6 @@ import {
 } from "./define-fixtures.js";
 import { setupFixtures, fixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-schema.js";
 import { Author } from "./models/author.js";
 import { Post } from "./models/post.js";
 import { LiveParrot, DeadParrot } from "./models/parrot.js";
@@ -396,54 +395,6 @@ describe("useFixtures vertices and edges", () => {
       expect(vertexIds).toContain(Number(edge.readAttribute("source_id")));
       expect(vertexIds).toContain(Number(edge.readAttribute("sink_id")));
     }
-  });
-});
-
-// --- useFixtures schema auto-derivation ({ schema } option) ---
-
-describe("useFixtures { schema } auto-derivation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-
-  // No manual schema-priming beforeAll: passing the full TEST_SCHEMA lets
-  // useFixtures create just the tables these sets touch (authorAddresses → posts).
-  const { authors } = fixtures(["authorAddresses", "authors", "posts"], {
-    connection: () => Base.adapter,
-    useTransactionalTests: false,
-    schema: TEST_SCHEMA,
-  });
-
-  it("creates the needed tables and seeds without a manual defineSchema call", async () => {
-    const david = authors("david");
-    expect(Number(david.id)).toBe(1);
-    const [row] = await Base.adapter.execute(
-      `SELECT name FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
-    );
-    expect((row as { name: string }).name).toBe("David");
-  });
-});
-
-describe("deriveFixtureSchema", () => {
-  it("slices only the requested sets' tables out of the full schema", async () => {
-    const sub = await deriveFixtureSchema(["authors", "posts"], TEST_SCHEMA);
-    // `posts` pulls in `categories_posts` too: `sliceSchema` includes the join
-    // table of any HABTM association on a model-backed set (the loader may write
-    // join rows from an owner association label). `Post habtm categories` owns
-    // the anonymous `categories_posts` join model, so its table is read straight
-    // off the through reflection — no target resolution, so it is detected the
-    // same whether or not the autoload index is installed. `has_many :through`
-    // join tables (taggings, categorizations, …) are deliberately NOT pulled in:
-    // they belong to real models whose fixture sets are requested by name.
-    expect(Object.keys(sub).sort()).toEqual(
-      [Author.tableName, Post.tableName, "categories_posts"].sort(),
-    );
-    // The slice carries the real column spec, not a placeholder.
-    expect(sub[Author.tableName]).toBe(TEST_SCHEMA[Author.tableName]);
-  });
-
-  it("omits a requested set whose table is absent from the schema", async () => {
-    const sub = await deriveFixtureSchema(["authors"], { other_table: { name: "string" } });
-    expect(sub).toEqual({});
   });
 });
 

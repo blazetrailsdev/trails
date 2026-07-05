@@ -10,7 +10,6 @@ import { Base, association, reflectOnAssociation, registerModel, NameError, pp }
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
 import type { Firm as FirmT } from "./test-helpers/models/company.js";
@@ -105,21 +104,18 @@ describe("AssociationProxyTest", () => {
     Human,
     Interest,
   ]);
-  const { authors, developers, members, posts, categories } = fixtures(
-    [
-      "authorAddresses",
-      "authors",
-      "posts",
-      "categories",
-      "categorizations",
-      "developers",
-      "projects",
-      "developersProjects",
-      "memberTypes",
-      "members",
-    ],
-    { schema: canonicalSchema },
-  );
+  const { authors, developers, members, posts, categories } = fixtures([
+    "authorAddresses",
+    "authors",
+    "posts",
+    "categories",
+    "categorizations",
+    "developers",
+    "projects",
+    "developersProjects",
+    "memberTypes",
+    "members",
+  ]);
 
   it("push does not lose additions to new record", async () => {
     const josh = new Author({ name: "Josh" }) as any;
@@ -1680,10 +1676,12 @@ describe("OverridingAssociationsTest", () => {
 });
 
 describe("GeneratedMethodsTest", () => {
-  const { computers, developers, posts, comments } = fixtures(
-    ["computers", "developers", "posts", "comments"],
-    { schema: canonicalSchema },
-  );
+  const { computers, developers, posts, comments } = fixtures([
+    "computers",
+    "developers",
+    "posts",
+    "comments",
+  ]);
   it("association methods override attribute methods of same name", async () => {
     const computer = await Computer.find(computers("workstation").id);
     const developer = await Developer.find(developers("david").id);
@@ -1759,10 +1757,14 @@ describe("WithAnnotationsTest", () => {
     }
   }
 
-  const { pirates } = fixtures(
-    ["pirates", "parrots", "parrotsPirates", "ships", "treasures", "priceEstimates"],
-    { schema: canonicalSchema },
-  );
+  const { pirates } = fixtures([
+    "pirates",
+    "parrots",
+    "parrotsPirates",
+    "ships",
+    "treasures",
+    "priceEstimates",
+  ]);
 
   it("belongs to with annotation includes a query comment", async () => {
     const pirate = await SpacePirateAnnotated.find(pirates("blackbeard").id);
@@ -1848,23 +1850,18 @@ describe("AssociationsTest", () => {
   // `authorFavorites` is declared so its rows are loaded (Rails: `fixtures
   // :author_favorites`); the subselect test reads them through the association.
   const { companies, authors, shardedBlogs, shardedBlogPosts, shardedComments, cpkOrders } =
-    fixtures(
-      [
-        "companies",
-        "authors",
-        "authorFavorites",
-        "shardedBlogs",
-        "shardedBlogPosts",
-        "shardedComments",
-        "shardedTags",
-        "shardedBlogPostsTags",
-        "cpkOrders",
-        "cpkBooks",
-      ],
-      {
-        schema: canonicalSchema,
-      },
-    );
+    fixtures([
+      "companies",
+      "authors",
+      "authorFavorites",
+      "shardedBlogs",
+      "shardedBlogPosts",
+      "shardedComments",
+      "shardedTags",
+      "shardedBlogPostsTags",
+      "cpkOrders",
+      "cpkBooks",
+    ]);
 
   let Author: typeof AuthorT;
   let AuthorFavorite: typeof Base;

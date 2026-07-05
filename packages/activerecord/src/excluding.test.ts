@@ -6,7 +6,6 @@
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { registerModel } from "./associations.js";
 import type { Relation } from "./relation.js";
 import { Post } from "./test-helpers/models/post.js";
@@ -20,9 +19,7 @@ describe("ExcludingTest", () => {
   // tables are pre-built per worker; seed them so each `excluding` relation has
   // rows to read back, and so the shared models resolve regardless of any
   // bespoke table a sibling file left in the worker DB.
-  const { posts, comments } = fixtures(["posts", "comments"], {
-    schema: canonicalSchema,
-  });
+  const { posts, comments } = fixtures(["posts", "comments"]);
 
   const ids = (records: { id: unknown }[]) => records.map((r) => r.id);
 

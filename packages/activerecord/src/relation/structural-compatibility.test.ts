@@ -6,12 +6,11 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 
 describe("StructuralCompatibilityTest", () => {
   // Mirrors Rails `fixtures :posts`.
-  fixtures(["posts"], { schema: canonicalSchema });
+  fixtures(["posts"]);
 
   it("compatible values", () => {
     const left = Post.where({ id: 1 });

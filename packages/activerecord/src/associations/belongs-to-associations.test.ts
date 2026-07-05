@@ -16,7 +16,6 @@ import {
 } from "../index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
 import { Account } from "../test-helpers/models/account.js";
@@ -197,9 +196,7 @@ async function withHasManyInversing(fn: () => Promise<void>): Promise<void> {
 }
 
 describe("BelongsToWithForeignKeyTest", () => {
-  const { authors, authorAddresses } = fixtures(["authors", "authorAddresses"], {
-    schema: canonicalSchema,
-  });
+  const { authors, authorAddresses } = fixtures(["authors", "authorAddresses"]);
 
   it("destroy linked models", async () => {
     const address = await AuthorAddress.create({});
@@ -229,32 +226,29 @@ describe("BelongsToAssociationsTest", () => {
     members,
     nodes,
     cpkBooks,
-  } = fixtures(
-    [
-      "accounts",
-      "companies",
-      "developers",
-      "projects",
-      "developersProjects",
-      "topics",
-      "authors",
-      "authorAddresses",
-      "essays",
-      "posts",
-      "tags",
-      "taggings",
-      "comments",
-      "sponsors",
-      "members",
-      "computers",
-      "nodes",
-      "trees",
-      "cpkAuthors",
-      "cpkBooks",
-      "cpkOrders",
-    ],
-    { schema: canonicalSchema },
-  );
+  } = fixtures([
+    "accounts",
+    "companies",
+    "developers",
+    "projects",
+    "developersProjects",
+    "topics",
+    "authors",
+    "authorAddresses",
+    "essays",
+    "posts",
+    "tags",
+    "taggings",
+    "comments",
+    "sponsors",
+    "members",
+    "computers",
+    "nodes",
+    "trees",
+    "cpkAuthors",
+    "cpkBooks",
+    "cpkOrders",
+  ]);
 
   it("belongs to", async () => {
     const client = await Client.find(3);
@@ -2021,7 +2015,7 @@ describe("BelongsToAssociationsTest", () => {
 });
 
 describe("AsyncBelongsToAssociationsTest", () => {
-  const { companies } = fixtures(["companies"], { schema: canonicalSchema });
+  const { companies } = fixtures(["companies"]);
 
   it("async load belongs to", async () => {
     const client = await Client.find(3);

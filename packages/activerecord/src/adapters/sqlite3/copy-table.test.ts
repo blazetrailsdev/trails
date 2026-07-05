@@ -6,7 +6,6 @@ import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 // Rails calls the private `copy_table` with `{ temporary: true }.merge(options)`.
 function copyTable(conn: any, from: string, to: string, options: Record<string, unknown> = {}) {
@@ -79,7 +78,7 @@ describeIfSqlite("CopyTableTest", () => {
   // Rails `fixtures :customers`. `schema` recreates the canonical tables so the
   // copy_table source tables (comments, owners, …) resolve regardless of any
   // bespoke schema a sibling file left in the shared worker DB.
-  fixtures(["customers"], { schema: canonicalSchema });
+  fixtures(["customers"]);
 
   it("copy table", async () => {
     await testCopyTable((await Base.leaseConnection()) as any);

@@ -7,14 +7,13 @@ import { Base } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 
 describe("CoreTest", () => {
   // Rails `CoreTest` declares `fixtures :topics`; every inspect/pretty-print
   // case reads `topics(:first)` (id 1, "The First Topic", author "David").
-  const { topics } = fixtures(["topics"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics"]);
 
   /** Stub `Topic.attributes_for_inspect`, restoring the prior own-property. */
   async function withAttributesForInspect<T>(value: unknown, fn: () => T | Promise<T>): Promise<T> {

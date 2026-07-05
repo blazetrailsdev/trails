@@ -6,7 +6,6 @@
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post } from "./test-helpers/models/post.js";
 
 describe("AnnotateTest", () => {
@@ -16,7 +15,7 @@ describe("AnnotateTest", () => {
   // (Rails' `assert posts.first`). `schema` recreates the canonical `posts`
   // table so the shared Post model resolves regardless of any bespoke `posts`
   // a sibling file left in the shared worker DB.
-  const { posts } = fixtures(["posts"], { schema: canonicalSchema });
+  const { posts } = fixtures(["posts"]);
 
   it("annotate wraps content in an inline comment", async () => {
     const relation = Post.select("id").annotate("foo");

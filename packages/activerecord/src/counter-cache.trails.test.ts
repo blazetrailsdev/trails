@@ -10,12 +10,11 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 
 describe("CounterCacheTest (trails)", () => {
-  fixtures(["posts", "comments"], { schema: canonicalSchema });
+  fixtures(["posts", "comments"]);
   beforeAll(() => {
     registerModel(CanonicalPost);
     registerModel(CanonicalComment);

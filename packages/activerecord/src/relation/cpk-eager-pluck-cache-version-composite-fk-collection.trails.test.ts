@@ -26,7 +26,6 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import { Nodes } from "@blazetrails/arel";
@@ -44,7 +43,7 @@ function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
 describe("CpkBook eager pluck / cache_version over a composite-FK collection", () => {
   // Rails creates CPK rows inline; no cpk fixtures exist. Ride the canonical,
   // empty cpk tables and let transactional rollback clean up each insert.
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   beforeAll(() => {
     [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => registerModel(m));

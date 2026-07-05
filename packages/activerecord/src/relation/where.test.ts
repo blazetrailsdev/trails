@@ -12,7 +12,6 @@ import { ProtectedParams } from "../test-helpers/protected-params.js";
 import { adapterType } from "../test-adapter.js";
 import { seconds } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -63,25 +62,22 @@ describe("WhereTest", () => {
     priceEstimates,
     essays,
     topics,
-  } = fixtures(
-    [
-      "authors",
-      "authorAddresses",
-      "categories",
-      "categorizations",
-      "cars",
-      "treasures",
-      "priceEstimates",
-      "binaries",
-      "edges",
-      "vertices",
-      "essays",
-      "posts",
-      "comments",
-      "topics",
-    ],
-    { schema: canonicalSchema },
-  );
+  } = fixtures([
+    "authors",
+    "authorAddresses",
+    "categories",
+    "categorizations",
+    "cars",
+    "treasures",
+    "priceEstimates",
+    "binaries",
+    "edges",
+    "vertices",
+    "essays",
+    "posts",
+    "comments",
+    "topics",
+  ]);
 
   it("type casting nested joins", async () => {
     const comment = comments("eager_other_comment1");

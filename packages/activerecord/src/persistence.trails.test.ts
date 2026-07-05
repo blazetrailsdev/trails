@@ -11,7 +11,6 @@
 import { describe, it, expect } from "vitest";
 import { RecordInvalid } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
@@ -21,7 +20,7 @@ import { captureSql } from "./testing/sql-capture.js";
 
 describe("PersistenceTest (trails)", () => {
   const Topic = CanonicalTopic;
-  fixtures(["topics", "developers"], { schema: canonicalSchema });
+  fixtures(["topics", "developers"]);
 
   // Rails: Model.update([ids], [attrs]) — parallel arrays, index-aligned.
   it("update with parallel ids + attrs arrays updates each record", async () => {
@@ -136,7 +135,7 @@ describe("PersistenceTest (trails)", () => {
 });
 
 describe("PersistenceTest (trails)", () => {
-  fixtures(["items"], { schema: canonicalSchema });
+  fixtures(["items"]);
 
   const Item = CanonicalItem;
 
@@ -163,7 +162,7 @@ describe("PersistenceTest (trails)", () => {
 });
 
 describe("PersistenceTest (trails)", () => {
-  const { clothingItems } = fixtures(["clothingItems"], { schema: canonicalSchema });
+  const { clothingItems } = fixtures(["clothingItems"]);
 
   // Regression guard: like save/delete, `updateColumns` must locate the row via
   // `_query_constraints_hash` (Rails persistence.rb:615-624/852-858), so a model

@@ -8,7 +8,6 @@ import { throwAbort } from "@blazetrails/activesupport";
 
 import { withTransactionalFixtures } from "../test-helpers/with-transactional-fixtures.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -563,9 +562,7 @@ describe("AssociationCallbacksTest", () => {
 // developers_projects fixtures.
 // ==========================================================================
 describe("AssociationCallbacksTest", () => {
-  const { projects, developers } = fixtures(["projects", "developers", "developersProjects"], {
-    schema: canonicalSchema,
-  });
+  const { projects, developers } = fixtures(["projects", "developers", "developersProjects"]);
 
   it("has and belongs to many add callback", async () => {
     const david = developers("david");

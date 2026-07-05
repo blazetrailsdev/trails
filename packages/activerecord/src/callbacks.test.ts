@@ -11,7 +11,6 @@ import { describe, it, expect } from "vitest";
 import { makeRange, throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
 
 type HistoryEntry = [string, string];
@@ -220,7 +219,7 @@ class CallbackHaltedDeveloper extends Base {
 }
 
 setupFixtures();
-const { developers } = fixtures(["developers"], { schema: canonicalSchema });
+const { developers } = fixtures(["developers"]);
 
 function assertSaveCallbacksNotCalled(someone: CallbackHaltedDeveloper): void {
   expect(someone.afterSaveCalled).toBe(false);

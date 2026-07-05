@@ -7,7 +7,6 @@ import { Base, composedOf, reflectOnAggregation } from "./index.js";
 import { reload as persistenceReload } from "./persistence.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import {
   Customer as CustomerModel,
   Money as MoneyClass,
@@ -33,7 +32,7 @@ afterAll(() => {
 describe("AggregationsTest", () => {
   // Mirrors Rails `fixtures :customers` via the shared Customer model; `{ schema }`
   // recreates the canonical `customers` table to survive sibling-file contamination.
-  const { customers } = fixtures(["customers"], { schema: canonicalSchema });
+  const { customers } = fixtures(["customers"]);
 
   // Rails: test_find_single_value_object
   it("find single value object", () => {

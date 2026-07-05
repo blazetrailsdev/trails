@@ -7,7 +7,6 @@ import { TimeWithZone } from "@blazetrails/activesupport";
 import { Base, composedOf, MultiparameterAssignmentErrors } from "./index.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
@@ -17,7 +16,7 @@ describe("MultiParameterAttributeTest", () => {
   // schema cache for topics so the synchronous loadSchema path (triggered by
   // new Topic() inside tests) finds the date/time column types correctly on all
   // adapters including MariaDB. Mirrors date.test.ts.
-  fixtures(["topics"], { schema: TEST_SCHEMA });
+  fixtures(["topics"]);
 
   beforeAll(async () => {
     // Eagerly populate Topic._attributeDefinitions from the warm pool schema cache.

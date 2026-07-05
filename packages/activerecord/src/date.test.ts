@@ -6,7 +6,6 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./base.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("DateTest", () => {
@@ -15,7 +14,7 @@ describe("DateTest", () => {
   // table (and recreating its shape via `{ schema }`) lets the file ride the
   // shared Topic model with a real `last_read` date column instead of an inline
   // scratch table that collided under parallel forks.
-  fixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"]);
 
   // Force-recreate the canonical `topics` table to its full shape. Under
   // vitest's per-file module isolation the signature/schema caches reset to

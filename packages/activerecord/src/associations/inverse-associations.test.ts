@@ -13,7 +13,6 @@ import {
 } from "../index.js";
 import { loadBelongsTo, loadHasOne, loadHasMany, setBelongsTo } from "../associations.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Branch, BrokenBranch } from "../test-helpers/models/branch.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
@@ -91,12 +90,15 @@ async function withAutomaticScopeInversing(
 }
 
 describe("AutomaticInverseFindingTests", () => {
-  const { books } = fixtures(
-    ["ratings", "comments", "cars", "bulbs", "books", "subscriptions", "subscribers"],
-    {
-      schema: canonicalSchema,
-    },
-  );
+  const { books } = fixtures([
+    "ratings",
+    "comments",
+    "cars",
+    "bulbs",
+    "books",
+    "subscriptions",
+    "subscribers",
+  ]);
   beforeAll(() => {
     [
       MixedCaseMonkey,
@@ -396,7 +398,7 @@ describe("InverseAssociationTests", () => {
 });
 
 describe("InverseHasOneTests", () => {
-  const { humans } = fixtures(["humans", "faces"], { schema: canonicalSchema });
+  const { humans } = fixtures(["humans", "faces"]);
   beforeAll(() => {
     registerModel(Human);
     registerModel(Face);
@@ -512,7 +514,6 @@ describe("InverseHasManyTests", () => {
     // to a CRC32 fallback id unless the authors set is already loaded, which
     // would orphan every post's `author_id`.
     ["humans", "interests", "authors", "posts", "comments", "cpkAuthors", "cpkOrders", "cpkBooks"],
-    { schema: canonicalSchema },
   );
   beforeAll(async () => {
     [Human, Interest, Post, SpecialPost, Author, Comment, CpkAuthor, CpkBook, CpkOrder].forEach(
@@ -840,9 +841,7 @@ describe("InverseHasManyTests", () => {
 });
 
 describe("InverseBelongsToTests", () => {
-  const { faces, interests } = fixtures(["humans", "faces", "interests"], {
-    schema: canonicalSchema,
-  });
+  const { faces, interests } = fixtures(["humans", "faces", "interests"]);
   beforeAll(() => {
     [Human, Face, Interest].forEach((m) => registerModel(m));
   });
@@ -1046,9 +1045,7 @@ describe("InverseBelongsToTests", () => {
 });
 
 describe("InversePolymorphicBelongsToTests", () => {
-  const { faces, interests } = fixtures(["humans", "faces", "interests"], {
-    schema: canonicalSchema,
-  });
+  const { faces, interests } = fixtures(["humans", "faces", "interests"]);
   beforeAll(() => {
     [Human, Face, Interest].forEach((m) => registerModel(m));
   });
@@ -1236,7 +1233,7 @@ describe("InversePolymorphicBelongsToTests", () => {
 // NOTE - these tests might not be meaningful, ripped as they were from the parental_control plugin
 // which would guess the inverse rather than look for an explicit configuration option.
 describe("InverseMultipleHasManyInversesForSameModel", () => {
-  fixtures(["humans", "interests", "zines"], { schema: canonicalSchema });
+  fixtures(["humans", "interests", "zines"]);
   beforeAll(() => {
     [Human, Interest, Zine].forEach((m) => registerModel(m));
   });

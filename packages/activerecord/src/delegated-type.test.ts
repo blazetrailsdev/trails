@@ -8,7 +8,6 @@ import { adapterType } from "./test-adapter.js";
 import { StringInquirer, travel, travelBack } from "@blazetrails/activesupport";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Base } from "./base.js";
 import { delegatedType } from "./index.js";
 // Canonical models — mirror Rails' `require "models/{account,entry,message,recipient,comment}"`.
@@ -32,9 +31,7 @@ afterAll(() => {
 describe("DelegatedTypeTest", () => {
   // Rails: `fixtures :comments, :accounts, :posts`. `{ schema }` recreates the
   // canonical fixture tables so the suite survives sibling-file contamination.
-  const { comments, accounts, posts } = fixtures(["comments", "accounts", "posts"], {
-    schema: canonicalSchema,
-  });
+  const { comments, accounts, posts } = fixtures(["comments", "accounts", "posts"]);
 
   // Entry/Message/Recipient aren't fixture-loaded (Rails builds them in setup),
   // so register them by name for polymorphic type resolution and create their

@@ -11,7 +11,6 @@ import { Base } from "./base.js";
 import { registerModel } from "./associations.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { quoteTableName as canonicalQuoteTableName } from "./test-helpers/quote-regex.js";
 // Aliased so the canonical models read clearly alongside the merge-block usage
 // below and so the `test:compare` `RelationTest` matcher stays unambiguous.
@@ -72,9 +71,7 @@ class UpdateAllTestModel extends Base {
 // scope to records they create under the rolled-back transactional fixture.
 // ==========================================================================
 describe("RelationTest", () => {
-  fixtures(["posts", "comments", "authors", "authorAddresses", "ratings", "categorizations"], {
-    schema: canonicalSchema,
-  });
+  fixtures(["posts", "comments", "authors", "authorAddresses", "ratings", "categorizations"]);
 
   beforeAll(() => {
     registerModel(CanonAuthor);
@@ -523,12 +520,14 @@ describe("RelationTest", () => {
 // describe name so `test:compare` matches it to Ruby's `RelationTest` in
 // relation_test.rb.
 describe("RelationTest", () => {
-  const { authors } = fixtures(
-    ["authors", "posts", "comments", "ratings", "categorizations", "categories"],
-    {
-      schema: canonicalSchema,
-    },
-  );
+  const { authors } = fixtures([
+    "authors",
+    "posts",
+    "comments",
+    "ratings",
+    "categorizations",
+    "categories",
+  ]);
 
   beforeAll(() => {
     registerModel(CanonAuthor);

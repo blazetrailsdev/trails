@@ -7,7 +7,6 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Comment } from "./test-helpers/models/comment.js";
 
@@ -18,7 +17,7 @@ describe("UnsafeRawSqlTest", () => {
   // Rails `fixtures :posts, :comments` — seed the canonical rows so the
   // ordering/pluck comparisons (Arel.sql vs string column name) read back the
   // same set of records.
-  fixtures(["posts", "comments"], { schema: canonicalSchema });
+  fixtures(["posts", "comments"]);
 
   // Shield against the shared-worker `posts` collision: sibling files that
   // physically replace `posts` with a title-only shape survive into this suite

@@ -11,7 +11,6 @@ import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
 import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
@@ -58,7 +57,7 @@ async function rebuildBooksTables(): Promise<void> {
 // so gate this suite the same way (all adapters support views, so it gates
 // nothing at runtime — it keeps the gate-fidelity match with Rails).
 describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
-  const { books } = fixtures(["books", "authors"], { schema: canonicalSchema });
+  const { books } = fixtures(["books", "authors"]);
 
   class Ebook extends Base {
     static override _tableName = "ebooks'";
@@ -144,7 +143,6 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
 // (vendor/rails/activerecord/test/cases/view_test.rb:100).
 describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   const { books } = fixtures(["books", "authors"], {
-    schema: canonicalSchema,
     useTransactionalTests: false,
   });
 
@@ -222,7 +220,6 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
 // delete/reseed via beforeEach/afterEach, committed DML, no savepoint).
 describe("UpdateableViewTest", () => {
   const { books } = fixtures(["books", "authors"], {
-    schema: canonicalSchema,
     useTransactionalTests: false,
   });
 

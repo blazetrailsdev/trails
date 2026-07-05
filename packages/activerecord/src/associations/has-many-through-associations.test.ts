@@ -7,7 +7,6 @@ import { Base, registerModel, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { association } from "../associations.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 
 import {
   Author,
@@ -150,7 +149,6 @@ describe("HasManyThroughAssociationsTest", () => {
       "organizations",
     ],
     {
-      schema: canonicalSchema,
       // "update counter caches on destroy with indestructible through record"
       // intentionally raises on destroy, which aborts the PG transaction and
       // poisons transactional-fixture teardown for all subsequent tests.
@@ -2138,9 +2136,7 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   describe("through scope (canonical)", () => {
-    const { authors: canonicalAuthors } = fixtures(["authors", "posts", "comments"], {
-      schema: canonicalSchema,
-    });
+    const { authors: canonicalAuthors } = fixtures(["authors", "posts", "comments"]);
 
     beforeAll(async () => {
       registerModel([Author, Post, FirstPost, Comment]);

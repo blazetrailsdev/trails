@@ -7,7 +7,6 @@ import { Base, CollectionProxy, association, registerModel } from "../index.js";
 import { HasMany } from "./builder/has-many.js";
 
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment, OopsError } from "../test-helpers/models/comment.js";
 import { Developer } from "../test-helpers/models/developer.js";
@@ -23,10 +22,13 @@ registerModel(Project);
 // `with_content` extension block) + real posts/comments fixture lookups,
 // mirroring `AssociationsExtensionsTest` against `posts(:welcome).comments`.
 describe("AssociationsExtensionsTest", () => {
-  const { posts, comments, developers, projects } = fixtures(
-    ["posts", "comments", "developers", "projects", "developersProjects"],
-    { schema: canonicalSchema },
-  );
+  const { posts, comments, developers, projects } = fixtures([
+    "posts",
+    "comments",
+    "developers",
+    "projects",
+    "developersProjects",
+  ]);
   it("extension on has many", async () => {
     const proxy = association(posts("welcome"), "comments") as unknown as {
       findMostRecent: () => Promise<Base | null>;

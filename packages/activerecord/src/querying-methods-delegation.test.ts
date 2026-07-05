@@ -5,11 +5,10 @@
 import { describe, it, expect } from "vitest";
 import { Topic } from "./test-helpers/models/topic.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // Rails `fixtures :topics`. Recreate the canonical topics table empty; each test
 // seeds its own rows and the transactional wrapper rolls them back.
-fixtures({ topics: [Topic, {}] }, { schema: canonicalSchema });
+fixtures({ topics: [Topic, {}] });
 
 describe("Base static query delegations", () => {
   it("Base.first() returns the first record", async () => {

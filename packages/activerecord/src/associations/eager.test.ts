@@ -14,7 +14,6 @@ import { Notifications } from "@blazetrails/activesupport";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
 import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {
   Post,
@@ -2531,10 +2530,13 @@ describe("EagerAssociationTest", () => {
 // composite-key preloading cases.
 // ==========================================================================
 describe("EagerAssociationTest", () => {
-  const { shardedBlogs, shardedBlogPosts, shardedComments } = fixtures(
-    ["shardedBlogs", "shardedBlogPosts", "shardedComments", "shardedTags", "shardedBlogPostsTags"],
-    { schema: canonicalSchema },
-  );
+  const { shardedBlogs, shardedBlogPosts, shardedComments } = fixtures([
+    "shardedBlogs",
+    "shardedBlogPosts",
+    "shardedComments",
+    "shardedTags",
+    "shardedBlogPostsTags",
+  ]);
 
   // fixtures loads the rows but does not register the models under the
   // class names the associations resolve by; register them here (dynamic import

@@ -4,7 +4,6 @@ import { Base, StatementInvalid, Relation } from "./index.js";
 import { hexdigest } from "@blazetrails/activesupport";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Comment } from "./test-helpers/models/comment.js";
@@ -46,7 +45,6 @@ describe("CollectionCacheKeyTest", () => {
   const { topics, projects } = fixtures(
     ["developers", "developersProjects", "projects", "topics", "comments", "posts"],
     {
-      schema: canonicalSchema,
       // This test deliberately runs `cache_key(:published_at)` against a column
       // that doesn't exist. On Postgres the resulting StatementInvalid aborts
       // the surrounding transaction, which would poison the shared

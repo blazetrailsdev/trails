@@ -25,7 +25,6 @@ import {
 import { adapterType } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
 import { Movie } from "./test-helpers/models/movie.js";
@@ -62,7 +61,6 @@ for (const klass of [
 // ==========================================================================
 describe("TransactionTest", () => {
   const { topics } = fixtures(["topics", "developers", "authors", "authorAddresses", "posts"], {
-    schema: canonicalSchema,
     usesTransaction: [
       "successful with return outside inner transaction",
       "number of transactions in commit",
@@ -1299,7 +1297,6 @@ describe("TransactionTest", () => {
 // ==========================================================================
 describe("TransactionTest", () => {
   const { topics } = fixtures(["topics"], {
-    schema: canonicalSchema,
     usesTransaction: [
       "rollback dirty changes even with raise during rollback removes from pool",
       "rollback dirty changes even with raise during rollback doesnt commit transaction",
@@ -1404,7 +1401,6 @@ describe("TransactionTest", () => {
 // ==========================================================================
 describe("TransactionTest", () => {
   fixtures(["topics"], {
-    schema: canonicalSchema,
     usesTransaction: [
       "savepoints name",
       "releasing named savepoints",
@@ -1698,7 +1694,7 @@ describe("TransactionTest", () => {
 // TransactionsWithTransactionalFixturesTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionsWithTransactionalFixturesTest", () => {
-  fixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"]);
 
   itIfSupports("savepoints", "automatic savepoint in outer transaction", async () => {
     const first = (await Topic.find(1)) as any;
@@ -1740,7 +1736,7 @@ describe("TransactionsWithTransactionalFixturesTest", () => {
 // TransactionUUIDTest — from transactions_test.rb
 // ==========================================================================
 describe("TransactionUUIDTest", () => {
-  fixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"]);
 
   it("the uuid is lazily computed", async () => {
     await Topic.transaction(async () => {
@@ -1784,7 +1780,7 @@ describe("ConcurrentTransactionTest", () => {
 // guards the standalone `transaction(Model, (tx) => ...)` callback wiring).
 // ==========================================================================
 describe("TransactionTest", () => {
-  fixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"]);
 
   it("call after commit after transaction commits", async () => {
     const log: string[] = [];

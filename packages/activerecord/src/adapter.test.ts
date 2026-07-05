@@ -21,7 +21,6 @@ import {
 } from "./index.js";
 import { Result } from "./result.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType, inMemoryDb } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
@@ -219,7 +218,6 @@ async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
 // `Base.connection` stands in for Rails' `@connection = ...lease_connection`.
 describe("AdapterTest", () => {
   fixtures(["accounts", "authors", "tasks", "topics", "subscribers", "posts", "books"], {
-    schema: canonicalSchema,
     usesTransaction: [
       // Raise a DB error mid-statement (aborts an open PG transaction, poisoning
       // transactional teardown) — run un-wrapped; they persist nothing. The
@@ -643,7 +641,6 @@ describe("AdapterTestWithoutTransaction", () => {
     "reset table with non integer pk",
   ];
   const { posts } = fixtures(["posts", "authors", "authorAddresses", "movies", "subscribers"], {
-    schema: canonicalSchema,
     usesTransaction: withoutTransaction,
   });
 
@@ -788,7 +785,6 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     "disconnect and recover on #configure_connection failure",
   ];
   fixtures(["posts", "authors", "authorAddresses"], {
-    schema: canonicalSchema,
     usesTransaction: nonTransactional,
   });
 

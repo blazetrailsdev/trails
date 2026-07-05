@@ -7,12 +7,11 @@ import { adapterType } from "./test-adapter.js";
 import { Base } from "./base.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Person } from "./test-helpers/models/person.js";
 import { assertQueriesMatch } from "./testing/query-assertions.js";
 
 describe("CustomLockingTest", () => {
-  const { people } = fixtures(["people"], { schema: canonicalSchema });
+  const { people } = fixtures(["people"]);
   beforeAll(async () => {
     await rebuildCanonicalTables(Base.connection, ["people"]);
   });

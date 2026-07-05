@@ -7,7 +7,6 @@ import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post, SpecialPost } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -22,9 +21,7 @@ const byId = (records: any[]) =>
   [...records].sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0));
 
 describe("OrTest", () => {
-  fixtures(["posts", "authors", "authorAddresses"], {
-    schema: canonicalSchema,
-  });
+  fixtures(["posts", "authors", "authorAddresses"]);
 
   it("or with relation", async () => {
     const expected = await Post.where("id = 1 or id = 2");
@@ -252,7 +249,7 @@ describe("OrTest", () => {
 // The maximum expression tree depth is 1000 by default for SQLite3.
 // https://www.sqlite.org/limits.html#max_expr_depth
 describe("TooManyOrTest", () => {
-  fixtures(["paragraphs"], { schema: canonicalSchema });
+  fixtures(["paragraphs"]);
 
   it.skipIf(adapterType === "sqlite")("too many or", async () => {
     const paragraphs = Array.from({ length: 1001 }, (_, i) =>

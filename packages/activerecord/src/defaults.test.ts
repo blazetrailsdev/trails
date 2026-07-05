@@ -22,7 +22,6 @@ import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import { describeIfSqlite } from "./adapters/sqlite3/test-helper.js";
 import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Entrant } from "./test-helpers/models/entrant.js";
 
 // Ride the boot-laid `Base.connection` (single-pool test model) rather than a
@@ -58,7 +57,7 @@ describe("DefaultTest", () => {
   // Rails: `require "models/entrant"` + `fixtures` not needed — the test only
   // reads `Entrant.columns_hash`. Wire the canonical `entrants` table so the
   // shared model resolves regardless of any bespoke `entrants` a sibling left.
-  fixtures(["entrants"], { schema: canonicalSchema });
+  fixtures(["entrants"]);
 
   it("nil defaults for not null columns", async () => {
     await Entrant.loadSchema();

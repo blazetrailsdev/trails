@@ -3,10 +3,9 @@ import { StringType } from "@blazetrails/activemodel";
 import { Connection } from "./connection.js";
 import { AttributedDeveloper, DeveloperName } from "../test-helpers/models/developer.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 describe("ConnectionTest", () => {
-  fixtures(["developers"], { schema: TEST_SCHEMA });
+  fixtures(["developers"]);
 
   beforeAll(async () => {
     await AttributedDeveloper.loadSchema();

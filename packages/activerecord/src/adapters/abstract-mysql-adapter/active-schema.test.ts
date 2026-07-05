@@ -6,7 +6,6 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 
 describeIfMysql("Mysql2Adapter", () => {
   let adapter: Mysql2Adapter;
@@ -27,7 +26,6 @@ describeIfMysql("Mysql2Adapter", () => {
     // must not happen while Base.connection holds a fixture transaction on
     // `people` (MySQL DDL implicitly commits and would strand that state).
     fixtures(["people"], {
-      schema: canonicalSchema,
       usesTransaction: ["add index"],
     });
 

@@ -16,7 +16,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Preloader } from "./preloader.js";
 import { ThroughAssociation } from "./preloader/through-association.js";
@@ -38,9 +37,7 @@ registerModel(Comment);
 });
 
 describe("Preloader::ThroughAssociation#through_scope", () => {
-  const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"], {
-    schema: canonicalSchema,
-  });
+  const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"]);
 
   function throughLoader(owners: Author[], name: string, scope?: any): ThroughAssociation {
     const loaders = new Preloader({
