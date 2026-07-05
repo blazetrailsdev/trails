@@ -34,6 +34,7 @@ import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connectio
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
 import { buildMergedJoinAliasTracker } from "./merged-join-alias-tracker.js";
+import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
 import { foreignKey } from "@blazetrails/activesupport";
 
@@ -581,7 +582,7 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       if (first instanceof Nodes.Node) {
         // Bind array: [Arel.sql("col = ?"), bind1, ...] — Arel bypasses check.
         // Store as a SqlLiteral so _applyOrderToManager emits it verbatim.
-        const rawSql = (first as any).value ?? this._modelClass.connection.toSql(first);
+        const rawSql = (first as any).value ?? connectionFor(this._modelClass).toSql(first);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "")
@@ -654,7 +655,7 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
     if (Array.isArray(arg)) {
       const [first, ...rest] = arg as unknown[];
       if (first instanceof Nodes.Node) {
-        const rawSql = (first as any).value ?? this._modelClass.connection.toSql(first);
+        const rawSql = (first as any).value ?? connectionFor(this._modelClass).toSql(first);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
         if (interpolated.trim() !== "")
@@ -1817,7 +1818,7 @@ export function buildCastValue(name: string, value: unknown): Attribute {
  */
 export function normalizeBoundValue(this: QueryMethodsHost, value: unknown): unknown {
   if (value instanceof Nodes.Node) {
-    return arelSql(this._modelClass.connection.toSql(value));
+    return arelSql(connectionFor(this._modelClass).toSql(value));
   }
   if (isRelationLike(value)) {
     return arelSql((value as { toSql(): string }).toSql());
@@ -2219,13 +2220,19 @@ function escapeRegex(s: string): string {
 }
 
 /**
- * Resolve the active connection for a model. Lets `Base.connection` propagate
- * its `ConnectionNotDefined` (or other connection errors) so callers
- * see the real cause rather than a `TypeError` on the next `.quote*`
- * access.
+ * Resolve the active connection for a model on a relation-build read. Prefers
+ * the connection threaded by the enclosing `withQueryConnection` wrap (Rails
+ * threads the `with_connection` connection through query building) so the read
+ * stays off the deprecated `.connection` getter — which would flip the lease
+ * permanent under `permanent_connection_checkout = :deprecated|:disallowed` when
+ * a scope is built inside a wrap (eager-load/preload scope construction during
+ * `first`/`last`/`find_each`). Falls back to the getter outside a wrap, which
+ * lets `Base.connection` propagate its `ConnectionNotDefined` (or other
+ * connection errors) so callers see the real cause rather than a `TypeError` on
+ * the next `.quote*`/`.toSql` access.
  */
 function connectionFor(modelClass: any): any {
-  return modelClass?.connection;
+  return threadedConnectionFor(modelClass) ?? modelClass?.connection;
 }
 
 function safeQuoteTableName(modelClass: any, name: string): string {
