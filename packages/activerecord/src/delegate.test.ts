@@ -2,10 +2,9 @@ import { describe, it, expect } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 describe("Delegate (Rails-guided)", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; tests create Post
   // without body. defineSchema fast-path reuses the canonical table (title+author_id

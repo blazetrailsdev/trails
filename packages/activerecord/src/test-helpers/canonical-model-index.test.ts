@@ -1,8 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { canonicalModelIndex } from "./canonical-model-index.js";
 import { resolveModel } from "../associations.js";
-import { deriveFixtureSchema } from "./use-fixtures.js";
-import { TEST_SCHEMA } from "./test-schema.js";
 import { Comment } from "./models/comment.js";
 import { Owner } from "./models/owner.js";
 import { Pet } from "./models/pet.js";
@@ -40,17 +38,6 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
       Pet as unknown as { _reflectOnAssociation(name: string): { klass: unknown } }
     )._reflectOnAssociation("owner");
     expect(refl.klass).toBe(Owner);
-  });
-
-  it("keeps deriveFixtureSchema bounded with the autoload index installed", async () => {
-    // Importing this module installed the autoload index globally, so every
-    // through/HABTM target now resolves instead of throwing. `deriveFixtureSchema`
-    // must still slice ONLY the requested sets' tables plus their HABTM join
-    // tables — never the whole transitively-reachable graph. `posts` owns the
-    // HABTM `categories_posts`; `has_many :through` join tables (taggings,
-    // categorizations, readers, …) belong to real models and are NOT pulled in.
-    const sub = await deriveFixtureSchema(["authors", "posts"], TEST_SCHEMA);
-    expect(Object.keys(sub).sort()).toEqual(["authors", "categories_posts", "posts"]);
   });
 
   it("throws a constant-not-found error for a genuine miss", () => {

@@ -288,10 +288,10 @@ export const fixtureRegistry = {
   },
   developers: {
     // Register Computer (the `sharedComputers` HABTM target) so its join-table
-    // reflection resolves when `useFixtures` slices the schema — the loader
-    // materializes `computers_developers` rows from the owner's `sharedComputers`
-    // association label, so that table must be created even when the join set
-    // isn't requested by name.
+    // reflection resolves when the loader materializes `computers_developers`
+    // rows from the owner's `sharedComputers` association label — the join
+    // target must be registered even when the join set isn't requested by name.
+    // The `computers_developers` table itself comes from the template clone.
     model: (): Promise<
       [
         typeof import("./models/developer.js").Developer,

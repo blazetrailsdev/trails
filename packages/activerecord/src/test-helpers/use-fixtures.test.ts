@@ -100,9 +100,9 @@ describe("useFixtures", () => {
 
   const { topics } = fixtures(
     { topics: [Topic, { rails: { title: "Rails" } }] },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("accessor returns the instance by label after beforeEach runs", () => {
@@ -131,9 +131,9 @@ describe("useFixtures multi-set", () => {
       topics: [Topic, { rails: { title: "Rails" } }],
       posts: [Post, { hello: { title: "Hello" } }],
     },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("both sets are accessible", () => {
@@ -154,9 +154,9 @@ describe("useFixtures slash-keyed fixture sets", () => {
   // accessible via bracket notation only; dot-access would be a syntax error.
   const result = fixtures(
     { "admin/accounts": [AccountModel, { david: { name: "David" } }] },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("result property is accessible via bracket notation", () => {
@@ -192,9 +192,9 @@ describe("all/ fixture sets — explicit enumeration", () => {
       "all/tasks": [TaskModel, {}],
       "all/namespaced/accounts": [AccountModel, { signals37: { name: "37signals" } }],
     },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("all four fixture sets are accessible via bracket notation", () => {
@@ -235,9 +235,9 @@ describe("useFixtures type contract", () => {
       topics: [Topic, { first: { title: "First" }, second: { title: "Second" } }],
       posts: [Post, { welcome: { body: "Hi" } }],
     },
-    // Mock adapter over stubbed models: opt out of the `fixtures()` TEST_SCHEMA
-    // slice-derivation (there is nothing to create).
-    { connection: () => makeAdapter() as any, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over stubbed models: seeding goes through the mock
+    // adapter, so no real table is involved.
+    { connection: () => makeAdapter() as any, useTransactionalTests: false },
   );
 
   it("accessor return type is narrowed to the model instance type", () => {
