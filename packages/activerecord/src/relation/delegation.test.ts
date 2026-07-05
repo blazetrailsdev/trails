@@ -548,6 +548,19 @@ describe("DelegationTest", () => {
       );
     });
 
+    it("to_xml threads dasherize/camelize through the empty-collection default root", async () => {
+      // conversions.rb:189-195: the empty default is the pre-rename value
+      // "nil_classes", so `dasherize: false` keeps the underscore and `camelize`
+      // capitalizes it — the pre-dashed literal would defeat both.
+      const empty = Comment.where({ id: -1 });
+      expect(await empty.toXml({ skipInstruct: true, dasherize: false })).toBe(
+        '<nil_classes type="array"/>',
+      );
+      expect(await Comment.where({ id: -1 }).toXml({ skipInstruct: true, camelize: true })).toBe(
+        '<NilClasses type="array"/>',
+      );
+    });
+
     it("to_xml threads dasherize false through the root, children, and attribute tags", async () => {
       // conversions_test.rb:171-178: `dasherize: false` leaves the underscored
       // key form intact on every tag produced from the shared options hash.

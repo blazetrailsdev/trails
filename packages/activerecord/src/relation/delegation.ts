@@ -893,7 +893,11 @@ export class DelegationMethods {
     const root =
       options.root ??
       (records.length === 0
-        ? "nil-classes"
+        ? // conversions.rb:189-195: the empty default is the *pre-rename* value
+          // `underscore(NilClass.name).pluralize` = "nil_classes"; `renameKey`
+          // below dashes it to "nil-classes" under default options and composes
+          // correctly with `dasherize: false` / `camelize:`.
+          "nil_classes"
         : records.every((r) => r.constructor === records[0].constructor)
           ? (records[0].constructor as { modelName: { plural: string } }).modelName.plural
           : "objects");
