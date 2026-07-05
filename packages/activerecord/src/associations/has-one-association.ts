@@ -32,10 +32,10 @@ export class HasOneAssociation extends SingularAssociation {
    * Set when a deferred assignment displaces an *unloaded* has_one on a persisted
    * owner: at queue time the current target has not been materialized, so there
    * is no in-memory `_displacedRecord` to remove — but a DB row keyed by the
-   * owner may still exist and, under `:dependent`, must be removed. Rails loads
-   * the current target synchronously inside `replace`; the JS property setter
-   * cannot `await`, so we defer the load to `removeDisplaced`, which queries the
-   * existing DB-associated record and runs the dependent remove against it.
+   * owner may still exist and must be removed (nullified, or per `:dependent`).
+   * Rails loads the current target synchronously inside `replace`; the JS
+   * property setter cannot `await`, so we defer the load to `removeDisplaced`,
+   * which queries the existing DB-associated record and runs the remove.
    */
   _removeDisplacedFromDb = false;
 
@@ -82,11 +82,13 @@ export class HasOneAssociation extends SingularAssociation {
       !sameRecord(displaced, record)
     ) {
       this._displacedRecord = displaced;
-    } else if (!wasLoaded && !displaced && this.reflection.options.dependent) {
+    } else if (!wasLoaded && !displaced) {
       // The current target was never materialized, so we have no in-memory
-      // displaced record — but a DB row keyed by the owner may exist. Under
-      // `:dependent`, Rails loads and removes it synchronously in `replace`; we
-      // defer that load to `removeDisplaced` at the owner's save.
+      // displaced record — but a DB row keyed by the owner may exist. Rails'
+      // `replace` always evaluates `load_target` (has_one_association.rb:59), so
+      // it materializes and `remove_target!`s any displaced row regardless of
+      // `:dependent` — the `else` branch nullifies the old FK even with no
+      // `:dependent`. We defer that load to `removeDisplaced` at the owner's save.
       this._removeDisplacedFromDb = true;
     }
   }
