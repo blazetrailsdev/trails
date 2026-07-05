@@ -46,6 +46,14 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
     await adapter.close().catch(() => {});
   });
 
+  it("active is false for a never-connected / fake adapter", () => {
+    // Rails' Mysql2Adapter#active? is gated on connected? (raw_connection
+    // non-nil). A fake or never-connected adapter has no _client, so the sync
+    // getter reports inactive without touching a real DB.
+    expect(adapter.active).toBe(false);
+    expect(new Mysql2Adapter(MYSQL_TEST_URL).active).toBe(false);
+  });
+
   it("translates connection-loss errnos to ConnectionFailed", () => {
     // Mirrors AbstractMysqlAdapter#translate_exception cases for
     // ER_CONNECTION_KILLED / ER_SERVER_SHUTDOWN / CR_SERVER_GONE_ERROR /
@@ -135,6 +143,27 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
   afterEach(async () => {
     vi.restoreAllMocks();
     await adapter.close();
+  });
+
+  // trails-only: the sync `active` getter converges to Rails' Mysql2Adapter#active?
+  // `connected?` guard (`!(@raw_connection.nil? || ...)`) — a never-connected
+  // adapter (`_client === null`) reports inactive until a query establishes the
+  // connection, then false again after disconnectBang(). Rails eager-connects so
+  // it has no never-connected window to cover; this guards trails' lazy-connect.
+  describe("#active sync getter reflects connection state", () => {
+    it("is false before any connection and true after the first query", async () => {
+      const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+      try {
+        expect(fresh.active).toBe(false);
+        // First query still connects lazily (verifyBang's _ensureClient net).
+        await fresh.execQuery("SELECT 1");
+        expect(fresh.active).toBe(true);
+        fresh.disconnectBang();
+        expect(fresh.active).toBe(false);
+      } finally {
+        await fresh.close();
+      }
+    });
   });
 
   // Rails: activerecord/test/cases/adapters/abstract_mysql_adapter/mysql_adapter_test.rb

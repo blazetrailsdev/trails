@@ -112,15 +112,23 @@ class Mysql2StatementPool extends MysqlStatementPool {
  */
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
   // Cached liveness state — true until a failure is observed (ping fail,
-  // disconnect, permanent close). Does not require _client to be non-null:
-  // a freshly-constructed adapter has no connection yet but is considered
-  // active (matching Rails, where @raw_connection is set before the adapter
-  // is handed to callers). Set false by disconnectBang(); restored to true
-  // by reconnectBang() and by successful activeAsync().
+  // disconnect, permanent close). Set false by disconnectBang(); restored to
+  // true by reconnectBang() and by successful activeAsync().
   private _activeState = true;
 
+  // Mirrors Rails' Mysql2Adapter#active? (mysql2_adapter.rb:108) whose first
+  // guard is `connected?` — `!(@raw_connection.nil? || @raw_connection.closed?)`.
+  // A never-connected adapter (`_client === null`) therefore reports inactive:
+  // trails connects lazily, so `_client` stands in for `@raw_connection`. The
+  // sync getter can't do the live `ping` half of Rails' active? (that's
+  // activeAsync); `_activeState` is the cached liveness that ping updates.
   override get active(): boolean {
-    return !this._permanentlyClosed && !this._isFakeConnection && this._activeState;
+    return (
+      this._client !== null &&
+      !this._permanentlyClosed &&
+      !this._isFakeConnection &&
+      this._activeState
+    );
   }
 
   /**
@@ -152,6 +160,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // non-nil before the adapter reaches callers).
   override isConnected(): boolean {
     return !this._permanentlyClosed && !this._isFakeConnection && this._activeState;
+  }
+
+  // Now that the sync `active` getter requires `_client !== null`, a
+  // never-connected adapter reports inactive, so the base `verifyBang` would
+  // take the full reconnectBang (reset caches, restore transactions, retry
+  // loop) on the very first query of every fresh adapter. That reset cycle is
+  // spurious when there is simply no connection yet — establish it lazily via
+  // `_ensureClient` (Rails' `connect` on a nil `@raw_connection`) and mark the
+  // adapter verified. A `_client` that already exists but is stale still falls
+  // through to the base path, whose `active` check drives the real reconnect.
+  override async verifyBang(): Promise<void> {
+    if (this._client === null && !this._permanentlyClosed && !this._isFakeConnection) {
+      await this._ensureClient();
+      this.verifiedBang();
+      return;
+    }
+    await super.verifyBang();
   }
 
   // Single persistent connection — mirrors Rails' @raw_connection.
