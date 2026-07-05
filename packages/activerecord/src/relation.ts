@@ -225,32 +225,47 @@ function _onEquals(a: string | Nodes.Node, b: string | Nodes.Node): boolean {
  * substitution. Other operands (the owner-side attribute, a `Casted` STI-type
  * literal, raw values) are left untouched.
  *
- * Two faithful limitations carried over verbatim from the string path this
- * replaces (so executed SQL is unchanged — both are matched on the target
- * table NAME, exactly as the old `quoteTable(join.table)` substitution was):
+ * A **true self-association** (e.g. `Comment has_many :children` or `Employee
+ * has_many :subordinates`) shares one table NAME across owner and target, so an
+ * ON like `comments.parent_id = comments.id` would rebind BOTH sides if matched
+ * purely by name. Rails' AliasTracker aliases only the target `Table` object;
+ * the caller threads that owner (source) `Table` instance in as `excludeNode` so
+ * the owner-side attribute is skipped by identity while every other `fromName`
+ * reference — the target column and any scope predicate on it — is rebound.
  *
- * - **True self-association** (e.g. `Employee has_many :subordinates,
- *   foreign_key: :manager_id`): owner and target are the SAME table, so an ON
- *   like `employees.manager_id = employees.id` rebinds BOTH sides to the alias.
- *   Rails' AliasTracker aliases only the target table object, leaving the owner
- *   unaliased; matching by name can't distinguish them. This is a pre-existing
- *   latent deviation (identical under the old string substitution), not changed
- *   here — converging it needs identity-based (target `Table` instance)
- *   rebinding at the builder, out of scope for this string→AST conversion.
+ * One faithful limitation remains:
+ *
  * - **`SqlLiteral` operand** (e.g. a raw `where("table.col = ?")` scope folded
  *   into the ON): opaque text with no walkable attribute, so it falls through
  *   unrebound. The builder call sites here emit purely Arel-node predicates, so
  *   this never fires today; a top-level raw-SQL `on` string still takes the
  *   `typeof join.on === "string"` substitution path in `_addAssocJoin`.
  */
-function _rebindOperand(value: unknown, fromName: string, alias: string): unknown {
-  return value instanceof Nodes.Node ? _rebindTableInNode(value, fromName, alias) : value;
+function _rebindOperand(
+  value: unknown,
+  fromName: string,
+  alias: string,
+  excludeNode?: Table,
+): unknown {
+  return value instanceof Nodes.Node
+    ? _rebindTableInNode(value, fromName, alias, excludeNode)
+    : value;
 }
 
-function _rebindTableInNode(node: Nodes.Node, fromName: string, alias: string): Nodes.Node {
+function _rebindTableInNode(
+  node: Nodes.Node,
+  fromName: string,
+  alias: string,
+  // The owner-side Table instance of a self-join. Attributes whose relation IS
+  // this exact instance are left unaliased (the owner keeps the real table),
+  // while every OTHER `fromName`-named reference — the target column plus any
+  // scope predicate the association appended on the target — is rebound. Omitted
+  // for non-self-joins, where owner and target names differ and nothing collides.
+  excludeNode?: Table,
+): Nodes.Node {
   if (node instanceof Nodes.Attribute) {
     const rel = node.relation;
-    if (rel instanceof Table && !rel.tableAlias && rel.name === fromName) {
+    if (rel instanceof Table && !rel.tableAlias && rel.name === fromName && rel !== excludeNode) {
       return new Nodes.Attribute(new Table(alias), node.name, node.caster);
     }
     return node;
@@ -258,18 +273,18 @@ function _rebindTableInNode(node: Nodes.Node, fromName: string, alias: string): 
   const clone: any = Object.create(Object.getPrototypeOf(node));
   if (node instanceof Nodes.Nary) {
     return Object.assign(clone, node, {
-      children: node.children.map((c) => _rebindTableInNode(c, fromName, alias)),
+      children: node.children.map((c) => _rebindTableInNode(c, fromName, alias, excludeNode)),
     });
   }
   if (node instanceof Nodes.Binary) {
     return Object.assign(clone, node, {
-      left: _rebindOperand(node.left, fromName, alias),
-      right: _rebindOperand(node.right, fromName, alias),
+      left: _rebindOperand(node.left, fromName, alias, excludeNode),
+      right: _rebindOperand(node.right, fromName, alias, excludeNode),
     });
   }
   if (node instanceof Nodes.Grouping || node instanceof Nodes.Unary) {
     return Object.assign(clone, node, {
-      expr: _rebindOperand((node as { expr: unknown }).expr, fromName, alias),
+      expr: _rebindOperand((node as { expr: unknown }).expr, fromName, alias, excludeNode),
     });
   }
   return node;
@@ -286,10 +301,9 @@ function _addAssocJoin(
     assoc?: string;
   }>,
   type: "inner" | "left",
-  join: { table: string; on: string | Nodes.Node },
+  join: { table: string; on: string | Nodes.Node; ownerNode?: Table },
   assocName: string,
   modelClass: any,
-  leftOuterJoinsValues: ReadonlyArray<unknown> | undefined,
   ownerTable: string,
   quoteTable: (name: string) => string,
   // One AliasTracker shared across every JoinDependency bucket (inner joins,
@@ -302,18 +316,28 @@ function _addAssocJoin(
   // eager). Used only for association-level dedup (a repeat of the same
   // association reuses the existing join); their SQL is owned by JoinDependency
   // and never re-emitted here.
-  jdJoins: ReadonlyArray<{ table: string; assoc: string }> = [],
+  jdJoins: ReadonlyArray<{ table: string; assoc: string; as: string }> = [],
 ): string | undefined {
-  // If the association is already covered by the deferred LEFT OUTER JOIN path,
-  // skip — that join is emitted when the manager is built, so adding a second
-  // join here would cause ambiguous column names.
-  if (leftOuterJoinsValues?.some((v) => typeof v === "string" && v === assocName)) return undefined;
   // Association-level dedup (Rails `left_outer_joins_values |= args`,
   // query_methods.rb:124-128): a sibling join for the SAME association already
-  // emitted via JoinDependency or a prior flat where-join is reused. A
-  // JoinDependency join carries no flat alias, so the predicate keeps the real
-  // table; a prior flat join reuses whatever alias it minted.
-  if (jdJoins.some((j) => j.assoc === assocName && j.table === join.table)) return undefined;
+  // emitted via JoinDependency (inner `joins`, `leftOuterJoins`, or eager) is
+  // reused. The IS NULL / IS NOT NULL predicate must land on that join's
+  // effective table: a self-join is aliased (e.g. `children_comments`), so
+  // return the alias; a plain join keeps its real table, so return undefined.
+  const jd = jdJoins.find((j) => j.assoc === assocName && j.table === join.table);
+  if (jd) {
+    if (jd.as !== join.table) return jd.as;
+    // A self-join JD (target == owner, e.g. `leftJoins(:children)` on Comment)
+    // is aliased at emit time, but the seed-time JoinDependency here has not run
+    // its alias assignment, so `jd.as` is still the bare owner table. The
+    // emitting path aliases it to the tracker candidate (`{plural}_{owner}`);
+    // reuse that same alias so the IS NULL / IS NOT NULL predicate lands on the
+    // joined child rows rather than the always-present owner PK.
+    if (join.table === ownerTable) {
+      return _trackerAliasFor(tracker, join.table, assocName, ownerTable);
+    }
+    return undefined;
+  }
   const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
   if (sameAssoc) return sameAssoc.as;
   // Flat-to-flat repeat with a compatible ON collapses into the existing join.
@@ -336,7 +360,7 @@ function _addAssocJoin(
     const reboundOn =
       typeof join.on === "string"
         ? join.on.split(`${quoteTable(join.table)}.`).join(`${quoteTable(alias)}.`)
-        : _rebindTableInNode(join.on, join.table, alias);
+        : _rebindTableInNode(join.on, join.table, alias, join.ownerNode);
     clauses.push({
       type,
       table: join.table,
@@ -469,7 +493,16 @@ const StrictLoadingScope = {
  * is no longer copied onto `_joinClauses`, since a plain `.joins(:assoc)` now
  * resolves its klass through the join-dependency walk.
  */
-type JoinClauseSpec = { table: string; on: string | Nodes.Node; klass?: unknown };
+type JoinClauseSpec = {
+  table: string;
+  on: string | Nodes.Node;
+  klass?: unknown;
+  // The owner-side (source) `Table` instance inside `on`. For a self-join the
+  // owner and target share a table NAME but are distinct Table objects, so an
+  // alias rebind must swap every target reference by name yet leave THIS owner
+  // instance untouched (`_rebindTableInNode` excludes it by identity).
+  ownerNode?: Table;
+};
 
 /**
  * Shared frozen empty array returned by value readers whose backing field is
@@ -759,7 +792,6 @@ export class Relation<T extends Base> {
           join,
           assocName,
           rel._modelClass as any,
-          cloned._leftOuterJoinsValues,
           ownerTable,
           quoteTable,
           tracker,
@@ -807,7 +839,6 @@ export class Relation<T extends Base> {
           join,
           assocName,
           rel._modelClass as any,
-          cloned._leftOuterJoinsValues,
           ownerTable,
           quoteTable,
           tracker,
@@ -856,20 +887,20 @@ export class Relation<T extends Base> {
    * identically to the JoinDependency/adapter path. It is seeded from the actual
    * join *nodes*: a table joined in any bucket — including the owner table via a
    * self-join — is claimed, so a later flat where-join on it aliases
-   * (`aliased_table_for`, alias_tracker.rb:58-77). A *standalone* true
-   * self-association (target == owner with no prior join) is intentionally left
-   * unaliased: the flat path rebinds the ON predicate by table NAME
-   * (`_rebindTableInNode`), which cannot distinguish the owner side from the
-   * target side, so aliasing it here would rewrite both. That is the pre-existing
-   * deviation documented on `_rebindOperand`; converging it needs identity-based
-   * rebinding and is out of scope for this story. `jdJoins` carries each
-   * JoinDependency join's (table, association) for association-level dedup.
+   * (`aliased_table_for`, alias_tracker.rb:58-77). The owner (FROM) table is
+   * pre-claimed below, so even a *standalone* true self-association (target ==
+   * owner with no prior join) aliases: the flat path rebinds the ON predicate by
+   * table NAME while excluding the owner `Table` instance by identity
+   * (`_rebindTableInNode`), so the target side takes the alias and the owner side
+   * stays put. `jdJoins` carries each JoinDependency join's (table, association,
+   * effective alias) for association-level dedup — a self-join predicate reuses
+   * the emitted alias rather than the always-present owner PK.
    *
    * @internal
    */
   private _unifiedJoinAliasTracker(aliasLength: number): {
     tracker: AliasTracker;
-    jdJoins: Array<{ table: string; assoc: string }>;
+    jdJoins: Array<{ table: string; assoc: string; as: string }>;
   } {
     // Seed the tracker with the manual `_joinValues` (raw string / Arel join
     // nodes) so a where-chain alias decision counts collisions against them via
@@ -880,7 +911,15 @@ export class Relation<T extends Base> {
     );
     const tracker = new AliasTracker(aliasLength, undefined, manualJoins, this._conn() as any);
     const ownerTable = (this._modelClass as any).tableName;
-    const jdJoins: Array<{ table: string; assoc: string }> = [];
+    // Claim the owner (FROM) table, mirroring Rails' JoinDependency, whose base
+    // node occupies the tracker before any association join. This forces a
+    // standalone self-join (target == owner, e.g. `Comment has_many :children`)
+    // that whereAssociated/whereMissing must ADD to alias itself (`aliased_table_for`
+    // sees the owner already taken) instead of colliding on the bare owner table.
+    // Identity-based ON rebind (`_rebindTableInNode` with the target Table node)
+    // then aliases only the target side, leaving the owner reference intact.
+    if ((tracker.aliases.get(ownerTable) ?? 0) === 0) tracker.aliases.set(ownerTable, 1);
+    const jdJoins: Array<{ table: string; assoc: string; as: string }> = [];
 
     // Mirror the join buckets `_applyJoinsToManager` actually emits: named inner
     // joins, eager load, includes promoted to eager load, and left-outer joins
@@ -911,7 +950,11 @@ export class Relation<T extends Base> {
         if ((tracker.aliases.get(table) ?? 0) === 0) tracker.aliases.set(table, 1);
         const eff = node.effectiveSqlName;
         if (eff && eff !== table) tracker.aliases.set(eff, (tracker.aliases.get(eff) ?? 0) + 1);
-        jdJoins.push({ table, assoc: node.immediateAssocName });
+        jdJoins.push({
+          table,
+          assoc: node.immediateAssocName,
+          as: eff && eff !== table ? eff : table,
+        });
       }
     }
     // Replay flat where-joins already on this relation so a repeat self-join in
@@ -945,7 +988,7 @@ export class Relation<T extends Base> {
    * - through/HABTM: returns null (caller throws).
    */
   private _resolveAssociationTarget(assocName: string): {
-    joins: Array<{ table: string; on: string | Nodes.Node }>;
+    joins: Array<{ table: string; on: string | Nodes.Node; ownerNode?: Table }>;
     table: string;
     pks: string[];
   } | null {
@@ -2049,6 +2092,22 @@ export class Relation<T extends Base> {
     if (reflection.options.foreignKey != null) return reflection.options.foreignKey;
     if (reflection.type === "belongsTo") return `${_toUnderscore(name)}_id`;
     if (reflection.options.as) return `${_toUnderscore(reflection.options.as)}_id`;
+    // Rails' `derive_foreign_key` defers to the inverse belongs_to's foreign key
+    // when `inverse_of:` is set (reflection.rb:558-566), so a self-referential
+    // `has_many :children, inverse_of: :parent` uses the parent's `parent_id`
+    // instead of the owner-name default `comment_id`. Resolve the inverse on the
+    // target model and read its (option or `<name>_id`) foreign key.
+    if (reflection.options.inverseOf != null) {
+      const targetClassName = reflection.options.className ?? _camelize(_singularize(name));
+      const targetModel: any = modelRegistry.get(targetClassName);
+      const inverse = (targetModel?._associations ?? []).find(
+        (a: any) => a.name === reflection.options.inverseOf,
+      );
+      if (inverse) {
+        if (inverse.options.foreignKey != null) return inverse.options.foreignKey;
+        return `${_toUnderscore(inverse.name)}_id`;
+      }
+    }
     return `${_toUnderscore(ownerName)}_id`;
   }
 
@@ -2110,6 +2169,7 @@ export class Relation<T extends Base> {
         table: targetTable,
         on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         klass: targetModel,
+        ownerNode: src,
       };
     }
 
@@ -2155,6 +2215,7 @@ export class Relation<T extends Base> {
         table: targetTable,
         on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         klass: targetModel,
+        ownerNode: src,
       };
     }
 

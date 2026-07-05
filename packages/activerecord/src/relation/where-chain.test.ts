@@ -51,27 +51,14 @@ describe("WhereChainTest", () => {
     expect(includesRecord(relation, posts("authorless"))).toBe(false);
   });
 
-  // Skip boundary: only the standalone self-join cases where
-  // where.associated / where.missing must ADD the `Comment.children` self-join
-  // itself (no prior join). trails' flat string ON-rebind path can't alias a
-  // self-join it adds with no sibling join to disambiguate — the predicate
-  // collapses to the unaliased owner table (`ambiguous column name: comments.id`).
-  // This is the documented `_rebindOperand` deviation; converging it requires
-  // routing whereAssociated/whereMissing through JoinDependency/AliasTracker.
-  // Tracked by RFC 0027 `converge-where-associated-missing-onto-join-dependency`.
-  //
-  // The `add joins before` case (further down) is NOT skipped: a prior inner
-  // `joins("children")` is built by JoinDependency, which aliases the child side
-  // (`children_comments`) correctly. whereAssociated dedups onto that join, so the
-  // emitted SQL is `FROM comments INNER JOIN comments children_comments ON
-  // children_comments.parent_id = comments.id WHERE comments.id IS NOT NULL`. The
-  // base-table `IS NOT NULL` is degenerate but harmless — the INNER JOIN already
-  // restricts to comments that have a child, a Rails-equivalent result set that
-  // is deterministic across adapters. The `add left joins before` /
-  // `add left outer joins before` cases ARE skipped: a LEFT join keeps childless
-  // rows, so the predicate must land on the aliased child column to filter them,
-  // which the flat path can't do.
-  it.skip("associated with child association", async () => {
+  // Self-join `children` (RFC 0027 convergence): where.associated / where.missing
+  // that must ADD the `Comment.children` self-join now alias it via the unified
+  // AliasTracker — the owner (FROM) table is pre-claimed, so the added join takes
+  // the `children_comments` alias and an identity-based ON rebind swaps only the
+  // target side, leaving `comments.id` intact. When a prior `leftJoins(:children)`
+  // already emits the aliased join, the predicate dedups onto that alias instead
+  // of the always-present owner PK, so childless rows filter correctly.
+  it("associated with child association", async () => {
     const relation = await Comment.all().where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
@@ -209,24 +196,24 @@ describe("WhereChainTest", () => {
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
 
-  // NOT skipped: the prior inner `joins("children")` provides a JoinDependency
-  // self-join (aliased `children_comments`) that does the filtering. See the
-  // skip-boundary note above.
+  // Prior inner `joins("children")` supplies the JoinDependency self-join
+  // (aliased `children_comments`); the predicate dedups onto it. See the
+  // self-join note above.
   it("associated with add joins before", async () => {
     const relation = await Comment.joins("children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
 
-  // Self-join `children` — see skip note above (RFC 0027 convergence story).
-  it.skip("associated with add left joins before", async () => {
+  // Self-join `children` — see the self-join note above.
+  it("associated with add left joins before", async () => {
     const relation = await Comment.leftJoins("children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
   });
 
-  // Self-join `children` — see skip note above (RFC 0027 convergence story).
-  it.skip("associated with add left outer joins before", async () => {
+  // Self-join `children` — see the self-join note above.
+  it("associated with add left outer joins before", async () => {
     const relation = await Comment.leftOuterJoins("children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
     expect(includesRecord(relation, comments("more_greetings"))).toBe(false);
@@ -243,8 +230,8 @@ describe("WhereChainTest", () => {
     expect(ids(relation)).toEqual([posts("authorless").id]);
   });
 
-  // Self-join `children` — see skip note above (RFC 0027 convergence story).
-  it.skip("missing with child association", async () => {
+  // Self-join `children` — see the self-join note above.
+  it("missing with child association", async () => {
     const relation = await Comment.all().where().missing("children");
     expect(includesRecord(relation, comments("more_greetings"))).toBe(true);
     expect(includesRecord(relation, comments("greetings"))).toBe(false);
