@@ -22,7 +22,7 @@ set is exactly the intersection).
 
 `fixtures({...})` (`test-helpers/fixtures.ts:64`) composes exactly:
 
-```
+```text
 setupHandlerSuite()                              # via setupFixtures()
 + withTransactionalFixtures(() => Base.connection)  # via useHandlerTransactionalFixtures()
 + useFixtures(...)                               # the fixture data + schema slice
@@ -71,14 +71,14 @@ Bucket A — see below.
 
 Bucket C is largely already-correct: these files intentionally have no per-test
 transaction (PG DDL / schema-migration / type suites that
-[break under fixtures transactional wrapping](https://github.com) — 25P02 aborts).
+break under `fixtures({})` transactional wrapping (PR #4513) — 25P02 aborts).
 They are inventoried for completeness but need **no conversion** — RFC 0062's
 burndown target is the pair (A) and the redundant double-wiring (B). Bucket C
 stories, if cut at all, are audit-only confirmations.
 
 ### Bucket A — pair, no data (54)
 
-```
+```text
 adapters/abstract-mysql-adapter/adapter-prevent-writes.test.ts
 adapters/postgresql/array.test.ts
 adapters/postgresql/explain.test.ts
@@ -137,7 +137,7 @@ validations/presence-validation.test.ts
 
 ### Bucket B — redundant `setupFixtures()` beside `fixtures(...)` (28)
 
-```
+```text
 adapters/abstract-mysql-adapter/mysql-explain.test.ts
 adapter.test.ts
 annotate.test.ts
@@ -170,7 +170,7 @@ validations/validations.test.ts
 
 ### Bucket C — `setupFixtures`-only, no txn / no data (31)
 
-```
+```text
 adapters/abstract-mysql-adapter/schema-migrations.test.ts
 adapters/postgresql/bytea.test.ts
 adapters/postgresql/citext.test.ts
@@ -206,7 +206,7 @@ validations/numericality-validation.test.ts
 
 ### Bucket D — mixed per-`describe` (12)
 
-```
+```text
 associations/belongs-to-associations.test.ts
 associations/eager-load-nested-include.test.ts
 associations/has-many-associations.test.ts
@@ -235,12 +235,15 @@ be deferred / dropped.
 | `convert-pair-associations-encryption-a`   | A      |    14 | associations tail + encryption/\* + attribute/attributes                           |
 | `convert-pair-core-relation-a`             | A      |    14 | base/dirty/reflection/relation/\* core                                             |
 | `convert-pair-secure-validations-a`        | A      |    10 | secure-_, token, type, validations/_                                               |
-| `delete-redundant-setupfixtures-assoc-b`   | B      |    14 | associations/\* + adapter/annotate/callbacks (first half)                          |
-| `delete-redundant-setupfixtures-core-b`    | B      |    14 | core + relation + validations (second half)                                        |
 | `convert-mixed-perdescribe-associations-d` | D      |     7 | associations/\* + associations.test.ts                                             |
 | `convert-mixed-perdescribe-core-d`         | D      |     5 | counter-cache/custom-locking/delegate/finder/persistence/relation                  |
 | `confirm-sfonly-no-txn-intent-c`           | C      |    31 | audit-only: confirm no-transaction intent (PG-DDL suites); no code change expected |
 
-Bucket B clusters land before Bucket A/D in scheduling: they are pure deletions,
-lowest-risk, and shrink the caller count fastest.
-</content>
+**Bucket B** is already owned by the pre-existing story
+`converge-setupfixtures-redundant-next-to-fixtures` (RFC 0062), which covers all
+28 files as one straight deletion. This audit supplies the concrete file list
+above; no new Bucket B stories were cut (two duplicates were closed as
+superseded by that story).
+
+Bucket B lands before Bucket A/D in scheduling: pure deletions, lowest-risk, and
+they shrink the caller count fastest.
