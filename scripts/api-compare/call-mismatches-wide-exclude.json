@@ -43144,6 +43144,13 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_where_clause",
+    "call": "map",
+    "reason": "Rails' `build_where_clause` `map` is `key.map { |k| attribute_aliases[k] }` inside `transform_keys` for composite ARRAY keys; JS object keys can't be arrays, so trails resolves single-key aliases via `aliases[key] ?? key` and composite keys via `PredicateBuilder#buildComposite` — no `map` over keys applies."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-methods.ts",
+    "rubyName": "build_where_clause",
     "call": "attribute_aliases",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
