@@ -432,10 +432,14 @@ export class PredicateBuilder {
       value = (value as { id: unknown }).id;
     }
     // Rails applies the attribute's cast type — including any NormalizedValueType
-    // decoration — to `where`/`find_by` keyword arguments. Normalize the query
-    // value here so a normalizer that maps to nil (e.g. `presence`) routes through
-    // the same `IS NULL` path as an explicit nil, matching `where(col: nil)`.
-    value = this.normalizeQueryValue(attribute.name, value);
+    // decoration — to `where`/`find_by` keyword arguments. Normalize the scalar
+    // query value here so a normalizer that maps to nil (e.g. `presence`) routes
+    // through the same `IS NULL` path as an explicit nil, matching
+    // `where(col: nil)`. Multi-value forms (Array/Set/Range/Relation) are left
+    // for their handlers, which normalize each element via the wrapped bind type.
+    if (this.isScalarQueryValue(value)) {
+      value = this.normalizeQueryValue(attribute.name, value);
+    }
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
@@ -470,11 +474,26 @@ export class PredicateBuilder {
    * decorated type's `cast` casts then normalizes, mirroring Rails'
    * `type_for_attribute(name).cast(value)`.
    */
+  /**
+   * A scalar reaches the equality/`basicObjectHandler` path where a single
+   * normalized value applies. Multi-value forms (Array/Set/Range/Relation) and
+   * StatementCache Substitute placeholders are excluded: their elements are
+   * normalized later by the wrapped bind type, and a Substitute must stay
+   * un-cast so the cached statement binds the real value at execution time.
+   */
+  private isScalarQueryValue(value: unknown): boolean {
+    return !(
+      value === null ||
+      value === undefined ||
+      Array.isArray(value) ||
+      value instanceof Set ||
+      value instanceof Range ||
+      value instanceof Substitute ||
+      this.isRelation(value)
+    );
+  }
+
   private normalizeQueryValue(columnName: string, value: unknown): unknown {
-    // A StatementCache Substitute is a placeholder bound at execution time;
-    // normalizing it here would corrupt the cached statement (e.g. `find_by`).
-    // The real value is normalized on the serialize path via the decorated type.
-    if (value instanceof Substitute) return value;
     const klass = (this.table as { klass?: { _normalizations?: Map<string, unknown> } }).klass;
     const normalizations = klass?._normalizations;
     if (!normalizations || !normalizations.has(columnName)) return value;
