@@ -128,9 +128,10 @@ export interface FixturesConnectionOpts {
  * `insertFixturesSet` that deletes each table once and inserts all rows together
  * (see {@link insertPreparedFixtureSets}), mirroring how Rails loads multiple
  * same-table fixture files (fixtures.rb groups by table then unshifts all rows).
- * The only rejected case is genuinely-conflicting rows: two same-table sets that
- * declare the same label map to the same computed PK, so merging them would
- * collide.
+ * The only rejected case is genuinely-conflicting rows: two same-table sets
+ * whose rows collide on a primary key — either a shared pinned `id`, or a shared
+ * label (the label deterministically derives the PK), so merging them would
+ * clobber one row with the other.
  *
  * @internal
  */
