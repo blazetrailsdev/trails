@@ -147,8 +147,15 @@ describe("NestedThroughAssociationsTest", () => {
   // has_many through
   // Source: has_many
   // Through: has_many through
-  // trails deduplicates nested-through results by PK; Rails returns all rows including duplicates.
-  it.todo("has many through has many through with has many source reflection");
+  it("has many through has many through with has many source reflection", async () => {
+    const luke = subscribers("first");
+    const davidSub = subscribers("second");
+    const david = authors("david");
+    const result = await david.subscribers.order("subscribers.nick");
+    expect(result.map((s: any) => s.nick)).toEqual(
+      [luke, davidSub, davidSub].map((s: any) => s.nick),
+    );
+  });
 
   it("has many through has many through with has many source reflection preload", async () => {
     const luke = subscribers("first");
@@ -399,8 +406,12 @@ describe("NestedThroughAssociationsTest", () => {
   // has_many through
   // Source: belongs_to
   // Through: has_many through
-  // Rails returns [general, general] (duplicate because two posts have the same tag); trails deduplicates by PK.
-  it.todo("has many through has many through with belongs to source reflection");
+  it("has many through has many through with belongs to source reflection", async () => {
+    const general = tags("general");
+    const david = authors("david");
+    const result = await david.taggingTags.toArray();
+    expect(result.map((t: any) => t.id)).toEqual([general.id, general.id]);
+  });
 
   it("has many through has many through with belongs to source reflection preload", async () => {
     const general = tags("general");
