@@ -432,6 +432,15 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
  * plain `:through` reflection here would, with autoload active, resolve (and
  * register) every transitively reachable model instead of throwing, leaking the
  * slice far past the requested sets.
+ *
+ * NOTE for the future wiring of {@link throughLabelAssociations} into actual
+ * fixture loading: that materializer expands plain `has_many :through` labels
+ * too, but this slice no longer creates those join tables implicitly. A test
+ * whose fixture row expands a plain-through label must therefore also request the
+ * through model's fixture set by name (so its table slices in) — otherwise the
+ * load hits "no such table". HABTM labels are unaffected (their table is pulled
+ * in here). Today `throughLabelAssociations` has no production caller, so there
+ * is no live gap; this is a guard-rail for whoever wires it up.
  */
 export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};

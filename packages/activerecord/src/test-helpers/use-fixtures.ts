@@ -235,11 +235,12 @@ export async function deriveFixtureSchema(
 
 /**
  * Picks each resolved set's table out of `fullSchema`, plus the join table of any
- * `has_many :through` / HABTM association on a model-backed set. The join-table pull
+ * HABTM association on a model-backed set (see {@link throughJoinTableNames} for
+ * why the pull is HABTM-only, not every `has_many :through`). The join-table pull
  * lets a model fixture materialize join rows from an owner association label (e.g.
  * `developers` seeding `computers_developers` from `sharedComputers: ["laptop"]`)
- * without the caller also requesting the join set by name — the table it writes to
- * must exist in the slice.
+ * without the caller also requesting the join set by name — the HABTM join table,
+ * having no fixture set of its own, must exist in the slice regardless.
  */
 function sliceSchema(fixtures: ResolvedFixtureMap, fullSchema: Schema): Schema {
   const sub: Schema = {};
