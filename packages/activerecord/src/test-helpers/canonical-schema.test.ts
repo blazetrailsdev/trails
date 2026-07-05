@@ -81,18 +81,10 @@ describe("rebuildCanonicalTables", () => {
   });
 });
 
-// Read the live table-name set from sqlite_master, tolerating both the
-// object-row and `{ columns, rows }` array-row selectAll shapes.
+// Read the live table-name set from sqlite_master.
 async function tableNames(adapter: AbstractAdapter): Promise<Set<string>> {
-  const res = (await adapter.selectAll(
-    "SELECT name FROM sqlite_master WHERE type = 'table'",
-  )) as unknown;
-  if (Array.isArray(res)) {
-    return new Set((res as { name: string }[]).map((r) => r.name));
-  }
-  const { columns, rows } = res as { columns: string[]; rows: unknown[][] };
-  const i = columns.indexOf("name");
-  return new Set(rows.map((row) => String(row[i])));
+  const res = await adapter.selectAll("SELECT name FROM sqlite_master WHERE type = 'table'");
+  return new Set(res.pluck("name").map((name) => String(name)));
 }
 
 describe("ensureCanonicalTables", () => {
