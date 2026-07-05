@@ -75,9 +75,9 @@ async function testCopyTable(
 // and the assertions probe SQLite identifier quoting / PRAGMA structure, so this
 // must skip when the handler connection is PG/MySQL in the CI matrix.
 describeIfSqlite("CopyTableTest", () => {
-  // Rails `fixtures :customers`. `schema` recreates the canonical tables so the
-  // copy_table source tables (comments, owners, …) resolve regardless of any
-  // bespoke schema a sibling file left in the shared worker DB.
+  // Rails `fixtures :customers`. The canonical tables — including the
+  // copy_table source tables (comments, owners, …) — come from the template
+  // clone.
   fixtures(["customers"]);
 
   it("copy table", async () => {

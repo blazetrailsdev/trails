@@ -13,9 +13,8 @@ import "../../test-helpers/models/post.js";
 // and the `SEARCH … authors USING … PRIMARY KEY` plan shape are SQLite-specific,
 // so this must skip when the handler connection is PG/MySQL in the CI matrix.
 describeIfSqlite("SQLite3ExplainTest", () => {
-  // Rails `fixtures :authors, :author_addresses`. `schema` recreates the
-  // canonical tables so the shared Author/Post models resolve regardless of
-  // any bespoke schema a sibling file left in the shared worker DB.
+  // Rails `fixtures :authors, :author_addresses`. The canonical tables come
+  // from the template clone.
   const { authors } = fixtures(["authors", "authorAddresses"]);
 
   it("explain for one query", async () => {

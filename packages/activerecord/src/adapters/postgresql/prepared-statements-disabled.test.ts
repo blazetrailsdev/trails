@@ -14,17 +14,15 @@ import { developerFixtureData } from "../../test-helpers/fixtures/developers.js"
 // `developerFixtureData.david` carries the `sharedComputers: ["laptop"]` HABTM
 // association label, which the fixture loader materializes into a
 // `computers_developers` join row. Register Computer at module load so the
-// `sharedComputers` reflection resolves when `fixtures()` slices the schema —
-// without it the join table is dropped from the slice and the seed insert fails.
+// `sharedComputers` reflection resolves when the loader writes that join row —
+// without it the join target is unresolved and the seed insert fails.
 registerModel(Computer);
 
 describeIfPg("PostgreSQLAdapter", () => {
   describe("PreparedStatementsDisabledTest", () => {
     // Rails `fixtures :developers`. Seeded through the inline `[Model, data]` map.
-    // `schema` recreates the canonical `developers` table (and the
-    // `computers_developers` join table the `sharedComputers` label materializes)
-    // so the shared Developer model resolves regardless of any bespoke schema a
-    // sibling file left in the worker DB.
+    // The canonical `developers` table (and the `computers_developers` join table
+    // the `sharedComputers` label materializes) come from the template clone.
     const { developers } = fixtures({ developers: [Developer, developerFixtureData] });
 
     // `preparedStatements` lives on AbstractAdapter but isn't on the

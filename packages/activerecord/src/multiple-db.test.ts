@@ -29,10 +29,9 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   // ref("courses", …) which can't cross adapter registries (arunit2 ↔ primary).
   // Seed each set through its model-specific connection via `fixtures()`'
   // caller-supplied `connection` knob. `use_transactional_tests = false`
-  // (Rails), and `schema: undefined` because the tables are created by
-  // `setupSecondPool` (colleges/courses in arunit2, entrants in primary), not
-  // sliced from the canonical `TEST_SCHEMA` default.
-  const seedOpts = { useTransactionalTests: false, schema: undefined } as const;
+  // (Rails). The tables are created by `setupSecondPool` (colleges/courses in
+  // arunit2, entrants in primary), not from the canonical template clone.
+  const seedOpts = { useTransactionalTests: false } as const;
   const { colleges } = fixtures(["colleges"], {
     connection: () => College.connection,
     ...seedOpts,

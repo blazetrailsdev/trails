@@ -809,10 +809,9 @@ describe("OptimisticLockingWithSchemaChangeTest", () => {
 describe("PessimisticLockingTest", () => {
   // Mirrors Rails `fixtures :people` — seed the canonical people rows and read
   // them with `Person.find(people("michael").id)` (Rails' `Person.find(1)`)
-  // instead of constructing records inline. `schema` recreates the canonical
-  // `people` table so the full fixture columns (gender, *_id, counts) and the
-  // shared Person model resolve, regardless of any bespoke `people` a sibling
-  // file left in the shared worker DB.
+  // instead of constructing records inline. The canonical `people` table —
+  // with its full fixture columns (gender, *_id, counts) — comes from the
+  // template clone.
   // `with lock sets isolation` must run outside the transactional-fixtures
   // wrapper — setting an isolation level inside a nested transaction raises
   // (mirrors Rails, where isolation requires a top-level transaction).
