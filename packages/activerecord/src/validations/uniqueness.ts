@@ -47,7 +47,6 @@ export function validatesUniqueness(
     conditions?: (this: any) => any;
     caseSensitive?: boolean;
     allowNil?: boolean;
-    allowBlank?: boolean;
     // Context-guard keys honored by Base#_runAsyncValidations (it re-applies
     // the on:/if:/unless: intersection that the sync callback chain installs).
     on?: string | string[];

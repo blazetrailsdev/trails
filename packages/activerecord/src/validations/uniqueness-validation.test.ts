@@ -392,8 +392,8 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: false, allowNil: true });
-    Topic.validatesUniqueness("parent_id", { caseSensitive: false, allowNil: true });
+    // Rails: `validates_uniqueness_of(:title, :parent_id, case_sensitive: false, allow_nil: true)`.
+    Topic.validatesUniquenessOf("title", "parent_id", { caseSensitive: false, allowNil: true });
 
     const t = new Topic({ title: "I'm unique!", parent_id: 2 });
     expect(await t.save()).toBe(true);
