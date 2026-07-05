@@ -1561,12 +1561,7 @@ describe("TestNestedAttributesForDelegatedType", () => {
     Entry.acceptsNestedAttributesFor("entryable");
   });
 
-  // tracked-pending-convergence (0023-surfaced-deviations): nested attributes
-  // for a delegated_type association are not yet supported — trails treats the
-  // delegated `entryable` as a plain polymorphic belongs_to and refuses to build
-  // it, rather than instantiating the concrete type from `entryable_type`.
-  // See nested-attributes-delegated-type convergence story.
-  it.skip("should build a new record based on the delegated type", () => {
+  it("should build a new record based on the delegated type", () => {
     const entry = new Entry({
       entryable_type: "Message",
       entryableAttributes: { subject: "Hello world!" },
