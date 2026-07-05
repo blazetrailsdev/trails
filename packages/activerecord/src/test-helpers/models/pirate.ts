@@ -15,7 +15,7 @@ import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Pirate extends Base {
-  declare parrotsLimit: number | null;
+  declare parrotsLimit: number;
   declare catchphrase: string;
 
   declare parrot: Parrot | null;

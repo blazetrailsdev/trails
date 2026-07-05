@@ -901,11 +901,11 @@ describe("DirtyTest", () => {
     Object.defineProperty(Foo.prototype, "catchphrase", {
       configurable: true,
       get(this: Pirate): string | null {
-        const v = (this as any).readAttribute("catchphrase") as string | null;
+        const v = this.readAttribute("catchphrase") as string | null;
         return v == null ? v : v.toUpperCase();
       },
       set(this: Pirate, v: string | null) {
-        (this as any).writeAttribute("catchphrase", v);
+        this.writeAttribute("catchphrase", v);
       },
     });
 
