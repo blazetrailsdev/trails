@@ -19,6 +19,7 @@ import { columnType, type ColumnType, type Result } from "../result.js";
 import { EnumType } from "../enum.js";
 import {
   arelColumn,
+  arelColumns,
   buildCteSql,
   buildJoinDependencies,
   QueryMethodBangs,
@@ -466,10 +467,10 @@ async function groupedAggregate(
   }
   const effectiveGroupCol = association ? (association.foreignKey as string) : groupCol;
   // Mirror Rails `execute_grouped_calculation`, which resolves group fields via
-  // `arel_columns` — so a `from(subquery, alias)` leaves the group column
-  // unqualified (matching the subquery alias) instead of pinning it to the
-  // original model table. A raw Arel node passes straight through.
-  const groupNode = arelColumn.call(rel as never, effectiveGroupCol) as Nodes.Node;
+  // the plural `arel_columns` — so a `from(subquery, alias)` leaves the group
+  // column unqualified (matching the subquery alias) instead of pinning it to
+  // the original model table, and a raw Arel node passes straight through.
+  const groupNode = arelColumns.call(rel as never, [effectiveGroupCol])[0] as Nodes.Node;
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
   const manager = table.project(groupKeyAlias, aggNode.as("val"));
