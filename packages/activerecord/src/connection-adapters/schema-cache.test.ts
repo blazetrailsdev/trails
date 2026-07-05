@@ -208,6 +208,29 @@ describe("SchemaCacheTest", () => {
     expect(id.primaryKey).toBe(true);
   });
 
+  it("initWith reconciles a stale dump's promoted-unique primaryKey flag", () => {
+    // A schema cache dumped before this convergence can carry MySQL's bogus
+    // promoted-unique `primaryKey: true` alongside `primary_keys: { table: null }`.
+    // Deriving the columns hash on load must not resurface the flag.
+    const cache = new SchemaCache();
+    cache.initWith({
+      columns: {
+        subscribers: [
+          new Column(
+            "nick",
+            null,
+            new SqlTypeMetadata({ sqlType: "varchar(100)", type: "varchar" }),
+            false,
+            { primaryKey: true },
+          ),
+        ],
+      },
+      primary_keys: { subscribers: null },
+    });
+    expect(cache.getCachedColumnsHash("subscribers")!["nick"].primaryKey).toBe(false);
+    expect(cache.getCachedPrimaryKeys("subscribers")).toBeNull();
+  });
+
   it("setPrimaryKeys reconciles already-warm columns regardless of warm order", () => {
     // Reverse order: columns warmed first (bogus promoted-unique flag), then the
     // authoritative key. setPrimaryKeys reconciles the already-warm columns.

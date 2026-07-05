@@ -167,15 +167,7 @@ export class SchemaCache {
 
     this._version = (coder["version"] as string | number) ?? null;
 
-    // Derive columnsHash from columns (Rails: derive_columns_hash_and_deduplicate_values)
-    this._columnsHash.clear();
-    for (const [table, cols] of this._columns) {
-      const hash: Record<string, Column> = {};
-      for (const col of cols) {
-        hash[col.name] = col;
-      }
-      this._columnsHash.set(table, hash);
-    }
+    this.deriveColumnsHash();
   }
 
   isCached(tableName: string): boolean {
@@ -511,9 +503,23 @@ export class SchemaCache {
     );
     this._indexes = new Map(Object.entries((indexes as Record<string, unknown[]>) ?? {}));
 
-    // Derive columnsHash (Rails: derive_columns_hash_and_deduplicate_values)
+    this.deriveColumnsHash();
+  }
+
+  /**
+   * Rebuild `_columnsHash` from `_columns` (Rails:
+   * derive_columns_hash_and_deduplicate_values). Both `_columns` and the
+   * authoritative `_primaryKeys` are already loaded, so reconcile the per-column
+   * `primaryKey` flags against the key cache before exposing the hash — a schema
+   * cache dumped before this convergence can carry MySQL's promoted-unique
+   * `primaryKey: true` alongside `primary_keys: { table: null }`, and the derive
+   * step must not resurface the bogus flag. Mirrors Rails treating `@primary_keys`
+   * as authoritative while deriving `columns_hash` (schema_cache.rb).
+   */
+  private deriveColumnsHash(): void {
     this._columnsHash.clear();
     for (const [table, cols] of this._columns) {
+      this.reconcilePrimaryKeyFlags(table, cols);
       const hash: Record<string, Column> = {};
       for (const col of cols) {
         hash[col.name] = col;
