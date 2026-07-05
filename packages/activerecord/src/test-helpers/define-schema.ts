@@ -1,5 +1,6 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
+import { realPool } from "../connection-adapters/abstract/connection-pool.js";
 
 export type PrimitiveColumnSpec =
   | "string"
@@ -657,7 +658,7 @@ async function _resetAutoIncrement(
  */
 async function _warmSchemaCache(adapter: DatabaseAdapter, table: string): Promise<void> {
   const sc = adapter.schemaCache;
-  const pool = adapter.pool ?? null;
+  const pool = realPool(adapter.pool);
   // `!sc` is required, not dead: the `DatabaseAdapter` interface types
   // `schemaCache` as optional (`adapter.ts`), even though AbstractAdapter's
   // getter always returns one. Dropping it fails typecheck (TS18048).
@@ -724,7 +725,10 @@ async function _defineSchemaImpl(
     const newSig = tableSignature(raw);
     const cachedSig = cache.get(table);
     const sc = adapter.schemaCache;
-    const pool = adapter.pool ?? null;
+    // A standalone adapter now carries a NullPool (not null); treat it as "no
+    // pool" so we consult the signature cache rather than probing the DB
+    // through a pool that can't check out a connection.
+    const pool = realPool(adapter.pool);
     const stillExists =
       sc && pool !== null
         ? ((await sc.dataSourceExists(pool, table)) ?? cachedSig !== undefined)

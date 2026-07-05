@@ -459,7 +459,12 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.datetime("updated_at", { null: false });
   });
 
-  await define("old_cars", {}, (t) => {});
+  // Rails: `create_table :old_cars, id: :integer` — an integer (not bigint) PK,
+  // load-bearing for the mysql2 adapter FK type-mismatch tests, which reference
+  // old_cars.id from a bigint `<ref>_id` column and expect MismatchedForeignKey.
+  await define("old_cars", { serialPk: "id" }, (t) => {
+    t.integer("id");
+  });
 
   await define("carriers", {}, (t) => {});
 

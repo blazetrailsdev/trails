@@ -21,6 +21,7 @@ import {
 } from "./inheritance.js";
 import { singularize } from "@blazetrails/activesupport";
 import { modelRegistry } from "./associations.js";
+import { realPool } from "./connection-adapters/abstract/connection-pool.js";
 import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
@@ -1128,7 +1129,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // pools (SQLite :memory: + size 1) the connection is already permanently
   // checked out, so calling pool.withConnection would deadlock; FakePool
   // yields the connection we already hold.
-  const candidate = startingAdapter.pool ?? startingAdapter;
+  const candidate = realPool(startingAdapter.pool) ?? startingAdapter;
   const pool =
     candidate && typeof (candidate as { withConnection?: unknown }).withConnection === "function"
       ? new FakePool(startingAdapter)
@@ -1208,7 +1209,7 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
     // doesn't deadlock on withConnection.
     const cache = conn.schemaCache;
     if (cache && typeof cache.columnsHash === "function") {
-      const candidate = conn.pool ?? conn;
+      const candidate = realPool(conn.pool) ?? conn;
       const pool =
         candidate &&
         typeof (candidate as { withConnection?: unknown }).withConnection === "function"
@@ -1391,7 +1392,7 @@ export async function tableExists(this: SchemaHost): Promise<boolean> {
   const conn = this.connection;
   const cache = conn.schemaCache;
   if (!cache || typeof cache.dataSourceExists !== "function") return true;
-  const pool = conn.pool ?? conn;
+  const pool = realPool(conn.pool) ?? conn;
   const exists = await cache.dataSourceExists(pool, this.tableName);
   return exists !== false;
 }

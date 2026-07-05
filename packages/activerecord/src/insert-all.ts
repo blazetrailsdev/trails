@@ -2,6 +2,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Nodes, Visitors } from "@blazetrails/arel";
 import { ArgumentError, SerializeCastValue } from "@blazetrails/activemodel";
 import { IndexDefinition } from "./connection-adapters/abstract/schema-definitions.js";
+import { realPool } from "./connection-adapters/abstract/connection-pool.js";
 import { UnknownAttributeError } from "./errors.js";
 import type { Base } from "./base.js";
 import { quoteSqlValue } from "./base.js";
@@ -494,7 +495,7 @@ export class InsertAll {
     } else {
       const cache = conn.schemaCache;
       if (!cache || typeof cache.indexes !== "function") return [];
-      indexes = await cache.indexes(conn.pool ?? conn, tableName);
+      indexes = await cache.indexes(realPool(conn.pool) ?? conn, tableName);
     }
     return indexes.filter((i: any) => i.unique);
   }
@@ -516,7 +517,7 @@ export class InsertAll {
     } else {
       const cache = conn.schemaCache;
       if (!cache || typeof cache.primaryKeys !== "function") return [];
-      pk = await cache.primaryKeys(conn.pool ?? conn, tableName);
+      pk = await cache.primaryKeys(realPool(conn.pool) ?? conn, tableName);
     }
     if (pk == null) return [];
     return Array.isArray(pk) ? pk : [pk];
