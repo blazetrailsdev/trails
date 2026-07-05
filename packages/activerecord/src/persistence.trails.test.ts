@@ -10,8 +10,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { RecordInvalid } from "./index.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -21,8 +20,6 @@ import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { captureSql } from "./testing/sql-capture.js";
 
 describe("PersistenceTest (trails)", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
   const Topic = CanonicalTopic;
   fixtures(["topics", "developers"], { schema: canonicalSchema });
 
@@ -139,8 +136,6 @@ describe("PersistenceTest (trails)", () => {
 });
 
 describe("PersistenceTest (trails)", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
   fixtures(["items"], { schema: canonicalSchema });
 
   const Item = CanonicalItem;

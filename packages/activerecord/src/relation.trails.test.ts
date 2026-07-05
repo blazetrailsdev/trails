@@ -12,8 +12,7 @@ import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
 import {
@@ -30,8 +29,7 @@ describe("isBlank / isPresent", () => {
   // boot-laid empty on the primary worker DB, so ride `Base.connection` (the
   // handler suite) rather than a sidecar-pool lease with an in-test
   // `createTable`. Transactional fixtures roll back the inserted row per test.
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
 
   it("isBlank returns true when no records exist", async () => {
     // Inline model on the canonical `developers` table (not the canonical
@@ -56,8 +54,7 @@ describe("isBlank / isPresent", () => {
 });
 
 describe("RelationTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
 
   // No like-named Rails test: relation_test.rb only covers the invalid-key path
   // ("merging a hash with unknown keys raises"). This guards the positive
@@ -492,8 +489,7 @@ describe("RelationTest", () => {
 // to exactly the same SQL as `relation.toSql()` — i.e. the legacy string-assembly
 // path and the Arel-manager path can no longer drift.
 describe("Relation#arel build_arel convergence", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
   beforeAll(() => {
     registerModel("Widget", Widget);
     registerModel("Gadget", Gadget);

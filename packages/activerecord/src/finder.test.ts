@@ -13,8 +13,7 @@ import {
 } from "./index.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
@@ -564,8 +563,7 @@ describe("FinderTest", () => {
 // FinderTest — targets finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
 
   it("count by sql", async () => {
     class Topic extends Base {
@@ -1486,8 +1484,7 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
 
   class Post extends Base {
     static {
@@ -1609,8 +1606,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
 
   // Rails: test_find_with_array_of_ids
   // Rails: test_find_raises_record_not_found
@@ -1634,8 +1630,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
 
   it("find_by with non-hash conditions returns the first matching record", async () => {
     class Item extends Base {
@@ -2305,7 +2300,6 @@ describe("FinderTest", () => {
     ],
     { schema: canonicalSchema },
   );
-  useHandlerTransactionalFixtures();
 
   const Topic = CanonicalTopic;
   const Author = CanonicalAuthor;
