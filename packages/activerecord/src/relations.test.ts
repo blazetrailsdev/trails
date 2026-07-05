@@ -381,6 +381,8 @@ describe("RelationTest", () => {
     const subquery = Comment.from(relation, `grouped_${Comment.tableName}`)
       .group("type")
       .average("post_count");
+    // Rails reads the select alias via `&:post_count`; trails exposes no dynamic
+    // reader for select aliases, so read it through readAttribute.
     const relCounts = (await relation.toArray())
       .map((r: any) => r.readAttribute("post_count"))
       .sort();
