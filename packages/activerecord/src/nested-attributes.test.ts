@@ -20,6 +20,7 @@ import {
 } from "./index.js";
 import { markForDestruction, isMarkedForDestruction } from "./autosave-association.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { Human } from "./test-helpers/models/human.js";
 import { Interest } from "./test-helpers/models/interest.js";
 import { Owner } from "./test-helpers/models/owner.js";
@@ -1542,13 +1543,31 @@ describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
 // TestNestedAttributesWithExtend
 // ==========================================================================
 describe("TestNestedAttributesWithExtend", () => {
-  // tracked-pending-convergence (0023-surfaced-deviations): the `extend:` option
-  // on an association (Rails `has_many :treasures, extend: PostTreasuresExtension`)
-  // is not wired into nested-attributes builds — the extension module's overrides
-  // (e.g. `build` naming the record "from extension") do not run.
-  // See nested-attributes-association-extend convergence story.
-  it.skip("extend affects nested attributes", async () => {
-    /* requires association `extend:` support */
+  fixtures({ pirates: [Pirate, {}], treasures: [Treasure, {}] });
+
+  it("extend affects nested attributes", async () => {
+    // Rails: `has_many :treasures, as: :looter, extend: Pirate::PostTreasuresExtension`
+    // with `PostTreasuresExtension#build` prepending `name: "from extension"`.
+    class SuperPirate extends Base {
+      static tableName = "pirates";
+      declare treasures: AssociationProxy<Treasure>;
+      static {
+        this.hasMany("treasures", {
+          as: "looter",
+          className: "Treasure",
+          extend: Pirate.postTreasuresExtension,
+        });
+        this.acceptsNestedAttributesFor("treasures");
+      }
+    }
+    registerModel(SuperPirate);
+
+    const pirate = await SuperPirate.createBang({
+      catchphrase: "Don' botharrr talkin' like one, savvy?",
+    });
+    (pirate as any).treasuresAttributes = [{ id: null }];
+    const treasures = (await pirate.association("treasures").loadTarget()) as Treasure[];
+    expect(treasures[0].name).toEqual("from extension");
   });
 });
 
