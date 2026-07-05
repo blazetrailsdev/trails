@@ -737,7 +737,7 @@ describe("resolveFixtureNames same-table guard", () => {
     // dogs (sophie) and otherDogs (lassie) both map to `dogs` and both pin id: 1,
     // so merging them would collide on the primary key.
     await expect(resolveFixtureNames(["dogs", "otherDogs"])).rejects.toThrow(
-      /conflicting row \(id:1\)/,
+      /both map to table "dogs" with a row that resolves to the same primary key/,
     );
   });
 

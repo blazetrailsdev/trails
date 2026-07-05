@@ -4,6 +4,7 @@ import {
   prepareJoinTableFixtures,
   insertPreparedFixtureSets,
   throughJoinTableNames,
+  effectiveFixtureKey,
   type PreparedFixtureSet,
 } from "./define-fixtures.js";
 import { type Schema } from "./define-schema.js";
@@ -128,10 +129,11 @@ export interface FixturesConnectionOpts {
  * `insertFixturesSet` that deletes each table once and inserts all rows together
  * (see {@link insertPreparedFixtureSets}), mirroring how Rails loads multiple
  * same-table fixture files (fixtures.rb groups by table then unshifts all rows).
- * The only rejected case is genuinely-conflicting rows: two same-table sets
- * whose rows collide on a primary key — either a shared pinned `id`, or a shared
- * label (the label deterministically derives the PK), so merging them would
- * clobber one row with the other.
+ * The only rejected case is genuinely-conflicting rows: two same-table sets whose
+ * rows resolve to the same primary key. A row's key is resolved the way the loader
+ * derives it — an explicit pin on the model's real primary-key column, else the
+ * label-derived CRC32 id — in one keyspace, so a pinned id and a colliding derived
+ * id are both caught. Join-table sets (no model) concatenate and are not guarded.
  *
  * @internal
  */
@@ -139,11 +141,11 @@ export async function resolveFixtureNames(
   names: readonly FixtureName[],
 ): Promise<ResolvedFixtureMap> {
   const map: ResolvedFixtureMap = {};
-  // Per-table map of already-claimed row keys → the set that claimed each, so two
-  // same-table sets that would collide on a row are rejected while disjoint sets
-  // merge cleanly. A row's key is its explicit `id` when it has one (Rails lets a
-  // fixture pin its PK), otherwise its label — the label deterministically derives
-  // the PK, so a shared label means a shared PK.
+  // Per-table map of already-claimed primary-key values → a descriptor of the set
+  // (and label) that claimed each, so two same-table sets whose rows resolve to the
+  // same PK are rejected while disjoint sets merge cleanly. The key is the row's
+  // effective PK (explicit pin OR the label-derived CRC32 id, in one keyspace),
+  // computed off the model's real primaryKey column — see effectiveFixtureKey.
   const tableRowKeys = new Map<string, Map<string, string>>();
   for (const name of names) {
     const entry = fixtureRegistry[name] as (typeof fixtureRegistry)[FixtureName] | undefined;
@@ -178,25 +180,30 @@ export async function resolveFixtureNames(
       table = m.tableName;
       model = m;
     }
-    // Same-table sets merge (each accessor keeps its own rows), but two sets
-    // whose rows collide on a primary key would clobber each other — reject that.
-    let rowKeys = tableRowKeys.get(table);
-    if (rowKeys === undefined) {
-      rowKeys = new Map();
-      tableRowKeys.set(table, rowKeys);
-    }
-    for (const [label, row] of Object.entries(entry.data)) {
-      const explicitId = (row as { id?: unknown }).id;
-      const key = explicitId !== undefined ? `id:${String(explicitId)}` : `label:${label}`;
-      const prior = rowKeys.get(key);
-      if (prior !== undefined) {
-        throw new Error(
-          `useFixtures: "${name}" and "${prior}" both map to table "${table}" with a ` +
-            `conflicting row (${key}); same-table sets load together, but two rows sharing ` +
-            `a primary key collide. Rename the label or change the pinned id.`,
-        );
+    // Same-table sets merge (each accessor keeps its own rows), but two rows that
+    // resolve to the same primary key would clobber each other — reject that. Only
+    // model-backed sets have a PK; join-table sets (model === null) concatenate.
+    if (model !== null) {
+      let rowKeys = tableRowKeys.get(table);
+      if (rowKeys === undefined) {
+        rowKeys = new Map();
+        tableRowKeys.set(table, rowKeys);
       }
-      rowKeys.set(key, name);
+      for (const [label, row] of Object.entries(entry.data)) {
+        // Resolve to the row's actual PK value the way the loader does, so an
+        // explicit pin and a label-derived id share one keyspace (see
+        // effectiveFixtureKey). Keyed on the model's real primaryKey column.
+        const key = effectiveFixtureKey(model, label, row);
+        const prior = rowKeys.get(key);
+        if (prior !== undefined) {
+          throw new Error(
+            `useFixtures: ${prior} and "${name}" (${label}) both map to table "${table}" with a ` +
+              `row that resolves to the same primary key; same-table sets load together, but ` +
+              `two rows sharing a primary key collide. Rename the label or change the pinned id.`,
+          );
+        }
+        rowKeys.set(key, `"${name}" (${label})`);
+      }
     }
     map[name] = { table, model, data: entry.data };
   }
