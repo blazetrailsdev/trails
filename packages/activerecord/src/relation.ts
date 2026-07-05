@@ -3600,16 +3600,49 @@ export class Relation<T extends Base> {
     const promotedIncludes = this._includesToPromoteFromReferences();
     const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
     const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));
+    // Partition CTE-name symbols out of the left-outer values into LEFT OUTER
+    // JOIN nodes, mirroring buildJoinBuckets' `select_named_joins` block
+    // (query_methods.rb:1830-1836). Only true associations remain for the JD;
+    // a CTEJoin routes to `buildWithJoinNode(name, OuterJoin)` (like the
+    // subquery `from(relation)` path) so `Post.with(cte).leftOuterJoins(cteSym)`
+    // emits a LEFT OUTER JOIN directly on this live path instead of raising
+    // "Invalid association spec". A JoinDependency already in the values is
+    // stashed into `leftStashed`; the constructed left-outer JD is `unshift`ed
+    // ahead of it (query_methods.rb:1843: `stashed_left_joins.unshift`).
+    //
+    // Rails pushes the CTE join_node in the left-outer section (query_methods.rb:1832)
+    // BEFORE the `joins_values` loop appends its nodes to the same bucket
+    // (query_methods.rb:1852-1863), so `buckets[:join_node]` is
+    // `[...cteNodes, ...joinsValuesNodes]`. Here the `_joinValues` loop already
+    // ran and populated `joinNodes`, so collect the CTE nodes separately and
+    // `unshift` them to the front to preserve that Rails order.
+    const cteOuterJoinNodes: Nodes.Join[] = [];
+    const leftStashed: JoinDependency[] = [];
+    const leftAssociations = _qm.selectNamedJoins.call(
+      this as any,
+      pendingLeftOuter,
+      leftStashed,
+      (left: unknown) => {
+        if (left instanceof _qm.CTEJoin) {
+          cteOuterJoinNodes.push(
+            _qm.buildWithJoinNode.call(this as any, left.name, Nodes.OuterJoin) as Nodes.Join,
+          );
+        } else {
+          throw _qm.argumentError("only Hash, Symbol and Array are allowed");
+        }
+      },
+    );
+    if (cteOuterJoinNodes.length > 0) joinNodes.unshift(...cteOuterJoinNodes);
     const leftOuterJd =
-      pendingLeftOuter.length > 0
+      leftAssociations.length > 0
         ? QueryMethodBangs.constructJoinDependency.call(
             this as any,
-            pendingLeftOuter,
+            leftAssociations as any,
             Nodes.OuterJoin,
           )
         : null;
-    const stashedJoins: JoinDependency[] = [];
-    if (leftOuterJd) stashedJoins.push(leftOuterJd);
+    if (leftOuterJd) leftStashed.unshift(leftOuterJd);
+    const stashedJoins: JoinDependency[] = [...leftStashed];
     // Fold the eager JoinDependency in last, mirroring Rails' `joins_values`
     // ordering (left-outer stash unshifted ahead of the eager stash in
     // `build_join_buckets`). `walk` dedups any eager node coinciding with a
