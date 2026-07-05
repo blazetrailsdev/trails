@@ -6,8 +6,7 @@
  */
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, registerModel, acceptsNestedAttributesFor } from "./index.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Shared callback sink — Rails uses a class variable `@@add_callback_called`
 // captured by the `before_add` procs declared on the associations below.
@@ -74,8 +73,7 @@ registerModel("NwcBird", NwcBird);
 registerModel("NwcPirate", NwcPirate);
 
 describe("NestedAttributesWithCallbacksTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   let pirate: any;
   let birds: NwcBird[];

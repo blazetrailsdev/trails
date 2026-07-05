@@ -8,8 +8,7 @@ import {
   Logger,
 } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 
 const REGEXP_CLEAR_STR = `\\x1b\\[${BaseLogSubscriber.MODES.clear}m`;
@@ -102,8 +101,7 @@ describe("LogSubscriberTest", () => {
   // The DB-backed tests (basic/exists query logging) drive a real query
   // through the auto-attached production LogSubscriber, which logs via
   // ActiveRecord::Base.logger. A `developers` table is all those SELECTs need.
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeEach(() => {
     mockLogger = new MockLogger();
     LogSubscriber.logger = mockLogger;

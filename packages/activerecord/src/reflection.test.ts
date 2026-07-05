@@ -31,11 +31,9 @@ import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 describe("ReflectionTest", () => {
   function makeModels() {

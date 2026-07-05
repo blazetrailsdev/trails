@@ -1,11 +1,9 @@
 import { describe, it, expect, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("TouchTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   afterEach(() => {
     vi.useRealTimers();
   });

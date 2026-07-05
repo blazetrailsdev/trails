@@ -7,12 +7,10 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("lazy async schema reflection", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("find_by without an explicit load_schema", async () => {
     // No `this.attribute(...)` and no explicit `Topic.loadSchema()` —

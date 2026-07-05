@@ -10,8 +10,7 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { stiName, polymorphicName, qualifiedName, namespaceSegments } from "./inheritance.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import {
   ClothingItem,
   ClothingItemUsed,
@@ -21,8 +20,7 @@ import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { AdminAccount } from "./test-helpers/models/admin/account.js";
 
 describe("InheritanceTest (module-namespaced sti_name)", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(async () => {
     await ClothingItem.loadSchema();
   });
