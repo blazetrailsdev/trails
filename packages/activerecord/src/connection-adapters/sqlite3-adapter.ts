@@ -2601,13 +2601,22 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       const sqlType = col.sqlTypeMetadata?.sqlType ?? "TEXT";
       let def = `${quoteColumnName(destName)} ${sqlType}`;
       if (col.collation) def += ` COLLATE ${quoteColumnName(col.collation)}`;
-      if (!compositePk && pkCols.includes(col.name)) def += " PRIMARY KEY";
-      if (!col.null) def += " NOT NULL";
-      if (!sqlite3Col.autoIncrement && col.default !== null && col.default !== undefined) {
-        def += ` DEFAULT ${this.quoteDefault(col.default)}`;
+      if (sqlite3Col.isVirtual()) {
+        // Re-emit the GENERATED clause so the copy stays a generated column
+        // (Rails copy_table passes as:/stored:/type: through to create_table).
+        def += ` GENERATED ALWAYS AS (${col.defaultFunction})`;
+        def += sqlite3Col.isVirtualStored() ? " STORED" : " VIRTUAL";
+      } else {
+        if (!compositePk && pkCols.includes(col.name)) def += " PRIMARY KEY";
+        if (!col.null) def += " NOT NULL";
+        if (!sqlite3Col.autoIncrement && col.default !== null && col.default !== undefined) {
+          def += ` DEFAULT ${this.quoteDefault(col.default)}`;
+        }
+        // Generated columns are computed, never copied as content (Rails rejects
+        // columns whose options carry `:as`).
+        contentCols.push(destName);
       }
       colDefs.push(def);
-      if (!sqlite3Col.isVirtual()) contentCols.push(destName);
     }
     if (compositePk) {
       const renamedPks = pkCols.map((c) => rename[c] ?? c);
