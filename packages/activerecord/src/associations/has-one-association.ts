@@ -28,6 +28,17 @@ export class HasOneAssociation extends SingularAssociation {
    */
   _displacedRecord: Base | null = null;
 
+  /**
+   * Set when a deferred assignment displaces an *unloaded* has_one on a persisted
+   * owner: at queue time the current target has not been materialized, so there
+   * is no in-memory `_displacedRecord` to remove — but a DB row keyed by the
+   * owner may still exist and, under `:dependent`, must be removed. Rails loads
+   * the current target synchronously inside `replace`; the JS property setter
+   * cannot `await`, so we defer the load to `removeDisplaced`, which queries the
+   * existing DB-associated record and runs the dependent remove against it.
+   */
+  _removeDisplacedFromDb = false;
+
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
   }
@@ -35,6 +46,7 @@ export class HasOneAssociation extends SingularAssociation {
   override reset(): void {
     super.reset();
     this._displacedRecord = null;
+    this._removeDisplacedFromDb = false;
   }
 
   /**
@@ -48,6 +60,7 @@ export class HasOneAssociation extends SingularAssociation {
    * the Rails-faithful immediate-persist path.
    */
   queueWrite(record: Base | null): void {
+    const wasLoaded = this.loaded;
     const displaced = this.target;
     this.replace(record);
     if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) return;
@@ -55,6 +68,7 @@ export class HasOneAssociation extends SingularAssociation {
     // (`owner.x = other; owner.x = original`).
     if (this._displacedRecord && sameRecord(record, this._displacedRecord)) {
       this._displacedRecord = null;
+      this._removeDisplacedFromDb = false;
       return;
     }
     // Only a *persisted* displaced record has a row/foreign key to nullify. A
@@ -68,6 +82,12 @@ export class HasOneAssociation extends SingularAssociation {
       !sameRecord(displaced, record)
     ) {
       this._displacedRecord = displaced;
+    } else if (!wasLoaded && !displaced && this.reflection.options.dependent) {
+      // The current target was never materialized, so we have no in-memory
+      // displaced record — but a DB row keyed by the owner may exist. Under
+      // `:dependent`, Rails loads and removes it synchronously in `replace`; we
+      // defer that load to `removeDisplaced` at the owner's save.
+      this._removeDisplacedFromDb = true;
     }
   }
 
@@ -136,9 +156,30 @@ export class HasOneAssociation extends SingularAssociation {
    * inside `HasOneAssociation#replace`.
    */
   async removeDisplaced(): Promise<void> {
-    const displaced = this._displacedRecord;
-    if (!displaced) return;
+    let displaced = this._displacedRecord;
     this._displacedRecord = null;
+    if (!displaced && this._removeDisplacedFromDb) {
+      // Unloaded property-setter replace: materialize the existing DB-associated
+      // record now (the owner still keys the pre-replace row, since the new
+      // target has not been persisted yet) so its `:dependent` remove runs.
+      // Mirrors Rails' synchronous `load_target` inside `replace`. `replace`
+      // already cached the new (unsaved) target, so clear it around the find to
+      // force a DB query instead of returning that cached record.
+      this._removeDisplacedFromDb = false;
+      const savedTarget = this.target;
+      const savedLoaded = this.loaded;
+      this.target = null;
+      this.loaded = false;
+      let found: Base | null = null;
+      try {
+        found = await this.doAsyncFindTarget();
+      } finally {
+        this.target = savedTarget;
+        this.loaded = savedLoaded;
+      }
+      if (found && !sameRecord(found, savedTarget)) displaced = found;
+    }
+    if (!displaced) return;
     const currentTarget = this.target;
     this.target = displaced;
     try {
