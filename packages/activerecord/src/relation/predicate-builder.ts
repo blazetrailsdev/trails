@@ -7,6 +7,7 @@ import { RangeHandler, UnboundableBound } from "./predicate-builder/range-handle
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
+import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
 
@@ -430,6 +431,11 @@ export class PredicateBuilder {
     if (respondsToId(value)) {
       value = (value as { id: unknown }).id;
     }
+    // Rails applies the attribute's cast type — including any NormalizedValueType
+    // decoration — to `where`/`find_by` keyword arguments. Normalize the query
+    // value here so a normalizer that maps to nil (e.g. `presence`) routes through
+    // the same `IS NULL` path as an explicit nil, matching `where(col: nil)`.
+    value = this.normalizeQueryValue(attribute.name, value);
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
@@ -455,6 +461,27 @@ export class PredicateBuilder {
       return this.relationHandler.call(attribute, value);
     }
     return this.basicObjectHandler.call(attribute, value);
+  }
+
+  /**
+   * Apply the attribute's normalizer (via its decorated cast type) to a scalar
+   * query value, but only for attributes that declare one — so non-normalized
+   * columns keep their raw query values and existing casting semantics. The
+   * decorated type's `cast` casts then normalizes, mirroring Rails'
+   * `type_for_attribute(name).cast(value)`.
+   */
+  private normalizeQueryValue(columnName: string, value: unknown): unknown {
+    // A StatementCache Substitute is a placeholder bound at execution time;
+    // normalizing it here would corrupt the cached statement (e.g. `find_by`).
+    // The real value is normalized on the serialize path via the decorated type.
+    if (value instanceof Substitute) return value;
+    const klass = (this.table as { klass?: { _normalizations?: Map<string, unknown> } }).klass;
+    const normalizations = klass?._normalizations;
+    if (!normalizations || !normalizations.has(columnName)) return value;
+    const type = this.table.typeForAttribute(columnName) as
+      | { cast?(v: unknown): unknown }
+      | undefined;
+    return type?.cast ? type.cast(value) : value;
   }
 
   buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {
