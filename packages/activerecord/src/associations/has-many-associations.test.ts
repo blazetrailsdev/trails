@@ -4957,7 +4957,7 @@ describe("HasManyAssociationsTest", () => {
         )
         .joins("clients")
         .group(`${NamespacedFirm.tableName}.id`)
-        .find(firm.id)) as never as { readAttribute(n: string): unknown };
+        .find(firm.id)) as any;
       expect(Number(stats.readAttribute("num_clients"))).toBe(1);
     } finally {
       Base.storeFullStiClass = old;
