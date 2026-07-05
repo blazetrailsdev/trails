@@ -189,12 +189,11 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
   });
 
   it("with joins", async () => {
-    // Rails: `.joins(:commented_posts)`. trails' inner-join API does not accept a
-    // bare CTE name as a symbol (the CTEJoin partition only runs on the
-    // left_outer/eager paths), so we join the CTE by its SQL name instead — the
-    // assertion (POSTS_WITH_COMMENTS) is unchanged.
+    // Rails: `.joins(:commented_posts)`. trails routes a CTE-name symbol in
+    // joins() to build_with_join_node(name, InnerJoin) — an
+    // `INNER JOIN commented_posts ON commented_posts.post_id = posts.id`.
     const relation = Post.with({ commented_posts: Comment.select("post_id").distinct() }).joins(
-      "JOIN commented_posts ON commented_posts.post_id = posts.id",
+      cteSym("commented_posts"),
     );
 
     expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_COMMENTS);
