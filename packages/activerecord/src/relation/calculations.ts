@@ -52,6 +52,11 @@ interface CalculationConnection {
   toSql(arel: unknown): string;
   quote(value: unknown): string;
   quoteTableName(name: string): string;
+  quoteColumnName(name: string): string;
+  columnsForDistinct(
+    columns: string | string[],
+    orders?: (string | Nodes.Node)[],
+  ): string | string[];
   execute(sql: string): Promise<Record<string, unknown>[]>;
   selectAll(
     sql: string,
@@ -741,6 +746,18 @@ export async function performCount(
           // deterministic, Rails-ordered top-n set of primary keys before the
           // re-count — otherwise an arbitrary limited id set can diverge.
           this._applyOrderToManager(idSubquery, table);
+          // Rails builds the DISTINCT select via `columns_for_distinct(pk,
+          // order_values)`: PG/MySQL reject `SELECT DISTINCT id ... ORDER BY
+          // <non-selected>`, so those adapters prepend the (aliased) order
+          // expressions to the select list. Re-project through the adapter hook
+          // so the ordered id fetch is valid cross-adapter (sqlite's base hook
+          // returns the pk unchanged). The pk column keeps its name, so the
+          // by-name `row[pk]` extraction below still finds it.
+          const pkColumn = `${this._conn().quoteTableName(table.name)}.${this._conn().quoteColumnName(pk)}`;
+          const distinctSelect = this._conn().columnsForDistinct(pkColumn, idSubquery.orders);
+          idSubquery.projections = (
+            Array.isArray(distinctSelect) ? distinctSelect : [distinctSelect]
+          ).map((s) => new Nodes.SqlLiteral(s));
           applyFromToManager(this, idSubquery);
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
