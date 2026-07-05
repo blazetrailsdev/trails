@@ -583,6 +583,20 @@ describe("DelegationTest", () => {
       expect(xml).toContain("<postId>");
     });
 
+    it("to_xml threads camelize true through the root, children, and attribute tags together", async () => {
+      // The same options hash camelizes the collection root, each child element,
+      // AND every attribute tag uniformly (conversions.rb:200-201 + to_tag).
+      const xml = await Comment.where({ type: "Comment" }).toXml({
+        skipTypes: true,
+        skipInstruct: true,
+        only: ["post_id"],
+        camelize: true,
+      });
+      expect(xml).toContain("<Comments>");
+      expect(xml).toContain("<Comment>");
+      expect(xml).toContain("<PostId>");
+    });
+
     it("delegates connection, primary_key, table_name and transaction to the model", async () => {
       const relation = Comment.all();
       expect(relation.tableName).toBe(Comment.tableName);
