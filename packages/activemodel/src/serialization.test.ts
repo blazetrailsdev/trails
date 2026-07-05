@@ -792,6 +792,51 @@ describe("toXml()", () => {
     expect(xml).toContain("<person>");
     expect(xml).toContain("</person>");
   });
+
+  it("dasherizes multi-word attribute tags by default", () => {
+    class Address extends Model {
+      static {
+        this.attribute("streetAddress", "string");
+      }
+    }
+    const a = new Address({ streetAddress: "Paulina" });
+    const xml = a.toXml();
+    expect(xml).toContain("<street-address>Paulina</street-address>");
+  });
+
+  it("preserves underscored attribute tags with dasherize false", () => {
+    class Address extends Model {
+      static {
+        this.attribute("streetAddress", "string");
+      }
+    }
+    const a = new Address({ streetAddress: "Paulina" });
+    const xml = a.toXml({ dasherize: false });
+    expect(xml).toContain("<street_address>Paulina</street_address>");
+  });
+
+  it("camelizes attribute and root tags with camelize lower", () => {
+    class Address extends Model {
+      static {
+        this.attribute("streetAddress", "string");
+      }
+    }
+    const a = new Address({ streetAddress: "Paulina" });
+    const xml = a.toXml({ camelize: "lower" });
+    expect(xml).toContain("<streetAddress>Paulina</streetAddress>");
+  });
+
+  it("camelizes attribute and root tags with camelize true", () => {
+    class Address extends Model {
+      static {
+        this.attribute("streetAddress", "string");
+      }
+    }
+    const a = new Address({ streetAddress: "Paulina" });
+    const xml = a.toXml({ camelize: true });
+    expect(xml).toContain("<Address>");
+    expect(xml).toContain("<StreetAddress>Paulina</StreetAddress>");
+  });
 });
 
 // ===========================================================================

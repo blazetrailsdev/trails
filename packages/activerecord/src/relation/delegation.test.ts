@@ -548,6 +548,28 @@ describe("DelegationTest", () => {
       );
     });
 
+    it("to_xml threads dasherize false through the root, children, and attribute tags", async () => {
+      // conversions_test.rb:171-178: `dasherize: false` leaves the underscored
+      // key form intact on every tag produced from the shared options hash.
+      const xml = await Comment.where({ type: "Comment" }).toXml({
+        skipTypes: true,
+        skipInstruct: true,
+        only: ["post_id"],
+        dasherize: false,
+      });
+      expect(xml).toContain("<post_id>");
+    });
+
+    it("to_xml threads camelize through the root, children, and attribute tags", async () => {
+      const xml = await Comment.where({ type: "Comment" }).toXml({
+        skipTypes: true,
+        skipInstruct: true,
+        only: ["post_id"],
+        camelize: "lower",
+      });
+      expect(xml).toContain("<postId>");
+    });
+
     it("delegates connection, primary_key, table_name and transaction to the model", async () => {
       const relation = Comment.all();
       expect(relation.tableName).toBe(Comment.tableName);

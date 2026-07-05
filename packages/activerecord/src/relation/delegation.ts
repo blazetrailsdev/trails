@@ -14,7 +14,9 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
   Delegation as ASDelegation,
-  dasherize,
+  underscore,
+  renameKey,
+  type RenameKeyOptions,
   inGroups,
   inGroupsOf,
   singularize,
@@ -649,17 +651,20 @@ export type ToSentenceOptions = {
 };
 
 /** Options for the collection {@link DelegationMethods.toXml} serializer. */
-export type ToXmlOptions = SerializeOptions & {
-  root?: string;
-  children?: string;
-  skipTypes?: boolean;
-  skipInstruct?: boolean;
-};
+export type ToXmlOptions = SerializeOptions &
+  RenameKeyOptions & {
+    root?: string;
+    children?: string;
+    skipTypes?: boolean;
+    skipInstruct?: boolean;
+  };
 
 /** A record that knows how to serialize itself to XML (ActiveModel#to_xml). */
 interface XmlSerializable {
   constructor: unknown;
-  toXml(options?: SerializeOptions & { root?: string; skipTypes?: boolean }): string;
+  toXml(
+    options?: SerializeOptions & RenameKeyOptions & { root?: string; skipTypes?: boolean },
+  ): string;
 }
 
 /**
@@ -894,12 +899,18 @@ export class DelegationMethods {
           ? (records[0].constructor as { modelName: { plural: string } }).modelName.plural
           : "objects");
     const children = options.children ?? singularize(root);
-    const rootTag = dasherize(root);
-    const childTag = dasherize(children);
+    const renameOptions: RenameKeyOptions = {
+      dasherize: options.dasherize,
+      camelize: options.camelize,
+    };
+    const rootTag = renameKey(underscore(root), renameOptions);
     const arrayAttr = skipTypes ? "" : ' type="array"';
 
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
-    const childOpts = { ...recordOptions, root: childTag };
+    // Pass the raw (un-transformed) child name as each record's `:root`; the
+    // record's own `toXml` applies the same `renameKey` transform, so root,
+    // children, and attribute tags all honor `dasherize:`/`camelize:` uniformly.
+    const childOpts = { ...recordOptions, root: children };
 
     if (records.length === 0) {
       return `${instruct}<${rootTag}${arrayAttr}/>`;
