@@ -7994,9 +7994,15 @@ export interface Relation<T extends Base>
   mergeBang(other: any): Relation<T>;
 }
 
-// DelegationMethods carries getters (connection/primaryKey/tableName/name) and
+// DelegationMethods carries getters (connection/primaryKey/tableName) and
 // generic/T-returning methods, so its surface is declared explicitly here rather
 // than via Included<> (which drops accessors and erases the generics).
+// NB: `name` (`delegate :name, to: :model`) is intentionally NOT a getter here —
+// a string-typed `name` accessor would make `Relation` structurally satisfy the
+// ubiquitous `{ name: string }` shape and flip `Array#reduce` accumulator
+// inference, so it lives as a class-body method (`name(): string`) on Relation
+// instead. `slice` (`to: :records`) is likewise a class-body method (its
+// signature must stay override-compatible with `CollectionProxy#slice`).
 export interface Relation<T extends Base> {
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;
