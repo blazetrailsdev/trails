@@ -412,9 +412,40 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
   return out;
 }
 
-/** The join-table names for every resolvable through/HABTM association on the model. */
+/**
+ * The join-table names {@link sliceSchema} must add so a model fixture can
+ * materialize join rows from an owner association label.
+ *
+ * ONLY HABTM join tables qualify (`macro === "hasAndBelongsToMany"`): a HABTM
+ * join model is an anonymous class the declaring model owns (its table, e.g.
+ * `categories_posts`, has no fixture set of its own), so it must be pulled into
+ * the slice implicitly. A plain `has_many :through` join table, by contrast,
+ * belongs to a real model whose fixture set — if a test seeds it — is requested
+ * by name and slices its own table in; we deliberately do NOT pull it in from the
+ * owner's reflections.
+ *
+ * Restricting to the HABTM macro is also what lets the canonical-model autoload
+ * index install globally without ballooning the derived schema. The join table
+ * is read off the HABTM through reflection (whose `.klass` is the owned join
+ * model, resolving no further); the association's TARGET class is never touched,
+ * so this walk triggers NO autoload. Consulting `.klass`/`modelRegistry` for a
+ * plain `:through` reflection here would, with autoload active, resolve (and
+ * register) every transitively reachable model instead of throwing, leaking the
+ * slice far past the requested sets.
+ */
 export function throughJoinTableNames(ModelClass: BaseClass): string[] {
-  return Array.from(throughLabelAssociations(ModelClass).values(), (a) => a.joinTable);
+  const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
+  const names: string[] = [];
+  for (const refl of Object.values(reflections)) {
+    const r = refl as {
+      macro?: string;
+      throughReflection?: { tableName?: string };
+    };
+    if (r.macro !== "hasAndBelongsToMany") continue;
+    const joinTable = r.throughReflection?.tableName;
+    if (typeof joinTable === "string") names.push(joinTable);
+  }
+  return names;
 }
 
 /**
