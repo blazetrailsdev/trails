@@ -4,7 +4,7 @@ import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("TypesTest", () => {
-  fixtures({}, { useTransactionalTests: false });
+  fixtures({});
   it("attributes which are invalid for database can still be reassigned", async () => {
     const TypeWhichCannotGoToTheDatabase = class extends ValueType {
       override serialize(): unknown {

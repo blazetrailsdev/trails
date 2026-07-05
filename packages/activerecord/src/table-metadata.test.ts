@@ -21,7 +21,7 @@ class AuditRequiredDeveloper extends Base {
 }
 
 describe("TableMetadataTest", () => {
-  fixtures({}, { useTransactionalTests: false });
+  fixtures({});
   beforeAll(async () => {
     await AuditLog.loadSchema();
     await AuditRequiredDeveloper.loadSchema();

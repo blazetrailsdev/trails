@@ -16,7 +16,7 @@ import {
 } from "./reflection.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 
-fixtures({}, { useTransactionalTests: false });
+fixtures({});
 
 describe("ReflectionTest", () => {
   it("plain function for source type does not raise (only ES classes are rejected)", () => {
