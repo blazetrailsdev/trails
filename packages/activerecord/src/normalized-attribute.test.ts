@@ -67,10 +67,7 @@ describe("NormalizedAttributeTest", () => {
     expect(aircraft.name).toBe("Fly Higher");
   });
 
-  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
-  // `valid?` does not re-normalize changed-in-place attributes before
-  // validation, so `validated_name` keeps the un-normalized in-place value.
-  it.skip("normalizes changed-in-place value before validation", async () => {
+  it("normalizes changed-in-place value before validation", async () => {
     aircraft._attributes.set("name", "fly high");
     expect(aircraft.name).toBe("fly high");
 
@@ -120,20 +117,14 @@ describe("NormalizedAttributeTest", () => {
     expect(fromDatabase.name).toBe("NOT titlecase");
   });
 
-  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
-  // trails normalizes on write but does not wire NormalizedValueType into the
-  // query path, so `find_by` does not normalize the query value (noon) here.
-  it.skip("finds record by normalized value", async () => {
+  it("finds record by normalized value", async () => {
     expect((aircraft.manufactured_at as Temporal.Instant).equals(noon(time))).toBe(true);
     const found = await NormalizedAircraft.findBy({ manufactured_at: time.toString() });
     expect(found).not.toBeNull();
     expect(found!.id).toBe(aircraft.id);
   });
 
-  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
-  // `where` does not normalize query values, so `where(name: "")` renders `= ''`
-  // instead of normalizing `""` -> nil -> `IS NULL`.
-  it.skip("uses the same query when finding record by nil and normalized nil values", () => {
+  it("uses the same query when finding record by nil and normalized nil values", () => {
     expect(NormalizedAircraft.where({ name: null }).toSql()).toBe(
       NormalizedAircraft.where({ name: "" }).toSql(),
     );
@@ -151,10 +142,7 @@ describe("NormalizedAttributeTest", () => {
     expect(NormalizedAircraft.normalizeValueFor("name", "ONLY titlecase")).toBe("Only Titlecase");
   });
 
-  // Skipped pending RFC 0030 story `normalizes-query-and-in-place-type-decoration`:
-  // the changed-in-place portion (`name.replace("0")` then `save`) requires
-  // re-normalizing mutated values before save, which trails does not yet wire.
-  it.skip("minimizes number of times normalization is applied", async () => {
+  it("minimizes number of times normalization is applied", async () => {
     const CountApplied = class extends Aircraft {};
     CountApplied.normalizes("name", (name: unknown) => succ(name as string));
 

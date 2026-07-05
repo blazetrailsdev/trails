@@ -7,6 +7,7 @@ import { RangeHandler, UnboundableBound } from "./predicate-builder/range-handle
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
 import { AssociationQueryValue } from "./predicate-builder/association-query-value.js";
+import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
 
@@ -430,6 +431,23 @@ export class PredicateBuilder {
     if (respondsToId(value)) {
       value = (value as { id: unknown }).id;
     }
+    // Rails applies the attribute's cast type — including any NormalizedValueType
+    // decoration — to `where`/`find_by` keyword arguments. A normalizer that maps
+    // a scalar to nil (e.g. `presence`) must route through the same `IS NULL`
+    // path as an explicit nil so `where(col: "")` matches `where(col: nil)`. We
+    // only need the normalized value to decide nil-routing here; the non-nil
+    // value flows to the handler unchanged and is normalized once by the wrapped
+    // bind type (so it is not normalized twice). Multi-value forms
+    // (Array/Set/Range/Relation) are left untouched here: their handlers don't
+    // normalize, but each element is normalized downstream when it becomes a
+    // bind — `buildBindAttribute` resolves the wrapped type via `typeForAttribute`
+    // (and `HomogeneousIn#castedValues` serializes through it for the IN path).
+    if (this.isScalarQueryValue(value)) {
+      const normalized = this.normalizeQueryValue(attribute.name, value);
+      if (normalized === null || normalized === undefined) {
+        return attribute.isNull();
+      }
+    }
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
@@ -464,6 +482,42 @@ export class PredicateBuilder {
       return this.relationHandler.call(attribute, value);
     }
     return this.basicObjectHandler.call(attribute, value);
+  }
+
+  /**
+   * A scalar reaches the equality/`basicObjectHandler` path where a single
+   * normalized value applies. Multi-value forms (Array/Set/Range/Relation) and
+   * StatementCache Substitute placeholders are excluded: their elements are
+   * normalized later by the wrapped bind type, and a Substitute must stay
+   * un-cast so the cached statement binds the real value at execution time.
+   */
+  private isScalarQueryValue(value: unknown): boolean {
+    return !(
+      value === null ||
+      value === undefined ||
+      Array.isArray(value) ||
+      value instanceof Set ||
+      value instanceof Range ||
+      value instanceof Substitute ||
+      this.isRelation(value)
+    );
+  }
+
+  /**
+   * Apply the attribute's normalizer (via its decorated cast type) to a scalar
+   * query value, but only for attributes that declare one — so non-normalized
+   * columns keep their raw query values and existing casting semantics. The
+   * decorated type's `cast` casts then normalizes, mirroring Rails'
+   * `type_for_attribute(name).cast(value)`.
+   */
+  private normalizeQueryValue(columnName: string, value: unknown): unknown {
+    const klass = (this.table as { klass?: { _normalizations?: Map<string, unknown> } }).klass;
+    const normalizations = klass?._normalizations;
+    if (!normalizations || !normalizations.has(columnName)) return value;
+    const type = this.table.typeForAttribute(columnName) as
+      | { cast?(v: unknown): unknown }
+      | undefined;
+    return type?.cast ? type.cast(value) : value;
   }
 
   buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {

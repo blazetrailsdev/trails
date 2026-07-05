@@ -272,6 +272,9 @@ export class Model {
     { fns: Array<(value: unknown) => unknown>; applyToNil: boolean }
   > = new Map();
 
+  /** Guards one-time `before_validation` registration per class (see `normalizes`). */
+  static _normalizeChangedInPlaceRegistered?: boolean;
+
   /**
    * Register a normalization function for one or more attributes.
    * The function is called before validation on every write.
@@ -317,6 +320,36 @@ export class Model {
       } else {
         this._normalizations.set(attr, { fns: [fn], applyToNil });
       }
+    }
+
+    // Rails' ActiveRecord::Normalization registers
+    // `before_validation :normalize_changed_in_place_attributes` at include
+    // time. We register it lazily on the first class in a hierarchy to call
+    // `normalizes` (subclasses inherit the callback via the copy-on-write
+    // chain, so the inherited-truthy guard keeps exactly one registration).
+    if (!this._normalizeChangedInPlaceRegistered) {
+      Object.defineProperty(this, "_normalizeChangedInPlaceRegistered", {
+        value: true,
+        writable: true,
+        configurable: true,
+      });
+      this.beforeValidation((record) => {
+        record.normalizeChangedInPlaceAttributes();
+      });
+    }
+  }
+
+  /**
+   * Re-normalize every normalized attribute that has changed in place, so a
+   * mutated value is normalized before validation and persistence.
+   *
+   * Mirrors: ActiveRecord::Normalization#normalize_changed_in_place_attributes
+   */
+  normalizeChangedInPlaceAttributes(): void {
+    const ctor = this.constructor as typeof Model;
+    if (!ctor._normalizations) return;
+    for (const name of ctor._normalizations.keys()) {
+      if (this.attributeChangedInPlace(name)) this.normalizeAttribute(name);
     }
   }
 
@@ -2428,9 +2461,17 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#attribute_changed_in_place?
    */
   attributeChangedInPlace(name: string): boolean {
-    const original = this._dirty.attributeWas(name);
+    // trails can't observe true in-place mutation of an immutable JS value, so
+    // we infer it: an attribute was changed *outside* the tracked write path
+    // (e.g. a direct `_attributes` write) when its live value no longer matches
+    // what dirty tracking recorded. A normal assignment records the new value
+    // as the change's right-hand side, so `current === recorded` and this
+    // returns false — the assignment path already normalized the value, and
+    // re-normalizing would double-apply a non-idempotent normalizer.
     const current = this.readAttribute(name);
-    // In-place change = same type but different identity
+    const recorded = this._dirty.mutationsFromDatabase[name];
+    if (recorded) return current !== recorded[1];
+    const original = this._dirty.attributeWas(name);
     if (original === undefined) return false;
     return original !== current;
   }

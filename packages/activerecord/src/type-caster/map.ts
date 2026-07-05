@@ -1,5 +1,8 @@
-import { Type, ValueType } from "@blazetrails/activemodel";
+import { Type, ValueType, normalizedValueType } from "@blazetrails/activemodel";
 import { enumTypeFor } from "../enum.js";
+
+/** Normalizer registry shape stored on the model class by `Model.normalizes`. */
+type NormalizationEntry = { fns: Array<(value: unknown) => unknown>; applyToNil: boolean };
 
 /**
  * Casts attribute values for database operations using the model's
@@ -36,6 +39,33 @@ export class Map {
   }
 
   typeForAttribute(name: string): Type {
+    return this.decorateWithNormalizer(name, this._baseTypeForAttribute(name));
+  }
+
+  /**
+   * Decorate the resolved type with the model's normalizer for `name`, if any.
+   *
+   * Rails wires normalization by wrapping the attribute's cast type with
+   * NormalizedValueType, so `type_for_attribute` (used by the predicate builder
+   * to serialize query values) normalizes `where`/`find_by` keyword arguments.
+   * trails applies normalization imperatively on the write path, so we wrap here
+   * — on the query-side type caster only — to normalize query values without
+   * double-applying on writes (which never route through this caster).
+   */
+  private decorateWithNormalizer(name: string, type: Type): Type {
+    const normalizations: globalThis.Map<string, NormalizationEntry> | undefined =
+      this._klass?._normalizations;
+    const entry = normalizations?.get(name);
+    if (!entry) return type;
+    const normalizer = (value: unknown): unknown => {
+      let result = value;
+      for (const fn of entry.fns) result = fn(result);
+      return result;
+    };
+    return normalizedValueType(type, normalizer, entry.applyToNil);
+  }
+
+  private _baseTypeForAttribute(name: string): Type {
     const klass = this._klass;
 
     // Prefer O(1) lookup via _attributeDefinitions (avoids building full attributeTypes object)

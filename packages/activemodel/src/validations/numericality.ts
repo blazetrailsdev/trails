@@ -526,13 +526,11 @@ export function prepareValueForValidation(
   // Rails has an early `return value if record_attribute_changed_in_place?`
   // short-circuit (numericality.rb:121) — in-place mutation means the
   // cast value IS what the user just changed; raw before_type_cast is
-  // stale. Trails skips this optimization today because
-  // `Model.attributeChangedInPlace` returns true for ANY change (not
-  // just in-place mutation), so honoring the short-circuit would let
-  // normal `10 → "abc"` updates bypass numericality. The
-  // `isRecordAttributeChangedInPlace` helper is still exported (Rails
-  // parity surface), it just isn't a gate here yet. Revisit once
-  // trails grows true in-place-mutation tracking.
+  // stale. Trails does not yet gate on this: `isRecordAttributeChangedInPlace`
+  // is exported (Rails parity surface) but unused here. `attributeChangedInPlace`
+  // now infers genuine in-place mutation (value diverged from tracked change),
+  // so wiring the short-circuit is plausible — but left for a focused change
+  // with its own coverage rather than as a side effect of this path.
   //
   // Trails exposes raw values through the generic
   // `readAttributeBeforeTypeCast(name)` API on Model rather than the
