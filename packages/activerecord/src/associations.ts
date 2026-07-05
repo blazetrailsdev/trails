@@ -300,14 +300,50 @@ export function registerModel(
 }
 
 /**
+ * Zeitwerk analog: a fallback name→class index populated by the canonical
+ * test-models barrel. When {@link resolveModel} or reflection's `computeClass`
+ * miss {@link modelRegistry}, they consult this index to autoload a canonical
+ * model by name — the trails equivalent of Rails autoloading a constant on
+ * first reference from an already-indexed `test/models/` tree. It stays
+ * undefined in production (no index installed), so a genuine miss still throws.
+ * @internal
+ */
+let canonicalModelAutoloadIndex: ReadonlyMap<string, typeof Base> | undefined;
+
+/**
+ * Install the eager canonical-model autoload index. Called once, as a side
+ * effect, by the canonical test-models index module.
+ * @internal
+ */
+export function _setCanonicalModelAutoloadIndex(index: ReadonlyMap<string, typeof Base>): void {
+  canonicalModelAutoloadIndex = index;
+}
+
+/**
+ * Look up a model by name, falling back to the canonical autoload index on a
+ * {@link modelRegistry} miss. A hit in the index is registered so subsequent
+ * lookups resolve directly from the registry. Returns undefined on a genuine
+ * miss (name in neither the registry nor the index).
+ * @internal
+ */
+export function lookupModelWithAutoload(name: string): typeof Base | undefined {
+  const model = modelRegistry.get(name);
+  if (model) return model;
+  const autoloaded = canonicalModelAutoloadIndex?.get(name);
+  if (autoloaded) {
+    registerModel(autoloaded);
+    return autoloaded;
+  }
+  return undefined;
+}
+
+/**
  * Resolve a model class by name.
  */
 export function resolveModel(name: string): typeof Base {
-  const model = modelRegistry.get(name);
+  const model = lookupModelWithAutoload(name);
   if (!model) {
-    throw new NameError(
-      `Model "${name}" not found in registry. Did you call registerModel(${name})?`,
-    );
+    throw new NameError(`uninitialized constant ${name}`);
   }
   return model;
 }

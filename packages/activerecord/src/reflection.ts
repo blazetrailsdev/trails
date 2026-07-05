@@ -15,7 +15,7 @@ import { _correctNames } from "./associations.js";
 import { joinTableName } from "./migration/join-table.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
 
-import { modelRegistry } from "./associations.js";
+import { modelRegistry, lookupModelWithAutoload } from "./associations.js";
 import {
   hasQueryConstraints,
   queryConstraintsList,
@@ -664,7 +664,7 @@ export class MacroReflection extends AbstractReflection {
 
   computeClass(name: string): typeof Base {
     const lookupName = name.startsWith("::") ? name.slice(2) : name;
-    const resolved = modelRegistry.get(lookupName);
+    const resolved = lookupModelWithAutoload(lookupName);
     if (!resolved) {
       // Rails resolves both association and aggregation reflection classes
       // through compute_type, which raises NameError for a missing constant
@@ -1253,7 +1253,7 @@ export class AssociationReflection extends MacroReflection {
         const segments = nestingSource.split("::");
         for (let i = segments.length; i > 0; i--) {
           const candidate = [...segments.slice(0, i), simpleName].join("::");
-          const resolved = modelRegistry.get(candidate);
+          const resolved = lookupModelWithAutoload(candidate);
           if (resolved) {
             if (!(resolved as any)._isActiveRecordBase) {
               throw new ArgumentError(
@@ -1266,7 +1266,7 @@ export class AssociationReflection extends MacroReflection {
       }
     }
 
-    const resolved = modelRegistry.get(simpleName);
+    const resolved = lookupModelWithAutoload(simpleName);
     if (!resolved) {
       // Rails' compute_class raises NameError for a missing constant (the only
       // error check_validity! callers rescue); the subclass guard below raises

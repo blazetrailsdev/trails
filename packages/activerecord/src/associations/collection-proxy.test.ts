@@ -9,26 +9,27 @@ import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
+// Opt this file into the canonical-model autoload index (Zeitwerk analog):
+// `Comment`, `Tagging`, `Tag`, and `Owner` — association targets with no
+// fixture set of their own — resolve by name on first reference instead of
+// needing a manual `registerModel`. Installed per-file rather than globally so
+// only converted (fully-canonical) files pick up the fallback.
+import "../test-helpers/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Comment } from "../test-helpers/models/comment.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Tag } from "../test-helpers/models/tag.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Toy } from "../test-helpers/models/toy.js";
-import { Owner } from "../test-helpers/models/owner.js";
 
 // `authors`, `posts`, `cpkAuthors`, `cpkBooks`, `pets`, and `toys` are declared
 // fixture sets below, so their models (`Author`, `Post`, `CpkAuthor`, `CpkBook`,
 // `Pet`, `Toy`) register automatically when the set resolves — no `registerModel`
 // needed, mirroring Rails' `fixtures :authors`. `Comment`, `Tagging`, `Tag`, and
-// `Owner` are association targets with no fixture set of their own, so they still
-// register explicitly until the autoload fallback (part b) lands.
-registerModel(Comment);
-registerModel(Tagging);
-registerModel(Tag);
-registerModel(Owner);
+// `Owner` are association targets with no fixture set of their own; the canonical
+// autoload fallback resolves them by name on first association reference, the
+// trails equivalent of Rails autoloading the constant from `test/models/`.
 
 describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   fixtures(["authors", "posts"]);
