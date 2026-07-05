@@ -2938,7 +2938,14 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
               buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join,
             );
           } else {
-            throw argumentError("only Hash, Symbol and Array are allowed");
+            // Rails' inner joins_values fallback raises a plain RuntimeError
+            // `"unknown class: <ClassName>"` (query_methods.rb:1870-1872) — NOT
+            // the left-outer bucket's `ArgumentError` "only Hash, Symbol and
+            // Array are allowed" (query_methods.rb:1834). The two buckets diverge
+            // here, so mirror that divergence.
+            throw new Error(
+              `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
+            );
           }
         }) as AssociationSpec[])
       : ([] as AssociationSpec[]);
@@ -2967,11 +2974,15 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
     for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
   }
 
-  // CTE inner-join nodes (from a joins(cteSym) partitioned above) emit as
-  // Rails' buckets[:join_node], after the named JoinDependency constraints.
-  for (const node of cteInnerJoinNodes) manager.appendJoinNode(node);
-
+  // Rails' single `buckets[:join_node]` array is populated raw joins_values Join
+  // nodes FIRST (the `while joins.first.is_a?(Arel::Nodes::Join)` loop,
+  // query_methods.rb:1856-1863), THEN CTE nodes appended by the select_named_joins
+  // block (query_methods.rb:1865-1873); `build_joins` concats the whole array once
+  // (query_methods.rb:1899). Preserve that order: raw `plan.joinNodes` before the
+  // partitioned `cteInnerJoinNodes`.
   for (const node of plan.joinNodes) manager.appendJoinNode(node);
+
+  for (const node of cteInnerJoinNodes) manager.appendJoinNode(node);
 
   // When a tracker was threaded in (Rails passes the alias HASH itself to
   // `join_scope.arel(alias_tracker.aliases)`, so claims made while building this
