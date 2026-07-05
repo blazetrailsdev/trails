@@ -11,11 +11,11 @@ import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-s
 import type {
   Schema,
   TableSchema,
-} from "../../packages/activerecord/src/test-helpers/define-schema.js";
+} from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import {
   isWrappedSchema,
   columnsOf,
-} from "../../packages/activerecord/src/test-helpers/define-schema.js";
+} from "../../packages/activerecord/src/test-helpers/schema-types.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
