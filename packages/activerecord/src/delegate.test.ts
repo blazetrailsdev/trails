@@ -1,13 +1,12 @@
 import { describe, it, expect } from "vitest";
 import { Base, registerModel, delegate } from "./index.js";
 import { Associations } from "./associations.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
-
-setupFixtures();
-useHandlerTransactionalFixtures();
+import { fixtures } from "./test-helpers/fixtures.js";
+import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 describe("Delegate (Rails-guided)", () => {
+  fixtures([], { schema: canonicalSchema });
+
   // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; tests create Post
   // without body. defineSchema fast-path reuses the canonical table (title+author_id
   // are a subset), so the NOT NULL constraint fires. Phase G: supply body in creates

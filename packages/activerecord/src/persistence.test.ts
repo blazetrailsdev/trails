@@ -27,8 +27,7 @@ import {
 import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter.js";
 import type { TableDefinition as PgTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
 
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
@@ -1130,8 +1129,7 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
 
   const Topic = CanonicalTopic;
 
@@ -1709,8 +1707,7 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   registerModel(ChatMessage);
   registerModel(ChatMessageCustomPk);
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([], { schema: canonicalSchema });
   beforeAll(async () => {
     // uuid is a PG-only defineSchema type, so the schema is only applied on
     // postgres; the tests below are individually gated to the same adapter.
