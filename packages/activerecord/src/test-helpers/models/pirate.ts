@@ -1,4 +1,5 @@
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
+import { CollectionProxy } from "../../associations/collection-proxy.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import type { Bird } from "./bird.js";
 import type { Bulb } from "./bulb.js";
@@ -51,6 +52,23 @@ export class Pirate extends Base {
   declare parrot_id: number;
   declare updated_on: Temporal.Instant | Temporal.PlainDateTime;
 
+  /**
+   * Rails: `module PostTreasuresExtension; def build(attributes = {})`
+   * `super({ name: "from extension" }.merge(attributes)); end; end`.
+   * Ruby's `super` reaches the CollectionProxy's own `build`; trails installs
+   * extension methods on the proxy instance (not a prototype layer), so the
+   * "super" call is expressed as `CollectionProxy.prototype.build.call`.
+   */
+  static postTreasuresExtension = {
+    build(this: CollectionProxy<Base>, ...args: unknown[]): Base {
+      const attributes = (args[0] as Record<string, unknown>) ?? {};
+      return CollectionProxy.prototype.build.call(this, {
+        name: "from extension",
+        ...attributes,
+      }) as Base;
+    },
+  };
+
   static {
     // Rails: `attr_accessor :cancel_save_from_callback, :parrots_limit`
     this.attribute("parrotsLimit", "integer", { virtual: true });
@@ -79,7 +97,7 @@ export class Pirate extends Base {
     });
     this.hasAndBelongsToMany("autosavedParrots", { className: "Parrot", autosave: true });
 
-    this.hasMany("treasures", { as: "looter" });
+    this.hasMany("treasures", { as: "looter", extend: Pirate.postTreasuresExtension });
     this.hasMany("treasureEstimates", { through: "treasures", source: "priceEstimates" });
 
     this.hasOne("ship");
