@@ -895,15 +895,20 @@ describe("DirtyTest", () => {
     // `readAttribute`/`writeAttribute` — the trails analog of the `super`
     // accessor — for a functionally reader-only override. Dirty tracking reads
     // the raw stored value (not the public reader), so `changes` is unaffected.
-    const Foo = class extends Pirate {
-      get catchphrase(): string | null {
+    const Foo = class extends Pirate {};
+    // `declare catchphrase: string` on Pirate forbids overriding it as an
+    // accessor pair via TS syntax (TS2611), so shadow it on the subclass
+    // prototype directly — the runtime effect Ruby's `def catchphrase` has.
+    Object.defineProperty(Foo.prototype, "catchphrase", {
+      configurable: true,
+      get(this: Pirate): string | null {
         const v = (this as any).readAttribute("catchphrase") as string | null;
         return v == null ? v : v.toUpperCase();
-      }
-      set catchphrase(v: string | null) {
+      },
+      set(this: Pirate, v: string | null) {
         (this as any).writeAttribute("catchphrase", v);
-      }
-    };
+      },
+    });
 
     const pirate = (await Foo.createBang({ catchphrase: "arrrr" })) as Rec;
 
