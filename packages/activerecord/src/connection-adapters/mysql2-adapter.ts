@@ -1357,17 +1357,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
-   * Disconnect and mark reconnectable. Mirrors Rails'
-   * `Mysql2Adapter#reconnect!` (disconnect! + connect). Connection is
-   * re-established lazily on the next query.
-   */
-  /**
    * Eagerly establish the single persistent connection. Mirrors Rails' private
    * `Mysql2Adapter#connect` (`@raw_connection = new_client(@connection_parameters)`,
    * mysql2_adapter.rb:144), which raises `ConnectionNotEstablished` (carrying the
-   * pool via `set_pool`) when the socket is dead. Driven eagerly by `connectBang()`
-   * (Rails' public `connect!`) and by `reconnect()` — `_ensureClient()` is the
-   * `new_client` analog and already attaches the pool to a connect failure.
+   * pool via `set_pool`) when the socket is dead. Driven by `connectBang()`
+   * (Rails' public `connect!`); `reconnect()` establishes the same way via
+   * `_ensureClient()` — the `new_client` analog, which already attaches the pool
+   * to a connect failure.
    * @internal
    */
   async connect(): Promise<void> {
