@@ -107,6 +107,16 @@ function _crc32(str: string): number {
   return (crc ^ 0xffffffff) >>> 0;
 }
 
+// `IndexDefinition` concise-ifies per-column option maps (order/length) but
+// keeps an empty `{}` when the option is absent; the `_indexes` bookkeeping and
+// the schema dump expect `undefined` there, so collapse the empty map.
+function _emptyOptionToUndefined<T>(value: T): T | undefined {
+  if (value != null && typeof value === "object" && Object.keys(value).length === 0) {
+    return undefined;
+  }
+  return value;
+}
+
 // Migration error classes. Rails defines these in migration.rb, so
 // they live here. internal-metadata.ts imports EnvironmentStorageError
 // back from this module; the ESM cycle is safe because each callsite
@@ -1590,11 +1600,14 @@ export class MigrationContext {
   private _indexes = new Map<
     string,
     {
-      columns: string[];
+      // A String for an expression index (kept verbatim), a column-name array
+      // otherwise — mirrors the adapter's `IndexDefinition#columns`.
+      columns: string | string[];
       unique: boolean;
       name?: string;
       where?: string;
-      orders?: Record<string, string>;
+      // Concise per-column sort order: a scalar when uniform, a Record otherwise.
+      orders?: string | Record<string, string>;
       using?: string;
       type?: string;
       lengths?: number | Record<string, number>;
@@ -2260,8 +2273,6 @@ export class MigrationContext {
       comment?: string;
     },
   ): Promise<void> {
-    const cols = Array.isArray(columns) ? columns : [columns];
-    const unique = options?.unique ?? false;
     const an = this._adapterName;
     // Warm the cached database version before issuing the index DDL. The MySQL
     // adapter's `addIndex` builds the `CREATE INDEX` through its SchemaCreation
@@ -2280,49 +2291,49 @@ export class MigrationContext {
     // Rails-faithful copy and long table+column combos get the `idx_on_...<hash>`
     // form the direct `connection.add_index` path already produces.
     await this.connection.addIndex(table, columns, options ?? {});
-    // Resolve the name the adapter used, for the in-memory `_indexes`
-    // bookkeeping the schema dump reads. `indexName` applies the same
-    // schema-strip (PostgreSQL) + expression-column reduction + hash fallback
-    // as the adapter's own `add_index_options`, so add/remove and the dump agree.
-    // Pass the original `columns` (not the arrayified `cols`): `indexNameOptions`
-    // reduces a single expression column (e.g. "lower(email)" → "lower_email")
-    // only when it sees a bare String — pre-wrapping it in an array fails that
-    // `typeof === "string"` check and leaks the raw parenthesised name into the
-    // dump, desyncing it from the DDL. This composition equals the adapter's
-    // `indexColumnNames(columnName)` → `indexNameOptions(...)` for every shape.
-    const indexName =
-      options?.name ?? this.connection.indexName(table, this.connection.indexNameOptions(columns));
-    // Rails gates the sort-order suffix on `supports_index_sort_order?`
-    // (abstract/schema_statements.rb#add_options_for_index_columns, via the
-    // MySQL adapter's `super` call). PostgreSQL/SQLite always support it; MySQL
-    // is version-gated (MariaDB ≥ 10.8.1 / MySQL ≥ 8.0.1), so older servers drop
-    // `DESC`/`ASC` from the DDL. The version was warmed above, so
-    // `supportsIndexSortOrder()` reads true/false correctly here — the stored
-    // `orders` must match what the DDL the adapter emitted actually persisted.
-    const sortOrderSupported =
-      typeof this.connection.supportsIndexSortOrder === "function"
-        ? this.connection.supportsIndexSortOrder()
-        : true;
-    const usingStored =
-      an === "postgres" && options?.using && options.using !== "btree" ? options.using : undefined;
-    const comment = options?.comment?.trim() ? options.comment : undefined;
+    // Source the in-memory `_indexes` bookkeeping the schema dump reads from the
+    // same `IndexDefinition` the adapter resolved for the DDL, rather than
+    // re-deriving the index name and re-gating the persisted metadata per
+    // adapter here. `addIndexOptions` (Rails' `add_index_options`) is the
+    // adapter's single copy of "what was built": it resolves the columns
+    // (an expression column stays a verbatim String), the index name
+    // (schema-strip + expression reduction + hash fallback), and the concise
+    // per-column option maps exactly as the executed `addIndex` did.
+    const [idx] = await this.connection.addIndexOptions(table, columns, options ?? {});
+    // The DDL visitor only emits each option where the backend supports it, so
+    // gate the stored metadata on the same adapter capabilities to match what
+    // was actually persisted: partial `WHERE` (dropped on MySQL), sort order
+    // (version-gated on MySQL/MariaDB — the #4397 reconstruct parity, warmed
+    // above via `getDatabaseVersion`), and `NULLS NOT DISTINCT` / covering
+    // `INCLUDE` (Postgres). `using` is stored only for Postgres, where a
+    // non-default access method round-trips (the dumper drops the `btree`
+    // default).
+    const supports = (
+      name:
+        | "supportsPartialIndex"
+        | "supportsIndexSortOrder"
+        | "supportsNullsNotDistinct"
+        | "supportsIndexInclude",
+      fallback: boolean,
+    ): boolean =>
+      typeof this.connection[name] === "function" ? this.connection[name]() : fallback;
+    const comment = idx.comment?.trim() ? idx.comment : undefined;
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({
-      columns: cols,
-      unique,
-      name: indexName,
-      // Mirror what the DDL above actually persisted: `WHERE` is dropped on
-      // MySQL (no partial-index support), `NULLS NOT DISTINCT` is Postgres
-      // -only, and the sort order is dropped where the backend doesn't support
-      // it (`sortOrderSupported`), so the dumped schema matches the real
-      // round-trip per adapter.
-      where: an !== "mysql" ? options?.where : undefined,
-      orders: sortOrderSupported ? options?.order : undefined,
-      using: usingStored,
-      type: an === "mysql" ? options?.type : undefined,
-      lengths: an === "mysql" ? options?.length : undefined,
-      nullsNotDistinct: an === "postgres" ? options?.nullsNotDistinct : undefined,
-      include: options?.include,
+      columns: idx.columns,
+      unique: idx.unique,
+      name: idx.name,
+      where: supports("supportsPartialIndex", true) ? idx.where : undefined,
+      orders: supports("supportsIndexSortOrder", true)
+        ? _emptyOptionToUndefined(idx.orders)
+        : undefined,
+      using: an === "postgres" && idx.using && idx.using !== "btree" ? idx.using : undefined,
+      type: idx.type,
+      lengths: _emptyOptionToUndefined(idx.lengths),
+      nullsNotDistinct: supports("supportsNullsNotDistinct", false)
+        ? idx.nullsNotDistinct
+        : undefined,
+      include: supports("supportsIndexInclude", false) ? idx.include : undefined,
       comment,
     });
   }
@@ -2449,11 +2460,11 @@ export class MigrationContext {
   }
 
   indexes(tableName: string): Array<{
-    columns: string[];
+    columns: string | string[];
     unique: boolean;
     name?: string;
     where?: string;
-    orders?: Record<string, string>;
+    orders?: string | Record<string, string>;
     using?: string;
     nullsNotDistinct?: boolean;
     include?: string[];
@@ -2462,7 +2473,8 @@ export class MigrationContext {
     if (!idxs) return [];
     return idxs.map((i) => ({
       ...i,
-      columns: [...i.columns],
+      // Preserve an expression index's verbatim String; clone the array form.
+      columns: typeof i.columns === "string" ? i.columns : [...i.columns],
       include: i.include ? [...i.include] : undefined,
     }));
   }
