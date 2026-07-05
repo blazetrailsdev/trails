@@ -16,7 +16,6 @@ import {
 } from "../index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
@@ -2022,7 +2021,6 @@ describe("BelongsToAssociationsTest", () => {
 });
 
 describe("AsyncBelongsToAssociationsTest", () => {
-  useHandlerTransactionalFixtures();
   const { companies } = fixtures(["companies"], { schema: canonicalSchema });
 
   it("async load belongs to", async () => {

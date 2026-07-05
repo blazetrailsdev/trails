@@ -3,8 +3,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Author, AuthorFavorite } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -108,8 +107,7 @@ function sample<T>(arr: T[]): T {
 }
 
 describe("EagerLoadPolyAssocsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("include query", async () => {
     const circles: Circle[] = [];

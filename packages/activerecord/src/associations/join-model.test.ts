@@ -20,7 +20,6 @@ import {
 } from "./errors.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";
 import {
   Post,
@@ -111,7 +110,6 @@ class ScopedSourceTag extends Base {
 }
 
 describe("AssociationsJoinModelTest", () => {
-  useHandlerTransactionalFixtures();
   const { authors, posts, categories, tags, taggings, comments, items, books, vertices } = fixtures(
     [
       "authors",
