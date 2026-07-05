@@ -11,6 +11,9 @@ import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
 import { registerModel } from "../../index.js";
 
+// The outer `describeIfMysql` beforeAll reads `Base.connection` before the
+// nested MySQLExplainTest `fixtures()` establishes it, so the handler wiring has
+// to be laid at file scope here — it is NOT redundant with the nested call.
 setupFixtures();
 
 describeIfMysql("Mysql2Adapter", () => {

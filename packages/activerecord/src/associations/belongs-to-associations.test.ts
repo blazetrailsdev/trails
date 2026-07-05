@@ -15,7 +15,7 @@ import {
   modelRegistry,
 } from "../index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -198,7 +198,6 @@ async function withHasManyInversing(fn: () => Promise<void>): Promise<void> {
 }
 
 describe("BelongsToWithForeignKeyTest", () => {
-  setupFixtures();
   const { authors, authorAddresses } = fixtures(["authors", "authorAddresses"], {
     schema: canonicalSchema,
   });
@@ -215,7 +214,6 @@ describe("BelongsToWithForeignKeyTest", () => {
 });
 
 describe("BelongsToAssociationsTest", () => {
-  setupFixtures();
   const {
     accounts,
     companies,
@@ -2024,7 +2022,6 @@ describe("BelongsToAssociationsTest", () => {
 });
 
 describe("AsyncBelongsToAssociationsTest", () => {
-  setupFixtures();
   useHandlerTransactionalFixtures();
   const { companies } = fixtures(["companies"], { schema: canonicalSchema });
 

@@ -10,7 +10,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Preloader } from "./preloader.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -24,7 +24,6 @@ type RecordInternals = {
 const internals = (record: Base): RecordInternals => record as unknown as RecordInternals;
 
 describe("Preloader BigInt PK / number FK key match", () => {
-  setupFixtures();
   const { authors } = fixtures(["authors", "posts"], { schema: TEST_SCHEMA });
 
   beforeAll(() => {

@@ -16,7 +16,7 @@ import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply, UniqueReply, SillyUniqueReply } from "../test-helpers/models/reply.js";
 import { WarehouseThing } from "../test-helpers/models/warehouse-thing.js";
@@ -117,7 +117,6 @@ for (const klass of [IneptWizard, Conjurer, Thaumaturgist]) {
 }
 
 describe("UniquenessValidationTest", () => {
-  setupFixtures();
   // Rails `fixtures :topics, "warehouse-things"`.
   fixtures(["topics", "warehouseThings"]);
 
@@ -701,7 +700,6 @@ describe("UniquenessValidationTest", () => {
 });
 
 describe("UniquenessValidationWithIndexTest", () => {
-  setupFixtures();
   fixtures(["topics"]);
 
   afterEach(() => {
@@ -833,7 +831,6 @@ describe("UniquenessValidationWithIndexTest", () => {
 });
 
 describe("UniquenessWithCompositeKey", () => {
-  setupFixtures();
   fixtures(["cpkAuthors"]);
 
   beforeAll(() => {

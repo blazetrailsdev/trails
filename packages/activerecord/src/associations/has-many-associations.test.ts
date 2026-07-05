@@ -1081,7 +1081,6 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupFixtures();
   useHandlerTransactionalFixtures();
   const { companies } = fixtures(["companies"]);
   beforeAll(async () => {

@@ -4,7 +4,7 @@
 import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, RecordInvalid } from "../index.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { association } from "../associations.js";
 import { quoteTableName } from "../test-helpers/quote-regex.js";
 import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
@@ -79,7 +79,6 @@ import {
 import { PersonalLegacyThing } from "../test-helpers/models/personal-legacy-thing.js";
 
 describe("HasManyThroughAssociationsTest", () => {
-  setupFixtures();
   const {
     posts,
     readers,
