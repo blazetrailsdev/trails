@@ -29,6 +29,7 @@ import type { TableDefinition as PgTableDefinition } from "./connection-adapters
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
+import { adapterSupports } from "./test-helpers/supports.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
 import { captureSql } from "./testing/sql-capture.js";
 import { ClothingItem, ClothingItemSized } from "./test-helpers/models/clothing-item.js";
@@ -64,6 +65,9 @@ import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
 import { CpkBook, CpkOrder, CpkBestSeller } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
+import { Default } from "./test-helpers/models/default.js";
+import { PkAutopopulatedByATriggerRecord } from "./test-helpers/models/pk-autopopulated-by-a-trigger-record.js";
 import { Company, LargeClient, Client, Firm } from "./test-helpers/models/company.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
@@ -1883,5 +1887,329 @@ describe("QueryConstraintsTest", () => {
       "color",
       "size",
     ]);
+  });
+});
+
+// ==========================================================================
+// PersistenceTest — adapter-specific auto-populated column coverage.
+// Rails defines `test_fills_auto_populated_columns_on_creation` three times —
+// once per adapter, guarded `if current_adapter?(:PostgreSQLAdapter)` /
+// `elsif :SQLite3Adapter` / `elsif :Mysql2Adapter` — each asserting the
+// DB-populated defaults on the `defaults` table. That table lives in the
+// per-adapter `*_specific_schema.rb` (NOT canonical schema.rb). We mirror the
+// three guarded defs as three adapter-gated tests (each builds its adapter's
+// `defaults` table faithfully).
+//
+// Tracked-pending-convergence under RFC 0023-surfaced-deviations: trails'
+// insert path reads back only ONE column (the auto-increment PK) on INSERT,
+// not the full RETURNING row, so DB-populated non-PK columns come back nil
+// after `create` (documented in base.ts `_createRecord`). Rails zips every
+// auto-populated column. Each test therefore `ctx.skip()`s ahead of its
+// assertions pending
+// rfcs/0023-surfaced-deviations/stories/insert-read-back-auto-populated-columns.md
+// (drop the `ctx.skip()` line to un-skip once the read-back is fixed).
+// ==========================================================================
+describe("PersistenceTest", () => {
+  registerModel(Default);
+  fixtures([]);
+
+  async function buildDefaultsTable() {
+    const connection = Base.connection;
+    if (adapterType === "postgres") {
+      // Mirror postgresql_specific_schema.rb `create_table :defaults`.
+      const pg = connection as PostgreSQLAdapter;
+      await pg.createTable("defaults", { force: true }, (t) => {
+        const d = t as PgTableDefinition;
+        if (pg.supportsVirtualColumns()) {
+          d.virtual("virtual_stored_number", {
+            type: "integer",
+            as: "random_number * 10",
+            stored: true,
+          });
+        }
+        d.integer("random_number", { default: () => "random() * 100" });
+        d.string("ruby_on_rails", { default: () => "concat('Ruby ', 'on ', 'Rails')" });
+        d.date("modified_date", { default: () => "CURRENT_DATE" });
+        d.date("modified_date_function", { default: () => "now()" });
+        d.date("fixed_date", { default: "2004-01-01" });
+        d.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+        d.datetime("modified_time_without_precision", {
+          precision: null,
+          default: () => "CURRENT_TIMESTAMP",
+        });
+        d.datetime("modified_time_with_precision_0", {
+          precision: 0,
+          default: () => "CURRENT_TIMESTAMP",
+        });
+        d.datetime("modified_time_function", { default: () => "now()" });
+        d.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+        d.timestamptz("fixed_time_with_time_zone", { default: "2004-01-01 01:00:00+1" });
+        d.column("char1", "char(1)", { default: "Y" });
+        d.string("char2", { limit: 50, default: "a varchar field" });
+        d.text("char3", { default: "a text field" });
+        d.bigint("bigint_default", { default: () => "0::bigint" });
+        d.binary("binary_default_function", { default: () => "convert_to('A', 'UTF8')" });
+      });
+    } else if (adapterType === "sqlite") {
+      // Mirror sqlite_specific_schema.rb `create_table :defaults`.
+      await connection.createTable("defaults", { force: true }, (t) => {
+        t.integer("random_number", { default: () => "ABS(RANDOM())" });
+        t.string("ruby_on_rails", { default: () => "('Ruby ' || 'on ' || 'Rails')" });
+        t.date("modified_date", { default: () => "CURRENT_DATE" });
+        t.date("modified_date_function", { default: () => "DATE('now')" });
+        t.date("fixed_date", { default: "2004-01-01" });
+        t.datetime("modified_time", { default: () => "CURRENT_TIMESTAMP" });
+        t.datetime("modified_time_without_precision", {
+          precision: null,
+          default: () => "CURRENT_TIMESTAMP",
+        });
+        t.datetime("modified_time_with_precision_0", {
+          precision: 0,
+          default: () => "CURRENT_TIMESTAMP",
+        });
+        t.datetime("modified_time_function", { default: () => "DATETIME('now')" });
+        t.datetime("fixed_time", { default: "2004-01-01 00:00:00.000000-00" });
+        t.column("char1", "char(1)", { default: "Y" });
+        t.string("char2", { limit: 50, default: "a varchar field" });
+        t.text("char3", { default: "a text field" });
+      });
+    } else {
+      // Mirror mysql2_specific_schema.rb `create_table :defaults`.
+      const supportsDefaultExpression =
+        (
+          connection as { supportsDefaultExpression?: () => boolean }
+        ).supportsDefaultExpression?.() ?? false;
+      await connection.createTable("defaults", { force: true }, (t) => {
+        t.date("fixed_date", { default: "2004-01-01" });
+        t.datetime("fixed_time", { default: "2004-01-01 00:00:00" });
+        t.column("char1", "char(1)", { default: "Y" });
+        t.string("char2", { limit: 50, default: "a varchar field" });
+        if (supportsDefaultExpression) {
+          t.binary("uuid", { limit: 36, default: () => "(uuid())" });
+          t.string("char2_concatenated", { default: () => "(concat(`char2`, '-'))" });
+        }
+      });
+    }
+    await (Default as unknown as { loadSchema(): Promise<void> }).loadSchema();
+  }
+
+  async function withDefaultsTable(assertions: (record: any) => void | Promise<void>) {
+    await buildDefaultsTable();
+    try {
+      const record = (await Default.create()) as any;
+      expect(record.id).not.toBeNull();
+      await assertions(record);
+    } finally {
+      await Base.connection.dropTable("defaults", { ifExists: true });
+    }
+  }
+
+  // Rails: `if current_adapter?(:PostgreSQLAdapter)`.
+  it.skipIf(adapterType !== "postgres")("fills auto populated columns on creation", async (ctx) => {
+    ctx.skip(); // deviation: insert-read-back-auto-populated-columns
+    await withDefaultsTable(async (record) => {
+      expect(record.ruby_on_rails).toBe("Ruby on Rails");
+      if ((Base.connection as PostgreSQLAdapter).supportsVirtualColumns()) {
+        expect(record.virtual_stored_number).not.toBeNull();
+      }
+      expect(record.random_number).not.toBeNull();
+      expect(record.modified_date).not.toBeNull();
+      expect(record.modified_date_function).not.toBeNull();
+      expect(record.modified_time).not.toBeNull();
+      expect(record.modified_time_without_precision).not.toBeNull();
+      expect(record.modified_time_function).not.toBeNull();
+      // Rails: `assert_equal "A", record.binary_default_function` — trails
+      // returns binary columns as raw bytes, so decode to compare.
+      expect(Buffer.from(record.binary_default_function).toString()).toBe("A");
+
+      // Rails' PG variant (persistence_test.rb:85-92): an anonymous class on the
+      // `postgresql_identity_table` (id GENERATED BY DEFAULT AS IDENTITY, from
+      // postgresql_specific_schema.rb:51-56) round-trips its DB-generated PK.
+      // Gated on `supports_identity_columns?` (identity_columns: ["postgres"]).
+      if ((Base.connection as PostgreSQLAdapter).supportsIdentityColumns()) {
+        const connection = Base.connection;
+        await connection.execute(`DROP TABLE IF EXISTS postgresql_identity_table`);
+        await connection.execute(
+          `CREATE TABLE postgresql_identity_table (id INT PRIMARY KEY GENERATED BY DEFAULT AS IDENTITY)`,
+        );
+        try {
+          class IdentityTable extends Base {
+            static _tableName = "postgresql_identity_table";
+          }
+          registerModel(IdentityTable);
+          await (IdentityTable as unknown as { loadSchema(): Promise<void> }).loadSchema();
+          const identityRecord = (await IdentityTable.createBang()) as any;
+          expect(identityRecord.id).not.toBeNull();
+        } finally {
+          await connection.execute(`DROP TABLE IF EXISTS postgresql_identity_table`);
+        }
+      }
+    });
+  });
+
+  // Rails: `elsif current_adapter?(:SQLite3Adapter)`.
+  it.skipIf(adapterType !== "sqlite")("fills auto populated columns on creation", async (ctx) => {
+    ctx.skip(); // deviation: insert-read-back-auto-populated-columns
+    await withDefaultsTable((record) => {
+      expect(record.ruby_on_rails).toBe("Ruby on Rails");
+      expect(record.random_number).not.toBeNull();
+      expect(record.modified_date).not.toBeNull();
+      expect(record.modified_date_function).not.toBeNull();
+      expect(record.modified_time).not.toBeNull();
+      expect(record.modified_time_without_precision).not.toBeNull();
+      expect(record.modified_time_function).not.toBeNull();
+    });
+  });
+
+  // Rails: `elsif current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`.
+  it.skipIf(adapterType !== "mysql")("fills auto populated columns on creation", async (ctx) => {
+    ctx.skip(); // deviation: insert-read-back-auto-populated-columns
+    await withDefaultsTable((record) => {
+      expect(record.char1).not.toBeNull();
+      const supportsDefaultExpression =
+        (
+          Base.connection as { supportsDefaultExpression?: () => boolean }
+        ).supportsDefaultExpression?.() ?? false;
+      if (supportsDefaultExpression && Base.connection.supportsInsertReturning?.()) {
+        expect(record.uuid).not.toBeNull();
+      }
+    });
+  });
+});
+
+// ==========================================================================
+// PersistenceTest — insert-returning PK populated by a DB trigger.
+// Rails gates `test_model_with_no_auto_populated_fields_still_returns_primary_key_after_insert`
+// on `supports_insert_returning? && !current_adapter?(:SQLite3Adapter)` — i.e.
+// PostgreSQL and MariaDB. The `pk_autopopulated_by_a_trigger_records` table plus
+// its BEFORE INSERT trigger live in the per-adapter `*_specific_schema.rb`, so
+// we build them per-adapter (with the same adapter gate) here.
+// ==========================================================================
+describe("PersistenceTest", () => {
+  registerModel(PkAutopopulatedByATriggerRecord);
+  fixtures([]);
+
+  // Rails gate: `supports_insert_returning? && !current_adapter?(:SQLite3Adapter)`.
+  // Resolved at collection time off the static support matrix (PostgreSQL and
+  // MariaDB; MySQL 8 and SQLite excluded) — the same idiom other suites use.
+  const supportsTrigger = adapterSupports("insert_returning") && adapterType !== "sqlite";
+
+  beforeAll(async () => {
+    if (!supportsTrigger) return;
+    const connection = Base.connection;
+    await connection.createTable(
+      "pk_autopopulated_by_a_trigger_records",
+      { force: true, id: false },
+      (t) => {
+        t.integer("id", { null: false });
+      },
+    );
+    if (adapterType === "postgres") {
+      // Mirror postgresql_specific_schema.rb: a plpgsql function + trigger that
+      // fills `id` with COALESCE(MAX(id), 0) + 1 before each insert.
+      await connection.execute(`
+        CREATE OR REPLACE FUNCTION populate_column()
+        RETURNS TRIGGER AS $$
+        DECLARE
+          max_value INTEGER;
+        BEGIN
+            SELECT MAX(id) INTO max_value FROM pk_autopopulated_by_a_trigger_records;
+            NEW.id = COALESCE(max_value, 0) + 1;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      await connection.execute(`
+        CREATE TRIGGER before_insert_trigger
+        BEFORE INSERT ON pk_autopopulated_by_a_trigger_records
+        FOR EACH ROW
+        EXECUTE FUNCTION populate_column();
+      `);
+    } else {
+      // Mirror mysql2_specific_schema.rb / trilogy_specific_schema.rb.
+      await connection.execute(`
+        CREATE TRIGGER before_insert_trigger
+        BEFORE INSERT ON pk_autopopulated_by_a_trigger_records
+        FOR EACH ROW
+        SET NEW.id = (SELECT COALESCE(MAX(id), 0) + 1 FROM pk_autopopulated_by_a_trigger_records);
+      `);
+    }
+    await (
+      PkAutopopulatedByATriggerRecord as unknown as { loadSchema(): Promise<void> }
+    ).loadSchema();
+  });
+
+  afterAll(async () => {
+    if (!supportsTrigger) return;
+    await Base.connection.dropTable("pk_autopopulated_by_a_trigger_records", { ifExists: true });
+  });
+
+  it.skipIf(!supportsTrigger)(
+    "model with no auto populated fields still returns primary key after insert",
+    async () => {
+      const record = (await PkAutopopulatedByATriggerRecord.create()) as any;
+
+      expect(record.id).not.toBeNull();
+      expect(record.id).toBeGreaterThan(0);
+    },
+  );
+});
+
+// ==========================================================================
+// PersistenceTest — deviations tracked under RFC 0023-surfaced-deviations.
+// Both cases are ported at Rails-verbatim names but skipped pending a fix:
+//   * `update attribute in before validation respects callback chain` calls
+//     `update_attribute` (a DB write) from a `before_validation` callback.
+//     trails validations are sync-only, so an async `beforeValidation` throws
+//     "Async callback on sync chain". Tracked:
+//     rfcs/0023-surfaced-deviations/stories/async-before-validation-sync-chain.md
+//   * `persist inherited class with different table name` asserts the restricted
+//     `name` attribute round-trips through create/dirty-tracking, which trails
+//     does not do for `name`. Tracked:
+//     rfcs/0023-surfaced-deviations/stories/restricted-name-attribute-reader-and-dirty-tracking.md
+// ==========================================================================
+describe("PersistenceTest", () => {
+  const Topic = CanonicalTopic;
+  fixtures(["topics"]);
+
+  it.skip("update attribute in before validation respects callback chain", async () => {
+    let counter = 0;
+    const callOnce = (record: any) => {
+      if (record.savedChangeToAuthorName()) counter += 1;
+    };
+    class TrackingTopic extends Topic {
+      static {
+        const self = this as any;
+        self.beforeValidation(async function (this: any) {
+          await this.updateAttribute("author_name", "David");
+        });
+        self.afterCreate(function (this: any) {
+          callOnce(this);
+        });
+        self.afterUpdate(function (this: any) {
+          if (this.savedChangeToAuthorName()) callOnce(this);
+        });
+      }
+    }
+    registerModel(TrackingTopic);
+
+    await TrackingTopic.create({ title: "New Topic", author_name: "Not David" });
+
+    expect(counter).toBe(1);
+  });
+
+  it.skip("persist inherited class with different table name", async () => {
+    class MinimalisticAircraft extends Minimalistic {
+      static _tableName = "aircraft";
+    }
+    registerModel(MinimalisticAircraft);
+
+    const before = (await Aircraft.count()) as number;
+    const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as any;
+    aircraft.name = "Wright Glider";
+    await aircraft.save();
+    expect(await Aircraft.count()).toBe(before + 1);
+
+    expect(((await Aircraft.last()) as any).name).toBe("Wright Glider");
   });
 });
