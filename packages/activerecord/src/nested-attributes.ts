@@ -287,7 +287,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
         : assocDef.type === "belongsTo"
           ? `${underscore(assocName)}_id`
           : `${underscore(ctor.name)}_id`);
-    const fkColumns = compositeFkColumns ?? [foreignKey];
 
     // Foreign-key attributes anchoring a built has_many/has_one child back to
     // this owner. A composite FK reads each owner PK column named by the
@@ -312,22 +311,6 @@ async function processNestedAttributes(record: Base): Promise<void> {
 
     const childPk = (targetModel as any).primaryKey || "id";
 
-    // Get known attribute names from the target model
-    const knownAttrs = new Set<string>();
-    const attrDefs: Map<string, any> | undefined = (targetModel as any)._attributeDefinitions;
-    if (attrDefs) {
-      for (const name of attrDefs.keys()) {
-        knownAttrs.add(name);
-      }
-    }
-    // Also allow the primary key and foreign key. Nested attributes
-    // conventionally address the existing record by the literal `id` key (Rails
-    // matches `record.id.to_s == attributes["id"].to_s`), which maps to the
-    // model's primary key even when it is named something other than `id`.
-    knownAttrs.add(childPk);
-    for (const col of fkColumns) knownAttrs.add(col);
-    knownAttrs.add("id");
-
     for (const attrs of attrsList) {
       const { _destroy, ...restAttrs } = attrs as any;
       const pkValue = restAttrs[childPk] ?? restAttrs["id"];
@@ -335,15 +318,12 @@ async function processNestedAttributes(record: Base): Promise<void> {
       // as regular attributes during update.
       const { [childPk]: _pkIgnored, id: _idIgnored, ...childAttrs } = restAttrs;
 
-      // Validate attributes against the target model's known columns
-      if (knownAttrs.size > 0) {
-        for (const key of Object.keys(childAttrs)) {
-          if (!knownAttrs.has(key)) {
-            const dummy = new (targetModel as any)();
-            throw new UnknownAttributeError(dummy, key);
-          }
-        }
-      }
+      // Validate attributes against the target model's known columns, resolving
+      // `alias_attribute` keys the same way the build path does. `childAttrs`
+      // already has the PK/`id` addressing keys stripped; the foreign-key
+      // columns are real target columns (present in `_attributeDefinitions`), so
+      // `assertNestedAttributesAreKnown` accepts them without a bespoke set.
+      assertNestedAttributesAreKnown(targetModel, childAttrs);
 
       // Check _destroy before rejectIf — destroy should work regardless of rejectIf
       if (_destroy && config.options.allowDestroy) {
