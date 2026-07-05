@@ -38,7 +38,7 @@ async function dropView(name: string): Promise<void> {
 
 // Force-recreate `books`/`authors` to the canonical shape before each suite's
 // view is created. Vitest resets the schema-signature cache to canonical per
-// file, so `useFixtures`' own `defineSchema` sees a cache-hit and skips the
+// file, so `fixtures()`' own schema-priming sees a cache-hit and skips the
 // repair — leaving whatever reduced `books` shape (no `cover`/`status`) a sibling
 // handler-suite file co-scheduled earlier in the same fork left in the shared
 // worker DB. The `CREATE VIEW … SELECT cover, status FROM books` below then fails

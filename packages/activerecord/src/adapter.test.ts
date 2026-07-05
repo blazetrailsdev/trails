@@ -639,7 +639,7 @@ describe("AdapterTestWithoutTransaction", () => {
   registerModel("Subscriber", Subscriber);
 
   // Rails: `self.use_transactional_tests = false`. truncate commits (and on
-  // MySQL implicitly commits as DDL), so these run un-wrapped; useFixtures
+  // MySQL implicitly commits as DDL), so these run un-wrapped; fixtures()
   // re-seeds each table in its beforeEach, standing in for `reset_fixtures`.
   const withoutTransaction = [
     "create with query cache",

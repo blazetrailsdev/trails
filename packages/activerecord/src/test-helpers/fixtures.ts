@@ -1,8 +1,8 @@
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { TEST_SCHEMA } from "./test-schema.js";
-import { useHandlerFixtures } from "./use-handler-fixtures.js";
 import { type WithTransactionalFixturesOptions } from "./with-transactional-fixtures.js";
 import {
+  useHandlerFixtures,
   type FixtureMap,
   type FixtureName,
   type TablelessFixtureEntry,

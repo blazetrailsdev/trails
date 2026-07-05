@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
-import { useFixtures, resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
+import { useHandlerFixtures, resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
 import { registerModel } from "../associations.js";
 import { FixtureSet } from "./fixture-set.js";
@@ -99,7 +99,10 @@ describe("useFixtures", () => {
   const rows = new Map([[topicId, { id: topicId, title: "Rails" }]]);
   const Topic = makeModel("topics", rows);
 
-  const { topics } = useFixtures({ topics: [Topic, { rails: { title: "Rails" } }] }, () => adapter);
+  const { topics } = useHandlerFixtures(
+    { topics: [Topic, { rails: { title: "Rails" } }] },
+    { connection: () => adapter, useTransactionalTests: false },
+  );
 
   it("accessor returns the instance by label after beforeEach runs", () => {
     const t = topics("rails");
@@ -122,12 +125,12 @@ describe("useFixtures multi-set", () => {
   const Topic = makeModel("topics", topicRows);
   const Post = makeModel("posts", postRows);
 
-  const { topics, posts } = useFixtures(
+  const { topics, posts } = useHandlerFixtures(
     {
       topics: [Topic, { rails: { title: "Rails" } }],
       posts: [Post, { hello: { title: "Hello" } }],
     },
-    () => adapter,
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("both sets are accessible", () => {
@@ -146,9 +149,9 @@ describe("useFixtures slash-keyed fixture sets", () => {
 
   // Slash-keyed entries in the object-map overload. The result property is
   // accessible via bracket notation only; dot-access would be a syntax error.
-  const result = useFixtures(
+  const result = useHandlerFixtures(
     { "admin/accounts": [AccountModel, { david: { name: "David" } }] },
-    () => adapter,
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("result property is accessible via bracket notation", () => {
@@ -177,14 +180,14 @@ describe("all/ fixture sets — explicit enumeration", () => {
   const PersonModel = makeModel("people", new Map());
   const TaskModel = makeModel("tasks", new Map());
 
-  const result = useFixtures(
+  const result = useHandlerFixtures(
     {
       "all/developers": [DevModel, {}],
       "all/people": [PersonModel, {}],
       "all/tasks": [TaskModel, {}],
       "all/namespaced/accounts": [AccountModel, { signals37: { name: "37signals" } }],
     },
-    () => adapter,
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("all four fixture sets are accessible via bracket notation", () => {
@@ -220,12 +223,12 @@ describe("useFixtures type contract", () => {
     }
   }
 
-  const { topics, posts } = useFixtures(
+  const { topics, posts } = useHandlerFixtures(
     {
       topics: [Topic, { first: { title: "First" }, second: { title: "Second" } }],
       posts: [Post, { welcome: { body: "Hi" } }],
     },
-    () => makeAdapter() as any,
+    { connection: () => makeAdapter() as any, useTransactionalTests: false },
   );
 
   it("accessor return type is narrowed to the model instance type", () => {
@@ -252,10 +255,10 @@ describe("useFixtures by registry name", () => {
 
   // author_addresses listed first: authors.author_address_id ref() resolves to its
   // declared ids, so the target set must load before its dependent.
-  const { authors, posts } = useFixtures(
-    ["authorAddresses", "authors", "posts"],
-    () => Base.adapter,
-  );
+  const { authors, posts } = useHandlerFixtures(["authorAddresses", "authors", "posts"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
 
   it("loads authors by label with the expected attributes", async () => {
     const david = authors("david");
@@ -310,9 +313,9 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 
   // categories + posts declare explicit ids, so they load BEFORE the join set —
   // categoriesPosts' category_id/post_id ref()s then resolve to those declared ids.
-  const { categories, posts, categoriesPosts } = useFixtures(
+  const { categories, posts, categoriesPosts } = useHandlerFixtures(
     ["categories", "posts", "categoriesPosts"],
-    () => Base.adapter,
+    { connection: () => Base.adapter, useTransactionalTests: false },
   );
 
   it("resolves each join row's FK pair to the referenced rows' ids", () => {
@@ -348,9 +351,9 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
   setupFixtures();
   useHandlerTransactionalFixtures();
 
-  const { people, treasures, peoplesTreasures } = useFixtures(
+  const { people, treasures, peoplesTreasures } = useHandlerFixtures(
     ["people", "treasures", "peoplesTreasures"],
-    () => Base.adapter,
+    { connection: () => Base.adapter, useTransactionalTests: false },
   );
 
   it("resolves rich_person_id/treasure_id to the referenced rows", () => {
@@ -367,7 +370,10 @@ describe("useFixtures vertices and edges", () => {
   useHandlerTransactionalFixtures();
 
   // vertices must load before edges so edge ref()s resolve to declared vertex ids.
-  const { vertices, edges } = useFixtures(["vertices", "edges"], () => Base.adapter);
+  const { vertices, edges } = useHandlerFixtures(["vertices", "edges"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
 
   it("loads all 5 vertices and 4 edges", () => {
     expect(vertices.all().length).toBe(5);
@@ -391,7 +397,9 @@ describe("useFixtures { schema } auto-derivation", () => {
 
   // No manual schema-priming beforeAll: passing the full TEST_SCHEMA lets
   // useFixtures create just the tables these sets touch (authorAddresses → posts).
-  const { authors } = useFixtures(["authorAddresses", "authors", "posts"], () => Base.adapter, {
+  const { authors } = useHandlerFixtures(["authorAddresses", "authors", "posts"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
     schema: TEST_SCHEMA,
   });
 
@@ -435,7 +443,10 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
   // people.michael declares neither created_at nor updated_at, but both columns
   // are NOT NULL — defineFixtures must fill them with the current time, mirroring
   // Rails' FixtureSet::TableRow#fill_timestamps. Without it the INSERT fails.
-  const { people } = useFixtures(["people"], () => Base.adapter);
+  const { people } = useHandlerFixtures(["people"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
 
   it("fills created_at/updated_at for a row that omits them", async () => {
     const id = people("michael").id;
@@ -459,7 +470,10 @@ describe("useFixtures with a string primary key", () => {
   // row declares `nick: "alterself"`; resolveDeclaredPk must use that string
   // verbatim instead of coercing/rejecting it. Without string-PK support the
   // seeder threw on the non-integer declared id.
-  const { subscribers } = useFixtures(["subscribers"], () => Base.adapter);
+  const { subscribers } = useHandlerFixtures(["subscribers"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
 
   it("loads a record keyed by its declared string primary key", async () => {
     const luke = subscribers("first");
@@ -486,11 +500,20 @@ describe("useFixtures reconciles the PK column against the schema", () => {
   // seeder must seed `ID`, not a phantom `id`. Bulb also has a default_scope
   // (`where(name: "defaulty")`) that would hide the `special` row on reload —
   // the unscoped reload covers that.
-  const { bulbs } = useFixtures(["bulbs"], () => Base.adapter);
+  const { bulbs } = useHandlerFixtures(["bulbs"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
   // mixed_case_monkeys: `t.primary_key :monkeyID` under a non-`id` camelCased name.
-  const { mixedCaseMonkeys } = useFixtures(["mixedCaseMonkeys"], () => Base.adapter);
+  const { mixedCaseMonkeys } = useHandlerFixtures(["mixedCaseMonkeys"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
   // mateys is id-less (`id: false`, no PK) — no PK column may be seeded at all.
-  const { mateys } = useFixtures(["mateys"], () => Base.adapter);
+  const { mateys } = useHandlerFixtures(["mateys"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
 
   it("populates the `ID` column for a custom-PK table", async () => {
     const special = bulbs("special");
@@ -530,9 +553,9 @@ describe("useFixtures seeds composite-primary-key tables", () => {
   // "tag_id"]`); both key columns are supplied by ref()s in the fixture row.
   // cpkOrders loads first so its declared key map backs the cpkOrderTags
   // order_id ref() (which resolves to the order's `id` column).
-  const { cpkOrders, cpkOrderTags, cpkBooks } = useFixtures(
+  const { cpkOrders, cpkOrderTags, cpkBooks } = useHandlerFixtures(
     ["cpkOrders", "cpkOrderTags", "cpkBooks"],
-    () => Base.adapter,
+    { connection: () => Base.adapter, useTransactionalTests: false },
   );
 
   it("seeds a composite-model-PK order against the schema's single id", () => {
@@ -577,9 +600,15 @@ describe("useFixtures resolves STI subclasses on standalone load", () => {
   // pointing at LiveParrot/DeadParrot. Loading the base `parrots` set must
   // hydrate each row as its declared subclass — the subclasses live in the same
   // module as Parrot, so the registry's `model` thunk eagerly loads them.
-  const { parrots } = useFixtures(["parrots"], () => Base.adapter);
+  const { parrots } = useHandlerFixtures(["parrots"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
   // vegetables.yml uses `custom_type` → Cucumber/Cabbage/RedCabbage.
-  const { vegetables } = useFixtures(["vegetables"], () => Base.adapter);
+  const { vegetables } = useHandlerFixtures(["vegetables"], {
+    connection: () => Base.adapter,
+    useTransactionalTests: false,
+  });
 
   it("hydrates a LiveParrot-typed row as a LiveParrot instance", () => {
     expect(parrots("george")).toBeInstanceOf(LiveParrot);
@@ -784,7 +813,10 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   // hazard `resolveFixtureNames` rejects within a single call), so each is scoped
   // to its own nested describe — only one seeder runs per test.
   describe("encryptedBooks set", () => {
-    const { encryptedBooks } = useFixtures(["encryptedBooks"], () => Base.adapter);
+    const { encryptedBooks } = useHandlerFixtures(["encryptedBooks"], {
+      connection: () => Base.adapter,
+      useTransactionalTests: false,
+    });
 
     it("reads the encrypted name attribute back as its expected plaintext", () => {
       expect(encryptedBooks("awdr").readAttribute("name")).toBe("Agile Web Development with Rails");
@@ -804,9 +836,9 @@ describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", 
   });
 
   describe("encryptedBookThatIgnoresCases set", () => {
-    const { encryptedBookThatIgnoresCases } = useFixtures(
+    const { encryptedBookThatIgnoresCases } = useHandlerFixtures(
       ["encryptedBookThatIgnoresCases"],
-      () => Base.adapter,
+      { connection: () => Base.adapter, useTransactionalTests: false },
     );
 
     it("reads an ignore-case encrypted fixture back as plaintext", () => {

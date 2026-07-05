@@ -1,9 +1,8 @@
 // Tests for the tableless fixture loader — mirrors Rails' naked/yml fixture test cases.
 // vendor/rails/activerecord/test/cases/fixtures_test.rb (FixturesTest)
 import { describe, it, expect } from "vitest";
-import { useFixtures } from "./use-fixtures.js";
 import { defineJoinTableFixtures } from "./define-fixtures.js";
-import { setupFixtures } from "./fixtures.js";
+import { fixtures, setupFixtures } from "./fixtures.js";
 import { Tree } from "./models/tree.js";
 import { Base } from "../base.js";
 import "../relation.js";
@@ -19,10 +18,7 @@ describe("tableless useFixtures (naked/yml)", () => {
 
   // test_empty_yaml_fixture — accounts.yml is an empty file; seeding 0 rows succeeds.
   describe("test_empty_yaml_fixture", () => {
-    const { accounts } = useFixtures(
-      [{ table: "accounts", data: nakedYmlAccountsFixtureData }],
-      () => Base.connection,
-    );
+    const { accounts } = fixtures([{ table: "accounts", data: nakedYmlAccountsFixtureData }]);
 
     it("loads an empty fixture set without error", () => {
       expect(accounts.all()).toHaveLength(0);
@@ -31,10 +27,7 @@ describe("tableless useFixtures (naked/yml)", () => {
 
   // test_empty_yaml_fixture_with_a_comment_in_it — companies.yml has only a comment.
   describe("test_empty_yaml_fixture_with_a_comment_in_it", () => {
-    const { companies } = useFixtures(
-      [{ table: "companies", data: nakedYmlCompaniesFixtureData }],
-      () => Base.connection,
-    );
+    const { companies } = fixtures([{ table: "companies", data: nakedYmlCompaniesFixtureData }]);
 
     it("loads a comment-only fixture set without error", () => {
       expect(companies.all()).toHaveLength(0);
@@ -47,11 +40,11 @@ describe("tableless useFixtures (naked/yml)", () => {
   // Trails: mirrors the same error format, reporting all invalid columns at once.
   //
   // The test calls defineJoinTableFixtures directly rather than routing through
-  // useFixtures because the error surfaces in beforeEach: Vitest marks the enclosing
+  // fixtures() because the error surfaces in beforeEach: Vitest marks the enclosing
   // test as failed with the hook error, which cannot be intercepted with
   // expect().rejects inside the same test body. Testing the underlying function is
-  // equivalent — useFixtures delegates to defineJoinTableFixtures in its beforeEach
-  // without wrapping the error.
+  // equivalent — the fixture loader delegates to defineJoinTableFixtures in its
+  // beforeEach without wrapping the error.
   describe("test_yaml_file_with_invalid_column", () => {
     it("raises with Rails-mirrored message listing all unknown columns", async () => {
       await expect(
@@ -64,10 +57,7 @@ describe("tableless useFixtures (naked/yml)", () => {
   // Rails strips the leading colon and inserts id=1, name="The Root".
   // Trails: the TS fixture data already uses plain keys; insertion works correctly.
   describe("test_yaml_file_with_symbol_columns", () => {
-    const { trees } = useFixtures(
-      [{ table: "trees", data: nakedYmlTreesFixtureData }],
-      () => Base.connection,
-    );
+    const { trees } = fixtures([{ table: "trees", data: nakedYmlTreesFixtureData }]);
 
     it("inserts the row and it can be found by primary key", async () => {
       const root = await Tree.findBy({ id: 1 });
