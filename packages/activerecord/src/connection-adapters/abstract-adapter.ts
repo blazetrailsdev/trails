@@ -280,6 +280,8 @@ export interface AbstractAdapter {
   ): string;
   /** @internal */
   generateIndexName(tableName: string, column: string | string[]): string;
+  /** @internal */
+  indexNameOptions(columnNames: string | string[]): { column: string | string[] };
   indexExists(
     tableName: string,
     columns: string | string[] | null | undefined,

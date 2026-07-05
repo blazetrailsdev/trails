@@ -16,6 +16,7 @@ import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { newRawTestAdapter } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("MigrationTest", () => {
@@ -167,6 +168,34 @@ describe("MigrationTest", () => {
     expect(N("blob", "mysql")).toEqual({ type: "binary" });
     expect(N("uuid", "postgres")).toEqual({ type: "uuid" });
     expect(N("jsonb", "postgres")).toEqual({ type: "jsonb" });
+  });
+
+  it("addIndex bookkeeping reduces a single-column expression index name", async () => {
+    // Regression: MigrationContext#addIndex delegates the DDL to the adapter but
+    // records the resolved name into `_indexes` for the schema dump. That name
+    // must match the DDL the adapter emitted. `indexNameOptions` only reduces an
+    // expression column ("lower(email)" → "lower_email") when it sees a bare
+    // String — a pre-arrayified `["lower(email)"]` fails its `typeof === "string"`
+    // check and leaks the raw parenthesised name into the dump. Guards that
+    // addIndex derives the bookkeeping name from the original `columns`.
+    const ss = new SchemaStatements({} as unknown as DatabaseAdapter);
+    const ddlColumns: unknown[] = [];
+    const stub = {
+      adapterName: "sqlite" as const,
+      addIndex: async (_t: string, columns: string | string[]) => {
+        ddlColumns.push(columns);
+      },
+      indexName: (t: string, o: { column?: string | string[]; name?: string }) =>
+        ss.indexName(t, o),
+      indexNameOptions: (c: string | string[]) => ss.indexNameOptions(c),
+      supportsIndexSortOrder: () => true,
+    };
+    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    await ctx.addIndex("users", "lower(email)");
+    // The adapter (and thus the real DDL) receives the un-arrayified column.
+    expect(ddlColumns[0]).toBe("lower(email)");
+    const idx = ctx.indexes("users").find((i) => i.columns.includes("lower(email)"));
+    expect(idx?.name).toBe("index_users_on_lower_email");
   });
 
   it("_introspectColumns handles PG ARRAY + USER-DEFINED + datetime_precision rows", async () => {
