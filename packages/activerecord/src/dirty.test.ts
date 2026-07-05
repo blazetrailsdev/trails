@@ -890,15 +890,14 @@ describe("DirtyTest", () => {
 
   it("changes is correct for subclass", async () => {
     // Rails overrides only the reader (`def catchphrase; super.upcase; end`),
-    // keeping the generated writer. A JS getter override shadows the inherited
-    // accessor pair and drops the setter, so re-add a setter; both delegate to
-    // `readAttribute`/`writeAttribute` — the trails analog of the `super`
-    // accessor — for a functionally reader-only override. Dirty tracking reads
-    // the raw stored value (not the public reader), so `changes` is unaffected.
+    // keeping the generated writer. `declare catchphrase: string` on Pirate
+    // forbids overriding it as an accessor pair via TS syntax (TS2611), so
+    // shadow it on the subclass prototype with `Object.defineProperty` — the
+    // runtime effect Ruby's `def catchphrase` has. Both accessors delegate to
+    // `readAttribute`/`writeAttribute` (the trails analog of `super`) for a
+    // functionally reader-only override. Dirty tracking reads the raw stored
+    // value (not the public reader), so `changes` is unaffected.
     const Foo = class extends Pirate {};
-    // `declare catchphrase: string` on Pirate forbids overriding it as an
-    // accessor pair via TS syntax (TS2611), so shadow it on the subclass
-    // prototype directly — the runtime effect Ruby's `def catchphrase` has.
     Object.defineProperty(Foo.prototype, "catchphrase", {
       configurable: true,
       get(this: Pirate): string | null {
