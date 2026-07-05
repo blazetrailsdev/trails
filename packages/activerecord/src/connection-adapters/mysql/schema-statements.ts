@@ -473,7 +473,8 @@ interface IntrospectionHost {
  * Return Column metadata for the named table. Reads from
  * `information_schema.columns` — matches Rails' column introspection
  * shape. Populates the fields SchemaCache serializes (name, default,
- * null, sqlTypeMetadata, primaryKey).
+ * null, sqlTypeMetadata). Carries no per-column primary flag — like
+ * Rails' MySQL::Column, the primary key is resolved via adapter.primaryKey().
  */
 export async function columns(this: IntrospectionHost, tableName: string): Promise<Column[]> {
   const { schema, table } = this.parseMysqlName(tableName);
@@ -486,7 +487,6 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
             character_maximum_length AS char_len,
             numeric_precision AS num_precision,
             numeric_scale AS num_scale,
-            column_key AS col_key,
             collation_name AS collation,
             column_comment AS comment,
             extra AS extra
@@ -588,7 +588,6 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
     });
     const nullable =
       String((r.nullable ?? r.NULLABLE ?? r.IS_NULLABLE ?? "YES") as string).toUpperCase() !== "NO";
-    const colKey = String((r.col_key ?? r.COL_KEY ?? r.COLUMN_KEY ?? "") as string);
     const extraRaw = String((r.extra ?? r.EXTRA ?? "") as string);
     const extra = extraRaw.toLowerCase();
     // Mirror newColumnFromField's function-default detection (mysql/schema-statements.ts):
@@ -674,7 +673,17 @@ export async function columns(this: IntrospectionHost, tableName: string): Promi
         collation: (r.collation ?? r.COLLATION ?? null) as string | null,
         comment: presence((r.comment ?? r.COMMENT) as string | null | undefined) ?? null,
         defaultFunction: defFn,
-        primaryKey: colKey === "PRI",
+        // No per-column primary flag — mirrors Rails' MySQL::Column
+        // (abstract_mysql_adapter.rb / mysql/schema_statements.rb#new_column_from_field,
+        // which passes no primary argument), and the SHOW FULL FIELDS sibling path
+        // newColumnFromField above, which likewise omits it. MySQL/MariaDB report
+        // column_key = 'PRI' not only for a real PRIMARY KEY but also for a promoted
+        // UNIQUE-NOT-NULL index when a table has no PRIMARY KEY, so keying the flag off
+        // column_key over-reports that promoted-unique column as primary. information_schema
+        // alone can't distinguish the two, and the authoritative resolution is via
+        // adapter.primaryKey() (SHOW KEYS ... 'PRIMARY') — so carry no flag here rather
+        // than a bogus one. A separate PK query would trip QueryCacheTest and a JOIN would
+        // time out SchemaDumperTest's full-DB dump (see PR #4379 / #4594).
         autoIncrement: extra === "auto_increment",
         // Literal port of Rails MySQL::Column#unsigned? (`/\bunsigned(?: zerofill)?\z/`).
         // End-anchored (JS `$` without /m ≡ Ruby `\z`): the modifier only ever trails the
