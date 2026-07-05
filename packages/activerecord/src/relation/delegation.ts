@@ -14,7 +14,8 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
   Delegation as ASDelegation,
-  dasherize,
+  renameKey,
+  type RenameKeyOptions,
   inGroups,
   inGroupsOf,
   singularize,
@@ -649,17 +650,20 @@ export type ToSentenceOptions = {
 };
 
 /** Options for the collection {@link DelegationMethods.toXml} serializer. */
-export type ToXmlOptions = SerializeOptions & {
-  root?: string;
-  children?: string;
-  skipTypes?: boolean;
-  skipInstruct?: boolean;
-};
+export type ToXmlOptions = SerializeOptions &
+  RenameKeyOptions & {
+    root?: string;
+    children?: string;
+    skipTypes?: boolean;
+    skipInstruct?: boolean;
+  };
 
 /** A record that knows how to serialize itself to XML (ActiveModel#to_xml). */
 interface XmlSerializable {
   constructor: unknown;
-  toXml(options?: SerializeOptions & { root?: string; skipTypes?: boolean }): string;
+  toXml(
+    options?: SerializeOptions & RenameKeyOptions & { root?: string; skipTypes?: boolean },
+  ): string;
 }
 
 /**
@@ -889,17 +893,32 @@ export class DelegationMethods {
     const root =
       options.root ??
       (records.length === 0
-        ? "nil-classes"
+        ? // conversions.rb:189-195: the empty default is the *pre-rename* value
+          // `underscore(NilClass.name).pluralize` = "nil_classes"; `renameKey`
+          // below dashes it to "nil-classes" under default options and composes
+          // correctly with `dasherize: false` / `camelize:`.
+          "nil_classes"
         : records.every((r) => r.constructor === records[0].constructor)
           ? (records[0].constructor as { modelName: { plural: string } }).modelName.plural
           : "objects");
-    const children = options.children ?? singularize(root);
-    const rootTag = dasherize(root);
-    const childTag = dasherize(children);
+    const renameOptions: RenameKeyOptions = {
+      dasherize: options.dasherize,
+      camelize: options.camelize,
+    };
+    // conversions.rb:200-201: Rails renames the root FIRST, then singularizes
+    // the already-renamed root for the child name — never underscoring the
+    // (already snake_case, or caller-supplied) root string. `to_tag` then
+    // re-applies `rename_key` to each child, which is idempotent since the name
+    // is already in target form.
+    const rootTag = renameKey(root, renameOptions);
+    const children = options.children ?? singularize(rootTag);
     const arrayAttr = skipTypes ? "" : ' type="array"';
 
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
-    const childOpts = { ...recordOptions, root: childTag };
+    // Each record's own `toXml` re-applies the same `renameKey` transform to its
+    // `:root`; passing the already-renamed `children` is idempotent, so root,
+    // children, and attribute tags all honor `dasherize:`/`camelize:` uniformly.
+    const childOpts = { ...recordOptions, root: children };
 
     if (records.length === 0) {
       return `${instruct}<${rootTag}${arrayAttr}/>`;

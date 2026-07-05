@@ -548,6 +548,55 @@ describe("DelegationTest", () => {
       );
     });
 
+    it("to_xml threads dasherize/camelize through the empty-collection default root", async () => {
+      // conversions.rb:189-195: the empty default is the pre-rename value
+      // "nil_classes", so `dasherize: false` keeps the underscore and `camelize`
+      // capitalizes it — the pre-dashed literal would defeat both.
+      const empty = Comment.where({ id: -1 });
+      expect(await empty.toXml({ skipInstruct: true, dasherize: false })).toBe(
+        '<nil_classes type="array"/>',
+      );
+      expect(await Comment.where({ id: -1 }).toXml({ skipInstruct: true, camelize: true })).toBe(
+        '<NilClasses type="array"/>',
+      );
+    });
+
+    it("to_xml threads dasherize false through the root, children, and attribute tags", async () => {
+      // conversions_test.rb:171-178: `dasherize: false` leaves the underscored
+      // key form intact on every tag produced from the shared options hash.
+      const xml = await Comment.where({ type: "Comment" }).toXml({
+        skipTypes: true,
+        skipInstruct: true,
+        only: ["post_id"],
+        dasherize: false,
+      });
+      expect(xml).toContain("<post_id>");
+    });
+
+    it("to_xml threads camelize through the root, children, and attribute tags", async () => {
+      const xml = await Comment.where({ type: "Comment" }).toXml({
+        skipTypes: true,
+        skipInstruct: true,
+        only: ["post_id"],
+        camelize: "lower",
+      });
+      expect(xml).toContain("<postId>");
+    });
+
+    it("to_xml threads camelize true through the root, children, and attribute tags together", async () => {
+      // The same options hash camelizes the collection root, each child element,
+      // AND every attribute tag uniformly (conversions.rb:200-201 + to_tag).
+      const xml = await Comment.where({ type: "Comment" }).toXml({
+        skipTypes: true,
+        skipInstruct: true,
+        only: ["post_id"],
+        camelize: true,
+      });
+      expect(xml).toContain("<Comments>");
+      expect(xml).toContain("<Comment>");
+      expect(xml).toContain("<PostId>");
+    });
+
     it("delegates connection, primary_key, table_name and transaction to the model", async () => {
       const relation = Comment.all();
       expect(relation.tableName).toBe(Comment.tableName);

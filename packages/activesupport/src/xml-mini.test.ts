@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { dasherize, camelize } from "./inflector.js";
+import { renameKey } from "./xml-mini.js";
 
 describe("ParsingTest", () => {
   it.skip("symbol");
@@ -17,28 +17,6 @@ describe("ParsingTest", () => {
 });
 
 describe("RenameKeyTest", () => {
-  // renameKey: transform an underscore_key with dasherize/camelize options
-  function renameKey(
-    key: string,
-    options: { dasherize?: boolean; camelize?: boolean | "lower" | "upper" } = {},
-  ): string {
-    let result = key;
-    if (options.camelize === true || options.camelize === "upper") {
-      result = camelize(result, true);
-    } else if (options.camelize === "lower") {
-      result = camelize(result, false);
-    } else if (options.dasherize !== false) {
-      // Extract leading/trailing underscores
-      const leadingMatch = result.match(/^(_+)/);
-      const trailingMatch = result.match(/(_+)$/);
-      const leading = leadingMatch ? leadingMatch[1] : "";
-      const trailing = trailingMatch ? trailingMatch[1] : "";
-      const inner = result.slice(leading.length, result.length - trailing.length);
-      result = leading + dasherize(inner) + trailing;
-    }
-    return result;
-  }
-
   it("rename key dasherizes by default", () => {
     expect(renameKey("hello_world")).toBe("hello-world");
   });

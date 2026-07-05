@@ -14,7 +14,9 @@ import {
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
-  dasherize,
+  underscore,
+  renameKey,
+  type RenameKeyOptions,
   htmlEscape,
   resetCallbacks as asResetCallbacks,
 } from "@blazetrails/activesupport";
@@ -2173,10 +2175,23 @@ export class Model {
    *
    * Mirrors: ActiveModel::Serializers::Xml#to_xml
    */
-  toXml(options?: SerializeOptions & { root?: string; skipTypes?: boolean }): string {
+  toXml(
+    options?: SerializeOptions & { root?: string; skipTypes?: boolean } & RenameKeyOptions,
+  ): string {
     const hash = this.serializableHash(options);
-    const root = options?.root ?? (this.constructor as typeof Model).modelName.singular;
-    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false, this._xmlTypeMap(hash))}</${root}>`;
+    const renameOptions: RenameKeyOptions = {
+      dasherize: options?.dasherize,
+      camelize: options?.camelize,
+    };
+    // The root (default `modelName.singular`, already snake_case, or a
+    // caller-supplied literal) is renamed directly — Rails' serializer reformats
+    // the root without underscoring it (conversions.rb:88 / :200). Only the
+    // camelCase per-attribute keys are underscored first (in `_hashToXml`).
+    const root = renameKey(
+      options?.root ?? (this.constructor as typeof Model).modelName.singular,
+      renameOptions,
+    );
+    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false, this._xmlTypeMap(hash), renameOptions)}</${root}>`;
   }
 
   /**
@@ -2205,6 +2220,7 @@ export class Model {
     indent: string,
     skipTypes = false,
     typeMap: Record<string, string> = {},
+    renameOptions: RenameKeyOptions = {},
   ): string {
     // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
     // attribute on every tag; the `nil="true"` marker is a separate attribute
@@ -2212,7 +2228,7 @@ export class Model {
     const typeAttr = (t: string) => (skipTypes ? "" : ` type="${t}"`);
     let xml = "";
     for (const [key, value] of Object.entries(hash)) {
-      const tag = dasherize(key);
+      const tag = renameKey(underscore(key), renameOptions);
       // The cast/column type name (when known) overrides JS-runtime inference so
       // the `type=` attribute is adapter-agnostic (e.g. a bigint `id` stays
       // `type="integer"` whether it arrives as a JS number, BigInt, or string).
@@ -2231,7 +2247,7 @@ export class Model {
         !(value instanceof Temporal.PlainTime) &&
         !(value instanceof Temporal.ZonedDateTime)
       ) {
-        xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes)}${indent}</${tag}>\n`;
+        xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes, {}, renameOptions)}${indent}</${tag}>\n`;
         // boundary: legacy Date values serialize as ISO 8601 dateTime XML.
       } else if (value instanceof Date) {
         xml += `${indent}<${tag}${typeAttr("dateTime")}>${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
@@ -2239,7 +2255,7 @@ export class Model {
         xml += `${indent}<${tag}${typeAttr("array")}>\n`;
         for (const item of value) {
           if (typeof item === "object" && item !== null) {
-            xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ", skipTypes)}${indent}  </item>\n`;
+            xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ", skipTypes, {}, renameOptions)}${indent}  </item>\n`;
           } else {
             xml += `${indent}  <item>${this._escapeXml(String(item))}</item>\n`;
           }

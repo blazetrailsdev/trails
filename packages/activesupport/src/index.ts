@@ -165,6 +165,8 @@ export {
 
 export { Inflections, loadDefaults } from "./inflector/inflections.js";
 
+export { renameKey, type RenameKeyOptions } from "./xml-mini.js";
+
 export {
   isBlank,
   isPresent,
