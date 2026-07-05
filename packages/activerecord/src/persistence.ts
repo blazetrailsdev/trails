@@ -433,9 +433,19 @@ interface ToggleBangRecord extends AttributeIO {
 
 /** Mirrors: ActiveRecord::Persistence#increment */
 export function increment<T extends AttributeIO>(this: T, attribute: string, by: number = 1): T {
-  const current = Number(this.readAttribute(attribute)) || 0;
-  this.writeAttribute(attribute, current + by);
+  // Rails increments through `self[attribute]`, which resolves attribute
+  // aliases (e.g. `available_credit` → `credit_limit`) before touching state.
+  const name = resolveAttributeAlias(this, attribute);
+  const current = Number(this.readAttribute(name)) || 0;
+  this.writeAttribute(name, current + by);
   return this;
+}
+
+/** Resolves an attribute alias to its underlying column via `_attributeAliases`. */
+function resolveAttributeAlias(record: object, attribute: string): string {
+  const aliases = (record.constructor as { _attributeAliases?: Record<string, string> })
+    ._attributeAliases;
+  return aliases?.[attribute] ?? attribute;
 }
 
 /**
@@ -475,6 +485,10 @@ export async function incrementBang<T extends CounterBangRecord>(
   if (attribute === undefined) {
     throw new Error("wrong number of arguments (given 0, expected 1..3)");
   }
+  // Resolve the alias once so the in-memory increment, the delta computation,
+  // the `updateCounters` SET clause, and the dirty-clear all target the real
+  // column (Rails resolves via `self[attribute]` / `_write_attribute`).
+  attribute = resolveAttributeAlias(this, attribute);
   this.increment(attribute, by);
   // Rails: `change = public_send(attribute) - public_send(:"#{attribute}_in_database")`
   // — persist the delta between the (already-incremented) in-memory value and

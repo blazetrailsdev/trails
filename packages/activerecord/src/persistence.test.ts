@@ -249,6 +249,21 @@ describe("PersistenceTest", () => {
     expect(a.credit_limit).toBe(59);
   });
 
+  // Rails: test_increment_aliased_attribute — `available_credit` is
+  // alias_attribute'd to `credit_limit` (our alias: `availableCredit`).
+  it("increment aliased attribute", async () => {
+    const a = accounts("signals37") as any;
+    expect(a.availableCredit).toBe(50);
+
+    await a.incrementBang("availableCredit");
+    await a.reload();
+    expect(a.availableCredit).toBe(51);
+
+    await a.increment("availableCredit").incrementBang("availableCredit");
+    await a.reload();
+    expect(a.availableCredit).toBe(53);
+  });
+
   // Rails: test_increment_nil_attribute — `topics(:first).parent_id` starts nil.
   it("increment nil attribute", async () => {
     const topic = topics("first") as any;
