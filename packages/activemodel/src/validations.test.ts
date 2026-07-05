@@ -138,7 +138,13 @@ describe("ValidationsTest", () => {
     });
 
     it("validates numericality of with nil allowed", () => {
-      expect(new Numeric({}).isValid()).toBe(true);
+      class NilOk extends Model {
+        static {
+          this.attribute("value", "string");
+          this.validates("value", { numericality: { allowNil: true } });
+        }
+      }
+      expect(new NilOk({}).isValid()).toBe(true);
     });
 
     it("validates numericality of only integers", () => {
@@ -1669,7 +1675,13 @@ describe("Validations", () => {
     });
 
     it("validates numericality of with nil allowed", () => {
-      expect(new Numeric({}).isValid()).toBe(true);
+      class NilOk extends Model {
+        static {
+          this.attribute("count", "string");
+          this.validates("count", { numericality: { allowNil: true } });
+        }
+      }
+      expect(new NilOk({}).isValid()).toBe(true);
     });
 
     it("validates numericality of with integer only", () => {

@@ -55,8 +55,11 @@ export class NumericalityValidator extends EachValidator {
     precision = 15,
     scale?: number,
   ): void {
+    // Mirrors Rails `is_number?(nil) => false`: a nil/undefined value that
+    // reaches validate_each (i.e. `allow_nil: true` did NOT short-circuit it in
+    // EachValidator#validate) is always :not_a_number. The default is to reject
+    // nil — matching `test_default_validates_numericality_of`.
     if (value === null || value === undefined) {
-      if (this.options.allowNil !== false) return;
       record.errors.add(attribute, "not_a_number", this.filteredOptions(value));
       return;
     }

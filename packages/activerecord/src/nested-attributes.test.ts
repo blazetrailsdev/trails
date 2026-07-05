@@ -1510,32 +1510,43 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 // ==========================================================================
 describe("TestIndexErrorsWithNestedAttributesOnlyMode", () => {
   fixtures({ guitars: [Guitar, {}], tuning_pegs: [TuningPeg, {}] });
-  beforeAll(() => {
-    Guitar.acceptsNestedAttributesFor("tuningPegs", {
-      rejectIf: (a) => Number(a["pitch"]) % 2 === 1,
-    });
-  });
 
-  // tracked-pending-convergence (0023-surfaced-deviations): nested has_many
-  // index_errors validation does not propagate to the parent's `valid?` when
-  // the children are assigned in-memory via nested attributes — trails does not
-  // run the indexed nested-record validators for the unloaded/assigned target.
-  // See nested-attributes-index-errors convergence story.
-  it.skip("index in nested_attributes_order order", async () => {
-    const guitar = await Guitar.createBang({});
+  // Mirrors Rails' anonymous `@guitar_class` (nested_attributes_test.rb:1171):
+  // `has_many :tuning_pegs, index_errors: :nested_attributes_order` keys nested
+  // errors by write order rather than the association/DB order used by the
+  // canonical `Guitar` model (`index_errors: true`). Rides the canonical
+  // `guitars`/`tuning_pegs` tables and the canonical `TuningPeg`
+  // (`validates_numericality_of :pitch`).
+  class IndexedGuitar extends Base {
+    static tableName = "guitars";
+    declare tuningPegs: AssociationProxy<TuningPeg>;
+    static {
+      this.hasMany("tuningPegs", {
+        className: "TuningPeg",
+        foreignKey: "guitar_id",
+        indexErrors: "nestedAttributesOrder",
+      });
+      this.acceptsNestedAttributesFor("tuningPegs", {
+        rejectIf: (a) => Number(a["pitch"]) % 2 === 1,
+      });
+    }
+  }
+
+  it("index in nested_attributes_order order", async () => {
+    const guitar = await IndexedGuitar.createBang({});
     await (guitar as any).tuningPegs.createBang({ pitch: 1 });
     const peg2 = await (guitar as any).tuningPegs.createBang({ pitch: 2 });
     expect(await guitar.isValid()).toBe(true);
     await guitar.update({ tuningPegsAttributes: [{ id: peg2.id, pitch: null }] });
     expect(await guitar.isValid()).toBe(false);
-    expect(Object.keys((guitar as any).errors.messages)).toEqual(["tuningPegs[0].pitch"]);
+    expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuningPegs[0].pitch"]);
   });
 
-  it.skip("index unaffected by reject_if", async () => {
-    const guitar = await Guitar.createBang({});
+  it("index unaffected by reject_if", async () => {
+    const guitar = await IndexedGuitar.createBang({});
     await guitar.update({ tuningPegsAttributes: [{ pitch: 1 }, { pitch: null }] });
     expect(await guitar.isValid()).toBe(false);
-    expect(Object.keys((guitar as any).errors.messages)).toEqual(["tuningPegs[1].pitch"]);
+    expect([...(guitar as any).errors.messages.keys()]).toEqual(["tuningPegs[1].pitch"]);
   });
 });
 
