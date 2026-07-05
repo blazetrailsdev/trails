@@ -37,6 +37,7 @@ import {
   ConfigurationError,
   AssociationTypeMismatch,
   RecordNotFound,
+  Rollback,
 } from "../errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { strictLoadingViolationBang } from "../core.js";
@@ -1280,9 +1281,21 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     }
     const record = this._buildRaw(attrs) as T;
     if (block) block(record);
+    // Rails' `_create_record` wraps the insert in a transaction and re-raises
+    // `Rollback unless result` (collection_association.rb:363-371) so a
+    // non-raising `save` failure undoes any partial write. `add_to_target`
+    // buffers the record into the target and fires after_add regardless of the
+    // save result — the `yield(record)` return is ignored — so we accumulate it
+    // in `result` here rather than gating the in-memory push.
     // Rails' add_to_target computes `replace: replace || association_scope.distinct_value`,
     // so a `distinct` association scope dedups in place rather than appending twice.
-    await this._addToTarget(record, { replace: this.distinctValue }, () => record.save());
+    await this.transaction(async () => {
+      let result: boolean | undefined = undefined;
+      await this._addToTarget(record, { replace: this.distinctValue }, async () => {
+        result = await record.save();
+      });
+      if (!result) throw new Rollback();
+    });
     return record;
   }
 
@@ -1293,11 +1306,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * `save`, when supplied, runs between `set_inverse_instance` and the target
    * mutation (Rails' `yield(record)` inside `replace_on_target`, used by
-   * `create` to `insert_record`). If it resolves false the record is left out
-   * of the target — matching the prior `if (saved)` gate. (Rails pushes
-   * regardless and relies on the surrounding `transaction { ... } / raise
-   * Rollback` to undo the DB write; trails' `create` has no transaction yet —
-   * see `_createThrough` — so we gate the in-memory push on save success.)
+   * `create`/`concat` to `insert_record`). Its return value is ignored: the
+   * record is committed to the target and `after_add` fires regardless of the
+   * save result, matching Rails' `replace_on_target` (the `yield(record)` at
+   * collection_association.rb:470 is unused). A non-raising save failure that
+   * needs to be undone is rolled back by the surrounding `transaction { ... } /
+   * raise Rollback` — the `create` and persisted-`concat` paths both wrap the
+   * insert in a transaction (see `create` and the `concat` funnel below).
    *
    * Rails' append branch is gated on `@_was_loaded || !loaded?`. On the create
    * path `@_was_loaded` is set true before the save and reset to `loaded?`
@@ -1308,7 +1323,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private async _addToTarget(
     record: T,
     options: { skipCallbacks?: boolean; replace?: boolean } = {},
-    save?: () => Promise<boolean | undefined>,
+    save?: () => Promise<unknown>,
   ): Promise<T | null> {
     const { skipCallbacks = false, replace = false } = options;
     const index = this._targetReplaceIndex(record, replace);
@@ -1319,7 +1334,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       return null;
     }
     _setCollectionInverseInstance(this._record, this._assocName, this._assocDef.options, record);
-    if (save && !(await save())) return record;
+    if (save) await save();
     this._commitToTarget(record, index);
     if (!skipCallbacks) fireAssocCallbacks(this._assocDef.options.afterAdd, this._record, record);
     return record;

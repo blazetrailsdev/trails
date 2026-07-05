@@ -248,6 +248,25 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
+  it("adding buffers a record whose save fails into the target", async () => {
+    // Rails' `replace_on_target` adds the record to the in-memory target and
+    // fires after_add regardless of the insert result — only a `before_add`
+    // throw :abort skips it (collection_association.rb:457-483). A `before_save`
+    // throw :abort makes `save` return false without raising, so the record is
+    // still buffered; the failed insert is undone by the surrounding
+    // transaction's `raise Rollback unless result`.
+    const bad = Client.new({ name: "Bad" }) as any;
+    bad.throwOnSave = true;
+
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.load();
+    await firstFirm.clientsOfFirm.concat(bad);
+
+    expect(await firstFirm.clientsOfFirm.toArray()).toContain(bad);
+    const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
+    expect(reloaded).not.toContain(bad);
+  });
+
   it("destroying", async () => {
     const firstFirm = companies("first_firm") as any;
     await firstFirm.clientsOfFirm.load();
