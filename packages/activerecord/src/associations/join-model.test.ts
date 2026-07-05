@@ -19,7 +19,7 @@ import {
   EagerLoadPolymorphicError,
 } from "./errors.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
 import { Author, AuthorAddress, AuthorFavorite } from "../test-helpers/models/author.js";
 import {
@@ -111,7 +111,6 @@ class ScopedSourceTag extends Base {
 }
 
 describe("AssociationsJoinModelTest", () => {
-  setupFixtures();
   useHandlerTransactionalFixtures();
   const { authors, posts, categories, tags, taggings, comments, items, books, vertices } = fixtures(
     [

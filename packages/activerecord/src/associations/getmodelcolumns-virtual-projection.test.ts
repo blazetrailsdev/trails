@@ -12,12 +12,11 @@
  */
 import { describe, it, expect } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Firm, Company, Client } from "../test-helpers/models/company.js";
 import { registerModel } from "../index.js";
 
 describe("getModelColumns virtual-attribute eager projection", () => {
-  setupFixtures();
   const { companies } = fixtures(["companies"]);
   registerModel(Company);
   registerModel(Firm);
