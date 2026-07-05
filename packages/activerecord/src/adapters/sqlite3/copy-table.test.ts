@@ -162,16 +162,27 @@ describeIfSqlite("CopyTableTest", () => {
     await testCopyTable((await Base.leaseConnection()) as any, "binaries", "binaries2");
   });
 
-  it.skip("copy table with virtual column", () => {
-    // BLOCKED: adapter-sqlite — columns() never threads generatedType, so
-    // Sqlite3Column#isVirtual() is always false. copy_table then treats the
-    // generated `upper_name` as a content column and emits an INSERT into it,
-    // which SQLite rejects, and column.virtualStored?/default_function never
-    // report the generated expression.
-    // ROOT-CAUSE: connection-adapters/sqlite3-adapter.ts columns() omits the
-    // GENERATED-column detection that table_structure_with_collation already
-    // computes; the value is dropped before reaching Sqlite3Column.
-    // SCOPE: thread generatedType + default_function through columns(); file
-    // sqlite3-columns-thread-generated-type.
+  it("copy table with virtual column", async () => {
+    const conn = (await Base.leaseConnection()) as any;
+    await conn.createTable("virtual_columns", { force: true }, (t: any) => {
+      t.string("name");
+      t.virtual("upper_name", { type: "string", as: "UPPER(name)", stored: true });
+    });
+
+    try {
+      await testCopyTable(conn, "virtual_columns", "virtual_columns2", {}, async () => {
+        const columns = await conn.columns("virtual_columns2");
+        const column = columns.find((col: any) => col.name === "upper_name");
+        expect(column.isVirtualStored()).toBe(true);
+        expect(column.type).toBe("string");
+        expect(column.defaultFunction).toBe("UPPER(name)");
+      });
+    } finally {
+      try {
+        await conn.dropTable("virtual_columns");
+      } catch {
+        // rescue nil
+      }
+    }
   });
 });
