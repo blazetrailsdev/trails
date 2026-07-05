@@ -17,6 +17,8 @@ import { repairValidations } from "./test-helpers/repair-validations.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";
+import { ClothingItem } from "./test-helpers/models/clothing-item.js";
+import { captureSql } from "./testing/sql-capture.js";
 
 describe("PersistenceTest (trails)", () => {
   setupFixtures();
@@ -162,5 +164,27 @@ describe("PersistenceTest (trails)", () => {
     expect(count).toBe(1);
     expect(await Item.where({ name: "A" }).count()).toBe(0);
     expect(await Item.where({ name: "B" }).count()).toBe(1);
+  });
+});
+
+describe("PersistenceTest (trails)", () => {
+  const { clothingItems } = fixtures(["clothingItems"], { schema: canonicalSchema });
+
+  // Regression guard: like save/delete, `updateColumns` must locate the row via
+  // `_query_constraints_hash` (Rails persistence.rb:615-624/852-858), so a model
+  // declaring `query_constraints` updates by those columns rather than the
+  // primary key alone. `ClothingItem` declares `query_constraints :clothing_type,
+  // :color`.
+  it("updateColumns targets query_constraints columns in the WHERE", async () => {
+    const clothingItem = clothingItems("green_t_shirt");
+    const sqls = await captureSql(async () => {
+      await clothingItem.updateColumns({ description: "Lovely green t-shirt" });
+    });
+    const sql = sqls.find((s) => /^UPDATE/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+
+    const reloaded = await ClothingItem.findBy({ id: clothingItem.id });
+    expect(reloaded?.description).toBe("Lovely green t-shirt");
   });
 });

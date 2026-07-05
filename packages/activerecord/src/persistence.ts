@@ -1231,10 +1231,13 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     get(name: string): unknown;
   };
 
-  // Capture the PK *before* applying attrs — if the caller is updating a
-  // PK column, we still need to target the row by its existing id, not
-  // the new value we're about to write.
-  const originalId = this.id;
+  // Capture the row-locating constraints *before* applying attrs (Rails:
+  // `update_constraints = _query_constraints_hash` precedes `write_cast_value`).
+  // `_query_constraints_hash` keys each query_constraints_list column (or the
+  // primary key when none are declared) to its `*_in_database` value, so a model
+  // with `query_constraints` updates by those persisted columns — not the PK —
+  // and a record updating a constraint/PK column still targets its existing row.
+  const updateConstraints = _queryConstraintsHash.call(this as unknown as PersistencePrivateHost);
 
   // Cast values through their declared attribute types (no dirty tracking —
   // this path bypasses writeAttribute deliberately) and collect the cast
@@ -1300,7 +1303,15 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   const um = new UpdateManager();
   um.table(table);
   um.set(setPairs as Parameters<UpdateManager["set"]>[0]);
-  um.where(ctor._buildPkWhereNode(originalId));
+  um.where(
+    (
+      ctor as unknown as {
+        _buildQueryConstraintsWhereNode(
+          c: Record<string, unknown>,
+        ): Parameters<UpdateManager["where"]>[0];
+      }
+    )._buildQueryConstraintsWhereNode(updateConstraints),
+  );
   // Mirrors Rails' update_columns → _update_record: an all_queries default
   // scope (and any global current scope) is stacked onto the UPDATE constraints.
   applyDefaultAndGlobalConstraints(um as never, ctor as never);
