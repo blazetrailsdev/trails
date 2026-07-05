@@ -1906,6 +1906,17 @@ export class Relation<T extends Base> {
           rel._namedInnerJoins.push(arg);
         continue;
       }
+      // A genuine Symbol is trails' signal for "association/CTE name" (vs a raw
+      // SQL string), mirroring Ruby's `joins(:name)`. Route it into
+      // `_namedInnerJoins` so `emitJoinPlan`'s `selectNamedJoins` can partition a
+      // `with(...)` CTE name out to `buildWithJoinNode(name, InnerJoin)`; a raw
+      // Symbol left in `_joinValues` would reach the arel visitor and raise
+      // "Unknown node type: Symbol".
+      if (typeof arg === "symbol") {
+        if (!rel._namedInnerJoins.some((v) => _qm.structuralUnionEq(v, arg)))
+          rel._namedInnerJoins.push(arg as unknown as AssociationSpec);
+        continue;
+      }
       const joinValue = arg as string | Nodes.Join;
       if (!rel._joinValues.some((v) => _qm.structuralUnionEq(v, joinValue)))
         rel._joinValues.push(joinValue);

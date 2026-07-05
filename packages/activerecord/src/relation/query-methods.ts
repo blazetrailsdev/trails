@@ -2920,9 +2920,38 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // mirrors `unless named_joins.empty? && stashed_joins.empty?`; when named_joins
   // is empty but the stash is not, Rails still builds an empty
   // `construct_join_dependency([], InnerJoin)` and folds the stash into it.
-  const [namedJoins, joinType] =
+  //
+  // Rails build_join_buckets (query_methods.rb:1865-1873) runs the inner
+  // joins_values through select_named_joins, whose block routes a CTEJoin — a
+  // joins() symbol matching a with(...) CTE name — to build_with_join_node(name)
+  // (an InnerJoin node), while ordinary association names fold into the named
+  // JoinDependency. Mirror it here so BOTH the live path (_applyJoinsToManager)
+  // and the subquery path (buildJoins) route the CTE symbol; without the
+  // partition the bare Symbol reaches the arel visitor and raises
+  // "Unknown node type: Symbol".
+  const cteInnerJoinNodes: Nodes.Join[] = [];
+  const innerNamed =
     this._namedInnerJoins.length > 0
-      ? ([this._namedInnerJoins, Nodes.InnerJoin] as const)
+      ? (selectNamedJoins.call(this, this._namedInnerJoins, plan.stashedJoins, (join) => {
+          if (join instanceof CTEJoin) {
+            cteInnerJoinNodes.push(
+              buildWithJoinNode.call(this, join.name, Nodes.InnerJoin) as Nodes.Join,
+            );
+          } else {
+            // Rails' inner joins_values fallback raises a plain RuntimeError
+            // `"unknown class: <ClassName>"` (query_methods.rb:1870-1872) — NOT
+            // the left-outer bucket's `ArgumentError` "only Hash, Symbol and
+            // Array are allowed" (query_methods.rb:1834). The two buckets diverge
+            // here, so mirror that divergence.
+            throw new Error(
+              `unknown class: ${(join as { constructor?: { name?: string } })?.constructor?.name}`,
+            );
+          }
+        }) as AssociationSpec[])
+      : ([] as AssociationSpec[]);
+  const [namedJoins, joinType] =
+    innerNamed.length > 0
+      ? ([innerNamed, Nodes.InnerJoin] as const)
       : plan.namedJoins.length > 0
         ? ([plan.namedJoins, Nodes.OuterJoin] as const)
         : ([[] as AssociationSpec[], Nodes.InnerJoin] as const);
@@ -2945,7 +2974,15 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
     for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
   }
 
+  // Rails' single `buckets[:join_node]` array is populated raw joins_values Join
+  // nodes FIRST (the `while joins.first.is_a?(Arel::Nodes::Join)` loop,
+  // query_methods.rb:1856-1863), THEN CTE nodes appended by the select_named_joins
+  // block (query_methods.rb:1865-1873); `build_joins` concats the whole array once
+  // (query_methods.rb:1899). Preserve that order: raw `plan.joinNodes` before the
+  // partitioned `cteInnerJoinNodes`.
   for (const node of plan.joinNodes) manager.appendJoinNode(node);
+
+  for (const node of cteInnerJoinNodes) manager.appendJoinNode(node);
 
   // When a tracker was threaded in (Rails passes the alias HASH itself to
   // `join_scope.arel(alias_tracker.aliases)`, so claims made while building this
