@@ -735,6 +735,12 @@ export async function performCount(
           idSubquery.distinct();
           this._applyJoinsToManager(idSubquery, makeEagerJd());
           this._applyWheresToManager(idSubquery, table);
+          // Mirror Rails `distinct_relation_for_primary_key`
+          // (schema_statements.rb:1429-1452): the limited id subquery retains
+          // the relation's `order_values` so the LIMIT/OFFSET selects a
+          // deterministic, Rails-ordered top-n set of primary keys before the
+          // re-count — otherwise an arbitrary limited id set can diverge.
+          this._applyOrderToManager(idSubquery, table);
           applyFromToManager(this, idSubquery);
           if (this._limitValue !== null) idSubquery.take(this._limitValue);
           if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
