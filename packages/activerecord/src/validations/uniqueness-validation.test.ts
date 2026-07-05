@@ -392,7 +392,8 @@ describe("UniquenessValidationTest", () => {
   });
 
   it("validate case insensitive uniqueness", async () => {
-    Topic.validatesUniqueness("title", { caseSensitive: false });
+    // Rails: `validates_uniqueness_of(:title, :parent_id, case_sensitive: false, allow_nil: true)`.
+    Topic.validatesUniquenessOf("title", "parent_id", { caseSensitive: false, allowNil: true });
 
     const t = new Topic({ title: "I'm unique!", parent_id: 2 });
     expect(await t.save()).toBe(true);
@@ -400,21 +401,33 @@ describe("UniquenessValidationTest", () => {
     t.writeAttribute("content", "Remaining unique");
     expect(await t.save()).toBe(true);
 
+    // fixture topics(:second) has parent_id 1, so parent_id collides too.
     const t2 = new Topic({ title: "I'm UNIQUE!", parent_id: 1 });
     expect(await t2.save()).toBe(false);
+    expect(t2.errors.get("title").length).toBeGreaterThan(0);
+    expect(t2.errors.get("parent_id").length).toBeGreaterThan(0);
     expect(t2.errors.get("title")).toEqual(["has already been taken"]);
 
     t2.writeAttribute("title", "I'm truly UNIQUE!");
+    expect(await t2.save()).toBe(false);
+    expect(t2.errors.get("title")).toEqual([]);
+    expect(t2.errors.get("parent_id").length).toBeGreaterThan(0);
+
+    t2.writeAttribute("parent_id", 4);
+    expect(await t2.save()).toBe(true);
+
+    t2.writeAttribute("parent_id", null);
+    t2.writeAttribute("title", null);
     expect(await t2.save()).toBe(true);
   });
 
   it("validate uniqueness of with multiple attributes and array forms", async () => {
     // Rails' `validates_uniqueness_of(*attr_names)` arity: `_merge_attributes`
     // flattens nested arrays and registers a deferred check per attribute, so a
-    // single call can guard several columns. (Mirrors the multi-attr form used by
-    // Rails' test_validate_case_insensitive_uniqueness without the integer
-    // case-insensitive scope column, which hits a separate SQLite LOWER(bind)
-    // quirk tracked by story uniqueness-case-insensitive-integer-column-sqlite.)
+    // single call can guard several columns. (A string-column variant of the
+    // multi-attr form used by Rails' test_validate_case_insensitive_uniqueness;
+    // the integer `:parent_id` case-insensitive column that test also covers is
+    // asserted directly in "validate case insensitive uniqueness".)
     Topic.validatesUniquenessOf(["title"], "author_name");
 
     // Fixture topics(:first): title "The First Topic", author_name "David".
