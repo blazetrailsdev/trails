@@ -771,17 +771,26 @@ export function assignNestedAttributesForOneToOneAssociation(
       existing.assignAttributes(assignable);
       assoc.initializeAttributes(existing);
     } else {
-      // Rails defers the polymorphic-target check to build time: a polymorphic
-      // belongs_to has no `build_#{association_name}` method, so the writer
-      // raises. Immediate in-memory build otherwise (`part.ship.name` is
-      // readable right after assignment); autosave persists it on save.
+      // Rails nested_attributes.rb:451 — `method = :"build_#{association_name}";
+      // respond_to?(method) ? public_send(method, ...) : raise`. A plain
+      // polymorphic belongs_to has no `build_#{name}` method, so the writer
+      // raises. A `delegated_type` role, however, defines `build_#{role}`
+      // (delegated-type.ts) which instantiates the concrete type named by the
+      // `*_type` column, so it builds through that method instead of raising.
       if (isPolymorphicBelongsTo(record, associationName)) {
-        throw new Error(
-          `Cannot build association \`${associationName}'. ` +
-            `Are you trying to build a polymorphic one-to-one association?`,
-        );
+        const buildMethod = `build${camelize(associationName, true)}`;
+        const builder = (record as unknown as Record<string, unknown>)[buildMethod];
+        if (typeof builder === "function") {
+          (builder as (attrs: Record<string, unknown>) => unknown).call(record, assignable);
+        } else {
+          throw new Error(
+            `Cannot build association \`${associationName}'. ` +
+              `Are you trying to build a polymorphic one-to-one association?`,
+          );
+        }
+      } else {
+        assoc.build(assignable);
       }
-      assoc.build(assignable);
     }
   }
 }
