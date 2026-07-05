@@ -167,15 +167,7 @@ export class SchemaCache {
 
     this._version = (coder["version"] as string | number) ?? null;
 
-    // Derive columnsHash from columns (Rails: derive_columns_hash_and_deduplicate_values)
-    this._columnsHash.clear();
-    for (const [table, cols] of this._columns) {
-      const hash: Record<string, Column> = {};
-      for (const col of cols) {
-        hash[col.name] = col;
-      }
-      this._columnsHash.set(table, hash);
-    }
+    this.deriveColumnsHash();
   }
 
   isCached(tableName: string): boolean {
@@ -404,6 +396,7 @@ export class SchemaCache {
   }
 
   setColumns(tableName: string, cols: Column[]): void {
+    this.reconcilePrimaryKeyFlags(tableName, cols);
     this._columns.set(tableName, cols);
     const hash: Record<string, Column> = {};
     for (const col of cols) {
@@ -415,6 +408,37 @@ export class SchemaCache {
 
   setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
     this._primaryKeys.set(tableName, pk);
+    const cols = this._columns.get(tableName);
+    if (cols) this.reconcilePrimaryKeyFlags(tableName, cols);
+  }
+
+  /**
+   * Clear per-column `primaryKey` flags that the authoritative `_primaryKeys`
+   * cache contradicts. MySQL/MariaDB report `column_key = 'PRI'` for a
+   * UNIQUE-NOT-NULL index when a table has no PRIMARY KEY (the "promoted unique"
+   * case), so `mysql/schema-statements.ts` reflects a bogus primary flag on that
+   * column — Rails' `MySQL::Column` carries no per-column primary flag and
+   * resolves the key solely from the `PRIMARY` constraint. `add()` warms
+   * `_primaryKeys` (via the authoritative `SHOW KEYS ... 'PRIMARY'` /
+   * key_column_usage query) before `columns()`, so the correct answer is already
+   * in hand — reconcile against it query-free. Called from both `setColumns` and
+   * `setPrimaryKeys` so the correction is independent of which warms first.
+   *
+   * Clear-only: a flag is dropped when the authoritative key set excludes the
+   * column, never added. Real primary keys (whose flag the adapter already set
+   * and whose name the query returns) are untouched, and adapters that reflect
+   * the flag correctly (sqlite/postgres) agree with the query so nothing changes.
+   * When `_primaryKeys` is not yet warm the flags are left as reflected.
+   */
+  private reconcilePrimaryKeyFlags(tableName: string, cols: Column[]): void {
+    if (!this._primaryKeys.has(tableName)) return;
+    const pk = this._primaryKeys.get(tableName);
+    const pkNames = new Set(pk == null ? [] : Array.isArray(pk) ? pk : [pk]);
+    for (const col of cols) {
+      if (col.primaryKey && !pkNames.has(col.name)) {
+        (col as { primaryKey: boolean }).primaryKey = false;
+      }
+    }
   }
 
   setDataSourceExists(tableName: string, exists: boolean): void {
@@ -479,9 +503,23 @@ export class SchemaCache {
     );
     this._indexes = new Map(Object.entries((indexes as Record<string, unknown[]>) ?? {}));
 
-    // Derive columnsHash (Rails: derive_columns_hash_and_deduplicate_values)
+    this.deriveColumnsHash();
+  }
+
+  /**
+   * Rebuild `_columnsHash` from `_columns` (Rails:
+   * derive_columns_hash_and_deduplicate_values). Both `_columns` and the
+   * authoritative `_primaryKeys` are already loaded, so reconcile the per-column
+   * `primaryKey` flags against the key cache before exposing the hash — a schema
+   * cache dumped before this convergence can carry MySQL's promoted-unique
+   * `primaryKey: true` alongside `primary_keys: { table: null }`, and the derive
+   * step must not resurface the bogus flag. Mirrors Rails treating `@primary_keys`
+   * as authoritative while deriving `columns_hash` (schema_cache.rb).
+   */
+  private deriveColumnsHash(): void {
     this._columnsHash.clear();
     for (const [table, cols] of this._columns) {
+      this.reconcilePrimaryKeyFlags(table, cols);
       const hash: Record<string, Column> = {};
       for (const col of cols) {
         hash[col.name] = col;
