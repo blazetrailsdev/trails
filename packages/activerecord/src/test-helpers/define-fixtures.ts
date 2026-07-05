@@ -131,6 +131,10 @@ function resolveDeclaredPk(
 export function effectiveFixtureKey(model: BaseClass, label: string, row: FixtureAttrs): string {
   const pk = model.primaryKey;
   if (Array.isArray(pk)) {
+    // No adapter here, so unlike prepareModelFixtures this can't drop composite key
+    // columns absent from the table schema (tableColumnNames gate). Harmless for the
+    // known composite fixtures (cpk_orders/cpk_order_tags key columns are all real);
+    // a phantom key column would only over-fold the guard key, never mask a real one.
     const generated = compositeIdentify(label, pk);
     return "c:" + JSON.stringify(pk.map((col) => row[col] ?? generated[col]));
   }
