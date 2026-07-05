@@ -2274,16 +2274,16 @@ export class MigrationContext {
     },
   ): Promise<void> {
     const an = this._adapterName;
-    // Warm the cached database version before issuing the index DDL. The MySQL
-    // adapter's `addIndex` builds the `CREATE INDEX` through its SchemaCreation
-    // visitor, which gates the `DESC`/`ASC` sort-order suffix on
-    // `supportsIndexSortOrder()` — a synchronous read of `_databaseVersion` that
-    // silently yields false when unset. MigrationContext#addIndex runs on the
-    // shared-worker schema-reconstruct path on a freshly-leased connection whose
-    // version is still cold, and neither MySQL `addIndex` override warms it, so
-    // warm it here — otherwise a genuinely descending index round-trips ascending
-    // (the MariaDB reconstruct flake fixed in #4397).
-    if (an === "mysql") await this.connection.getDatabaseVersion?.();
+    // Warm the cached database version before issuing the index DDL or reading
+    // the capability predicates below. Several `supports*` predicates read
+    // `databaseVersion` synchronously: MySQL's `supportsIndexSortOrder` (the
+    // `DESC`/`ASC` suffix, MariaDB reconstruct parity #4397) yields false when
+    // unset, while PostgreSQL's `supportsIndexInclude` (≥ 11) and
+    // `supportsNullsNotDistinct` (≥ 15) *throw* when unset. MigrationContext#
+    // addIndex runs on the shared-worker schema-reconstruct path on a
+    // freshly-leased connection whose version is still cold, so warm it here for
+    // every adapter before the gating below reads those predicates.
+    await this.connection.getDatabaseVersion?.();
     // Rails' `Migration` delegates the DDL — and the default index-name
     // derivation (index_name → generate_index_name, incl. the identifier-length
     // hash fallback) — to `connection.add_index`. Delegate rather than
