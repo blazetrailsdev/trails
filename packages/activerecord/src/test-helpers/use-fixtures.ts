@@ -1,15 +1,11 @@
-import { afterEach, beforeAll, beforeEach } from "vitest";
+import { afterEach, beforeEach } from "vitest";
 import {
   prepareModelFixtures,
   prepareJoinTableFixtures,
   insertPreparedFixtureSets,
-  throughJoinTableNames,
   effectiveFixtureKey,
   type PreparedFixtureSet,
 } from "./define-fixtures.js";
-import { type Schema } from "./define-schema.js";
-import { TEST_SCHEMA } from "./test-schema.js";
-import { ensureCanonicalTables } from "./canonical-schema.js";
 import {
   fixtureRegistry,
   isJoinTableEntry,
@@ -51,7 +47,7 @@ export type FixtureMap = Record<string, [BaseClass, Record<string, FixtureAttrs>
 /**
  * Internally-resolved fixture set. `model === null` marks a HABTM join-table set
  * (seeded via {@link defineJoinTableFixtures}); otherwise it's a model-backed set.
- * `table` is the DB table to seed/clean and to slice the schema by.
+ * `table` is the DB table to seed and clean.
  */
 type ResolvedFixtureSet = {
   table: string;
@@ -89,22 +85,6 @@ export type UseFixturesByNameResult<N extends FixtureName> = {
     ? JoinTableAccessor<Extract<keyof RegistryData<K>, string>>
     : FixtureAccessor<RegistryModel<K>, Extract<keyof RegistryData<K>, string>>;
 };
-
-export interface UseFixturesOpts {
-  /**
-   * When set, `useFixtures` uses this schema only to pick *which* tables to lay
-   * (the names of the sets the fixtures touch), then creates them via
-   * {@link ensureCanonicalTables} in a `beforeAll` — replacing a manual
-   * `defineSchema({ ...slice })` call. Pass the full canonical schema (e.g.
-   * `TEST_SCHEMA`); only the tables the fixtures touch are created.
-   *
-   * NOTE: only the table *names* are honored, not their column shapes — each
-   * table is created in its full canonical shape from the registry, so a
-   * genuinely bespoke (non-canonical) shape passed here is ignored. The type
-   * still permits an arbitrary `Schema` object for the name-selection role.
-   */
-  schema?: Schema;
-}
 
 export interface FixturesConnectionOpts {
   /**
@@ -211,50 +191,6 @@ export async function resolveFixtureNames(
   return map;
 }
 
-/**
- * Slices the minimal sub-schema needed to seed the requested fixture sets out of a
- * full schema: each set's table (resolved through the registry), keyed by the model's
- * own `tableName`. Lets a caller hand `useFixtures` the whole canonical `TEST_SCHEMA`
- * and have it pick out only the tables it touches — no hand-maintained
- * `defineSchema({ customers: TEST_SCHEMA.customers })` slice that drifts when the
- * fixture set's columns change.
- *
- * A requested set whose table is absent from `fullSchema` is silently skipped here —
- * the seed-time `defineFixtures` call then surfaces a precise "no such table" error,
- * which is a better signal than an opaque schema-derivation failure. Column-level
- * `references:` targets are intentionally NOT pulled in: `defineSchema` treats them
- * as creation-ordering hints only (never emitted as FK constraints) and skips any
- * target missing from the schema, so a per-table slice creates valid DDL on its own.
- */
-export async function deriveFixtureSchema(
-  names: readonly FixtureName[],
-  fullSchema: Schema,
-): Promise<Schema> {
-  return sliceSchema(await resolveFixtureNames(names), fullSchema);
-}
-
-/**
- * Picks each resolved set's table out of `fullSchema`, plus the join table of any
- * HABTM association on a model-backed set (see {@link throughJoinTableNames} for
- * why the pull is HABTM-only, not every `has_many :through`). The join-table pull
- * lets a model fixture materialize join rows from an owner association label (e.g.
- * `developers` seeding `computers_developers` from `sharedComputers: ["laptop"]`)
- * without the caller also requesting the join set by name — the HABTM join table,
- * having no fixture set of its own, must exist in the slice regardless.
- */
-function sliceSchema(fixtures: ResolvedFixtureMap, fullSchema: Schema): Schema {
-  const sub: Schema = {};
-  for (const { table, model } of Object.values(fixtures)) {
-    if (table in fullSchema) sub[table] = fullSchema[table]!;
-    if (model) {
-      for (const joinTable of throughJoinTableNames(model)) {
-        if (joinTable in fullSchema) sub[joinTable] = fullSchema[joinTable]!;
-      }
-    }
-  }
-  return sub;
-}
-
 /** Returns true for "table/relation does not exist" errors from any adapter. */
 function isTableMissingError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
@@ -283,7 +219,6 @@ export type UseTablelessFixturesResult<T extends readonly TablelessFixtureEntry[
 function useTablelessFixtures(
   entries: readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter,
-  opts?: UseFixturesOpts,
 ): Record<string, unknown> {
   // Tableless entries key their accessor by `table`, so two entries on the same
   // table would clobber each other's store slot. (Model-backed same-table sets in
@@ -301,14 +236,6 @@ function useTablelessFixtures(
 
   const keys = entries.map((e) => e.table);
   const store: Record<string, Record<string, unknown>> = {};
-
-  if (opts?.schema) {
-    const fullSchema = opts.schema;
-    beforeAll(async () => {
-      const names = entries.map((e) => e.table).filter((t) => t in fullSchema);
-      await ensureCanonicalTables(getAdapter(), names);
-    });
-  }
 
   beforeEach(async () => {
     const adapter = getAdapter();
@@ -404,38 +331,27 @@ function useTablelessFixtures(
  * fixtures["admin/accounts"]("signals37"); // → Admin::Account instance
  * ```
  *
- * Pass `{ schema }` to skip the manual `defineSchema` step: `useFixtures` derives the
- * minimal sub-schema for the requested sets (see {@link deriveFixtureSchema}) and
- * creates those tables in a `beforeAll`. Hand it the whole `TEST_SCHEMA` and it picks
- * out only what it needs:
- *
- * ```ts
- * setupHandlerSuite();
- * useHandlerTransactionalFixtures();
- * const { customers } = useFixtures(["customers"], () => Base.connection, { schema: TEST_SCHEMA });
- * ```
+ * No `schema` is needed: globalSetup lays the full `TEST_SCHEMA` into every
+ * worker DB and clones it to each per-worker slot, so the canonical tables
+ * already exist before any test runs — `useFixtures` only seeds and cleans rows.
  *
  * @internal
  */
 function useFixtures<M extends FixtureMap>(
   fixtures: M,
   getAdapter: () => DatabaseAdapter,
-  opts?: UseFixturesOpts,
 ): UseFixturesResult<M>;
 function useFixtures<const N extends FixtureName>(
   names: readonly N[],
   getAdapter: () => DatabaseAdapter,
-  opts?: UseFixturesOpts,
 ): UseFixturesByNameResult<N>;
 function useFixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
   getAdapter: () => DatabaseAdapter,
-  opts?: UseFixturesOpts,
 ): UseTablelessFixturesResult<T>;
 function useFixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   getAdapter: () => DatabaseAdapter,
-  opts?: UseFixturesOpts,
 ): Record<string, unknown> {
   // Tableless array: every element is an object with { table, data }.
   // The `length > 0` guard is intentional: an empty array is vacuously correct for
@@ -462,11 +378,7 @@ function useFixtures(
         );
       }
     }
-    return useTablelessFixtures(
-      fixturesOrNames as readonly TablelessFixtureEntry[],
-      getAdapter,
-      opts,
-    );
+    return useTablelessFixtures(fixturesOrNames as readonly TablelessFixtureEntry[], getAdapter);
   }
   // Symmetric guard: if the first element is a by-name string, scan remaining elements
   // for any tableless { table, data } object. A mixed array here would reach
@@ -508,18 +420,6 @@ function useFixtures(
 
   // Per-test mutable state: populated in beforeEach, cleared in afterEach.
   const store: Record<string, Record<string, unknown>> = {};
-
-  // Schema auto-derivation (opt-in via opts.schema): create just the tables these
-  // fixture sets touch, sliced from the supplied schema. Registered as a beforeAll so
-  // it runs once before the per-test seeding beforeEach below — and after any handler
-  // suite's setup (registered earlier in the describe body), so getAdapter() is live.
-  if (opts?.schema) {
-    const fullSchema = opts.schema;
-    beforeAll(async () => {
-      if (!fixtures) fixtures = await resolveFixtureNames(keys as readonly FixtureName[]);
-      await ensureCanonicalTables(getAdapter(), Object.keys(sliceSchema(fixtures, fullSchema)));
-    });
-  }
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
   // (before the pinned transaction opens) when useHandlerTransactionalFixtures is
@@ -598,7 +498,7 @@ function useFixtures(
   return result;
 }
 
-type FixturesOptions = WithTransactionalFixturesOptions & UseFixturesOpts & FixturesConnectionOpts;
+type FixturesOptions = WithTransactionalFixturesOptions & FixturesConnectionOpts;
 
 /**
  * Rails-faithful public surface for declaring fixtures in a test file — the sole
@@ -613,10 +513,11 @@ type FixturesOptions = WithTransactionalFixturesOptions & UseFixturesOpts & Fixt
  * contract where including `TestFixtures`, declaring `fixtures :name`, and
  * enabling `use_transactional_tests` are a single class-level opt-in.
  *
- * Calling `fixtures()` IS the opt-in to the canonical schema: it defaults
- * `schema` to `TEST_SCHEMA`, so converted tests never pass `schema` and the
- * minimal sub-schema for the requested sets is derived automatically. An
- * explicit `schema` still overrides for sets the canonical schema lacks.
+ * Calling `fixtures()` IS the opt-in to the canonical schema: the full
+ * `TEST_SCHEMA` is laid into every worker DB once by globalSetup (trails'
+ * `db:test:prepare`) and cloned to each per-worker slot, so the canonical
+ * tables already exist before any test runs — `fixtures()` only seeds and
+ * cleans rows, never issues DDL.
  *
  * @example  // primary documented form
  *   const { authors, posts } = fixtures({
@@ -654,19 +555,8 @@ export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
   options: FixturesOptions | undefined = undefined,
 ): Record<string, unknown> {
-  const {
-    usesTransaction,
-    invalidateSchemaCache,
-    useTransactionalTests,
-    connection,
-    ...fixtureOpts
-  } = options ?? {};
-
-  // Opting into `fixtures()` IS the opt-in to the canonical schema: converted
-  // tests get `TEST_SCHEMA` slice-derivation by default and never pass `schema`
-  // themselves. An explicit `schema` (including `undefined`) still wins for the
-  // few sets the canonical schema doesn't yet cover.
-  const fixtureOptsWithSchema = { schema: TEST_SCHEMA, ...fixtureOpts };
+  const { usesTransaction, invalidateSchemaCache, useTransactionalTests, connection } =
+    options ?? {};
 
   // Caller-supplied connection/adapter thunk wins over the default handler
   // connection: multi-database suites seed through a model-specific
@@ -685,5 +575,5 @@ export function fixtures(
     });
   }
 
-  return useFixtures(fixturesOrNames as FixtureMap, getConnection, fixtureOptsWithSchema);
+  return useFixtures(fixturesOrNames as FixtureMap, getConnection);
 }

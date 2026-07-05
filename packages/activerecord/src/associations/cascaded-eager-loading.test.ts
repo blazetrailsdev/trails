@@ -10,7 +10,6 @@
 import { describe, it, expect } from "vitest";
 import { registerModel, enableSti, registerSubclass, resetCallbacks } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Base } from "../base.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Person } from "../test-helpers/models/person.js";
@@ -32,23 +31,20 @@ import { Account } from "../test-helpers/models/account.js";
 import { assertQueriesCount } from "../testing/query-assertions.js";
 
 describe("CascadedEagerLoadingTest", () => {
-  const { authors, topics, vertices, companies, people } = fixtures(
-    [
-      "authors",
-      "posts",
-      "topics",
-      "companies",
-      "accounts",
-      "comments",
-      "categorizations",
-      "categories",
-      "categoriesPosts",
-      "edges",
-      "vertices",
-      "people",
-    ],
-    { schema: canonicalSchema },
-  );
+  const { authors, topics, vertices, companies, people } = fixtures([
+    "authors",
+    "posts",
+    "topics",
+    "companies",
+    "accounts",
+    "comments",
+    "categorizations",
+    "categories",
+    "categoriesPosts",
+    "edges",
+    "vertices",
+    "people",
+  ]);
 
   enableSti(Topic);
   registerModel(Person);

@@ -29,7 +29,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Hotel } from "../test-helpers/models/hotel.js";
 import { Department } from "../test-helpers/models/department.js";
@@ -44,7 +43,7 @@ registerModel(CakeDesigner);
 registerModel(DrinkDesigner);
 
 describe("HABTM Slot E — polymorphic + STI through", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   async function seed() {
     const hotel = await Hotel.create({});

@@ -5,7 +5,6 @@ import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
 import "./test-helpers/canonical-model-index.js";
@@ -49,7 +48,6 @@ describe("CalculationsTest", () => {
       "oneNeedQuoting",
     ] as const,
     {
-      schema: canonicalSchema,
       usesTransaction: [
         // These tests intentionally trigger DB errors (invalid column/syntax) which
         // abort PG transactions; they must run outside the transactional fixtures wrapper.

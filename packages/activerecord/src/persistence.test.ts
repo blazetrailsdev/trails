@@ -28,7 +28,6 @@ import type { PostgreSQLAdapter } from "./connection-adapters/postgresql-adapter
 import type { TableDefinition as PgTableDefinition } from "./connection-adapters/postgresql/schema-definitions.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
 import { captureSql } from "./testing/sql-capture.js";
@@ -114,10 +113,12 @@ for (const klass of [
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics, accounts, clothingItems } = fixtures(
-    ["topics", "minimalistics", "accounts", "clothingItems"],
-    { schema: canonicalSchema },
-  );
+  const { topics, accounts, clothingItems } = fixtures([
+    "topics",
+    "minimalistics",
+    "accounts",
+    "clothingItems",
+  ]);
 
   // The `auto_id_tests` table is prebuilt on the per-worker DB from the
   // canonical schema (`template-global-setup.ts`); `loadSchema` warms the cache
@@ -500,9 +501,7 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
-  const { topics } = fixtures(["topics", "developers", "parrots", "posts"], {
-    schema: canonicalSchema,
-  });
+  const { topics } = fixtures(["topics", "developers", "parrots", "posts"]);
 
   // Rails: `Developer.update!(salary: 1_000_000)` — the class-level bang
   // update touches every Developer, and the salary inclusion validation
@@ -571,9 +570,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics } = fixtures(["topics", "companies"], {
-    schema: canonicalSchema,
-  });
+  const { topics } = fixtures(["topics", "companies"]);
 
   it("build", () => {
     const topic = Topic.build({ title: "New Topic" });
@@ -807,7 +804,7 @@ describe("PersistenceTest", () => {
 // bespoke Post to canonical Client + companies fixtures.
 // ==========================================================================
 describe("PersistenceTest", () => {
-  fixtures(["companies"], { schema: canonicalSchema });
+  fixtures(["companies"]);
 
   // Rails: test_delete_new_record
   it("delete new record", async () => {
@@ -861,7 +858,7 @@ describe("PersistenceTest", () => {
 // SpecialPost STI (persistence_test.rb#test_instantiate_creates_a_new_instance)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  fixtures(["posts", "authors"], { schema: canonicalSchema });
+  fixtures(["posts", "authors"]);
 
   // Rails: test_instantiate_creates_a_new_instance
   it("instantiate creates a new instance", () => {
@@ -879,7 +876,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — create with custom timestamps (canonical LiveParrot).
 // ==========================================================================
 describe("PersistenceTest", () => {
-  fixtures(["parrots"], { schema: canonicalSchema });
+  fixtures(["parrots"]);
 
   // Rails: test_create_with_custom_timestamps
   it("create with custom timestamps", async () => {
@@ -897,7 +894,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — becomes errors base (canonical AdminUser subclass).
 // ==========================================================================
 describe("PersistenceTest", () => {
-  fixtures(["admin/users"], { schema: canonicalSchema });
+  fixtures(["admin/users"]);
 
   // Rails: test_becomes_errors_base
   it("becomes errors base", () => {
@@ -927,9 +924,7 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   const Developer = CanonicalDeveloper;
-  const { topics } = fixtures(["topics", "minivans", "developers"], {
-    schema: canonicalSchema,
-  });
+  const { topics } = fixtures(["topics", "minivans", "developers"]);
 
   // Rails: test_update_column_should_not_modify_updated_at
   // Developer aliases updated_at → legacy_updated_at (developer.rb), so the
@@ -994,7 +989,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics } = fixtures(["topics"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics"]);
 
   // Rails: test_delete
   it("delete", async () => {
@@ -1071,9 +1066,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics, people } = fixtures(["topics", "people", "cars"], {
-    schema: canonicalSchema,
-  });
+  const { topics, people } = fixtures(["topics", "people", "cars"]);
 
   it("decrement with touch an attribute updates timestamps", async () => {
     const topic = topics("first");
@@ -1129,7 +1122,7 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   const Topic = CanonicalTopic;
 
@@ -1351,7 +1344,7 @@ describe("PersistenceTest", () => {
   }); // QueryConstraintsTest
 });
 describe("PersistenceTest", () => {
-  fixtures(["topics", "posts", "authors"], { schema: canonicalSchema });
+  fixtures(["topics", "posts", "authors"]);
   const Topic = CanonicalTopic;
   const Post = CanonicalPost;
 
@@ -1390,7 +1383,7 @@ describe("PersistenceTest", () => {
 });
 
 describe("PersistenceTest", () => {
-  fixtures(["topics", "developers"], { schema: canonicalSchema });
+  fixtures(["topics", "developers"]);
   const Topic = CanonicalTopic;
 
   it("update column", async () => {
@@ -1472,9 +1465,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — composite primary key destroy (persistence_test.rb)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  const { cpkBooks } = fixtures(["cpkAuthors", "cpkBooks"], {
-    schema: canonicalSchema,
-  });
+  const { cpkBooks } = fixtures(["cpkAuthors", "cpkBooks"]);
 
   it("destroy with single composite primary key", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
@@ -1517,7 +1508,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  const { topics } = fixtures(["topics", "companies"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics", "companies"]);
 
   it("becomes after reload schema from cache", () => {
     (Reply as any).defineAttributeMethods();
@@ -1576,9 +1567,7 @@ describe("PersistenceTest", () => {
 // PersistenceTest — readonly attributes + non-id primary keys (persistence_test.rb)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  const { developers } = fixtures(["developers", "minivans", "speedometers"], {
-    schema: canonicalSchema,
-  });
+  const { developers } = fixtures(["developers", "minivans", "speedometers"]);
 
   it("update attribute for readonly attribute", async () => {
     const minivan = await Minivan.find("m1");
@@ -1707,7 +1696,7 @@ describe("PersistenceTest", () => {
 describe("PersistenceTest", () => {
   registerModel(ChatMessage);
   registerModel(ChatMessageCustomPk);
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
   beforeAll(async () => {
     // uuid is a PG-only defineSchema type, so the schema is only applied on
     // postgres; the tests below are individually gated to the same adapter.
@@ -1767,7 +1756,7 @@ describe("PersistenceTest", () => {
 // becomes + restricted-name dirty tracking (persistence_test.rb:473)
 // ==========================================================================
 describe("PersistenceTest", () => {
-  fixtures(["companies"], { schema: canonicalSchema });
+  fixtures(["companies"]);
   // Warm the schema cache so Company's column accessors (incl. the restricted
   // `name` reader) are generated before `new Company(...)`, matching Rails where
   // the connection reflects columns lazily on first use.
@@ -1788,7 +1777,7 @@ describe("PersistenceTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
-  fixtures(["topics", "developers", "parrots"], { schema: canonicalSchema });
+  fixtures(["topics", "developers", "parrots"]);
 
   it("save valid record", async () => {
     const topic = new Topic({ title: "New Topic" });
@@ -1832,9 +1821,7 @@ describe("PersistenceTest", () => {
 // QueryConstraintsTest — targets persistence_test.rb QueryConstraintsTest
 // ==========================================================================
 describe("QueryConstraintsTest", () => {
-  const { clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"], {
-    schema: canonicalSchema,
-  });
+  const { clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"]);
 
   beforeAll(async () => {
     // `developers_projects` is a join table with no single primary key; warm its

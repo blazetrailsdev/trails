@@ -24,7 +24,6 @@ import { Ship } from "./test-helpers/models/ship.js";
 import { Treasure } from "./test-helpers/models/treasure.js";
 import { registerModel } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { ProtectedParams } from "./test-helpers/protected-params.js";
 
 // ShipPart's nested associations resolve `Ship` / `Treasure` from the model
@@ -34,7 +33,7 @@ registerModel(Ship);
 registerModel(Treasure);
 
 describe("ForbiddenAttributesProtectionTest", () => {
-  fixtures(["people", "companies"], { schema: canonicalSchema });
+  fixtures(["people", "companies"]);
 
   it("forbidden attributes cannot be used for mass assignment", () => {
     const params = new ProtectedParams({ first_name: "Guille", gender: "m" });

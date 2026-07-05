@@ -9,7 +9,6 @@ import { Base, serialize, SerializationTypeMismatch } from "./index.js";
 import { HashObject } from "./serialize.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { SerializedPerson } from "./test-helpers/models/person.js";
 import { TrafficLight } from "./test-helpers/models/traffic-light.js";
@@ -37,9 +36,7 @@ class MyObject {
 }
 
 describe("SerializedAttributeTest", () => {
-  const { topics, posts } = fixtures(["topics", "posts"], {
-    schema: canonicalSchema,
-  });
+  const { topics, posts } = fixtures(["topics", "posts"]);
 
   it("serialize does not eagerly load columns", () => {
     // Rails: assert_no_queries { Topic.serialize(:content) }
@@ -611,7 +608,7 @@ describe("SerializedAttributeTest", () => {
 // Reruns a subset of tests with use_yaml_unsafe_load=false. In trails we use
 // JSON serialization regardless; we mirror the safe-load overrides using JSON coders.
 describe("SerializedAttributeTestWithYamlSafeLoad", () => {
-  fixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"]);
 
   it("serialized attribute", async () => {
     // Rails SafeLoad override: type: String (safe under Psych safe_load; base class uses MyObject which isn't).

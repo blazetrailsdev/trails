@@ -7,7 +7,6 @@ import { describeIfPg } from "./test-helper.js";
 import { Base } from "../../base.js";
 import { registerModel } from "../../associations.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 import { Developer } from "../../test-helpers/models/developer.js";
 import { Computer } from "../../test-helpers/models/computer.js";
 import { developerFixtureData } from "../../test-helpers/fixtures/developers.js";
@@ -15,21 +14,16 @@ import { developerFixtureData } from "../../test-helpers/fixtures/developers.js"
 // `developerFixtureData.david` carries the `sharedComputers: ["laptop"]` HABTM
 // association label, which the fixture loader materializes into a
 // `computers_developers` join row. Register Computer at module load so the
-// `sharedComputers` reflection resolves when `fixtures()` slices the schema —
-// without it the join table is dropped from the slice and the seed insert fails.
+// `sharedComputers` reflection resolves when the loader writes that join row —
+// without it the join target is unresolved and the seed insert fails.
 registerModel(Computer);
 
 describeIfPg("PostgreSQLAdapter", () => {
   describe("PreparedStatementsDisabledTest", () => {
     // Rails `fixtures :developers`. Seeded through the inline `[Model, data]` map.
-    // `schema` recreates the canonical `developers` table (and the
-    // `computers_developers` join table the `sharedComputers` label materializes)
-    // so the shared Developer model resolves regardless of any bespoke schema a
-    // sibling file left in the worker DB.
-    const { developers } = fixtures(
-      { developers: [Developer, developerFixtureData] },
-      { schema: canonicalSchema },
-    );
+    // The canonical `developers` table (and the `computers_developers` join table
+    // the `sharedComputers` label materializes) come from the template clone.
+    const { developers } = fixtures({ developers: [Developer, developerFixtureData] });
 
     // `preparedStatements` lives on AbstractAdapter but isn't on the
     // `DatabaseAdapter` interface that `connection` is typed as.

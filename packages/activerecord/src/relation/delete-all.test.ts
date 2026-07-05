@@ -5,7 +5,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -23,19 +22,16 @@ for (const klass of [Author, AuthorAddress, Comment, Post, Pet, Toy, CpkOrder, C
 // DeleteAllTest — targets relation/delete_all_test.rb
 // ==========================================================================
 describe("DeleteAllTest", () => {
-  const { authors, posts, cpkOrderAgreements } = fixtures(
-    [
-      "authors",
-      "authorAddresses",
-      "comments",
-      "posts",
-      "pets",
-      "toys",
-      "cpkOrders",
-      "cpkOrderAgreements",
-    ],
-    { schema: canonicalSchema },
-  );
+  const { authors, posts, cpkOrderAgreements } = fixtures([
+    "authors",
+    "authorAddresses",
+    "comments",
+    "posts",
+    "pets",
+    "toys",
+    "cpkOrders",
+    "cpkOrderAgreements",
+  ]);
 
   it("destroy all", async () => {
     const davids = Author.where({ name: "David" });

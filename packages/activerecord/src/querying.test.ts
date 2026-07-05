@@ -5,12 +5,11 @@ import { Result } from "./result.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // Rails `fixtures :topics`. Recreate the canonical topics table empty so the
 // forwarder/aggregate assertions run against a clean shape on the shared worker
 // DB; the static forwarders only assert relation/promise types, not row data.
-fixtures({ topics: [Topic, {}] }, { schema: canonicalSchema });
+fixtures({ topics: [Topic, {}] });
 
 describe("QueryingTest — static forwarders on Base", () => {
   it("includes() returns a Relation without throwing", () => {

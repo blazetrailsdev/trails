@@ -11,7 +11,6 @@ import { Base } from "./index.js";
 import type { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { describeIfSupports, itIfSupports } from "./test-helpers/supports.js";
 import { dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
@@ -37,9 +36,8 @@ async function dropView(name: string): Promise<void> {
 }
 
 // Force-recreate `books`/`authors` to the canonical shape before each suite's
-// view is created. Vitest resets the schema-signature cache to canonical per
-// file, so `fixtures()`' own schema-priming sees a cache-hit and skips the
-// repair — leaving whatever reduced `books` shape (no `cover`/`status`) a sibling
+// view is created. The tables come from the template clone and nothing else
+// recreates them, so whatever reduced `books` shape (no `cover`/`status`) a sibling
 // handler-suite file co-scheduled earlier in the same fork left in the shared
 // worker DB. The `CREATE VIEW … SELECT cover, status FROM books` below then fails
 // with "Unknown column" on MySQL. This drops + recreates unconditionally.
@@ -58,7 +56,7 @@ async function rebuildBooksTables(): Promise<void> {
 // so gate this suite the same way (all adapters support views, so it gates
 // nothing at runtime — it keeps the gate-fidelity match with Rails).
 describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
-  const { books } = fixtures(["books", "authors"], { schema: canonicalSchema });
+  const { books } = fixtures(["books", "authors"]);
 
   class Ebook extends Base {
     static override _tableName = "ebooks'";
@@ -144,7 +142,6 @@ describeIfSupports("views", "ViewWithPrimaryKeyTest", () => {
 // (vendor/rails/activerecord/test/cases/view_test.rb:100).
 describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
   const { books } = fixtures(["books", "authors"], {
-    schema: canonicalSchema,
     useTransactionalTests: false,
   });
 
@@ -222,7 +219,6 @@ describeIfSupports("views", "ViewWithoutPrimaryKeyTest", () => {
 // delete/reseed via beforeEach/afterEach, committed DML, no savepoint).
 describe("UpdateableViewTest", () => {
   const { books } = fixtures(["books", "authors"], {
-    schema: canonicalSchema,
     useTransactionalTests: false,
   });
 

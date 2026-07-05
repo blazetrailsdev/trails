@@ -41,8 +41,8 @@ import { repairValidations } from "./test-helpers/repair-validations.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 
 // The canonical models these tests exercise, declared as (data-less) fixture
-// sets. Declaring a set derives its slice of TEST_SCHEMA (plus HABTM join
-// tables) and auto-registers the model on resolution — replacing the manual
+// sets. Their tables come from the template clone; declaring a set
+// auto-registers the model on resolution — replacing the manual
 // `defineSchema` + `registerModel` bootstrap. Empty data means no seeded rows;
 // each test builds the records it needs (matching Rails, which doesn't declare
 // fixtures for these classes).

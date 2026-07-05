@@ -1,5 +1,5 @@
 import { describe, it, expect, expectTypeOf, vi, beforeAll, afterAll } from "vitest";
-import { resolveFixtureNames, deriveFixtureSchema } from "./use-fixtures.js";
+import { resolveFixtureNames } from "./use-fixtures.js";
 import { fixtureRegistry, isJoinTableEntry } from "./fixtures-registry.js";
 import { registerModel } from "../associations.js";
 import { FixtureSet } from "./fixture-set.js";
@@ -13,7 +13,6 @@ import {
 } from "./define-fixtures.js";
 import { setupFixtures, fixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
-import { TEST_SCHEMA } from "./test-schema.js";
 import { Author } from "./models/author.js";
 import { Post } from "./models/post.js";
 import { LiveParrot, DeadParrot } from "./models/parrot.js";
@@ -101,9 +100,9 @@ describe("useFixtures", () => {
 
   const { topics } = fixtures(
     { topics: [Topic, { rails: { title: "Rails" } }] },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("accessor returns the instance by label after beforeEach runs", () => {
@@ -132,9 +131,9 @@ describe("useFixtures multi-set", () => {
       topics: [Topic, { rails: { title: "Rails" } }],
       posts: [Post, { hello: { title: "Hello" } }],
     },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("both sets are accessible", () => {
@@ -155,9 +154,9 @@ describe("useFixtures slash-keyed fixture sets", () => {
   // accessible via bracket notation only; dot-access would be a syntax error.
   const result = fixtures(
     { "admin/accounts": [AccountModel, { david: { name: "David" } }] },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("result property is accessible via bracket notation", () => {
@@ -193,9 +192,9 @@ describe("all/ fixture sets — explicit enumeration", () => {
       "all/tasks": [TaskModel, {}],
       "all/namespaced/accounts": [AccountModel, { signals37: { name: "37signals" } }],
     },
-    // Mock adapter over a non-canonical / stubbed table: opt out of the
-    // `fixtures()` TEST_SCHEMA slice-derivation (there is nothing to create).
-    { connection: () => adapter, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over a non-canonical / stubbed table: seeding goes through
+    // the mock adapter, so no real table is involved.
+    { connection: () => adapter, useTransactionalTests: false },
   );
 
   it("all four fixture sets are accessible via bracket notation", () => {
@@ -236,9 +235,9 @@ describe("useFixtures type contract", () => {
       topics: [Topic, { first: { title: "First" }, second: { title: "Second" } }],
       posts: [Post, { welcome: { body: "Hi" } }],
     },
-    // Mock adapter over stubbed models: opt out of the `fixtures()` TEST_SCHEMA
-    // slice-derivation (there is nothing to create).
-    { connection: () => makeAdapter() as any, useTransactionalTests: false, schema: undefined },
+    // Mock adapter over stubbed models: seeding goes through the mock
+    // adapter, so no real table is involved.
+    { connection: () => makeAdapter() as any, useTransactionalTests: false },
   );
 
   it("accessor return type is narrowed to the model instance type", () => {
@@ -396,54 +395,6 @@ describe("useFixtures vertices and edges", () => {
       expect(vertexIds).toContain(Number(edge.readAttribute("source_id")));
       expect(vertexIds).toContain(Number(edge.readAttribute("sink_id")));
     }
-  });
-});
-
-// --- useFixtures schema auto-derivation ({ schema } option) ---
-
-describe("useFixtures { schema } auto-derivation", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-
-  // No manual schema-priming beforeAll: passing the full TEST_SCHEMA lets
-  // useFixtures create just the tables these sets touch (authorAddresses → posts).
-  const { authors } = fixtures(["authorAddresses", "authors", "posts"], {
-    connection: () => Base.adapter,
-    useTransactionalTests: false,
-    schema: TEST_SCHEMA,
-  });
-
-  it("creates the needed tables and seeds without a manual defineSchema call", async () => {
-    const david = authors("david");
-    expect(Number(david.id)).toBe(1);
-    const [row] = await Base.adapter.execute(
-      `SELECT name FROM ${Base.adapter.quoteTableName(Author.tableName)} WHERE id = 1`,
-    );
-    expect((row as { name: string }).name).toBe("David");
-  });
-});
-
-describe("deriveFixtureSchema", () => {
-  it("slices only the requested sets' tables out of the full schema", async () => {
-    const sub = await deriveFixtureSchema(["authors", "posts"], TEST_SCHEMA);
-    // `posts` pulls in `categories_posts` too: `sliceSchema` includes the join
-    // table of any HABTM association on a model-backed set (the loader may write
-    // join rows from an owner association label). `Post habtm categories` owns
-    // the anonymous `categories_posts` join model, so its table is read straight
-    // off the through reflection — no target resolution, so it is detected the
-    // same whether or not the autoload index is installed. `has_many :through`
-    // join tables (taggings, categorizations, …) are deliberately NOT pulled in:
-    // they belong to real models whose fixture sets are requested by name.
-    expect(Object.keys(sub).sort()).toEqual(
-      [Author.tableName, Post.tableName, "categories_posts"].sort(),
-    );
-    // The slice carries the real column spec, not a placeholder.
-    expect(sub[Author.tableName]).toBe(TEST_SCHEMA[Author.tableName]);
-  });
-
-  it("omits a requested set whose table is absent from the schema", async () => {
-    const sub = await deriveFixtureSchema(["authors"], { other_table: { name: "string" } });
-    expect(sub).toEqual({});
   });
 });
 

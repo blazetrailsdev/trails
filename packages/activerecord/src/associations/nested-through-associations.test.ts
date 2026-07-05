@@ -3,7 +3,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -86,36 +85,33 @@ describe("NestedThroughAssociationsTest", () => {
     people,
     references,
     jobs,
-  } = fixtures(
-    [
-      "authors",
-      "authorAddresses",
-      "books",
-      "posts",
-      "subscriptions",
-      "subscribers",
-      "tags",
-      "taggings",
-      "people",
-      "readers",
-      "references",
-      "jobs",
-      "ratings",
-      "comments",
-      "members",
-      "memberDetails",
-      "memberTypes",
-      "sponsors",
-      "clubs",
-      "organizations",
-      "categories",
-      "categoriesPosts",
-      "categorizations",
-      "memberships",
-      "essays",
-    ],
-    { schema: canonicalSchema },
-  );
+  } = fixtures([
+    "authors",
+    "authorAddresses",
+    "books",
+    "posts",
+    "subscriptions",
+    "subscribers",
+    "tags",
+    "taggings",
+    "people",
+    "readers",
+    "references",
+    "jobs",
+    "ratings",
+    "comments",
+    "members",
+    "memberDetails",
+    "memberTypes",
+    "sponsors",
+    "clubs",
+    "organizations",
+    "categories",
+    "categoriesPosts",
+    "categorizations",
+    "memberships",
+    "essays",
+  ]);
 
   // has_many through
   // Source: has_many through

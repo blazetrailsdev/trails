@@ -8,7 +8,6 @@ import "../index.js";
 import { Range } from "../index.js";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -31,10 +30,15 @@ const includesRecord = (records: unknown[], record: unknown): boolean =>
   records.some((r) => (r as any).id === (record as any).id);
 
 describe("WhereChainTest", () => {
-  const { posts, comments, authors, humans } = fixtures(
-    ["posts", "comments", "authors", "humans", "essays", "authorAddresses", "books"],
-    { schema: canonicalSchema },
-  );
+  const { posts, comments, authors, humans } = fixtures([
+    "posts",
+    "comments",
+    "authors",
+    "humans",
+    "essays",
+    "authorAddresses",
+    "books",
+  ]);
 
   // david is author 1, mary is author 2.
   const davidPostsCount = async (): Promise<number> =>

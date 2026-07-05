@@ -30,7 +30,6 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { adapterType } from "../test-adapter.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "../test-helpers/models/post.js";
 
 // Establish the primary (boot-laid canonical-schema) pool so the bespoke
@@ -128,7 +127,7 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
     describe("executing through Relation#pluck", () => {
       // `posts` rides the boot-laid canonical schema (RFC 0059 Phase 1);
       // per-file `repairWorkerSchema` restores any sibling drift beforehand.
-      fixtures(["posts"], { schema: canonicalSchema });
+      fixtures(["posts"]);
 
       it("scopes plucked rows to the from(subquery)", async () => {
         const sub = CanonicalPost.where("id <= 2");

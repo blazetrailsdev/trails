@@ -6,7 +6,6 @@ import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { describeIfSupports } from "../../test-helpers/supports.js";
 import { captureSql } from "../../testing/sql-capture.js";
 import { Base } from "../../index.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
@@ -16,7 +15,7 @@ import { Post } from "../../test-helpers/models/post.js";
 describeIfMysql("Mysql2Adapter", () => {
   describeIfSupports("optimizer_hints", "OptimizerHintsTest", () => {
     // mirrors Rails: fixtures :posts
-    fixtures(["posts"], { schema: canonicalSchema });
+    fixtures(["posts"]);
 
     let adapter: Mysql2Adapter;
     beforeAll(async () => {

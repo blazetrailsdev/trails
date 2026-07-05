@@ -6,13 +6,10 @@
 import { describe, it, expect } from "vitest";
 import "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("AndTest", () => {
-  const { authors } = fixtures(["authors", "authorAddresses"], {
-    schema: canonicalSchema,
-  });
+  const { authors } = fixtures(["authors", "authorAddresses"]);
 
   it("and", async () => {
     const david = authors("david");

@@ -10,7 +10,6 @@ import {
 } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
@@ -83,7 +82,6 @@ describe("RelationTest", () => {
       "subscribers",
     ],
     {
-      schema: canonicalSchema,
       usesTransaction: ["finding with subquery without select does not change the select"],
     },
   );

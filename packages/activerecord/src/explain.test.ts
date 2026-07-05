@@ -13,7 +13,6 @@ import { buildExplainClause } from "./explain.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Car } from "./test-helpers/models/car.js";
 import { Bulb } from "./test-helpers/models/bulb.js";
 
@@ -21,7 +20,7 @@ registerModel(Car);
 registerModel(Bulb);
 
 describe("ExplainTest", () => {
-  fixtures(["cars", "bulbs"], { schema: canonicalSchema });
+  fixtures(["cars", "bulbs"]);
 
   itIfSupports("explain", "relation explain", async () => {
     const message = await Car.where({ name: "honda" }).explain();

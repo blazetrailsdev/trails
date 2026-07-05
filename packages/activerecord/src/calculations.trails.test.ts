@@ -6,7 +6,6 @@ import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so the `topics` association target
 // (`Topic`) resolves by name on first reference — no manual `registerModel`.
 import "./test-helpers/canonical-model-index.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // ==========================================================================
 // lookupCastTypeFromJoinDependencies unit tests
@@ -114,7 +113,7 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
     }
   }
 
-  fixtures(["topics", "authors"], { schema: canonicalSchema });
+  fixtures(["topics", "authors"]);
 
   // A plain `joins(:assoc)` now feeds buildJoinDependencies (via _namedInnerJoins),
   // so lookupCastTypeFromJoinDependencies recovers the joined column's cast type

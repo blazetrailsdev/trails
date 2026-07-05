@@ -16,7 +16,6 @@ import { sql as arelSql } from "@blazetrails/arel";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import {
   assertQueriesCount,
@@ -57,7 +56,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 // those onto the real finder_test.rb models/fixtures is tracked under RFC 0048.
 // ==========================================================================
 describe("FinderTest", () => {
-  const { topics } = fixtures(["topics"], { schema: canonicalSchema });
+  const { topics } = fixtures(["topics"]);
   const rid = (r: unknown) => (r as { id: number }).id;
   const Topic = CanonicalTopic;
   // Register by Rails name so STI Reply rows resolve their belongs_to :topic
@@ -469,9 +468,7 @@ describe("FinderTest", () => {
 // builder; tracked under RFC 0023.
 // ==========================================================================
 describe("FinderTest", () => {
-  const { topics, cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"], {
-    schema: canonicalSchema,
-  });
+  const { topics, cpkBooks } = fixtures(["topics", "cpkAuthors", "cpkBooks"]);
   const Topic = CanonicalTopic;
   registerModel("Topic", Topic);
   registerModel("Reply", CanonicalReply);
@@ -563,7 +560,7 @@ describe("FinderTest", () => {
 // FinderTest — targets finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   it("count by sql", async () => {
     class Topic extends Base {
@@ -1484,7 +1481,7 @@ describe("FinderTest", () => {
 // FinderTest2 — additional coverage for finder_test.rb
 // ==========================================================================
 describe("FinderTest", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   class Post extends Base {
     static {
@@ -1606,7 +1603,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   // Rails: test_find_with_array_of_ids
   // Rails: test_find_raises_record_not_found
@@ -1630,7 +1627,7 @@ describe("FinderTest", () => {
 });
 
 describe("FinderTest", () => {
-  fixtures([], { schema: canonicalSchema });
+  fixtures([]);
 
   it("find_by with non-hash conditions returns the first matching record", async () => {
     class Item extends Base {
@@ -1652,7 +1649,7 @@ describe("FinderTest", () => {
 // faithful-port-finder-test-synthetic-clusters.
 // ==========================================================================
 describe("FinderTest", () => {
-  const { posts } = fixtures(["posts", "comments"], { schema: canonicalSchema });
+  const { posts } = fixtures(["posts", "comments"]);
   registerModel(CanonicalPost);
   registerModel(CanonicalComment);
 
@@ -1738,7 +1735,6 @@ describe("FinderTest", () => {
 // ==========================================================================
 describe("FinderTest", () => {
   fixtures(["topics", "comments", "posts", "companies", "accounts"], {
-    schema: canonicalSchema,
     // Rails' malformed-condition test intentionally raises StatementInvalid
     // (unknown `dhh` column), which aborts the surrounding PG transaction and
     // poisons transactional-fixtures teardown; run it outside the wrapper.
@@ -2016,10 +2012,14 @@ describe("FinderTest", () => {
 // Customer/Cpk::Book pair asserts identical behavior.
 // ==========================================================================
 describe("FinderTest", () => {
-  const { customers, cpkBooks, authors, topics } = fixtures(
-    ["customers", "cpkBooks", "cpkAuthors", "topics", "authors", "posts"],
-    { schema: canonicalSchema },
-  );
+  const { customers, cpkBooks, authors, topics } = fixtures([
+    "customers",
+    "cpkBooks",
+    "cpkAuthors",
+    "topics",
+    "authors",
+    "posts",
+  ]);
   const Customer = CanonicalCustomer;
   const Author = CanonicalAuthor;
   registerModel("Customer", Customer);
@@ -2235,7 +2235,7 @@ describe("FinderTest", () => {
 // Kept in its own describe so declaring fixtures() does not activate
 // test-fixture-parity across the stub-heavy exists/find-by block above.
 describe("FinderTest", () => {
-  const { customers } = fixtures(["customers"], { schema: canonicalSchema });
+  const { customers } = fixtures(["customers"]);
   const Customer = CanonicalCustomer;
 
   it("exists with aggregate having three mappings", async () => {
@@ -2286,20 +2286,17 @@ describe("FinderTest", () => {
 // coverage (RFC 0023). Test names match Rails verbatim.
 // ==========================================================================
 describe("FinderTest", () => {
-  const { topics, authors, developers } = fixtures(
-    [
-      "topics",
-      "authors",
-      "posts",
-      "comments",
-      "categorizations",
-      "taggings",
-      "subscribers",
-      "developers",
-      "ratings",
-    ],
-    { schema: canonicalSchema },
-  );
+  const { topics, authors, developers } = fixtures([
+    "topics",
+    "authors",
+    "posts",
+    "comments",
+    "categorizations",
+    "taggings",
+    "subscribers",
+    "developers",
+    "ratings",
+  ]);
 
   const Topic = CanonicalTopic;
   const Author = CanonicalAuthor;

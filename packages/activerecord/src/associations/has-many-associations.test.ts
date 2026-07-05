@@ -100,7 +100,6 @@ import { captureSql } from "../testing/sql-capture.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { TypedEssay } from "../test-helpers/models/essay.js";
 import { PersonWithPolymorphicDependentNullifyComments } from "../test-helpers/models/person.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 
 describe("HasManyAssociationsTestPrimaryKeys", () => {
   const { people } = fixtures([
@@ -348,10 +347,16 @@ describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { posts, humans, categories } = fixtures(
-    ["posts", "comments", "humans", "categories", "essays", "tags", "taggings", "people"],
-    { schema: TEST_SCHEMA },
-  );
+  const { posts, humans, categories } = fixtures([
+    "posts",
+    "comments",
+    "humans",
+    "categories",
+    "essays",
+    "tags",
+    "taggings",
+    "people",
+  ]);
 
   beforeAll(async () => {
     registerModel(HmPost);
@@ -6303,7 +6308,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { posts } = fixtures(["posts", "tags", "taggings"], { schema: TEST_SCHEMA });
+  const { posts } = fixtures(["posts", "tags", "taggings"]);
 
   beforeAll(async () => {
     registerModel(HmPost);
@@ -6610,7 +6615,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { authors } = fixtures(["authors", "posts"], { schema: TEST_SCHEMA });
+  const { authors } = fixtures(["authors", "posts"]);
 
   beforeAll(async () => {
     registerModel(HmAuthor);
@@ -6679,10 +6684,16 @@ describe("HasManyAssociationsTestPrimaryKeys", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { companies, topics } = fixtures(
-    ["companies", "accounts", "topics", "posts", "comments", "taggings", "cars", "bulbs"],
-    { schema: TEST_SCHEMA },
-  );
+  const { companies, topics } = fixtures([
+    "companies",
+    "accounts",
+    "topics",
+    "posts",
+    "comments",
+    "taggings",
+    "cars",
+    "bulbs",
+  ]);
 
   beforeAll(() => {
     registerModel(Company);
@@ -6951,9 +6962,7 @@ describe("AsyncHasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { topics } = fixtures(["companies", "accounts", "topics"], {
-    schema: TEST_SCHEMA,
-  });
+  const { topics } = fixtures(["companies", "accounts", "topics"]);
 
   beforeAll(() => {
     registerModel(Company);
@@ -7053,9 +7062,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { cars } = fixtures(["cars", "topics", "ships", "treasures"], {
-    schema: TEST_SCHEMA,
-  });
+  const { cars } = fixtures(["cars", "topics", "ships", "treasures"]);
 
   beforeAll(() => {
     registerModel(HmCar);
@@ -7201,10 +7208,13 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { cpkAuthors, shardedBlogPosts } = fixtures(
-    ["cpkAuthors", "cpkBooks", "shardedBlogs", "shardedBlogPosts", "shardedComments"],
-    { schema: TEST_SCHEMA },
-  );
+  const { cpkAuthors, shardedBlogPosts } = fixtures([
+    "cpkAuthors",
+    "cpkBooks",
+    "shardedBlogs",
+    "shardedBlogPosts",
+    "shardedComments",
+  ]);
 
   // fixtures loads the fixture rows but does not register the models
   // under the class names the associations resolve by (`CpkBook`,
@@ -7272,9 +7282,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { categories } = fixtures(["categories", "categorizations"], {
-    schema: TEST_SCHEMA,
-  });
+  const { categories } = fixtures(["categories", "categorizations"]);
 
   beforeAll(() => {
     registerModel(Category);
@@ -7304,14 +7312,11 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  fixtures(
-    {
-      user_comments_counts: [UserCommentsCount, {}],
-      post_comments_counts: [PostCommentsCount, {}],
-      comment_overlapping_counter_caches: [CommentOverlappingCounterCache, {}],
-    },
-    { schema: TEST_SCHEMA },
-  );
+  fixtures({
+    user_comments_counts: [UserCommentsCount, {}],
+    post_comments_counts: [PostCommentsCount, {}],
+    comment_overlapping_counter_caches: [CommentOverlappingCounterCache, {}],
+  });
 
   beforeAll(() => {
     registerModel(CommentOverlappingCounterCache);

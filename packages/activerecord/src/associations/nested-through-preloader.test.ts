@@ -28,7 +28,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment, SpecialComment, SubSpecialComment } from "../test-helpers/models/comment.js";
@@ -47,9 +46,7 @@ describe("HMT Slot D — nested-through preloader / STI / joins+includes", () =>
     authors,
     ratings,
     comments: fixtureComments,
-  } = fixtures(["authors", "authorAddresses", "posts", "comments", "ratings"], {
-    schema: canonicalSchema,
-  });
+  } = fixtures(["authors", "authorAddresses", "posts", "comments", "ratings"]);
 
   it("proxy.toArray() walks a 3-level nested-through chain and filters by owner", async () => {
     // Author → comments (through posts) → ratings (3-level chain).

@@ -17,7 +17,6 @@ import "../index.js";
 import { registerModel } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { adapterType } from "../test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -44,10 +43,13 @@ const capSql = (fn: () => unknown) =>
   captureSql(fn as () => Promise<void>, { includeSchema: false });
 
 describe("NamedScopingTest", () => {
-  const { topics, posts, authors } = fixtures(
-    ["topics", "posts", "authors", "comments", "authorAddresses"],
-    { schema: canonicalSchema },
-  );
+  const { topics, posts, authors } = fixtures([
+    "topics",
+    "posts",
+    "authors",
+    "comments",
+    "authorAddresses",
+  ]);
 
   it("implements enumerable", async () => {
     expect((await Topic.all()).length).toBeGreaterThan(0);

@@ -11,7 +11,6 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Post } from "./test-helpers/models/post.js";
 import { association } from "./associations.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";
 import { LogSubscriber } from "./log-subscriber.js";
@@ -61,9 +60,7 @@ function assertCache(
 }
 
 describe("QueryCacheTest", () => {
-  fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
-    schema: canonicalSchema,
-  });
+  fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"]);
 
   afterEach(async () => {
     Task.connectionPool().clearQueryCache();
@@ -632,9 +629,7 @@ describe("QuerySerializedParamTest", () => {
 });
 
 describe("QueryCacheExpiryTest", () => {
-  fixtures(["tasks", "posts", "categories", "categoriesPosts"], {
-    schema: canonicalSchema,
-  });
+  fixtures(["tasks", "posts", "categories", "categoriesPosts"]);
 
   afterEach(async () => {
     (await Task.leaseConnection()).clearQueryCache();
@@ -724,7 +719,6 @@ describe("QueryCacheExpiryTest", () => {
 
 describe("TransactionInCachedSqlActiveRecordPayloadTest", () => {
   fixtures(["tasks"], {
-    schema: canonicalSchema,
     usesTransaction: ["payload with open transaction"],
   });
 

@@ -4,13 +4,12 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("CloneTest", () => {
   // `fixtures` wires `setupFixtures` internally and is
   // transactional, mirroring Rails' `fixtures :topics`.
-  fixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"]);
 
   it("persisted", async () => {
     const topic = await Topic.first();

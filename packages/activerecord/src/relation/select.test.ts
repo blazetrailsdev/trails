@@ -9,7 +9,6 @@ import { StatementInvalid } from "../index.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post, PostWithDefaultSelect } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { registerModel } from "../associations.js";
@@ -37,7 +36,6 @@ describe("SelectTest", () => {
   // of the wrapping transaction via `usesTransaction` and run in autocommit —
   // the failed statement then errors cleanly without leaving an aborted txn.
   fixtures(["posts", "comments"], {
-    schema: canonicalSchema,
     usesTransaction: [
       "select with not exists field",
       "select with hash with not exists field",

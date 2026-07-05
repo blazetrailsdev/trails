@@ -11,7 +11,6 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, registerSubclass, enableSti } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
@@ -34,24 +33,21 @@ import { Job } from "../test-helpers/models/job.js";
 
 describe("InnerJoinAssociationTest", () => {
   const { authors, posts, people, categories, categoriesPosts, shardedBlogPosts, shardedComments } =
-    fixtures(
-      [
-        "authors",
-        "authorAddresses",
-        "essays",
-        "posts",
-        "comments",
-        "categories",
-        "categoriesPosts",
-        "categorizations",
-        "taggings",
-        "tags",
-        "people",
-        "shardedComments",
-        "shardedBlogPosts",
-      ],
-      { schema: canonicalSchema },
-    );
+    fixtures([
+      "authors",
+      "authorAddresses",
+      "essays",
+      "posts",
+      "comments",
+      "categories",
+      "categoriesPosts",
+      "categorizations",
+      "taggings",
+      "tags",
+      "people",
+      "shardedComments",
+      "shardedBlogPosts",
+    ]);
 
   enableSti(Category);
   registerModel(Author);

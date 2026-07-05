@@ -7,7 +7,6 @@ import { Base, composedOf, reflectOnAggregation } from "./index.js";
 import { reload as persistenceReload } from "./persistence.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import {
   Customer as CustomerModel,
   Money as MoneyClass,
@@ -31,9 +30,9 @@ afterAll(() => {
 // against the canonical Customer model + composed_of mappings, rather than the
 // ad-hoc inline Customer classes used elsewhere in this file.
 describe("AggregationsTest", () => {
-  // Mirrors Rails `fixtures :customers` via the shared Customer model; `{ schema }`
-  // recreates the canonical `customers` table to survive sibling-file contamination.
-  const { customers } = fixtures(["customers"], { schema: canonicalSchema });
+  // Mirrors Rails `fixtures :customers` via the shared Customer model; the
+  // canonical `customers` table comes from the template clone.
+  const { customers } = fixtures(["customers"]);
 
   // Rails: test_find_single_value_object
   it("find single value object", () => {

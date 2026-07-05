@@ -7,7 +7,6 @@ import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post } from "./test-helpers/models/post.js";
 import {
   connectedToStack,
@@ -786,7 +785,6 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
   const testName =
     "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed";
   fixtures(["posts"], {
-    schema: canonicalSchema,
     usesTransaction: [testName],
   });
 

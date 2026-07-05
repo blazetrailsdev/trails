@@ -5,7 +5,6 @@ import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Project, SpecialProject } from "../test-helpers/models/project.js";
 import {
   Developer,
@@ -171,28 +170,25 @@ class Source extends Base {
 // Developer/Project models + developers_projects fixtures.
 // ==========================================================================
 describe("HasAndBelongsToManyAssociationsTest", () => {
-  const { developers, projects, computers } = fixtures(
-    [
-      "developers",
-      "projects",
-      "developersProjects",
-      "computers",
-      "categories",
-      "posts",
-      "categoriesPosts",
-      "authors",
-      "categorizations",
-      "tags",
-      "taggings",
-      "parrots",
-      "pirates",
-      "parrotsPirates",
-      "treasures",
-      "parrotsTreasures",
-      "priceEstimates",
-    ],
-    { schema: canonicalSchema },
-  );
+  const { developers, projects, computers } = fixtures([
+    "developers",
+    "projects",
+    "developersProjects",
+    "computers",
+    "categories",
+    "posts",
+    "categoriesPosts",
+    "authors",
+    "categorizations",
+    "tags",
+    "taggings",
+    "parrots",
+    "pirates",
+    "parrotsPirates",
+    "treasures",
+    "parrotsTreasures",
+    "priceEstimates",
+  ]);
 
   beforeAll(async () => {
     for (const m of [

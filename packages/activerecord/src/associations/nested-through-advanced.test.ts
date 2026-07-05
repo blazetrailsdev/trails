@@ -8,7 +8,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Tag } from "../test-helpers/models/tag.js";
@@ -31,10 +30,13 @@ registerModel(CakeDesigner);
 registerModel(DrinkDesigner);
 
 describe("HMT Slot E — nested-through advanced", () => {
-  const { authors, tags, taggings } = fixtures(
-    ["authors", "authorAddresses", "posts", "taggings", "tags"],
-    { schema: canonicalSchema },
-  );
+  const { authors, tags, taggings } = fixtures([
+    "authors",
+    "authorAddresses",
+    "posts",
+    "taggings",
+    "tags",
+  ]);
 
   it("distinct on the source-reflection scope returns one row when a tag is reachable via multiple posts", async () => {
     // david has two posts (welcome + thinking) each tagged "general".

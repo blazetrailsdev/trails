@@ -3,7 +3,6 @@
  */
 import { describe, it, expect } from "vitest";
 import { describeIfPg } from "./test-helper.js";
-import { TEST_SCHEMA as canonicalSchema } from "../../test-helpers/test-schema.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Post } from "../../test-helpers/models/post.js";
 
@@ -11,7 +10,7 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("BindParameterTest", () => {
     // Mirrors Rails' `fixtures :posts`. Authors are declared first so the posts
     // fixture's author label-ref resolves to David's id (matching Rails posts.yml).
-    fixtures(["authors", "posts"], { schema: canonicalSchema });
+    fixtures(["authors", "posts"]);
 
     // Mirrors Rails' private `assert_quoted_as(expected, value, match: 0)`:
     // Post.where("title = ?", value) inlines `value` into the displayed SQL with

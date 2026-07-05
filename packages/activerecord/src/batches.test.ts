@@ -7,7 +7,6 @@ import { describe, it, expect } from "vitest";
 import { Relation } from "./index.js";
 import { errorOnIgnoredOrder, setErrorOnIgnoredOrder } from "./ar-config.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertQueriesCount, assertQueriesMatch } from "./testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "./test-helpers/quote-regex.js";
 import {
@@ -31,18 +30,15 @@ import { registerModel } from "./associations.js";
 registerModel([Tagging, Tag]);
 
 describe("EachTest", () => {
-  const { posts } = fixtures(
-    [
-      "posts",
-      "taggings",
-      "developers",
-      "subscribers",
-      "cpkOrders",
-      "cpkBooks",
-      "cpkAuthors",
-    ] as const,
-    { schema: canonicalSchema },
-  );
+  const { posts } = fixtures([
+    "posts",
+    "taggings",
+    "developers",
+    "subscribers",
+    "cpkOrders",
+    "cpkBooks",
+    "cpkAuthors",
+  ] as const);
 
   it("each should execute one query per batch", async () => {
     const total = Number(await Post.count());

@@ -11,7 +11,6 @@ import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { Preloader } from "./preloader.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
 // Opt into the canonical-model autoload index so the `posts` association target
 // (`Post`) resolves by name during preload — no manual `registerModel`.
 import "../test-helpers/canonical-model-index.js";
@@ -26,7 +25,7 @@ type RecordInternals = {
 const internals = (record: Base): RecordInternals => record as unknown as RecordInternals;
 
 describe("Preloader BigInt PK / number FK key match", () => {
-  const { authors } = fixtures(["authors", "posts"], { schema: TEST_SCHEMA });
+  const { authors } = fixtures(["authors", "posts"]);
 
   it("matches children when the owner PK is a BigInt and the child FK is a number", async () => {
     const david = await Author.find(authors("david").id);

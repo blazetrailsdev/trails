@@ -7,7 +7,6 @@ import { describe, it, expect } from "vitest";
 import { sql as arelSql } from "@blazetrails/arel";
 import "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Company } from "../test-helpers/models/company.js";
@@ -41,7 +40,7 @@ const cteSym = (name: string) => Symbol(name) as unknown as string;
 // WithTest — targets relation/with_test.rb
 // ==========================================================================
 describeIfSupports("common_table_expressions", "WithTest", () => {
-  fixtures(["comments", "posts", "companies"], { schema: canonicalSchema });
+  fixtures(["comments", "posts", "companies"]);
   // `comments`/`posts`/`companies` ride the boot-laid canonical schema (RFC 0059
   // Phase 1); per-file `repairWorkerSchema` (test-setup-dy.ts) restores the
   // canonical shape of any table a sibling file drifted on the shared worker DB

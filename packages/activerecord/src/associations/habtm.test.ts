@@ -10,7 +10,6 @@ import { describe, it, expect } from "vitest";
 import "../index.js";
 import { association } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 // Opt into the canonical-model autoload index so the `Developer`/`Project`
 // association targets resolve by name on first reference — no manual
 // `registerModel`.
@@ -19,9 +18,7 @@ import { Developer as CanonicalDeveloper } from "../test-helpers/models/develope
 import { Project as CanonicalProject } from "../test-helpers/models/project.js";
 
 describe("has_and_belongs_to_many", () => {
-  const { developers, projects } = fixtures(["developers", "projects", "developersProjects"], {
-    schema: canonicalSchema,
-  });
+  const { developers, projects } = fixtures(["developers", "projects", "developersProjects"]);
 
   it("loads associated records through a join table", async () => {
     // `david` joins both projects via the `developers_projects` join table.

@@ -6,7 +6,6 @@
 import { describe, it, expect } from "vitest";
 import "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { assertNoQueries, assertQueriesCount } from "./testing/query-assertions.js";
 import { association, registerModel } from "./associations.js";
 import { Developer } from "./test-helpers/models/developer.js";
@@ -23,9 +22,9 @@ registerModel(Topic);
 // NullRelationTest — targets null_relation_test.rb
 // ==========================================================================
 describe("NullRelationTest", () => {
-  // Mirrors Rails `fixtures :posts, :comments`; `{ schema }` recreates the
-  // canonical tables so the suite survives sibling-file contamination.
-  fixtures(["posts", "comments"], { schema: canonicalSchema });
+  // Mirrors Rails `fixtures :posts, :comments`; the canonical tables come from
+  // the template clone.
+  fixtures(["posts", "comments"]);
 
   it("none", async () => {
     await assertNoQueries(false, async () => {

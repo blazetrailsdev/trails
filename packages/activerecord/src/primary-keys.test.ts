@@ -6,7 +6,6 @@ import { Base, registerModel } from "./index.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -20,10 +19,12 @@ import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
 import { Country } from "./test-helpers/models/country.js";
 
 describe("PrimaryKeysTest", () => {
-  const { topics, subscribers, mixedCaseMonkeys } = fixtures(
-    ["topics", "subscribers", "movies", "mixedCaseMonkeys"],
-    { schema: canonicalSchema },
-  );
+  const { topics, subscribers, mixedCaseMonkeys } = fixtures([
+    "topics",
+    "subscribers",
+    "movies",
+    "mixedCaseMonkeys",
+  ]);
 
   beforeAll(async () => {
     registerModel(Reply);
@@ -544,9 +545,7 @@ async function primaryKeysOf(tableName: string): Promise<string[]> {
 }
 
 describe("CompositePrimaryKeyTest", () => {
-  const { cpkBooks } = fixtures(["cpkAuthors", "cpkOrders", "cpkBooks"], {
-    schema: canonicalSchema,
-  });
+  const { cpkBooks } = fixtures(["cpkAuthors", "cpkOrders", "cpkBooks"]);
 
   beforeAll(async () => {
     await rebuildCanonicalTables(Base.connection, ["cpk_books", "cpk_orders", "cpk_authors"]);

@@ -10,7 +10,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import {
   Content,
   ContentPosition,
@@ -18,7 +17,7 @@ import {
 } from "../test-helpers/models/content.js";
 
 describe("BidirectionalDestroyDependenciesTest", () => {
-  fixtures(["content", "contentPositions"], { schema: canonicalSchema });
+  fixtures(["content", "contentPositions"]);
 
   registerModel(Content);
   registerModel(ContentPosition);

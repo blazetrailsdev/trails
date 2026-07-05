@@ -9,7 +9,6 @@ import { sql as arelSql } from "@blazetrails/arel";
 
 import { registerModel, Range } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -35,10 +34,14 @@ registerModel([
 const ids = async (rel: any): Promise<unknown[]> => (await rel.toArray()).map((r: any) => r.id);
 
 describe("RelationMergingTest", () => {
-  const { authors, developers } = fixtures(
-    ["developers", "comments", "authors", "authorAddresses", "posts", "ratings"],
-    { schema: canonicalSchema },
-  );
+  const { authors, developers } = fixtures([
+    "developers",
+    "comments",
+    "authors",
+    "authorAddresses",
+    "posts",
+    "ratings",
+  ]);
 
   const mergeClauseAssertions = async (
     davidAndMary: any,
@@ -389,7 +392,6 @@ describe("RelationMergingTest", () => {
 
 describe("MergingDifferentRelationsTest", () => {
   const { posts } = fixtures(["posts", "authors", "authorAddresses", "developers", "comments"], {
-    schema: canonicalSchema,
     // The same-alias CTE case deliberately triggers a StatementInvalid, which
     // aborts the PG transaction and would poison shared transactional
     // fixtures; run it outside the shared transaction.

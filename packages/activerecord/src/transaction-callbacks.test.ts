@@ -23,7 +23,6 @@ import {
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 function defineBehaviourTopic() {
   return class extends Base {
@@ -45,11 +44,9 @@ function defineBehaviourTopic() {
   };
 }
 
-// Rails `fixtures :topics, :owners, :pets`. `{ schema }` recreates the canonical
-// tables so sibling-file contamination on the shared worker DB can't leak rows.
-fixtures(["topics", "owners", "pets"], {
-  schema: canonicalSchema,
-});
+// Rails `fixtures :topics, :owners, :pets`. The canonical tables come from the
+// template clone.
+fixtures(["topics", "owners", "pets"]);
 
 describe("TransactionCallbacksTest", () => {
   it("before commit exception should pop transaction stack", async () => {

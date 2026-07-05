@@ -6,11 +6,10 @@
 import { describe, it, expect } from "vitest";
 
 import { fixtures } from "./test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("frozen / isFrozen", () => {
-  fixtures(["topics"], { schema: canonicalSchema });
+  fixtures(["topics"]);
 
   it("deleting an unpersisted record still marks it destroyed and frozen", async () => {
     // Matches Rails' `delete` which only issues the DELETE when persisted?

@@ -8,7 +8,6 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { TEST_SCHEMA as canonicalSchema } from "../test-helpers/test-schema.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Developer } from "../test-helpers/models/developer.js";
@@ -91,7 +90,6 @@ describe("UpdateAllTest", () => {
       "cpkOrderAgreements",
     ],
     {
-      schema: canonicalSchema,
       // "update all doesnt ignore order" deliberately raises a DB error to test
       // ORDER BY semantics; on PG this aborts the transaction, poisoning teardown.
       usesTransaction: ["update all doesnt ignore order"],
