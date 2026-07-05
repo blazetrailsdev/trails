@@ -3,7 +3,7 @@ import { IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
-fixtures({}, { useTransactionalTests: false });
+fixtures({});
 
 describe("IntegerTest", () => {
   it("casting ActiveRecord models", () => {

@@ -1143,6 +1143,9 @@ describe("EagerAssociationTest", () => {
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {
+  // Opt out of transactional fixtures: the 65536-row seed below is committed
+  // once in `beforeAll` (via chunked insertAll) and torn down manually in
+  // `afterAll`, rather than reseeded/rolled back per test.
   fixtures({}, { useTransactionalTests: false });
   // Mirrors the citations.yml fixture: 65536 rows (id 0..65535, book2_id i*i).
   // The point of these tests is that preload/eager_load split an IN clause whose

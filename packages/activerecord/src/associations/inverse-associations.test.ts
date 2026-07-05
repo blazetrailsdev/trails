@@ -1257,7 +1257,7 @@ describe("InverseMultipleHasManyInversesForSameModel", () => {
 // dedicated `branches` table setup BrokenBranch needs without disturbing the
 // fixture-backed block above.
 describe("InverseBelongsToTests", () => {
-  fixtures({}, { useTransactionalTests: false });
+  fixtures({});
   beforeAll(() => {
     [Branch, BrokenBranch].forEach((m) => registerModel(m));
   });

@@ -10,7 +10,7 @@ import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { NumericData } from "../test-helpers/models/numeric-data.js";
 
-fixtures({}, { useTransactionalTests: false });
+fixtures({});
 
 beforeAll(async () => {
   await NumericData.loadSchema();
