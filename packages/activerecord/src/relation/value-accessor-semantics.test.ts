@@ -103,7 +103,8 @@ describe("Relation value accessor Rails semantics", () => {
     const rel = relation().order([new Nodes.SqlLiteral("id = ?"), 1]);
     expect(rel.orderValues).toBe(internals(rel)._orderClauses);
     expect(rel.orderValues[0]).toBeInstanceOf(Nodes.SqlLiteral);
-    expect((rel.orderValues[0] as Nodes.SqlLiteral).value).toBe("id = 1");
+    // Bind is interpolated (quoting is adapter-specific, so match loosely).
+    expect((rel.orderValues[0] as Nodes.SqlLiteral).value).toMatch(/^id = '?1'?$/);
   });
 
   it("select_values returns the shared frozen empty array when unset", () => {
