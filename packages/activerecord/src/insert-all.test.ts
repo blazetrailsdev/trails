@@ -105,7 +105,6 @@ async function withRecordTimestamps(
 }
 
 describe("InsertAllTest", () => {
-  fixtures({}, { useTransactionalTests: false });
   fixtures(["authors", "books"], {
     // These two raise a DB-level RecordNotUnique; a PG unique violation aborts
     // the surrounding transaction and poisons transactional-fixtures teardown,
