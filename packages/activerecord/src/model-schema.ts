@@ -26,6 +26,21 @@ import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
+import { threadedConnectionFor } from "./connection-handling.js";
+
+/**
+ * Adapter for a schema-reflection read: prefer the connection threaded by the
+ * enclosing internal `with_connection` wrap ({@link threadedConnectionFor}) —
+ * matching Rails, which threads the block's `connection` through schema
+ * reflection — and only fall back to the deprecated `Model.connection` getter
+ * when no wrap is active (or the wrap belongs to a different pool). Reading the
+ * threaded connection keeps these reads off the getter so they never flip the
+ * lease permanent. `threadedConnectionFor` never throws (returns `null`), so the
+ * `.connection` fallback still throws where callers rely on a `try`/`catch`.
+ */
+function reflectionAdapter(klass: any): any {
+  return threadedConnectionFor(klass) ?? klass.connection;
+}
 
 /**
  * Schema metadata for ActiveRecord models — table name, primary key,
@@ -105,7 +120,7 @@ function containedTableNamePrefix(this: typeof Base): string {
  */
 export function buildPkWhere(this: typeof Base, idValue: unknown): string {
   const pk = this.primaryKey;
-  const a = this.connection;
+  const a = reflectionAdapter(this);
   if (Array.isArray(pk)) {
     if (!Array.isArray(idValue) || idValue.length !== pk.length) return "1=0";
     const conditions: string[] = [];
@@ -249,7 +264,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   let adapter: DatabaseAdapterLike | null = null;
   for (const cand of candidates) {
     try {
-      adapter = cand.connection as DatabaseAdapterLike;
+      adapter = reflectionAdapter(cand) as DatabaseAdapterLike;
     } catch {
       adapter = null;
     }
@@ -494,7 +509,7 @@ export function deriveJoinTableName(this: SchemaHost, otherTableName: string): s
 }
 
 export function quotedTableName(this: SchemaHost): string {
-  return this.connection.quoteTableName(this.tableName);
+  return reflectionAdapter(this).quoteTableName(this.tableName);
 }
 
 /**
@@ -1110,7 +1125,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   const candidates: SchemaHost[] = schemaHost === this ? [schemaHost] : [schemaHost, this];
   for (const cand of candidates) {
     try {
-      startingAdapter = cand.connection;
+      startingAdapter = reflectionAdapter(cand);
     } catch {
       startingAdapter = undefined;
     }
@@ -1163,7 +1178,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   // adapter moved.
   let currentAdapter: SchemaHost["connection"] | undefined;
   try {
-    currentAdapter = adapterOwner.connection;
+    currentAdapter = reflectionAdapter(adapterOwner);
   } catch {
     currentAdapter = undefined;
   }
@@ -1178,7 +1193,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
  */
 function cachedColumnNames(host: SchemaHost): Set<string> | null {
   try {
-    const cached = host.connection?.schemaCache?.getCachedColumnsHash?.(host.tableName) as
+    const cached = reflectionAdapter(host)?.schemaCache?.getCachedColumnsHash?.(host.tableName) as
       | Record<string, unknown>
       | undefined;
     if (cached) return new Set(Object.keys(cached));
@@ -1199,7 +1214,7 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
   const cached = cachedColumnNames(host);
   if (cached) return cached;
   try {
-    const conn = host.connection;
+    const conn = reflectionAdapter(host);
     const table = host.tableName;
     if (!conn || !table) return null;
     // Resolve columns through the shared schema cache so the reflection is
@@ -1305,7 +1320,7 @@ function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   const candidates = schemaHost === host ? [schemaHost] : [schemaHost, host];
   for (const cand of candidates) {
     try {
-      adapter = cand.connection;
+      adapter = reflectionAdapter(cand);
     } catch {
       adapter = undefined;
     }
@@ -1389,7 +1404,7 @@ export function columnDefaults(this: SchemaHost): Record<string, unknown> {
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
-  const conn = this.connection;
+  const conn = reflectionAdapter(this);
   const cache = conn.schemaCache;
   if (!cache || typeof cache.dataSourceExists !== "function") return true;
   const pool = realPool(conn.pool) ?? conn;

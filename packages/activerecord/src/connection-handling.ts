@@ -450,15 +450,6 @@ const CONNECTION_DEPRECATION_MSG =
 export function connection(this: typeof Base): DatabaseAdapter {
   // Fast path: directly assigned via `Model.adapter = x` (tests + simple setups)
   if ((this as any)._adapter) return (this as any)._adapter;
-  // Inside an internal `withQueryConnection` wrap, resolve to the connection it
-  // threaded for *this* pool — without flipping the lease permanent. This keeps
-  // schema-reflection reads on the wrapped query/transaction path (columnsHash,
-  // timestamp columns, …) off the deprecated-getter lease, matching Rails, which
-  // threads the `with_connection` block parameter through that code. An explicit
-  // `lease_connection()` still goes straight to the pool and makes the lease
-  // permanent.
-  const threaded = threadedConnectionFor(this);
-  if (threaded) return threaded;
   const pool = connectionPool.call(this);
   if (pool.isPermanentLease()) {
     const setting = permanentConnectionCheckout;

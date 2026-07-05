@@ -16,6 +16,7 @@
 import { Nodes } from "@blazetrails/arel";
 import { underscore, pluralize } from "@blazetrails/activesupport";
 import { AliasTracker } from "../associations/alias-tracker.js";
+import { threadedConnectionFor } from "../connection-handling.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 
 interface MergedJoinAliasHost {
@@ -43,7 +44,13 @@ export function buildMergedJoinAliasTracker(
   joinNodes: Nodes.Join[],
   existingAliases?: Map<string, number>,
 ): AliasTracker {
-  const connection = host._modelClass.connection;
+  // Prefer the connection threaded by the enclosing `withQueryConnection` wrap
+  // (Rails threads the `with_connection` connection through join building)
+  // rather than the deprecated `.connection` getter, which would flip the lease
+  // permanent under `permanent_connection_checkout = :deprecated|:disallowed`.
+  const connection = (threadedConnectionFor(
+    host._modelClass as unknown as Parameters<typeof threadedConnectionFor>[0],
+  ) ?? host._modelClass.connection) as Quoting & { tableAliasLength(): number };
   const aliasLength = connection.tableAliasLength();
   const seededAliases = existingAliases ? new Map(existingAliases) : new Map<string, number>();
   const tracker = new AliasTracker(aliasLength, seededAliases, joinNodes, connection);
