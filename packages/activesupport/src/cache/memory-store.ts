@@ -1,7 +1,8 @@
 import type { CacheOptions, CacheStore } from "./index.js";
 import { coder } from "./coder.js";
 import { Entry } from "./entry.js";
-import { Store, ArgumentError } from "./store.js";
+import { Store } from "./store.js";
+import { integer } from "./integer.js";
 
 // In-memory record backing a single key. We store the coder-serialized value
 // (so Date/undefined/bigint/non-finite numbers and deep-clone isolation survive
@@ -25,17 +26,6 @@ function toI(value: unknown): number {
     return m ? parseInt(m[0], 10) : 0;
   }
   return 0;
-}
-
-// Mirrors Ruby `Integer(amount)` over the numeric domain: a finite number
-// truncates toward zero (`Integer(1.5) # => 1`, `Integer(-1.9) # => -1`), while
-// NaN/Infinity raise the way Ruby's `Integer(Float::NAN)`/`Integer(Float::INFINITY)`
-// raise FloatDomainError — rather than silently coercing to a non-integer.
-function integer(amount: number): number {
-  if (!Number.isFinite(amount)) {
-    throw new ArgumentError(`invalid value for Integer(): ${amount}`);
-  }
-  return Math.trunc(amount);
 }
 
 export class MemoryStore extends Store implements CacheStore {

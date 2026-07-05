@@ -4,6 +4,7 @@ import { coder } from "./coder.js";
 import { DeserializationError } from "./deserialization-error.js";
 import { Entry } from "./entry.js";
 import { Store, type StoreOptions } from "./store.js";
+import { integer } from "./integer.js";
 import { type CacheEntry, isExpired } from "./entry-record.js";
 
 const FILENAME_MAX_SIZE = 228;
@@ -238,8 +239,9 @@ export class FileStore extends Store implements CacheStore {
     const key = this.normalizeKey(name, options);
     const version = this.normalizeVersion(name, options) ?? null;
     // Rails coerces `amount = Integer(amount)` once (file_store.rb:226) and uses
-    // it uniformly for the seed write, the return, and the hit-path addition.
-    const amt = Math.trunc(amount);
+    // it uniformly for the seed write, the return, and the hit-path addition;
+    // `Integer()` raises on NaN/Infinity rather than silently truncating.
+    const amt = integer(amount);
     const entry = this.readEntry(key, options);
     if (!entry || entry.isExpired() || entry.isMismatched(version)) {
       this.write(name, amt, options);

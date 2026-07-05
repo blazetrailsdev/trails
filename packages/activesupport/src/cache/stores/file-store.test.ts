@@ -240,6 +240,30 @@ describe("CacheIncrementDecrementBehavior", () => {
     expect(cache.decrement("quux", 100)).toBe(-100);
   });
 
+  // Rails coerces `amount = Integer(amount)` (file_store.rb:226), which raises
+  // FloatDomainError on NaN/Infinity rather than seeding a non-integer entry.
+  it("increment raises on a non-integer amount when seeding a missing key", () => {
+    expect(() => cache.increment("foo", NaN)).toThrow();
+    expect(() => cache.increment("foo", Infinity)).toThrow();
+    expect(() => cache.increment("foo", -Infinity)).toThrow();
+    expect(cache.read("foo")).toBeNull();
+  });
+
+  it("decrement raises on a non-integer amount when seeding a missing key", () => {
+    expect(() => cache.decrement("foo", NaN)).toThrow();
+    expect(() => cache.decrement("foo", Infinity)).toThrow();
+    expect(cache.read("foo")).toBeNull();
+  });
+
+  // Rails coerces once, so the seed write, the return value, and the hit-path
+  // addition all use `Integer(amount)` — a finite float truncates toward zero.
+  it("increment truncates a finite float amount toward zero", () => {
+    expect(cache.increment("frac", 1.9)).toBe(1);
+    expect(Number(cache.read("frac"))).toBe(1);
+    expect(cache.increment("frac", 2.9)).toBe(3);
+    expect(Number(cache.read("frac"))).toBe(3);
+  });
+
   it("test_ttl_isnt_updated", async () => {
     expect(cache.increment("foo", 1, { expiresIn: 0.1 })).toBe(1);
     // A second increment with a longer TTL must not reset the original expiry.
