@@ -22,16 +22,14 @@ import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations, association, loadHasMany } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 function migrationCtx() {
   return new MigrationContext(Base.connection);
 }
 
 describe("DJAS routing widening — sourceType + polymorphic source", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   class RwAuthor extends Base {
     static {

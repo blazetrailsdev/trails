@@ -6,12 +6,10 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { Associations } from "../associations.js";
 import { MigrationContext } from "../migration.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("RequiredAssociationsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   let ctx: MigrationContext;
   beforeAll(async () => {
     ctx = new MigrationContext(Base.connection);

@@ -3,8 +3,7 @@
  */
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 
 beforeAll(() => {
@@ -18,8 +17,7 @@ afterAll(() => {
 // EXPLAIN tests build their own ad-hoc `ex_*` tables via raw DDL. The outer
 // transaction wrapping each test rolls back those tables (PG DDL is
 // transactional).
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

@@ -5,13 +5,10 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, Mysql2Adapter } from "./test-helper.js";
 import { Base } from "../../index.js";
 import { ReadOnlyError, QueryCanceled } from "../../errors.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
-
-setupFixtures();
+import { fixtures } from "../../test-helpers/fixtures.js";
 
 describeIfMysql("Mysql2Adapter", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   // Rails: @conn = ActiveRecord::Base.lease_connection
   let conn: Mysql2Adapter;

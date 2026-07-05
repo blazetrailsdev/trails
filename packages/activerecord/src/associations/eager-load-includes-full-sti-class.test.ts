@@ -14,8 +14,7 @@ import { Base } from "../base.js";
 import { registerModel } from "../index.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Post } from "../test-helpers/models/post.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 // Rails defines `Namespaced::Post` inline (table "posts") with a polymorphic
 // has_one :tagging, as: :taggable. trails flattens the `::` into a collision-free
@@ -77,8 +76,7 @@ describe("PolymorphicNonFullClassNamesTest", () => {
 // stays at its default of true), flipping store_full_sti_class never changes how
 // the taggable association resolves — both branches must find the tagging.
 function runStiSharedTests(storeFullStiClass: boolean): void {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   beforeAll(async () => {
     await NamespacedPost.loadSchema();
@@ -150,8 +148,7 @@ function runStiSharedTests(storeFullStiClass: boolean): void {
 // disagrees with how the row was written, the type-column value mismatches and
 // the association resolves to nil.
 function runPolymorphicSharedTests(storeFullClassName: boolean): void {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   beforeAll(async () => {
     await NamespacedPost.loadSchema();
