@@ -484,11 +484,18 @@ describe("RelationTest", () => {
     ).rejects.toThrow(IrreversibleOrderError);
   });
 
-  it.skip("reverse arel assoc order with multiargument function", () => {
-    // BLOCKED: relations — Rails uses Arel.sql("REPLACE(title,'','')") => :asc (hash key is a
-    // SqlLiteral, a String subclass). Trails' SqlLiteral is not a String, so
-    // { [arelSql("...")]: "asc" } produces a wrong key. Without a SqlLiteral-keyed order
-    // API, this test cannot assert no-throw on reverse of a multi-arg function hash order.
+  it("reverse arel assoc order with multiargument function", () => {
+    // JS object keys can't be Arel nodes, so a Map is the faithful analog of Rails'
+    // `order(Arel.sql("REPLACE(title, '', '')") => :asc)`: the SqlLiteral key carries
+    // explicit direction, so reverseOrder flips it (Ascending→Descending) rather than
+    // routing through the raw-SQL reverse path that raises IrreversibleOrderError.
+    const order = new Map([[arelSql("REPLACE(title, '', '')"), "asc" as const]]);
+    expect(() => Topic.order(order).reverseOrder().toSql()).not.toThrow();
+    // The direction-carrying key is reversed by flipping ASC→DESC on the node,
+    // not by re-parsing raw SQL — so the multi-argument function survives intact.
+    expect(Topic.order(order).reverseOrder().toSql()).toContain(
+      "ORDER BY REPLACE(title, '', '') DESC",
+    );
   });
 
   it.skipIf(adapterType !== "postgres")("reverse order with nulls first or last", () => {
