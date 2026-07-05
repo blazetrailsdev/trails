@@ -384,15 +384,20 @@ describe("RelationTest", () => {
     // BLOCKED: relations — canonical comments table lacks STI `type` column
   });
 
-  it.skip("finding with subquery with eager loading in from", () => {
-    // BLOCKED: relations — Comment.includes("post").where({ "posts.type": "Post" }) subquery
-    // needs eager_load JOIN folded into FROM subquery; eagerLoad is implemented but
-    // composing it with from() as a subquery source is not yet supported
+  it("finding with subquery with eager loading in from", async () => {
+    const relation = Comment.includes("post").where({ "posts.type": "Post" }).order("id");
+    const expected = (await relation.toArray()).map((c) => c.id);
+    expect((await Comment.select("*").from(relation)).map((c) => c.id)).toEqual(expected);
+    expect((await Comment.select("subquery.*").from(relation)).map((c) => c.id)).toEqual(expected);
+    expect((await Comment.select("a.*").from(relation, "a")).map((c) => c.id)).toEqual(expected);
   });
 
-  it.skip("finding with subquery with eager loading in where", () => {
-    // BLOCKED: relations — same as above; Comment.includes("post").where({ "posts.type": "Post" })
-    // used as an id-in subquery requires eager_load→JOIN in the subquery context
+  it("finding with subquery with eager loading in where", async () => {
+    const relation = Comment.includes("post").where({ "posts.type": "Post" });
+    const expected = (await relation.toArray()).map((c) => Number(c.id)).sort((a, b) => a - b);
+    expect(
+      (await Comment.where({ id: relation })).map((c) => Number(c.id)).sort((a, b) => a - b),
+    ).toEqual(expected);
   });
 
   it("finding with conditions", async () => {
