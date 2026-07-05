@@ -3589,15 +3589,36 @@ export class Relation<T extends Base> {
     const promotedIncludes = this._includesToPromoteFromReferences();
     const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
     const pendingLeftOuter = this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v));
+    // Partition CTE-name symbols out of the left-outer values into LEFT OUTER
+    // JOIN nodes, mirroring buildJoinBuckets' `select_named_joins` block
+    // (query_methods.rb:1830-1836). Only true associations remain for the JD;
+    // a CTEJoin routes to `buildWithJoinNode(name, OuterJoin)` (like the
+    // subquery `from(relation)` path) so `Post.with(cte).leftOuterJoins(cteSym)`
+    // emits a LEFT OUTER JOIN directly on this live path instead of raising
+    // "Invalid association spec".
+    const stashedJoins: JoinDependency[] = [];
+    const leftAssociations = _qm.selectNamedJoins.call(
+      this as any,
+      pendingLeftOuter,
+      stashedJoins,
+      (left: unknown) => {
+        if (left instanceof _qm.CTEJoin) {
+          joinNodes.push(
+            _qm.buildWithJoinNode.call(this as any, left.name, Nodes.OuterJoin) as Nodes.Join,
+          );
+        } else {
+          throw _qm.argumentError("only Hash, Symbol and Array are allowed");
+        }
+      },
+    );
     const leftOuterJd =
-      pendingLeftOuter.length > 0
+      leftAssociations.length > 0
         ? QueryMethodBangs.constructJoinDependency.call(
             this as any,
-            pendingLeftOuter,
+            leftAssociations as any,
             Nodes.OuterJoin,
           )
         : null;
-    const stashedJoins: JoinDependency[] = [];
     if (leftOuterJd) stashedJoins.push(leftOuterJd);
     // Fold the eager JoinDependency in last, mirroring Rails' `joins_values`
     // ordering (left-outer stash unshifted ahead of the eager stash in

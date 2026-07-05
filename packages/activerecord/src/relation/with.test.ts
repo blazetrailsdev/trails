@@ -222,18 +222,19 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     // (query_methods.rb:1830-1836), which joins on
     // `cte[model.foreign_key] = table[model.primary_key]`. trails mirrors this in
     // `buildJoinBuckets`' `selectNamedJoins` block — a `CTEJoin` becomes
-    // `buildWithJoinNode(name, Nodes.OuterJoin)` — reached end-to-end when the
-    // `with(...).leftOuterJoins(cte)` relation is embedded as a `from(...)`
-    // subquery. Lock the OuterJoin routing: the CTE symbol must emit a
-    // LEFT OUTER JOIN to the CTE (`commented_posts.post_id = posts.id`), not an
-    // INNER JOIN. (trails Symbol is `Symbol("name")`.)
-    const subquery = Post.with({
+    // `buildWithJoinNode(name, Nodes.OuterJoin)`. The same partition runs on the
+    // live `_applyJoinsToManager` path, so `with(...).leftOuterJoins(cte)` emits
+    // the LEFT OUTER JOIN directly (no `from(...)` subquery wrapper). Lock the
+    // OuterJoin routing: the CTE symbol must emit a LEFT OUTER JOIN to the CTE
+    // (`commented_posts.post_id = posts.id`), not an INNER JOIN. (trails Symbol
+    // is `Symbol("name")`.)
+    const relation = Post.with({
       commented_posts: Comment.select("post_id").distinct(),
     })
       .leftOuterJoins(cteSym("commented_posts"))
       .select("posts.id");
 
-    const sql = (Post.from(subquery, "posts") as unknown as { toSql(): string }).toSql();
+    const sql = (relation as unknown as { toSql(): string }).toSql();
 
     // Identifier quoting is dialect-specific (`"` on sqlite/pg, backticks on
     // MariaDB/MySQL), so the quote char is optional in the match.
