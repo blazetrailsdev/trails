@@ -463,7 +463,7 @@ describe("CascadedEagerLoadingTest", () => {
 
     const oldPost = await (author as any).posts.createBang({ title: "first post", body: "test" });
     await oldPost.comments.createBang({
-      author_id: (authors("mary") as any).id,
+      author: authors("mary"),
       body: "a response",
     });
 
@@ -472,7 +472,7 @@ describe("CascadedEagerLoadingTest", () => {
       body: "test",
     });
     const lastComment = await recentPost.comments.createBang({
-      author_id: (authors("bob") as any).id,
+      author: authors("bob"),
       body: "a response",
     });
 
