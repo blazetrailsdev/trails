@@ -250,6 +250,43 @@ describe("HasManyAssociationsTest", () => {
     });
   });
 
+  it("adding buffers a record whose save fails into the target", async () => {
+    // Rails' `replace_on_target` adds the record to the in-memory target and
+    // fires after_add regardless of the insert result — only a `before_add`
+    // throw :abort skips it (collection_association.rb:457-483). A `before_save`
+    // throw :abort makes `save` return false without raising, so the record is
+    // still buffered; the failed insert is undone by the surrounding
+    // transaction's `raise Rollback unless result`.
+    const bad = Client.new({ name: "Bad" }) as any;
+    bad.throwOnSave = true;
+
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.load();
+    await firstFirm.clientsOfFirm.concat(bad);
+
+    expect(await firstFirm.clientsOfFirm.toArray()).toContain(bad);
+    const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
+    expect(reloaded).not.toContain(bad);
+  });
+
+  it("creating a record whose save fails buffers it into the target", async () => {
+    // `_create_record` wraps the insert in a transaction and buffers the record
+    // into the target regardless of the save result (collection_association.rb:363-371).
+    // A `before_save` throw :abort makes `save` return false without raising, so
+    // the record stays in the in-memory target while the insert is rolled back.
+    const firstFirm = companies("first_firm") as any;
+    await firstFirm.clientsOfFirm.load();
+
+    const bad = await firstFirm.clientsOfFirm.create({ name: "Bad" }, (r: any) => {
+      r.throwOnSave = true;
+    });
+
+    expect(bad.isNewRecord()).toBe(true);
+    expect(await firstFirm.clientsOfFirm.toArray()).toContain(bad);
+    const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
+    expect(reloaded).not.toContain(bad);
+  });
+
   it("destroying", async () => {
     const firstFirm = companies("first_firm") as any;
     await firstFirm.clientsOfFirm.load();
