@@ -60,7 +60,11 @@ describeIfMysql("Mysql2Adapter", () => {
         expect(await singleConn.activeAsync()).toBe(true);
         await singleConn.execute("SET SESSION wait_timeout=1");
         await new Promise((r) => setTimeout(r, 2000));
-        singleConn.reconnectBang();
+        // Rails' reconnect! is synchronous; trails' reconnectBang is async, so
+        // await it before reading the sync `active` getter — which now tracks
+        // real connection state (`_client !== null`), only re-established once
+        // reconnectBang's _ensureClient resolves.
+        await singleConn.reconnectBang();
         expect(singleConn.active).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
       } finally {
@@ -79,7 +83,10 @@ describeIfMysql("Mysql2Adapter", () => {
         // connection, so getConnection() returns the dead socket and ping() fails.
         // activeAsync() sets _activeState = false, making active return false.
         await singleConn.activeAsync();
-        singleConn.verifyBang(); // active is false → calls reconnectBang()
+        // active is false → verifyBang calls reconnectBang(). Await it (async in
+        // trails, unlike Rails' synchronous verify!) before reading the sync
+        // `active` getter, which now reflects `_client !== null`.
+        await singleConn.verifyBang();
         expect(singleConn.active).toBe(true);
         await expect(singleConn.execute("SELECT 1")).resolves.toBeDefined();
       } finally {
@@ -97,7 +104,11 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(adapter.quote("string")).toBe("'string'");
     });
 
-    it("active after disconnect", () => {
+    it("active after disconnect", async () => {
+      // Rails' @connection is a live pooled connection (raw_connection set), so
+      // establish one here before disconnecting — the sync `active` getter now
+      // tracks real connection state (`_client !== null`) like Rails' active?.
+      await adapter.execute("SELECT 1");
       expect(adapter.active).toBe(true);
       adapter.disconnectBang();
       expect(adapter.active).toBe(false);

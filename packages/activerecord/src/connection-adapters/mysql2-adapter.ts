@@ -112,15 +112,23 @@ class Mysql2StatementPool extends MysqlStatementPool {
  */
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
   // Cached liveness state — true until a failure is observed (ping fail,
-  // disconnect, permanent close). Does not require _client to be non-null:
-  // a freshly-constructed adapter has no connection yet but is considered
-  // active (matching Rails, where @raw_connection is set before the adapter
-  // is handed to callers). Set false by disconnectBang(); restored to true
-  // by reconnectBang() and by successful activeAsync().
+  // disconnect, permanent close). Set false by disconnectBang(); restored to
+  // true by reconnectBang() and by successful activeAsync().
   private _activeState = true;
 
+  // Mirrors Rails' Mysql2Adapter#active? (mysql2_adapter.rb:108) whose first
+  // guard is `connected?` — `!(@raw_connection.nil? || @raw_connection.closed?)`.
+  // A never-connected adapter (`_client === null`) therefore reports inactive:
+  // trails connects lazily, so `_client` stands in for `@raw_connection`. The
+  // sync getter can't do the live `ping` half of Rails' active? (that's
+  // activeAsync); `_activeState` is the cached liveness that ping updates.
   override get active(): boolean {
-    return !this._permanentlyClosed && !this._isFakeConnection && this._activeState;
+    return (
+      this._client !== null &&
+      !this._permanentlyClosed &&
+      !this._isFakeConnection &&
+      this._activeState
+    );
   }
 
   /**
@@ -145,14 +153,34 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  // Mirrors Rails' Mysql2Adapter#connected? — false only after a known
-  // disconnect/close or for fake adapters. A freshly-constructed adapter
-  // with no _client yet is still "connected" in the sense that it will
-  // connect on the next query (matching Rails, which always has @raw_connection
-  // non-nil before the adapter reaches callers).
+  // Mirrors Rails' Mysql2Adapter#connected? — `!(@raw_connection.nil? ||
+  // @raw_connection.closed?)` (mysql2_adapter.rb:104). `_client` is trails'
+  // `@raw_connection`, so a never-connected / disconnected adapter (`_client
+  // === null`) reports NOT connected. This also matches the base adapter's
+  // `isConnected()` (`_connection !== null`) and keeps `active ⟹ isConnected`,
+  // the invariant Rails guarantees by checking `connected?` first inside
+  // `active?`.
   override isConnected(): boolean {
-    return !this._permanentlyClosed && !this._isFakeConnection && this._activeState;
+    return (
+      this._client !== null &&
+      !this._permanentlyClosed &&
+      !this._isFakeConnection &&
+      this._activeState
+    );
   }
+
+  // No verifyBang override: now that the sync `active` getter reflects real
+  // connection state, a never-connected adapter reports inactive and flows
+  // through the inherited base `verifyBang` (abstract-adapter.ts) exactly like
+  // any other inactive adapter — `_unconfiguredConnection` promotion when the
+  // deprecated raw-connection was stashed (mysql2's `_isFakeConnection` path),
+  // otherwise `reconnectBang({ restoreTransactions: true })` with its retry
+  // loop. This mirrors Rails' `verify!` (abstract_adapter.rb:759), which gates
+  // the `attempt_configure_connection`-only shortcut on `@unconfigured_connection`
+  // and routes a genuinely fresh (`@raw_connection == nil`) adapter through the
+  // full retry-capable `reconnect!` — there is no separate "never connected"
+  // shortcut. `Mysql2Adapter#reconnect` closes a nil `_client` as a no-op, so the
+  // full path costs nothing extra on a fresh adapter and gains connect retries.
 
   // Single persistent connection — mirrors Rails' @raw_connection.
   private _client: mysql.Connection | null = null;
