@@ -4,16 +4,14 @@ import { Base, MigrationContext, registerModel } from "../index.js";
 import { Associations, loadHasMany } from "../associations.js";
 import { DisableJoinsAssociationScope } from "./disable-joins-association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 function migrationCtx() {
   return new MigrationContext(Base.connection);
 }
 
 describe("DisableJoinsAssociationScope", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   class DjsAuthor extends Base {
     static {

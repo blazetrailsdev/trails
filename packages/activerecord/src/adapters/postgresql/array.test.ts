@@ -4,8 +4,7 @@
 import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { SchemaDumper } from "../../schema-dumper.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base, serialize, ColumnNotSerializableError, StatementInvalid } from "../../index.js";
 import { TimeWithZone, TimeZone, setZone, resetZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -23,8 +22,7 @@ afterAll(() => {
 // builder; it is created via raw DDL below (mirroring Rails'
 // `@connection.create_table "pg_arrays"`). The outer per-test transaction
 // rolls back inserts and any addColumn DDL done inside it() bodies.
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

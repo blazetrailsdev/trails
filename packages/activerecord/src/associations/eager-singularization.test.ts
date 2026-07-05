@@ -13,12 +13,10 @@ import type { AssociationProxy } from "./collection-proxy.js";
 import { describe, it, beforeAll, afterAll, expect } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { MigrationContext } from "../migration.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
 describe("EagerSingularizationTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   let ctx: MigrationContext;
 

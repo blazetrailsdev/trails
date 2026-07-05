@@ -5,8 +5,7 @@ import { describe, it, expect, beforeAll, afterAll, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
@@ -21,8 +20,7 @@ afterAll(() => {
 // The `virtual_columns` table uses PG generated/virtual columns; it is
 // built inline below via `createTable` (mirroring Rails'
 // `@connection.create_table "virtual_columns"`).
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
