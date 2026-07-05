@@ -170,16 +170,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   // A never-connected adapter with no failure observed (`_client === null` but
-  // `_activeState` still true) reported `active === true` before the sync getter
-  // was tightened, so the base `verifyBang` no-op'd and the first query connected
-  // lazily via `_ensureClient` — WITHOUT a reconnectBang/configure cycle. Tightening
-  // `active` now makes that state report inactive, which would route it through the
-  // full reconnectBang (checkVersion + configure + cache/transaction reset) on the
-  // first query of every fresh adapter — behavior that never ran on main. Preserve
-  // the prior path exactly: connect lazily and mark verified. Only the fresh,
-  // no-failure state is intercepted; a disconnected/failed adapter
-  // (`_activeState === false`, e.g. after disconnectBang) falls through to the base
-  // reconnect path so its clearCache/reset/configure still run as before.
+  // `_activeState` still true) reports `active === false` once the sync getter is
+  // tightened, so the base `verifyBang` would route it through the full
+  // `reconnectBang` (reconnect() close/reopen + retry loop + enableLazyTransactions
+  // + resetTransaction + clearCache + configure) on the first query of every fresh
+  // adapter. reconnect()'s close-and-reopen and the reset/clearCache steps are pure
+  // no-ops on an adapter that has nothing to close and no cache/transaction yet, so
+  // establish the connection lazily via `_ensureClient` and run `configure` directly
+  // — the one step with observable effect. This mirrors Rails' `reconnect!` →
+  // `attempt_configure_connection` guarantee (abstract_adapter.rb:662) without the
+  // spurious teardown/retry churn. A disconnected/failed adapter
+  // (`_activeState === false`, e.g. after disconnectBang) still falls through to the
+  // base reconnect path so its transaction restore + clearCache run as before.
   override async verifyBang(): Promise<void> {
     if (
       this._client === null &&
@@ -188,6 +190,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       !this._isFakeConnection
     ) {
       await this._ensureClient();
+      await this.attemptConfigureConnection();
       this.verifiedBang();
       return;
     }
