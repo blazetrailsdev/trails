@@ -16,18 +16,16 @@
  * Not a Rails-mirrored test name — this is a TS-internal threading invariant
  * with no single Ruby counterpart.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
+// Opt into the canonical-model autoload index so the `author` association target
+// (`Author`) resolves by name during eager build_joins — no manual
+// `registerModel`.
+import "../test-helpers/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Author } from "../test-helpers/models/author.js";
 
 describe("eager build_joins shared AliasTracker", () => {
   fixtures([]);
-  beforeAll(async () => {
-    registerModel("Post", Post);
-    registerModel("Author", Author);
-  });
 
   it("aliases the eager OUTER JOIN when an explicit joins already claims the table", () => {
     const rel = Post.includes("author")

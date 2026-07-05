@@ -9,14 +9,17 @@
  * mutated. We still clear Topic's validators in `afterEach` to mirror the
  * repair behavior exactly.
  */
-import { afterEach, describe, expect, it, beforeAll } from "vitest";
+import { afterEach, describe, expect, it } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
-import { Base, RecordInvalid, registerModel } from "../index.js";
+import { Base, RecordInvalid } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
+// Opt into the canonical-model autoload index so association targets resolve by
+// name on first reference — no manual `registerModel`.
+import "../test-helpers/canonical-model-index.js";
 import { assertNoQueries } from "../testing/query-assertions.js";
 import { Topic } from "../test-helpers/models/topic.js";
-import { Reply, WrongReply } from "../test-helpers/models/reply.js";
+import { WrongReply } from "../test-helpers/models/reply.js";
 import { Developer } from "../test-helpers/models/developer.js";
 import { Parrot } from "../test-helpers/models/parrot.js";
 import { Company } from "../test-helpers/models/company.js";
@@ -32,16 +35,6 @@ describe("ValidationsTest", () => {
   // Rails `fixtures :topics, :developers`. Loading the topics set registers the
   // Topic/Reply STI subtree; loading developers builds the developers table.
   fixtures(["topics", "developers"]);
-
-  beforeAll(() => {
-    registerModel("Topic", Topic);
-    registerModel("Reply", Reply);
-    registerModel("WrongReply", WrongReply);
-    registerModel("Developer", Developer);
-    registerModel("Parrot", Parrot);
-    registerModel("Company", Company);
-    registerModel("PriceEstimate", PriceEstimate);
-  });
 
   // Rails: `repair_validations(Topic)` — Topic is never mutated by these tests,
   // but mirror the cleanup anyway.

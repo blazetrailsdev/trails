@@ -14,9 +14,12 @@
  * association cache — the behavior under test is the cascading `valid?`, not
  * collection persistence.
  */
-import { afterEach, describe, expect, it, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
+import { afterEach, describe, expect, it } from "vitest";
 import { association } from "../associations.js";
+// Opt into the canonical-model autoload index so association targets
+// (`Human`/`Interest`) resolve by name on first reference — no manual
+// `registerModel`.
+import "../test-helpers/canonical-model-index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { repairValidations } from "../test-helpers/repair-validations.js";
 import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
@@ -29,13 +32,6 @@ describe("AssociationValidationTest", () => {
   // Rails `fixtures :topics` — needed by test_validates_associated_missing's
   // `Topic.first`. Loading the set also registers Topic/Reply (STI).
   fixtures(["topics"]);
-
-  beforeAll(() => {
-    registerModel("Topic", Topic);
-    registerModel("Reply", Reply);
-    registerModel("Human", Human);
-    registerModel("Interest", Interest);
-  });
 
   // Rails `repair_validations(Topic, Reply)` — clear validators added to the
   // canonical models so per-test `validates_*` calls do not leak.

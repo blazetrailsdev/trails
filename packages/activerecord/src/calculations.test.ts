@@ -2,20 +2,21 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "./encryption.js";
 import { describe, it, expect } from "vitest";
-import { registerModel } from "./index.js";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+// Opt into the canonical-model autoload index so association targets resolve by
+// name on first reference — no manual `registerModel`.
+import "./test-helpers/canonical-model-index.js";
 import { Account } from "./test-helpers/models/account.js";
-import { Company, Firm, DependentFirm, Client } from "./test-helpers/models/company.js";
+import { Company, DependentFirm, Client } from "./test-helpers/models/company.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply } from "./test-helpers/models/reply.js";
 import { Post } from "./test-helpers/models/post.js";
-import { Comment } from "./test-helpers/models/comment.js";
 import { Book } from "./test-helpers/models/book.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
-import { CpkBook, CpkChapter } from "./test-helpers/models/cpk.js";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Contract } from "./test-helpers/models/contract.js";
@@ -59,28 +60,6 @@ describe("CalculationsTest", () => {
       ],
     },
   );
-
-  registerModel("Company", Company);
-  registerModel("Firm", Firm);
-  registerModel("DependentFirm", DependentFirm);
-  registerModel("Client", Client);
-  registerModel("Account", Account);
-  registerModel("Topic", Topic);
-  registerModel("Reply", Reply);
-  registerModel("Post", Post);
-  registerModel("Comment", Comment);
-  registerModel("Book", Book);
-  registerModel("Author", Author);
-  registerModel("Contract", Contract);
-  registerModel("Speedometer", Speedometer);
-  registerModel("Minivan", Minivan);
-  registerModel("ShipPart", ShipPart);
-  registerModel("Treasure", Treasure);
-  registerModel("NeedQuoting", NeedQuoting);
-  registerModel("Edge", Edge);
-  registerModel("CpkBook", CpkBook);
-  registerModel("CpkChapter", CpkChapter);
-  registerModel("NumericData", NumericData);
 
   it("should sum field", async () => {
     expect(await Account.sum("credit_limit")).toBe(318);
