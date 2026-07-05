@@ -8,7 +8,7 @@
  */
 import { describe, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { Professor } from "../../test-helpers/models/professor.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
@@ -33,7 +33,7 @@ function quoteLit(s: string): string {
   return `'${s.replace(/'/g, "''")}'`;
 }
 
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

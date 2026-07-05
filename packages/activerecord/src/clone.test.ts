@@ -7,7 +7,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("CloneTest", () => {
-  // `fixtures` wires `setupFixtures` internally and is
+  // `fixtures` wires the handler suite internally and is
   // transactional, mirroring Rails' `fixtures :topics`.
   fixtures(["topics"]);
 

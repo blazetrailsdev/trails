@@ -4,7 +4,7 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { describeIfMysql, isMariaDb, Mysql2Adapter } from "./test-helper.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
-import { fixtures, setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { Author } from "../../test-helpers/models/author.js";
 import { Post } from "../../test-helpers/models/post.js";
@@ -13,7 +13,7 @@ import { registerModel } from "../../index.js";
 // The outer `describeIfMysql` beforeAll reads `Base.connection` before the
 // nested MySQLExplainTest `fixtures()` establishes it, so the handler wiring has
 // to be laid at file scope here — it is NOT redundant with the nested call.
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 describeIfMysql("Mysql2Adapter", () => {
   registerModel(Author);

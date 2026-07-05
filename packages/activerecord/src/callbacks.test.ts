@@ -10,7 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { makeRange, throwAbort } from "@blazetrails/activesupport";
 import { Base, RecordNotSaved, RecordNotDestroyed, RecordInvalid } from "./index.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { ContextualCallbacksDeveloper } from "./test-helpers/models/contextual-callbacks-developer.js";
 
 type HistoryEntry = [string, string];
@@ -218,7 +218,7 @@ class CallbackHaltedDeveloper extends Base {
   }
 }
 
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 const { developers } = fixtures(["developers"]);
 
 function assertSaveCallbacksNotCalled(someone: CallbackHaltedDeveloper): void {

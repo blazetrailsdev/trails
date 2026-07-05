@@ -1,10 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("TypesTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
   it("attributes which are invalid for database can still be reassigned", async () => {
     const TypeWhichCannotGoToTheDatabase = class extends ValueType {
       override serialize(): unknown {

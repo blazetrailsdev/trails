@@ -14,9 +14,9 @@ import {
   counterCacheColumnOption,
   resolveAliasedColumn,
 } from "./reflection.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 describe("ReflectionTest", () => {
   it("plain function for source type does not raise (only ES classes are rejected)", () => {

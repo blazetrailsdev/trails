@@ -5,7 +5,7 @@ import { setPermanentConnectionCheckout } from "./ar-config.js";
 import { ActiveRecordError } from "./errors.js";
 import { HashConfig } from "./database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "./database-configurations.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
 import { Post } from "./test-helpers/models/post.js";
 import {
@@ -536,7 +536,7 @@ describe("ConnectionHandlingTest", () => {
 });
 
 describe("withRoleAndShard loads Relation return values within scope (Story K gap 5)", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   it("calls .load() on a Relation returned from the block", async () => {
     const { withRoleAndShard } = await import("./connection-handling.js");

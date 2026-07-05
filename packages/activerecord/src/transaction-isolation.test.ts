@@ -2,13 +2,13 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
 import { adapterType } from "./test-adapter.js";
 import { adapterSupports } from "./test-helpers/supports.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { describeIfPg, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 
 // Runs when the adapter does NOT support transaction isolation (or is SQLite3).
 // Rails: TransactionIsolationUnsupportedTest
 describe("TransactionIsolationUnsupportedTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   it.skipIf(adapterType !== "sqlite")("setting the isolation level raises an error", async () => {
     class Tag extends Base {
@@ -44,7 +44,7 @@ describe("TransactionIsolationUnsupportedTest", () => {
 // body that also runs on MySQL is required before their gate can match Rails'
 // mysql,postgresql adapter set).
 describe("TransactionIsolationTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
     "setting isolation when joining a transaction raises an error",
@@ -85,7 +85,7 @@ describe("TransactionIsolationTest", () => {
 // their transactions run on independent physical connections — matching Rails'
 // `Tag.establish_connection :arunit` / `Tag2.establish_connection :arunit` pattern.
 describeIfPg("TransactionIsolationTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   class Tag extends Base {
     static {

@@ -1,9 +1,9 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { Base } from "./index.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("TestColumnAlias", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
   beforeAll(async () => {
     await (Base.connection as any).executeMutation("INSERT INTO topics (title) VALUES ('a')");
   });

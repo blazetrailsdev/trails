@@ -12,7 +12,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 const utc = (v: Temporal.Instant) => v.toZonedDateTimeISO("UTC");
 
 describe("MultiParameterAttributeTest", () => {
-  // fixtures wires setupFixtures + withTransactionalFixtures and warms the pool's
+  // fixtures wires the handler suite + transactional fixtures and warms the pool's
   // schema cache for topics so the synchronous loadSchema path (triggered by
   // new Topic() inside tests) finds the date/time column types correctly on all
   // adapters including MariaDB. Mirrors date.test.ts.

@@ -11,7 +11,7 @@
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
 import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
-import { setupFixtures, fixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
@@ -72,7 +72,7 @@ afterEach(async () => {
 });
 
 describe("TransactionTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   beforeAll(async () => {
     // Re-lay the canonical `topics` on the handler connection (drop-and-recreate,

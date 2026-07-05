@@ -20,7 +20,7 @@ import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
 import "./test-helpers/canonical-model-index.js";
@@ -105,7 +105,6 @@ async function withRecordTimestamps(
 }
 
 describe("InsertAllTest", () => {
-  setupFixtures();
   fixtures(["authors", "books"], {
     // These two raise a DB-level RecordNotUnique; a PG unique violation aborts
     // the surrounding transaction and poisons transactional-fixtures teardown,

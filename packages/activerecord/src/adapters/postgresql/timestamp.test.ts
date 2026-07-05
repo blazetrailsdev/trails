@@ -13,11 +13,11 @@ import {
 } from "./test-helper.js";
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { withTimezoneConfig } from "../../test-helper.js";
 import { Base } from "../../index.js";
 
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

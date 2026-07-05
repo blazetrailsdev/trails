@@ -1,9 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { IntegerType } from "@blazetrails/activemodel";
 import { Base } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 
-setupFixtures();
+fixtures({});
 
 describe("IntegerTest", () => {
   it("casting ActiveRecord models", () => {

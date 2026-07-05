@@ -13,7 +13,7 @@ import {
 import { Notifications } from "@blazetrails/activesupport";
 import { HasManyThroughAssociation } from "./has-many-through-association.js";
 import { assertNotCalledOnInstanceOf } from "../testing/method-call-assertions.js";
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import {
   Post,
@@ -1143,7 +1143,10 @@ describe("EagerAssociationTest", () => {
 });
 
 describe("EagerLoadingTooManyIdsTest", () => {
-  setupFixtures();
+  // Opt out of transactional fixtures: the 65536-row seed below is committed
+  // once in `beforeAll` (via chunked insertAll) and torn down manually in
+  // `afterAll`, rather than reseeded/rolled back per test.
+  fixtures({}, { useTransactionalTests: false });
   // Mirrors the citations.yml fixture: 65536 rows (id 0..65535, book2_id i*i).
   // The point of these tests is that preload/eager_load split an IN clause whose
   // id list exceeds the adapter's bind-parameter limit, so the row count must be

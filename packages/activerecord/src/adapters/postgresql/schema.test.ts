@@ -6,7 +6,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import { StatementInvalid } from "../../errors.js";
 import { makeThingModels, makeThing5Model, makeSongAlbumModels } from "./schema-ar-models.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { dumpAllTableSchema } from "../../test-helpers/schema-dumping-helper.js";
 import type { SchemaSource } from "../../schema-dumper.js";
 import { Base } from "../../index.js";
@@ -119,7 +119,7 @@ async function teardownSchemas(adapter: PostgreSQLAdapter) {
   await adapter.dropSchema("music", { ifExists: true });
 }
 
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

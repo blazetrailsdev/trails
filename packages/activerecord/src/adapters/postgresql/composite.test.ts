@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import { Base } from "../../index.js";
 import { ValueType } from "@blazetrails/activemodel";
 
@@ -47,7 +47,7 @@ class FullAddressType extends ValueType<FullAddress> {
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
   let connection: PostgreSQLAdapter;
 
   async function setupCompositeType(): Promise<void> {

@@ -9,7 +9,7 @@ import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TimeWithZone, TimeZone, setZone, resetZone, BigDecimal } from "@blazetrails/activesupport";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 
 beforeAll(() => {
   vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -29,7 +29,7 @@ const toInt = (s: string) => parseInt(s, 10);
 const toFloat = (s: string) => parseFloat(s);
 const toBigInt = (s: string) => BigInt(s);
 
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

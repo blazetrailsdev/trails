@@ -6,7 +6,7 @@ import { describeIfPg, PostgreSQLAdapter, pgServerVersion } from "./test-helper.
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { Base, Schema } from "../../index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { setupFixtures } from "../../test-helpers/fixtures.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 
 // Rails: class PostgresqlEnum < ActiveRecord::Base
 //   enum :current_mood, { sad: "sad", okay: "ok", happy: "happy", aliased_field: "happy" }, prefix: true
@@ -47,7 +47,7 @@ async function withTestSchema(
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   let adapter: PostgreSQLAdapter;
   // The scoped tests qualify enum sql_types relative to the live search_path, so
