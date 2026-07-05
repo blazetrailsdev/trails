@@ -428,9 +428,12 @@ describe("deriveFixtureSchema", () => {
     const sub = await deriveFixtureSchema(["authors", "posts"], TEST_SCHEMA);
     // `posts` pulls in `categories_posts` too: `sliceSchema` includes the join
     // table of any HABTM association on a model-backed set (the loader may write
-    // join rows from an owner association label). Post HABTM categories now
-    // resolves because resolving the set registers Post, so its through
-    // reflection's join table is detectable.
+    // join rows from an owner association label). `Post habtm categories` owns
+    // the anonymous `categories_posts` join model, so its table is read straight
+    // off the through reflection — no target resolution, so it is detected the
+    // same whether or not the autoload index is installed. `has_many :through`
+    // join tables (taggings, categorizations, …) are deliberately NOT pulled in:
+    // they belong to real models whose fixture sets are requested by name.
     expect(Object.keys(sub).sort()).toEqual(
       [Author.tableName, Post.tableName, "categories_posts"].sort(),
     );
