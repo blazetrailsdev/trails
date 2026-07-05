@@ -423,6 +423,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return true;
   }
 
+  // Rails: `index.using == :btree || super` (abstract_mysql_adapter.rb#default_index_type?).
+  override defaultIndexType(using?: string): boolean {
+    return using === "btree" || super.defaultIndexType(using);
+  }
+
   supportsIndexSortOrder(): boolean {
     // Rails: `mariadb? ? database_version >= "10.8.1" : database_version >= "8.0.1"`
     // (abstract_mysql_adapter.rb#supports_index_sort_order?).
