@@ -164,7 +164,7 @@ describe("NumericalityValidationTest", () => {
     class Person extends Model {
       static {
         this.attribute("value", "string");
-        this.validates("value", { numericality: true });
+        this.validates("value", { numericality: { allowNil: true } });
       }
     }
     expect(new Person({}).isValid()).toBe(true);
