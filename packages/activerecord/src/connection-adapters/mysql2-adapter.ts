@@ -1362,12 +1362,29 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * re-established lazily on the next query.
    */
   /**
-   * No-op: connection is established lazily in `_ensureClient` on the first
-   * query. Exists for lifecycle API parity with Rails' `connect` method.
+   * Eagerly establish the single persistent connection. Mirrors Rails' private
+   * `Mysql2Adapter#connect` (`@raw_connection = new_client(@connection_parameters)`,
+   * mysql2_adapter.rb:144), which raises `ConnectionNotEstablished` (carrying the
+   * pool via `set_pool`) when the socket is dead. Driven eagerly by `connectBang()`
+   * (Rails' public `connect!`) and by `reconnect()` — `_ensureClient()` is the
+   * `new_client` analog and already attaches the pool to a connect failure.
    * @internal
    */
-  connect(): void {
-    // intentionally empty — single connection is established lazily
+  async connect(): Promise<void> {
+    await this._ensureClient();
+  }
+
+  /**
+   * Eager connect — mirrors Rails' `AbstractAdapter#connect!` (`verify!; self`),
+   * which `with_raw_connection` calls when `@raw_connection` is nil. Rather than
+   * route through `verify!` (whose `active?` short-circuit assumes an
+   * already-established `@raw_connection`), trails opens the raw connection
+   * directly — the same posture as `PostgreSQLAdapter#connectBang`. A dead socket
+   * surfaces as `ConnectionNotEstablished` here instead of on the first query.
+   * @internal
+   */
+  override async connectBang(): Promise<void> {
+    await this.connect();
   }
 
   /**
@@ -1380,7 +1397,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    *
    * @internal
    */
-  override reconnect(): void {
+  override async reconnect(): Promise<void> {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
     this._activeState = false;
     this._connectGeneration++;
@@ -1395,10 +1412,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connection = null;
     this._closeRawHandle();
     this._activeState = true;
-    // Kick off connection eagerly so verify/ping paths find a live connection
-    // promptly. Mirrors Rails' reconnect! which calls connect (not lazy) after
-    // disconnect!. Errors are surfaced on the next awaited call via _ensureClient.
-    this._ensureClient().catch(() => {});
+    // Re-establish the connection eagerly and PROPAGATE any connect failure —
+    // Rails' private `reconnect` calls `connect` synchronously, so a dead socket
+    // raises out of `reconnect!` (mysql2_adapter.rb:150 → :144). Awaiting here
+    // lets the inherited `reconnectBang` translate + re-raise the
+    // `ConnectionNotEstablished` (carrying the pool) instead of swallowing it.
+    await this._ensureClient();
   }
 
   /**

@@ -7,10 +7,10 @@
  * probes, the empty-result-set guard, extended timezone re-sync) live in the
  * sibling mysql2-adapter.trails.test.ts.
  *
- * connection_error / reconnection_error drive `reconnectBang()` — the method
- * Rails' `connect!` reaches (verify! → reconnect!) when a fresh adapter has no
- * live connection — since trails connects lazily and has no eager `connect!`.
- * A standalone adapter now carries a NullPool by default (matching Rails
+ * connection_error drives `connectBang()` — trails' eager connect, the
+ * `PostgreSQLAdapter#connectBang`-style analog of Rails' public `connect!` —
+ * and reconnection_error drives `reconnectBang()` directly (Rails' `reconnect!`).
+ * A standalone adapter carries a NullPool by default (matching Rails
  * `@pool = NullPool.new`), so `error.connection_pool` is asserted faithfully.
  *
  * The FK type-mismatch tests ride the canonical `engines` / `old_cars` (int PK)
@@ -55,15 +55,15 @@ describeIfMysql("Mysql2AdapterTest", () => {
 
   it("connection error", async () => {
     // Rails: `Mysql2Adapter.new(socket: File::NULL, ...).connect!` raises
-    // ConnectionNotEstablished whose `connection_pool` is a NullPool. trails
-    // connects lazily (there is no eager `connect!`), so the failure to connect
-    // to a dead socket surfaces on the first query — the same rescued
-    // `connect` → `set_pool(@pool)` path, carrying the standalone adapter's
-    // NullPool.
+    // ConnectionNotEstablished whose `connection_pool` is a NullPool. trails'
+    // `connectBang()` is the eager connect (Rails' `connect!` establishing
+    // `@raw_connection`), so the dead-socket failure surfaces here via the same
+    // rescued `connect` → `set_pool(@pool)` path, carrying the standalone
+    // adapter's NullPool.
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
       const error = await badAdapter
-        .execute("SELECT 1")
+        .connectBang()
         .then(() => null)
         .catch((e) => e);
       expect(error).toBeInstanceOf(ConnectionNotEstablished);
@@ -76,13 +76,13 @@ describeIfMysql("Mysql2AdapterTest", () => {
   it("reconnection error", async () => {
     // Rails reconnects a standalone adapter whose config points at a dead
     // socket and asserts the raised ConnectionNotEstablished's `connection_pool`
-    // equals the adapter's own pool (a NullPool). trails connects lazily, so
-    // force the connect via a query after a reconnect and assert the same.
+    // equals the adapter's own pool (a NullPool). trails' `reconnectBang()`
+    // (Rails' `reconnect!`) now re-establishes the connection eagerly and
+    // re-raises the translated ConnectionNotEstablished, so assert it directly.
     const badAdapter = new Mysql2Adapter({ socketPath: "/dev/null", preparedStatements: false });
     try {
-      await badAdapter.reconnectBang().catch(() => {});
       const error = await badAdapter
-        .execute("SELECT 1")
+        .reconnectBang()
         .then(() => null)
         .catch((e) => e);
       expect(error).toBeInstanceOf(ConnectionNotEstablished);
