@@ -339,8 +339,12 @@ describe("NestedThroughAssociationsTest", () => {
   // has_many through
   // Source: has_many
   // Through: has_and_belongs_to_many
-  // Direct load of hasMany through a hasAndBelongsToMany returns empty; only preload/joins paths work.
-  it.todo("has many through has and belongs to many with has many source reflection");
+  it("has many through has and belongs to many with has many source reflection", async () => {
+    const greetings = comments("greetings");
+    const moreGreetings = comments("more_greetings");
+    const result = await categories("technology").postComments.order("comments.id");
+    expect(result.map((c: any) => c.id)).toEqual([greetings.id, moreGreetings.id]);
+  });
 
   it("has many through has and belongs to many with has many source reflection preload", async () => {
     const greetings = comments("greetings");
@@ -369,9 +373,12 @@ describe("NestedThroughAssociationsTest", () => {
   // has_many through
   // Source: has_many through a habtm
   // Through: has_many through
-  // Direct load of categoryPostComments (through categories→habtm posts→comments) returns empty.
-  // The nested-through-habtm direct query path doesn't build the correct join for this chain.
-  it.todo("has many through has many with has many through habtm source reflection");
+  it("has many through has many with has many through habtm source reflection", async () => {
+    const greetings = comments("greetings");
+    const moreGreetings = comments("more_greetings");
+    const result = await authors("bob").categoryPostComments.order("comments.id");
+    expect(result.map((c: any) => c.id)).toEqual([greetings.id, moreGreetings.id]);
+  });
 
   it("has many through has many with has many through habtm source reflection preload", async () => {
     const greetings = comments("greetings");
@@ -789,7 +796,13 @@ describe("NestedThroughAssociationsTest", () => {
     expect(count).toBe(1);
   });
 
-  // Direct load of orderedPostComments (hasMany through habtm posts→comments) returns empty
-  // while preload returns [2, 1]; habtm-through direct-load gap makes the two paths diverge.
-  it.todo("has many through reset source reflection after loading is complete");
+  it("has many through reset source reflection after loading is complete", async () => {
+    const [, preloaded] = (await Category.preload("orderedPostComments").find(1, 2)) as any[];
+    const original = await Category.find(2);
+    const preloadedIds = ((preloaded.association("orderedPostComments").target ?? []) as any[]).map(
+      (c: any) => c.id,
+    );
+    const originalIds = (await original.orderedPostComments.toArray()).map((c: any) => c.id);
+    expect(originalIds).toEqual(preloadedIds);
+  });
 });
