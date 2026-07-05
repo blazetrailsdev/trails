@@ -97,7 +97,11 @@ describeIfMysql("Mysql2Adapter", () => {
       expect(adapter.quote("string")).toBe("'string'");
     });
 
-    it("active after disconnect", () => {
+    it("active after disconnect", async () => {
+      // Rails' @connection is a live pooled connection (raw_connection set), so
+      // establish one here before disconnecting — the sync `active` getter now
+      // tracks real connection state (`_client !== null`) like Rails' active?.
+      await adapter.execute("SELECT 1");
       expect(adapter.active).toBe(true);
       adapter.disconnectBang();
       expect(adapter.active).toBe(false);
