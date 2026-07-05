@@ -2612,9 +2612,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         if (!sqlite3Col.autoIncrement && col.default !== null && col.default !== undefined) {
           def += ` DEFAULT ${this.quoteDefault(col.default)}`;
         }
+        // Generated columns are computed, never copied as content (Rails rejects
+        // columns whose options carry `:as`).
+        contentCols.push(destName);
       }
       colDefs.push(def);
-      if (!sqlite3Col.isVirtual()) contentCols.push(destName);
     }
     if (compositePk) {
       const renamedPks = pkCols.map((c) => rename[c] ?? c);
