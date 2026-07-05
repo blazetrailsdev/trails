@@ -24,7 +24,6 @@
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
 import type { TransactionManager } from "./connection-adapters/abstract/transaction.js";
-import { clearAppliedSchemaSignatures } from "./test-helpers/define-schema.js";
 import { resetTestTables } from "./test-helpers/drop-all-tables.js";
 import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
@@ -263,6 +262,5 @@ export async function resetTestAdapterState(): Promise<void> {
       { preventPermanentCheckout: true },
     );
   }
-  clearAppliedSchemaSignatures();
   Base._modelsByName.clear();
 }
