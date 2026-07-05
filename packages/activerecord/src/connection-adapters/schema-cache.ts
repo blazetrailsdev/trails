@@ -298,6 +298,21 @@ export class SchemaCache {
    * cache resolves `primary_key` from the reflected table rather than the
    * convention.
    *
+   * This column-flag derivation is adapter-scoped: it fires only for adapters
+   * whose `columns()` flag the PK (sqlite/postgres). MySQL/MariaDB's `columns()`
+   * carries no per-column primary flag — matching Rails' `MySQL::Column`
+   * (`abstract_mysql_adapter.rb`), which resolves the key solely via
+   * `@connection.primary_key` — so this branch never resolves a MySQL key and
+   * falls through to `undefined`. That is not a gap: MySQL PK resolution is
+   * authoritative-only, and `loadSchema` → `loadSchemaFromAdapter`
+   * (`model-schema.ts`) always warms `_primaryKeys` (via `adapter.primaryKey()`)
+   * alongside the columns hash, so the `_primaryKeys` hit above answers first.
+   * A MySQL custom-PK table therefore still resolves through the model path
+   * (regression-tested in `primary-keys.test.ts`); only a low-level caller that
+   * warms `_columns` without `_primaryKeys` — which the model path never does —
+   * would see the fall-through, exactly as Rails would require a `primary_keys`
+   * query there.
+   *
    * Deliberately returns `undefined` (not `null`) when the warm columns flag no
    * primary key: the authoritative keyless→`null` answer comes from the async
    * `primaryKeys` query, and resolving it here would change a warm-but-unqueried
