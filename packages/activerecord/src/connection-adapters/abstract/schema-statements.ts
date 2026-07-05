@@ -721,8 +721,27 @@ export class SchemaStatements {
   async removeReference(
     tableName: string,
     refName: string,
-    options: { polymorphic?: boolean } = {},
+    options: {
+      polymorphic?: boolean;
+      foreignKey?: boolean | { toTable?: string; column?: string };
+    } = {},
   ): Promise<void> {
+    // Mirrors Rails remove_reference (schema_statements.rb): when `foreign_key`
+    // is given, drop the constraint BEFORE the column, otherwise MySQL/MariaDB
+    // refuses to drop the column's index while the FK still needs it. This is
+    // the inverse `add_reference ... foreign_key:` records (CommandRecorder
+    // passes the same args through), so it has to undo the FK the forward call
+    // created.
+    if (options.foreignKey) {
+      const fkOptions =
+        typeof options.foreignKey === "object"
+          ? { ...options.foreignKey }
+          : { toTable: pluralize(refName) };
+      if ((fkOptions as { column?: string }).column == null) {
+        (fkOptions as { column?: string }).column = `${refName}_id`;
+      }
+      await this.removeForeignKey(tableName, fkOptions);
+    }
     if (options.polymorphic) {
       await this.removeColumn(tableName, `${refName}_type`);
     }
@@ -733,7 +752,10 @@ export class SchemaStatements {
   async removeBelongsTo(
     tableName: string,
     refName: string,
-    options: { polymorphic?: boolean } = {},
+    options: {
+      polymorphic?: boolean;
+      foreignKey?: boolean | { toTable?: string; column?: string };
+    } = {},
   ): Promise<void> {
     return this.removeReference(tableName, refName, options);
   }
