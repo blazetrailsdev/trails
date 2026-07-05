@@ -7,13 +7,15 @@
  * association comes back empty even though Ruby's width-agnostic `Integer ==`
  * would match. Guards against that regression on the PG bigserial-PK lane.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { Base, registerModel } from "../index.js";
+import { describe, it, expect } from "vitest";
+import { Base } from "../index.js";
 import { Preloader } from "./preloader.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { TEST_SCHEMA } from "../test-helpers/test-schema.js";
+// Opt into the canonical-model autoload index so the `posts` association target
+// (`Post`) resolves by name during preload — no manual `registerModel`.
+import "../test-helpers/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
-import { Post } from "../test-helpers/models/post.js";
 
 type RecordInternals = {
   _attributes: { writeCastValue(name: string, value: unknown): void };
@@ -25,11 +27,6 @@ const internals = (record: Base): RecordInternals => record as unknown as Record
 
 describe("Preloader BigInt PK / number FK key match", () => {
   const { authors } = fixtures(["authors", "posts"], { schema: TEST_SCHEMA });
-
-  beforeAll(() => {
-    registerModel("Author", Author);
-    registerModel("Post", Post);
-  });
 
   it("matches children when the owner PK is a BigInt and the child FK is a number", async () => {
     const david = await Author.find(authors("david").id);

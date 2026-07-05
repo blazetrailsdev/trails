@@ -5,17 +5,17 @@
 import { describe, it, expect, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
+// Opt into the canonical-model autoload index so association targets resolve by
+// name on first reference — no manual `registerModel`.
+import "./test-helpers/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Author } from "./test-helpers/models/author.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 
 describe("InstrumentationTest", () => {
-  registerModel("Author", Author);
-  registerModel("Book", Book);
-  registerModel("ClothingItem", ClothingItem);
   fixtures(["books", "authors"], { schema: canonicalSchema });
 
   afterEach(() => {
@@ -231,7 +231,6 @@ function transactionInSqlActiveRecordPayloadTests(): void {
 }
 
 describe("TransactionInSqlActiveRecordPayloadTest", () => {
-  registerModel("Book", Book);
   fixtures(["books"], { schema: canonicalSchema });
 
   afterEach(() => {
@@ -242,7 +241,6 @@ describe("TransactionInSqlActiveRecordPayloadTest", () => {
 });
 
 describe("TransactionInSqlActiveRecordPayloadNonTransactionalTest", () => {
-  registerModel("Book", Book);
   // Rails: `self.use_transactional_tests = false` — neither case may run inside
   // the rollback-on-teardown outer transaction.
   fixtures(["books"], {

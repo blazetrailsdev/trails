@@ -14,20 +14,16 @@
  * Not a Rails-mirrored test name — this is a TS-internal refactor invariant
  * with no Ruby counterpart.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
+// Opt into the canonical-model autoload index so the belongsTo("author") target
+// (`Author`) resolves by name during JoinDependency construction — no manual
+// `registerModel`.
+import "../test-helpers/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Author } from "../test-helpers/models/author.js";
 
 describe("build_joins from(subquery) dedup", () => {
   fixtures([]);
-  beforeAll(async () => {
-    // Register the belongsTo("author") target so `joins("author")` resolves
-    // during JoinDependency construction.
-    registerModel("Post", Post);
-    registerModel("Author", Author);
-  });
 
   it("emits a single INNER JOIN (no LEFT OUTER JOIN) through the from-subquery", () => {
     const sub = Post.joins("author").leftOuterJoins("author");

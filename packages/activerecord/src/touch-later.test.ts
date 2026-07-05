@@ -7,30 +7,21 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { travel, travelBack } from "@blazetrails/activesupport";
-import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+// Opt into the canonical-model autoload index so association targets resolve by
+// name on first reference — no manual `registerModel`.
+import "./test-helpers/canonical-model-index.js";
 import { setBeforeCommittedOnAllRecords } from "./ar-config.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import { Node } from "./test-helpers/models/node.js";
-import { Tree } from "./test-helpers/models/tree.js";
-import { Owner } from "./test-helpers/models/owner.js";
-import { Pet } from "./test-helpers/models/pet.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 // Mirrors Rails `fixtures :nodes, :trees, :owners, :pets`. The fixture loader
 // seeds explicit PKs and resets serial sequences, which a plain `create` does
 // not do for the custom-named `owner_id`/`pet_id` PKs on Postgres.
 const { nodes, trees, owners, pets } = fixtures(["nodes", "trees", "owners", "pets"]);
-
-registerModel("Invoice", Invoice);
-registerModel("LineItem", LineItem);
-registerModel("Node", Node);
-registerModel("Tree", Tree);
-registerModel("Owner", Owner);
-registerModel("Pet", Pet);
-registerModel("Topic", Topic);
 
 // Mirrors Ruby's `time.to_i` — whole epoch seconds, the granularity Rails'
 // touch_later assertions compare at (DB datetime columns drop sub-second

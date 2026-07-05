@@ -13,12 +13,13 @@
  * Not a Rails-mirrored test name — this covers a trails-specific deviation with
  * no direct Ruby counterpart.
  */
-import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
+import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { Post } from "../test-helpers/models/post.js";
+// Opt into the canonical-model autoload index so the `posts`/`comments`
+// association targets (`Post`, `Comment`) resolve by name during build_joins —
+// no manual `registerModel`.
+import "../test-helpers/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
-import { Comment } from "../test-helpers/models/comment.js";
 
 interface JoinValueHost {
   // Public Rails-mirrored accessor for `left_outer_joins_values`
@@ -34,11 +35,6 @@ const asHost = (rel: unknown): JoinValueHost => rel as JoinValueHost;
 
 describe("join value union structural dedup", () => {
   fixtures({});
-  beforeAll(() => {
-    registerModel("Author", Author);
-    registerModel("Post", Post);
-    registerModel("Comment", Comment);
-  });
 
   it("emits a single LEFT OUTER JOIN for a structurally-equal Hash spec joined twice", () => {
     const rel = Author.leftJoins({ posts: "comments" }).leftJoins({ posts: "comments" });

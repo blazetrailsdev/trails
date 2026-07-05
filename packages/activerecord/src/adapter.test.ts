@@ -17,7 +17,6 @@ import {
   InvalidForeignKey,
   RangeError,
   ValueTooLong,
-  registerModel,
   Rollback,
 } from "./index.js";
 import { Result } from "./result.js";
@@ -27,6 +26,9 @@ import { adapterType, inMemoryDb } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
 import { runWithoutConnection } from "./test-helpers/connection-helper.js";
+// Opt into the canonical-model autoload index so association targets resolve by
+// name on first reference — no manual `registerModel`.
+import "./test-helpers/canonical-model-index.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Post } from "./test-helpers/models/post.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";
@@ -216,10 +218,6 @@ async function activePredicate(conn: DatabaseAdapter): Promise<boolean> {
 // schema + official Book/Post/Author/Event models and real fixtures; the leased
 // `Base.connection` stands in for Rails' `@connection = ...lease_connection`.
 describe("AdapterTest", () => {
-  registerModel("Author", Author);
-  registerModel("Post", Post);
-  registerModel("Book", Book);
-  registerModel("Event", Event);
   fixtures(["accounts", "authors", "tasks", "topics", "subscribers", "posts", "books"], {
     schema: canonicalSchema,
     usesTransaction: [
@@ -632,12 +630,6 @@ describe("AdapterForeignKeyTest", () => {
 });
 
 describe("AdapterTestWithoutTransaction", () => {
-  registerModel("Author", Author);
-  registerModel("Post", Post);
-  registerModel("AuthorAddress", AuthorAddress);
-  registerModel("Movie", Movie);
-  registerModel("Subscriber", Subscriber);
-
   // Rails: `self.use_transactional_tests = false`. truncate commits (and on
   // MySQL implicitly commits as DDL), so these run un-wrapped; fixtures()
   // re-seeds each table in its beforeEach, standing in for `reset_fixtures`.
@@ -764,10 +756,6 @@ describe("AdapterTestWithoutTransaction", () => {
 // MySQL/PostgreSQL (Rails `skip`s on SQLite), so the cases that depend on them
 // stay gated on a non-SQLite adapter.
 describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
-  registerModel("Post", Post);
-  registerModel("Author", Author);
-  registerModel("AuthorAddress", AuthorAddress);
-
   // Rails: `self.use_transactional_tests = false`; the disconnect/reconnect
   // lifecycle would be meaningless wrapped in a per-test transaction, so every
   // case runs un-wrapped and fixtures re-seed each table in their beforeEach.

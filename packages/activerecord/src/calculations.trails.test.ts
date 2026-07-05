@@ -1,9 +1,11 @@
 import { describe, it, expect } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base } from "./index.js";
 import type { JoinDependency } from "./associations/join-dependency.js";
 import { lookupCastTypeFromJoinDependencies } from "./relation/calculations.js";
-import { Topic } from "./test-helpers/models/topic.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+// Opt into the canonical-model autoload index so the `topics` association target
+// (`Topic`) resolves by name on first reference — no manual `registerModel`.
+import "./test-helpers/canonical-model-index.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 
 // ==========================================================================
@@ -96,8 +98,6 @@ describe("lookupCastTypeFromJoinDependencies", () => {
 // ==========================================================================
 
 describe("lookupCastTypeFromJoinDependencies integration", () => {
-  registerModel("Topic", Topic);
-
   // Rails' Author `has_many :topics, primary_key: "name", foreign_key:
   // "author_name"`. Defined locally under a distinct class name (not the
   // canonical Author model) so importing it does not perturb the shared model

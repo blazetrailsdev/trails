@@ -16,13 +16,15 @@
  *     partitioned indexes, Speedometer no-DB-key — d2-insert-all-canonical-models
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "./index.js";
 import { UnknownAttributeError, RecordNotUnique } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+// Opt into the canonical-model autoload index so association targets resolve by
+// name on first reference — no manual `registerModel`.
+import "./test-helpers/canonical-model-index.js";
 import { withDbWarningsAction } from "./test-helpers/with-db-warnings-action.js";
 import { assertQueriesMatch, assertNoQueriesMatch } from "./testing/query-assertions.js";
 import { captureLogOutput } from "./testing/sql-capture.js";
@@ -36,8 +38,6 @@ import { Category, SpecialCategory } from "./test-helpers/models/category.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
 import { Speedometer } from "./test-helpers/models/speedometer.js";
-import { Subscriber } from "./test-helpers/models/subscriber.js";
-import { Subscription } from "./test-helpers/models/subscription.js";
 
 // Adapter capability gates (mirror Rails' supports_* predicates / current_adapter?).
 // Feature-gated tests use itIfSupports(...) / adapterSupports(...) so the
@@ -107,16 +107,6 @@ async function withRecordTimestamps(
 
 describe("InsertAllTest", () => {
   setupFixtures();
-  registerModel("Author", Author);
-  registerModel("Book", Book);
-  registerModel("Cart", Cart);
-  registerModel("Category", Category);
-  registerModel("SpecialCategory", SpecialCategory);
-  registerModel("Developer", Developer);
-  registerModel("Ship", Ship);
-  registerModel("Speedometer", Speedometer);
-  registerModel("Subscriber", Subscriber);
-  registerModel("Subscription", Subscription);
   fixtures(["authors", "books"], {
     schema: canonicalSchema,
     // These two raise a DB-level RecordNotUnique; a PG unique violation aborts

@@ -1,6 +1,5 @@
 // Faithful port of vendor/rails/activerecord/test/cases/statement_cache_test.rb
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "./index.js";
 import { StatementCache } from "./statement-cache.js";
 import { Book } from "./test-helpers/models/book.js";
 import { Liquid } from "./test-helpers/models/liquid.js";
@@ -10,12 +9,10 @@ import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { RecordNotFound } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-
-registerModel("Book", Book);
-registerModel("Liquid", Liquid);
-registerModel("Molecule", Molecule);
-registerModel("Electron", Electron);
-registerModel("NumericData", NumericData);
+// Opt into the canonical-model autoload index so association targets
+// (`Molecule`/`Electron` via `Liquid`) resolve by name — no manual
+// `registerModel`.
+import "./test-helpers/canonical-model-index.js";
 
 fixtures([]);
 
