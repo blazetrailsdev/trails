@@ -150,6 +150,17 @@ function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
   return sqliteTypeCast.call(this, value);
 }
 
+// A structured column default: an array or a plain object literal (`default: {}`
+// / `default: []`). Excludes null, SqlLiteral, Date, and other class instances,
+// which have their own quoting paths and must not be routed through the column
+// type's `serialize`.
+function isStructuredDefault(value: unknown): boolean {
+  if (Array.isArray(value)) return true;
+  if (value === null || typeof value !== "object" || isSqlLiteral(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 function _isSqliteMissingDbError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const e = error as { code?: unknown; message?: unknown };
@@ -985,12 +996,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // column's cast type before quoting (abstract/quoting.rb:157). A structured
   // default for a `json` column (`default: {}`) must serialize to the JSON text
   // `{}` rather than being coerced with `String({})` → "[object Object]". Route
-  // object/array defaults through the column type; SqlLiteral and scalars keep
-  // their existing quoting.
+  // only plain-object/array defaults through the column type; scalars, dates,
+  // SqlLiteral, and other class instances keep their existing quoting paths.
   private serializeDefaultForColumn(value: unknown, sqlType: string | null | undefined): unknown {
-    if (value === null || typeof value !== "object" || isSqlLiteral(value) || !sqlType) {
-      return value;
-    }
+    if (!sqlType || !isStructuredDefault(value)) return value;
     const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
     return typeof castType.serialize === "function" ? castType.serialize(value) : value;
   }
