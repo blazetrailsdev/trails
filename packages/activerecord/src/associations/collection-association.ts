@@ -228,12 +228,20 @@ export class CollectionAssociation extends Association {
   protected async concatRecords(records: Base[], shouldRaise = false): Promise<Base[]> {
     await concatRecordsLoop(records, async (record, resultStillTrue) => {
       (this as any).raiseOnTypeMismatchBang(record);
-      const added = this.addToTarget(record);
-      // `!added` → before_add aborted; `resultStillTrue === false` → a prior
-      // record failed, so Rails' `result &&= insert_record` short-circuits the
-      // save while still buffering this record above.
-      if (!added || this.owner.isNewRecord() || !resultStillTrue) return true;
-      return await this.insertRecord(record, true, shouldRaise);
+      // Mirror Rails' `add_to_target(record) { insert_record }`
+      // (collection_association.rb:440-446): the insert runs *inside* the
+      // funnel — after before_add + set_inverse_instance, before the target
+      // mutation and after_add — rather than after the whole add. A
+      // before_add abort (`added == null`) skips the yield, so `inserted`
+      // stays true and the fold leaves `result` unchanged.
+      let inserted = true;
+      await this.addToTarget(record, {}, async () => {
+        // `resultStillTrue === false` → a prior record failed, so Rails'
+        // `result &&= insert_record` short-circuits the save.
+        if (this.owner.isNewRecord() || !resultStillTrue) return;
+        inserted = await this.insertRecord(record, true, shouldRaise);
+      });
+      return inserted;
     });
     return records;
   }
@@ -509,14 +517,30 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * Add a record to the in-memory target array, firing callbacks
-   * and setting inverse associations.
+   * Add a record to the in-memory target array, firing callbacks and setting
+   * inverse associations. Mirrors Rails' single `add_to_target(record, &block)`
+   * (collection_association.rb:281-283): when a `save` callback is supplied it
+   * runs at Rails' `yield(record)` point — after `set_inverse_instance`, before
+   * the target mutation and after_add — and the method returns a promise.
+   * `concatRecords` passes the per-record insert as `save` so it runs inside the
+   * add funnel; the target push happens regardless of the save result (Rails
+   * relies on the surrounding `raise Rollback` to undo a failed insert), keeping
+   * the OO path's membership behavior unchanged. Sync callers (build/replace,
+   * no `save`) get the synchronous return.
    */
+  addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
+  addToTarget(
+    record: Base,
+    options: { skipCallbacks?: boolean; replace?: boolean },
+    save: () => Promise<void>,
+  ): Promise<Base | null>;
   addToTarget(
     record: Base,
     options: { skipCallbacks?: boolean; replace?: boolean } = {},
-  ): Base | null {
+    save?: () => Promise<void>,
+  ): Base | null | Promise<Base | null> {
     const { skipCallbacks = false, replace: shouldReplace = false } = options;
+    if (save) return replaceOnTargetAsync(this, record, skipCallbacks, shouldReplace, save);
     return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
   }
 
@@ -1080,6 +1104,48 @@ function replaceCommonRecordsInMemory(
   }
 }
 
+/**
+ * Rails `replace_on_target`'s pre-`yield` half: the index lookup, `before_add`
+ * abort check, `set_inverse_instance`, and `@association_ids` reset. Returns the
+ * replace index (`-1` when appending) or `null` when `before_add` aborted the
+ * add (Rails' `catch(:abort) { ... } || return`). Shared by the sync
+ * `replaceOnTarget` and the async `replaceOnTargetAsync` so both stay in parity.
+ * @internal
+ */
+function beginReplaceOnTarget(
+  assoc: CollectionAssociation,
+  record: Base,
+  skipCallbacks: boolean,
+  replace: boolean,
+): number | null {
+  const index = replace ? assoc.target.indexOf(record) : -1;
+  if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
+  assoc.setInverseInstance(record);
+  (assoc as any)._associationIds = null;
+  return index;
+}
+
+/**
+ * Rails `replace_on_target`'s post-`yield` half: the target mutation and
+ * `after_add` callback.
+ * @internal
+ */
+function finishReplaceOnTarget(
+  assoc: CollectionAssociation,
+  record: Base,
+  skipCallbacks: boolean,
+  index: number,
+): Base {
+  const target = assoc.target;
+  if (index !== -1) {
+    target[index] = record;
+  } else {
+    target.push(record);
+  }
+  if (!skipCallbacks) callback(assoc, "afterAdd", record);
+  return record;
+}
+
 /** @internal */
 function replaceOnTarget(
   assoc: CollectionAssociation,
@@ -1087,28 +1153,29 @@ function replaceOnTarget(
   skipCallbacks: boolean,
   replace: boolean,
 ): Base | null {
-  const replaced = assoc as any;
-  let index = -1;
-  if (replace) {
-    index = assoc.target.indexOf(record);
-  }
+  const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
+  if (index === null) return null;
+  return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
+}
 
-  // Rails: catch(:abort) { callback(:before_add, record) } || return unless skip_callbacks
-  if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
-
-  assoc.setInverseInstance(record);
-  replaced._associationIds = null;
-
-  const target = assoc.target;
-  if (index !== -1) {
-    target[index] = record;
-  } else {
-    target.push(record);
-  }
-
-  if (!skipCallbacks) callback(assoc, "afterAdd", record);
-
-  return record;
+/**
+ * Async twin of `replaceOnTarget`: runs `save` at Rails' `yield(record)` point
+ * — after `set_inverse_instance`, before the target mutation and after_add.
+ * Kept as a separate async function so the sync `replaceOnTarget` callers
+ * (build/replace paths) stay synchronous.
+ * @internal
+ */
+async function replaceOnTargetAsync(
+  assoc: CollectionAssociation,
+  record: Base,
+  skipCallbacks: boolean,
+  replace: boolean,
+  save?: () => Promise<void>,
+): Promise<Base | null> {
+  const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
+  if (index === null) return null;
+  if (save) await save();
+  return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
 }
 
 /**
