@@ -246,15 +246,13 @@ describe("HasOneAssociationsTest", () => {
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
 
-  it.skip("association change calls destroy", () => {
-    // BLOCKED: the JS property setter (`firm.account = Account.new`) cannot
-    // await, so the displaced account is not loaded at queue time and
-    // `persistReplace` has no `previousTarget` to dependent-destroy. The
-    // before_destroy inverse-owner seed (has-one-association.ts) already
-    // makes the cascade record `destroyed_account_ids` once the displaced
-    // record IS known (see "dependence"); what remains is loading the
-    // existing DB target on an unloaded property-setter replace. Tracked by
-    // follow-on story unskip-has-one-load-displaced-on-replace.
+  it("association change calls destroy", async () => {
+    const firm = companies("first_firm") as any;
+    // Property setter queues on an unloaded has_one; `firm.save()` loads the
+    // existing DB account and runs the dependent: :destroy remove against it.
+    firm.account = new Account({ credit_limit: 5 });
+    await firm.save();
+    expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([firm.id]);
   });
 
   it("natural assignment to already associated record", async () => {
