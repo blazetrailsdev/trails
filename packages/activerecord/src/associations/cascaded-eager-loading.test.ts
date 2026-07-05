@@ -493,13 +493,40 @@ describe("CascadedEagerLoadingTest", () => {
     expect(retrievedComments[0].id).toBe(lastComment.id);
   });
 
-  it.skip("preloading across has one through constrains loaded records", () => {
-    // BLOCKED: nested preload through a has_one :through does not instantiate the
-    //   nested association (separate from the now-available resetCallbacks API).
-    // ROOT-CAUSE: `preload(recent_response: :author)` loads recent_response (the
-    //   has_one :through), but the nested `:author` on that record is never
-    //   instantiated, so the after_initialize recorder sees 1 record instead of
-    //   2. The recentResponse target loads; its `author` child does not preload.
-    //   Tracked: RFC 0030 story nested-preload-through-has-one-source.
+  it("preloading across has one through constrains loaded records", async () => {
+    const author = (await Author.findBy({ id: (authors("david") as any).id }))!;
+
+    const oldPost = await (author as any).posts.createBang({ title: "first post", body: "test" });
+    await oldPost.comments.createBang({
+      author: authors("mary"),
+      body: "a response",
+    });
+
+    const recentPost = await (author as any).posts.createBang({
+      title: "first post",
+      body: "test",
+    });
+    await recentPost.comments.createBang({
+      author: authors("bob"),
+      body: "a response",
+    });
+
+    const authorsRel = Author.where({ id: author.id });
+    const retrievedAuthors: Base[] = [];
+
+    await resetCallbacks(Author, "initialize", async () => {
+      Author.afterInitialize((record: Author) => {
+        retrievedAuthors.push(record);
+      });
+      await authorsRel.preload({ recentResponse: "author" }).load();
+    });
+
+    // Rails: assert_equal [author, authors(:bob)], retrieved_authors — AR#== is
+    // same class + same id, so match the recorded records' class and ids.
+    expect(retrievedAuthors).toHaveLength(2);
+    expect(retrievedAuthors.map((r) => (r as any).id)).toEqual([
+      author.id,
+      (authors("bob") as any).id,
+    ]);
   });
 });
