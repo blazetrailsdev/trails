@@ -47,9 +47,28 @@ So `fixtures([], { … })` runs `setupHandlerSuite()` +
 `withTransactionalFixtures(() => Base.connection)` + `useFixtures([])` — the exact
 suite-wiring + per-test transaction the pair provides, with no fixture data
 loaded and no canonical schema created (the default `schema: TEST_SCHEMA` derives
-an empty slice for zero requested sets, a no-op). Pair-only files keep their
-bespoke `createTable()` in `beforeAll` unchanged and simply replace the two-line
-pair with a single `fixtures([], …)` call.
+an empty slice for zero requested sets, a no-op). Each pair replaces to a single
+`fixtures([], …)` call; a file's existing schema setup — whichever form it uses
+(`createTable`, `defineSchema`, or none at all when the block rides the canonical
+schema) — is orthogonal and left untouched.
+
+Two properties of Bucket A files are load-bearing for the conversion stories and
+must not be under-scoped:
+
+- **Table creation is not a defining trait.** Rails' fixture wiring is per-test
+  transactional setup (`setup_fixtures` / `teardown_fixtures`,
+  `vendor/rails/activerecord/lib/active_record/test_fixtures.rb:108-133`), fully
+  independent of how — or whether — a suite creates its tables. In Bucket A,
+  ~30 of the 54 files call **no** `createTable()` at all (e.g.
+  `attribute-methods.test.ts`, `base.test.ts`, most `associations/*`,
+  `validations/*`): they ride the canonical schema. Others create tables via
+  `createTable` or `defineSchema`. The conversion touches only the pair, never
+  the schema setup.
+- **A file may hold several pairs, not one.** The pair is per-`describe`, so
+  files split into multiple suites carry one pair each — e.g.
+  `attribute-methods.test.ts` and `base.test.ts` have **3** pairs,
+  `autosave-association.test.ts` / `dirty.test.ts` / `normalized-attribute.test.ts`
+  have 2. Conversion is per pair (per `describe`), not one edit per file.
 
 Rejected alternative: a retained combined no-data helper (e.g.
 `setupTransactionalSuite()`). It would be a second public surface for something
@@ -62,12 +81,12 @@ Bucket A — see below.
 
 ## Buckets
 
-| Bucket                | What                                                                                                                           | Count | Conversion target                                                                                                                                             |
-| --------------------- | ------------------------------------------------------------------------------------------------------------------------------ | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **A** — pair, no data | `setupFixtures()` + `useHandlerTransactionalFixtures()`, bespoke `createTable()`, no fixture map, no `fixtures(...)` call      |    54 | `fixtures([], { … })` replacing the two-line pair; keep `createTable()`                                                                                       |
-| **B** — redundant     | `setupFixtures()` on a file that already calls `fixtures(...)` (which re-wires the suite)                                      |    28 | Delete the `setupFixtures()` line (+ its import if now unused). Zero behavior change                                                                          |
-| **C** — sf-only       | `setupFixtures()` only — no transaction, no fixture data (pure handler wiring / shared-DB shield with manual `createTable()`)  |    31 | Keep `setupFixtures()`; no transactional wrapper wanted (many are PG-DDL suites that break under txn wrapping). No conversion needed beyond confirming intent |
-| **D** — mixed         | `setupFixtures()` + `useHandlerTransactionalFixtures()` **and** a `fixtures(...)` call in the same file (per-`describe` split) |    12 | Per-`describe` hand conversion: data blocks → `fixtures([...] )`, no-data blocks → `fixtures([], …)`, drop redundant top-level pair                           |
+| Bucket                | What                                                                                                                                                                             | Count | Conversion target                                                                                                                                             |
+| --------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- | ----: | ------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **A** — pair, no data | `setupFixtures()` + `useHandlerTransactionalFixtures()` pair(s), no fixture map, no `fixtures(...)` call (schema comes from canonical / `createTable` / `defineSchema`, or none) |    54 | Replace each pair with `fixtures([], { … })`; leave schema setup untouched. Files may hold multiple pairs (per `describe`) — convert every pair               |
+| **B** — redundant     | `setupFixtures()` on a file that already calls `fixtures(...)` (which re-wires the suite)                                                                                        |    28 | Delete the `setupFixtures()` line (+ its import if now unused). Zero behavior change                                                                          |
+| **C** — sf-only       | `setupFixtures()` only — no transaction, no fixture data (pure handler wiring / shared-DB shield with manual `createTable()`)                                                    |    31 | Keep `setupFixtures()`; no transactional wrapper wanted (many are PG-DDL suites that break under txn wrapping). No conversion needed beyond confirming intent |
+| **D** — mixed         | `setupFixtures()` + `useHandlerTransactionalFixtures()` **and** a `fixtures(...)` call in the same file (per-`describe` split)                                                   |    12 | Per-`describe` hand conversion: data blocks → `fixtures([...] )`, no-data blocks → `fixtures([], …)`, drop redundant top-level pair                           |
 
 Bucket C is largely already-correct: these files intentionally have no per-test
 transaction (PG DDL / schema-migration / type suites that
@@ -224,10 +243,13 @@ relation.trails.test.ts
 ## Conversion story cut
 
 Clusters are directory-grouped to minimise file-overlap conflicts between
-parallel converters, sized well under the 500-LOC ceiling (each file is a
-two-line swap or a one-line delete). Bucket C needs no conversion, so its stories
-are audit-only confirmations that the intent (no transaction) is correct and can
-be deferred / dropped.
+parallel converters, sized well under the 500-LOC ceiling. Per-file edit size
+varies: a Bucket A file may hold several per-`describe` pairs (each → one
+`fixtures([], …)` call), a Bucket B file is a single-line delete, and Bucket D
+files need per-`describe` judgement. LOC estimates below account for the
+multi-pair files. Bucket C needs no conversion, so its stories are audit-only
+confirmations that the intent (no transaction) is correct and can be deferred /
+dropped.
 
 | Story slug                                 | Bucket | Files | Notes                                                                              |
 | ------------------------------------------ | ------ | ----: | ---------------------------------------------------------------------------------- |
