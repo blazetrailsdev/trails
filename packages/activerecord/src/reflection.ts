@@ -1253,7 +1253,7 @@ export class AssociationReflection extends MacroReflection {
         const segments = nestingSource.split("::");
         for (let i = segments.length; i > 0; i--) {
           const candidate = [...segments.slice(0, i), simpleName].join("::");
-          const resolved = modelRegistry.get(candidate);
+          const resolved = lookupModelWithAutoload(candidate);
           if (resolved) {
             if (!(resolved as any)._isActiveRecordBase) {
               throw new ArgumentError(

@@ -4,6 +4,7 @@ import { resolveModel } from "../associations.js";
 import { Comment } from "./models/comment.js";
 import { Owner } from "./models/owner.js";
 import { Pet } from "./models/pet.js";
+import { MyAppBusinessCompany } from "./models/company-in-module.js";
 
 describe("canonical model autoload index (Zeitwerk analog)", () => {
   it("indexes canonical models by their class name", () => {
@@ -11,6 +12,14 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
     // so they resolve on first reference without a manual `registerModel`.
     expect(canonicalModelIndex.get("Comment")).toBe(Comment);
     expect(canonicalModelIndex.get("Owner")).toBe(Owner);
+  });
+
+  it("indexes namespaced models under their `::`-qualified Ruby name", () => {
+    // Rails resolves a namespaced association target through the namespace walk
+    // (`MyApplication::Business::Company`), not the flat JS constructor name, so
+    // the index must carry the qualified key for the walk to hit it.
+    expect(canonicalModelIndex.get("MyApplication::Business::Company")).toBe(MyAppBusinessCompany);
+    expect(resolveModel("MyApplication::Business::Company")).toBe(MyAppBusinessCompany);
   });
 
   it("resolveModel autoloads an indexed model on a registry miss", () => {

@@ -1,5 +1,6 @@
 import { Base } from "../base.js";
 import { _setCanonicalModelAutoloadIndex } from "../associations.js";
+import { qualifiedName } from "../inheritance.js";
 // The canonical models barrel eagerly evaluates encrypted models
 // (`EncryptedTrafficLight.encrypts(...)`, `EncryptedPost`'s eager key provider,
 // etc.) at module load, which requires the encryption namespace to be
@@ -30,9 +31,15 @@ function buildCanonicalModelIndex(): ReadonlyMap<string, typeof Base> {
   for (const exported of Object.values(canonicalModels)) {
     if (typeof exported === "function" && exported !== Base && exported.prototype instanceof Base) {
       const cls = exported as typeof Base;
-      // First export wins on a name clash; the barrel never re-exports two
-      // distinct classes under one name, so this only guards STI re-exports.
-      if (cls.name && !index.has(cls.name)) index.set(cls.name, cls);
+      // Index by both the flat JS constructor name AND the `::`-qualified Ruby
+      // name (`Publisher::Magazine`), so a namespaced association target resolves
+      // whether the reflection's namespace-walk asks for the qualified candidate
+      // or a caller asks for the bare name. First export wins on a name clash;
+      // the barrel never re-exports two distinct classes under one name, so this
+      // only guards STI re-exports.
+      for (const key of new Set([cls.name, qualifiedName(cls)])) {
+        if (key && !index.has(key)) index.set(key, cls);
+      }
     }
   }
   return index;
