@@ -968,7 +968,7 @@ export function extractAssociated<T extends typeof Base>(this: T, name: string):
  */
 export function except<T extends typeof Base>(
   this: T,
-  ...skips: Array<import("./relation/query-methods.js").ExceptKey>
+  ...skips: Array<import("./relation/query-methods.js").ExceptSkip>
 ): Relation<InstanceType<T>> {
   return this.all().except(...skips);
 }

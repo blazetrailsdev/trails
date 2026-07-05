@@ -63,7 +63,7 @@ import {
   arelColumnsFromHash as _arelColumnsFromHash,
   referencesFromConditions,
   type UnscopeType,
-  type ExceptKey,
+  type ExceptSkip,
   type AssociationSpec,
   type JoinSpec,
   type OrderArg,
@@ -1801,7 +1801,7 @@ export class Relation<T extends Base> {
    * directive, so merging the result does not erase the same parts on the
    * other relation.
    */
-  except(...skips: Array<ExceptKey>): Relation<T> {
+  except(...skips: Array<ExceptSkip>): Relation<T> {
     const rel = this._clone();
     for (const skip of skips) {
       switch (skip) {
@@ -1837,7 +1837,9 @@ export class Relation<T extends Base> {
           rel._skipQueryCache = undefined;
           break;
         default:
-          _qm.resetValueForScope(rel as any, skip);
+          // Rails' `values.except(*skips)` silently ignores unknown keys;
+          // resetValueForScope's switch no-ops on any non-UnscopeType string.
+          _qm.resetValueForScope(rel as any, skip as UnscopeType);
           break;
       }
     }
