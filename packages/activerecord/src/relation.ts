@@ -916,8 +916,9 @@ export class Relation<T extends Base> {
     // standalone self-join (target == owner, e.g. `Comment has_many :children`)
     // that whereAssociated/whereMissing must ADD to alias itself (`aliased_table_for`
     // sees the owner already taken) instead of colliding on the bare owner table.
-    // Identity-based ON rebind (`_rebindTableInNode` with the target Table node)
-    // then aliases only the target side, leaving the owner reference intact.
+    // The ON rebind (`_rebindTableInNode`) then swaps the target references to the
+    // alias while excluding the owner `Table` instance by identity, leaving the
+    // owner side intact.
     if ((tracker.aliases.get(ownerTable) ?? 0) === 0) tracker.aliases.set(ownerTable, 1);
     const jdJoins: Array<{ table: string; assoc: string; as: string }> = [];
 
