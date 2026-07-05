@@ -97,9 +97,11 @@ export class Merger {
   private mergeJoins(rel: any): void {
     // Rails: joins_values and left_outer_joins_values are separate arrays, so each
     // merge helper unions its own array independently (no interleaving in Rails).
-    // Our codebase mirrors that split: explicit SQL joins go into _joinClauses,
-    // Arel/string join nodes into _joinValues, and named left-outer-join associations
-    // into _leftOuterJoinsValues. Each is merged independently below.
+    // trails keeps explicit SQL joins in _joinClauses and every `.joins` argument
+    // in the unified _joinsValues store; the other relation's `joinsValues` is
+    // partitioned into raw join values vs named association joins (the same split
+    // `build_joins` derives) and each is merged independently below, writing back
+    // into _joinsValues. left-outer-join associations live in _leftOuterJoinsValues.
     // Arel::Nodes::InnerJoin is the type used for same-model inner joins in Rails'
     // cross-model merge path.
     const clauses: Array<{ type: string; table: string; on: string; quoted?: boolean }> =
@@ -111,13 +113,15 @@ export class Merger {
     // same join node) would otherwise duplicate the join and make its columns
     // ambiguous. Dedup structurally via the Arel node's `eql` (falling back to
     // reference/`===` for strings and nodes without it).
-    for (const v of (this.other._joinValues ?? []) as unknown[]) {
+    const otherJoinsValues = (this.other.joinsValues ?? []) as unknown[];
+    const otherRawJoins = otherJoinsValues.filter((v) => !this.other._isNamedJoinValue(v));
+    for (const v of otherRawJoins) {
       const dup = (rel._joinValues as unknown[]).some((existing) =>
         typeof (v as any)?.eql === "function" && v?.constructor === (existing as any)?.constructor
           ? (v as any).eql(existing)
           : v === existing,
       );
-      if (!dup) rel._joinValues.push(v);
+      if (!dup) rel._joinsValues.push(v);
     }
     // Rails merge_joins (merger.rb): when other.klass == relation.klass the
     // association names union directly into joins_values; otherwise Merger builds
@@ -127,13 +131,13 @@ export class Merger {
     // Rails treats as an association) build a JoinDependency on `other` whose
     // AliasTracker handles nested-through / HABTM correctly.
     const sameKlass = this.other._modelClass === rel._modelClass;
-    const otherNamed: unknown[] = this.other._namedInnerJoins ?? [];
+    const otherNamed: unknown[] = otherJoinsValues.filter((v) => this.other._isNamedJoinValue(v));
     if (sameKlass) {
       for (const v of otherNamed) {
         // joins_values |= dedups structurally-equal Hash specs (eql?/hash), so a
         // same-klass merge folds an equal spec — not by JS reference identity.
         if (!rel._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
-          rel._namedInnerJoins.push(v);
+          rel._joinsValues.push(v);
       }
     } else if (otherNamed.length > 0) {
       rel._namedInnerJoinDeps.push(

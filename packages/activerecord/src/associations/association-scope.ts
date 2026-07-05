@@ -1003,6 +1003,7 @@ export class AssociationScope {
     const refs = item._referencesValues ?? [];
     if (refs.length === 0) return;
     const target = scope as {
+      _joinsValues: unknown[];
       _joinValues: unknown[];
       _joinClauses: unknown[];
       _namedInnerJoins: unknown[];
@@ -1016,12 +1017,12 @@ export class AssociationScope {
     // straight across, then union named association joins (same-klass) or build
     // cross-klass JoinDependencies (Merger#merge_joins / #merge_outer_joins).
     for (const jc of item._joinClauses ?? []) target._joinClauses.push(jc);
-    for (const jv of item._joinValues ?? []) target._joinValues.push(jv);
+    for (const jv of item._joinValues ?? []) target._joinsValues.push(jv);
     const namedInner = item._namedInnerJoins ?? [];
     if (namedInner.length > 0) {
       if (sameKlass) {
         for (const v of namedInner)
-          if (!target._namedInnerJoins.includes(v)) target._namedInnerJoins.push(v);
+          if (!target._namedInnerJoins.includes(v)) target._joinsValues.push(v);
       } else {
         target._namedInnerJoinDeps.push(
           constructJoinDependency.call(item as never, namedInner as never, Nodes.InnerJoin),

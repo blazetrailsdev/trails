@@ -176,9 +176,15 @@ interface QueryMethodsHost {
     // global registry scan by table name.
     klass?: unknown;
   }>;
-  _joinValues: (string | Nodes.Join)[];
+  // Unified insertion-ordered `joins_values` backing store; `joinsValues`
+  // exposes it (Rails' `@values[:joins]`). `_joinValues` / `_namedInnerJoins`
+  // are read-only getters derived from it via `_isNamedJoinValue`.
+  _joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  _isNamedJoinValue(v: unknown): boolean;
+  readonly _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
-  _namedInnerJoins: AssociationSpec[];
+  readonly _namedInnerJoins: AssociationSpec[];
   // Pre-built InnerJoin JoinDependencies from a cross-klass merge (Rails
   // merge_joins builds these against `other.klass`); emitted via joinConstraints
   // and walked for klass lookups alongside _namedInnerJoins.
@@ -845,8 +851,7 @@ export function resetValueForScope(host: QueryMethodsHost, scope: UnscopeType): 
       break;
     case "joins":
       host._joinClauses = [];
-      host._joinValues = [];
-      host._namedInnerJoins = [];
+      host._joinsValues = [];
       break;
     case "leftOuterJoins":
       host._joinClauses = host._joinClauses.filter((j) => j.type !== "left");
@@ -925,7 +930,8 @@ function joinsBang(this: QueryMethodsHost, ...args: (string | Nodes.Join)[]): an
   // structuralUnionEq mirrors that: === first, then deepEqual (which delegates
   // to a node's own eql for Arel nodes).
   for (const arg of args) {
-    if (!this._joinValues.some((seen) => structuralUnionEq(seen, arg))) this._joinValues.push(arg);
+    if (!this._joinsValues.some((seen) => structuralUnionEq(seen, arg)))
+      this._joinsValues.push(arg);
   }
   return this;
 }
@@ -2601,14 +2607,14 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
   //   join_dependencies.unshift construct_join_dependency(select_named_joins(joins, …), nil)
   // i.e. ALL named association joins fold into a single JoinDependency (nil join
   // type, since this set is consulted for table-klass / cast-type lookups, not
-  // SQL emission). _namedInnerJoins is our joins_values and so leads the union;
+  // SQL emission). The named association joins in `joins_values` lead the union;
   // _joinClauses hold pre-resolved raw SQL (table + ON), not association names,
   // and do not contribute here.
   const joinNames: AssociationSpec[] = [];
   const addNames = (specs: ReadonlyArray<AssociationSpec>) => {
     for (const a of specs) if (!joinNames.includes(a)) joinNames.push(a);
   };
-  addNames(this._namedInnerJoins);
+  addNames(this.joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[]);
   addNames(this._leftOuterJoinsValues);
   addNames(this._eagerLoadAssociations);
   addNames(this._includesAssociations);
@@ -2758,6 +2764,16 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
     named_join: [],
   };
 
+  // Named association joins vs raw join values, both derived from the unified
+  // `joins_values` store (Rails reads `joins_values` here and partitions with
+  // `select_named_joins`).
+  const joinsValues = this.joinsValues;
+  const namedInner = joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[];
+  const rawJoinValues = joinsValues.filter((v) => !this._isNamedJoinValue(v)) as (
+    | string
+    | Nodes.Join
+  )[];
+
   // Mirror Rails build_join_buckets (query_methods.rb:1828–1876):
   // When left_outer_joins_values is non-empty, Rails runs select_named_joins on
   // them to build stashed_left_joins. If joins_values is also empty, it returns
@@ -2782,8 +2798,8 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
     );
 
     if (
-      this._namedInnerJoins.length === 0 &&
-      this._joinValues.length === 0 &&
+      namedInner.length === 0 &&
+      rawJoinValues.length === 0 &&
       this._joinClauses.length === 0 &&
       this._eagerLoadAssociations.length === 0
     ) {
@@ -2829,7 +2845,7 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
   }
   const hasStashed = buckets.stashed_join.length > 0;
 
-  for (const v of this._joinValues) {
+  for (const v of rawJoinValues) {
     const node: Nodes.Join =
       typeof v === "string" ? (new Nodes.StringJoin(arelSql(v.trim()) as any) as Nodes.Join) : v;
     if (!(node instanceof Nodes.LeadingJoin) && hasStashed) {
@@ -3007,13 +3023,16 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
 
 /** @internal */
 export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTracker): void {
+  const joinsValues = this.joinsValues;
+  const hasNamedInner = joinsValues.some((v) => this._isNamedJoinValue(v));
+  const hasRawJoins = joinsValues.some((v) => !this._isNamedJoinValue(v));
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 ||
     this._leftOuterJoinsValues.length > 0 ||
-    this._namedInnerJoins.length > 0 ||
+    hasNamedInner ||
     this._namedInnerJoinDeps.length > 0 ||
     this._leftOuterJoinDeps.length > 0;
-  if (this._joinClauses.length === 0 && this._joinValues.length === 0 && !hasEagerAssocs) return;
+  if (this._joinClauses.length === 0 && !hasRawJoins && !hasEagerAssocs) return;
 
   // Subquery path: buckets fold eager into stashed_join. Delegate emission to
   // the shared `build_joins` port.
