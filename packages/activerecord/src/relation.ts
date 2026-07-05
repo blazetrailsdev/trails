@@ -1157,9 +1157,7 @@ export class Relation<T extends Base> {
     }
     const castConditions: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(conditions)) {
-      castConditions[key] = Array.isArray(value)
-        ? value.map((v) => this._castWhereValue(key, v))
-        : this._castWhereValue(key, value);
+      castConditions[key] = this._castWhereValue(key, value);
     }
     // Mirrors Rails' WhereClause#invert — branches on the actual predicate count,
     // not the key count, since one key can expand to multiple predicates:
@@ -1209,12 +1207,7 @@ export class Relation<T extends Base> {
     const buildClause = (cond: Record<string, unknown>): WhereClause => {
       const cast: Record<string, unknown> = {};
       for (const [key, value] of Object.entries(cond)) {
-        cast[key] =
-          value instanceof Relation
-            ? value
-            : Array.isArray(value)
-              ? value.map((v) => this._castWhereValue(key, v))
-              : this._castWhereValue(key, value);
+        cast[key] = value instanceof Relation ? value : this._castWhereValue(key, value);
       }
       return new WhereClause(this.predicateBuilder.buildFromHash(cast));
     };
@@ -6168,6 +6161,24 @@ export class Relation<T extends Base> {
       if (tablePrefix === this._modelClass.arelTable.name) {
         attrKey = key.slice(firstDot + 1);
       }
+    }
+    if (Array.isArray(value)) {
+      // A `where(col: [...])` array is one of two things: an `IN (...)` list of
+      // scalars (element-cast each through the column type) or — on a
+      // force-equality column (PG array / range / serialized) — a single
+      // force-equality value the predicate builder binds whole. `force_equality?`
+      // on the column type distinguishes them. Element-casting a whole array
+      // through an OID::Array column would run the string-only
+      // `_castAttributeValue` per element and parse each scalar as its own array
+      // literal (`'black'` → `[]`), corrupting `['black','blue']` → `[[],[]]`;
+      // leave the array intact and let the predicate builder's force-equality
+      // bind serialize it via the column type. Non-force-equality columns keep
+      // the element-wise IN-list cast.
+      const type = this._modelClass.typeForAttribute?.(attrKey) as
+        | { isForceEquality?(v: unknown): boolean }
+        | undefined;
+      if (type?.isForceEquality?.(value)) return value;
+      return value.map((v) => this._modelClass._castAttributeValue(attrKey, v));
     }
     return this._modelClass._castAttributeValue(attrKey, value);
   }

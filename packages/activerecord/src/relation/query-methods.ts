@@ -979,11 +979,7 @@ export function buildWhereClause(
     const normalized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(opts)) {
       const resolved = aliases[key] ?? key;
-      normalized[resolved] = isRelationLike(value)
-        ? value
-        : Array.isArray(value)
-          ? value.map((v) => this._castWhereValue(resolved, v))
-          : this._castWhereValue(resolved, value);
+      normalized[resolved] = isRelationLike(value) ? value : this._castWhereValue(resolved, value);
     }
     const block = (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName);
     const parts = this.predicateBuilder.buildFromHash(normalized, block);
@@ -1294,13 +1290,7 @@ function havingBang(
 
   const cast: Record<string, unknown> = {};
   for (const [key, value] of Object.entries(opts)) {
-    if (isRelationLike(value)) {
-      cast[key] = value;
-    } else {
-      cast[key] = Array.isArray(value)
-        ? value.map((v) => this._castWhereValue(key, v))
-        : this._castWhereValue(key, value);
-    }
+    cast[key] = isRelationLike(value) ? value : this._castWhereValue(key, value);
   }
   this._havingClause.predicates.push(...this.predicateBuilder.buildFromHash(cast));
   return this;

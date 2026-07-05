@@ -433,6 +433,17 @@ export class PredicateBuilder {
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
+    // Rails checks `table.type(attribute.name).force_equality?(value)` at the top
+    // of `build` — right after the `id` deref and BEFORE any handler dispatch
+    // (predicate_builder.rb:57-69). So a force-equality value (PG array, PG range,
+    // serialized coder object) never reaches a registered handler. Mirror that
+    // precedence, and run it on the value BEFORE the Set→Array normalization
+    // below: Rails routes a Set through handler_for (ArrayHandler), and
+    // `OID::Array#force_equality?` is `value.is_a?(::Array)` — a Ruby Set is not
+    // an Array, so a Set on an array column force-equalizes in neither Rails nor
+    // here. Normalizing Set→Array first would spuriously trip force-equality.
+    const forceEqNode = this._buildForceEqualityOrNull(attribute, value);
+    if (forceEqNode !== null) return forceEqNode;
     // Normalize Set → Array before dispatch so every code path (custom handlers,
     // explicit Array branch, handlerFor fallback) receives an array. Rails registers
     // Set with ArrayHandler by default (predicate_builder.rb:20).
@@ -444,8 +455,6 @@ export class PredicateBuilder {
       return customHandler.call(attribute, value);
     }
     if (value instanceof Range) {
-      const rangeNode = this._buildRangeEqualityOrNull(attribute, value);
-      if (rangeNode !== null) return rangeNode;
       return this.rangeHandler.call(attribute, value);
     }
     if (Array.isArray(value)) {
@@ -458,7 +467,7 @@ export class PredicateBuilder {
   }
 
   buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {
-    const rangeNode = this._buildRangeEqualityOrNull(attribute, range);
+    const rangeNode = this._buildForceEqualityOrNull(attribute, range);
     if (rangeNode !== null) return rangeNode;
     return this.rangeHandler.call(attribute, range);
   }
@@ -604,8 +613,18 @@ export class PredicateBuilder {
     this._tableContext = context;
   }
 
-  /** @internal */
-  private _buildRangeEqualityOrNull(attribute: Nodes.Attribute, value: Range): Nodes.Node | null {
+  /**
+   * Mirrors Rails `PredicateBuilder#build` force-equality dispatch
+   * (`operator ||= table.type(attribute.name).force_equality?(value) && :eq`):
+   * runs the multi-source type lookup and, when the resolved type reports
+   * `force_equality?(value)`, returns `attribute.eq(bind)` built with the SAME
+   * type object that matched — otherwise `null` so the caller falls through to
+   * handler dispatch. Type-agnostic: applies to `OID::Range`, `OID::Array`, and
+   * `Type::Serialized` alike.
+   *
+   * @internal
+   */
+  private _buildForceEqualityOrNull(attribute: Nodes.Attribute, value: unknown): Nodes.Node | null {
     type CastLike = { cast(v: unknown): unknown; serialize(v: unknown): unknown };
     type TypeLike =
       | ({ isForceEquality?(v: unknown): boolean } & Partial<CastLike>)

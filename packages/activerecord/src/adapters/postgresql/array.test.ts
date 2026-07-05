@@ -534,11 +534,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("where by attribute with array", async () => {
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+      }
+      await PgArrays.loadSchema();
       const tags = ["black", "blue"];
-      await adapter.execute(`INSERT INTO pg_arrays (tags) VALUES ($1)`, [tags]);
-      const rows = await adapter.execute(`SELECT * FROM pg_arrays WHERE tags = $1`, [tags]);
-      expect(rows).toHaveLength(1);
-      expect(rows[0].tags).toEqual(tags);
+      // Rails: record = PgArray.create!(tags: tags);
+      //        assert_equal record, PgArray.where(tags: tags).take
+      // force_equality? on the array type routes `where(tags: [..])` to a single
+      // `tags = $1` bind ('{black,blue}'), NOT `tags IN ('black', 'blue')`.
+      const record = await (PgArrays as any).create({ tags });
+      const relation = (PgArrays as any).where({ tags });
+      expect(relation.toSql()).toContain('"tags" = ');
+      const found = await relation.take();
+      expect(found).not.toBeNull();
+      expect(found.id).toBe(record.id);
     });
 
     it("uniqueness validation", async () => {
