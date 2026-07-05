@@ -3,8 +3,6 @@ import { canonicalModelIndex } from "./canonical-model-index.js";
 import { resolveModel } from "../associations.js";
 import { deriveFixtureSchema } from "./use-fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
-import { Author } from "./models/author.js";
-import { Post } from "./models/post.js";
 import { Comment } from "./models/comment.js";
 import { Owner } from "./models/owner.js";
 import { Pet } from "./models/pet.js";
@@ -51,8 +49,6 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
     // tables — never the whole transitively-reachable graph. `posts` owns the
     // HABTM `categories_posts`; `has_many :through` join tables (taggings,
     // categorizations, readers, …) belong to real models and are NOT pulled in.
-    void Author; // resolves the requested sets through the same globally-installed index
-    void Post;
     const sub = await deriveFixtureSchema(["authors", "posts"], TEST_SCHEMA);
     expect(Object.keys(sub).sort()).toEqual(["authors", "categories_posts", "posts"]);
   });

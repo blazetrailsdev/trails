@@ -442,8 +442,16 @@ export function throughJoinTableNames(ModelClass: BaseClass): string[] {
       throughReflection?: { tableName?: string };
     };
     if (r.macro !== "hasAndBelongsToMany") continue;
-    const joinTable = r.throughReflection?.tableName;
-    if (typeof joinTable === "string") names.push(joinTable);
+    try {
+      // `throughReflection.tableName` resolves the anonymous join model (owned by
+      // the declaring model, so no target resolution and no autoload). Guarded so
+      // an unresolvable HABTM skips rather than failing the whole slice, matching
+      // throughLabelAssociations.
+      const joinTable = r.throughReflection?.tableName;
+      if (typeof joinTable === "string") names.push(joinTable);
+    } catch {
+      continue;
+    }
   }
   return names;
 }
