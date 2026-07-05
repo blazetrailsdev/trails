@@ -179,6 +179,35 @@ describe("SchemaCacheTest", () => {
     expect(cache.getCachedPrimaryKeys("users")).toBeNull();
   });
 
+  it("setColumns clears a promoted-unique primaryKey flag the authoritative key excludes", () => {
+    // MySQL/MariaDB report column_key = 'PRI' for a UNIQUE-NOT-NULL column when
+    // the table has no PRIMARY KEY, so the adapter reflects a bogus primary
+    // flag. add() warms _primaryKeys (authoritative, null here) before columns,
+    // so setColumns reconciles the flag away — matching Rails' MySQL::Column,
+    // which carries no per-column primary flag.
+    const cache = new SchemaCache();
+    cache.setPrimaryKeys("subscribers", null);
+    const nick = makeColumn("nick", "varchar(100)", { primaryKey: true, null: false });
+    cache.setColumns("subscribers", [nick, makeColumn("name", "varchar(100)")]);
+    expect(nick.primaryKey).toBe(false);
+    expect(cache.getCachedColumnsHash("subscribers")!["nick"].primaryKey).toBe(false);
+  });
+
+  it("setColumns keeps a genuine primaryKey flag the authoritative key includes", () => {
+    const cache = new SchemaCache();
+    cache.setPrimaryKeys("users", "id");
+    const id = makeColumn("id", "integer", { primaryKey: true, null: false });
+    cache.setColumns("users", [id, makeColumn("name", "text")]);
+    expect(id.primaryKey).toBe(true);
+  });
+
+  it("setColumns leaves flags untouched when the authoritative key is not warm", () => {
+    const cache = new SchemaCache();
+    const id = makeColumn("id", "integer", { primaryKey: true, null: false });
+    cache.setColumns("countries", [id]);
+    expect(id.primaryKey).toBe(true);
+  });
+
   it("columns for existent table", async () => {
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer"), makeColumn("name", "text")]);

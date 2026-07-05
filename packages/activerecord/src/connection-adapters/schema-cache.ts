@@ -404,6 +404,7 @@ export class SchemaCache {
   }
 
   setColumns(tableName: string, cols: Column[]): void {
+    this.reconcilePrimaryKeyFlags(tableName, cols);
     this._columns.set(tableName, cols);
     const hash: Record<string, Column> = {};
     for (const col of cols) {
@@ -415,6 +416,34 @@ export class SchemaCache {
 
   setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
     this._primaryKeys.set(tableName, pk);
+  }
+
+  /**
+   * Clear per-column `primaryKey` flags that the authoritative `_primaryKeys`
+   * cache contradicts. MySQL/MariaDB report `column_key = 'PRI'` for a
+   * UNIQUE-NOT-NULL index when a table has no PRIMARY KEY (the "promoted unique"
+   * case), so `mysql/schema-statements.ts` reflects a bogus primary flag on that
+   * column — Rails' `MySQL::Column` carries no per-column primary flag and
+   * resolves the key solely from the `PRIMARY` constraint. `add()` warms
+   * `_primaryKeys` (via the authoritative `SHOW KEYS ... 'PRIMARY'` /
+   * key_column_usage query) before `columns()`, so by the time `setColumns` runs
+   * the correct answer is already in hand — reconcile against it query-free.
+   *
+   * Clear-only: a flag is dropped when the authoritative key set excludes the
+   * column, never added. Real primary keys (whose flag the adapter already set
+   * and whose name the query returns) are untouched, and adapters that reflect
+   * the flag correctly (sqlite/postgres) agree with the query so nothing changes.
+   * When `_primaryKeys` is not yet warm the flags are left as reflected.
+   */
+  private reconcilePrimaryKeyFlags(tableName: string, cols: Column[]): void {
+    if (!this._primaryKeys.has(tableName)) return;
+    const pk = this._primaryKeys.get(tableName);
+    const pkNames = new Set(pk == null ? [] : Array.isArray(pk) ? pk : [pk]);
+    for (const col of cols) {
+      if (col.primaryKey && !pkNames.has(col.name)) {
+        (col as { primaryKey: boolean }).primaryKey = false;
+      }
+    }
   }
 
   setDataSourceExists(tableName: string, exists: boolean): void {
