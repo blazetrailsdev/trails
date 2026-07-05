@@ -1662,14 +1662,25 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    const newDefault =
-      typeof defaultOrChanges === "object" && defaultOrChanges !== null
-        ? (defaultOrChanges as any).to
-        : defaultOrChanges;
+    // Rails' extract_new_default_value only unwraps a Hash when it carries BOTH
+    // :from and :to (schema_statements.rb:1820); a bare structured default like
+    // `{}` is the literal default, not a changes hash.
+    const isChanges =
+      typeof defaultOrChanges === "object" &&
+      defaultOrChanges !== null &&
+      "from" in defaultOrChanges &&
+      "to" in defaultOrChanges;
+    const newDefault = isChanges ? (defaultOrChanges as { to: unknown }).to : defaultOrChanges;
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.alterTable(tableName, (columns) => {
       if (columns[columnName]) {
-        columns[columnName].dflt_value = newDefault === null ? null : this.quoteDefault(newDefault);
+        // Rails recreates the table and re-emits DEFAULT through
+        // quote_default_expression, which serializes structured values through
+        // the column's cast type (sqlite3_adapter.rb:366). Mirror that so a
+        // `default: {}` on a json column quotes to `{}` and not `[object Object]`.
+        const columnType = columns[columnName].type as string | null | undefined;
+        const serialized = this.serializeDefaultForColumn(newDefault, columnType);
+        columns[columnName].dflt_value = serialized === null ? null : this.quoteDefault(serialized);
       }
     });
   }
@@ -1681,7 +1692,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     defaultValue?: unknown,
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
-      const quotedDefault = this.quoteDefault(defaultValue);
+      // Rails backfills NULLs via quote_default_expression, which serializes the
+      // value through the column's cast type (abstract/schema_statements.rb).
+      const existing = (await this.columns(tableName)).find((c) => c.name === columnName);
+      const serialized = this.serializeDefaultForColumn(defaultValue, existing?.sqlType ?? null);
+      const quotedDefault = this.quoteDefault(serialized);
       await this.executeMutation(
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
@@ -1704,9 +1719,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       if (columns[columnName]) {
         columns[columnName].type = sqlType;
         if (options?.null !== undefined) columns[columnName].notnull = options.null ? 0 : 1;
-        if (options?.default !== undefined)
+        if (options?.default !== undefined) {
+          const serialized = this.serializeDefaultForColumn(options.default, sqlType);
           columns[columnName].dflt_value =
-            options.default === null ? null : this.quoteDefault(options.default);
+            serialized === null ? null : this.quoteDefault(serialized);
+        }
         if (options?.collation !== undefined) columns[columnName].collation = options.collation;
       }
     });
