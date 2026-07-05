@@ -31,7 +31,7 @@ class TokenUser extends User {
 const DAY = 24 * 60 * 60 * 1000;
 
 describe("TokenForTest", () => {
-  // NOT useHandlerTransactionalFixtures(): these tests `destroy` the user, and a
+  // `useTransactionalTests: false`: these tests `destroy` the user, and a
   // model destroy opens its own transaction. On PostgreSQL, nesting that destroy
   // transaction inside the per-test fixtures transaction double-starts the
   // transaction instrumenter (InstrumentationAlreadyStartedError). Cleaning up
