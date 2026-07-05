@@ -84,14 +84,16 @@ describeIfSqlite("CopyTableTest", () => {
     await testCopyTable((await Base.leaseConnection()) as any);
   });
 
-  it.skip("copy table with column with default", () => {
-    // BLOCKED: adapter-sqlite — a `json` column added with `default: {}` quotes
-    // its default via String({}) → "[object Object]" instead of serializing the
-    // value to JSON "{}", so the copied column's default mismatches Rails.
-    // ROOT-CAUSE: the json type's default serialization is not applied on the
-    // addColumn DEFAULT path for SQLite.
-    // SCOPE: serialize structured defaults through the column type before
-    // quoting; file sqlite3-json-default-serialization.
+  it("copy table with column with default", async () => {
+    const conn = (await Base.leaseConnection()) as any;
+    await testCopyTable(conn, "comments", "comments_with_default", {}, async () => {
+      await conn.addColumn("comments_with_default", "options", "json", { default: {} });
+      await testCopyTable(conn, "comments_with_default", "comments_with_default2", {}, async () => {
+        const columns = await conn.columns("comments_with_default2");
+        const column = columns.find((col: { name: string }) => col.name === "options");
+        expect(column.default).toEqual("{}");
+      });
+    });
   });
 
   it("copy table renaming column", async () => {

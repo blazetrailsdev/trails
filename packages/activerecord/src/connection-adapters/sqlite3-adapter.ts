@@ -150,6 +150,17 @@ function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
   return sqliteTypeCast.call(this, value);
 }
 
+// A structured column default: an array or a plain object literal (`default: {}`
+// / `default: []`). Excludes null, SqlLiteral, Date, and other class instances,
+// which have their own quoting paths and must not be routed through the column
+// type's `serialize`.
+function isStructuredDefault(value: unknown): boolean {
+  if (Array.isArray(value)) return true;
+  if (value === null || typeof value !== "object" || isSqlLiteral(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
 function _isSqliteMissingDbError(error: unknown): boolean {
   if (!error || typeof error !== "object") return false;
   const e = error as { code?: unknown; message?: unknown };
@@ -977,7 +988,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       }
       return /^\w+\(.*\)$/.test(str) ? ` DEFAULT (${str})` : ` DEFAULT ${str}`;
     }
-    return super.quoteDefaultExpression(value, column);
+    const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
+    return super.quoteDefaultExpression(this.serializeDefaultForColumn(value, sqlType), column);
+  }
+
+  // Rails' abstract quote_default_expression serializes the value through the
+  // column's cast type before quoting (abstract/quoting.rb:157). A structured
+  // default for a `json` column (`default: {}`) must serialize to the JSON text
+  // `{}` rather than being coerced with `String({})` → "[object Object]". Route
+  // only plain-object/array defaults through the column type; scalars, dates,
+  // SqlLiteral, and other class instances keep their existing quoting paths.
+  private serializeDefaultForColumn(value: unknown, sqlType: string | null | undefined): unknown {
+    if (!sqlType || !isStructuredDefault(value)) return value;
+    const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
+    return typeof castType.serialize === "function" ? castType.serialize(value) : value;
   }
 
   override quotedTrue(): string {
@@ -1609,7 +1633,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
     if (options?.null === false) sql += " NOT NULL";
     if (options?.default !== undefined) {
-      sql += ` DEFAULT ${this.quoteDefault(options.default)}`;
+      sql += ` DEFAULT ${this.quoteDefault(this.serializeDefaultForColumn(options.default, sqlType))}`;
     }
     // Invalidate the cached reflection for this table, matching the abstract
     // SchemaStatements#addColumn (which clears before mutating). Without this
@@ -1638,14 +1662,25 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<void> {
-    const newDefault =
-      typeof defaultOrChanges === "object" && defaultOrChanges !== null
-        ? (defaultOrChanges as any).to
-        : defaultOrChanges;
+    // Rails' extract_new_default_value only unwraps a Hash when it carries BOTH
+    // :from and :to (schema_statements.rb:1820); a bare structured default like
+    // `{}` is the literal default, not a changes hash.
+    const isChanges =
+      typeof defaultOrChanges === "object" &&
+      defaultOrChanges !== null &&
+      "from" in defaultOrChanges &&
+      "to" in defaultOrChanges;
+    const newDefault = isChanges ? (defaultOrChanges as { to: unknown }).to : defaultOrChanges;
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.alterTable(tableName, (columns) => {
       if (columns[columnName]) {
-        columns[columnName].dflt_value = newDefault === null ? null : this.quoteDefault(newDefault);
+        // Rails recreates the table and re-emits DEFAULT through
+        // quote_default_expression, which serializes structured values through
+        // the column's cast type (sqlite3_adapter.rb:366). Mirror that so a
+        // `default: {}` on a json column quotes to `{}` and not `[object Object]`.
+        const columnType = columns[columnName].type as string | null | undefined;
+        const serialized = this.serializeDefaultForColumn(newDefault, columnType);
+        columns[columnName].dflt_value = serialized === null ? null : this.quoteDefault(serialized);
       }
     });
   }
@@ -1657,7 +1692,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     defaultValue?: unknown,
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
-      const quotedDefault = this.quoteDefault(defaultValue);
+      // Rails backfills NULLs via quote_default_expression, which serializes the
+      // value through the column's cast type (abstract/schema_statements.rb).
+      const existing = (await this.columns(tableName)).find((c) => c.name === columnName);
+      const serialized = this.serializeDefaultForColumn(defaultValue, existing?.sqlType ?? null);
+      const quotedDefault = this.quoteDefault(serialized);
       await this.executeMutation(
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
@@ -1680,9 +1719,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       if (columns[columnName]) {
         columns[columnName].type = sqlType;
         if (options?.null !== undefined) columns[columnName].notnull = options.null ? 0 : 1;
-        if (options?.default !== undefined)
+        if (options?.default !== undefined) {
+          const serialized = this.serializeDefaultForColumn(options.default, sqlType);
           columns[columnName].dflt_value =
-            options.default === null ? null : this.quoteDefault(options.default);
+            serialized === null ? null : this.quoteDefault(serialized);
+        }
         if (options?.collation !== undefined) columns[columnName].collation = options.collation;
       }
     });
