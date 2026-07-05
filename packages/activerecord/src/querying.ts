@@ -30,9 +30,14 @@ export async function findBySql<T extends typeof Base>(
 ): Promise<InstanceType<T>[]> {
   const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
   const resolvedBlock = typeof opts === "function" ? opts : block;
-  // Rails threads the `with_connection` block's connection through the query and
-  // instantiation path; wrapping here releases the pool lease afterwards under
-  // `permanent_connection_checkout = :deprecated | :disallowed`.
+  // Rails wraps only `_query_by_sql` in `with_connection`, running
+  // `_load_from_sql` outside the block (querying.rb#find_by_sql). We keep the
+  // load inside the wrap because, unlike Ruby's, trails' instantiation lazily
+  // resolves the schema through the connection getter — so leaving it outside
+  // re-leases the pool permanently under
+  // `permanent_connection_checkout = :deprecated | :disallowed`. Widening the
+  // wrap to cover the load keeps the release behavior faithful; it issues no
+  // extra SQL, so the query semantics are unchanged.
   return withQueryConnection(this as unknown as typeof Base, async () => {
     const result = await _queryBySql.call(this, sql, binds, {
       allowRetry: resolvedOpts.allowRetry,
