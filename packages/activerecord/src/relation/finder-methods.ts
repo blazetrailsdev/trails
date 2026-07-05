@@ -901,7 +901,7 @@ export function orderedRelation(rel: FinderRelation): any {
     if (cols.length > 0) {
       // Use hash-form { col: "asc" } so _orderClauses stores ["col", "asc"] tuples.
       // Tuple form is what reverseOrderBang expects — Arel node form pre-renders to
-      // { raw: '"tbl"."col" ASC' } which the chained-replace in reverseOrderBang
+      // a SqlLiteral('"tbl"."col" ASC') which the chained-replace in reverseOrderBang
       // would undo (ASC→DESC→ASC). This matches Rails: table[column].asc nodes are
       // rendered by the visitor at SQL-build time, not at order-storage time.
       return (rel as any).order(...cols.map((col: string) => ({ [col]: "asc" as const })));

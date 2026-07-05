@@ -88,8 +88,8 @@ describe("inspectOrderClause", () => {
     expect(inspectOrderClause(["views", "desc"])).toBe('"views desc"');
   });
 
-  it("renders a { raw } SQL fragment", () => {
-    expect(inspectOrderClause({ raw: "RANDOM()" })).toBe('sql("RANDOM()")');
+  it("renders a SqlLiteral SQL fragment", () => {
+    expect(inspectOrderClause(new Nodes.SqlLiteral("RANDOM()"))).toBe('sql("RANDOM()")');
   });
 
   it("stringifies an Arel Node order via toSql()", () => {

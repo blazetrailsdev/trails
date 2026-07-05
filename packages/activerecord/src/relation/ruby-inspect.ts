@@ -75,17 +75,14 @@ export function inspectArelValue(value: unknown): string {
 
 /**
  * Render one `Relation#order` clause for `inspect`. Order clauses come in
- * four shapes: a plain column string, a `[column, direction]` tuple, a
- * `{ raw }` SQL fragment, or an Arel Node. Tuples render as `"col dir"`;
- * everything else delegates to {@link inspectArelValue}.
+ * three shapes: a plain column string, a `[column, direction]` tuple, or an
+ * Arel Node (including `SqlLiteral` for raw SQL fragments). Tuples render as
+ * `"col dir"`; everything else delegates to {@link inspectArelValue}.
  */
 export function inspectOrderClause(clause: unknown): string {
   if (Array.isArray(clause)) {
     const [col, dir] = clause as [string, "asc" | "desc"];
     return JSON.stringify(`${col} ${dir}`);
-  }
-  if (clause !== null && typeof clause === "object" && "raw" in clause) {
-    return `sql(${JSON.stringify((clause as { raw: string }).raw)})`;
   }
   return inspectArelValue(clause);
 }
