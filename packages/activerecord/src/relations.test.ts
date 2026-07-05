@@ -1711,6 +1711,16 @@ describe("RelationTest", () => {
     expect(authorPostsArr.map((p) => p.id)).toEqual(directPosts.map((p) => p.id));
   });
 
+  it("except with unrecognized key is a no-op", async () => {
+    const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
+    const baseline = (await relation.toArray()).map((p) => p.id);
+
+    // Rails' `values.except(*skips)` silently ignores unknown keys; the widened
+    // skip type lets `except("bogus")` typecheck without a cast.
+    const unchanged = relation.except("bogus");
+    expect((await unchanged.toArray()).map((p) => p.id)).toEqual(baseline);
+  });
+
   it("only", async () => {
     const relation = Post.where({ author_id: 1 }).order("id ASC").limit(1);
     expect((await relation.toArray()).map((p) => p.id)).toEqual([posts("welcome").id]);

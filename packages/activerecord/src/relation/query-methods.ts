@@ -792,6 +792,14 @@ export type ExceptKey =
   | "skipQueryCache";
 
 /**
+ * Argument type for `SpawnMethods#except`. Rails' `values.except(*skips)`
+ * (spawn_methods.rb:59-60) accepts ANY key — unrecognized ones are a silent
+ * no-op. The `(string & {})` arm preserves `ExceptKey` autocomplete while
+ * still admitting arbitrary strings without a cast (e.g. `Post.except("bogus")`).
+ */
+export type ExceptSkip = ExceptKey | (string & {});
+
+/**
  * Reset a single value-key to its default, with no merge-replay side effect.
  *
  * Shared by `unscope!` (which additionally records the key in
