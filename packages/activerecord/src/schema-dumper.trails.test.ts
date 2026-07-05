@@ -275,6 +275,11 @@ describe("SchemaDumperAdapterTest", () => {
     const { SchemaMigration } = await import("./schema-migration.js");
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
+    // schema_migrations survives per-file truncation (truncate skips it by
+    // design), so a prior run's version row can survive in the shared PG
+    // worker DB and collide on schema_migrations_pkey. Clear first to keep
+    // this test hermetic — same guard the sibling "defaults to 0" test uses.
+    await sm.deleteAllVersions();
     await sm.recordVersion("20240101000000");
     await sm.recordVersion("20240201000000");
     const result = await TopLevelDumper.dumpWithVersion(adapter);
