@@ -324,20 +324,13 @@ function _addAssocJoin(
   // reused. The IS NULL / IS NOT NULL predicate must land on that join's
   // effective table: a self-join is aliased (e.g. `children_comments`), so
   // return the alias; a plain join keeps its real table, so return undefined.
+  // `jd.as` already carries the effective alias the manager-build path emits —
+  // computed once, in bucket order, by `_unifiedJoinAliasTracker` (including the
+  // self-join case whose seed-time JD left `effectiveSqlName` un-aliased). Reuse
+  // it so a self-join predicate lands on the joined child rows (`children_comments`)
+  // rather than the always-present owner PK; a plain join keeps its real table.
   const jd = jdJoins.find((j) => j.assoc === assocName && j.table === join.table);
-  if (jd) {
-    if (jd.as !== join.table) return jd.as;
-    // A self-join JD (target == owner, e.g. `leftJoins(:children)` on Comment)
-    // is aliased at emit time, but the seed-time JoinDependency here has not run
-    // its alias assignment, so `jd.as` is still the bare owner table. The
-    // emitting path aliases it to the tracker candidate (`{plural}_{owner}`);
-    // reuse that same alias so the IS NULL / IS NOT NULL predicate lands on the
-    // joined child rows rather than the always-present owner PK.
-    if (join.table === ownerTable) {
-      return _trackerAliasFor(tracker, join.table, assocName, ownerTable);
-    }
-    return undefined;
-  }
+  if (jd) return jd.as !== join.table ? jd.as : undefined;
   const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
   if (sameAssoc) return sameAssoc.as;
   // Flat-to-flat repeat with a compatible ON collapses into the existing join.
@@ -949,8 +942,19 @@ export class Relation<T extends Base> {
         // count never rises above 1 (first use keeps the real name); repeat
         // joins are counted under their alias name so the next `_N` is correct.
         if ((tracker.aliases.get(table) ?? 0) === 0) tracker.aliases.set(table, 1);
-        const eff = node.effectiveSqlName;
-        if (eff && eff !== table) tracker.aliases.set(eff, (tracker.aliases.get(eff) ?? 0) + 1);
+        let eff = node.effectiveSqlName;
+        if (eff && eff !== table) {
+          tracker.aliases.set(eff, (tracker.aliases.get(eff) ?? 0) + 1);
+        } else if (table === ownerTable) {
+          // Self-join whose seed-time JoinDependency did NOT run its alias
+          // assignment (`effectiveSqlName` is still the bare owner table). The
+          // manager-build path aliases it to the tracker candidate; mint that
+          // alias HERE, in bucket order, so the tracker's `_N` bookkeeping is the
+          // single source of truth and the stored `as` is the exact string the
+          // emitted `JOIN ... <alias>` will use — even when several self-joins on
+          // the same owner table are in play.
+          eff = _trackerAliasFor(tracker, table, node.immediateAssocName, ownerTable) ?? table;
+        }
         jdJoins.push({
           table,
           assoc: node.immediateAssocName,
@@ -2081,33 +2085,44 @@ export class Relation<T extends Base> {
    * - polymorphic `as` → `#{as}_id`
    * - otherwise → `#{owner.model_name}_id` (the owning model)
    *
+   * - `inverse_of` (when `inferFromInverseOf`) → the inverse reflection's own
+   *   foreign key, recursively (reflection.rb:558-566:
+   *   `inverse_of.foreign_key(infer_from_inverse_of: false)`)
+   *
    * An explicit `foreignKey` option always wins (and may be a composite
    * `string[]`). `ownerName` is the owning model's class name — for a `:through`
    * source association the owner is the through model, not the base model, so
-   * callers pass the appropriate name. The `infer_from_inverse_of` /
-   * `inverse_of` branch is not yet ported.
+   * callers pass the appropriate name.
+   *
+   * `inferFromInverseOf` mirrors Rails' `infer_from_inverse_of:` guard: the
+   * recursive call into the inverse passes `false` so the inverse's OWN
+   * `inverse_of` is not chased (prevents two mutually-inverse associations from
+   * bouncing forever).
    *
    * @internal
    */
-  private _deriveForeignKey(reflection: any, name: string, ownerName: string): string | string[] {
+  private _deriveForeignKey(
+    reflection: any,
+    name: string,
+    ownerName: string,
+    inferFromInverseOf = true,
+  ): string | string[] {
     if (reflection.options.foreignKey != null) return reflection.options.foreignKey;
     if (reflection.type === "belongsTo") return `${_toUnderscore(name)}_id`;
     if (reflection.options.as) return `${_toUnderscore(reflection.options.as)}_id`;
-    // Rails' `derive_foreign_key` defers to the inverse belongs_to's foreign key
-    // when `inverse_of:` is set (reflection.rb:558-566), so a self-referential
-    // `has_many :children, inverse_of: :parent` uses the parent's `parent_id`
-    // instead of the owner-name default `comment_id`. Resolve the inverse on the
-    // target model and read its (option or `<name>_id`) foreign key.
-    if (reflection.options.inverseOf != null) {
+    // When `inverse_of:` is set, defer to the inverse reflection's foreign key so
+    // a self-referential `has_many :children, inverse_of: :parent` uses the
+    // parent belongs_to's `parent_id` rather than the owner-name default
+    // `comment_id`. Recurse through the full derivation (option / composite array
+    // / belongsTo / polymorphic `as`) rather than re-deriving inline, so a
+    // polymorphic or explicitly-keyed inverse resolves correctly too.
+    if (reflection.options.inverseOf != null && inferFromInverseOf) {
       const targetClassName = reflection.options.className ?? _camelize(_singularize(name));
       const targetModel: any = modelRegistry.get(targetClassName);
       const inverse = (targetModel?._associations ?? []).find(
         (a: any) => a.name === reflection.options.inverseOf,
       );
-      if (inverse) {
-        if (inverse.options.foreignKey != null) return inverse.options.foreignKey;
-        return `${_toUnderscore(inverse.name)}_id`;
-      }
+      if (inverse) return this._deriveForeignKey(inverse, inverse.name, targetClassName, false);
     }
     return `${_toUnderscore(ownerName)}_id`;
   }
