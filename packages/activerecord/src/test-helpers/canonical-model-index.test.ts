@@ -3,6 +3,7 @@ import { canonicalModelIndex } from "./canonical-model-index.js";
 import { resolveModel } from "../associations.js";
 import { Comment } from "./models/comment.js";
 import { Owner } from "./models/owner.js";
+import { Pet } from "./models/pet.js";
 
 describe("canonical model autoload index (Zeitwerk analog)", () => {
   it("indexes canonical models by their class name", () => {
@@ -17,6 +18,17 @@ describe("canonical model autoload index (Zeitwerk analog)", () => {
     // the canonical class — the fallback covers the un-registered case.
     expect(resolveModel("Comment")).toBe(Comment);
     expect(resolveModel("Owner")).toBe(Owner);
+  });
+
+  it("autoloads an association-target model through reflection's computeClass", () => {
+    // `Pet belongsTo owner` names `Owner` only as a target — no fixture set, no
+    // manual `registerModel`. Resolving the reflection's `.klass` must autoload
+    // it via the fallback (reflection.ts computeClass), the empirical anchor for
+    // this part (HasManyReflection/BelongsToReflection._klass).
+    const refl = (
+      Pet as unknown as { _reflectOnAssociation(name: string): { klass: unknown } }
+    )._reflectOnAssociation("owner");
+    expect(refl.klass).toBe(Owner);
   });
 
   it("throws a constant-not-found error for a genuine miss", () => {
