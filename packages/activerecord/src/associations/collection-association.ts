@@ -235,7 +235,7 @@ export class CollectionAssociation extends Association {
       // before_add abort (`added == null`) skips the yield, so `inserted`
       // stays true and the fold leaves `result` unchanged.
       let inserted = true;
-      await this.addToTargetAsync(record, {}, async () => {
+      await this.addToTarget(record, {}, async () => {
         // `resultStillTrue === false` → a prior record failed, so Rails'
         // `result &&= insert_record` short-circuits the save.
         if (this.owner.isNewRecord() || !resultStillTrue) return;
@@ -517,34 +517,31 @@ export class CollectionAssociation extends Association {
   }
 
   /**
-   * Add a record to the in-memory target array, firing callbacks
-   * and setting inverse associations.
+   * Add a record to the in-memory target array, firing callbacks and setting
+   * inverse associations. Mirrors Rails' single `add_to_target(record, &block)`
+   * (collection_association.rb:281-283): when a `save` callback is supplied it
+   * runs at Rails' `yield(record)` point — after `set_inverse_instance`, before
+   * the target mutation and after_add — and the method returns a promise.
+   * `concatRecords` passes the per-record insert as `save` so it runs inside the
+   * add funnel; the target push happens regardless of the save result (Rails
+   * relies on the surrounding `raise Rollback` to undo a failed insert), keeping
+   * the OO path's membership behavior unchanged. Sync callers (build/replace,
+   * no `save`) get the synchronous return.
    */
+  addToTarget(record: Base, options?: { skipCallbacks?: boolean; replace?: boolean }): Base | null;
+  addToTarget(
+    record: Base,
+    options: { skipCallbacks?: boolean; replace?: boolean },
+    save: () => Promise<void>,
+  ): Promise<Base | null>;
   addToTarget(
     record: Base,
     options: { skipCallbacks?: boolean; replace?: boolean } = {},
-  ): Base | null {
-    const { skipCallbacks = false, replace: shouldReplace = false } = options;
-    return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
-  }
-
-  /**
-   * Async sibling of `addToTarget` that runs `save` between
-   * `set_inverse_instance` and the target mutation, mirroring Rails'
-   * `replace_on_target`'s `yield(record)` step (collection_association.rb:457-483).
-   * `concatRecords` uses it to `insert_record` inside the add funnel; the target
-   * push happens regardless of the save result (Rails relies on the surrounding
-   * `raise Rollback` to undo a failed insert), keeping the OO path's membership
-   * behavior unchanged.
-   * @internal
-   */
-  addToTargetAsync(
-    record: Base,
-    options: { skipCallbacks?: boolean; replace?: boolean } = {},
     save?: () => Promise<void>,
-  ): Promise<Base | null> {
+  ): Base | null | Promise<Base | null> {
     const { skipCallbacks = false, replace: shouldReplace = false } = options;
-    return replaceOnTargetAsync(this, record, skipCallbacks, shouldReplace, save);
+    if (save) return replaceOnTargetAsync(this, record, skipCallbacks, shouldReplace, save);
+    return replaceOnTarget(this, record, skipCallbacks, shouldReplace);
   }
 
   /**
