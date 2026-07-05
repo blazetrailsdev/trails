@@ -824,6 +824,12 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
 
     await Post.count();
     expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.findBySql("SELECT * FROM posts");
+    expect(Post.connectionPool().activeConnection).toBeNull();
+
+    await Post.countBySql("SELECT COUNT(*) FROM posts");
+    expect(Post.connectionPool().activeConnection).toBeNull();
   });
 });
 
