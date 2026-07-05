@@ -33,7 +33,9 @@ import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { adapterType } from "./test-adapter.js";
 import { ChatMessage, ChatMessageCustomPk } from "./test-helpers/models/chat-message.js";
 import { captureSql } from "./testing/sql-capture.js";
-import { ClothingItem } from "./test-helpers/models/clothing-item.js";
+import { ClothingItem, ClothingItemSized } from "./test-helpers/models/clothing-item.js";
+import { Dashboard } from "./test-helpers/models/dashboard.js";
+import { queryConstraints, queryConstraintsList } from "./persistence.js";
 // Imported under an alias: a top-level `Topic`/`Item` binding would make
 // esbuild rename the bespoke in-function `class Topic`/`class Item`
 // declarations in the later (still-bespoke) describe blocks to `Topic2`/`Item2`,
@@ -44,15 +46,25 @@ import { Minimalistic } from "./test-helpers/models/minimalistic.js";
 import { Account } from "./test-helpers/models/account.js";
 // Registers the Reply STI subclasses so Topic#destroy can resolve its
 // `replies`/`uniqueReplies` associations (mirrors `require "models/reply"`).
-import { Reply, SillyReply, UniqueReply, SillyUniqueReply } from "./test-helpers/models/reply.js";
+import {
+  Reply,
+  SillyReply,
+  UniqueReply,
+  SillyUniqueReply,
+  WrongReply,
+} from "./test-helpers/models/reply.js";
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";
-import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
+import {
+  Developer as CanonicalDeveloper,
+  DeveloperCalledDavid,
+  AuditLog,
+} from "./test-helpers/models/developer.js";
 import { Parrot, LiveParrot } from "./test-helpers/models/parrot.js";
 // `Post` is imported under an alias for the same esbuild-rename reason as
 // `Topic`/`Item`: a bespoke in-function `class Post` declaration still exists in
 // the not-yet-converted update-all block.
 import { Post as CanonicalPost, SpecialPost } from "./test-helpers/models/post.js";
-import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
+import { CpkBook, CpkOrder, CpkBestSeller } from "./test-helpers/models/cpk.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 import { Company, LargeClient, Client, Firm } from "./test-helpers/models/company.js";
 import { AdminUser } from "./test-helpers/models/admin/user.js";
@@ -60,6 +72,7 @@ import { MissingAttributeError } from "@blazetrails/activemodel";
 import { AutoId } from "./test-helpers/models/auto-id.js";
 import { Person } from "./test-helpers/models/person.js";
 import { Car } from "./test-helpers/models/car.js";
+import { Ship } from "./test-helpers/models/ship.js";
 import { sql as arelSql } from "@blazetrails/arel";
 
 for (const klass of [
@@ -86,6 +99,13 @@ for (const klass of [
   AutoId,
   Person,
   Car,
+  WrongReply,
+  DeveloperCalledDavid,
+  Dashboard,
+  CpkBestSeller,
+  ClothingItemSized,
+  AuditLog,
+  Ship,
 ]) {
   registerModel(klass);
 }
@@ -227,6 +247,26 @@ describe("PersistenceTest", () => {
     await a.increment("credit_limit", 1).incrementBang("credit_limit", 3);
     await a.reload();
     expect(a.credit_limit).toBe(59);
+  });
+
+  // Rails: test_increment_nil_attribute — `topics(:first).parent_id` starts nil.
+  it("increment nil attribute", async () => {
+    const topic = topics("first") as any;
+    expect(topic.parent_id).toBeNull();
+    await topic.incrementBang("parent_id");
+    expect(topic.parent_id).toBe(1);
+  });
+
+  // Rails: test_increment_updates_counter_in_db_using_offset — two in-memory
+  // copies each increment; the DB applies both offsets, so a1 reloads to +2.
+  it("increment updates counter in db using offset", async () => {
+    const a1 = accounts("signals37");
+    const initialCredit = a1.credit_limit;
+    const a2 = await Account.find(a1.id);
+    await a1.incrementBang("credit_limit");
+    await a2.incrementBang("credit_limit");
+    await a1.reload();
+    expect(a1.credit_limit).toBe(initialCredit + 2);
   });
 
   it("decrement attribute", async () => {
@@ -600,6 +640,132 @@ describe("PersistenceTest", () => {
     );
     expect((await Topic.find(1)).content).not.toBe("updated");
     expect((await Topic.find(2)).content).not.toBe("updated");
+  });
+
+  it("update many with duplicated ids!", async () => {
+    const updated = await Topic.updateBang(
+      [1, 1, 2],
+      [{ content: "1 duplicated" }, { content: "1 updated" }, { content: "2 updated" }],
+    );
+    expect(updated.map((t: any) => Number(t.id))).toEqual([1, 1, 2]);
+    expect((await Topic.find(1)).content).toBe("1 updated");
+    expect((await Topic.find(2)).content).toBe("2 updated");
+  });
+
+  it("update many with invalid id!", async () => {
+    await expect(
+      Topic.updateBang([1, 2, 99999], [{ content: "1 updated" }, { content: "2 updated" }, {}]),
+    ).rejects.toThrow(RecordNotFound);
+    expect((await Topic.find(1)).content).not.toBe("1 updated");
+    expect((await Topic.find(2)).content).not.toBe("2 updated");
+  });
+
+  it("update many with active record base object!", async () => {
+    await expect(
+      (Topic as any).updateBang(topics("first"), { content: "1 updated" }),
+    ).rejects.toThrow(
+      "You are passing an instance of ActiveRecord::Base to `update!`. " +
+        "Please pass the id of the object by calling `.id`.",
+    );
+    expect((await Topic.find(1)).content).not.toBe("1 updated");
+  });
+
+  it("update many with array of active record base objects!", async () => {
+    await expect(
+      (Topic as any).updateBang([topics("first"), topics("second")], { content: "updated" }),
+    ).rejects.toThrow(
+      "You are passing an array of ActiveRecord::Base instances to `update!`. " +
+        "Please pass the ids of the objects by calling `pluck(:id)` or `map(&:id)`.",
+    );
+    expect((await Topic.find(1)).content).not.toBe("updated");
+    expect((await Topic.find(2)).content).not.toBe("updated");
+  });
+
+  it("update object", async () => {
+    const topic = new Topic();
+    topic.title = "Another New Topic";
+    (topic as any).written_on = "2003-12-12 23:23:00";
+    await topic.save();
+    const topicReloaded = await Topic.find(topic.id);
+    expect(topicReloaded.title).toBe("Another New Topic");
+
+    topicReloaded.title = "Updated topic";
+    await topicReloaded.save();
+
+    const topicReloadedAgain = await Topic.find(topic.id);
+    expect(topicReloadedAgain.title).toBe("Updated topic");
+  });
+
+  it("update all", async () => {
+    const updateAll = (u: unknown) => (Topic as any).updateAll(u) as Promise<number>;
+    expect(await updateAll("content = 'bulk updated!'")).toBe(await Topic.count());
+    expect((await Topic.find(1)).content).toBe("bulk updated!");
+    expect((await Topic.find(2)).content).toBe("bulk updated!");
+
+    expect(await updateAll(["content = ?", "bulk updated again!"])).toBe(await Topic.count());
+    expect((await Topic.find(1)).content).toBe("bulk updated again!");
+    expect((await Topic.find(2)).content).toBe("bulk updated again!");
+
+    expect(await updateAll(["content = ?", null])).toBe(await Topic.count());
+    expect((await Topic.find(1)).content).toBeNull();
+  });
+
+  it("update all with hash", async () => {
+    expect((await Topic.find(1)).last_read).not.toBeNull();
+    expect(await Topic.updateAll({ content: "bulk updated with hash!", last_read: null })).toBe(
+      await Topic.count(),
+    );
+    expect((await Topic.find(1)).content).toBe("bulk updated with hash!");
+    expect((await Topic.find(2)).content).toBe("bulk updated with hash!");
+    expect((await Topic.find(1)).last_read).toBeNull();
+    expect((await Topic.find(2)).last_read).toBeNull();
+  });
+
+  it("update column with one changed and one updated", async () => {
+    const t = (await Topic.order("id").limit(1).first())! as any;
+    const authorName = t.author_name;
+    t.author_name = "John";
+    await t.updateColumn("title", "super_title");
+    expect(t.author_name).toBe("John");
+    expect(t.title).toBe("super_title");
+    expect(t.changed).toBe(true);
+    expect(t.attributeChanged("author_name")).toBe(true);
+
+    await t.reload();
+    expect(t.author_name).toBe(authorName);
+    expect(t.title).toBe("super_title");
+  });
+
+  it("update columns with one changed and one updated", async () => {
+    const t = (await Topic.order("id").limit(1).first())! as any;
+    const authorName = t.author_name;
+    t.author_name = "John";
+    await t.updateColumns({ title: "super_title" });
+    expect(t.author_name).toBe("John");
+    expect(t.title).toBe("super_title");
+    expect(t.changed).toBe(true);
+    expect(t.attributeChanged("author_name")).toBe(true);
+
+    await t.reload();
+    expect(t.author_name).toBe(authorName);
+    expect(t.title).toBe("super_title");
+  });
+
+  // Rails: test_increment_with_touch_updates_timestamps — bare `touch: true`
+  // bumps updated_at alongside the counter.
+  it("increment with touch updates timestamps", async () => {
+    const topic = topics("first");
+    expect(topic.replies_count).toBe(1);
+    const previouslyUpdatedAt = topic.updated_at;
+    travel(1000);
+    try {
+      await topic.incrementBang("replies_count", 1, { touch: true });
+    } finally {
+      travelBack();
+    }
+    await topic.reload();
+    expect(topic.replies_count).toBe(2);
+    expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
   });
 
   it("becomes includes errors", () => {
@@ -1406,6 +1572,92 @@ describe("PersistenceTest", () => {
     await expect(minivan.updateAttribute("color", "black")).rejects.toThrow(ActiveRecordError);
   });
 
+  it("update attribute for readonly attribute!", async () => {
+    const minivan = await Minivan.find("m1");
+    await expect((minivan as any).updateAttributeBang("color", "black")).rejects.toThrow(
+      ActiveRecordError,
+    );
+  });
+
+  it("update column for readonly attribute", async () => {
+    const minivan = await Minivan.find("m1");
+    const prevColor = minivan.color;
+    await expect(minivan.updateColumn("color", "black")).rejects.toThrow(ActiveRecordError);
+    expect(minivan.color).toBe(prevColor);
+  });
+
+  it("update columns with one readonly attribute", async () => {
+    const minivan = await Minivan.find("m1");
+    const prevColor = minivan.color;
+    const prevName = minivan.name;
+    await expect(minivan.updateColumns({ name: "My old minivan", color: "black" })).rejects.toThrow(
+      ActiveRecordError,
+    );
+    expect(minivan.color).toBe(prevColor);
+    expect(minivan.name).toBe(prevName);
+
+    await minivan.reload();
+    expect(minivan.color).toBe(prevColor);
+    expect(minivan.name).toBe(prevName);
+  });
+
+  it("update columns should not use setter method", async () => {
+    const dev = (await CanonicalDeveloper.find(1)) as any;
+    // Mirror Rails' per-instance `salary=` override (doubles the value):
+    // update_columns must write the raw value straight to the column.
+    let setterCalled = false;
+    Object.defineProperty(dev, "salary", {
+      configurable: true,
+      get() {
+        return this.readAttribute("salary");
+      },
+      set(value: number) {
+        setterCalled = true;
+        this.writeAttribute("salary", value * 2);
+      },
+    });
+
+    await dev.updateColumns({ salary: 80000 });
+    expect(dev.salary).toBe(80000);
+    expect(setterCalled).toBe(false);
+
+    await dev.reload();
+    expect(dev.salary).toBe(80000);
+  });
+
+  it("update column with default scope", async () => {
+    const developer = (await DeveloperCalledDavid.first())! as any;
+    developer.name = "John";
+    await developer.saveBang();
+
+    expect(await developer.updateColumn("name", "Will")).toBe(true);
+  });
+
+  it("update columns with default scope", async () => {
+    const developer = (await DeveloperCalledDavid.first())! as any;
+    developer.name = "John";
+    await developer.saveBang();
+
+    expect(await developer.updateColumns({ name: "Will" })).toBe(true);
+  });
+
+  it("persisted returns boolean", async () => {
+    let developer = new CanonicalDeveloper({ name: "Jose" });
+    expect(developer.isPersisted()).toBe(false);
+    await developer.saveBang();
+    expect(developer.isPersisted()).toBe(true);
+
+    developer = (await CanonicalDeveloper.first())!;
+    expect(developer.isPersisted()).toBe(true);
+    await developer.destroy();
+    expect(developer.isPersisted()).toBe(false);
+
+    developer = (await CanonicalDeveloper.last())!;
+    expect(developer.isPersisted()).toBe(true);
+    await developer.delete();
+    expect(developer.isPersisted()).toBe(false);
+  });
+
   it("update columns with model having primary key other than id", async () => {
     const minivan = await Minivan.find("m1");
     const newName = "sebavan";
@@ -1516,5 +1768,121 @@ describe("PersistenceTest", () => {
     const client = company.becomes(Client);
     expect(client.name).toBe("37signals");
     expect(client.changedAttributes).toEqual(["name"]);
+  });
+});
+
+// ==========================================================================
+// PersistenceTest — save / query-cache
+// ==========================================================================
+describe("PersistenceTest", () => {
+  const Topic = CanonicalTopic;
+  fixtures(["topics", "developers", "parrots"], { schema: canonicalSchema });
+
+  it("save valid record", async () => {
+    const topic = new Topic({ title: "New Topic" });
+    expect(await topic.saveBang()).toBe(true);
+  });
+
+  it("save invalid record", async () => {
+    const reply = new WrongReply({ title: "New reply" });
+    await expect(reply.saveBang()).rejects.toThrow("Validation failed: Content Empty");
+  });
+
+  it("reload via querycache", async () => {
+    const connection = await Base.leaseConnection();
+    connection.enableQueryCacheBang();
+    connection.clearQueryCache();
+    expect(connection.queryCacheEnabled).toBe(true);
+    const parrot = await Parrot.create({ name: "Shane" });
+
+    // populate the cache with the SELECT result
+    const foundParrot = await Parrot.find(parrot.id);
+    expect(foundParrot.id).toBe(parrot.id);
+
+    expect(connection.queryCache!.size).toBe(1);
+    await Base.uncached(async () => {
+      (foundParrot as any).name = "Mary";
+      await foundParrot.save();
+    });
+
+    // reload should get the DB version, not the querycache version
+    await foundParrot.reload();
+    expect((foundParrot as any).name).toBe("Mary");
+
+    const foundParrot2 = await Parrot.find(parrot.id);
+    expect((foundParrot2 as any).name).toBe("Mary");
+
+    connection.disableQueryCacheBang();
+  });
+});
+
+// ==========================================================================
+// QueryConstraintsTest — targets persistence_test.rb QueryConstraintsTest
+// ==========================================================================
+describe("QueryConstraintsTest", () => {
+  const { clothingItems } = fixtures(["clothingItems", "dashboards", "topics", "posts"], {
+    schema: canonicalSchema,
+  });
+
+  beforeAll(async () => {
+    // `developers_projects` is a join table with no single primary key; warm its
+    // schema so the anonymous class's `primaryKey` reflection resolves to null.
+    await ClothingItem.loadSchema();
+  });
+
+  it("query constraints list is nil if primary key is nil", async () => {
+    class DevelopersProjects extends Base {
+      static _tableName = "developers_projects";
+    }
+    await DevelopersProjects.loadSchema();
+    expect(DevelopersProjects.primaryKey).toBeNull();
+    expect(queryConstraintsList.call(DevelopersProjects as any)).toBeNull();
+  });
+
+  it("query constraints list is nil for non cpk model", () => {
+    expect(queryConstraintsList.call(CanonicalPost as any)).toBeNull();
+    expect(queryConstraintsList.call(Dashboard as any)).toBeNull();
+  });
+
+  it("query constraints list equals to composite primary key", () => {
+    expect(queryConstraintsList.call(CpkOrder as any)).toEqual(["shop_id", "id"]);
+    expect(queryConstraintsList.call(CpkBook as any)).toEqual(["author_id", "id"]);
+  });
+
+  it("child keeps parents query constraints", async () => {
+    const greenTShirt = clothingItems("green_t_shirt");
+    let sqls = await captureSql(async () => {
+      await greenTShirt.reload();
+    });
+    let sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+
+    const usedBlueJeans = clothingItems("used_blue_jeans");
+    sqls = await captureSql(async () => {
+      await usedBlueJeans.reload();
+    });
+    sql = sqls.find((s) => /^SELECT/.test(s.trimStart())) ?? "";
+    expect(sql).toMatch(/WHERE .*clothing_type/);
+    expect(sql).toMatch(/WHERE .*color/);
+  });
+
+  it("child keeps parents query contraints derived from composite pk", () => {
+    expect(queryConstraintsList.call(CpkBestSeller as any)).toEqual(["author_id", "id"]);
+  });
+
+  it("query constraints raises an error when no columns provided", () => {
+    class NoColumns extends Base {
+      static _tableName = "topics";
+    }
+    expect(() => queryConstraints.call(NoColumns as any)).toThrow(ArgumentError);
+  });
+
+  it("child class with query constraints overrides parents", () => {
+    expect(queryConstraintsList.call(ClothingItemSized as any)).toEqual([
+      "clothing_type",
+      "color",
+      "size",
+    ]);
   });
 });

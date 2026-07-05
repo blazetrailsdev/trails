@@ -8,6 +8,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { isAbortSignal } from "@blazetrails/activesupport";
 import {
+  ArgumentError,
   sanitizeForMassAssignment,
   SerializeCastValue,
   runAfterCallbacksOnProto,
@@ -164,7 +165,7 @@ export function instantiate(
  */
 export function queryConstraints(this: PersistenceHost, ...columns: string[]): void {
   if (columns.length === 0) {
-    throw new Error("You must specify at least one column to be used in querying");
+    throw new ArgumentError("You must specify at least one column to be used in querying");
   }
   this._queryConstraintsList = columns.map(String);
   this._hasQueryConstraints = true;
@@ -1237,9 +1238,20 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
         _attributeAliases?: Record<string, string>;
       }
     )._attributeAliases ?? {};
+  // Rails resolves aliases and verifies every key against attr_readonly up
+  // front (`transform_keys { verify_readonly_attribute }`) before writing any
+  // value, so a readonly column raises without mutating the earlier keys.
+  const resolvedEntries = Object.entries(attrs).map(
+    ([rawKey, value]) => [aliases[rawKey] ?? rawKey, value] as const,
+  );
+  for (const [key] of resolvedEntries) {
+    verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, key);
+  }
+
   const setPairs: Array<[unknown, unknown]> = [];
-  for (const [rawKey, value] of Object.entries(attrs)) {
-    const key = aliases[rawKey] ?? rawKey;
+  const updatedKeys: string[] = [];
+  for (const [key, value] of resolvedEntries) {
+    updatedKeys.push(key);
     const def = ctor._attributeDefinitions.get(key);
     if (!def && !pkCols.includes(key)) {
       throw new UnknownAttributeError(this, key);
@@ -1293,7 +1305,15 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     affectedRows = await adapter.execUpdate(sql, "Update Columns");
   }
 
-  this.changesApplied();
+  // Rails clears the change only for the updated columns (`clear_attribute_change(k)`),
+  // leaving any other pending in-memory changes dirty — not a whole-record
+  // `changes_applied`.
+  const clearer = this as unknown as { clearAttributeChange?(name: string): void };
+  if (typeof clearer.clearAttributeChange === "function") {
+    for (const key of updatedKeys) clearer.clearAttributeChange(key);
+  } else {
+    this.changesApplied();
+  }
   return affectedRows === 1;
 }
 
