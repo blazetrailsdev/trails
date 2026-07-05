@@ -5,8 +5,7 @@
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { User } from "./test-helpers/models/user.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Mirrors Rails' `retry_flaky_test` (secure_password_test.rb): retry the timing
 // assertion a few times before failing, so a single unlucky preemption spike
@@ -27,8 +26,7 @@ async function retryFlakyTest(fn: () => Promise<void>, retryCount = 3): Promise<
 }
 
 describe("SecurePasswordTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(async () => {
     await User.loadSchema();
   });

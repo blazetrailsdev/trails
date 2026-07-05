@@ -6,8 +6,7 @@
 import { afterEach, beforeAll, describe, expect, it } from "vitest";
 import { Base, registerModel } from "../index.js";
 import { association } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { repairValidations } from "../test-helpers/repair-validations.js";
 import { Human } from "../test-helpers/models/human.js";
 import { Face } from "../test-helpers/models/face.js";
@@ -37,8 +36,7 @@ function setAssoc(record: Base, name: string, value: unknown) {
 }
 
 describe("PresenceValidationTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   beforeAll(async () => {
     // The canonical humans/faces/interests/speedometers/dashboards tables are

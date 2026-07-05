@@ -9,8 +9,7 @@ import { Electron } from "./test-helpers/models/electron.js";
 import { NumericData } from "./test-helpers/models/numeric-data.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
 import { RecordNotFound } from "./errors.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 registerModel("Book", Book);
 registerModel("Liquid", Liquid);
@@ -18,8 +17,7 @@ registerModel("Molecule", Molecule);
 registerModel("Electron", Electron);
 registerModel("NumericData", NumericData);
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 beforeAll(async () => {
   await Promise.all([
