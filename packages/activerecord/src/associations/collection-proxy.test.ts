@@ -9,6 +9,12 @@ import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
 import { Base, association, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
+// Opt this file into the canonical-model autoload index (Zeitwerk analog):
+// `Comment`, `Tagging`, `Tag`, and `Owner` — association targets with no
+// fixture set of their own — resolve by name on first reference instead of
+// needing a manual `registerModel`. Installed per-file rather than globally so
+// only converted (fully-canonical) files pick up the fallback.
+import "../test-helpers/canonical-model-index.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Tagging } from "../test-helpers/models/tagging.js";

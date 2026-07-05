@@ -1,7 +1,3 @@
-// Eagerly build & install the canonical-model autoload index (Zeitwerk
-// analog): any test declaring fixtures can then reference an association-target
-// model by name without a manual `registerModel`.
-import "./canonical-model-index.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { type WithTransactionalFixturesOptions } from "./with-transactional-fixtures.js";
