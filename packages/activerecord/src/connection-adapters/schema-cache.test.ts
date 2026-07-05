@@ -208,6 +208,17 @@ describe("SchemaCacheTest", () => {
     expect(id.primaryKey).toBe(true);
   });
 
+  it("setPrimaryKeys reconciles already-warm columns regardless of warm order", () => {
+    // Reverse order: columns warmed first (bogus promoted-unique flag), then the
+    // authoritative key. setPrimaryKeys reconciles the already-warm columns.
+    const cache = new SchemaCache();
+    const nick = makeColumn("nick", "varchar(100)", { primaryKey: true, null: false });
+    cache.setColumns("subscribers", [nick, makeColumn("name", "varchar(100)")]);
+    expect(nick.primaryKey).toBe(true);
+    cache.setPrimaryKeys("subscribers", null);
+    expect(nick.primaryKey).toBe(false);
+  });
+
   it("columns for existent table", async () => {
     const cache = new SchemaCache();
     cache.setColumns("users", [makeColumn("id", "integer"), makeColumn("name", "text")]);

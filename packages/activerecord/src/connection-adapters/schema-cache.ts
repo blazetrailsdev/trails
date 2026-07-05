@@ -416,6 +416,8 @@ export class SchemaCache {
 
   setPrimaryKeys(tableName: string, pk: string | string[] | null): void {
     this._primaryKeys.set(tableName, pk);
+    const cols = this._columns.get(tableName);
+    if (cols) this.reconcilePrimaryKeyFlags(tableName, cols);
   }
 
   /**
@@ -426,8 +428,9 @@ export class SchemaCache {
    * column — Rails' `MySQL::Column` carries no per-column primary flag and
    * resolves the key solely from the `PRIMARY` constraint. `add()` warms
    * `_primaryKeys` (via the authoritative `SHOW KEYS ... 'PRIMARY'` /
-   * key_column_usage query) before `columns()`, so by the time `setColumns` runs
-   * the correct answer is already in hand — reconcile against it query-free.
+   * key_column_usage query) before `columns()`, so the correct answer is already
+   * in hand — reconcile against it query-free. Called from both `setColumns` and
+   * `setPrimaryKeys` so the correction is independent of which warms first.
    *
    * Clear-only: a flag is dropped when the authoritative key set excludes the
    * column, never added. Real primary keys (whose flag the adapter already set
