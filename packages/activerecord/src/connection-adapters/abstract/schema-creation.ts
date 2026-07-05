@@ -378,7 +378,18 @@ export class SchemaCreation {
     let sql: string;
     switch (type) {
       case "string":
-        sql = `VARCHAR(${options.limit ?? 255})`;
+        // Rails derives the default limit from the adapter's native-type hash
+        // (`type_to_sql`: `limit ||= native[:limit]`). Only MySQL's
+        // `NATIVE_DATABASE_TYPES[:string]` carries `limit: 255`
+        // (abstract_mysql_adapter.rb:33); sqlite3 (`{ name: "varchar" }`,
+        // sqlite3_adapter.rb:71) and PostgreSQL (`{ name: "character varying" }`,
+        // postgresql_adapter.rb:136) have no default length, so a bare
+        // `t.string` stays unbounded (nil limit) there.
+        if (this.adapterName === "mysql") {
+          sql = `VARCHAR(${options.limit ?? 255})`;
+        } else {
+          sql = options.limit != null ? `VARCHAR(${options.limit})` : "VARCHAR";
+        }
         break;
       case "text":
         sql = "TEXT";

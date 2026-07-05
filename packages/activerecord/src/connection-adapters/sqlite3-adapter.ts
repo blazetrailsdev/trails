@@ -1367,7 +1367,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   nativeDatabaseTypes(): Record<string, { name: string; limit?: number }> {
     return {
       primary_key: { name: "integer" },
-      string: { name: "varchar", limit: 255 },
+      string: { name: "varchar" },
       text: { name: "text" },
       integer: { name: "integer" },
       float: { name: "float" },
