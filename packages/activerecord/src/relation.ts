@@ -3595,12 +3595,14 @@ export class Relation<T extends Base> {
     // a CTEJoin routes to `buildWithJoinNode(name, OuterJoin)` (like the
     // subquery `from(relation)` path) so `Post.with(cte).leftOuterJoins(cteSym)`
     // emits a LEFT OUTER JOIN directly on this live path instead of raising
-    // "Invalid association spec".
-    const stashedJoins: JoinDependency[] = [];
+    // "Invalid association spec". A JoinDependency already in the values is
+    // stashed into `leftStashed`; the constructed left-outer JD is `unshift`ed
+    // ahead of it (query_methods.rb:1843: `stashed_left_joins.unshift`).
+    const leftStashed: JoinDependency[] = [];
     const leftAssociations = _qm.selectNamedJoins.call(
       this as any,
       pendingLeftOuter,
-      stashedJoins,
+      leftStashed,
       (left: unknown) => {
         if (left instanceof _qm.CTEJoin) {
           joinNodes.push(
@@ -3619,7 +3621,8 @@ export class Relation<T extends Base> {
             Nodes.OuterJoin,
           )
         : null;
-    if (leftOuterJd) stashedJoins.push(leftOuterJd);
+    if (leftOuterJd) leftStashed.unshift(leftOuterJd);
+    const stashedJoins: JoinDependency[] = [...leftStashed];
     // Fold the eager JoinDependency in last, mirroring Rails' `joins_values`
     // ordering (left-outer stash unshifted ahead of the eager stash in
     // `build_join_buckets`). `walk` dedups any eager node coinciding with a
