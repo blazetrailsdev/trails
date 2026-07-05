@@ -11,7 +11,7 @@ import {
   defineJoinTableFixtures,
   isFixtureRef,
 } from "./define-fixtures.js";
-import { setupFixtures } from "./fixtures.js";
+import { setupFixtures, fixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { Author } from "./models/author.js";
@@ -749,17 +749,11 @@ describe("resolveFixtureNames same-table guard", () => {
 
 // --- same-table multi-set load ---
 
-describe("useFixtures loads multiple same-table fixture sets in one call", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
-
+describe("fixtures() loads multiple same-table fixture sets in one call", () => {
   // deadParrots + liveParrots are STI subclasses backed by the same `parrots`
   // table. They load together: the table is deleted once and both sets' rows are
   // merged into one insert, with each accessor returning its own rows.
-  const { deadParrots, liveParrots } = useFixtures(
-    ["deadParrots", "liveParrots"],
-    () => Base.adapter,
-  );
+  const { deadParrots, liveParrots } = fixtures(["deadParrots", "liveParrots"]);
 
   it("resolves a DeadParrot-typed row from the deadParrots accessor", () => {
     expect(deadParrots("deadbird")).toBeInstanceOf(DeadParrot);
