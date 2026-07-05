@@ -33,7 +33,7 @@ import {
  *   useTransactionalTests();
  *
  *   beforeAll(async () => {
- *     await defineSchema({ posts: { title: "string" } });
+ *     await loadCanonicalSchema(Base.connection);
  *   });
  *
  *   it("inserts without leaking to the next test", async () => {

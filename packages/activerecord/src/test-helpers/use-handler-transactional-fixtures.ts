@@ -13,12 +13,10 @@ import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
  * fixture-pin work lives in `ConnectionPool#pinConnectionBang` under the
  * `{ fixture: true }` flag.
  *
- * Phase D-Z: `afterAll` no longer drops tables or clears schema signatures.
- * SAVEPOINT/rollback already cleans up test data; canonical tables persist
- * empty across files so the next file's `defineSchema` skips DDL (cache hit)
- * and only resets auto-increment counters.
- * Files with bespoke schemas call `dropAllTables` explicitly (which clears
- * the signature cache so the next `defineSchema` re-creates correctly).
+ * Phase D-Z: `afterAll` no longer drops tables. SAVEPOINT/rollback already
+ * cleans up test data; the canonical tables laid down once at boot persist
+ * empty across files. Files with bespoke schemas call `dropAllTables`
+ * explicitly.
  *
  * Pair with `setupHandlerSuite()`:
  *
@@ -26,7 +24,7 @@ import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
  *   useHandlerTransactionalFixtures();
  *
  *   beforeAll(async () => {
- *     await defineSchema({ topics: { title: "string" } });
+ *     await loadCanonicalSchema(Base.connection);
  *   });
  *
  * @internal

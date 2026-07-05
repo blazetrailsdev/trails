@@ -2,24 +2,16 @@ import { describe, expect, test } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import { defineSchema } from "./define-schema.js";
 import {
   ensureCanonicalTables,
   loadCanonicalSchema,
   rebuildCanonicalTables,
 } from "./canonical-schema.js";
-import { TEST_SCHEMA } from "./test-schema.js";
 
-// Phase-1 invariant (RFC 0059): `loadCanonicalSchema` must lay down byte-for-byte
-// the same schema `defineSchema(TEST_SCHEMA)` does. This guards against drift
-// while both live in parallel (phases 2–3) — e.g. a column added to test-schema.ts
-// but not to the loader. Deleted alongside defineSchema/TEST_SCHEMA in phase 4.
-//
 // Runs on SQLite regardless of the ambient ARCONN adapter (it constructs its own
 // in-memory adapters), which is where any faithful-transcription slip surfaces:
 // column names, types, defaults, nullability, PKs, and indexes all appear in the
-// dumped DDL. The per-adapter transforms (serialIdType, DATETIME(6)) are shared
-// code imported from define-schema.ts, so PG/MySQL cannot diverge independently.
+// dumped DDL.
 
 // `selectAll` returns a `Result` whose rows are positional arrays; `toArray()`
 // maps them to hash rows via the column index, so `r.type`/`r.name`/`r.sql`
@@ -37,27 +29,21 @@ async function dumpSchema(adapter: AbstractAdapter): Promise<string> {
 }
 
 describe("loadCanonicalSchema", () => {
-  test("lays down byte-for-byte the same schema as defineSchema(TEST_SCHEMA)", async () => {
-    const viaDefineSchema = new BetterSQLite3Adapter(":memory:");
-    const viaLoader = new BetterSQLite3Adapter(":memory:");
+  test("lays down real canonical DDL for hundreds of tables", async () => {
+    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
     try {
-      await defineSchema(viaDefineSchema as unknown as AbstractAdapter, TEST_SCHEMA);
-      await loadCanonicalSchema(viaLoader as unknown as AbstractAdapter);
+      await loadCanonicalSchema(adapter);
+      const dump = await dumpSchema(adapter);
 
-      const expected = await dumpSchema(viaDefineSchema as unknown as AbstractAdapter);
-      const actual = await dumpSchema(viaLoader as unknown as AbstractAdapter);
-
-      expect(actual).toBe(expected);
       // Sanity floor: the canonical schema is hundreds of tables + indexes, so a
-      // silently-empty dump (both empty ⇒ trivially equal) can't pass this test.
-      expect(expected.split("\n").length).toBeGreaterThan(300);
+      // silently-empty dump can't pass this test.
+      expect(dump.split("\n").length).toBeGreaterThan(300);
       // Content floor: the dump must carry real DDL, not placeholder rows — a
       // shape mismatch collapses every line to "undefined undefined: undefined".
-      expect(expected).not.toContain("undefined undefined: undefined");
-      expect(expected).toMatch(/table topics: CREATE TABLE "?topics"?/);
+      expect(dump).not.toContain("undefined undefined: undefined");
+      expect(dump).toMatch(/table topics: CREATE TABLE "?topics"?/);
     } finally {
-      await viaDefineSchema.close();
-      await viaLoader.close();
+      await (adapter as unknown as BetterSQLite3Adapter).close();
     }
   });
 });

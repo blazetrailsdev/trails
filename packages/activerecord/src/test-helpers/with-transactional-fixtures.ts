@@ -4,10 +4,6 @@ import { resetTestAdapterState } from "../test-adapter.js";
 import type { ConnectionPool } from "../connection-adapters/abstract/connection-pool.js";
 import { realPool } from "../connection-adapters/abstract/connection-pool.js";
 import { popSkipGlobalReset, pushSkipGlobalReset } from "./skip-global-reset.js";
-import {
-  _restoreAppliedSchemaSignaturesForAdapter,
-  _snapshotAppliedSchemaSignaturesForAdapter,
-} from "./define-schema.js";
 
 interface TxnHost {
   transactionManager: {
@@ -143,7 +139,7 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  *   beforeAll(async () => {
  *     await establishFromTestConfig();
  *     adapter = Base.connection;
- *     await defineSchema(adapter, { ... });
+ *     await loadCanonicalSchema(adapter);
  *   });
  *   withTransactionalFixtures(() => adapter);
  *
@@ -153,7 +149,7 @@ function pooledAdapterPool(adapter: TransactionalFixturesAdapter): ConnectionPoo
  *   let adapter: PostgreSQLAdapter;
  *   beforeAll(async () => {
  *     adapter = new PostgreSQLAdapter(PG_TEST_URL);
- *     await defineSchema(adapter, { ... });
+ *     await loadCanonicalSchema(adapter);
  *   });
  *   withTransactionalFixtures(() => adapter);
  */
@@ -242,12 +238,6 @@ export function withTransactionalFixtures(
   // beforeAll: callers register their schema-setup beforeAll *after* calling
   // the helper, so the schema does not yet exist when our beforeAll fires.
   let warmed = false;
-  // Snapshots of defineSchema's per-adapter signature cache taken at the
-  // start of each test. On rollback we restore — preserving signatures for
-  // tables created outside the test transaction (e.g. in `beforeAll`) while
-  // discarding signatures for any `defineSchema(...)` that ran inside the
-  // `it()` body (whose DDL was rolled back at the DB).
-  let outerSig: Map<string, string> | null = null;
   // Tracks whether we opened an outer transaction for the current test.
   // Tests in usesTransaction run without a wrapping transaction (Rails parity:
   // test_fixtures.rb:108-110 run_in_transaction? returns false for these).
@@ -289,7 +279,6 @@ export function withTransactionalFixtures(
     _txnOpenedForTest = true;
     // Open a recording window so teardown re-reflects only DDL-touched tables.
     if (invalidateSchemaCache) adapter.schemaCache?.recordTouchedTables();
-    outerSig = _snapshotAppliedSchemaSignaturesForAdapter(adapter);
     const pool = pooledAdapterPool(adapter);
     if (pool) {
       // Mirrors Rails test_fixtures.rb:177-184 pin/lease lifecycle:
@@ -327,7 +316,5 @@ export function withTransactionalFixtures(
       while (t.openTransactions > 0) await t.rollbackTransaction();
     }
     if (invalidateSchemaCache) await reReflectTouchedTables(adapter);
-    if (outerSig) _restoreAppliedSchemaSignaturesForAdapter(adapter, outerSig);
-    outerSig = null;
   });
 }

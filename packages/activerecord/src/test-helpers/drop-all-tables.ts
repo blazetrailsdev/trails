@@ -1,5 +1,4 @@
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { clearAppliedSchemaSignaturesForTables } from "./define-schema.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 
 /**
@@ -8,23 +7,17 @@ import { TEST_SCHEMA } from "./test-schema.js";
  * shape-stable for the whole run. Between tests these only need their **rows**
  * cleared (TRUNCATE), never a DROP — see {@link resetTestTables}.
  *
- * Everything else — bespoke tables a not-yet-converted `defineSchema` caller
- * created, and the `schema_migrations` / `ar_internal_metadata` bookkeeping
- * tables that migrator tests manage per-test — is dropped, exactly as the
- * previous unconditional `dropAllTables` did, so no per-test migration/schema
+ * Everything else — bespoke tables a test created, and the
+ * `schema_migrations` / `ar_internal_metadata` bookkeeping tables that
+ * migrator tests manage per-test — is dropped, exactly as the previous
+ * unconditional `dropAllTables` did, so no per-test migration/schema
  * state leaks across the reset.
  */
 const CANONICAL_TABLE_NAMES: ReadonlySet<string> = new Set(Object.keys(TEST_SCHEMA));
 
 /**
- * Drops every user table/view/matview in the database and reconciles the
- * `defineSchema` signature cache for this adapter against the tables it
- * actually dropped — deleting only those entries rather than wiping the
- * whole cache. A blanket wipe forced the next file's `defineSchema` down
- * the Path-C signature-mismatch drop for every table (re-dropping +
- * recreating tables whose shape never changed); reconciling keeps cache
- * hits for any table left untouched. Idempotent; per-DROP errors are
- * swallowed so teardown noise never aborts the sequence.
+ * Drops every user table/view/matview in the database. Idempotent; per-DROP
+ * errors are swallowed so teardown noise never aborts the sequence.
  * PG covers all schemas in `current_schemas(false)` (not just `public`).
  * MySQL uses a pinned pool connection with `FOREIGN_KEY_CHECKS=0`.
  */
@@ -39,11 +32,11 @@ export async function dropAllTables(adapter: DatabaseAdapter): Promise<void> {
  * dominant DDL-churn source measured in PR #4499), this **truncates** the
  * canonical tables (schema/indexes preserved — RFC 0059 lays them once at boot
  * and keeps them shape-stable). **Every non-canonical table is dropped**, exactly
- * as the previous unconditional `dropAllTables` did: bespoke tables a
- * not-yet-converted `defineSchema` caller created (so their shape can't leak
- * into the next file) *and* the `schema_migrations` / `ar_internal_metadata`
- * bookkeeping tables (migrator tests manage those per-test and rely on the reset
- * clearing them). Views/matviews are never canonical, so they are always dropped.
+ * as the previous unconditional `dropAllTables` did: bespoke tables a test
+ * created (so their shape can't leak into the next file) *and* the
+ * `schema_migrations` / `ar_internal_metadata` bookkeeping tables (migrator
+ * tests manage those per-test and rely on the reset clearing them).
+ * Views/matviews are never canonical, so they are always dropped.
  */
 export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
   await resetTables(adapter, "reset");
@@ -52,21 +45,17 @@ export async function resetTestTables(adapter: DatabaseAdapter): Promise<void> {
 type ResetMode = "drop-all" | "reset";
 
 async function resetTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
-  let dropped: string[];
   switch (adapter.adapterName) {
     case "postgres":
-      dropped = await resetPgTables(adapter, mode);
+      await resetPgTables(adapter, mode);
       break;
     case "mysql":
-      dropped = await resetMysqlTables(adapter, mode);
+      await resetMysqlTables(adapter, mode);
       break;
     case "sqlite":
-      dropped = await resetSqliteTables(adapter, mode);
+      await resetSqliteTables(adapter, mode);
       break;
-    default:
-      dropped = [];
   }
-  clearAppliedSchemaSignaturesForTables(adapter, dropped);
 }
 
 /**
@@ -117,34 +106,23 @@ function _isPgConnectionError(e: unknown): boolean {
   );
 }
 
-async function resetPgTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
-  // Accumulate across both attempts: tables dropped before a connection error
-  // are gone from pg_tables, so the retry won't re-enumerate them. Returning
-  // only the retry's list would leave their signature entries un-reconciled —
-  // a stale no-op risk for a raw adapter whose dataSourceExists guard falls
-  // back to `cachedSig !== undefined`.
-  const dropped: string[] = [];
+async function resetPgTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
   try {
-    await _resetPgTablesOnce(adapter, mode, dropped);
+    await _resetPgTablesOnce(adapter, mode);
   } catch (e) {
     // exec() routes through withRawConnection, whose retry loop calls
     // reconnectBang → the PG reconnect() override on a connection error, so
     // _rawConnection is now null and the next _acquireFreshClient() will open a
     // fresh pg.Client. Retry exactly once.
     if (_isPgConnectionError(e)) {
-      await _resetPgTablesOnce(adapter, mode, dropped);
+      await _resetPgTablesOnce(adapter, mode);
     } else {
       throw e;
     }
   }
-  return dropped;
 }
 
-async function _resetPgTablesOnce(
-  adapter: DatabaseAdapter,
-  mode: ResetMode,
-  dropped: string[],
-): Promise<void> {
+async function _resetPgTablesOnce(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
   const schema = `ANY(current_schemas(false))`;
   // Views/matviews are never canonical — always drop them.
   for (const { schemaname: s, name: n } of (await adapter.execute(
@@ -180,7 +158,6 @@ async function _resetPgTablesOnce(
     }
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${s}"."${t}" CASCADE`);
-      dropped.push(t);
     } catch (e) {
       if (_isPgConnectionError(e)) throw e;
     }
@@ -188,11 +165,10 @@ async function _resetPgTablesOnce(
   await truncateNonEmpty(adapter, toTruncate);
 }
 
-async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
+async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
   // Works with both the legacy pool model (_driverPool) and the current
   // single-connection model (_client). Falls back to adapter.execute /
   // adapter.executeMutation so both paths share one implementation.
-  const dropped: string[] = [];
   const toTruncate: string[] = [];
   try {
     await adapter.execute(`SET FOREIGN_KEY_CHECKS=0`);
@@ -218,7 +194,6 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
       }
       try {
         await adapter.executeMutation(`DROP TABLE IF EXISTS \`${name}\``);
-        dropped.push(name);
       } catch {}
     }
     await truncateNonEmpty(adapter, toTruncate);
@@ -227,11 +202,9 @@ async function resetMysqlTables(adapter: DatabaseAdapter, mode: ResetMode): Prom
       await adapter.execute(`SET FOREIGN_KEY_CHECKS=1`);
     } catch {}
   }
-  return dropped;
 }
 
-async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<string[]> {
-  const dropped: string[] = [];
+async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Promise<void> {
   const toTruncate: string[] = [];
   for (const { name } of (await adapter.execute(
     `SELECT name FROM sqlite_master WHERE type='view' AND name NOT LIKE 'sqlite_%'`,
@@ -249,9 +222,7 @@ async function resetSqliteTables(adapter: DatabaseAdapter, mode: ResetMode): Pro
     }
     try {
       await adapter.executeMutation(`DROP TABLE IF EXISTS "${name}"`);
-      dropped.push(name);
     } catch {}
   }
   await truncateNonEmpty(adapter, toTruncate);
-  return dropped;
 }
