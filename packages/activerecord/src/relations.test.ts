@@ -367,21 +367,51 @@ describe("RelationTest", () => {
       "type",
       "post_count",
     );
-    const relCounts = (await relation.toArray()).map((r: any) => r.post_count).sort();
-    const subCounts = (await subquery.toArray()).map((r: any) => r.post_count).sort();
+    const relCounts = (await relation.toArray())
+      .map((r: any) => r.readAttribute("post_count"))
+      .sort();
+    const subCounts = (await subquery.toArray())
+      .map((r: any) => r.readAttribute("post_count"))
+      .sort();
     expect(subCounts).toEqual(relCounts);
   });
 
-  it.skip("group with subquery in from does not use original table name", () => {
-    // BLOCKED: relations — canonical comments table lacks STI `type` column
+  it("group with subquery in from does not use original table name", async () => {
+    const relation = Comment.group("type").select("COUNT(post_id) AS post_count,type");
+    const subquery = Comment.from(relation, `grouped_${Comment.tableName}`)
+      .group("type")
+      .average("post_count");
+    const relCounts = (await relation.toArray())
+      .map((r: any) => r.readAttribute("post_count"))
+      .sort();
+    const subValues = Object.values((await subquery) as Record<string, number>).sort();
+    expect(subValues).toEqual(relCounts);
   });
 
-  it.skip("select with subquery string in from does not use original table name", () => {
-    // BLOCKED: relations — canonical comments table lacks STI `type` column
+  it("select with subquery string in from does not use original table name", async () => {
+    const relation = Comment.group("type").select("COUNT(post_id) AS post_count, type");
+    const subquery = Comment.from(
+      `(${await relation.toSql()}) ${Comment.tableName}_grouped`,
+    ).select("type", "post_count");
+    const relCounts = (await relation.toArray())
+      .map((r: any) => r.readAttribute("post_count"))
+      .sort();
+    const subCounts = (await subquery.toArray())
+      .map((r: any) => r.readAttribute("post_count"))
+      .sort();
+    expect(subCounts).toEqual(relCounts);
   });
 
-  it.skip("group with subquery string in from does not use original table name", () => {
-    // BLOCKED: relations — canonical comments table lacks STI `type` column
+  it("group with subquery string in from does not use original table name", async () => {
+    const relation = Comment.group("type").select("COUNT(post_id) AS post_count,type");
+    const subquery = Comment.from(`(${await relation.toSql()}) ${Comment.tableName}_grouped`)
+      .group("type")
+      .average("post_count");
+    const relCounts = (await relation.toArray())
+      .map((r: any) => r.readAttribute("post_count"))
+      .sort();
+    const subValues = Object.values((await subquery) as Record<string, number>).sort();
+    expect(subValues).toEqual(relCounts);
   });
 
   it.skip("finding with subquery with eager loading in from", () => {
