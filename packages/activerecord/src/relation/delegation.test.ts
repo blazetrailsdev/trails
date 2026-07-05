@@ -555,6 +555,16 @@ describe("DelegationTest", () => {
       expect(relation.connection).toBe(Comment.connection);
       expect(await Comment.all().transaction(async () => 42)).toBe(42);
     });
+
+    it("delegates slice to records (self-loading a slice of the loaded rows)", async () => {
+      const records = await Comment.all();
+      const sliced = await Comment.all().slice(1, 3);
+      expect(sliced.map((c: any) => c.id)).toEqual(records.slice(1, 3).map((c) => c.id));
+    });
+
+    it("delegates name to the model class name", () => {
+      expect(Comment.all().name()).toBe("Comment");
+    });
   }); // DelegationNamedMethods
 });
 

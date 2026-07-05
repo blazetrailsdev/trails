@@ -6595,6 +6595,38 @@ export class Relation<T extends Base> {
   }
 
   /**
+   * `delegate :slice, to: :records` (relation/delegation.rb:104) — a slice of
+   * the loaded records. Rails reads the eager `records` array synchronously;
+   * trails loads asynchronously, so this self-loads via `toArray()` first and
+   * slices a copy.
+   *
+   * The return type carries a bare `T[]` alternative so `CollectionProxy#slice`
+   * — which overrides this with a synchronous, eager `slice(start?, end?): T[]`
+   * over its already-loaded `_target` — stays assignable to the base signature.
+   */
+  slice(start?: number, end?: number): T[] | Promise<T[]> {
+    return this.toArray().then((records) => records.slice(start, end));
+  }
+
+  /**
+   * `delegate :name, to: :model` (relation/delegation.rb:106) — the model
+   * class name.
+   *
+   * Exposed as a method (not a `get name(): string`) deliberately: a
+   * string-typed `name` getter would make the structurally-typed `Relation`
+   * satisfy the ubiquitous `{ name: string }` object shape, which silently
+   * flips `Array#reduce` accumulator inference — e.g.
+   * `[{ name }, …].reduce((memo, param) => memo.where(param), Model.unscoped())`
+   * would resolve the `reduce(cb, initial: T): T` overload with `T = { name }`
+   * (since `Relation` would be assignable to the element type) instead of the
+   * generic `reduce<U>(cb, initial: U): U` with `U = Relation`. A method-typed
+   * `name` is not assignable to `{ name: string }`, so inference stays correct.
+   */
+  name(): string {
+    return this.model.name;
+  }
+
+  /**
    * Alias for isLoaded.
    *
    * Mirrors: ActiveRecord::Relation#loaded?
