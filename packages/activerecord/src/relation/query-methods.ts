@@ -150,7 +150,7 @@ export type OrderArg =
 // ---------------------------------------------------------------------------
 interface QueryMethodsHost {
   _whereClause: WhereClause;
-  _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string } | Nodes.Node>;
+  _orderClauses: Array<string | [string, "asc" | "desc"] | Nodes.Node>;
   _rawOrderClauses: string[];
   _reordering: boolean | undefined;
   _limitValue: number | null;
@@ -580,11 +580,12 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       const [first, ...rest] = arg as unknown[];
       if (first instanceof Nodes.Node) {
         // Bind array: [Arel.sql("col = ?"), bind1, ...] — Arel bypasses check.
-        // Store as { raw } so _applyOrderToManager emits it verbatim.
+        // Store as a SqlLiteral so _applyOrderToManager emits it verbatim.
         const rawSql = (first as any).value ?? this._modelClass.connection.toSql(first);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
-        if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
+        if (interpolated.trim() !== "")
+          this._orderClauses.push(new Nodes.SqlLiteral(String(interpolated)));
       } else {
         // Plain string array: all elements must be strings; validate each immediately.
         if (!(arg as unknown[]).every((e) => typeof e === "string")) {
@@ -656,7 +657,8 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
         const rawSql = (first as any).value ?? this._modelClass.connection.toSql(first);
         const interpolated =
           rest.length > 0 ? this._modelClass.sanitizeSqlArray(rawSql, ...rest) : rawSql;
-        if (interpolated.trim() !== "") this._orderClauses.push({ raw: String(interpolated) });
+        if (interpolated.trim() !== "")
+          this._orderClauses.push(new Nodes.SqlLiteral(String(interpolated)));
       } else {
         if (!(arg as unknown[]).every((e) => typeof e === "string")) {
           throw argumentError("Order arguments passed as an array must contain only strings");
@@ -1433,13 +1435,6 @@ function reverseOrderBang(this: QueryMethodsHost): any {
       if (typeof (clause as any).desc === "function") return (clause as any).desc();
       return clause;
     }
-    if (typeof clause === "object" && !Array.isArray(clause) && "raw" in clause) {
-      // Delegate to reverseSqlOrder's String branch (splits comma-separated
-      // terms, flips trailing ASC↔DESC, appends DESC otherwise) and re-wrap.
-      const raw = (clause as { raw: string }).raw.trim();
-      const reversed = reverseSqlOrder.call(this, [raw]) as string[];
-      return { raw: reversed.join(", ") };
-    }
     if (typeof clause === "string") {
       const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);
       if (match) {
@@ -1454,14 +1449,14 @@ function reverseOrderBang(this: QueryMethodsHost): any {
       // first/last" still raise, while balanced expressions reverse.
       if (clause.includes(",")) {
         const reversed = reverseSqlOrder.call(this, [clause]) as string[];
-        return { raw: reversed.join(", ") };
+        return new Nodes.SqlLiteral(reversed.join(", "));
       }
       // Bare column flips to a quoted desc tuple; any SQL expression goes through reverseSqlOrder.
       if (/^[\w.]+$/.test(clause)) {
         return [clause, "desc" as const];
       }
       const reversed = reverseSqlOrder.call(this, [clause]) as string[];
-      return { raw: reversed.join(", ") };
+      return new Nodes.SqlLiteral(reversed.join(", "));
     }
     const [col, dir] = clause;
     return [col, dir === "asc" ? "desc" : "asc"] as [string, "asc" | "desc"];

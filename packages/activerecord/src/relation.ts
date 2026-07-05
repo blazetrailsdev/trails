@@ -483,8 +483,7 @@ export class Relation<T extends Base> {
   private _modelClass: typeof Base;
   /** @internal */
   _whereClause: WhereClause = WhereClause.empty();
-  private _orderClauses: Array<string | [string, "asc" | "desc"] | { raw: string } | Nodes.Node> =
-    [];
+  private _orderClauses: Array<string | [string, "asc" | "desc"] | Nodes.Node> = [];
   private _rawOrderClauses: string[] = [];
   // Tri-state (Rails `@values.fetch(:reordering, nil)`): `undefined` = unset,
   // distinct from an explicit `false`. Mirrors `_isStrictLoading` below.
@@ -4446,19 +4445,14 @@ export class Relation<T extends Base> {
   /**
    * Return the ORDER clauses.
    *
-   * Mirrors: ActiveRecord::Relation#order_values. Unlike the other value
-   * readers this one cannot return the stored reference: trails keeps raw SQL
-   * orderings as `{ raw }` markers in `_orderClauses`, so the reader normalizes
-   * them to `SqlLiteral` nodes on read (Rails stores `Arel::Nodes::SqlLiteral`
-   * directly). The mapped array is therefore necessarily a fresh allocation —
-   * a documented, accessor-local exception to the stored-reference rule.
+   * Mirrors: ActiveRecord::Relation#order_values — returns the stored array by
+   * reference (Rails' `@values.fetch` semantics), matching the other value
+   * readers. Raw SQL orderings are stored as `Arel::Nodes::SqlLiteral` nodes
+   * directly (like Rails), so no on-read normalization or fresh allocation is
+   * needed.
    */
   get orderValues(): Array<string | [string, "asc" | "desc"] | Nodes.Node> {
-    return this._orderClauses.map((clause) =>
-      typeof clause === "object" && !Array.isArray(clause) && "raw" in clause
-        ? new Nodes.SqlLiteral((clause as { raw: string }).raw)
-        : clause,
-    );
+    return this._orderClauses;
   }
 
   /**
@@ -6087,10 +6081,6 @@ export class Relation<T extends Base> {
         // Arel order nodes (Ascending/Descending/Attribute/...) preserved by
         // orderBang — emit directly so identity survives to the SQL manager.
         manager.order(clause);
-        continue;
-      }
-      if (typeof clause === "object" && !Array.isArray(clause) && "raw" in clause) {
-        manager.order(new Nodes.SqlLiteral((clause as { raw: string }).raw));
         continue;
       }
       if (typeof clause === "string") {
