@@ -8,6 +8,7 @@ import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
 import { raiseNotFoundAll } from "../relation/finder-methods.js";
+import { normalizeAssociationKey } from "./key-normalization.js";
 import { polymorphicName } from "../inheritance.js";
 
 /**
@@ -962,7 +963,16 @@ export class CollectionAssociation extends Association {
   }
 
   private findByScan(ids: unknown[]): Base | Base[] {
-    const normalize = (v: unknown) => JSON.stringify(v);
+    // Fold each key through `normalizeAssociationKey` before stringifying: an
+    // in-memory target PK is a BigInt (int8 default under PG bigserial) while a
+    // `find(id)` argument is a number, and a raw `JSON.stringify` of a BigInt
+    // throws outright ("Do not know how to serialize a BigInt"). Normalizing
+    // both sides folds `1n` and `1` to the same key so the scan matches the way
+    // Ruby's width-agnostic `Integer ==` does.
+    const normalize = (v: unknown) =>
+      JSON.stringify(
+        Array.isArray(v) ? v.map(normalizeAssociationKey) : normalizeAssociationKey(v),
+      );
     const normalizedIds = ids.map(normalize);
 
     if (ids.length === 1) {
