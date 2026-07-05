@@ -382,11 +382,15 @@ describe("RelationTest", () => {
       .group("type")
       .average("post_count");
     // Rails reads the select alias via `&:post_count`; trails exposes no dynamic
-    // reader for select aliases, so read it through readAttribute.
+    // reader for select aliases, so read it through readAttribute. COUNT() is a
+    // bigint on PG/MariaDB while average() yields a number, so coerce both to
+    // Number for comparison (Rails compares BigDecimal == Integer loosely).
     const relCounts = (await relation.toArray())
-      .map((r: any) => r.readAttribute("post_count"))
+      .map((r: any) => Number(r.readAttribute("post_count")))
       .sort();
-    const subValues = Object.values((await subquery) as Record<string, number>).sort();
+    const subValues = Object.values((await subquery) as Record<string, number>)
+      .map(Number)
+      .sort();
     expect(subValues).toEqual(relCounts);
   });
 
@@ -410,9 +414,11 @@ describe("RelationTest", () => {
       .group("type")
       .average("post_count");
     const relCounts = (await relation.toArray())
-      .map((r: any) => r.readAttribute("post_count"))
+      .map((r: any) => Number(r.readAttribute("post_count")))
       .sort();
-    const subValues = Object.values((await subquery) as Record<string, number>).sort();
+    const subValues = Object.values((await subquery) as Record<string, number>)
+      .map(Number)
+      .sort();
     expect(subValues).toEqual(relCounts);
   });
 
