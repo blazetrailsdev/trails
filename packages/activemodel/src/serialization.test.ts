@@ -793,6 +793,20 @@ describe("toXml()", () => {
     expect(xml).toContain("</person>");
   });
 
+  it("renames a caller-supplied root without underscoring it", () => {
+    // Rails renames `options[:root]` directly (conversions.rb:88/:200) — no
+    // `underscore` — so a mixed-case literal root is left essentially untouched
+    // (dasherize only rewrites `_`/space; camelize on an already-camelized word
+    // is idempotent). Force-underscoring it would wrongly yield `<my-root>`.
+    class User extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const u = new User({ name: "Alice" });
+    expect(u.toXml({ root: "MyRoot" })).toContain("<MyRoot>");
+  });
+
   it("dasherizes multi-word attribute tags by default", () => {
     class Address extends Model {
       static {

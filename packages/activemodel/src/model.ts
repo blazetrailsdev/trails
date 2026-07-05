@@ -2183,8 +2183,12 @@ export class Model {
       dasherize: options?.dasherize,
       camelize: options?.camelize,
     };
+    // The root (default `modelName.singular`, already snake_case, or a
+    // caller-supplied literal) is renamed directly — Rails' serializer reformats
+    // the root without underscoring it (conversions.rb:88 / :200). Only the
+    // camelCase per-attribute keys are underscored first (in `_hashToXml`).
     const root = renameKey(
-      underscore(options?.root ?? (this.constructor as typeof Model).modelName.singular),
+      options?.root ?? (this.constructor as typeof Model).modelName.singular,
       renameOptions,
     );
     return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false, this._xmlTypeMap(hash), renameOptions)}</${root}>`;

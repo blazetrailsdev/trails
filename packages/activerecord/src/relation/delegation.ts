@@ -14,7 +14,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type { SerializeOptions } from "@blazetrails/activemodel";
 import {
   Delegation as ASDelegation,
-  underscore,
   renameKey,
   type RenameKeyOptions,
   inGroups,
@@ -898,17 +897,22 @@ export class DelegationMethods {
         : records.every((r) => r.constructor === records[0].constructor)
           ? (records[0].constructor as { modelName: { plural: string } }).modelName.plural
           : "objects");
-    const children = options.children ?? singularize(root);
     const renameOptions: RenameKeyOptions = {
       dasherize: options.dasherize,
       camelize: options.camelize,
     };
-    const rootTag = renameKey(underscore(root), renameOptions);
+    // conversions.rb:200-201: Rails renames the root FIRST, then singularizes
+    // the already-renamed root for the child name — never underscoring the
+    // (already snake_case, or caller-supplied) root string. `to_tag` then
+    // re-applies `rename_key` to each child, which is idempotent since the name
+    // is already in target form.
+    const rootTag = renameKey(root, renameOptions);
+    const children = options.children ?? singularize(rootTag);
     const arrayAttr = skipTypes ? "" : ' type="array"';
 
     const instruct = skipInstruct ? "" : '<?xml version="1.0" encoding="UTF-8"?>\n';
-    // Pass the raw (un-transformed) child name as each record's `:root`; the
-    // record's own `toXml` applies the same `renameKey` transform, so root,
+    // Each record's own `toXml` re-applies the same `renameKey` transform to its
+    // `:root`; passing the already-renamed `children` is idempotent, so root,
     // children, and attribute tags all honor `dasherize:`/`camelize:` uniformly.
     const childOpts = { ...recordOptions, root: children };
 
