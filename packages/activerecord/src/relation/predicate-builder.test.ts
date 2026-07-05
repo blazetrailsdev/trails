@@ -223,6 +223,30 @@ describe("PredicateBuilderTest", () => {
       expect(sql).toMatch(/>= 18/);
       expect(sql).toMatch(/< 65/);
     });
+
+    // No verbatim Rails test for this in isolation: it pins the trails
+    // convergence for Rails' uniform `force_equality?` dispatch at the top of
+    // `PredicateBuilder#build` (predicate_builder.rb:57-69). When the column
+    // type reports `force_equality?(value)` — as OID::Array does for an Array —
+    // the value is bound as a single equality (`col = ?`) BEFORE any handler
+    // dispatch, so an array never reaches ArrayHandler → `IN (...)`. This is the
+    // PG-array case (`where(arrayCol: [1, 2])` → `arr = '{1,2}'`) at unit level.
+    it("forces equality for a force-equality type instead of dispatching to a handler", () => {
+      const builder = new PredicateBuilder(table);
+      const forceEqType = {
+        isForceEquality: (v: unknown) => Array.isArray(v),
+        cast: (v: unknown) => v,
+        serialize: (v: unknown) => v,
+      };
+      (builder as any)._tableContext = { typeForAttribute: () => forceEqType };
+      const node = builder.build(table.get("tags"), [1, 2]);
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
+      // Single equality bind, NOT `IN (?, ?)`.
+      expect(sql).toContain('"posts"."tags" = ?');
+      expect(sql).not.toMatch(/IN \(/);
+      expect(binds).toHaveLength(1);
+      expect((binds[0] as { value: unknown }).value).toEqual([1, 2]);
+    });
   });
 
   describe("buildNegatedFromHash", () => {

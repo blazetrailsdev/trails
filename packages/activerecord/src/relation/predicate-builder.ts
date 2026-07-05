@@ -433,19 +433,23 @@ export class PredicateBuilder {
     if (value === null || value === undefined) {
       return attribute.isNull();
     }
+    // Rails checks `table.type(attribute.name).force_equality?(value)` at the top
+    // of `build` — right after the `id` deref and BEFORE any handler dispatch
+    // (predicate_builder.rb:57-69). So a force-equality value (PG array, PG range,
+    // serialized coder object) never reaches a registered handler. Mirror that
+    // precedence, and run it on the value BEFORE the Set→Array normalization
+    // below: Rails routes a Set through handler_for (ArrayHandler), and
+    // `OID::Array#force_equality?` is `value.is_a?(::Array)` — a Ruby Set is not
+    // an Array, so a Set on an array column force-equalizes in neither Rails nor
+    // here. Normalizing Set→Array first would spuriously trip force-equality.
+    const forceEqNode = this._buildForceEqualityOrNull(attribute, value);
+    if (forceEqNode !== null) return forceEqNode;
     // Normalize Set → Array before dispatch so every code path (custom handlers,
     // explicit Array branch, handlerFor fallback) receives an array. Rails registers
     // Set with ArrayHandler by default (predicate_builder.rb:20).
     if (value instanceof Set) {
       value = Array.from(value);
     }
-    // Rails checks `table.type(attribute.name).force_equality?(value)` at the top
-    // of `build` — BEFORE any handler dispatch (predicate_builder.rb:57-69). So a
-    // force-equality value (PG array, PG range, serialized coder object) never
-    // reaches a registered handler. Mirror that precedence: run the check above
-    // the custom-handler / range / array branches.
-    const forceEqNode = this._buildForceEqualityOrNull(attribute, value);
-    if (forceEqNode !== null) return forceEqNode;
     const customHandler = this.handlers.length > 0 ? this.handlerFor(value) : null;
     if (customHandler && customHandler !== this.basicObjectHandler) {
       return customHandler.call(attribute, value);
