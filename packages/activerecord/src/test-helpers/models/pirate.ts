@@ -14,13 +14,10 @@ import { throwAbort } from "@blazetrails/activesupport";
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
-/**
- * @trails-typegen skip-columns: catchphrase
- * dirty.test.ts overrides `catchphrase` as a get/set accessor pair (TS2611 —
- * a declared property cannot be overridden as an accessor). Suppress this
- * column's schema declare; all association declares still materialize.
- */
 export class Pirate extends Base {
+  declare parrotsLimit: number;
+  declare catchphrase: string;
+
   declare parrot: Parrot | null;
   declare nonValidatedParrot: Parrot | null;
   declare parrots: AssociationProxy<Parrot>;
