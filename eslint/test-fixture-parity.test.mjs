@@ -152,6 +152,12 @@ describe("test-fixture-parity rule", () => {
           errors: [{ messageId: "missing" }],
         },
         {
+          name: "non-empty fixtures() without destructuring → still warns (only fixtures([]) is scope-level)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { fixtures(["customers"]); it("find single value object", () => { expect(1).toBe(1); }); });`,
+          errors: [{ messageId: "missing" }],
+        },
+        {
           name: "sibling describe accessor not visible → warns",
           filename: AR("aggregations.test.ts"),
           code: `describe("A", () => { const { customers } = useFixtures(["c"], () => conn); }); describe("B", () => { it("find single value object", () => { customers("david"); }); });`,
