@@ -215,7 +215,14 @@ export class BelongsToAssociation extends SingularAssociation {
         ? (this.owner as any)._readAttribute(fk)
         : (this.owner as any)[fk],
     );
-    return values.length === 1 ? values[0] : JSON.stringify(values);
+    if (values.length === 1) return values[0];
+    // BigInt FK components (int8 under PG bigserial) can't go through
+    // JSON.stringify ("Do not know how to serialize a BigInt"); fold to their
+    // decimal string, mirroring CollectionAssociation#recordIdentity. The
+    // single-FK branch returns the raw value, so only the composite path needs
+    // this. The key stays deterministic — same source on every read.
+    const ids = values.map((v) => (typeof v === "bigint" ? v.toString() : v));
+    return JSON.stringify(ids);
   }
 
   protected override findTargetNeeded(): boolean {
