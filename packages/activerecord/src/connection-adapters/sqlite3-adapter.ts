@@ -977,7 +977,22 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       }
       return /^\w+\(.*\)$/.test(str) ? ` DEFAULT (${str})` : ` DEFAULT ${str}`;
     }
-    return super.quoteDefaultExpression(value, column);
+    const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
+    return super.quoteDefaultExpression(this.serializeDefaultForColumn(value, sqlType), column);
+  }
+
+  // Rails' abstract quote_default_expression serializes the value through the
+  // column's cast type before quoting (abstract/quoting.rb:157). A structured
+  // default for a `json` column (`default: {}`) must serialize to the JSON text
+  // `{}` rather than being coerced with `String({})` → "[object Object]". Route
+  // object/array defaults through the column type; SqlLiteral and scalars keep
+  // their existing quoting.
+  private serializeDefaultForColumn(value: unknown, sqlType: string | null | undefined): unknown {
+    if (value === null || typeof value !== "object" || isSqlLiteral(value) || !sqlType) {
+      return value;
+    }
+    const castType = this.lookupCastType(sqlType) as { serialize?(v: unknown): unknown };
+    return typeof castType.serialize === "function" ? castType.serialize(value) : value;
   }
 
   override quotedTrue(): string {
@@ -1609,7 +1624,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
     if (options?.null === false) sql += " NOT NULL";
     if (options?.default !== undefined) {
-      sql += ` DEFAULT ${this.quoteDefault(options.default)}`;
+      sql += ` DEFAULT ${this.quoteDefault(this.serializeDefaultForColumn(options.default, sqlType))}`;
     }
     // Invalidate the cached reflection for this table, matching the abstract
     // SchemaStatements#addColumn (which clears before mutating). Without this
