@@ -378,7 +378,14 @@ export class SchemaCreation {
     let sql: string;
     switch (type) {
       case "string":
-        sql = `VARCHAR(${options.limit ?? 255})`;
+        // Rails' sqlite3 `NATIVE_DATABASE_TYPES[:string]` is `{ name: "varchar" }`
+        // with no default length, so a bare `t.string` maps to `varchar` (nil
+        // limit). MySQL/PostgreSQL default an unbounded string to `varchar(255)`.
+        if (this.adapterName === "sqlite") {
+          sql = options.limit != null ? `VARCHAR(${options.limit})` : "VARCHAR";
+        } else {
+          sql = `VARCHAR(${options.limit ?? 255})`;
+        }
         break;
       case "text":
         sql = "TEXT";

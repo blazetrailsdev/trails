@@ -137,16 +137,20 @@ describeIfSqlite("CopyTableTest", () => {
     });
   });
 
-  it.skip("copy table with id col that is not primary key", () => {
-    // BLOCKED: schema-emission — the canonical `goofy_string_id.id` string column
-    // is emitted as `varchar(255)`, so its introspected `limit` is 255 where
-    // Rails' bare `t.string` carries no limit (nil). The test asserts both the
-    // original and copied id columns have a nil limit.
-    // ROOT-CAUSE: defineSchema/SQLite type-mapping appends the default 255 limit
-    // to unbounded string columns; Rails' sqlite3 string maps to `varchar`
-    // without a length.
-    // SCOPE: drop the implicit 255 limit on unbounded string columns for SQLite;
-    // file sqlite3-string-column-no-default-limit.
+  it("copy table with id col that is not primary key", async () => {
+    const conn = (await Base.leaseConnection()) as any;
+    await testCopyTable(conn, "goofy_string_id", "goofy_string_id2", {}, async () => {
+      const originalId = (await conn.columns("goofy_string_id")).find(
+        (col: any) => col.name === "id",
+      );
+      const copiedId = (await conn.columns("goofy_string_id2")).find(
+        (col: any) => col.name === "id",
+      );
+      expect(copiedId.type).toEqual(originalId.type);
+      expect(copiedId.sqlType).toEqual(originalId.sqlType);
+      expect(originalId.limit).toBeNull();
+      expect(copiedId.limit).toBeNull();
+    });
   });
 
   it("copy table with unconventional primary key", async () => {
