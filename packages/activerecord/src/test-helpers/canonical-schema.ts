@@ -2118,7 +2118,7 @@ export async function rebuildCanonicalTables(
   const unknown = [...wanted].filter((n) => !known.has(n));
   if (unknown.length > 0) {
     // Test-helper invariant with no Rails error counterpart — a bare Error is
-    // intentional (mirrors the throws in the sibling schema-types.ts helper).
+    // intentional (mirrors the sibling ensureCanonicalTables throw below).
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(`rebuildCanonicalTables: unknown canonical table(s): ${unknown.join(", ")}`);
   }
