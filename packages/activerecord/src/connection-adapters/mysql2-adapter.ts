@@ -169,33 +169,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     );
   }
 
-  // A never-connected adapter with no failure observed (`_client === null` but
-  // `_activeState` still true) reports `active === false` once the sync getter is
-  // tightened, so the base `verifyBang` would route it through the full
-  // `reconnectBang` (reconnect() close/reopen + retry loop + enableLazyTransactions
-  // + resetTransaction + clearCache + configure) on the first query of every fresh
-  // adapter. reconnect()'s close-and-reopen and the reset/clearCache steps are pure
-  // no-ops on an adapter that has nothing to close and no cache/transaction yet, so
-  // establish the connection lazily via `_ensureClient` and run `configure` directly
-  // — the one step with observable effect. This mirrors Rails' `reconnect!` →
-  // `attempt_configure_connection` guarantee (abstract_adapter.rb:662) without the
-  // spurious teardown/retry churn. A disconnected/failed adapter
-  // (`_activeState === false`, e.g. after disconnectBang) still falls through to the
-  // base reconnect path so its transaction restore + clearCache run as before.
-  override async verifyBang(): Promise<void> {
-    if (
-      this._client === null &&
-      this._activeState &&
-      !this._permanentlyClosed &&
-      !this._isFakeConnection
-    ) {
-      await this._ensureClient();
-      await this.attemptConfigureConnection();
-      this.verifiedBang();
-      return;
-    }
-    await super.verifyBang();
-  }
+  // No verifyBang override: now that the sync `active` getter reflects real
+  // connection state, a never-connected adapter reports inactive and flows
+  // through the inherited base `verifyBang` (abstract-adapter.ts) exactly like
+  // any other inactive adapter — `_unconfiguredConnection` promotion when the
+  // deprecated raw-connection was stashed (mysql2's `_isFakeConnection` path),
+  // otherwise `reconnectBang({ restoreTransactions: true })` with its retry
+  // loop. This mirrors Rails' `verify!` (abstract_adapter.rb:759), which gates
+  // the `attempt_configure_connection`-only shortcut on `@unconfigured_connection`
+  // and routes a genuinely fresh (`@raw_connection == nil`) adapter through the
+  // full retry-capable `reconnect!` — there is no separate "never connected"
+  // shortcut. `Mysql2Adapter#reconnect` closes a nil `_client` as a no-op, so the
+  // full path costs nothing extra on a fresh adapter and gains connect retries.
 
   // Single persistent connection — mirrors Rails' @raw_connection.
   private _client: mysql.Connection | null = null;
