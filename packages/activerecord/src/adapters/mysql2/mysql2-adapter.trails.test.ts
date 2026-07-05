@@ -49,9 +49,13 @@ describe("Mysql2Adapter#translateException (fabricated errors)", () => {
   it("active is false for a never-connected / fake adapter", () => {
     // Rails' Mysql2Adapter#active? is gated on connected? (raw_connection
     // non-nil). A fake or never-connected adapter has no _client, so the sync
-    // getter reports inactive without touching a real DB.
+    // getter — and isConnected() (Rails' connected?) — report inactive without
+    // touching a real DB, preserving the `active ⟹ isConnected` invariant.
     expect(adapter.active).toBe(false);
-    expect(new Mysql2Adapter(MYSQL_TEST_URL).active).toBe(false);
+    expect(adapter.isConnected()).toBe(false);
+    const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
+    expect(fresh.active).toBe(false);
+    expect(fresh.isConnected()).toBe(false);
   });
 
   it("translates connection-loss errnos to ConnectionFailed", () => {
@@ -155,11 +159,14 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
       const fresh = new Mysql2Adapter(MYSQL_TEST_URL);
       try {
         expect(fresh.active).toBe(false);
+        expect(fresh.isConnected()).toBe(false);
         // First query still connects lazily (verifyBang's _ensureClient net).
         await fresh.execQuery("SELECT 1");
         expect(fresh.active).toBe(true);
+        expect(fresh.isConnected()).toBe(true);
         fresh.disconnectBang();
         expect(fresh.active).toBe(false);
+        expect(fresh.isConnected()).toBe(false);
       } finally {
         await fresh.close();
       }

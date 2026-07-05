@@ -153,25 +153,40 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }
   }
 
-  // Mirrors Rails' Mysql2Adapter#connected? — false only after a known
-  // disconnect/close or for fake adapters. A freshly-constructed adapter
-  // with no _client yet is still "connected" in the sense that it will
-  // connect on the next query (matching Rails, which always has @raw_connection
-  // non-nil before the adapter reaches callers).
+  // Mirrors Rails' Mysql2Adapter#connected? — `!(@raw_connection.nil? ||
+  // @raw_connection.closed?)` (mysql2_adapter.rb:104). `_client` is trails'
+  // `@raw_connection`, so a never-connected / disconnected adapter (`_client
+  // === null`) reports NOT connected. This also matches the base adapter's
+  // `isConnected()` (`_connection !== null`) and keeps `active ⟹ isConnected`,
+  // the invariant Rails guarantees by checking `connected?` first inside
+  // `active?`.
   override isConnected(): boolean {
-    return !this._permanentlyClosed && !this._isFakeConnection && this._activeState;
+    return (
+      this._client !== null &&
+      !this._permanentlyClosed &&
+      !this._isFakeConnection &&
+      this._activeState
+    );
   }
 
-  // Now that the sync `active` getter requires `_client !== null`, a
-  // never-connected adapter reports inactive, so the base `verifyBang` would
-  // take the full reconnectBang (reset caches, restore transactions, retry
-  // loop) on the very first query of every fresh adapter. That reset cycle is
-  // spurious when there is simply no connection yet — establish it lazily via
-  // `_ensureClient` (Rails' `connect` on a nil `@raw_connection`) and mark the
-  // adapter verified. A `_client` that already exists but is stale still falls
-  // through to the base path, whose `active` check drives the real reconnect.
+  // A never-connected adapter with no failure observed (`_client === null` but
+  // `_activeState` still true) reported `active === true` before the sync getter
+  // was tightened, so the base `verifyBang` no-op'd and the first query connected
+  // lazily via `_ensureClient` — WITHOUT a reconnectBang/configure cycle. Tightening
+  // `active` now makes that state report inactive, which would route it through the
+  // full reconnectBang (checkVersion + configure + cache/transaction reset) on the
+  // first query of every fresh adapter — behavior that never ran on main. Preserve
+  // the prior path exactly: connect lazily and mark verified. Only the fresh,
+  // no-failure state is intercepted; a disconnected/failed adapter
+  // (`_activeState === false`, e.g. after disconnectBang) falls through to the base
+  // reconnect path so its clearCache/reset/configure still run as before.
   override async verifyBang(): Promise<void> {
-    if (this._client === null && !this._permanentlyClosed && !this._isFakeConnection) {
+    if (
+      this._client === null &&
+      this._activeState &&
+      !this._permanentlyClosed &&
+      !this._isFakeConnection
+    ) {
       await this._ensureClient();
       this.verifiedBang();
       return;
