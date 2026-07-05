@@ -8,6 +8,7 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { isAbortSignal } from "@blazetrails/activesupport";
 import {
+  ArgumentError,
   sanitizeForMassAssignment,
   SerializeCastValue,
   runAfterCallbacksOnProto,
@@ -164,7 +165,7 @@ export function instantiate(
  */
 export function queryConstraints(this: PersistenceHost, ...columns: string[]): void {
   if (columns.length === 0) {
-    throw new Error("You must specify at least one column to be used in querying");
+    throw new ArgumentError("You must specify at least one column to be used in querying");
   }
   this._queryConstraintsList = columns.map(String);
   this._hasQueryConstraints = true;
@@ -432,9 +433,19 @@ interface ToggleBangRecord extends AttributeIO {
 
 /** Mirrors: ActiveRecord::Persistence#increment */
 export function increment<T extends AttributeIO>(this: T, attribute: string, by: number = 1): T {
-  const current = Number(this.readAttribute(attribute)) || 0;
-  this.writeAttribute(attribute, current + by);
+  // Rails increments through `self[attribute]`, which resolves attribute
+  // aliases (e.g. `available_credit` → `credit_limit`) before touching state.
+  const name = resolveAttributeAlias(this, attribute);
+  const current = Number(this.readAttribute(name)) || 0;
+  this.writeAttribute(name, current + by);
   return this;
+}
+
+/** Resolves an attribute alias to its underlying column via `_attributeAliases`. */
+function resolveAttributeAlias(record: object, attribute: string): string {
+  const aliases = (record.constructor as { _attributeAliases?: Record<string, string> })
+    ._attributeAliases;
+  return aliases?.[attribute] ?? attribute;
 }
 
 /**
@@ -474,6 +485,10 @@ export async function incrementBang<T extends CounterBangRecord>(
   if (attribute === undefined) {
     throw new Error("wrong number of arguments (given 0, expected 1..3)");
   }
+  // Resolve the alias once so the in-memory increment, the delta computation,
+  // the `updateCounters` SET clause, and the dirty-clear all target the real
+  // column (Rails resolves via `self[attribute]` / `_write_attribute`).
+  attribute = resolveAttributeAlias(this, attribute);
   this.increment(attribute, by);
   // Rails: `change = public_send(attribute) - public_send(:"#{attribute}_in_database")`
   // — persist the delta between the (already-incremented) in-memory value and
@@ -1216,10 +1231,13 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     get(name: string): unknown;
   };
 
-  // Capture the PK *before* applying attrs — if the caller is updating a
-  // PK column, we still need to target the row by its existing id, not
-  // the new value we're about to write.
-  const originalId = this.id;
+  // Capture the row-locating constraints *before* applying attrs (Rails:
+  // `update_constraints = _query_constraints_hash` precedes `write_cast_value`).
+  // `_query_constraints_hash` keys each query_constraints_list column (or the
+  // primary key when none are declared) to its `*_in_database` value, so a model
+  // with `query_constraints` updates by those persisted columns — not the PK —
+  // and a record updating a constraint/PK column still targets its existing row.
+  const updateConstraints = _queryConstraintsHash.call(this as unknown as PersistencePrivateHost);
 
   // Cast values through their declared attribute types (no dirty tracking —
   // this path bypasses writeAttribute deliberately) and collect the cast
@@ -1237,9 +1255,20 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
         _attributeAliases?: Record<string, string>;
       }
     )._attributeAliases ?? {};
+  // Rails resolves aliases and verifies every key against attr_readonly up
+  // front (`transform_keys { verify_readonly_attribute }`) before writing any
+  // value, so a readonly column raises without mutating the earlier keys.
+  const resolvedEntries = Object.entries(attrs).map(
+    ([rawKey, value]) => [aliases[rawKey] ?? rawKey, value] as const,
+  );
+  for (const [key] of resolvedEntries) {
+    verifyReadonlyAttribute.call(this as unknown as PersistencePrivateHost, key);
+  }
+
   const setPairs: Array<[unknown, unknown]> = [];
-  for (const [rawKey, value] of Object.entries(attrs)) {
-    const key = aliases[rawKey] ?? rawKey;
+  const updatedKeys: string[] = [];
+  for (const [key, value] of resolvedEntries) {
+    updatedKeys.push(key);
     const def = ctor._attributeDefinitions.get(key);
     if (!def && !pkCols.includes(key)) {
       throw new UnknownAttributeError(this, key);
@@ -1274,7 +1303,15 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
   const um = new UpdateManager();
   um.table(table);
   um.set(setPairs as Parameters<UpdateManager["set"]>[0]);
-  um.where(ctor._buildPkWhereNode(originalId));
+  um.where(
+    (
+      ctor as unknown as {
+        _buildQueryConstraintsWhereNode(
+          c: Record<string, unknown>,
+        ): Parameters<UpdateManager["where"]>[0];
+      }
+    )._buildQueryConstraintsWhereNode(updateConstraints),
+  );
   // Mirrors Rails' update_columns → _update_record: an all_queries default
   // scope (and any global current scope) is stacked onto the UPDATE constraints.
   applyDefaultAndGlobalConstraints(um as never, ctor as never);
@@ -1293,7 +1330,15 @@ export async function updateColumns<T extends UpdateColumnsRecord>(
     affectedRows = await adapter.execUpdate(sql, "Update Columns");
   }
 
-  this.changesApplied();
+  // Rails clears the change only for the updated columns (`clear_attribute_change(k)`),
+  // leaving any other pending in-memory changes dirty — not a whole-record
+  // `changes_applied`.
+  const clearer = this as unknown as { clearAttributeChange?(name: string): void };
+  if (typeof clearer.clearAttributeChange === "function") {
+    for (const key of updatedKeys) clearer.clearAttributeChange(key);
+  } else {
+    this.changesApplied();
+  }
   return affectedRows === 1;
 }
 
