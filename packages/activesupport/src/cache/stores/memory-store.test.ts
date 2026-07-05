@@ -84,6 +84,35 @@ describe("CacheIncrementDecrementBehavior", () => {
     expect(cache.decrement("quux", 100)).toBe(-100);
   });
 
+  // The seed path writes `Integer(amount)` (memory_store.rb:248), which raises
+  // FloatDomainError on NaN/Infinity rather than seeding a non-integer entry.
+  it("increment raises on a non-integer amount when seeding a missing key", () => {
+    expect(() => cache.increment("foo", NaN)).toThrow();
+    expect(() => cache.increment("foo", Infinity)).toThrow();
+    // The raise fires before any write, so the key is never seeded.
+    expect(cache.read("foo")).toBeNull();
+  });
+
+  it("decrement raises on a non-integer amount when seeding a missing key", () => {
+    expect(() => cache.decrement("foo", NaN)).toThrow();
+    expect(() => cache.decrement("foo", Infinity)).toThrow();
+    expect(cache.read("foo")).toBeNull();
+  });
+
+  // Rails seeds a missing key with `Integer(amount)` (so `1.5` writes `1`) but
+  // returns the raw `amount` (memory_store.rb:248-249).
+  it("increment seeds with the integer amount but returns the raw amount", () => {
+    expect(cache.increment("frac", 1.5)).toBe(1.5);
+    expect(Number(cache.read("frac"))).toBe(1);
+  });
+
+  // The hit path never calls `Integer()` (memory_store.rb:251): it adds the raw
+  // `amount` to `entry.value.to_i` without truncation.
+  it("increment adds the raw amount on the hit path", () => {
+    cache.write("frac", 1, { raw: true });
+    expect(cache.increment("frac", 2.5)).toBe(3.5);
+  });
+
   it("test_ttl_isnt_updated", async () => {
     expect(cache.increment("foo", 1, { expiresIn: 0.1 })).toBe(1);
     // A second increment with a longer TTL must not reset the original expiry.
