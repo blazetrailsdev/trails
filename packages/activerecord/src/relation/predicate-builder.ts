@@ -438,7 +438,10 @@ export class PredicateBuilder {
     // only need the normalized value to decide nil-routing here; the non-nil
     // value flows to the handler unchanged and is normalized once by the wrapped
     // bind type (so it is not normalized twice). Multi-value forms
-    // (Array/Set/Range/Relation) are normalized per element by their handlers.
+    // (Array/Set/Range/Relation) are left untouched here: their handlers don't
+    // normalize, but each element is normalized downstream when it becomes a
+    // bind — `buildBindAttribute` resolves the wrapped type via `typeForAttribute`
+    // (and `HomogeneousIn#castedValues` serializes through it for the IN path).
     if (this.isScalarQueryValue(value)) {
       const normalized = this.normalizeQueryValue(attribute.name, value);
       if (normalized === null || normalized === undefined) {
@@ -473,13 +476,6 @@ export class PredicateBuilder {
   }
 
   /**
-   * Apply the attribute's normalizer (via its decorated cast type) to a scalar
-   * query value, but only for attributes that declare one — so non-normalized
-   * columns keep their raw query values and existing casting semantics. The
-   * decorated type's `cast` casts then normalizes, mirroring Rails'
-   * `type_for_attribute(name).cast(value)`.
-   */
-  /**
    * A scalar reaches the equality/`basicObjectHandler` path where a single
    * normalized value applies. Multi-value forms (Array/Set/Range/Relation) and
    * StatementCache Substitute placeholders are excluded: their elements are
@@ -498,6 +494,13 @@ export class PredicateBuilder {
     );
   }
 
+  /**
+   * Apply the attribute's normalizer (via its decorated cast type) to a scalar
+   * query value, but only for attributes that declare one — so non-normalized
+   * columns keep their raw query values and existing casting semantics. The
+   * decorated type's `cast` casts then normalizes, mirroring Rails'
+   * `type_for_attribute(name).cast(value)`.
+   */
   private normalizeQueryValue(columnName: string, value: unknown): unknown {
     const klass = (this.table as { klass?: { _normalizations?: Map<string, unknown> } }).klass;
     const normalizations = klass?._normalizations;
