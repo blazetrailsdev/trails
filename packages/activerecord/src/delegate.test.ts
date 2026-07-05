@@ -11,7 +11,7 @@ describe("Delegate (Rails-guided)", () => {
   // D-Y-INCOMPATIBLE: canonical posts table has `body NOT NULL`; tests create Post
   // without body. defineSchema fast-path reuses the canonical table (title+author_id
   // are a subset), so the NOT NULL constraint fires. Phase G: supply body in creates
-  // or migrate to useFixtures().
+  // or migrate to fixtures().
   // Rails: test "delegate to association"
   it.skip("delegates attribute reads to a belongs_to association", async () => {
     class Author extends Base {

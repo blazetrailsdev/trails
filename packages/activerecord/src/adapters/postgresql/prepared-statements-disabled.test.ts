@@ -15,7 +15,7 @@ import { developerFixtureData } from "../../test-helpers/fixtures/developers.js"
 // `developerFixtureData.david` carries the `sharedComputers: ["laptop"]` HABTM
 // association label, which the fixture loader materializes into a
 // `computers_developers` join row. Register Computer at module load so the
-// `sharedComputers` reflection resolves when `useFixtures` slices the schema —
+// `sharedComputers` reflection resolves when `fixtures()` slices the schema —
 // without it the join table is dropped from the slice and the seed insert fails.
 registerModel(Computer);
 
