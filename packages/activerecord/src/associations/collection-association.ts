@@ -968,7 +968,11 @@ export class CollectionAssociation extends Association {
     // `find(id)` argument is a number, and a raw `JSON.stringify` of a BigInt
     // throws outright ("Do not know how to serialize a BigInt"). Normalizing
     // both sides folds `1n` and `1` to the same key so the scan matches the way
-    // Ruby's width-agnostic `Integer ==` does.
+    // Ruby's width-agnostic `Integer ==` does. `normalize` runs over both the
+    // incoming `ids` and each target's `primaryKeyValue(r)`, which returns an
+    // *array* for a composite-PK klass (see `primaryKeyValue`) — hence the
+    // per-element map, so a composite key holding a BigInt doesn't re-introduce
+    // the `JSON.stringify` throw on the target side.
     const normalize = (v: unknown) =>
       JSON.stringify(
         Array.isArray(v) ? v.map(normalizeAssociationKey) : normalizeAssociationKey(v),
