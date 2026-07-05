@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { I18n } from "@blazetrails/activemodel";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 beforeEach(() => {
   I18n.reset();
 });

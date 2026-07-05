@@ -4,16 +4,14 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
 
 // Rails guards test_numeric_fields_with_nan with current_adapter?(:PostgreSQLAdapter):
 // only PostgreSQL's numeric type stores NaN (SQLite/MySQL reject 'NaN'::numeric).
 const itPg = adapterType === "postgres" ? it : it.skip;
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 beforeAll(async () => {
   await NumericData.loadSchema();

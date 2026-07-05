@@ -1,14 +1,12 @@
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import { Base, association, registerModel, Rollback } from "./index.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Mirrors vendor/rails/activerecord/test/models/lesson.rb — `class LessonError`.
 class LessonError extends Error {}
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 describe("HabtmDestroyOrderTest", () => {
   function makeModels() {

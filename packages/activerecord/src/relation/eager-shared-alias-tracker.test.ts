@@ -18,14 +18,12 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("eager build_joins shared AliasTracker", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(async () => {
     registerModel("Post", Post);
     registerModel("Author", Author);

@@ -12,12 +12,10 @@
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 /** Fresh relation per test — the trails analogue of Rails' `Relation.new(FakeKlass)`. */
 function relation(): any {
   return Post.all();

@@ -5,8 +5,7 @@
 import { describe, it, expect, vi } from "vitest";
 import { Base } from "./index.js";
 
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { assertNoQueriesMatch } from "./testing/query-assertions.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -19,8 +18,7 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 // query-free. There is no upstream Rails counterpart — this guards a trails-only
 // cold-cache write-path optimization.
 describe("virtual attribute reconciliation warms the schema cache", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("populates the shared schema cache when reconciling on a cold cache", async () => {
     class Post extends Base {
       static {

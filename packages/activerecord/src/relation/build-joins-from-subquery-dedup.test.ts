@@ -16,14 +16,12 @@
  */
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 
 describe("build_joins from(subquery) dedup", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(async () => {
     // Register the belongsTo("author") target so `joins("author")` resolves
     // during JoinDependency construction.
