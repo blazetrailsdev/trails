@@ -11,7 +11,7 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { InvalidSignature } from "@blazetrails/activesupport/message-verifier";
 import { travel, travelBack } from "@blazetrails/activesupport";
 import { generatesTokenFor, setTokenForSecret } from "./token-for.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 // Rails: class User < ::User { generates_token_for :lookup; … }
 class TokenUser extends User {
@@ -37,7 +37,7 @@ describe("TokenForTest", () => {
   // transaction instrumenter (InstrumentationAlreadyStartedError). Cleaning up
   // with deleteAll in afterEach (the signed-id.test.ts pattern) keeps the shared
   // `users` table isolated without an enclosing transaction.
-  setupFixtures();
+  fixtures([], { useTransactionalTests: false });
   beforeAll(async () => {
     registerModel(Room);
     await TokenUser.loadSchema();

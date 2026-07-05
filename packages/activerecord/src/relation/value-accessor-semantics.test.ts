@@ -9,13 +9,11 @@
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import type { Relation } from "../relation.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 /** The split join-storage and group fields the reader semantics build on. */
 type JoinInternals = {
   _namedInnerJoins: unknown[];

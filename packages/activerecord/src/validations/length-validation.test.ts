@@ -6,18 +6,16 @@
 import { describe, it, expect, beforeAll } from "vitest";
 import "../index.js";
 import { registerModel, association } from "../associations.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Pet } from "../test-helpers/models/pet.js";
 
 describe("LengthValidationTest", () => {
-  setupFixtures();
   // Mirrors Rails `fixtures :owners` — transactional fixtures (per-test
   // BEGIN/ROLLBACK). The owner rows themselves are never read by these tests;
   // every case builds fresh records, exactly like the Rails counterpart's
   // `@owner = Class.new(Owner)` + `@owner.new`.
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   beforeAll(async () => {
     registerModel("Owner", Owner);

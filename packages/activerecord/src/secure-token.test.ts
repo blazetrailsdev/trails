@@ -6,12 +6,10 @@ import { describe, it, expect, beforeAll, beforeEach } from "vitest";
 import { Base } from "./index.js";
 import { User } from "./test-helpers/models/user.js";
 import { hasSecureToken, MinimumLengthError } from "./secure-token.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("SecureTokenTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(async () => {
     await User.loadSchema();
   });
