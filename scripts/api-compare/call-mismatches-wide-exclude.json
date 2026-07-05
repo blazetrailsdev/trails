@@ -24929,6 +24929,20 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql2-adapter.ts",
+    "rubyName": "connect",
+    "call": "new_client",
+    "reason": "Rails' private connect (mysql2_adapter.rb:144) is `@raw_connection = new_client(...)`; trails' connect() delegates to _ensureClient(), which calls Mysql2Adapter.newClient() (the new_client analog) — so the call is satisfied one frame down, not inlined here."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2-adapter.ts",
+    "rubyName": "connect",
+    "call": "set_pool",
+    "reason": "Rails' connect rescues ConnectionNotEstablished and re-raises `ex.set_pool(@pool)` (mysql2_adapter.rb:146-147); trails' connect() delegates to _ensureClient(), whose catch attaches the pool via translated.setPool(this.pool) — same set_pool behavior, one frame down."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2-adapter.ts",
     "rubyName": "disconnect!",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
