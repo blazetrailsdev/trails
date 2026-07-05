@@ -4,6 +4,7 @@ import {
   ref,
   isFixtureRef,
   defineFixtures,
+  effectiveFixtureKey,
   resolveModelForTable,
   FixtureSetPrimaryKeyError,
 } from "./define-fixtures.js";
@@ -49,6 +50,30 @@ describe("fixtureId", () => {
     expect(fixtureId("david")).toBe(127326141);
     expect(fixtureId("david")).toBe(fixtureId("david"));
     expect(fixtureId("david")).not.toBe(fixtureId("mary"));
+  });
+});
+
+describe("effectiveFixtureKey", () => {
+  it("keys an unpinned row on its label-derived id", () => {
+    const model = makeModel("users", new Map());
+    expect(effectiveFixtureKey(model, "grace", {})).toBe("s:" + fixtureId("grace"));
+  });
+
+  it("puts an explicit pin and a colliding derived id in the same keyspace", () => {
+    // A row pinning `id: fixtureId("grace")` must produce the same key as an
+    // unpinned `grace` row, so a cross-kind DB collision is caught.
+    const model = makeModel("users", new Map());
+    const pinned = effectiveFixtureKey(model, "other", { id: fixtureId("grace") });
+    const derived = effectiveFixtureKey(model, "grace", {});
+    expect(pinned).toBe(derived);
+  });
+
+  it("keys on the model's real primary-key column, not a hardcoded id", () => {
+    // Subscriber pins its PK under `nick`; an `id`-based guard would miss it.
+    const model = makeModel("subscribers", new Map(), "nick");
+    expect(effectiveFixtureKey(model, "first", { nick: "alex" })).toBe("s:alex");
+    // A stray `id` value on a nick-keyed model is irrelevant to the PK.
+    expect(effectiveFixtureKey(model, "second", { nick: "bo", id: 1 })).toBe("s:bo");
   });
 });
 

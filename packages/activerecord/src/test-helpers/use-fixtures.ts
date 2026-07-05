@@ -4,6 +4,7 @@ import {
   prepareJoinTableFixtures,
   insertPreparedFixtureSets,
   throughJoinTableNames,
+  effectiveFixtureKey,
   type PreparedFixtureSet,
 } from "./define-fixtures.js";
 import { type Schema } from "./define-schema.js";
@@ -122,17 +123,17 @@ export interface FixturesConnectionOpts {
  * Resolves fixture-set names through the registry into the `[Model, data]` map shape.
  * Model classes are dynamic-imported (see {@link FixtureRegistryEntry}), so this is async.
  *
- * Rejects a request that names two sets backed by the same table (e.g.
- * `deadParrots`/`liveParrots` → `parrots`, `dogs`/`otherDogs` → `dogs`). Each
- * `defineFixtures` call deletes its table before inserting, so seeding both in
- * one call would wipe the first set's rows while leaving its accessor populated
- * with now-deleted instances. Rails loads multiple same-table fixture files by
- * deleting each table once and inserting all sets together; that combined path
- * needs a `defineFixtures` change (build rows per model, delete the shared table
- * once) and is deferred. Until then, load only ONE of the same-table sets in a
- * given test/scope — separate `useFixtures` calls don't help, since each
- * registers its own `beforeEach` loader and the later loader's delete still
- * clobbers the earlier set on every test.
+ * Two requested sets backed by the same table (e.g. `deadParrots`/`liveParrots`
+ * → `parrots`, `dogs`/`otherDogs` → `dogs`) load together in one call: the
+ * loader prepares every set, MERGES their rows per table, and issues a single
+ * `insertFixturesSet` that deletes each table once and inserts all rows together
+ * (see {@link insertPreparedFixtureSets}), mirroring how Rails loads multiple
+ * same-table fixture files (fixtures.rb groups by table then unshifts all rows).
+ * The only rejected case is genuinely-conflicting rows: two same-table sets whose
+ * rows resolve to the same primary key. A row's key is resolved the way the loader
+ * derives it — an explicit pin on the model's real primary-key column, else the
+ * label-derived CRC32 id — in one keyspace, so a pinned id and a colliding derived
+ * id are both caught. Join-table sets (no model) concatenate and are not guarded.
  *
  * @internal
  */
@@ -140,7 +141,12 @@ export async function resolveFixtureNames(
   names: readonly FixtureName[],
 ): Promise<ResolvedFixtureMap> {
   const map: ResolvedFixtureMap = {};
-  const tableToName = new Map<string, string>();
+  // Per-table map of already-claimed primary-key values → a descriptor of the set
+  // (and label) that claimed each, so two same-table sets whose rows resolve to the
+  // same PK are rejected while disjoint sets merge cleanly. The key is the row's
+  // effective PK (explicit pin OR the label-derived CRC32 id, in one keyspace),
+  // computed off the model's real primaryKey column — see effectiveFixtureKey.
+  const tableRowKeys = new Map<string, Map<string, string>>();
   for (const name of names) {
     const entry = fixtureRegistry[name] as (typeof fixtureRegistry)[FixtureName] | undefined;
     if (!entry) {
@@ -174,17 +180,31 @@ export async function resolveFixtureNames(
       table = m.tableName;
       model = m;
     }
-    const prior = tableToName.get(table);
-    if (prior !== undefined) {
-      throw new Error(
-        `useFixtures: "${name}" and "${prior}" both map to table "${table}"; ` +
-          `combined same-table loading isn't supported yet (defineFixtures deletes the ` +
-          `table per set). Load only one of them in this test/scope — splitting across ` +
-          `separate useFixtures calls does not help, since the later loader's delete still ` +
-          `clobbers the earlier set on every test.`,
-      );
+    // Same-table sets merge (each accessor keeps its own rows), but two rows that
+    // resolve to the same primary key would clobber each other — reject that. Only
+    // model-backed sets have a PK; join-table sets (model === null) concatenate.
+    if (model !== null) {
+      let rowKeys = tableRowKeys.get(table);
+      if (rowKeys === undefined) {
+        rowKeys = new Map();
+        tableRowKeys.set(table, rowKeys);
+      }
+      for (const [label, row] of Object.entries(entry.data)) {
+        // Resolve to the row's actual PK value the way the loader does, so an
+        // explicit pin and a label-derived id share one keyspace (see
+        // effectiveFixtureKey). Keyed on the model's real primaryKey column.
+        const key = effectiveFixtureKey(model, label, row);
+        const prior = rowKeys.get(key);
+        if (prior !== undefined) {
+          throw new Error(
+            `useFixtures: ${prior} and "${name}" (${label}) both map to table "${table}" with a ` +
+              `row that resolves to the same primary key; same-table sets load together, but ` +
+              `two rows sharing a primary key collide. Rename the label or change the pinned id.`,
+          );
+        }
+        rowKeys.set(key, `"${name}" (${label})`);
+      }
     }
-    tableToName.set(table, name);
     map[name] = { table, model, data: entry.data };
   }
   return map;
@@ -263,9 +283,9 @@ function useTablelessFixtures(
   getAdapter: () => DatabaseAdapter,
   opts?: UseFixturesOpts,
 ): Record<string, unknown> {
-  // Mirror the same-table duplicate guard in resolveFixtureNames: each
-  // defineJoinTableFixtures call deletes the table before inserting, so a
-  // second entry for the same table would wipe the first entry's rows.
+  // Tableless entries key their accessor by `table`, so two entries on the same
+  // table would clobber each other's store slot. (Model-backed same-table sets in
+  // resolveFixtureNames merge instead, because they key by set name.)
   const seenTables = new Set<string>();
   for (const { table } of entries) {
     if (seenTables.has(table)) {

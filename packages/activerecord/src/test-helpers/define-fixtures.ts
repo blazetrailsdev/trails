@@ -117,6 +117,33 @@ function resolveDeclaredPk(
   );
 }
 
+/**
+ * The primary-key value a fixture row will land on, as a stable string usable for
+ * collision detection across sets that share a table — computed exactly the way
+ * {@link prepareModelFixtures} derives it, so an explicit pin and a label-derived
+ * CRC32 id share ONE keyspace (a row pinning `id: 42` collides with an unpinned
+ * row whose label hashes to 42). Uses the model's declared `primaryKey`, so a
+ * custom-PK model (e.g. Subscriber's `nick`, Dashboard's `dashboard_id`) is keyed
+ * on its real column, not a hardcoded `id`. Composite-PK models fold their key
+ * columns (present values, else `compositeIdentify`) into the string.
+ * @internal
+ */
+export function effectiveFixtureKey(model: BaseClass, label: string, row: FixtureAttrs): string {
+  const pk = model.primaryKey;
+  if (Array.isArray(pk)) {
+    // No adapter here, so unlike prepareModelFixtures this can't drop composite key
+    // columns absent from the table schema (tableColumnNames gate). Harmless for the
+    // known composite fixtures (cpk_orders/cpk_order_tags key columns are all real);
+    // a phantom key column would only over-fold the guard key, never mask a real one.
+    const generated = compositeIdentify(label, pk);
+    return "c:" + JSON.stringify(pk.map((col) => row[col] ?? generated[col]));
+  }
+  // Id-less tables (declared PK is null/undefined) have no PK to collide on; fall
+  // back to the label so two identically-labelled naked rows still flag.
+  if (typeof pk !== "string") return "l:" + label;
+  return "s:" + String(resolveDeclaredPk(model.tableName, pk, label, row[pk]));
+}
+
 const REF_TAG = Symbol("fixture-ref");
 
 export interface FixtureRef {

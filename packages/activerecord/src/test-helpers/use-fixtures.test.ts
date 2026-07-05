@@ -11,7 +11,7 @@ import {
   defineJoinTableFixtures,
   isFixtureRef,
 } from "./define-fixtures.js";
-import { setupFixtures } from "./fixtures.js";
+import { setupFixtures, fixtures } from "./fixtures.js";
 import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { Author } from "./models/author.js";
@@ -724,16 +724,54 @@ describe("fixtureRegistry ref targets", () => {
 });
 
 describe("resolveFixtureNames same-table guard", () => {
-  it("rejects two requested sets that resolve to the same table", async () => {
+  it("resolves two requested sets that map to the same table", async () => {
     // deadParrots + liveParrots are both STI subclasses on the `parrots` table.
-    await expect(resolveFixtureNames(["deadParrots", "liveParrots"])).rejects.toThrow(
-      /both map to table "parrots"/,
+    // They merge into one load now (disjoint labels), so both entries resolve.
+    const map = await resolveFixtureNames(["deadParrots", "liveParrots"]);
+    expect(Object.keys(map)).toEqual(["deadParrots", "liveParrots"]);
+    expect(map.deadParrots.table).toBe("parrots");
+    expect(map.liveParrots.table).toBe("parrots");
+  });
+
+  it("rejects two same-table sets whose rows collide on a primary key", async () => {
+    // dogs (sophie) and otherDogs (lassie) both map to `dogs` and both pin id: 1,
+    // so merging them would collide on the primary key.
+    await expect(resolveFixtureNames(["dogs", "otherDogs"])).rejects.toThrow(
+      /both map to table "dogs" with a row that resolves to the same primary key/,
     );
   });
 
   it("resolves distinct-table sets without error", async () => {
     const map = await resolveFixtureNames(["authors", "posts"]);
     expect(Object.keys(map)).toEqual(["authors", "posts"]);
+  });
+});
+
+// --- same-table multi-set load ---
+
+describe("fixtures() loads multiple same-table fixture sets in one call", () => {
+  // deadParrots + liveParrots are STI subclasses backed by the same `parrots`
+  // table. They load together: the table is deleted once and both sets' rows are
+  // merged into one insert, with each accessor returning its own rows.
+  const { deadParrots, liveParrots } = fixtures(["deadParrots", "liveParrots"]);
+
+  it("resolves a DeadParrot-typed row from the deadParrots accessor", () => {
+    expect(deadParrots("deadbird")).toBeInstanceOf(DeadParrot);
+    expect(deadParrots("deadbird").readAttribute("name")).toBe("Dusty DeadBird");
+  });
+
+  it("resolves a LiveParrot-typed row from the liveParrots accessor", () => {
+    expect(liveParrots("dusty")).toBeInstanceOf(LiveParrot);
+    expect(liveParrots("dusty").readAttribute("name")).toBe("Dusty Bluebird");
+  });
+
+  it("inserts both sets' rows into the shared table", async () => {
+    const rows = (await Base.adapter.execute(
+      `SELECT name FROM ${Base.adapter.quoteTableName("parrots")} ORDER BY name`,
+    )) as { name: string }[];
+    const names = rows.map((r) => r.name);
+    expect(names).toContain("Dusty DeadBird");
+    expect(names).toContain("Dusty Bluebird");
   });
 });
 
