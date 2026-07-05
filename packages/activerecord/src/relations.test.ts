@@ -193,11 +193,12 @@ describe("RelationTest", () => {
     const xml = await baseTopics.toXml({ only: ["id"], methods: ["topicId"] });
     const topics = await Topic.where({ type: null });
     expect(xml).toContain('<topics type="array">');
-    // trails method names are camelCase, so the serialized tag is `topicId`
-    // (Rails' snake_case `topic_id` would dasherize to `topic-id`). The
-    // `type="integer"` attribute is adapter-dependent (PG/MariaDB return the id
-    // as BigInt/string, not JS number), so match the tag agnostically.
-    expect(xml).toMatch(new RegExp(`<topicId[^>]*>${topics[0].id}</topicId>`));
+    // The camelCase method name `topicId` is underscored then dasherized by
+    // `renameKey`, yielding Rails' `<topic-id>` tag (matching Ruby's snake_case
+    // `topic_id` method). The `type="integer"` attribute is adapter-dependent
+    // (PG/MariaDB return the id as BigInt/string, not JS number), so match the
+    // tag agnostically.
+    expect(xml).toMatch(new RegExp(`<topic-id[^>]*>${topics[0].id}</topic-id>`));
   });
 
   it("scoped all", async () => {
