@@ -8,6 +8,7 @@ import {
   type PreparedFixtureSet,
 } from "./define-fixtures.js";
 import { type Schema } from "./define-schema.js";
+import { TEST_SCHEMA } from "./test-schema.js";
 import { ensureCanonicalTables } from "./canonical-schema.js";
 import {
   fixtureRegistry,
@@ -107,8 +108,8 @@ export interface UseFixturesOpts {
 
 export interface FixturesConnectionOpts {
   /**
-   * Caller-supplied connection/adapter thunk. When set, {@link fixtures} /
-   * {@link useHandlerFixtures} seed, clean, and (when transactional) pin fixtures
+   * Caller-supplied connection/adapter thunk. When set, {@link fixtures}
+   * seeds, cleans, and (when transactional) pins fixtures
    * through this connection instead of the default `() => Base.connection`.
    *
    * Mirrors Rails loading a fixture set through a model-specific `connection`
@@ -360,8 +361,8 @@ function useTablelessFixtures(
 /**
  * Vitest helper that inserts fixture rows in a `beforeEach` and cleans them up in `afterEach`.
  *
- * **Internal implementation — test files must call `fixtures()` (or its
- * wrapper {@link useHandlerFixtures}) instead.** This lower-level entry point
+ * **Internal implementation — test files must call {@link fixtures}
+ * instead.** This lower-level entry point
  * takes an explicit `getAdapter` thunk and runs a per-test delete/reseed. It
  * was once a documented escape hatch for suites that could not use the
  * handler-resolved path (non-transactional suites committing across
@@ -369,8 +370,8 @@ function useTablelessFixtures(
  * connections, adapter-owning suites). Every one of those call sites has since
  * converged: non-transactional and caller-supplied-connection needs are now
  * expressed through the `useTransactionalTests` / `connection` options on
- * `fixtures()` / {@link useHandlerFixtures}, which forward the resolved thunk
- * here. It is no longer exported: the only caller is {@link useHandlerFixtures}
+ * {@link fixtures}, which forwards the resolved thunk
+ * here. It is no longer exported: the only caller is {@link fixtures}
  * (below, same module), so no test file can reach the raw engine directly.
  *
  * Returns an object of typed accessor functions — one per fixture set. Each accessor is callable
@@ -596,57 +597,61 @@ function useFixtures(
   return result;
 }
 
+type FixturesOptions = WithTransactionalFixturesOptions & UseFixturesOpts & FixturesConnectionOpts;
+
 /**
- * One-call wiring for handler-path test files that use fixtures.
+ * Rails-faithful public surface for declaring fixtures in a test file — the sole
+ * fixture entry point.
  *
- * Combines {@link setupHandlerSuite} + {@link withTransactionalFixtures} +
- * the module-private `useFixtures` engine into a single call, eliminating the
- * three-line boilerplate that every fixture-backed describe block previously
- * required. The engine lives here (unexported) so no test file can reach it
- * directly — `fixtures()` / `useHandlerFixtures` are the only fixture surfaces.
+ * One-call wiring that combines {@link setupHandlerSuite} +
+ * {@link withTransactionalFixtures} + the module-private `useFixtures` engine,
+ * eliminating the three-line boilerplate every fixture-backed describe block
+ * previously required. The engine lives here (unexported) so no test file can
+ * reach it directly — `fixtures()` is the only fixture surface. Mirrors Rails'
+ * `fixtures :authors, :posts` declaration and the `ActiveRecord::TestCase`
+ * contract where including `TestFixtures`, declaring `fixtures :name`, and
+ * enabling `use_transactional_tests` are a single class-level opt-in.
  *
- * Mirrors the Rails `ActiveRecord::TestCase` contract where including
- * `TestFixtures`, declaring `fixtures :name`, and enabling
- * `use_transactional_tests` are a single opt-in at the class level.
+ * Calling `fixtures()` IS the opt-in to the canonical schema: it defaults
+ * `schema` to `TEST_SCHEMA`, so converted tests never pass `schema` and the
+ * minimal sub-schema for the requested sets is derived automatically. An
+ * explicit `schema` still overrides for sets the canonical schema lacks.
  *
- * @example
- *   const { topics } = useHandlerFixtures({
- *     topics: [Topic, { rails: { title: "Rails" } }],
+ * @example  // primary documented form
+ *   const { authors, posts } = fixtures({
+ *     authors: [Author, { david: { name: "David" } }],
+ *     posts: [Post, { welcome: { title: "Welcome" } }],
  *   });
  *
  * @example  // by registry name
- *   const { customers } = useHandlerFixtures(["customers"]);
+ *   const { authors, posts } = fixtures(["authors", "posts"]);
  *
- * @example  // with usesTransaction opt-out
- *   const { posts } = useHandlerFixtures(["posts"], {
- *     usesTransaction: ["fires after_commit callback"],
- *   });
+ * @example  // non-transactional (Rails `use_transactional_tests = false`)
+ *   const { books } = fixtures(["books", "authors"], { useTransactionalTests: false });
  *
- * @example  // seed through a model-specific / caller-owned connection
- *   const { colleges } = useHandlerFixtures(["colleges"], {
+ * @example  // seed through a caller-supplied connection/adapter
+ *   const { colleges } = fixtures(["colleges"], {
  *     connection: () => College.connection,
  *     useTransactionalTests: false,
  *   });
  *
  * @internal
  */
-export function useHandlerFixtures<M extends FixtureMap>(
+export function fixtures<M extends FixtureMap>(
   fixtures: M,
-  options?: WithTransactionalFixturesOptions & UseFixturesOpts & FixturesConnectionOpts,
+  options?: FixturesOptions,
 ): UseFixturesResult<M>;
-export function useHandlerFixtures<const N extends FixtureName>(
+export function fixtures<const N extends FixtureName>(
   names: readonly N[],
-  options?: WithTransactionalFixturesOptions & UseFixturesOpts & FixturesConnectionOpts,
+  options?: FixturesOptions,
 ): UseFixturesByNameResult<N>;
-export function useHandlerFixtures<const T extends readonly TablelessFixtureEntry[]>(
+export function fixtures<const T extends readonly TablelessFixtureEntry[]>(
   tablelessEntries: T,
-  options?: WithTransactionalFixturesOptions & UseFixturesOpts & FixturesConnectionOpts,
+  options?: FixturesOptions,
 ): UseTablelessFixturesResult<T>;
-export function useHandlerFixtures(
+export function fixtures(
   fixturesOrNames: FixtureMap | readonly FixtureName[] | readonly TablelessFixtureEntry[],
-  options:
-    | (WithTransactionalFixturesOptions & UseFixturesOpts & FixturesConnectionOpts)
-    | undefined = undefined,
+  options: FixturesOptions | undefined = undefined,
 ): Record<string, unknown> {
   const {
     usesTransaction,
@@ -655,6 +660,12 @@ export function useHandlerFixtures(
     connection,
     ...fixtureOpts
   } = options ?? {};
+
+  // Opting into `fixtures()` IS the opt-in to the canonical schema: converted
+  // tests get `TEST_SCHEMA` slice-derivation by default and never pass `schema`
+  // themselves. An explicit `schema` (including `undefined`) still wins for the
+  // few sets the canonical schema doesn't yet cover.
+  const fixtureOptsWithSchema = { schema: TEST_SCHEMA, ...fixtureOpts };
 
   // Caller-supplied connection/adapter thunk wins over the default handler
   // connection: multi-database suites seed through a model-specific
@@ -673,9 +684,5 @@ export function useHandlerFixtures(
     });
   }
 
-  return useFixtures(
-    fixturesOrNames as FixtureMap,
-    getConnection,
-    Object.keys(fixtureOpts).length > 0 ? fixtureOpts : undefined,
-  );
+  return useFixtures(fixturesOrNames as FixtureMap, getConnection, fixtureOptsWithSchema);
 }

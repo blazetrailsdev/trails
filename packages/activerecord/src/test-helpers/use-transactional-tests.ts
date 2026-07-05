@@ -55,7 +55,7 @@ import {
  *
  * NOTE: distinct from the same-named *option field*
  * `WithTransactionalFixturesOptions.useTransactionalTests` (a boolean consumed
- * by `fixtures()` / `useHandlerFixtures` to select the non-transactional mode).
+ * by `fixtures()` to select the non-transactional mode).
  * This is a no-arg opt-in *function*; that is `{ useTransactionalTests: false }`.
  */
 export function useTransactionalTests(options?: WithTransactionalFixturesOptions): void {

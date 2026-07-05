@@ -197,7 +197,7 @@ export interface WithTransactionalFixturesOptions {
 
   /**
    * Mirrors Rails' `self.use_transactional_tests`. Defaults to `true`. When set
-   * to `false`, {@link useHandlerFixtures} / {@link fixtures} skip the
+   * to `false`, {@link fixtures} skips the
    * transactional wrapper entirely: fixtures are seeded and deleted per test via
    * `useFixtures`' own `beforeEach`/`afterEach` (real committed DML, no savepoint
    * pin), so inserts/updates are visible across pooled connections. Required by
