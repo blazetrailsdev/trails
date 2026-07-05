@@ -1,6 +1,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "../index.js";
-import { columnsOf } from "./define-schema.js";
+import { columnsOf } from "./schema-types.js";
 import { setupFixtures } from "./fixtures.js";
 import { TEST_SCHEMA } from "./test-schema.js";
 import { driftedTables, repairWorkerSchema } from "./schema-repair.js";

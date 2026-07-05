@@ -57,7 +57,7 @@ Associations.hasMany.call(Distinct, "values", { through: "groups" });
 setupFixtures();
 
 // `adapter.schemaStatements()` is optional on the adapter interface; fall back
-// to constructing one directly, mirroring define-schema.ts.
+// to constructing one directly, mirroring schema-types.ts.
 function schema(): SchemaStatements {
   return Base.connection.schemaStatements?.() ?? new SchemaStatements(Base.connection);
 }

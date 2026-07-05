@@ -43,7 +43,7 @@
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
-import { columnsOf, type Schema } from "./define-schema.js";
+import { columnsOf, type Schema } from "./schema-types.js";
 
 /** Tables the test harness must never touch — migration + environment state. */
 const PROTECTED_TABLES = new Set(["schema_migrations", "ar_internal_metadata"]);
