@@ -68,6 +68,11 @@ describe("test-fixture-parity rule", () => {
           code: `describe("T", () => { useHandlerTransactionalFixtures(); it("find single value object", () => { expect(1).toBe(1); }); });`,
         },
         {
+          name: "fixtures([]) without destructuring (RFC 0062) → scope-level pass",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { fixtures([]); it("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
           name: "accessor from outer describe used in nested it() → no warning",
           filename: AR("aggregations.test.ts"),
           code: `describe("Outer", () => { const { customers } = useFixtures(["c"], () => conn); describe("Inner", () => { it("find single value object", () => { customers("david"); }); }); });`,

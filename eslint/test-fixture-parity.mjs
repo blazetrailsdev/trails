@@ -7,9 +7,11 @@
  * `const { x } = useFixtures(...)` / `useHandlerFixtures(...)` destructuring
  * anywhere in scope.
  *
- * For `useHandlerTransactionalFixtures()` (no return value) the check falls
- * back to the describe-scope presence check — those tests load fixtures
- * transactionally without a named accessor.
+ * For `useHandlerTransactionalFixtures()` (no return value) — and for a
+ * fixture surface called without destructuring a named accessor, e.g. the
+ * RFC 0062 `fixtures([])` replacement — the check falls back to the
+ * describe-scope presence check: those tests load fixtures transactionally
+ * without a named accessor.
  *
  * Skipped tests (it.skip / it.skipIf / it.todo / test.skip, and anything nested
  * in describe.skip / describe.todo) are exempt — they are the migration backlog
@@ -235,6 +237,13 @@ const rule = {
               accessorsByScope.set(scope, s);
             }
             for (const n of names) s.add(n);
+          } else {
+            // A fixture surface invoked without destructuring a named accessor
+            // (e.g. `fixtures([])`, the RFC 0062 replacement for
+            // `useHandlerTransactionalFixtures()`) still wires the suite in
+            // scope, so — like the transactional helper — it satisfies the
+            // parity check via scope presence without a per-test accessor call.
+            transactionalScopes.add(scope);
           }
           return;
         }

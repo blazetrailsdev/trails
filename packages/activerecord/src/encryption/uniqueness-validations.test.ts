@@ -5,8 +5,7 @@ import {
   restoreEncryptionConfig,
   makeKeyProvider,
 } from "./test-helpers.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
 import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
@@ -16,8 +15,7 @@ import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Relation } from "../relation.js";
 import { Base } from "../index.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 describe("ActiveRecord::Encryption::UniquenessValidationsTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;

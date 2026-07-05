@@ -2,8 +2,7 @@
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Base } from "../index.js";
 import "../relation.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
@@ -17,8 +16,7 @@ import { NullEncryptor } from "./null-encryptor.js";
 import { Configuration as ConfigurationError } from "./errors.js";
 import { RecordInvalid } from "../validations.js";
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 describe("ActiveRecord::Encryption::ContextsTest", () => {
   let configSnapshot: ReturnType<typeof snapshotEncryptionConfig>;
@@ -41,8 +39,8 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     // Models are defined inline (rather than via the makeEncryptedPost /
     // makeEncryptedBook factories) because those factories pin `this.adapter`
     // to a passed adapter, which bypasses the connection handler and would put
-    // writes outside the per-test BEGIN/ROLLBACK savepoint that
-    // useHandlerTransactionalFixtures relies on. The sibling handler-suite
+    // writes outside the per-test BEGIN/ROLLBACK savepoint that the
+    // transactional `fixtures([])` wiring relies on. The sibling handler-suite
     // encryption test (uniqueness-validations.test.ts) hand-rolls models for
     // the same reason. They are also defined after configureEncryption so
     // encrypts() builds the scheme against the configured key material

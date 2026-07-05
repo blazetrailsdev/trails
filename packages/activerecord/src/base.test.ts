@@ -19,8 +19,7 @@ import { connectedToStack } from "./core.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType } from "@blazetrails/activemodel";
 
@@ -30,8 +29,7 @@ vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 // BasicsTest — targets base_test.rb
 // ==========================================================================
 describe("BasicsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   afterEach(() => {
     vi.restoreAllMocks();
   });
@@ -2033,8 +2031,7 @@ describe("BasicsTest", () => {
 // BasicsTest2 — additional coverage for base_test.rb
 // ==========================================================================
 describe("BasicsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   class PostInner extends Base {
     static {
@@ -2153,8 +2150,7 @@ describe("BasicsTest", () => {
 });
 
 describe("BasicsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   // -- Table name inference --
   it("table name guesses", () => {

@@ -2,12 +2,10 @@ import { describe, it, expect } from "vitest";
 
 import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 describe("BasePreventWritesTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   class Bird extends Base {
     static {

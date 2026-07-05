@@ -27,8 +27,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 
 import { describeIfSupports } from "./test-helpers/supports.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 
 import { Pirate } from "./test-helpers/models/pirate.js";
@@ -94,8 +93,7 @@ function checkPirateAfterSaveFailure(pirate: Rec): void {
 }
 
 describe("DirtyTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   // Canonical-schema shield. This suite rides the preloaded canonical tables
   // (people / topics / pirates / parrots / aircraft / numeric_data) rather than
@@ -1185,7 +1183,7 @@ describe("DirtyTest", () => {
 // set is unchanged (PG only).
 // ==========================================================================
 describeIfSupports("identity_columns", "DirtyTest", () => {
-  setupFixtures();
+  fixtures([], { useTransactionalTests: false });
 
   beforeEach(async () => {
     const conn = Base.connection as unknown as {

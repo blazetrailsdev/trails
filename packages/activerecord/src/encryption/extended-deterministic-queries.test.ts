@@ -1,6 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import {
   AdditionalValue,
   EncryptedQuery,
@@ -20,7 +19,7 @@ import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
 
-setupFixtures();
+fixtures([], { useTransactionalTests: false });
 
 // 32 bytes (base64-encoded) for AES-256-GCM. Cipher decodes the key from
 // base64, so we pad a known repeating byte to 32 bytes and encode. Shared
@@ -130,7 +129,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest", () => {
     await books.EncryptedBook.where("1=1");
   });
 
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   afterAll(() => {
     Relation.prototype.where = savedMethods.where as typeof Relation.prototype.where;
