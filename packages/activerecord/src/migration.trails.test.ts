@@ -188,6 +188,10 @@ describe("MigrationTest", () => {
       indexName: (t: string, o: { column?: string | string[]; name?: string }) =>
         ss.indexName(t, o),
       indexNameOptions: (c: string | string[]) => ss.indexNameOptions(c),
+      // addIndex now sources the `_indexes` bookkeeping from the adapter-built
+      // IndexDefinition, so the stub delegates to the real `addIndexOptions`.
+      addIndexOptions: (t: string, c: string | string[], o: Record<string, unknown>) =>
+        ss.addIndexOptions(t, c, o),
       supportsIndexSortOrder: () => true,
     };
     const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
