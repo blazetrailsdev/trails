@@ -432,13 +432,18 @@ export class PredicateBuilder {
       value = (value as { id: unknown }).id;
     }
     // Rails applies the attribute's cast type — including any NormalizedValueType
-    // decoration — to `where`/`find_by` keyword arguments. Normalize the scalar
-    // query value here so a normalizer that maps to nil (e.g. `presence`) routes
-    // through the same `IS NULL` path as an explicit nil, matching
-    // `where(col: nil)`. Multi-value forms (Array/Set/Range/Relation) are left
-    // for their handlers, which normalize each element via the wrapped bind type.
+    // decoration — to `where`/`find_by` keyword arguments. A normalizer that maps
+    // a scalar to nil (e.g. `presence`) must route through the same `IS NULL`
+    // path as an explicit nil so `where(col: "")` matches `where(col: nil)`. We
+    // only need the normalized value to decide nil-routing here; the non-nil
+    // value flows to the handler unchanged and is normalized once by the wrapped
+    // bind type (so it is not normalized twice). Multi-value forms
+    // (Array/Set/Range/Relation) are normalized per element by their handlers.
     if (this.isScalarQueryValue(value)) {
-      value = this.normalizeQueryValue(attribute.name, value);
+      const normalized = this.normalizeQueryValue(attribute.name, value);
+      if (normalized === null || normalized === undefined) {
+        return attribute.isNull();
+      }
     }
     if (value === null || value === undefined) {
       return attribute.isNull();
