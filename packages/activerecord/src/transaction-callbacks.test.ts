@@ -44,8 +44,8 @@ function defineBehaviourTopic() {
   };
 }
 
-// Rails `fixtures :topics, :owners, :pets`. `{ schema }` recreates the canonical
-// tables so sibling-file contamination on the shared worker DB can't leak rows.
+// Rails `fixtures :topics, :owners, :pets`. The canonical tables come from the
+// template clone.
 fixtures(["topics", "owners", "pets"]);
 
 describe("TransactionCallbacksTest", () => {

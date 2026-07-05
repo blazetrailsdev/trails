@@ -22,8 +22,8 @@ registerModel(Topic);
 // NullRelationTest — targets null_relation_test.rb
 // ==========================================================================
 describe("NullRelationTest", () => {
-  // Mirrors Rails `fixtures :posts, :comments`; `{ schema }` recreates the
-  // canonical tables so the suite survives sibling-file contamination.
+  // Mirrors Rails `fixtures :posts, :comments`; the canonical tables come from
+  // the template clone.
   fixtures(["posts", "comments"]);
 
   it("none", async () => {

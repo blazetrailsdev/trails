@@ -29,8 +29,9 @@ afterAll(() => {
 });
 
 describe("DelegatedTypeTest", () => {
-  // Rails: `fixtures :comments, :accounts, :posts`. `{ schema }` recreates the
-  // canonical fixture tables so the suite survives sibling-file contamination.
+  // Rails: `fixtures :comments, :accounts, :posts`. The canonical tables come
+  // from the template clone; the beforeAll below force-recreates them so the
+  // suite survives sibling-file contamination.
   const { comments, accounts, posts } = fixtures(["comments", "accounts", "posts"]);
 
   // Entry/Message/Recipient aren't fixture-loaded (Rails builds them in setup),
@@ -44,10 +45,9 @@ describe("DelegatedTypeTest", () => {
   registerModel("Recipient", Recipient);
 
   beforeAll(async () => {
-    // Force-recreate every canonical table this suite touches. The worker's
-    // canonical schema preload keeps signatures cache-warm, so a plain
-    // schema load (including the fixtures' own `{ schema }` derivation) is a
-    // no-op — meaning a sibling file that physically replaced `posts` with a
+    // Force-recreate every canonical table this suite touches. The tables
+    // already exist from the template clone, so nothing else drops them —
+    // meaning a sibling file that physically replaced `posts` with a
     // reduced shape (e.g. `posts: { title }`, no `body`) would survive into this
     // suite and break fixture seeding. Drop + recreate them verbatim. Covers the
     // fixture tables (`comments`/`accounts`/`posts`) plus the setup-built

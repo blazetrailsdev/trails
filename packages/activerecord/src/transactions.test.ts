@@ -1396,8 +1396,8 @@ describe("TransactionTest", () => {
 // TransactionTest (materialization + savepoint-name determinism) — Rails runs
 // these against a fresh, empty connection. They count exact query sequences and
 // assert savepoint names, so they opt out of the fixture transaction
-// (`usesTransaction`) to begin from a clean connection state, and the canonical
-// `topics` table is recreated for this describe via `{ schema }`.
+// (`usesTransaction`) to begin from a clean connection state; the canonical
+// `topics` table comes from the template clone.
 // ==========================================================================
 describe("TransactionTest", () => {
   fixtures(["topics"], {
