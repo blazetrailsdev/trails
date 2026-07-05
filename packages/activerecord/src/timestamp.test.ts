@@ -8,7 +8,7 @@ import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { travel, travelBack, travelTo } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "./index.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import {
   Developer,
   DeveloperCalledJamis,
@@ -531,7 +531,7 @@ describe("TimestampTest", () => {
 });
 
 describe("TimestampsWithoutTransactionTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   afterEach(async () => {
     const ctx = new MigrationContext(Base.connection);

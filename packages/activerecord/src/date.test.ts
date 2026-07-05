@@ -9,7 +9,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic } from "./test-helpers/models/topic.js";
 
 describe("DateTest", () => {
-  // `fixtures` wires `setupFixtures` internally, so no separate call.
+  // `fixtures` wires the handler suite internally, so no separate call.
   // Rails date_test.rb declares no `fixtures`; wiring the canonical `topics`
   // table lets the file ride the shared Topic model with a real `last_read`
   // date column instead of an inline scratch table that collided under

@@ -20,7 +20,7 @@ import {
   Rollback,
 } from "./index.js";
 import { Result } from "./result.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType, inMemoryDb } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
@@ -520,7 +520,7 @@ describe("AdapterTest", () => {
 // header), so we add it via raw DDL once per worker and tear it down after,
 // then drive the tables directly (Rails sets `use_transactional_tests = false`).
 describe("AdapterForeignKeyTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   const addFkSql = (): string =>
     "ALTER TABLE fk_test_has_fk ADD CONSTRAINT fk_name " +
@@ -1232,7 +1232,7 @@ describe("AdapterThreadSafetyTest", () => {
 // the abstract/sqlite/pg default is false, matching Rails
 // savepoint_errors_invalidate_transactions?.
 describe("InvalidateTransactionTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   // Rails wraps this in `if connection.savepoint_errors_invalidate_transactions?`
   // — a capability guard (true only on MySQL), not an adapter-fidelity gate

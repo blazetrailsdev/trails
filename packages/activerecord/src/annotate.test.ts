@@ -9,7 +9,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
 
 describe("AnnotateTest", () => {
-  // `fixtures` wires `setupFixtures` internally, so no separate call.
+  // `fixtures` wires the handler suite internally, so no separate call.
   // Mirrors Rails `fixtures :posts` — seed the canonical posts rows so each
   // annotated `select(:id)` relation has data to read back with `.first()`
   // (Rails' `assert posts.first`). The canonical `posts` table comes from the

@@ -30,7 +30,7 @@ interface ReflectionHost {
 // same models Rails' strict_loading_test.rb drives (`has_many :audit_logs`,
 // `has_one :ship`, `belongs_to :firm`, `has_and_belongs_to_many :projects`).
 describe("StrictLoadingNewRecordFindTargetTest", () => {
-  // `fixtures` wires `setupFixtures` internally; the `developers`
+  // `fixtures` wires the handler suite internally; the `developers`
   // fixture gives a persisted owner for the unchanged-behavior assertion.
   const { developers } = fixtures(["developers"]);
   // The loaders resolve target classes by name from the registry; register the

@@ -4,7 +4,7 @@
 // Rails test names and assertions as closely as TypeScript allows.
 import { describe, it, expect, afterEach, beforeEach } from "vitest";
 import { registerModel } from "./index.js"; // also eager-loads CollectionProxy for association()
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Topic } from "./test-helpers/models/topic.js";
@@ -575,7 +575,7 @@ describe("QueryCacheTest", () => {
 });
 
 describe("QueryCacheMutableParamTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   // Mirrors Rails' `class JsonObj; self.table_name = "json_objs"; attribute
   // :payload, :json; end` — a scratch table Rails creates in `setup` (not a

@@ -14,7 +14,7 @@ import { adapterType } from "./test-adapter.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { repairWorkerSchema } from "./test-helpers/schema-repair.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
@@ -52,7 +52,7 @@ async function freshContext(): Promise<{ adapter: DatabaseAdapter; ctx: Migratio
 
 // The migration-on-`people` tests (Rails runs `add_column/remove_column
 // "people", "last_name"` through a `Migrator`) need the canonical `people`
-// table materialized before the migrator runs. `setupFixtures()` establishes
+// table materialized before the migrator runs. `fixtures()` establishes
 // the schema-loaded primary pool, so `Base.connection` already carries the
 // canonical `people` table — no hand-built shape required. The afterEach strips
 // the scratch `last_name` column so sibling files see the pristine shape.
@@ -95,12 +95,12 @@ async function personColumnNames(adp: DatabaseAdapter): Promise<string[]> {
 }
 
 // Rails runs every migration test on `ActiveRecord::Base.connection`; ride the
-// schema-loaded primary pool established by `setupFixtures()` rather than a
-// sidecar `_pool` lease (RFC 0059). `setupFixtures()` shields the shared worker
+// schema-loaded primary pool established by `fixtures()` rather than a
+// sidecar `_pool` lease (RFC 0059). `fixtures()` shields the shared worker
 // DB from the global `resetTestAdapterState()`, so this file owns the per-test
 // cleanup of the bespoke tables its `MigrationContext` sub-describes create —
 // see the afterEach/afterAll below and each test's own `finally`.
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 // Mirrors migration_test.rb's teardown, which strips the scratch columns the
 // people-migration tests add back off the shared canonical `people` table and
@@ -230,7 +230,7 @@ describe("MigrationTest", () => {
     ctx.tableNamePrefix = "pre_";
     ctx.tableNameSuffix = "_suf";
     // Own the scratch tables for the whole test: with the global reset shielded
-    // by setupFixtures(), a leaked `pre_old_suf`/`pre_new_suf` would break the
+    // by fixtures(), a leaked `pre_old_suf`/`pre_new_suf` would break the
     // create/rename below, so clear any leak up front and drop in the finally.
     await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     try {
@@ -308,7 +308,7 @@ async function freshAdapter(): Promise<DatabaseAdapter> {
 // ==========================================================================
 // D-1 partial conversion: columnsHash()-only tests drop their adapter assignment
 // (adapter-independent). The 3 DB-operation tests and the DDL sub-describes retain
-// freshAdapterWithPeople()/await freshContext() isolation — adding setupFixtures() here
+// freshAdapterWithPeople()/await freshContext() isolation — adding fixtures() here
 // would call pushSkipGlobalReset() and prevent the per-test DDL cleanup that the
 // MigrationContext-based tests (ReservedWordsMigrationTest, BulkAlterTable, etc.)
 // depend on. Same structural reason as transaction-instrumentation.test.ts.
@@ -750,7 +750,7 @@ describe("MigrationTest", () => {
 
   it("create table with if not exists true", async () => {
     const { ctx } = await freshContext();
-    // With the global reset shielded by setupFixtures(), a leaked `things` from
+    // With the global reset shielded by fixtures(), a leaked `things` from
     // a sibling file would make the first, non-ifNotExists create raise; clear
     // any leak up front and drop in the finally so DDL stays confined here.
     await ctx.dropTable("things", { ifExists: true });
@@ -1495,7 +1495,7 @@ describe("MigrationTest", () => {
       bulkAdapter = await freshAdapter();
     });
     // Each test creates its own uniquely-named `bk*` table; with the global
-    // reset shielded by setupFixtures() they would persist across tests and into
+    // reset shielded by fixtures() they would persist across tests and into
     // sibling files, so drop them here (Rails' teardown drops the ad-hoc table).
     afterEach(async () => {
       const o = { ifExists: true } as const;
@@ -2203,9 +2203,9 @@ function mockMigration(): { migration: Migration; sql: string[] } {
 
 // Connection-fallback tests need a live Base connection pool (Rails leases the
 // migration connection from ActiveRecord::Base), so they run under
-// setupFixtures rather than the await freshAdapter()-per-test MigrationTest block.
+// fixtures() rather than the await freshAdapter()-per-test MigrationTest block.
 describe("MigrationTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   it("migration instance has connection", async () => {
     const migration = new (class extends Migration {})();

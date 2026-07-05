@@ -25,14 +25,14 @@ import { Comment } from "./test-helpers/models/comment.js";
 import { Tag } from "./test-helpers/models/tag.js";
 import { Tagging } from "./test-helpers/models/tagging.js";
 
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import "./associations/collection-proxy.js";
 import "./association-relation.js";
 
 // Establish the worker's canonical template DB for the whole file so the
 // in-memory `Contact` suite below doesn't lazily initialize a bare connection
 // that would shadow the handler clone for the fixture-backed suite.
-setupFixtures();
+fixtures({}, { useTransactionalTests: false });
 
 registerModel(Author);
 registerModel(Post);

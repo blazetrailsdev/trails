@@ -6,7 +6,7 @@ import { Base, registerModel } from "./index.js";
 import { SchemaDumper } from "./schema-dumper.js";
 import { MissingAttributeError } from "@blazetrails/activemodel";
 import { adapterType } from "./test-adapter.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { Topic } from "./test-helpers/models/topic.js";
 import { Reply, SillyReply } from "./test-helpers/models/reply.js";
@@ -422,7 +422,7 @@ describe("PrimaryKeysTest", () => {
 });
 
 describe("PrimaryKeyWithAutoIncrementTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   class AutoIncrement extends Base {
     static _tableName = "auto_increments";
@@ -480,7 +480,7 @@ describe("PrimaryKeyWithAutoIncrementTest", () => {
 });
 
 describe("PrimaryKeyAnyTypeTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   class Barcode extends Base {
     static _tableName = "barcodes";
@@ -684,7 +684,7 @@ describe("CompositePrimaryKeyTest", () => {
 });
 
 describe("PrimaryKeyIntegerNilDefaultTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   beforeEach(async () => {
     await (Base.connection as any).dropTable("int_defaults", { ifExists: true });
@@ -721,7 +721,7 @@ describe("PrimaryKeyIntegerNilDefaultTest", () => {
 });
 
 describe("PrimaryKeyIntegerTest", () => {
-  setupFixtures();
+  fixtures({}, { useTransactionalTests: false });
 
   class Widget extends Base {
     static _tableName = "widgets";
