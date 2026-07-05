@@ -636,9 +636,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // Mirrors Rails' Mysql2Adapter#connect: `rescue ConnectionNotEstablished
         // => ex; raise ex.set_pool(@pool)`. Attach the originating pool (a
         // NullPool for a standalone adapter) so `error.connection_pool` is set
-        // on a connect-time failure.
+        // on a connect-time failure. translateConnectError returns a
+        // ConnectionNotEstablished in every branch but NoDatabaseError; use its
+        // dedicated setPool (which flips the `_poolSet` guard) so a later
+        // setPool on the same object can't silently overwrite it.
         const translated = translateConnectError(err, this._database, this._poolConfig);
-        if (translated instanceof AdapterError) translated.setConnectionPool(this.pool);
+        if (translated instanceof ConnectionNotEstablished) {
+          translated.setPool(this.pool);
+        } else if (translated instanceof AdapterError) {
+          translated.setConnectionPool(this.pool);
+        }
         throw translated;
       },
     );

@@ -672,6 +672,11 @@ export class SchemaStatements {
       index?: boolean;
     } = {},
   ): Promise<void> {
+    // Mirrors ReferenceDefinition#initialize (schema_definitions.rb:214-216):
+    // a foreign key can't target a polymorphic (type-tagged) reference.
+    if (options.polymorphic && options.foreignKey) {
+      throw new ArgumentError("Cannot add a foreign key to a polymorphic relation");
+    }
     // Rails' ReferenceDefinition defaults `type: :bigint`
     // (schema_definitions.rb:204), matching the default `bigint` primary key a
     // referenced table gets — so a reference column lines up with the PK it
