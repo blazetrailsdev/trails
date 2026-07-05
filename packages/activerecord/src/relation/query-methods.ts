@@ -2420,15 +2420,20 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // `SelectManager#as`, so the alias is caller-trusted (same trust model as
     // the set-op branch above). A regex guard here was stricter than Rails and
     // left the two `from(Relation)` paths asymmetric.
-    // When the from-value is a Relation that needs eager loading, derive the
-    // from clause via applyJoinDependency on a clone first (mirrors Rails
-    // build_from). Clone avoids mutating the caller's relation in-place since
-    // applyJoinDependency modifies _joinClauses.
+    // When the from-value is a Relation that needs eager loading (Rails
+    // `opts.eager_loading?`), derive the from clause via
+    // `apply_join_dependency` first (Rails build_from). This folds the eager
+    // `includes`/`eager_load` into LEFT OUTER JOINs so a WHERE that references
+    // the joined table (e.g. `posts.type`) resolves inside the subquery.
+    // `applyJoinDependencyForArel` clones internally, so the caller's relation
+    // is not mutated.
     let resolved: any = opts;
-    if (typeof opts._eagerLoadingForSql === "function" && opts._eagerLoadingForSql()) {
-      resolved = opts._clone
-        ? opts._clone().applyJoinDependency(true)
-        : opts.applyJoinDependency(true);
+    if (
+      typeof opts._eagerLoadingForSql === "function" &&
+      opts._eagerLoadingForSql() &&
+      typeof opts.applyJoinDependencyForArel === "function"
+    ) {
+      resolved = opts.applyJoinDependencyForArel(opts._groupColumns?.length === 0);
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
     // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the
