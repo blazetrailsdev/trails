@@ -199,6 +199,32 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     expect(toIds(await relation.order("id").pluck("id"))).toEqual(POSTS_WITH_COMMENTS);
   });
 
+  it("with joins routes a cte symbol to an inner join", () => {
+    // Rails routes a symbol joins() arg matching a `with(...)` CTE name to a
+    // `build_with_join_node(name, Arel::Nodes::InnerJoin)` join_node
+    // (query_methods.rb:1865-1873), which joins on
+    // `cte[model.foreign_key] = table[model.primary_key]`. trails mirrors this in
+    // `emitJoinPlan`' `selectNamedJoins` block — a `CTEJoin` becomes
+    // `buildWithJoinNode(name, Nodes.InnerJoin)`. Lock the InnerJoin routing: the
+    // CTE symbol must emit an INNER JOIN to the CTE
+    // (`commented_posts.post_id = posts.id`), not a LEFT OUTER JOIN.
+    const sql = (
+      Post.with({
+        commented_posts: Comment.select("post_id").distinct(),
+      }).joins(cteSym("commented_posts")) as unknown as { toSql(): string }
+    ).toSql();
+
+    // Identifier quoting is dialect-specific (`"` on sqlite/pg, backticks on
+    // MariaDB/MySQL), so the quote char is optional in the match.
+    const q = `["\`]?`;
+    expect(sql).toMatch(
+      new RegExp(
+        `INNER JOIN ${q}commented_posts${q} ON ${q}commented_posts${q}\\.${q}post_id${q} = ${q}posts${q}\\.${q}id${q}`,
+      ),
+    );
+    expect(sql).not.toMatch(new RegExp(`LEFT OUTER JOIN ${q}commented_posts${q}`));
+  });
+
   it("with left joins", async () => {
     const relation = Post.with({ commented_posts: Comment.select("post_id").distinct() })
       .joins("LEFT OUTER JOIN commented_posts ON commented_posts.post_id = posts.id")
