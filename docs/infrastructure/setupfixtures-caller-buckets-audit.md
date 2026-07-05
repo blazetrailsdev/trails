@@ -59,11 +59,11 @@ must not be under-scoped:
   transactional setup (`setup_fixtures` / `teardown_fixtures`,
   `vendor/rails/activerecord/lib/active_record/test_fixtures.rb:108-133`), fully
   independent of how — or whether — a suite creates its tables. In Bucket A,
-  ~30 of the 54 files call **no** `createTable()` at all (e.g.
+  **41 of the 54** files call **no** `createTable()` at all (e.g.
   `attribute-methods.test.ts`, `base.test.ts`, most `associations/*`,
-  `validations/*`): they ride the canonical schema. Others create tables via
-  `createTable` or `defineSchema`. The conversion touches only the pair, never
-  the schema setup.
+  `validations/*`): they ride the canonical schema. The remaining 13 create
+  tables via `createTable` or `defineSchema`. The conversion touches only the
+  pair, never the schema setup.
 - **A file may hold several pairs, not one.** The pair is per-`describe`, so
   files split into multiple suites carry one pair each — e.g.
   `attribute-methods.test.ts` and `base.test.ts` have **3** pairs,
