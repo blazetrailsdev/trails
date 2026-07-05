@@ -3598,6 +3598,14 @@ export class Relation<T extends Base> {
     // "Invalid association spec". A JoinDependency already in the values is
     // stashed into `leftStashed`; the constructed left-outer JD is `unshift`ed
     // ahead of it (query_methods.rb:1843: `stashed_left_joins.unshift`).
+    //
+    // Rails pushes the CTE join_node in the left-outer section (query_methods.rb:1832)
+    // BEFORE the `joins_values` loop appends its nodes to the same bucket
+    // (query_methods.rb:1852-1863), so `buckets[:join_node]` is
+    // `[...cteNodes, ...joinsValuesNodes]`. Here the `_joinValues` loop already
+    // ran and populated `joinNodes`, so collect the CTE nodes separately and
+    // `unshift` them to the front to preserve that Rails order.
+    const cteOuterJoinNodes: Nodes.Join[] = [];
     const leftStashed: JoinDependency[] = [];
     const leftAssociations = _qm.selectNamedJoins.call(
       this as any,
@@ -3605,7 +3613,7 @@ export class Relation<T extends Base> {
       leftStashed,
       (left: unknown) => {
         if (left instanceof _qm.CTEJoin) {
-          joinNodes.push(
+          cteOuterJoinNodes.push(
             _qm.buildWithJoinNode.call(this as any, left.name, Nodes.OuterJoin) as Nodes.Join,
           );
         } else {
@@ -3613,6 +3621,7 @@ export class Relation<T extends Base> {
         }
       },
     );
+    if (cteOuterJoinNodes.length > 0) joinNodes.unshift(...cteOuterJoinNodes);
     const leftOuterJd =
       leftAssociations.length > 0
         ? QueryMethodBangs.constructJoinDependency.call(

@@ -247,6 +247,29 @@ describeIfSupports("common_table_expressions", "WithTest", () => {
     expect(sql).not.toMatch(new RegExp(`INNER JOIN ${q}commented_posts${q}`));
   });
 
+  it("with left joins routes a cte symbol before a raw joins node", () => {
+    // Rails' build_join_buckets pushes the CTE join_node in the left-outer
+    // section (query_methods.rb:1832) BEFORE the joins_values loop appends its
+    // nodes to the same bucket (query_methods.rb:1852-1863), so the CTE LEFT
+    // OUTER JOIN precedes a raw `.joins("...")` node in the emitted SQL. Lock
+    // that order on the live path when both are present.
+    const relation = Post.with({
+      commented_posts: Comment.select("post_id").distinct(),
+    })
+      .joins("INNER JOIN authors ON authors.id = posts.author_id")
+      .leftOuterJoins(cteSym("commented_posts"))
+      .select("posts.id");
+
+    const sql = (relation as unknown as { toSql(): string }).toSql();
+
+    const q = `["\`]?`;
+    const cteJoin = sql.search(new RegExp(`LEFT OUTER JOIN ${q}commented_posts${q}`));
+    const rawJoin = sql.search(/INNER JOIN authors/);
+    expect(cteJoin).toBeGreaterThanOrEqual(0);
+    expect(rawJoin).toBeGreaterThanOrEqual(0);
+    expect(cteJoin).toBeLessThan(rawJoin);
+  });
+
   it("raises when using block", () => {
     // Rails passes a literal block (`Post.with(attributes_for_inspect: :id) { }`);
     // the TS equivalent of a Ruby block is a trailing function argument.
