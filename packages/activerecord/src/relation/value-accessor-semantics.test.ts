@@ -8,6 +8,7 @@
  * than mirrored from a metaprogrammed Rails test.
  */
 import { describe, it, expect } from "vitest";
+import { Nodes } from "@blazetrails/arel";
 import "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -19,6 +20,7 @@ type JoinInternals = {
   _namedInnerJoins: unknown[];
   _joinValues: unknown[];
   _groupColumns: string[];
+  _orderClauses: unknown[];
 };
 
 function relation(): Relation<Post> {
@@ -87,6 +89,21 @@ describe("Relation value accessor Rails semantics", () => {
   it("group_values returns the stored reference", () => {
     const rel = relation().group("title");
     expect(rel.groupValues).toBe(internals(rel)._groupColumns);
+  });
+
+  it("order_values returns the stored reference", () => {
+    const rel = relation().order("title");
+    expect(rel.orderValues).toBe(internals(rel)._orderClauses);
+  });
+
+  it("order_values stores a raw SQL bind ordering as an Arel SqlLiteral node", () => {
+    // Bind-array form [Arel.sql("... ?"), bind]: the interpolated raw SQL is
+    // stored as a SqlLiteral node directly, so the reader returns it by
+    // reference (no on-read normalization).
+    const rel = relation().order([new Nodes.SqlLiteral("id = ?"), 1]);
+    expect(rel.orderValues).toBe(internals(rel)._orderClauses);
+    expect(rel.orderValues[0]).toBeInstanceOf(Nodes.SqlLiteral);
+    expect((rel.orderValues[0] as Nodes.SqlLiteral).value).toBe("id = 1");
   });
 
   it("select_values returns the shared frozen empty array when unset", () => {
