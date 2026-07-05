@@ -206,7 +206,11 @@ describe("SchemaDumperAdapterTest", () => {
     expect(result).toContain("horses");
     expect(result).toContain('"title"');
     expect(result).toContain('"body"');
-  });
+    // Adapter-introspection dumps walk the entire canonical schema (~200
+    // tables) on the shared PG worker DB; under 6-fork parallel load this
+    // legitimately exceeds vitest's 5s default. Bump to 60s (I/O contention,
+    // not a logic bug). See project_schema_dumper_trails_pg_schema_migrations_flake.
+  }, 60000);
 
   it("dumps schema with indexes from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
@@ -217,7 +221,7 @@ describe("SchemaDumperAdapterTest", () => {
     const result = await TopLevelDumper.dump(adapter);
     expect(result).toContain("addIndex");
     expect(result).toContain("index_testings_on_post_id");
-  });
+  }, 60000);
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
@@ -226,7 +230,7 @@ describe("SchemaDumperAdapterTest", () => {
     });
     const result = await TopLevelDumper.dump(adapter);
     expect(result).toMatch(/t\.datetime\("happened_at"[^}]*precision\s*:\s*null/);
-  });
+  }, 60000);
 
   it("adapter-backed dump preserves explicit string limit through AdapterSchemaSource", async () => {
     // Guards the U2 type/sqlType split: emitTable resolves the limit from the
@@ -239,7 +243,7 @@ describe("SchemaDumperAdapterTest", () => {
     });
     const result = await TopLevelDumper.dump(adapter);
     expect(result).toMatch(/t\.string\("code"[^}]*limit\s*:\s*10/);
-  });
+  }, 60000);
 
   it("skips internal tables when dumping from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
@@ -254,7 +258,7 @@ describe("SchemaDumperAdapterTest", () => {
     expect(result).toContain("reminders");
     expect(result).not.toContain("schema_migrations");
     expect(result).not.toContain("ar_internal_metadata");
-  });
+  }, 60000);
 
   it("dumpWithVersion defaults to 0 when no versions recorded", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
@@ -264,18 +268,23 @@ describe("SchemaDumperAdapterTest", () => {
     await sm.deleteAllVersions();
     const result = await TopLevelDumper.dumpWithVersion(adapter);
     expect(result).toContain("Schema version: 0");
-  });
+  }, 60000);
 
   it("dumpWithVersion includes latest migration version", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     const { SchemaMigration } = await import("./schema-migration.js");
     const sm = new SchemaMigration(adapter);
     await sm.createTable();
+    // schema_migrations survives per-file truncation (truncate skips it by
+    // design), so a prior run's version row can survive in the shared PG
+    // worker DB and collide on schema_migrations_pkey. Clear first to keep
+    // this test hermetic — same guard the sibling "defaults to 0" test uses.
+    await sm.deleteAllVersions();
     await sm.recordVersion("20240101000000");
     await sm.recordVersion("20240201000000");
     const result = await TopLevelDumper.dumpWithVersion(adapter);
     expect(result).toContain("Schema version: 20240201000000");
-  });
+  }, 60000);
 
   it("emitTable forwards comment from fetchTableOptions into createTable options", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
