@@ -2305,35 +2305,40 @@ export class MigrationContext {
     // was actually persisted: partial `WHERE` (dropped on MySQL), sort order
     // (version-gated on MySQL/MariaDB — the #4397 reconstruct parity, warmed
     // above via `getDatabaseVersion`), and `NULLS NOT DISTINCT` / covering
-    // `INCLUDE` (Postgres). `using` is stored only for Postgres, where a
-    // non-default access method round-trips (the dumper drops the `btree`
-    // default).
-    const supports = (
-      name:
-        | "supportsPartialIndex"
-        | "supportsIndexSortOrder"
-        | "supportsNullsNotDistinct"
-        | "supportsIndexInclude",
-      fallback: boolean,
-    ): boolean =>
-      typeof this.connection[name] === "function" ? this.connection[name]() : fallback;
+    // `INCLUDE` (Postgres). The `typeof` guards keep this resilient to the
+    // minimal stub adapters some tests pass. `using` has no adapter-level
+    // capability predicate (`supportsIndexUsing?` lives on the SchemaCreation),
+    // so it stays keyed on Postgres, where a non-default access method
+    // round-trips (the dumper drops the `btree` default).
+    const supportsPartialIndex =
+      typeof this.connection.supportsPartialIndex === "function"
+        ? this.connection.supportsPartialIndex()
+        : true;
+    const supportsSortOrder =
+      typeof this.connection.supportsIndexSortOrder === "function"
+        ? this.connection.supportsIndexSortOrder()
+        : true;
+    const supportsNullsNotDistinct =
+      typeof this.connection.supportsNullsNotDistinct === "function"
+        ? this.connection.supportsNullsNotDistinct()
+        : false;
+    const supportsIndexInclude =
+      typeof this.connection.supportsIndexInclude === "function"
+        ? this.connection.supportsIndexInclude()
+        : false;
     const comment = idx.comment?.trim() ? idx.comment : undefined;
     if (!this._indexes.has(table)) this._indexes.set(table, []);
     this._indexes.get(table)!.push({
       columns: idx.columns,
       unique: idx.unique,
       name: idx.name,
-      where: supports("supportsPartialIndex", true) ? idx.where : undefined,
-      orders: supports("supportsIndexSortOrder", true)
-        ? _emptyOptionToUndefined(idx.orders)
-        : undefined,
+      where: supportsPartialIndex ? idx.where : undefined,
+      orders: supportsSortOrder ? _emptyOptionToUndefined(idx.orders) : undefined,
       using: an === "postgres" && idx.using && idx.using !== "btree" ? idx.using : undefined,
       type: idx.type,
       lengths: _emptyOptionToUndefined(idx.lengths),
-      nullsNotDistinct: supports("supportsNullsNotDistinct", false)
-        ? idx.nullsNotDistinct
-        : undefined,
-      include: supports("supportsIndexInclude", false) ? idx.include : undefined,
+      nullsNotDistinct: supportsNullsNotDistinct ? idx.nullsNotDistinct : undefined,
+      include: supportsIndexInclude ? idx.include : undefined,
       comment,
     });
   }
