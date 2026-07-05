@@ -1107,6 +1107,48 @@ function replaceCommonRecordsInMemory(
   }
 }
 
+/**
+ * Rails `replace_on_target`'s pre-`yield` half: the index lookup, `before_add`
+ * abort check, `set_inverse_instance`, and `@association_ids` reset. Returns the
+ * replace index (`-1` when appending) or `null` when `before_add` aborted the
+ * add (Rails' `catch(:abort) { ... } || return`). Shared by the sync
+ * `replaceOnTarget` and the async `replaceOnTargetAsync` so both stay in parity.
+ * @internal
+ */
+function beginReplaceOnTarget(
+  assoc: CollectionAssociation,
+  record: Base,
+  skipCallbacks: boolean,
+  replace: boolean,
+): number | null {
+  const index = replace ? assoc.target.indexOf(record) : -1;
+  if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
+  assoc.setInverseInstance(record);
+  (assoc as any)._associationIds = null;
+  return index;
+}
+
+/**
+ * Rails `replace_on_target`'s post-`yield` half: the target mutation and
+ * `after_add` callback.
+ * @internal
+ */
+function finishReplaceOnTarget(
+  assoc: CollectionAssociation,
+  record: Base,
+  skipCallbacks: boolean,
+  index: number,
+): Base {
+  const target = assoc.target;
+  if (index !== -1) {
+    target[index] = record;
+  } else {
+    target.push(record);
+  }
+  if (!skipCallbacks) callback(assoc, "afterAdd", record);
+  return record;
+}
+
 /** @internal */
 function replaceOnTarget(
   assoc: CollectionAssociation,
@@ -1114,28 +1156,9 @@ function replaceOnTarget(
   skipCallbacks: boolean,
   replace: boolean,
 ): Base | null {
-  const replaced = assoc as any;
-  let index = -1;
-  if (replace) {
-    index = assoc.target.indexOf(record);
-  }
-
-  // Rails: catch(:abort) { callback(:before_add, record) } || return unless skip_callbacks
-  if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
-
-  assoc.setInverseInstance(record);
-  replaced._associationIds = null;
-
-  const target = assoc.target;
-  if (index !== -1) {
-    target[index] = record;
-  } else {
-    target.push(record);
-  }
-
-  if (!skipCallbacks) callback(assoc, "afterAdd", record);
-
-  return record;
+  const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
+  if (index === null) return null;
+  return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
 }
 
 /**
@@ -1152,29 +1175,10 @@ async function replaceOnTargetAsync(
   replace: boolean,
   save?: () => Promise<void>,
 ): Promise<Base | null> {
-  const replaced = assoc as any;
-  let index = -1;
-  if (replace) {
-    index = assoc.target.indexOf(record);
-  }
-
-  if (!skipCallbacks && !callback(assoc, "beforeAdd", record)) return null;
-
-  assoc.setInverseInstance(record);
-  replaced._associationIds = null;
-
+  const index = beginReplaceOnTarget(assoc, record, skipCallbacks, replace);
+  if (index === null) return null;
   if (save) await save();
-
-  const target = assoc.target;
-  if (index !== -1) {
-    target[index] = record;
-  } else {
-    target.push(record);
-  }
-
-  if (!skipCallbacks) callback(assoc, "afterAdd", record);
-
-  return record;
+  return finishReplaceOnTarget(assoc, record, skipCallbacks, index);
 }
 
 /**
