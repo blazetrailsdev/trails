@@ -9,14 +9,12 @@
  */
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { Base, registerModel } from "./index.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
 import { Comment as CanonicalComment } from "./test-helpers/models/comment.js";
 
 describe("CounterCacheTest (trails)", () => {
-  setupFixtures();
   fixtures(["posts", "comments"], { schema: canonicalSchema });
   beforeAll(() => {
     registerModel(CanonicalPost);
@@ -37,8 +35,7 @@ describe("CounterCacheTest (trails)", () => {
 });
 
 describe("CounterCacheTest deferred resolution (trails)", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   afterAll(async () => {
     const { modelRegistry } = await import("./associations.js");
     modelRegistry.delete("Reply");

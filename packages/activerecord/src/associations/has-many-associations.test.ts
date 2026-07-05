@@ -43,8 +43,7 @@ import {
 import { DeleteRestrictionError } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
-import { fixtures, setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 // Imported under HM-prefixed local aliases so the top-level bindings don't
 // collide with the bespoke `class Author` / `class Post` declarations in the
 // still-unconverted describes below. Without the alias, esbuild renames those
@@ -333,8 +332,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTestForReorderWithJoinDependency", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("should generate valid sql", () => {
     class Post extends Base {
@@ -729,8 +727,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   // -- Destroying --
   // `test_destroying`, `test_destroying_by_integer_id`,
   // `test_destroying_by_string_id`, and `test_destroying_a_collection` live in
@@ -1081,7 +1078,6 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  useHandlerTransactionalFixtures();
   const { companies } = fixtures(["companies"]);
   beforeAll(async () => {
     // A sibling test file may have warmed the shared schema cache for `bulbs`
@@ -1274,8 +1270,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   // -- Scoped queries --
 
@@ -6344,8 +6339,7 @@ describe("HasManyAssociationsTest", () => {
 // means each test runs inside BEGIN/ROLLBACK against the ambient canonical
 // tables rather than rebuilding them.
 describe("HasManyAssociationsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   beforeAll(() => {
     registerModel(HmAuthor);
@@ -6555,8 +6549,7 @@ describe("HasManyAssociationsTest", () => {
 // scope applies), `:all_bulbs` (unscope where:name), `:other_bulbs`
 // (unscope + rewrite), `:old_bulbs` (rewhere).
 describe("HasManyAssociationsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(async () => {
     registerModel(HmCar);
     registerModel(HmBulb);
@@ -7164,8 +7157,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   // Regression for HasManyAssociation#deleteRecords (the association-layer
   // `delete`, reached only via `record.association(name)` for a non-through

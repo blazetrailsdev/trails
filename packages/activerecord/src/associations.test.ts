@@ -9,8 +9,7 @@ import { describe, it, expect, afterEach, beforeAll, beforeEach, vi } from "vite
 import { Base, association, reflectOnAssociation, registerModel, NameError, pp } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { captureSql } from "./testing/sql-capture.js";
-import { fixtures, setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { TEST_SCHEMA as canonicalSchema } from "./test-helpers/test-schema.js";
 import { Author, type Author as AuthorT } from "./test-helpers/models/author.js";
 import { CpkOrder, CpkBook } from "./test-helpers/models/cpk.js";
@@ -69,8 +68,7 @@ function expectQuotedColumnInSql(
 }
 
 describe("AssociationsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(() => {
     registerModel("CpkOrder", CpkOrder);
     registerModel("CpkBook", CpkBook);
@@ -394,8 +392,7 @@ describe("AssociationProxyTest", () => {
 });
 
 describe("PreloaderTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   afterEach(() => vi.restoreAllMocks());
 
@@ -1582,13 +1579,12 @@ describe("PreloaderTest", () => {
 });
 
 describe("OverridingAssociationsTest", () => {
-  // Tests are synchronous reflection checks — no DB queries. setupFixtures +
-  // useHandlerTransactionalFixtures keep _skipGlobalResetDepth > 0 so the global
-  // beforeEach does not call resetTestAdapterState() (dropAllTables) between tests,
-  // which would silently drop canonical tables (cpk_order_agreements, cpk_cars, etc.)
-  // needed by the later AssociationsTest describe block.
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  // Tests are synchronous reflection checks — no DB queries. fixtures([]) keeps
+  // _skipGlobalResetDepth > 0 so the global beforeEach does not call
+  // resetTestAdapterState() (dropAllTables) between tests, which would silently
+  // drop canonical tables (cpk_order_agreements, cpk_cars, etc.) needed by the
+  // later AssociationsTest describe block.
+  fixtures([]);
 
   // Mirrors Rails' nested DifferentPerson / PeopleList / DifferentPeopleList classes.
   // vendor/rails/activerecord/test/cases/associations_test.rb:710
@@ -1763,7 +1759,6 @@ describe("WithAnnotationsTest", () => {
     }
   }
 
-  setupFixtures();
   const { pirates } = fixtures(
     ["pirates", "parrots", "parrotsPirates", "ships", "treasures", "priceEstimates"],
     { schema: canonicalSchema },
