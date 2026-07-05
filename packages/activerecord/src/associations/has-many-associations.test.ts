@@ -4942,6 +4942,9 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length === 1).toBe(false);
   });
   it("joins with namespaced model should use correct type", async () => {
+    // With storeFullStiClass on, the join to :clients must scope by the full STI
+    // name (type = 'Namespaced::Client'); if it demodulized to 'Client' the join
+    // would match no rows and num_clients would come back 0 instead of 1.
     const old = Base.storeFullStiClass;
     Base.storeFullStiClass = true;
     try {
