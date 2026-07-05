@@ -104,24 +104,6 @@ export function normalize(normalizedType: NormalizedValueType, value: unknown): 
   return normalizedType.normalizer(value);
 }
 
-/**
- * For each normalized attribute that changed in place, re-normalize its value.
- *
- * Mirrors: ActiveRecord::Normalization#normalize_changed_in_place_attributes (private)
- *
- * @internal
- */
-export function normalizeChangedInPlaceAttributes(record: any): void {
-  // Rails: self.class.normalized_attributes (Set from class_attribute).
-  // TS activemodel stores normalizations in Model._normalizations (Map<string, ...>).
-  const normalizations: Map<string, unknown> | undefined = record.constructor?._normalizations;
-  if (!normalizations) return;
-  for (const name of normalizations.keys()) {
-    if (
-      typeof record.attributeChangedInPlace === "function" &&
-      record.attributeChangedInPlace(name)
-    ) {
-      record.normalizeAttribute(name);
-    }
-  }
-}
+// `normalize_changed_in_place_attributes` lives on ActiveModel::Model
+// (`Model.prototype.normalizeChangedInPlaceAttributes`) and is wired onto Base
+// there; base.ts references that single implementation directly.

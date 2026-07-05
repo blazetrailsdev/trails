@@ -195,10 +195,7 @@ import {
   idBeforeTypeCast as _idBeforeTypeCast,
   isSavedChanges as _isSavedChanges,
 } from "./attribute-methods.js";
-import {
-  normalizeChangedInPlaceAttributes as _normalizeChangedInPlaceAttributesFn,
-  normalizedAttributes as _normalizedAttributes,
-} from "./normalization.js";
+import { normalizedAttributes as _normalizedAttributes } from "./normalization.js";
 import {
   toKey as _toKey,
   getId as _getId,
@@ -4852,10 +4849,11 @@ include(Base, {
   hasDeferTouchAttrs(this: Base) {
     return TouchLater.hasDeferTouchAttrs(this);
   },
-  // normalizeChangedInPlaceAttributes is not on Model; safe to wire.
-  normalizeChangedInPlaceAttributes(this: Base) {
-    return _normalizeChangedInPlaceAttributesFn(this);
-  },
+  // normalizeChangedInPlaceAttributes now lives on Model.prototype (this PR wires
+  // the before_validation there). Reference it directly so api:compare credits
+  // base.ts without a wrapper that would shadow — and diverge from — the single
+  // Model implementation.
+  normalizeChangedInPlaceAttributes: Model.prototype.normalizeChangedInPlaceAttributes,
   // normalizeAttribute lives on Model.prototype (inherited). Wire via direct
   // prototype reference so api:compare credits it to base.ts without shadowing
   // Model's implementation via a wrapper that would create a circular call.
