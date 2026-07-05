@@ -13,6 +13,8 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { CpkBook, CpkOrder, CpkCar, CpkCarReview } from "./test-helpers/models/cpk.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Categorization } from "./test-helpers/models/categorization.js";
+import { Pirate } from "./test-helpers/models/pirate.js";
+import { Parrot } from "./test-helpers/models/parrot.js";
 
 // Dynamic column reads/writes (FK/counter-cache columns and the generated
 // `*Attributes=` setters vary per model and are not statically declared), kept
@@ -103,5 +105,33 @@ describe("nested attributes (trails-only)", () => {
     expect(cols(reviews[0]).comment).toBe("zippy");
     expect(cols(reviews[0]).car_make).toBe("Honda");
     expect(cols(reviews[0]).car_model).toBe("Civic");
+  });
+});
+
+describe("nested attributes flush path alias resolution (trails-only)", () => {
+  fixtures({
+    pirates: [Pirate, {}],
+    parrots: [Parrot, {}],
+  });
+
+  // The post-save flush (`processNestedAttributes`) routes an existing-record
+  // update through `existing.update(childAttrs)`. The alias-backed key `title`
+  // (aliasAttribute("title", "name")) has a real writer, so it must update the
+  // record rather than raise UnknownAttributeError — matching the build path,
+  // which Rails' `assign_attributes` → `_assign_attribute` also resolves.
+  it("updates an existing record via an alias-backed nested key on the flush path", async () => {
+    Pirate.acceptsNestedAttributesFor("parrot");
+
+    const parrot = await Parrot.createBang({ name: "Original" });
+    const pirate = await Pirate.createBang({
+      catchphrase: "Arr",
+      parrot_id: readAttr(parrot, "id"),
+    });
+
+    cols(pirate).parrotAttributes = { id: readAttr(parrot, "id"), title: "Renamed" };
+    await pirate.save();
+
+    const reloaded = await Parrot.find(readAttr(parrot, "id"));
+    expect(readAttr(reloaded, "name")).toBe("Renamed");
   });
 });
