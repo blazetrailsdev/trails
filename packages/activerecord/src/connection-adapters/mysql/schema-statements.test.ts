@@ -19,6 +19,7 @@ import {
   foreignKeys,
   indexes,
   parseMysqlName,
+  columns,
   MysqlSchemaStatements,
 } from "./schema-statements.js";
 import { quote } from "./quoting.js";
@@ -491,6 +492,50 @@ describe("MySQL::SchemaStatements", () => {
     );
     expect(idx[0].columns).toEqual(["(lower(`title`))"]);
     expect(idx[0].orders).toEqual({ "(lower(`title`))": "desc" });
+  });
+});
+
+describe("MySQL::SchemaStatements#columns primary flag", () => {
+  // Minimal IntrospectionHost for columns(): stub schemaQuery to return the
+  // information_schema.columns rows MySQL yields, plus the type/version helpers
+  // columns() consults. No float-like column is present, so columnDefinitions
+  // (the MariaDB SHOW FULL FIELDS fallback) is never invoked.
+  const columnsHost = (rows: Record<string, unknown>[]) => ({
+    schemaQuery: async () => rows,
+    parseMysqlName,
+    lookupCastType: (sqlType: string) => ({
+      name: sqlType.startsWith("bigint") ? "integer" : "value",
+    }),
+    getFullVersion: async () => "8.0.32",
+    isMariadb: () => false,
+    columnDefinitions: async () => [],
+  });
+
+  // MySQL/MariaDB report column_key = 'PRI' for a promoted UNIQUE-NOT-NULL index
+  // when a table has no PRIMARY KEY, so keying Column.primaryKey off column_key
+  // over-reports. Rails' MySQL::Column carries no per-column primary flag, so
+  // columns() must not set one — the key is resolved via adapter.primaryKey().
+  it("does not flag a column primary even when column_key is PRI", async () => {
+    const host = columnsHost([
+      {
+        name: "code",
+        default_value: null,
+        nullable: "NO",
+        type: "bigint",
+        full_type: "bigint(20)",
+        char_len: null,
+        num_precision: 20,
+        num_scale: 0,
+        col_key: "PRI",
+        collation: null,
+        comment: null,
+        extra: "",
+      },
+    ]) as unknown as ThisParameterType<typeof columns>;
+    const cols = await columns.call(host, "widgets");
+    expect(cols).toHaveLength(1);
+    expect(cols[0].name).toBe("code");
+    expect(cols[0].primaryKey).toBeFalsy();
   });
 });
 

@@ -259,7 +259,14 @@ describe("introspectPrimaryKey", () => {
 
     const pk = await introspectPrimaryKey(stripped, "widgets");
 
-    expect(pk).toEqual(["id"]);
+    // The fallback derives the key from columns whose reflected `primaryKey`
+    // flag is set. MySQL/MariaDB's columns() carries no per-column primary flag
+    // — matching Rails' MySQL::Column (abstract_mysql_adapter.rb /
+    // mysql/schema_statements.rb#new_column_from_field), which passes no primary
+    // argument and resolves the key solely via @connection.primary_key. So with
+    // primaryKey() stripped there is nothing to fall back to and the result is
+    // empty; sqlite/postgres, whose columns() flag the PK, yield ["id"].
+    expect(pk).toEqual(adapterType === "mysql" ? [] : ["id"]);
   });
 });
 

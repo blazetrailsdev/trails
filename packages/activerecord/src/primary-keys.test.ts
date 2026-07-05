@@ -17,6 +17,7 @@ import { MixedCaseMonkey } from "./test-helpers/models/mixed-case-monkey.js";
 import { Dashboard } from "./test-helpers/models/dashboard.js";
 import { NonPrimaryKey } from "./test-helpers/models/non-primary-key.js";
 import { CpkBook, CpkOrder } from "./test-helpers/models/cpk.js";
+import { Country } from "./test-helpers/models/country.js";
 
 describe("PrimaryKeysTest", () => {
   const { topics, subscribers, mixedCaseMonkeys } = fixtures(
@@ -36,6 +37,7 @@ describe("PrimaryKeysTest", () => {
       "developers",
       "developers_projects",
       "cpk_books",
+      "countries",
     ]);
   });
 
@@ -44,6 +46,19 @@ describe("PrimaryKeysTest", () => {
     expect(topic.toKey()).toBeNull();
     const found = await Topic.find(topics("first").id);
     expect(found.toKey()).toEqual([topics("first").id]);
+  });
+
+  it("resolves a custom string primary key with no explicit primary_key= via the schema cache", async () => {
+    // Country declares no `static _primaryKey`; its `country_id` PK is resolved
+    // from the reflected schema. This guards the schema-cache PK resolution
+    // across adapters — notably MySQL/MariaDB, whose `columns()` carries no
+    // per-column primary flag (matching Rails' `MySQL::Column`), so resolution
+    // must come through the authoritative `_primaryKeys` warming rather than a
+    // column flag. A regression there would silently misresolve to the "id"
+    // convention.
+    (Country as unknown as { resetColumnInformation?: () => void }).resetColumnInformation?.();
+    await (Country as unknown as { loadSchema?: () => Promise<void> }).loadSchema?.();
+    expect(Country.primaryKey).toBe("country_id");
   });
 
   it("to key with customized primary key", async () => {

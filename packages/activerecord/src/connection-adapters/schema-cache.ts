@@ -298,6 +298,21 @@ export class SchemaCache {
    * cache resolves `primary_key` from the reflected table rather than the
    * convention.
    *
+   * This column-flag derivation is adapter-scoped: it fires only for adapters
+   * whose `columns()` flag the PK (sqlite/postgres). MySQL/MariaDB's `columns()`
+   * carries no per-column primary flag — matching Rails' `MySQL::Column`
+   * (`abstract_mysql_adapter.rb`), which resolves the key solely via
+   * `@connection.primary_key` — so this branch never resolves a MySQL key and
+   * falls through to `undefined`. That is not a gap: MySQL PK resolution is
+   * authoritative-only, and `loadSchema` → `loadSchemaFromAdapter`
+   * (`model-schema.ts`) always warms `_primaryKeys` (via `adapter.primaryKey()`)
+   * alongside the columns hash, so the `_primaryKeys` hit above answers first.
+   * A MySQL custom-PK table therefore still resolves through the model path
+   * (regression-tested in `primary-keys.test.ts`); only a low-level caller that
+   * warms `_columns` without `_primaryKeys` — which the model path never does —
+   * would see the fall-through, exactly as Rails would require a `primary_keys`
+   * query there.
+   *
    * Deliberately returns `undefined` (not `null`) when the warm columns flag no
    * primary key: the authoritative keyless→`null` answer comes from the async
    * `primaryKeys` query, and resolving it here would change a warm-but-unqueried
@@ -414,15 +429,21 @@ export class SchemaCache {
 
   /**
    * Clear per-column `primaryKey` flags that the authoritative `_primaryKeys`
-   * cache contradicts. MySQL/MariaDB report `column_key = 'PRI'` for a
-   * UNIQUE-NOT-NULL index when a table has no PRIMARY KEY (the "promoted unique"
-   * case), so `mysql/schema-statements.ts` reflects a bogus primary flag on that
-   * column — Rails' `MySQL::Column` carries no per-column primary flag and
-   * resolves the key solely from the `PRIMARY` constraint. `add()` warms
-   * `_primaryKeys` (via the authoritative `SHOW KEYS ... 'PRIMARY'` /
-   * key_column_usage query) before `columns()`, so the correct answer is already
-   * in hand — reconcile against it query-free. Called from both `setColumns` and
-   * `setPrimaryKeys` so the correction is independent of which warms first.
+   * cache contradicts. This is a general safety net for any adapter whose
+   * `columns()` could over-report a primary flag, reconciled query-free against
+   * `_primaryKeys` (which `add()` warms via the authoritative
+   * `SHOW KEYS ... 'PRIMARY'` / key_column_usage query before `columns()`).
+   * Called from both `setColumns` and `setPrimaryKeys` so the correction is
+   * independent of which warms first.
+   *
+   * Historically this cleared MySQL/MariaDB's "promoted unique" false positive:
+   * they report `column_key = 'PRI'` for a UNIQUE-NOT-NULL index when a table has
+   * no PRIMARY KEY, so `columns()` used to reflect a bogus flag on that column.
+   * `columns()` now carries no per-column primary flag at all for MySQL/MariaDB —
+   * matching Rails' `MySQL::Column`, which has none and resolves the key solely
+   * from the `PRIMARY` constraint — so this reconcile is a no-op for MySQL
+   * (nothing is ever set `true`, so there is nothing to clear). It stays as a
+   * harmless guard for any adapter that could theoretically over-report.
    *
    * Clear-only: a flag is dropped when the authoritative key set excludes the
    * column, never added. Real primary keys (whose flag the adapter already set
