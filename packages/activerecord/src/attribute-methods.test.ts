@@ -9,16 +9,14 @@ import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
 
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb
 // ==========================================================================
 describe("AttributeMethodsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("attribute keys on a new instance", async () => {
     class Post extends Base {
@@ -860,8 +858,7 @@ describe("AttributeMethodsTest", () => {
 // AttributeMethodsTestExtra — additional targets for attribute_methods_test.rb
 // ==========================================================================
 describe("AttributeMethodsTest", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("read_attribute with nil should not asplode", async () => {
     class Topic extends Base {
@@ -1226,8 +1223,7 @@ describe("AttributeMethodsTest", () => {
 // ==========================================================================
 
 describe("attribute_alias arelTable integration", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("test_attribute_alias_in_where_references_association_name", () => {
     // Unit cover for the `arelTable.get(alias)` mechanism, NOT the Rails port:
     // the Rails `test_attribute_alias_in_where_references_association_name` lives

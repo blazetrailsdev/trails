@@ -1,11 +1,9 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { Base, RecordNotFound } from "./index.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 let Topic: typeof Base;
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 
 // Recreate the model per test so a test that mutates the class (adds an
 // attribute, primes a finder cache, etc.) can't leak into later tests.

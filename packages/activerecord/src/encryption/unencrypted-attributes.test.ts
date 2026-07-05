@@ -7,8 +7,7 @@ import {
   assertNotEncryptedAttribute,
   withoutEncryption,
 } from "./test-helpers.js";
-import { setupFixtures } from "../test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "../test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "../test-helpers/fixtures.js";
 import type { EncryptedPost as EncryptedPostType } from "../test-helpers/models/post-encrypted.js";
 import { Configurable } from "./configurable.js";
 import { Decryption as DecryptionError } from "./errors.js";
@@ -18,8 +17,7 @@ import { Decryption as DecryptionError } from "./errors.js";
 // before the model is imported — load it lazily after configureEncryption().
 let EncryptedPost: typeof EncryptedPostType;
 
-setupFixtures();
-useHandlerTransactionalFixtures();
+fixtures([]);
 beforeAll(async () => {
   configureEncryption();
   ({ EncryptedPost } = await import("../test-helpers/models/post-encrypted.js"));

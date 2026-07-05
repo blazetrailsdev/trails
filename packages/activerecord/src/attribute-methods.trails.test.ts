@@ -11,8 +11,7 @@ import { describe, it, expect } from "vitest";
 import { Base, ReadonlyAttributeError, registerModel } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
 
 registerModel(Minivan);
@@ -25,8 +24,7 @@ interface Generatable {
 const generatable = (cls: unknown): Generatable => cls as Generatable;
 
 describe("AttributeMethodsTest (trails)", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("defineAttributeMethods cascades to the superclass", async () => {
     class Animal extends Base {

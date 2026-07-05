@@ -10,19 +10,19 @@
  * connected model with a real table is DB-faithful without a prior reflection —
  * matching Rails' `columns.map(&:name)`.
  *
- * No `useHandlerTransactionalFixtures()` here on purpose: its per-test
- * `clearSchemaCache` teardown would wipe the boot-warmed cache, which is
- * exactly the cold-cache state this test must avoid.
+ * `fixtures([], { useTransactionalTests: false })` here on purpose: the
+ * transactional variant's per-test `clearSchemaCache` teardown would wipe the
+ * boot-warmed cache, which is exactly the cold-cache state this test must avoid.
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
 
-import { setupFixtures } from "./test-helpers/fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
 describe("column_names sync virtual exclusion", () => {
-  setupFixtures();
+  fixtures([], { useTransactionalTests: false });
   beforeAll(async () => {
     // Warm the shared schema cache for `posts` (the boot-time analogue of Rails
     // loading `db/schema_cache.yml`) so a synchronous `columnNames()` on a cold

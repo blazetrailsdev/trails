@@ -37,22 +37,21 @@ import {
   computePrimaryKey,
   addAutosaveAssociationCallbacks,
 } from "./autosave-association.js";
-import { setupFixtures } from "./test-helpers/fixtures.js";
-import { useHandlerTransactionalFixtures } from "./test-helpers/use-handler-transactional-fixtures.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 
 function cacheAssoc(record: Base, name: string, value: unknown) {
   record.association(name).setTarget(value as any);
 }
 
-setupFixtures();
+fixtures([], { useTransactionalTests: false });
 
 describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   // Transactional fixtures roll back every persisted pirate/ship/parrot per test
   // so this block does not pollute the shared worker DB for sibling blocks
   // (e.g. TestAutosaveAssociationOnACollectionRemoveCallbacks) — Rails'
   // `use_transactional_tests`.
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(CanonicalShip);
@@ -483,7 +482,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Company extends Base {
@@ -978,7 +977,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Firm extends Base {
@@ -1578,7 +1577,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
@@ -1999,7 +1998,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Author extends Base {
@@ -2360,7 +2359,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Pirate extends Base {
@@ -2540,7 +2539,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Pirate extends Base {
@@ -2823,7 +2822,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 });
 
 describe("TestAutosaveAssociationsInGeneral", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("autosave works even when other callbacks update the parent model", async () => {
     class Ship extends Base {
       declare name: string | null;
@@ -3480,7 +3479,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Pirate extends Base {
@@ -3598,7 +3597,7 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
 });
 
 describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("should generate validation methods for has_many associations", async () => {
     class VmParent extends Base {
@@ -3813,7 +3812,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   function cacheAssoc(record: Base, name: string, value: unknown) {
     record.association(name).setTarget(value as any);
   }
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Pirate extends Base {
@@ -3898,7 +3897,7 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
 });
 
 describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("autosave new record on belongs to can be disabled per relationship", async () => {
     class Author extends Base {
       declare name: string | null;
@@ -4117,7 +4116,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("should automatically validate associations", async () => {
     class Item extends Base {
       declare name: string | null;
@@ -4147,7 +4146,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   // Dynamic import so esbuild doesn't rename the bespoke same-named classes
   // declared inside the describe.skip blocks above (Author/Book) — see the
@@ -4200,7 +4199,7 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("should automatically validate associations with :validate => true", async () => {
     class Author extends Base {
       declare name: string | null;
@@ -4244,7 +4243,7 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("should automatically validate associations with :validate => true", async () => {
     class Profile extends Base {
       declare bio: string | null;
@@ -4274,7 +4273,7 @@ describe("TestAutosaveAssociationValidationsOnAHasOneAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("should not has one through model", async () => {
     class HotOrg extends Base {
       declare name: string | null;
@@ -4411,7 +4410,7 @@ describe("TestAutosaveAssociationOnAHasOneThroughAssociation", () => {
 });
 
 describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("should automatically validate associations with :validate => true", async () => {
     class Tag extends Base {
       declare name: string | null;
@@ -4440,7 +4439,7 @@ describe("TestAutosaveAssociationValidationsOnAHABTMAssociation", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   // Mirrors Rails' nested Post/Comment classes (posts/comments tables) with a
   // Comment after_save callback that reads back the inverse `post.comments`.
@@ -4491,7 +4490,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociationWithInverse", () => {
 });
 
 describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("should not raise error", async () => {
     class BtOwner extends Base {
       declare name: string | null;
@@ -4529,7 +4528,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociationDefinedAsRecord", () => 
 });
 
 describe("TestAutosaveAssociationWithTouch", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   beforeAll(() => {
     registerModel(Invoice);
     registerModel(LineItem);
@@ -4541,7 +4540,7 @@ describe("TestAutosaveAssociationWithTouch", () => {
 });
 
 describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAcceptsNestedAttributes", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   beforeAll(() => {
     registerModel("Company", CanonicalCompany);
@@ -4568,7 +4567,7 @@ describe("TestAutosaveAssociationOnAHasManyAssociationDefinedInSubclassWithAccep
 });
 
 describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAttributes", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   function makeModels() {
     class Pirate extends Base {
@@ -4617,7 +4616,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 });
 
 describe("should update children when autosave is true and parent is new but child is not", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   it("should update children when autosave is true and parent is new but child is not", async () => {
     class UcParent extends Base {
       declare name: string | null;
@@ -5136,7 +5135,7 @@ describe("should update children when autosave is true and parent is new but chi
 });
 
 describe("ChangedForAutosaveTest", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
 
   it("parent is changed_for_autosave when nested autosave child is changed", () => {
     class Child extends Base {
@@ -5243,7 +5242,7 @@ describe("ChangedForAutosaveTest", () => {
 });
 
 describe("autosaveHasOne queryConstraints PK/FK pairing", () => {
-  useHandlerTransactionalFixtures();
+  fixtures([]);
   // When a class has queryConstraints and the has_one uses an explicit composite FK,
   // assoc.options.foreignKey is the composite array. The reflection normalizes it
   // into options.queryConstraints internally. computePrimaryKey(reflection) therefore
@@ -5495,7 +5494,7 @@ describe("computePrimaryKey", () => {
 // (save_collection_association -> association.destroy(record)) which fires the
 // before_remove/after_remove callbacks, not record-level child.destroy().
 describe("TestAutosaveAssociationOnACollectionRemoveCallbacks", () => {
-  setupFixtures();
+  fixtures([], { useTransactionalTests: false });
   beforeAll(() => {
     registerModel(CanonicalPirate);
     registerModel(CanonicalBird);

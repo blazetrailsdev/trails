@@ -68,6 +68,11 @@ describe("test-fixture-parity rule", () => {
           code: `describe("T", () => { useHandlerTransactionalFixtures(); it("find single value object", () => { expect(1).toBe(1); }); });`,
         },
         {
+          name: "fixtures([]) without destructuring (RFC 0062) → scope-level pass",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { fixtures([]); it("find single value object", () => { expect(1).toBe(1); }); });`,
+        },
+        {
           name: "accessor from outer describe used in nested it() → no warning",
           filename: AR("aggregations.test.ts"),
           code: `describe("Outer", () => { const { customers } = useFixtures(["c"], () => conn); describe("Inner", () => { it("find single value object", () => { customers("david"); }); }); });`,
@@ -144,6 +149,12 @@ describe("test-fixture-parity rule", () => {
           name: "useFixtures present but it() body never calls accessor → warns",
           filename: AR("aggregations.test.ts"),
           code: `describe("T", () => { const { customers } = useFixtures(["c"], () => conn); it("find single value object", () => { expect(1).toBe(1); }); });`,
+          errors: [{ messageId: "missing" }],
+        },
+        {
+          name: "non-empty fixtures() without destructuring → still warns (only fixtures([]) is scope-level)",
+          filename: AR("aggregations.test.ts"),
+          code: `describe("T", () => { fixtures(["customers"]); it("find single value object", () => { expect(1).toBe(1); }); });`,
           errors: [{ messageId: "missing" }],
         },
         {
