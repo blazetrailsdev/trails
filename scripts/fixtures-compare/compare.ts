@@ -11,11 +11,11 @@ import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-s
 import type {
   Schema,
   TableSchema,
-} from "../../packages/activerecord/src/test-helpers/define-schema.js";
+} from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import {
   isWrappedSchema,
   columnsOf,
-} from "../../packages/activerecord/src/test-helpers/define-schema.js";
+} from "../../packages/activerecord/src/test-helpers/schema-types.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -531,12 +531,12 @@ export function compareValue(tsVal: unknown, railsVal: unknown, attr: string, id
 }
 
 // Delegate the wrapped/legacy discrimination to the real `isWrappedSchema`
-// (imported from define-schema.ts) so this stays in lock-step — a hand-rolled
+// (imported from schema-types.ts) so this stays in lock-step — a hand-rolled
 // mirror silently misclassified the `indexes`-only wrapper form (a wrapper with
 // `columns` + `indexes` but no `primaryKey`, e.g. canonical `companies`), which
 // `isWrappedSchema` accepts but the old `"primaryKey" in table` check rejected.
 //
-// `hasImplicitId` mirrors define-schema.ts's `createOpts`: the implicit
+// `hasImplicitId` mirrors canonical-schema.ts's `createOpts`: the implicit
 // auto-increment `id` is suppressed only for `primaryKey: false` and the array
 // (composite / single-serial) form; a wrapper whose `primaryKey` is omitted
 // (indexes-only) still gets the default `id`, exactly as the legacy shape does.
@@ -562,7 +562,7 @@ function tableShape(table: TableSchema): {
  * `id` is allowed only when defineSchema would create one — that's the
  * legacy `Record<colName, ColumnSpec>` shape only. Any wrapped table
  * (`primaryKey: false` *or* `primaryKey: string[]`) has `id` suppressed
- * (see define-schema.ts setting `createOpts.id = false` for both),
+ * (see canonical-schema.ts setting `createOpts.id = false` for both),
  * so a stray `id` on those flags as drift.
  *
  * Returns `ported=false` when the table hasn't landed in TEST_SCHEMA yet —

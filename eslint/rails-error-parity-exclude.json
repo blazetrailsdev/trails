@@ -111,7 +111,7 @@
   "packages/activerecord/src/tasks/sqlite-database-tasks.ts",
   "packages/activerecord/src/test-databases.ts",
   "packages/activerecord/src/test-helpers/define-fixtures.ts",
-  "packages/activerecord/src/test-helpers/define-schema.ts",
+  "packages/activerecord/src/test-helpers/schema-types.ts",
   "packages/activerecord/src/test-helpers/models/author.ts",
   "packages/activerecord/src/test-helpers/models/bulb.ts",
   "packages/activerecord/src/test-helpers/models/developer.ts",

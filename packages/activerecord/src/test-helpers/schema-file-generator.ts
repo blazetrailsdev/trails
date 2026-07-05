@@ -11,7 +11,7 @@
 
 import { getEnv, getOsAsync } from "@blazetrails/activesupport";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
-import type { Schema, ColumnSpec, TableSchema, IndexSpec } from "./define-schema.js";
+import type { Schema, ColumnSpec, TableSchema, IndexSpec } from "./schema-types.js";
 
 const SCHEMA_TO_AR: Record<string, string> = { big_integer: "bigint" };
 
@@ -47,7 +47,7 @@ function indexesOf(t: TableSchema): IndexSpec[] {
 }
 
 // `integer` and `big_integer` both map to an auto-increment serial/identity PK
-// when declared `primaryKey: ["col"]`. Keep in sync with define-schema.ts's
+// when declared `primaryKey: ["col"]`. Keep in sync with schema-types.ts's
 // isIntegerSpec / serialIdType.
 function isIntegerSpec(spec: ColumnSpec | undefined): boolean {
   if (spec === undefined) return false;
@@ -91,7 +91,7 @@ function colOpts(
   if (cpkCols?.has(colName) && !parts.some((p) => p.startsWith("null:"))) {
     parts.push(`null: false`);
   }
-  // Mirrors define-schema.ts: MySQL DATETIME without precision defaults to
+  // Mirrors schema-types.ts: MySQL DATETIME without precision defaults to
   // DATETIME(0), which rejects fractional seconds. Inject precision:6 unless
   // the spec sets precision explicitly (even precision:null opts out).
   if (adapterName === "mysql" && primitive === "datetime" && !hasPrecision) {
@@ -132,7 +132,7 @@ function generateCode(
     // Rails' `t.primary_key :col`, which makes the column a serial/identity.
     // Emit it via the string `primaryKey` form (auto-increment) rather than the
     // array form (plain integer PK, no sequence). Keep them in sync with
-    // define-schema.ts, which applies the same rule for the fixtures path.
+    // schema-types.ts, which applies the same rule for the fixtures path.
     const serialPkName =
       Array.isArray(pk) && pk.length === 1 && isIntegerSpec(cols[pk[0]]) ? pk[0] : null;
     const cpkCols = Array.isArray(pk) && serialPkName === null ? new Set(pk) : null;
@@ -141,7 +141,7 @@ function generateCode(
     if (pk === false) tOptsEntries.push(`id: false`);
     else if (serialPkName !== null) {
       // Suppress the auto `id` column; the serial PK is emitted INLINE at its
-      // declared offset in the column loop below (mirrors define-schema.ts)
+      // declared offset in the column loop below (mirrors schema-types.ts)
       // rather than via createTable's string-`primaryKey` option, which hoists
       // the PK column first. Inline emission keeps the reflected column order
       // matching Rails — e.g. `auto_id_tests` declares `t.primary_key :auto_id`
@@ -160,7 +160,7 @@ function generateCode(
         // Emit the single-column integer PK inline at its declared offset.
         // Preserve the declared INTEGER width per adapter (serialIdType); the
         // default `primary_key` type widens to BIGINT on MySQL and breaks
-        // integer FK references. Keep in sync with define-schema.ts.
+        // integer FK references. Keep in sync with schema-types.ts.
         if (colName === serialPkName) {
           lines.push(
             `    t.column(${JSON.stringify(colName)}, ${JSON.stringify(serialIdType(colSpec, adapterName))}, { primaryKey: true });`,
@@ -198,7 +198,7 @@ function generateCode(
       if (index.order !== undefined) optEntries.push(`order: ${JSON.stringify(index.order)}`);
       // Sub-part prefix length is MySQL-only DDL (the abstract SchemaCreation
       // visitor emits `col(n)` unconditionally, which is invalid on PG/SQLite).
-      // Mirror define-schema.ts and drop it for non-MySQL adapters.
+      // Mirror schema-types.ts and drop it for non-MySQL adapters.
       if (index.length !== undefined && adapterName === "mysql")
         optEntries.push(`length: ${JSON.stringify(index.length)}`);
       if (index.nullsNotDistinct) optEntries.push(`nullsNotDistinct: true`);

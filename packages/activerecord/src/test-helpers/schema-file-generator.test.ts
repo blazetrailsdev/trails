@@ -8,13 +8,13 @@ import type {
   AnyPrimitiveColumnSpec,
   PrimitiveColumnSpec,
   IndexSpec,
-} from "./define-schema.js";
+} from "./schema-types.js";
 import {
   COLUMN_TYPE_MAP_PG,
   COLUMN_TYPE_MAP_MYSQL,
   COLUMN_TYPE_MAP_SQLITE,
   serialIdType,
-} from "./define-schema.js";
+} from "./schema-types.js";
 import { emitTableIndexes } from "./canonical-schema.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
 import type { AddIndexOptions } from "../connection-adapters/abstract/schema-definitions.js";
@@ -103,7 +103,7 @@ describe("generateSchemaFile", () => {
   it("emits a single-column integer custom PK inline at its declared offset (serial)", () => {
     // `id: false` suppresses the auto id; the serial PK column is emitted inline
     // at its declared offset with an INT-width serial type (default → "integer")
-    // so its reflected position matches Rails (mirrors define-schema.ts).
+    // so its reflected position matches Rails (mirrors schema-types.ts).
     expect(content).toContain('"gadgets", { id: false }');
     expect(content).toContain('"gadget_id", "integer", { primaryKey: true }');
     // The non-PK column is still emitted.
@@ -149,7 +149,7 @@ describe("generateSchemaFile (MySQL adapter)", () => {
   });
 
   it("emits native date, time, json column types (matching define-schema.ts)", () => {
-    // define-schema.ts COLUMN_TYPE_MAP_MYSQL maps date/time/json to their
+    // schema-types.ts COLUMN_TYPE_MAP_MYSQL maps date/time/json to their
     // native MySQL types (PR #4141) so DATE/TIME/JSON columns round-trip as
     // PlainDate/PlainTime/parsed-JSON instead of raw strings. The generator
     // must agree, or the boot-laid canonical schema lays these as VARCHAR and
@@ -235,15 +235,15 @@ describe("generateSchemaFile single-column big_integer PK id type per adapter", 
 });
 
 // PARITY GUARD — schema-file-generator.ts's per-adapter type mapping is a
-// parallel re-implementation of define-schema.ts's COLUMN_TYPE_MAP_* /
+// parallel re-implementation of schema-types.ts's COLUMN_TYPE_MAP_* /
 // serialIdType. A one-sided edit reintroduces silent drift: PR #4461 fixed a
 // MariaDB regression where the generator's stale SCHEMA_TO_AR_MYSQL still
-// remapped date/time/json → string, even though define-schema.ts's map had
+// remapped date/time/json → string, even though schema-types.ts's map had
 // been converged to native MySQL types by PR #4141 — so boot-laid canonical
 // `topics.last_read` was created as varchar(255) instead of date. This guard
 // drives the generator for a schema covering every PrimitiveColumnSpec on each
 // adapter and asserts the emitted `t.column(name, "type", …)` matches the
-// authoritative COLUMN_TYPE_MAP_* the fixtures path (define-schema.ts) uses.
+// authoritative COLUMN_TYPE_MAP_* the fixtures path (schema-types.ts) uses.
 describe("generateSchemaFile / define-schema.ts type-map parity", () => {
   // Generate a schema file, read it back, and delete it — the generator's only
   // observable output is the emitted module text.
@@ -274,7 +274,7 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
 
   // `Record<PrimitiveColumnSpec, string>` forces each map to carry every
   // primitive, so iterating its keys covers the full type surface — a primitive
-  // added to define-schema.ts is automatically exercised here.
+  // added to schema-types.ts is automatically exercised here.
   const CASES: ReadonlyArray<{
     adapter: string;
     map: Record<string, string>;
@@ -340,9 +340,11 @@ describe("generateSchemaFile / define-schema.ts type-map parity", () => {
 // — see the type-map parity guard above (PR #4464), which deliberately scoped out
 // this index-gating surface.
 //
-// The parity partner is `canonical-schema.ts`, NOT `define-schema.ts`: RFC 0059
-// phase 4 (retire-defineschema-and-one-schema-apparatus) DELETES define-schema,
-// so anchoring here would die with the DSL. Both `schema-file-generator.ts` and
+// The parity partner is `canonical-schema.ts`, NOT `schema-types.ts`: RFC 0059
+// phase 4 (retire-defineschema-and-one-schema-apparatus) DELETED the
+// schema-emitting DSL, leaving `schema-types.ts` as a bare type vocabulary that
+// issues no DDL — so anchoring here would die with the DSL. Both
+// `schema-file-generator.ts` and
 // `canonical-schema.ts` outlive that retirement, and both hand-mirror the same
 // schema.rb gating — so this guard drives BOTH through a recording adapter and
 // asserts they issue the same `addIndex(columns, options)` calls:

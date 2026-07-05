@@ -29,7 +29,7 @@ import {
   type ModelAssociationLookup,
 } from "../src/type-virtualization/resolve-target.js";
 import type { SchemaColumnValue } from "../src/type-virtualization/synthesize.js";
-import type { TableSchema, WrappedTableSchema } from "../src/test-helpers/define-schema.js";
+import type { TableSchema, WrappedTableSchema } from "../src/test-helpers/schema-types.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const MODELS_DIR = path.resolve(__dirname, "../src/test-helpers/models");
@@ -737,14 +737,14 @@ async function main(): Promise<void> {
   // The canonical schema map is only consumed when materializing files UNDER
   // MODELS_DIR (test-local models elsewhere supply their own bespoke schema).
   // Load it lazily via dynamic import so a test-file-only run never pays the
-  // import cost of `define-schema`'s adapter-runtime dependency graph. This is
+  // import cost of `schema-types`'s adapter-runtime dependency graph. This is
   // now purely an import-cost optimization: the static-import TDZ crash it
   // originally worked around is fixed at the source (abstract-adapter defers its
   // mixin wiring to first construction), so `isWrappedSchema` imports cleanly.
   let schemaColumnsByTable: SchemaColumnsByTable = {};
   if (targets.some((f) => f.startsWith(modelsDirPrefix))) {
     const { TEST_SCHEMA } = await import("../src/test-helpers/test-schema.js");
-    const { isWrappedSchema } = await import("../src/test-helpers/define-schema.js");
+    const { isWrappedSchema } = await import("../src/test-helpers/schema-types.js");
     schemaColumnsByTable = normalizeSchema(TEST_SCHEMA, isWrappedSchema);
   }
   const associationLookup = buildModelAssociationLookup(registry);

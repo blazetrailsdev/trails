@@ -15,7 +15,7 @@
 //   - identifier-length stress columns (t.string "a" * max_identifier_length)
 //   - polymorphic helper (modeled directly as `<name>_id` + `<name>_type`)
 
-import type { Schema } from "./define-schema.js";
+import type { Schema } from "./schema-types.js";
 
 /**
  * PR 0.5a group: alphabetical range "1_need_quoting".."bulbs" (covers

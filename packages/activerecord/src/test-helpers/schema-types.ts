@@ -1,3 +1,10 @@
+// Residual schema-type vocabulary left after RFC 0059 phase 4 deleted the
+// `defineSchema` DSL (PR #4587). This file no longer defines or emits any
+// schema — it holds only the `ColumnSpec` / `Schema` / `IndexSpec` type family
+// and the small pure helpers (`COLUMN_TYPE_MAP_*`, `serialIdType`, `columnsOf`,
+// `supportsExpressionIndex`, `isWrappedSchema`) that `canonical-schema.ts` and
+// the `TEST_SCHEMA` importers still consume.
+
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 export type PrimitiveColumnSpec =
