@@ -26,7 +26,7 @@ import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
-import { threadedConnectionFor } from "./connection-handling.js";
+import { threadedConnectionFor, connectionPool } from "./connection-handling.js";
 
 /**
  * Adapter for a schema-reflection read: prefer the connection threaded by the
@@ -326,23 +326,29 @@ type DatabaseAdapterLike = { schemaCache?: unknown };
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
   const target = isStiSubclass(klass) ? getStiBase(klass) : klass;
-  // Prefer the threaded (in-query) connection's warm cache — never touches
-  // `.connection`, so it is safe on the hot `new Model()` construction path.
-  try {
-    const conn = threadedConnectionFor(target) as { schemaCache?: unknown } | null;
+  const cachedFrom = (conn: { schemaCache?: unknown } | null | undefined) => {
     const cache = conn?.schemaCache as
       | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
       | undefined;
-    const hash = cache?.getCachedColumnsHash?.(target.tableName);
+    return cache?.getCachedColumnsHash?.(target.tableName);
+  };
+  // Read the warm schema cache off an already-available connection — the
+  // threaded (in-query) one, else a connection the pool has already leased.
+  // Both are connection-free reads (no `.connection`), so this is safe on the
+  // hot `new Model()` path and never forces a permanent checkout.
+  try {
+    const hash =
+      cachedFrom(threadedConnectionFor(target)) ??
+      cachedFrom(connectionPool.call(target).activeConnection as { schemaCache?: unknown } | null);
     if (hash) return hash;
   } catch {
     /* fall through */
   }
-  // No threaded connection (e.g. a bare `new Book()` outside any query): fall
-  // back to `columnsHash`, which resolves the same warm cache via the model's
-  // connection. Wrapped in try/catch so a table-less model or a disallowed
-  // permanent checkout degrades to the attribute-definition view rather than
-  // raising during construction.
+  // No connection available at all (e.g. a bare `new Book()` before any query):
+  // fall back to `columnsHash`, which resolves the same warm cache via the
+  // model's connection. Wrapped in try/catch so a table-less model or a
+  // disallowed permanent checkout degrades to the attribute-definition view
+  // rather than raising during construction.
   try {
     return columnsHash.call(target);
   } catch {
