@@ -5463,7 +5463,21 @@ export class Relation<T extends Base> {
   }
 
   private _toSql(): string {
-    return this._toSqlWithoutSetOp();
+    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
+    if (this._eagerLoadingForSql()) {
+      const eagerSql = this._buildEagerSql();
+      if (eagerSql !== null) return eagerSql;
+      // If _buildEagerSql returns null (e.g. unresolvable association),
+      // fall through to plain SQL so toSql() always returns something useful.
+    }
+
+    // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
+    // annotate() comments are folded into the manager AST by `_buildArel`, so a
+    // single collector numbers every bind in document order (CTE binds precede
+    // the main query's; PG `$N` placeholders fall out correctly by
+    // construction) — replacing the former post-compile string splice and its
+    // manual `$N` renumbering.
+    return this._compileSelectSql(this._buildArel());
   }
 
   // Mirrors: ActiveRecord::Relation#eager_loading?
@@ -5698,9 +5712,7 @@ export class Relation<T extends Base> {
    * Build the SelectManager for this relation: projections, joins, wheres,
    * order, distinct, limit/offset, group, having, lock, hints, and from(). Does
    * NOT apply the eager-load join dependency, annotate() comments, or CTE
-   * prefix — those remain in _toSqlWithoutSetOp. Used both for plain SELECT
-   * compilation and as each side of a set operation (where the arel Union* node
-   * composes the two managers).
+   * prefix — those are layered on in `_buildArel` / `_toSql`.
    */
   private _buildSelectManager(aliases?: AliasTracker): SelectManager {
     // `this.table` is the model's arel_table unless the relation was built on a
@@ -5751,24 +5763,6 @@ export class Relation<T extends Base> {
     if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
 
     return manager;
-  }
-
-  private _toSqlWithoutSetOp(): string {
-    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
-    if (this._eagerLoadingForSql()) {
-      const eagerSql = this._buildEagerSql();
-      if (eagerSql !== null) return eagerSql;
-      // If _buildEagerSql returns null (e.g. unresolvable association),
-      // fall through to plain SQL so toSql() always returns something useful.
-    }
-
-    // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
-    // annotate() comments are folded into the manager AST by `_buildArel`, so a
-    // single collector numbers every bind in document order (CTE binds precede
-    // the main query's; PG `$N` placeholders fall out correctly by
-    // construction) — replacing the former post-compile string splice and its
-    // manual `$N` renumbering.
-    return this._compileSelectSql(this._buildArel());
   }
 
   private _combineNodes(nodes: Nodes.Node[]): Nodes.Node | null {
@@ -5913,7 +5907,7 @@ export class Relation<T extends Base> {
    * Resolve this relation to the Arel SelectStatement node used as a CTE body,
    * mirroring Rails' `build_with_expression_from_value` Relation branch
    * (`value.arel(.ast)`). `_buildSelectManager` threads joins/wheres/from/having
-   * — matching `_toSqlWithoutSetOp` minus the CTE/eager/annotate prefix — so a
+   * — matching `_toSql` minus the CTE/eager/annotate prefix — so a
    * recursive body's string JOIN survives (with_recursive). Returns null for
    * relations whose SQL `_buildSelectManager` does not fully encode (eager-load
    * bodies), letting the caller fall back to pre-rendered SQL.
