@@ -1644,6 +1644,25 @@ export class MigrationContext {
 
   constructor(private connection: DatabaseAdapter) {}
 
+  private _schema?: SchemaStatements;
+  private _schemaConn?: DatabaseAdapter;
+
+  /**
+   * The connection's real `SchemaStatements` — the single Rails-faithful source
+   * of DDL/type generation. Mirrors {@link Migration.schema}; MigrationContext
+   * routes its schema-DSL methods through this instead of hand-rolling SQL so
+   * there is one source of truth as in Rails.
+   */
+  private get schema(): SchemaStatements {
+    const conn = this.connection;
+    if (!this._schema || this._schemaConn !== conn) {
+      assertSchemaAdapter(conn);
+      this._schema = conn.schemaStatements ? conn.schemaStatements() : new SchemaStatements(conn);
+      this._schemaConn = conn;
+    }
+    return this._schema;
+  }
+
   private get _adapterName(): "sqlite" | "postgres" | "mysql" {
     return this.connection.adapterName as "sqlite" | "postgres" | "mysql";
   }
@@ -2064,58 +2083,6 @@ export class MigrationContext {
     // Non-SQLite adapters: no-op; virtual tables are SQLite-specific.
   }
 
-  private _mapType(type: string, options?: ColumnOptions): string {
-    const an = this._adapterName;
-    switch (type.toLowerCase()) {
-      case "string":
-        // PG: unlimited `character varying` (matches Rails) so changeColumn-to-string
-        // doesn't introspect a spurious limit:255 into dumps.
-        return an === "postgres" ? "character varying" : `VARCHAR(255)`;
-      case "text":
-        return "TEXT";
-      case "integer":
-        return "INTEGER";
-      case "float":
-        return an === "postgres" ? "DOUBLE PRECISION" : "REAL";
-      case "decimal":
-        return "DECIMAL(10, 0)";
-      case "boolean":
-        return "BOOLEAN";
-      case "date":
-        return "DATE";
-      case "time": {
-        const p = options?.precision;
-        if (p != null && !(p >= 0 && p <= 6))
-          throw new ArgumentError(
-            `No TIME type has precision of ${p}. The allowed range of precision is from 0 to 6`,
-          );
-        return p != null ? `TIME(${p})` : "TIME";
-      }
-      case "datetime":
-      case "timestamp": {
-        const base = an === "postgres" ? "TIMESTAMP" : "DATETIME";
-        // MigrationContext is a lightweight SQL builder used in tests; _mapType always runs here
-        // (unlike real adapter addColumn which calls typeToSql directly). The precision=6 default
-        // for datetime matches Rails' behavior, but applies to timestamp too in this simplified path.
-        // precision: undefined → Rails default of 6; precision: null → no precision suffix
-        const p = options?.precision === undefined ? 6 : options.precision;
-        if (p != null && !(p >= 0 && p <= 6))
-          throw new ArgumentError(
-            `No ${base} type has precision of ${p}. The allowed range of precision is from 0 to 6`,
-          );
-        return p != null ? `${base}(${p})` : base;
-      }
-      case "binary":
-        return an === "postgres" ? "BYTEA" : "BLOB";
-      case "primary_key":
-        if (an === "postgres") return "SERIAL PRIMARY KEY";
-        if (an === "mysql") return "BIGINT AUTO_INCREMENT PRIMARY KEY";
-        return "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL";
-      default:
-        return type.toUpperCase();
-    }
-  }
-
   async addColumn(
     table: string,
     column: string,
@@ -2129,11 +2096,12 @@ export class MigrationContext {
       }
       return;
     }
-    await this.connection.executeMutation(
-      `ALTER TABLE "${table}" ADD COLUMN "${column}" ${this._mapType(type, _options)}`,
-    );
-    if (_options && "comment" in _options && (this.connection as any).supportsComments?.())
-      await this.changeColumnComment(table, column, (_options as any).comment ?? null);
+    // Delegate DDL/type generation to the adapter's SchemaStatements — the
+    // single Rails-faithful source — rather than the bespoke `_mapType` builder.
+    // The adapter's addColumn also owns comment application (PostgreSQL emits a
+    // separate COMMENT ON COLUMN; MySQL inlines it in the visitor), so we do not
+    // re-apply it here.
+    await this.schema.addColumn(table, column, type, _options ?? {});
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
     if (!this._columnMeta.has(table)) this._columnMeta.set(table, new Map());
@@ -2161,7 +2129,7 @@ export class MigrationContext {
       }
       const allCols = [columnOrColumns, optionsOrColumn, ...rest];
       for (const col of allCols) {
-        await this.connection.executeMutation(`ALTER TABLE "${table}" DROP COLUMN "${col}"`);
+        await this.schema.removeColumn(table, col);
         this._columns.get(table)?.delete(col);
         this._columnMeta.get(table)?.delete(col);
       }
@@ -2170,17 +2138,13 @@ export class MigrationContext {
     if (optionsOrColumn?.ifExists && !this.columnExists(table, columnOrColumns)) {
       return;
     }
-    await this.connection.executeMutation(
-      `ALTER TABLE "${table}" DROP COLUMN "${columnOrColumns}"`,
-    );
+    await this.schema.removeColumn(table, columnOrColumns);
     this._columns.get(table)?.delete(columnOrColumns);
     this._columnMeta.get(table)?.delete(columnOrColumns);
   }
 
   async renameColumn(table: string, from: string, to: string): Promise<void> {
-    await this.connection.executeMutation(
-      `ALTER TABLE "${table}" RENAME COLUMN "${from}" TO "${to}"`,
-    );
+    await this.schema.renameColumn(table, from, to);
     const cols = this._columns.get(table);
     if (cols) {
       cols.delete(from);
@@ -2200,17 +2164,12 @@ export class MigrationContext {
     type: string,
     _options?: ColumnOptions,
   ): Promise<void> {
-    if (this._adapterName === "mysql") {
-      await this.connection.executeMutation(
-        `ALTER TABLE "${table}" MODIFY COLUMN "${column}" ${this._mapType(type, _options)}`,
-      );
-    } else {
-      await this.connection.executeMutation(
-        `ALTER TABLE "${table}" ALTER COLUMN "${column}" TYPE ${this._mapType(type, _options)}`,
-      );
-    }
-    if (_options && "comment" in _options && (this.connection as any).supportsComments?.())
-      await this.changeColumnComment(table, column, (_options as any).comment ?? null);
+    // Delegate DDL/type generation to the adapter's SchemaStatements rather than
+    // the bespoke `_mapType` builder — the single Rails-faithful source. The
+    // adapter's changeColumn also owns comment application (PostgreSQL emits a
+    // separate COMMENT ON COLUMN; MySQL inlines it via changeColumnForAlter), so
+    // we do not re-apply it here.
+    await this.schema.changeColumn(table, column, type, _options ?? {});
     const meta = this._columnMeta.get(table);
     if (meta && meta.has(column)) {
       const entry = meta.get(column)!;
