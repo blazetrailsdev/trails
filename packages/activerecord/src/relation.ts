@@ -809,10 +809,19 @@ export class Relation<T extends Base> {
       const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
       let effectiveTable = target.table;
       // Rails' guard (query_methods.rb:91) skips re-joining an association
-      // already in joins_values / left_outer_joins_values. A self-join
-      // (owner and target share a table) needs its own alias, resolved by the
-      // unified alias tracker below, so the guard only applies when the target
-      // is a distinct table whose base name the IS NOT NULL predicate can use.
+      // already in joins_values / left_outer_joins_values. In trails the
+      // no-duplicate-join outcome is reached two ways depending on the shape:
+      //   - Self-join (owner and target share a table, e.g. Comment#children):
+      //     the join loop below routes through the unified alias tracker, which
+      //     dedups the pending join-value and this where-join onto one alias
+      //     (`children_comments`) — a single join whose alias the IS NOT NULL
+      //     predicate needs. This mirrors Rails' `class_name` branch, which
+      //     emits `not(:children => …)` resolving to that same alias. Skipping
+      //     here would strand `effectiveTable` on the base owner table and
+      //     misplace the predicate, so the guard must NOT skip self-joins.
+      //   - Distinct target table (e.g. Post#author): skip the redundant join;
+      //     `effectiveTable` stays the base table name, matching Rails' non-
+      //     class_name branch `not(reflection.table_name => …)`.
       const skipJoin = skipJoinFor?.has(assocName) && target.table !== ownerTable;
       if (!skipJoin) {
         for (const join of target.joins) {
