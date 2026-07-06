@@ -13,7 +13,14 @@ import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
-import { SOURCES } from "../../../../vendor/sources.js";
+// vendor/sources.ts resolves as CommonJS (the repo root has no
+// `"type": "module"`), but this file lives under scripts/parity, whose
+// package.json *is* `"type": "module"`. Across that ESM→CJS boundary a static
+// `import { SOURCES }` fails under tsx (the CI runner) — it can't expose the
+// named export — while a default import is `undefined` under Vitest (which
+// transforms sources.ts as ESM). A dynamic import does the interop correctly
+// under both runtimes, so resolve SOURCES that way at module-init time.
+const { SOURCES } = await import("../../../../vendor/sources.js");
 
 const HERE = dirname(fileURLToPath(import.meta.url));
 const GEMFILE_PATH = join(HERE, "Gemfile");
