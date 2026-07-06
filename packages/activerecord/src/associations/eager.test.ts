@@ -30,14 +30,13 @@ import {
   SpecialComment,
   SubSpecialComment,
 } from "../test-helpers/models/comment.js";
-import { Tag, OrderedTag } from "../test-helpers/models/tag.js";
+import { OrderedTag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Reader, LazyReader } from "../test-helpers/models/reader.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Category, SpecialCategory } from "../test-helpers/models/category.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
 import {
   Developer,
   EagerDeveloperWithDefaultScope,
@@ -57,7 +56,6 @@ import { ShardedBlog, ShardedBlogPost, ShardedComment } from "../test-helpers/mo
 import { captureSql } from "../testing/sql-capture.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Membership } from "../test-helpers/models/membership.js";
-import { Club } from "../test-helpers/models/club.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
 import { Contract } from "../test-helpers/models/contract.js";
@@ -66,7 +64,6 @@ import { Essay } from "../test-helpers/models/essay.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Matey } from "../test-helpers/models/matey.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
-import { Reference } from "../test-helpers/models/reference.js";
 import { CpkOrder, CpkBook, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 
 // Mirrors eager_test.rb's `find_all_ordered` helper.
@@ -138,11 +135,10 @@ describe("EagerAssociationTest", () => {
     "taggings",
   ]);
   beforeAll(async () => {
-    // Register every model the folded suites reference. Models with a requested
-    // fixture set auto-register on its resolution (#4348); STI subclasses,
-    // default-scope variants, and unfixtured models still need explicit
-    // registration, and re-registering the fixture-backed base models is
-    // idempotent, so listing the full set keeps the suite self-documenting.
+    // Models with a requested fixture set auto-register on its resolution
+    // (#4348), so only models WITHOUT a fixture set need explicit registration
+    // here: the CPK/scope-only models, STI subclasses (Firm/Client on companies,
+    // SpecialPost/StiPost/…), and the default-scope Developer variants.
     registerModel("PostWithDefaultScope", PostWithDefaultScope);
     registerModel(CpkOrder);
     registerModel(CpkBook);
@@ -150,45 +146,21 @@ describe("EagerAssociationTest", () => {
     registerModel(Mentor);
     registerModel(Contract);
     registerModel(AuditLog);
-    registerModel(Post);
     registerModel(SpecialPost);
     registerModel(StiPost);
     registerModel(SubSpecialComment);
     registerModel(PostWithDefaultInclude);
-    registerModel(Author);
-    registerModel(AuthorAddress);
-    registerModel(AuthorFavorite);
-    registerModel(Comment);
     registerModel(SpecialComment);
     registerModel(VerySpecialComment);
-    registerModel(Person);
-    registerModel(Reader);
     registerModel(LazyReader);
-    registerModel(Tag);
-    registerModel(Tagging);
-    registerModel(Category);
     registerModel(SpecialCategory);
-    registerModel(Categorization);
-    registerModel(Company);
     registerModel(Firm);
     registerModel(Client);
-    registerModel(Account);
-    registerModel(Developer);
-    registerModel(Project);
     registerModel(EagerDeveloperWithDefaultScope);
     registerModel(EagerDeveloperWithClassMethodDefaultScope);
     registerModel(EagerDeveloperWithLambdaDefaultScope);
     registerModel(EagerDeveloperWithBlockDefaultScope);
     registerModel(EagerDeveloperWithCallableDefaultScope);
-    registerModel(Member);
-    registerModel(Membership);
-    registerModel(Club);
-    registerModel(Sponsor);
-    registerModel(Pet);
-    registerModel(Owner);
-    registerModel(Job);
-    registerModel(Reference);
-    registerModel(Essay);
   });
   it("should work inverse of with eager load", async () => {
     const author = authors("david");
