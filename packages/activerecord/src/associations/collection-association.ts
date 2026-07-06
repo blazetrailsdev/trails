@@ -66,11 +66,13 @@ export class CollectionAssociation extends Association {
    */
   async idsReader(): Promise<unknown[]> {
     // Rails `ids_reader` plucks `reflection.association_primary_key` in all
-    // three branches, not the target model's own primary key. For a
-    // custom-PK association (e.g. `Category.primary_key == "name"`, or a
-    // has_many with an explicit `primary_key:`) this is the association's own
-    // key, so the reader must resolve it off the rich reflection (as
-    // `idsWriter` does) rather than reading `klass.primaryKey`.
+    // three branches. For a plain has_many this is the target model's own
+    // primary key, but for a custom-PK target (e.g. `Subscriber.primary_key
+    // == "nick"`) or a through association (where it delegates to the source
+    // reflection's `association_primary_key`, e.g. `Category.primary_key ==
+    // "name"` behind `author.essay_categories`) it is the association's own
+    // key. Resolve it off the rich reflection (as `idsWriter` does) rather
+    // than reading `klass.primaryKey`.
     const pk = this.associationPrimaryKey();
     const keys = Array.isArray(pk) ? pk : [pk];
     const readKey = (r: Base): unknown => {
