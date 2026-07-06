@@ -52,6 +52,7 @@ import {
 } from "./callbacks.js";
 import {
   serializableHash,
+  serializableAddIncludes,
   SerializeOptions,
   asJsonThenable,
   readAttributeForSerialization as serializationReadAttributeForSerialization,
@@ -168,6 +169,75 @@ const XML_MINI_TYPE_NAMES: Record<string, string> = {
   time: "time",
   binary: "binary",
 };
+
+/**
+ * A cast-derived type map for one serialized hash level, mirroring the
+ * column-type table Rails builds per-record in its XML serializer. `types`
+ * maps each scalar attribute key to its `XmlMini` `type=` name; `nested`
+ * carries the same info for each `include`d association keyed by association
+ * name, so a nested numeric column keeps an adapter-stable `type=` attribute
+ * even though `serializableHash` flattens the association into a plain object
+ * that no longer carries its model class.
+ */
+interface XmlTypeInfo {
+  types: Record<string, string>;
+  nested: Record<string, XmlTypeInfo>;
+}
+
+const EMPTY_XML_TYPE_INFO: XmlTypeInfo = { types: {}, nested: {} };
+
+/**
+ * Build the cast-derived {@link XmlTypeInfo} for a record's serialized `hash`,
+ * recursing into each `include`d association so nested numeric columns keep an
+ * adapter-stable `type=` attribute. This mirrors the per-record column-type
+ * table Rails' XML serializer carries for every included association: the
+ * flattened hash `serializableHash` produces no longer names the associated
+ * model, so we re-resolve the association readers (already loaded — no DB
+ * query) to reach each nested model's `typeForAttribute`.
+ *
+ * Mirrors: ActiveSupport::XmlMini::TYPE_NAMES applied to each attribute's cast
+ * type, threaded through the association tree.
+ */
+function _xmlTypeInfo(
+  record: object,
+  hash: Record<string, unknown>,
+  options?: SerializeOptions,
+): XmlTypeInfo {
+  const ctor = record.constructor as typeof Model;
+  const types: Record<string, string> = {};
+  if (typeof ctor.typeForAttribute === "function") {
+    for (const key of Object.keys(hash)) {
+      const xmlName = XML_MINI_TYPE_NAMES[ctor.typeForAttribute(key).type()];
+      if (xmlName) types[key] = xmlName;
+    }
+  }
+
+  const nested: Record<string, XmlTypeInfo> = {};
+  if (options?.include != null) {
+    serializableAddIncludes(record as SerializationRecord, options, (assocName, records, opts) => {
+      const subValue = hash[assocName];
+      // A collection include flattens to an array of hashes; a singular include
+      // to one hash. Every element of a collection shares a model class, so the
+      // representative (first) record's type info applies to all `<item>`s.
+      let repRecord: unknown;
+      let repHash: unknown;
+      if (Array.isArray(subValue)) {
+        if (subValue.length === 0) return;
+        repHash = subValue[0];
+        const items = Array.isArray(records) ? records : Array.from(records as Iterable<unknown>);
+        repRecord = items[0];
+      } else {
+        repHash = subValue;
+        repRecord = records;
+      }
+      if (repRecord && typeof repRecord === "object" && repHash && typeof repHash === "object") {
+        nested[assocName] = _xmlTypeInfo(repRecord, repHash as Record<string, unknown>, opts);
+      }
+    });
+  }
+
+  return { types, nested };
+}
 
 /**
  * Model — the base class that bundles Attributes, Validations, Callbacks,
@@ -2292,35 +2362,14 @@ export class Model {
       options?.root ?? (this.constructor as typeof Model).modelName.singular,
       renameOptions,
     );
-    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false, this._xmlTypeMap(hash), renameOptions)}</${root}>`;
-  }
-
-  /**
-   * Map each top-level serialized key to its Rails `XmlMini` `type=` name,
-   * derived from the attribute's cast/column type rather than the JS runtime
-   * type of the materialized value. This keeps `type="integer"` on a bigint
-   * `id` even when PG/MariaDB hand it back as a JS `BigInt`/string instead of a
-   * `number`. Keys whose cast type has no XmlMini name (strings, unknown
-   * attributes) are omitted so the serializer falls back to runtime inference.
-   *
-   * Mirrors: ActiveSupport::XmlMini::TYPE_NAMES applied to the attribute's type.
-   */
-  private _xmlTypeMap(hash: Record<string, unknown>): Record<string, string> {
-    const ctor = this.constructor as typeof Model;
-    if (typeof ctor.typeForAttribute !== "function") return {};
-    const map: Record<string, string> = {};
-    for (const key of Object.keys(hash)) {
-      const xmlName = XML_MINI_TYPE_NAMES[ctor.typeForAttribute(key).type()];
-      if (xmlName) map[key] = xmlName;
-    }
-    return map;
+    return `<${root}>\n${this._hashToXml(hash, "  ", options?.skipTypes ?? false, _xmlTypeInfo(this, hash, options), renameOptions)}</${root}>`;
   }
 
   private _hashToXml(
     hash: Record<string, unknown>,
     indent: string,
     skipTypes = false,
-    typeMap: Record<string, string> = {},
+    typeInfo: XmlTypeInfo = EMPTY_XML_TYPE_INFO,
     renameOptions: RenameKeyOptions = {},
   ): string {
     // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
@@ -2333,7 +2382,7 @@ export class Model {
       // The cast/column type name (when known) overrides JS-runtime inference so
       // the `type=` attribute is adapter-agnostic (e.g. a bigint `id` stays
       // `type="integer"` whether it arrives as a JS number, BigInt, or string).
-      const castTypeName = typeMap[key];
+      const castTypeName = typeInfo.types[key];
       if (value === null || value === undefined) {
         xml += `${indent}<${tag} nil="true"/>\n`;
       } else if (
@@ -2348,7 +2397,7 @@ export class Model {
         !(value instanceof Temporal.PlainTime) &&
         !(value instanceof Temporal.ZonedDateTime)
       ) {
-        xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes, {}, renameOptions)}${indent}</${tag}>\n`;
+        xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}</${tag}>\n`;
         // boundary: legacy Date values serialize as ISO 8601 dateTime XML.
       } else if (value instanceof Date) {
         xml += `${indent}<${tag}${typeAttr("dateTime")}>${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
@@ -2356,7 +2405,7 @@ export class Model {
         xml += `${indent}<${tag}${typeAttr("array")}>\n`;
         for (const item of value) {
           if (typeof item === "object" && item !== null) {
-            xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ", skipTypes, {}, renameOptions)}${indent}  </item>\n`;
+            xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </item>\n`;
           } else {
             xml += `${indent}  <item>${this._escapeXml(String(item))}</item>\n`;
           }
