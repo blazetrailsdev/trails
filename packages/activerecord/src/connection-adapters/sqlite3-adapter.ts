@@ -26,6 +26,7 @@ import {
   canRemoveIndexByName,
 } from "./abstract/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
+import { sqlForInsert } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   ReadOnlyError,
@@ -626,6 +627,42 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         throw translated;
       }
     });
+  }
+
+  /**
+   * Mirrors Rails' abstract `exec_insert` → `sql_for_insert` → `internal_exec_query`
+   * for the multi-column RETURNING read-back. `executeMutation` runs INSERTs via
+   * better-sqlite3's `.run()`, which discards RETURNING rows, so a multi-column
+   * auto-populated-columns list (Rails `_create_record` zips every returning
+   * column) would come back with only the generated id. Route just that case
+   * through the row-returning `internalExecQuery` (`.all()`, bind-aware, and it
+   * materializes the transaction) and mark the transaction dirty as
+   * `executeMutation` would. Single-column / no-RETURNING inserts keep the
+   * `executeMutation` path (its `lastInsertRowid` yields the id).
+   */
+  override async execInsert(
+    sql: string,
+    name?: string | null,
+    binds: unknown[] = [],
+    pk?: string | false | null,
+    _sequenceName?: string | null,
+    returning?: string[] | null,
+  ): Promise<Result | number> {
+    if (returning && returning.length > 1) {
+      const [returningSql, returningBinds] = sqlForInsert.call(
+        this as never,
+        sql,
+        pk ?? null,
+        binds,
+        returning,
+      );
+      if (/\sRETURNING\s/i.test(returningSql)) {
+        const result = await this.internalExecQuery(returningSql, name ?? "SQL", returningBinds);
+        this.dirtyCurrentTransaction();
+        return result;
+      }
+    }
+    return this.executeMutation(sql, binds, name ?? "SQL");
   }
 
   /**
@@ -3140,6 +3177,12 @@ function translateException(
 // schema changes — the trails analogue of Rails' `dirties_query_cache base,
 // :execute` for the write side.
 dirtiesQueryCache(AbstractSQLite3Adapter, "executeMutation");
+// `execInsert`'s multi-column RETURNING read-back runs through `internalExecQuery`
+// rather than `executeMutation`, so dirty it too — otherwise a subsequent read
+// could be served stale from the query cache after such an INSERT. (The
+// single-column path delegates to `executeMutation`, which is already dirtied;
+// the double-clear there is a harmless no-op.)
+dirtiesQueryCache(AbstractSQLite3Adapter, "execInsert");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers

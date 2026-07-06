@@ -1635,6 +1635,7 @@ export const DatabaseStatements = {
     binds?: unknown[],
     _pk?: string | false | null,
     _sequenceName?: string | null,
+    _returning?: string[] | null,
   ): Promise<number> {
     return this.executeMutation(sql, binds, name ?? "SQL");
   },

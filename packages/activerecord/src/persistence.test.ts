@@ -1900,18 +1900,20 @@ describe("QueryConstraintsTest", () => {
 // three guarded defs as three adapter-gated tests (each builds its adapter's
 // `defaults` table faithfully).
 //
-// Tracked-pending-convergence under RFC 0023-surfaced-deviations: trails'
-// insert path reads back only ONE column (the auto-increment PK) on INSERT,
-// not the full RETURNING row, so DB-populated non-PK columns come back nil
-// after `create` (documented in base.ts `_createRecord`). Rails zips every
-// auto-populated column. Each test therefore `ctx.skip()`s ahead of its
-// assertions pending
-// rfcs/0023-surfaced-deviations/stories/insert-read-back-auto-populated-columns.md
-// (drop the `ctx.skip()` line to un-skip once the read-back is fixed).
+// base.ts `_createRecord` reads back every auto-populated column via a
+// multi-column RETURNING on adapters that support it (PG, SQLite >= 3.35,
+// MariaDB), mirroring Rails `_create_record`'s `returning_columns.zip(
+// returning_values)`, so DB-computed defaults are visible on the record
+// returned by `create`.
 // ==========================================================================
 describe("PersistenceTest", () => {
   registerModel(Default);
-  fixtures([]);
+  // The adapter-specific `defaults` table is built and dropped with DDL inside
+  // each test; MySQL implicitly commits on DDL, which detonates a wrapping
+  // transactional-fixtures savepoint (ROLLBACK TO SAVEPOINT then fails). Run this
+  // suite non-transactionally — the `defaults` table is torn down in a `finally`
+  // regardless — matching the other DDL-driven suites.
+  fixtures([], { useTransactionalTests: false });
 
   async function buildDefaultsTable() {
     const connection = Base.connection;
@@ -2005,8 +2007,7 @@ describe("PersistenceTest", () => {
   }
 
   // Rails: `if current_adapter?(:PostgreSQLAdapter)`.
-  it.skipIf(adapterType !== "postgres")("fills auto populated columns on creation", async (ctx) => {
-    ctx.skip(); // deviation: insert-read-back-auto-populated-columns
+  it.skipIf(adapterType !== "postgres")("fills auto populated columns on creation", async () => {
     await withDefaultsTable(async (record) => {
       expect(record.ruby_on_rails).toBe("Ruby on Rails");
       if ((Base.connection as PostgreSQLAdapter).supportsVirtualColumns()) {
@@ -2048,8 +2049,7 @@ describe("PersistenceTest", () => {
   });
 
   // Rails: `elsif current_adapter?(:SQLite3Adapter)`.
-  it.skipIf(adapterType !== "sqlite")("fills auto populated columns on creation", async (ctx) => {
-    ctx.skip(); // deviation: insert-read-back-auto-populated-columns
+  it.skipIf(adapterType !== "sqlite")("fills auto populated columns on creation", async () => {
     await withDefaultsTable((record) => {
       expect(record.ruby_on_rails).toBe("Ruby on Rails");
       expect(record.random_number).not.toBeNull();
@@ -2062,8 +2062,7 @@ describe("PersistenceTest", () => {
   });
 
   // Rails: `elsif current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`.
-  it.skipIf(adapterType !== "mysql")("fills auto populated columns on creation", async (ctx) => {
-    ctx.skip(); // deviation: insert-read-back-auto-populated-columns
+  it.skipIf(adapterType !== "mysql")("fills auto populated columns on creation", async () => {
     await withDefaultsTable((record) => {
       expect(record.char1).not.toBeNull();
       const supportsDefaultExpression =
