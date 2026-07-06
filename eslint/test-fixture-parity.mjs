@@ -7,11 +7,9 @@
  * `const { x } = useFixtures(...)` / `useHandlerFixtures(...)` destructuring
  * anywhere in scope.
  *
- * For `useHandlerTransactionalFixtures()` (no return value) — and for a
- * fixture surface called without destructuring a named accessor, e.g. the
- * RFC 0062 `fixtures([])` replacement — the check falls back to the
- * describe-scope presence check: those tests load fixtures transactionally
- * without a named accessor.
+ * For a fixture surface called without destructuring a named accessor —
+ * e.g. `fixtures([])` — the check falls back to the describe-scope presence
+ * check: those tests load fixtures transactionally without a named accessor.
  *
  * Skipped tests (it.skip / it.skipIf / it.todo / test.skip, and anything nested
  * in describe.skip / describe.todo) are exempt — they are the migration backlog
@@ -166,9 +164,8 @@ function destructuredNames(callNode) {
 
 /**
  * True for a zero-fixture surface call — the first argument is an empty array
- * literal, e.g. `fixtures([])`. This is the RFC 0062 replacement for
- * `useHandlerTransactionalFixtures()`: it wires the suite + per-test txn in
- * scope but seeds no rows and exposes no named accessor.
+ * literal, e.g. `fixtures([])`. It wires the suite + per-test txn in scope but
+ * seeds no rows and exposes no named accessor.
  */
 function isEmptyFixtureCall(callNode) {
   const first = callNode.arguments[0];
@@ -192,8 +189,6 @@ function collectCallNamesIn(node, out = new Set()) {
 
 // Fixture helpers that produce a named accessor via destructuring.
 const ACCESSOR_HELPERS = new Set(["useFixtures", "useHandlerFixtures", "fixtures"]);
-// Fixture helpers that satisfy the check without a named accessor.
-const TRANSACTIONAL_HELPERS = new Set(["useHandlerTransactionalFixtures"]);
 
 const rule = {
   meta: {
@@ -249,19 +244,13 @@ const rule = {
             }
             for (const n of names) s.add(n);
           } else if (isEmptyFixtureCall(node)) {
-            // A zero-fixture surface call (`fixtures([])`, the RFC 0062
-            // replacement for `useHandlerTransactionalFixtures()`) still wires
-            // the suite in scope, so — like the transactional helper — it
-            // satisfies the parity check via scope presence without a per-test
-            // accessor call. A non-empty call with no destructuring seeds rows
-            // but exposes no accessor, so it is left to fall through and warn.
+            // A zero-fixture surface call (`fixtures([])`) still wires the suite
+            // in scope, so it satisfies the parity check via scope presence
+            // without a per-test accessor call. A non-empty call with no
+            // destructuring seeds rows but exposes no accessor, so it is left to
+            // fall through and warn.
             transactionalScopes.add(scope);
           }
-          return;
-        }
-
-        if (TRANSACTIONAL_HELPERS.has(calleeName)) {
-          transactionalScopes.add(nearestScope(node));
           return;
         }
 
