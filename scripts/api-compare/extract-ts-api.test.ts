@@ -288,6 +288,23 @@ describe("body call capture", () => {
     const m = cls.instanceMethods.find((m) => m.name === "reset")!;
     expect(m.calls).toEqual(["dup"]);
   });
+
+  it("does not credit a destructuring-assignment target as a value read", () => {
+    // A property access nested in a destructuring LHS is still a write, mirroring
+    // the `foo=` setter — array-pattern (`[this.foo] = arr`) and object-pattern
+    // (`({ a: this.bar } = obj)`) targets must be skipped, while the RHS reads
+    // (`arr.pop`, `obj.build`) are still credited.
+    const cls = extractFromSource(
+      `class Foo {
+        reset(arr, obj) {
+          [this.foo] = arr.pop();
+          ({ a: this.bar } = obj.build());
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "reset")!;
+    expect(m.calls).toEqual(["build", "pop"]);
+  });
 });
 
 describe("body call capture — renamed-import aliases", () => {

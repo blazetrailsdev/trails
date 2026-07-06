@@ -1180,7 +1180,7 @@
     "tsFile": "metal.ts",
     "rubyName": "performed?",
     "call": "response_body",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
@@ -1446,14 +1446,14 @@
     "tsFile": "metal/etag-with-template-digest.ts",
     "rubyName": "pick_template_for_etag",
     "call": "find_all",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
     "tsFile": "metal/etag-with-template-digest.ts",
     "rubyName": "pick_template_for_etag",
     "call": "first",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
@@ -1677,14 +1677,14 @@
     "tsFile": "metal/live.ts",
     "rubyName": "abort",
     "call": "clear",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
     "tsFile": "metal/live.ts",
     "rubyName": "abort",
     "call": "synchronize",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
@@ -1852,14 +1852,14 @@
     "tsFile": "metal/mime-responds.ts",
     "rubyName": "any_response?",
     "call": "fetch",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
     "tsFile": "metal/mime-responds.ts",
     "rubyName": "any_response?",
     "call": "format",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
@@ -2370,7 +2370,7 @@
     "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "reset",
     "call": "delete",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
@@ -2965,14 +2965,14 @@
     "tsFile": "renderer.ts",
     "rubyName": "env_for_request",
     "call": "key?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
     "tsFile": "renderer.ts",
     "rubyName": "env_for_request",
     "call": "merge",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
@@ -3140,7 +3140,7 @@
     "tsFile": "test-case.ts",
     "rubyName": "controller_class_name",
     "call": "anonymous?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actioncontroller",
@@ -3917,7 +3917,7 @@
     "tsFile": "http/mime-type.ts",
     "rubyName": "ref",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -3952,7 +3952,7 @@
     "tsFile": "http/mime-type.ts",
     "rubyName": "to_str",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -4176,21 +4176,21 @@
     "tsFile": "http/request.ts",
     "rubyName": "engine_script_name",
     "call": "get_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "engine_script_name=",
     "call": "routes",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "engine_script_name=",
     "call": "set_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -4204,49 +4204,49 @@
     "tsFile": "http/request.ts",
     "rubyName": "GET",
     "call": "action_encoding_template",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "GET",
     "call": "fetch_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "GET",
     "call": "from_query_string",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "GET",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "GET",
     "call": "path_parameters",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "GET",
     "call": "set_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -4316,56 +4316,56 @@
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "action_encoding_template",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "fetch_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "from_hash",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "from_pairs",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "params_parsers",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "parse_formatted_parameters",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "POST",
     "call": "path_parameters",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -4918,7 +4918,7 @@
     "tsFile": "journey/nodes/node.ts",
     "rubyName": "glob?",
     "call": "any?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -5275,7 +5275,7 @@
     "tsFile": "middleware/cookies.ts",
     "rubyName": "have_cookie_jar?",
     "call": "has_header?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -5310,7 +5310,7 @@
     "tsFile": "middleware/cookies.ts",
     "rubyName": "serializer",
     "call": "cookies_serializer",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -5555,42 +5555,42 @@
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
     "call": "each",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
     "call": "key?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
     "call": "map",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
     "call": "method_name",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -5716,7 +5716,7 @@
     "tsFile": "middleware/flash.ts",
     "rubyName": "flash_hash",
     "call": "get_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -5912,7 +5912,7 @@
     "tsFile": "middleware/session/abstract-store.ts",
     "rubyName": "initialize_sid",
     "call": "delete",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -5926,7 +5926,7 @@
     "tsFile": "middleware/session/mem-cache-store.ts",
     "rubyName": "initialize_sid",
     "call": "delete",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -6143,7 +6143,7 @@
     "tsFile": "middleware/stack.ts",
     "rubyName": "last",
     "call": "middlewares",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -6444,7 +6444,7 @@
     "tsFile": "request/session.ts",
     "rubyName": "find",
     "call": "get_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -7221,7 +7221,7 @@
     "tsFile": "routing/mapper.ts",
     "rubyName": "nested_scope?",
     "call": "nested?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -8481,35 +8481,35 @@
     "tsFile": "system-testing/driver.ts",
     "rubyName": "browser_options",
     "call": "compact",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "system-testing/driver.ts",
     "rubyName": "browser_options",
     "call": "merge",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "system-testing/driver.ts",
     "rubyName": "browser_options",
     "call": "options",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "system-testing/driver.ts",
     "rubyName": "initialize",
     "call": "delete",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "system-testing/driver.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -8803,14 +8803,14 @@
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "reset_routes",
     "call": "app",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "reset_routes",
     "call": "redefine_method",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -9153,28 +9153,28 @@
     "tsFile": "testing/integration.ts",
     "rubyName": "url_options",
     "call": "controller",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "url_options",
     "call": "default_url_options",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "url_options",
     "call": "reverse_merge!",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "testing/integration.ts",
     "rubyName": "url_options",
     "call": "routes",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
@@ -9237,7 +9237,7 @@
     "tsFile": "gem-version.ts",
     "rubyName": "gem_version",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "actionview",
@@ -10273,14 +10273,14 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "attribute_alias",
     "call": "attribute_aliases",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
     "rubyName": "attribute_alias",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
@@ -10483,14 +10483,14 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "generated_attribute_methods",
     "call": "include",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
     "rubyName": "generated_attribute_methods",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
@@ -10511,14 +10511,14 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "resolve_attribute_name",
     "call": "attribute_aliases",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
     "rubyName": "resolve_attribute_name",
     "call": "fetch",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
@@ -10637,7 +10637,7 @@
     "tsFile": "attribute-set.ts",
     "rubyName": "cast_types",
     "call": "transform_values",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
@@ -10840,7 +10840,7 @@
     "tsFile": "dirty.ts",
     "rubyName": "as_json",
     "call": "merge",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
@@ -10896,14 +10896,14 @@
     "tsFile": "dirty.ts",
     "rubyName": "attribute_previous_change",
     "call": "change_to_attribute",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
     "tsFile": "dirty.ts",
     "rubyName": "attribute_previous_change",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
@@ -11981,7 +11981,7 @@
     "tsFile": "type/value.ts",
     "rubyName": "initialize",
     "call": "serialize_cast_value_compatible?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activemodel",
@@ -12982,7 +12982,7 @@
     "tsFile": "associations/association.ts",
     "rubyName": "marshal_dump",
     "call": "map",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -16314,14 +16314,14 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "initialize_generated_modules",
     "call": "include",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
     "rubyName": "initialize_generated_modules",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -16349,7 +16349,7 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "method_defined_within?",
     "call": "owner",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -16615,14 +16615,14 @@
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_change_to_be_saved",
     "call": "change_to_attribute",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_change_to_be_saved",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -16650,14 +16650,14 @@
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "saved_change_to_attribute",
     "call": "change_to_attribute",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "saved_change_to_attribute",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -16762,14 +16762,14 @@
     "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "instance_method_already_implemented?",
     "call": "include?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/primary-key.ts",
     "rubyName": "instance_method_already_implemented?",
     "call": "primary_key",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -18526,7 +18526,7 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "extended_type_map_key",
     "call": "emulate_booleans",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -18589,7 +18589,7 @@
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "mariadb?",
     "call": "match?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -19065,14 +19065,14 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "connected?",
     "call": "any?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "connected?",
     "call": "synchronize",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -19352,7 +19352,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
     "rubyName": "any_waiting?",
     "call": "synchronize",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -19366,14 +19366,14 @@
     "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
     "rubyName": "can_remove_no_wait?",
     "call": "size",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
     "rubyName": "clear",
     "call": "synchronize",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -19394,7 +19394,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
     "rubyName": "num_waiting",
     "call": "synchronize",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -19793,21 +19793,21 @@
     "tsFile": "connection-adapters/abstract/query-cache.ts",
     "rubyName": "query_cache",
     "call": "compute_if_absent",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/query-cache.ts",
     "rubyName": "query_cache",
     "call": "context",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/query-cache.ts",
     "rubyName": "query_cache",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -19919,7 +19919,7 @@
     "tsFile": "connection-adapters/abstract/schema-creation.ts",
     "rubyName": "column_options",
     "call": "merge",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -20206,7 +20206,7 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "conditional_options",
     "call": "slice",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -20269,14 +20269,14 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "include?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "key?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -21088,7 +21088,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "extract_new_default_value",
     "call": "has_key?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -21165,7 +21165,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "foreign_keys_enabled?",
     "call": "fetch",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -21354,7 +21354,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "options_include_default?",
     "call": "include?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -22061,14 +22061,14 @@
     "tsFile": "connection-adapters/mysql/column.ts",
     "rubyName": "unsigned?",
     "call": "match?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql/column.ts",
     "rubyName": "virtual?",
     "call": "match?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -22243,21 +22243,21 @@
     "tsFile": "connection-adapters/mysql/schema-dumper.ts",
     "rubyName": "extract_expression_for_virtual_column",
     "call": "query_value",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql/schema-dumper.ts",
     "rubyName": "extract_expression_for_virtual_column",
     "call": "quote",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/mysql/schema-dumper.ts",
     "rubyName": "extract_expression_for_virtual_column",
     "call": "quote_column_name",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -23237,7 +23237,7 @@
     "tsFile": "connection-adapters/postgresql-adapter.ts",
     "rubyName": "supports_optimizer_hints?",
     "call": "extension_available?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -23265,14 +23265,14 @@
     "tsFile": "connection-adapters/postgresql/column.ts",
     "rubyName": "virtual?",
     "call": "present?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "affected_rows",
     "call": "clear",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -23363,7 +23363,7 @@
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -23783,7 +23783,7 @@
     "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
     "rubyName": "export_name_on_schema_dump?",
     "call": "match?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -23888,7 +23888,7 @@
     "tsFile": "connection-adapters/postgresql/utils.ts",
     "rubyName": "to_s",
     "call": "join",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -24952,7 +24952,7 @@
     "tsFile": "connection-adapters/sqlite3/database-statements.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -25561,7 +25561,7 @@
     "tsFile": "core.ts",
     "rubyName": "configurations=",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -25582,7 +25582,7 @@
     "tsFile": "core.ts",
     "rubyName": "connection_class?",
     "call": "connection_class",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -25778,14 +25778,14 @@
     "tsFile": "core.ts",
     "rubyName": "init_internals",
     "call": "define_attribute_methods",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "core.ts",
     "rubyName": "init_internals",
     "call": "primary_key",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -26261,7 +26261,7 @@
     "tsFile": "database-configurations/hash-config.ts",
     "rubyName": "database_tasks?",
     "call": "fetch",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -26436,14 +26436,14 @@
     "tsFile": "encryption.ts",
     "rubyName": "context",
     "call": "default_context",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption.ts",
     "rubyName": "current_custom_context",
     "call": "last",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -26919,14 +26919,14 @@
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "has_encrypted_attributes?",
     "call": "encrypted_attributes",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "has_encrypted_attributes?",
     "call": "present?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -27024,14 +27024,14 @@
     "tsFile": "encryption/encrypted-attribute-type.ts",
     "rubyName": "decryption_options",
     "call": "compact",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encrypted-attribute-type.ts",
     "rubyName": "encryption_options",
     "call": "compact",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -27325,14 +27325,14 @@
     "tsFile": "encryption/key-provider.ts",
     "rubyName": "encryption_key",
     "call": "id",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/key-provider.ts",
     "rubyName": "encryption_key",
     "call": "last",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -27682,14 +27682,14 @@
     "tsFile": "errors.ts",
     "rubyName": "set_query",
     "call": "call",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "errors.ts",
     "rubyName": "set_query",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -28081,7 +28081,7 @@
     "tsFile": "insert-all.ts",
     "rubyName": "resolve_attribute_alias",
     "call": "attribute_alias",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -28368,14 +28368,14 @@
     "tsFile": "locking/optimistic.ts",
     "rubyName": "locking_column=",
     "call": "reload_schema_from_cache",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "locking/optimistic.ts",
     "rubyName": "locking_column=",
     "call": "to_s",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -29159,7 +29159,7 @@
     "tsFile": "migration.ts",
     "rubyName": "reverting?",
     "call": "connection",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -30209,7 +30209,7 @@
     "tsFile": "no-touching.ts",
     "rubyName": "no_touching?",
     "call": "applied_to?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -31385,21 +31385,21 @@
     "tsFile": "relation.ts",
     "rubyName": "alias_tracker",
     "call": "connection_pool",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "alias_tracker",
     "call": "create",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "alias_tracker",
     "call": "model",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -35424,14 +35424,14 @@
     "tsFile": "relation.ts",
     "rubyName": "none?",
     "call": "empty?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "none?",
     "call": "present?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -35718,42 +35718,42 @@
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "call",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "each",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "includes_values",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "new",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "preload_values",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "strict_loading_value",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -38406,63 +38406,63 @@
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "empty?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "find",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "includes_values",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "includes!",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "model",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "preload_values",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "preload!",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "reflect_on_all_associations",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "relation",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -38749,14 +38749,14 @@
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "handler_for",
     "call": "detect",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "handler_for",
     "call": "last",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -38868,7 +38868,7 @@
     "tsFile": "relation/predicate-builder/polymorphic-array-value.ts",
     "rubyName": "klass",
     "call": "model",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -38980,7 +38980,7 @@
     "tsFile": "relation/query-attribute.ts",
     "rubyName": "unboundable?",
     "call": "serializable?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -40912,7 +40912,7 @@
     "tsFile": "scoping.ts",
     "rubyName": "scope_attributes?",
     "call": "any?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -41885,7 +41885,7 @@
     "tsFile": "tasks/mysql-database-tasks.ts",
     "rubyName": "collation",
     "call": "connection",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -42039,7 +42039,7 @@
     "tsFile": "tasks/postgresql-database-tasks.ts",
     "rubyName": "collation",
     "call": "connection",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -42872,14 +42872,14 @@
     "tsFile": "type.ts",
     "rubyName": "adapter_name_from",
     "call": "adapter",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "type.ts",
     "rubyName": "adapter_name_from",
     "call": "connection_db_config",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -42991,7 +42991,7 @@
     "tsFile": "validations.ts",
     "rubyName": "custom_validation_context?",
     "call": "exclude?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -43376,28 +43376,28 @@
     "tsFile": "cache.ts",
     "rubyName": "namespace_key",
     "call": "call",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "namespace_key",
     "call": "key?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "normalize_options",
     "call": "each",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "normalize_options",
     "call": "key?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
@@ -43782,7 +43782,7 @@
     "tsFile": "callbacks.ts",
     "rubyName": "duplicates?",
     "call": "matches?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
@@ -44230,14 +44230,14 @@
     "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "any?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "include?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
@@ -44321,7 +44321,7 @@
     "tsFile": "encrypted-file.ts",
     "rubyName": "read_env_key",
     "call": "presence",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
@@ -44545,7 +44545,7 @@
     "tsFile": "error-reporter.ts",
     "rubyName": "set_context",
     "call": "set",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
@@ -44951,7 +44951,7 @@
     "tsFile": "number-helper/number-to-phone-converter.ts",
     "rubyName": "country_code",
     "call": "blank?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activesupport",
@@ -47499,7 +47499,7 @@
     "tsFile": "signed-global-id.ts",
     "rubyName": "pick_purpose",
     "call": "fetch",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "globalid",
@@ -47569,7 +47569,7 @@
     "tsFile": "uri/gid.ts",
     "rubyName": "to_s",
     "call": "query",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "globalid",
@@ -47730,14 +47730,14 @@
     "tsFile": "cascade.ts",
     "rubyName": "initialize",
     "call": "add",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
     "tsFile": "cascade.ts",
     "rubyName": "initialize",
     "call": "each",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
@@ -47905,7 +47905,7 @@
     "tsFile": "deflater.ts",
     "rubyName": "initialize",
     "call": "fetch",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
@@ -48381,7 +48381,7 @@
     "tsFile": "mock-response.ts",
     "rubyName": "cookie",
     "call": "fetch",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
@@ -48682,28 +48682,28 @@
     "tsFile": "request.ts",
     "rubyName": "add_header",
     "call": "get_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
     "tsFile": "request.ts",
     "rubyName": "add_header",
     "call": "has_header?",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
     "tsFile": "request.ts",
     "rubyName": "add_header",
     "call": "set_header",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
     "tsFile": "request.ts",
     "rubyName": "delete_header",
     "call": "delete",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "rack",
@@ -49536,7 +49536,7 @@
     "tsFile": "engine/configuration.ts",
     "rubyName": "all_eager_load_paths",
     "call": "eager_load",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "trailties",
@@ -50131,7 +50131,7 @@
     "tsFile": "generators/rails/script/script-generator.ts",
     "rubyName": "depth",
     "call": "size",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "trailties",
@@ -50145,7 +50145,7 @@
     "tsFile": "generators/resource-helpers.ts",
     "rubyName": "controller_file_path",
     "call": "join",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "trailties",
@@ -50341,7 +50341,7 @@
     "tsFile": "paths.ts",
     "rubyName": "initialize",
     "call": "eager_load!",
-    "reason": "Value-accessor read now credited (credit-value-accessor-reads-in-wide-call-gate): this method reads accessor-backed value methods whose faithful TS mirror is a get-accessor READ; extractCalls now credits those reads, surfacing a real or bucket-(b)/(c) wide-call flag that the empty-call-set skip previously hid. Pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "trailties",

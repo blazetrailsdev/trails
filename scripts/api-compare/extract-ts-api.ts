@@ -1690,6 +1690,43 @@ function collectImportAliases(sourceFile: ts.SourceFile): Map<string, string> {
  * captured: the calls-parity check only acts on SIGNIFICANT_CALLS, none of
  * which are accessor-shaped, so accessors would contribute no signal.
  */
+// Whether a property access is the write target of an assignment — either a
+// direct LHS (`this.foo = x`) or nested inside a destructuring-assignment LHS
+// (`[this.foo] = arr`, `({ a: this.foo } = obj)`). In destructuring the LHS is
+// an array/object literal (not a binding pattern, since this is an assignment
+// not a declaration), so walk up through those literal shapes until reaching the
+// enclosing `=` BinaryExpression whose `left` is the access (or its container).
+// A write mirrors Ruby's writer send `foo=`, not the reader `foo`, so callers
+// skip crediting it. Compound assignments (`+=`, `||=`) are intentionally NOT
+// matched: `self.foo += x` desugars to `self.foo = self.foo + x`, which really
+// does call the reader.
+function isAssignmentWriteTarget(access: ts.PropertyAccessExpression): boolean {
+  let node: ts.Node = access;
+  let parent = node.parent as ts.Node | undefined;
+  while (parent !== undefined) {
+    if (ts.isBinaryExpression(parent) && parent.operatorToken.kind === ts.SyntaxKind.EqualsToken) {
+      return parent.left === node;
+    }
+    // Ascend only through the node shapes a destructuring-assignment LHS is
+    // built from; anything else means `access` is in a read position.
+    if (
+      ts.isArrayLiteralExpression(parent) ||
+      ts.isObjectLiteralExpression(parent) ||
+      ts.isPropertyAssignment(parent) ||
+      ts.isShorthandPropertyAssignment(parent) ||
+      ts.isSpreadAssignment(parent) ||
+      ts.isSpreadElement(parent) ||
+      ts.isParenthesizedExpression(parent)
+    ) {
+      node = parent;
+      parent = node.parent;
+      continue;
+    }
+    return false;
+  }
+  return false;
+}
+
 function extractCalls(node: ts.Node | undefined): string[] | undefined {
   if (!node) return undefined;
   const aliases = currentImportAliases;
@@ -1729,25 +1766,23 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
         names.add("super");
       }
     } else if (ts.isPropertyAccessExpression(n)) {
-      // A get-accessor READ (`this.joinsValues`) is the faithful TS mirror of a
-      // Ruby value-method call (`joins_values`) — Ruby has no attribute reads,
-      // only method sends, so a plain read IS a call there. Credit the property
-      // name so such reads count toward the ported call set, matching Ruby's
+      // A property READ (`this.joinsValues`, `obj.nested`) is the faithful TS
+      // mirror of a Ruby method send: Ruby has no public field access on ANY
+      // receiver — `x.foo` is always a call to `foo` on `x`, whether `x` is
+      // `self` or another object — so a plain read IS a call there. The rule is
+      // therefore receiver-agnostic (not `this`-only): credit the property name
+      // so any read counts toward the ported call set, matching Ruby's
       // reader-call semantics. Two accesses are NOT reads and are skipped:
       //   - the callee of a CallExpression (`this.foo(...)`): the isCall branch
       //     above already recorded `foo`, so crediting here double-records it;
-      //   - the target of an assignment (`this.foo = x`): that mirrors Ruby's
+      //   - the target of an assignment (`this.foo = x`, or a destructuring LHS
+      //     `[this.foo] = arr` / `({ a: this.foo } = obj)`): that mirrors Ruby's
       //     writer send `foo=`, not the reader `foo` — crediting the reader name
       //     would be unfaithful (and makes the call set body-shape dependent).
       const parent = n.parent;
       const isCallCallee =
         parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
-      const isAssignTarget =
-        parent !== undefined &&
-        ts.isBinaryExpression(parent) &&
-        parent.left === n &&
-        parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
-      if (!isCallCallee && !isAssignTarget) {
+      if (!isCallCallee && !isAssignmentWriteTarget(n)) {
         names.add(n.name.text);
       }
     }
