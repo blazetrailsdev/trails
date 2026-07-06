@@ -266,7 +266,15 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     // themselves again, causing a stack overflow. This test uses StubAdapter, which
     // does NOT override foreignKeys or removeForeignKey, so it hits the base
     // SchemaStatements code paths (not a concrete adapter shortcut).
-    const stub = new StubAdapter();
+    // AbstractAdapter.supports_foreign_keys? is false by default (Rails), which
+    // would short-circuit removeForeignKey via the use_foreign_keys? guard; opt
+    // in so the recursion-prone base path is actually exercised.
+    class FkStub extends StubAdapter {
+      isUseForeignKeys() {
+        return true;
+      }
+    }
+    const stub = new FkStub();
     // foreignKeys base path returns [] when adapter has no override
     const fks = await stub.foreignKeys("any_table");
     expect(fks).toEqual([]);
@@ -300,6 +308,43 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     await expect(
       stub.removeForeignKey("products", { name: "wrong_name", toTable: "other", ifExists: true }),
     ).rejects.toThrow(/no foreign key/i);
+  });
+
+  it("addForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
+    // Rails: add_foreign_key begins with `return unless use_foreign_keys?`.
+    // StubAdapter inherits AbstractAdapter.supports_foreign_keys? == false, so
+    // use_foreign_keys? is false through the real composition (no stubbing of
+    // the aggregate) — the guard must short-circuit before any SQL is emitted.
+    let executed = false;
+    class NoFkAdapter extends StubAdapter {
+      executeMutation(_sql: string) {
+        executed = true;
+        return Promise.resolve(0);
+      }
+    }
+    const stub = new NoFkAdapter();
+    expect((stub as any).isUseForeignKeys()).toBe(false);
+    await stub.addForeignKey("articles", "authors", { column: "author_id" });
+    expect(executed).toBe(false);
+  });
+
+  it("removeForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
+    // Rails: remove_foreign_key begins with `return unless use_foreign_keys?`.
+    // Without the guard this would reach foreign_key_for! and raise; the guard
+    // makes it a silent no-op when the adapter doesn't support foreign keys.
+    let executed = false;
+    class NoFkAdapter extends StubAdapter {
+      executeMutation(_sql: string) {
+        executed = true;
+        return Promise.resolve(0);
+      }
+    }
+    const stub = new NoFkAdapter();
+    expect((stub as any).isUseForeignKeys()).toBe(false);
+    await expect(
+      stub.removeForeignKey("articles", { name: "fk_whatever" }),
+    ).resolves.toBeUndefined();
+    expect(executed).toBe(false);
   });
 
   it("validColumnDefinitionOptions includes ifExists (Rails OPTION_NAMES)", () => {

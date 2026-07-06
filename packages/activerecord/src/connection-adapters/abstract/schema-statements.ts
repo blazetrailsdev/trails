@@ -783,6 +783,8 @@ export class SchemaStatements {
     ) {
       return fkAdapter.addForeignKey(fromTable, toTable, options);
     }
+    // Rails: return unless use_foreign_keys?
+    if (!this.isUseForeignKeys()) return;
     // Mirrors Rails' add_foreign_key short-circuit:
     //   return if options[:if_not_exists] == true &&
     //     foreign_key_exists?(from_table, to_table, **options.slice(:column))
@@ -843,6 +845,8 @@ export class SchemaStatements {
     ) {
       return adapter.removeForeignKey(fromTable, toTableOrOptions, options);
     }
+    // Rails: return unless use_foreign_keys?
+    if (!this.isUseForeignKeys()) return;
     // Mirrors Rails remove_foreign_key(from_table, to_table = nil, **options):
     // resolve the actual constraint via foreign_key_for! (matching column /
     // name / to_table against the live foreign keys) rather than deriving a

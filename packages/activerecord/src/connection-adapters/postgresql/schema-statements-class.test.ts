@@ -141,3 +141,28 @@ describe("PostgreSQLSchemaStatements#schemaSearchPath", () => {
     ).toBeNull();
   });
 });
+
+describe("PostgreSQLSchemaStatements#addForeignKey use_foreign_keys? guard", () => {
+  it("is a no-op when the adapter does not support foreign keys (Rails super guard)", async () => {
+    // Rails PG add_foreign_key is `assert_valid_deferrable(deferrable); super`,
+    // and the abstract super begins with `return unless use_foreign_keys?`.
+    // The override replicates the abstract body inline, so it must replicate the
+    // guard too — otherwise a real PG migration (which lands in this override,
+    // not the base method) emits ADD CONSTRAINT even when FKs are disabled.
+    const executed: string[] = [];
+    const adapter = {
+      adapterName: "postgres" as const,
+      supportsForeignKeys: () => false,
+      exec: vi.fn(async (sql: string) => {
+        executed.push(sql);
+      }),
+      executeMutation: vi.fn(async (sql: string) => {
+        executed.push(sql);
+      }),
+    } as unknown as DatabaseAdapter;
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    expect(ss.isUseForeignKeys()).toBe(false);
+    await ss.addForeignKey("articles", "authors", { column: "author_id" });
+    expect(executed).toEqual([]);
+  });
+});
