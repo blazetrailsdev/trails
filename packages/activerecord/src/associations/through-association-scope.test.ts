@@ -36,6 +36,18 @@ registerModel(Comment);
   scope: (rel: any) => rel.annotate("preload-through"),
 });
 
+// A raw-SQL source-table condition whose text embeds the THROUGH table name
+// (`posts.`) inside a string literal. The through table is `posts`; a naive
+// text scan for a `posts.` qualifier would relocate this source predicate onto
+// the through query (a false positive), so this pins that string literals are
+// stripped before the qualifier scan.
+(Author as any).hasMany("commentsWithLiteralThroughRef", {
+  className: "Comment",
+  through: "posts",
+  source: "comments",
+  scope: (rel: any) => rel.where("comments.body = 'mention posts.title here'"),
+});
+
 describe("Preloader::ThroughAssociation#through_scope", () => {
   const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"]);
 
@@ -60,6 +72,20 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     const [row] = await Author.where({ id: david.id }).preload("annotatedComments");
     const comments = (row.association("annotatedComments").target ?? []) as any[];
     expect(comments.length).toBeGreaterThan(0);
+  });
+
+  it("does not relocate a source predicate whose string literal embeds the through table name", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithLiteralThroughRef");
+    const partition = (loader as any)._partitionReflectionWhere();
+    // The `posts.` token lives inside a string literal, so the predicate is a
+    // source-table condition and must stay on the source preloader.
+    expect(partition.throughPredicates).toHaveLength(0);
+    expect(partition.sourcePredicates).toHaveLength(1);
+
+    // And the through query must not carry the source predicate.
+    const scope = (loader as any)._buildThroughScope();
+    expect(scope.toSql()).not.toContain("mention posts.title here");
   });
 
   it("cascades strict loading from the preload scope onto the through query", async () => {

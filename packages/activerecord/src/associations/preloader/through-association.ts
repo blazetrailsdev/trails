@@ -795,12 +795,12 @@ function predicateReferencesTable(node: any, tableName: string): boolean {
  * True when a raw-SQL predicate node's text qualifies a column with `tableName.`.
  * Handles SqlLiteral / BoundSqlLiteral and a single Grouping wrapper.
  *
- * Heuristic: this scans the raw SQL for a `<table>.` qualifier token; it does
- * NOT parse the SQL, so a qualifier appearing inside a string literal (e.g.
- * `where("note = 'see memberships.x'")`) would be a false positive and relocate
- * a source-table predicate onto the through query. No current scope hits this;
- * raw-SQL through conditions are simple table-qualified comparisons. Arel/hash
- * predicates take the precise `fetchAttribute` path above and never reach here.
+ * Not a SQL parse but a qualifier scan: string literals are stripped first (see
+ * `stripSqlStringLiterals`) so a `<table>.` qualifier appearing inside a quoted
+ * literal — e.g. `where("note = 'see memberships.x'")` — is NOT a false positive
+ * and does not relocate a source-table predicate onto the through query.
+ * Arel/hash predicates take the precise `fetchAttribute` path above and never
+ * reach here.
  * @internal
  */
 function rawSqlReferencesTable(node: any, tableName: string): boolean {
@@ -811,8 +811,26 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
   if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
   else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
   if (typeof sql !== "string") return false;
+  sql = stripSqlStringLiterals(sql);
   const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   return new RegExp(`(^|[^\\w.])${escaped}\\.`).test(sql);
+}
+
+/**
+ * Blank out single-quoted SQL string literals (keeping length via spaces) so a
+ * `<table>.` qualifier scan does not match a table name embedded in literal
+ * text. Doubled single-quotes (`''`, SQL's escaped quote) are consumed as part
+ * of the literal. Double-quoted tokens are SQL identifiers, not literals, so
+ * they are left intact. `?` placeholders in a BoundSqlLiteral are outside any
+ * literal and unaffected.
+ * @internal
+ */
+function stripSqlStringLiterals(sql: string): string {
+  // Not query construction — this blanks literals purely so the read-only
+  // qualifier scan below does not match a table name inside quoted text. The
+  // result is never executed as SQL.
+  // eslint-disable-next-line blazetrails/no-raw-sql
+  return sql.replace(/'(?:[^']|'')*'/g, (lit) => " ".repeat(lit.length));
 }
 
 /**
@@ -824,9 +842,9 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
  *
  * Uses the same Arel `fetchAttribute` walk as `predicateReferencesTable` for
  * precise hash/Arel conditions, and the same raw-SQL qualifier scan as
- * `rawSqlReferencesTable` — extracting every `<word>.` qualifier and flagging any
- * not in `allowedTables`. The raw-SQL scan is a heuristic (a qualifier inside a
- * string literal would be a false positive); no current scope hits that, and hash
+ * `rawSqlReferencesTable` — string literals are stripped first, then every
+ * `<word>.` qualifier is extracted and any not in `allowedTables` is flagged. A
+ * `<table>.` qualifier inside a quoted literal is not a false positive; hash
  * predicates take the exact Arel path.
  * @internal
  */
@@ -860,6 +878,7 @@ function rawSqlReferencesForeignTable(node: any, allowed: Set<string>): boolean 
   if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
   else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
   if (typeof sql !== "string") return false;
+  sql = stripSqlStringLiterals(sql);
   const qualifierRe = /(^|[^\w.])(\w+)\s*\./g;
   let match: RegExpExecArray | null;
   while ((match = qualifierRe.exec(sql)) !== null) {
