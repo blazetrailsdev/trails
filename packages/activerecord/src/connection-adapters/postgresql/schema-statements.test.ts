@@ -378,6 +378,21 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS rating`);
     });
 
+    it("change column default with a bare object treats it as a literal default", async () => {
+      // Rails' extract_new_default_value only unwraps a Hash carrying BOTH
+      // :from and :to; a bare `{ to: ... }` without :from is the literal
+      // default, not a changes hash (schema_statements.rb:1820).
+      await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "config", "json");
+      await adapter.changeColumnDefault(`${SCHEMA_NAME}.${TABLE_NAME}`, "config", { to: 1 });
+      const rows = await adapter.schemaQuery(
+        `SELECT column_default FROM information_schema.columns
+         WHERE table_schema = $1 AND table_name = $2 AND column_name = 'config'`,
+        [SCHEMA_NAME, TABLE_NAME],
+      );
+      expect(rows[0].column_default).toMatch(/"to":\s*1/);
+      await adapter.exec(`ALTER TABLE ${SCHEMA_NAME}.${TABLE_NAME} DROP COLUMN IF EXISTS config`);
+    });
+
     it("change column null", async () => {
       await adapter.addColumn(`${SCHEMA_NAME}.${TABLE_NAME}`, "flag", "integer");
       await adapter.changeColumnNull(`${SCHEMA_NAME}.${TABLE_NAME}`, "flag", false);

@@ -975,13 +975,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const quotedTable = this._qt(tableName);
     const quotedCol = this._qi(columnName);
-    const defaultValue =
-      defaultOrChanges !== null &&
-      typeof defaultOrChanges === "object" &&
-      "from" in defaultOrChanges &&
-      "to" in defaultOrChanges
-        ? (defaultOrChanges as { from: unknown; to: unknown }).to
-        : defaultOrChanges;
+    const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
     if (defaultValue == null) {
       await this.adapter.executeMutation(
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,

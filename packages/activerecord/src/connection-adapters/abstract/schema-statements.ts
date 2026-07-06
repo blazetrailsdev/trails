@@ -638,10 +638,10 @@ export class SchemaStatements {
     ) {
       return adapter.changeColumnDefault(tableName, columnName, options);
     }
-    const defaultVal =
-      typeof options === "object" && options !== null && "to" in (options as any)
-        ? (options as any).to
-        : options;
+    // Rails unwraps a Hash to its :to only when it carries BOTH :from and :to
+    // (extract_new_default_value, schema_statements.rb:1820); a bare structured
+    // default like `{ to: 1 }` without :from is the literal default.
+    const defaultVal = this.extractNewDefaultValue(options);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const clause = this.adapter.quoteDefaultExpression(defaultVal);
     await this.adapter.executeMutation(
