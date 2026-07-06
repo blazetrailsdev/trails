@@ -759,22 +759,48 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Load and return all associated records.
    */
   async toArray(): Promise<T[]> {
-    // Rails `to_a` runs `merge_target_lists` (preferring in-memory records over
-    // fresh DB rows); we apply the same merge here. We deliberately do NOT yet
-    // hydrate/cache `_target` or mark the association loaded the way Rails'
-    // `load_target` does — `toArray` stays the cache-bypassing re-query path
-    // because bang mutations (`whereBang`/etc.) must re-query with the mutated
-    // scope without hydrating the association cache. Converging `toArray` onto
-    // full `load_target` hydration is tracked separately.
-    const results = await this._execLoad();
-    return this._mergeTargetLists(results);
+    // Rails `to_a` → `CollectionProxy#records` → `load_target`
+    // (collection_proxy.rb, collection_association.rb) hydrates and caches the
+    // association target (`@target = merge_target_lists(...)`) and marks it
+    // loaded. Delegate to `load` for that full hydrate-and-cache path.
+    //
+    // Keep the cache-bypassing re-query path when either (a) an in-place bang
+    // mutation (`whereBang`/`orderBang`/...) has diverged the proxy scope — this
+    // is effectively a scoped AssociationRelation whose `to_a` runs
+    // `exec_queries` without touching the owner's cached target — or (b)
+    // `find_target?` is false: a new-record owner with no foreign key present.
+    // Rails' `load_target` only assigns/caches `@target` from a query when
+    // `find_target?` (or the target is stale); for the new-record-without-FK
+    // case it leaves the in-memory target untouched, which for a through
+    // association means re-traversing the in-memory chain (`post.author.books`
+    // …) on each read rather than caching a scoped subset.
+    if (this._cpMutated || !this._findTarget()) {
+      const results = await this._execLoad();
+      return this._mergeTargetLists(results);
+    }
+    return this.load();
   }
 
   // @ts-expect-error CP's load returns the hydrated T[] (loaded records);
   //   Relation's returns LoadedRelation<this>. CP is thenable via load()
   //   so T[] is the correct contract here. Permanent divergence.
   async load(): Promise<T[]> {
-    if (this._targetLoaded) return this._target;
+    if (this._targetLoaded) {
+      // Mirror Rails `CollectionAssociation#reader`: `if stale_target? reload`.
+      // When the owner's foreign key has changed since the target was cached
+      // (`author = other`), the cache is stale and must be re-queried. Reset the
+      // wrapper so the post-load sync re-captures the new stale state (Rails
+      // `reload` → `reset` → `load_target`); otherwise return the cache.
+      const wrapper = this._staleWrapper();
+      if (!(wrapper?.isStaleTarget?.() ?? false)) return this._target;
+      // Stale (owner FK changed since load): fall through to re-query. Clear
+      // the CP's cached target so the stale records don't survive
+      // `merge_target_lists`; leave the wrapper's loaded/stale marker intact so
+      // `Association#association_scope` sees the staleness and rebuilds its
+      // cached JOIN scope from the new foreign key (association.ts:241).
+      this._target = [];
+      this._targetLoaded = false;
+    }
     const results = await this._execLoad();
     this._target = this._mergeTargetLists(results);
     this._targetLoaded = true;
@@ -866,6 +892,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   private get _isThrough(): boolean {
     return !!this._assocDef.options.through;
+  }
+
+  /**
+   * The owner's Association wrapper for this proxy, used to consult
+   * `isStaleTarget()` (Rails `Association#stale_target?`) so a cached target is
+   * re-queried after the owner's foreign key changes.
+   */
+  private _staleWrapper(): { isStaleTarget?: () => boolean } | undefined {
+    const rec = this._record as unknown as {
+      association?: (n: string) => { isStaleTarget?: () => boolean };
+    };
+    return typeof rec.association === "function" ? rec.association(this._assocName) : undefined;
   }
 
   /**
