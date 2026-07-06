@@ -871,6 +871,11 @@ export async function foreignKeys(
 interface IndexesHost {
   schemaQuery(sql: string, binds?: unknown[]): Promise<Record<string, unknown>[]>;
   quoteTableName(name: string): string;
+  // Version-gated in Rails (false on MariaDB < 10.8.1 / MySQL < 8.0.1): when
+  // false, `add_options_for_index_columns`'s `super` skips the DESC/ASC suffix
+  // (abstract/schema_statements.rb#add_index_sort_order), so a functional
+  // index's collapsed columns string must omit the order even when Collation="D".
+  supportsIndexSortOrder(): boolean;
 }
 
 /** @internal
@@ -998,7 +1003,11 @@ export async function indexes(
         const quotedColumns = new Map<string, string>(
           columns.map((c) => [c, expressions[c] ?? quoteColumnName(c)]),
         );
-        addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
+        addOptionsForIndexColumns(
+          quotedColumns,
+          { order: orders, length: lengths },
+          this.supportsIndexSortOrder(),
+        );
         return { ...base, columns: Array.from(quotedColumns.values()).join(", ") };
       }
       return {
