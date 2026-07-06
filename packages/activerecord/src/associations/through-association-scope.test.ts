@@ -48,6 +48,16 @@ registerModel(Comment);
   scope: (rel: any) => rel.where("comments.body = 'mention posts.title here'"),
 });
 
+// Positive control: a GENUINE through-table (`posts.`) qualifier — unquoted, a
+// real column reference — must still be relocated onto the through query. Pins
+// that stripping string literals does not break the true-positive path.
+(Author as any).hasMany("commentsWithRealThroughRef", {
+  className: "Comment",
+  through: "posts",
+  source: "comments",
+  scope: (rel: any) => rel.where("posts.title = 'welcome'"),
+});
+
 describe("Preloader::ThroughAssociation#through_scope", () => {
   const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"]);
 
@@ -86,6 +96,18 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     // And the through query must not carry the source predicate.
     const scope = (loader as any)._buildThroughScope();
     expect(scope.toSql()).not.toContain("mention posts.title here");
+  });
+
+  it("relocates a genuine through-table qualifier onto the through query", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithRealThroughRef");
+    const partition = (loader as any)._partitionReflectionWhere();
+    // `posts.title` is a real column reference on the through table.
+    expect(partition.throughPredicates).toHaveLength(1);
+    expect(partition.sourcePredicates).toHaveLength(0);
+
+    const scope = (loader as any)._buildThroughScope();
+    expect(scope.toSql()).toContain("posts.title");
   });
 
   it("cascades strict loading from the preload scope onto the through query", async () => {
