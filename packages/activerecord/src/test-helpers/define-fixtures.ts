@@ -358,6 +358,11 @@ function detectHabtmParts(
  * - `targetTable` — the associated model's table, used to resolve a target label
  *   to its fixture id (CRC32 fallback);
  * - `throughModel` — the through model, consulted for timestamp filling.
+ * - `isHabtm` — whether the reflection is a HABTM (`macro ===
+ *   "hasAndBelongsToMany"`). A HABTM join model is anonymous and owns its table
+ *   (no fixture set of its own), whereas a plain `has_many :through` join table
+ *   belongs to a real model whose fixture set is requested by name. This gates
+ *   the precise "join table not loaded" guard in the join-row insertion loop.
  */
 interface ThroughLabelAssoc {
   joinTable: string;
@@ -365,6 +370,7 @@ interface ThroughLabelAssoc {
   rhsKey: string;
   targetTable: string | undefined;
   throughModel: BaseClass | undefined;
+  isHabtm: boolean;
 }
 
 /**
@@ -383,6 +389,7 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
   for (const [name, refl] of Object.entries(reflections)) {
     const r = refl as {
+      macro?: string;
       isThroughReflection?: () => boolean;
       foreignKey?: string | string[];
       klass?: { tableName?: string };
@@ -404,7 +411,14 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
       ) {
         continue;
       }
-      out.set(name, { joinTable, lhsKey, rhsKey, targetTable: r.klass?.tableName, throughModel });
+      out.set(name, {
+        joinTable,
+        lhsKey,
+        rhsKey,
+        targetTable: r.klass?.tableName,
+        throughModel,
+        isHabtm: r.macro === "hasAndBelongsToMany",
+      });
     } catch {
       continue;
     }
@@ -433,14 +447,15 @@ export function throughLabelAssociations(ModelClass: BaseClass): Map<string, Thr
  * register) every transitively reachable model instead of throwing, leaking the
  * slice far past the requested sets.
  *
- * NOTE for the future wiring of {@link throughLabelAssociations} into actual
- * fixture loading: that materializer expands plain `has_many :through` labels
- * too, but this slice no longer creates those join tables implicitly. A test
- * whose fixture row expands a plain-through label must therefore also request the
- * through model's fixture set by name (so its table slices in) — otherwise the
- * load hits "no such table". HABTM labels are unaffected (their table is pulled
- * in here). Today `throughLabelAssociations` has no production caller, so there
- * is no live gap; this is a guard-rail for whoever wires it up.
+ * NOTE on the wiring of {@link throughLabelAssociations} into actual fixture
+ * loading (now live — `defineFixtures` materializes join rows from association
+ * labels): that materializer expands plain `has_many :through` labels too, but
+ * this slice does not create those join tables implicitly. A test whose fixture
+ * row expands a plain-through label must therefore also load the through model's
+ * fixture set by name (so its table exists) — otherwise `defineFixtures` throws a
+ * precise "join table \"…\" is not loaded" error naming the missing set (rather
+ * than an opaque "no such table"). HABTM labels are unaffected (their table is
+ * pulled in here).
  */
 export function throughJoinTableNames(ModelClass: BaseClass): string[] {
   const reflections: Record<string, unknown> = (ModelClass as any)._reflections ?? {};
@@ -865,7 +880,7 @@ export async function prepareModelFixtures(
   const throughLabelAssocs = throughLabelAssociations(ModelClass);
   const joinTableRows = new Map<
     string,
-    { rows: FixtureAttrs[]; throughModel: BaseClass | undefined }
+    { rows: FixtureAttrs[]; throughModel: BaseClass | undefined; isHabtm: boolean }
   >();
 
   const labels = Object.keys(fixtures);
@@ -979,6 +994,7 @@ export async function prepareModelFixtures(
           const accum = joinTableRows.get(labelAssoc.joinTable) ?? {
             rows: [],
             throughModel: labelAssoc.throughModel,
+            isHabtm: labelAssoc.isHabtm,
           };
           for (const target of targets) {
             accum.rows.push({
@@ -1222,8 +1238,25 @@ export async function prepareModelFixtures(
   // once here rather than per join table.
   if (joinTableRows.size > 0) {
     const now = currentTimeFromProperTimezone();
-    for (const [joinTable, { rows: jrows, throughModel }] of joinTableRows) {
+    for (const [joinTable, { rows: jrows, throughModel, isHabtm }] of joinTableRows) {
       if (jrows.length === 0) continue;
+      // A plain `has_many :through` join table belongs to a real through model
+      // whose fixture set — unlike a HABTM join model's anonymous table — is NOT
+      // pulled into the loaded schema implicitly (see throughJoinTableNames). If a
+      // row expands such a label but the requesting test never loaded that through
+      // set, the join table is absent; surface a precise error naming it rather
+      // than letting the INSERT fail with an opaque "no such table".
+      if (!isHabtm && typeof (adapter as any).tableExists === "function") {
+        const exists: boolean = await (adapter as any).tableExists(joinTable);
+        if (!exists) {
+          throw new Error(
+            `defineFixtures: ${tableName} fixtures expand a plain has_many :through ` +
+              `association whose join table "${joinTable}" is not loaded — the ` +
+              `requesting test must also load the "${joinTable}" fixture set by name ` +
+              `(plain-through join tables are not sliced in automatically; HABTM ones are)`,
+          );
+        }
+      }
       // Mirror Rails' HasManyThroughProxy#timestamp_column_names —
       // `through_reflection.klass.all_timestamp_attributes_in_model`: every
       // timestamp column the through model *has* (alias-resolved), gated only by

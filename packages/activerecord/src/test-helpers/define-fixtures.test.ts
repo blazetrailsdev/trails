@@ -281,6 +281,72 @@ describe("defineFixtures", () => {
     expect(insertCalls[0]).toContain(String(fixtureId("trails")));
   });
 
+  // A plain `has_many :through` reflection (macro !== "hasAndBelongsToMany"): the
+  // through model (`categorizations`) is a real model whose fixture set — unlike a
+  // HABTM join model's anonymous table — is requested by name, so `sliceSchema`
+  // does NOT pull its join table in implicitly. Its label still materializes join
+  // rows through the same HasManyThroughProxy arm as HABTM.
+  function makePlainThroughAuthor() {
+    const Categorization = makeModel("categorizations", new Map());
+    const Author = makeModel(
+      "authors",
+      new Map([[fixtureId("david"), { id: fixtureId("david"), name: "David" }]]),
+    );
+    Author._reflections = {
+      categorizedPosts: {
+        macro: "hasMany",
+        isThroughReflection: () => true,
+        foreignKey: "post_id",
+        klass: { tableName: "posts" },
+        throughReflection: {
+          foreignKey: "author_id",
+          klass: Categorization,
+          tableName: "categorizations",
+        },
+      },
+    };
+    return Author;
+  }
+
+  it("plain has_many :through label: materializes join rows into the through table when it is loaded", async () => {
+    const adapter = makeAdapter();
+    (adapter as any).tableExists = vi.fn(async () => true);
+    const Author = makePlainThroughAuthor();
+
+    await defineFixtures(adapter, Author, {
+      david: { name: "David", categorizedPosts: ["welcome"] },
+    });
+
+    const joinInsert = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO") && s.includes("categorizations"));
+    expect(joinInsert).toBeDefined();
+    // lhs = through_reflection.foreign_key (author_id) → owner id; rhs =
+    // association.foreign_key (post_id) → posts.welcome, which pins `id: 1`
+    // canonically (resolved through resolveFixtureId, like the HABTM path).
+    expect(joinInsert).toContain(String(fixtureId("david")));
+    expect(joinInsert).toMatch(/, 1\)/);
+    // The preflight consulted the through table by name before inserting.
+    expect((adapter as any).tableExists).toHaveBeenCalledWith("categorizations");
+  });
+
+  it("plain has_many :through label: unloaded through table surfaces a precise error, not 'no such table'", async () => {
+    const adapter = makeAdapter();
+    (adapter as any).tableExists = vi.fn(async () => false);
+    const Author = makePlainThroughAuthor();
+
+    await expect(
+      defineFixtures(adapter, Author, {
+        david: { name: "David", categorizedPosts: ["welcome"] },
+      }),
+    ).rejects.toThrow(/join table "categorizations" is not loaded/);
+    // The join-table INSERT must never have been attempted.
+    const joinInsert = (adapter.execute as ReturnType<typeof vi.fn>).mock.calls
+      .map((c: unknown[]) => c[0] as string)
+      .find((s) => s.includes("INSERT INTO") && s.includes("categorizations"));
+    expect(joinInsert).toBeUndefined();
+  });
+
   it("tableName registry: resolveModelForTable returns the model after defineFixtures", async () => {
     const adapter = makeAdapter();
     const rows = new Map([[fixtureId("david"), { id: fixtureId("david") }]]);
