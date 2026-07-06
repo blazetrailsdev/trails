@@ -1807,9 +1807,15 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // 1/0. Mirrors mysql2_adapter.rb's `Type.register(:string, ...)` block
     // (`Type::String.new(true: "1", false: "0")`) and its char/enum/set
     // registrations.
+    // char/varchar thread `extract_limit(sql_type)` onto the type
+    // (mysql2_adapter.rb:43-46, `register_type(%r(char)i)`), so
+    // `type_for_attribute(col).limit` reflects the column limit. enum/set
+    // register the limitless string (mysql2_adapter.rb:48-49).
+    const mysqlStringWithLimit = (sqlType: string) =>
+      new StringType({ trueString: "1", falseString: "0", limit: this.extractLimit(sqlType) });
     const mysqlString = () => new StringType({ trueString: "1", falseString: "0" });
-    m.registerType(/^char/i, undefined, mysqlString);
-    m.registerType(/^varchar/i, undefined, mysqlString);
+    m.registerType(/^char/i, undefined, mysqlStringWithLimit);
+    m.registerType(/^varchar/i, undefined, mysqlStringWithLimit);
     m.registerType(/^enum/i, undefined, mysqlString);
     m.registerType(/^set/i, undefined, mysqlString);
     m.registerType(/^binary/i, undefined, () => new BinaryType());
