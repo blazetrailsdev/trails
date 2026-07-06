@@ -2117,7 +2117,16 @@ export class Relation<T extends Base> {
     // / belongsTo / polymorphic `as`) rather than re-deriving inline, so a
     // polymorphic or explicitly-keyed inverse resolves correctly too.
     if (reflection.options.inverseOf != null && inferFromInverseOf) {
-      const targetClassName = reflection.options.className ?? _camelize(_singularize(name));
+      // Mirror Rails' `derive_class_name` (reflection.rb:812-816): only a
+      // collection association singularizes before camelizing; belongsTo/hasOne
+      // camelize the name as-is. Matches the `isPlural` branching at the fallback
+      // resolver above rather than singularizing unconditionally.
+      const isPlural =
+        reflection.type === "hasMany" ||
+        reflection.type === "hasAndBelongsToMany" ||
+        (reflection.type as string) === "hasManyThrough";
+      const targetClassName =
+        reflection.options.className ?? _camelize(isPlural ? _singularize(name) : name);
       const targetModel: any = modelRegistry.get(targetClassName);
       const inverse = (targetModel?._associations ?? []).find(
         (a: any) => a.name === reflection.options.inverseOf,
