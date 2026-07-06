@@ -517,7 +517,7 @@ async function performClassUpdate(
       return record;
     }
     // Empty ids list is a no-op (Rails behaves this way; Base.find([]) would
-    // otherwise raise RecordNotFound "empty list of ids").
+    // otherwise raise RecordNotFound "without an ID").
     if (idOrAttrs.length === 0) return [];
     const attrsArr = attrs as Record<string, unknown>[];
     if (!Array.isArray(attrsArr) || attrsArr.length !== idOrAttrs.length) {

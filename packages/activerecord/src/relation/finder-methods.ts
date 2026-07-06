@@ -70,8 +70,8 @@ export interface NormalizedFindIds {
  * `NormalizedFindIds` shape.
  *
  * Raises `RecordNotFound` for the deterministic input errors:
- *   - zero-arg call                     → "empty list of ids", `id: []`
- *   - explicit `find([])`               → same
+ *   - zero-arg call                     → "without an ID" (Rails `when 0`)
+ *   - explicit `find([])`               → short-circuits to `[]` (no raise)
  *   - composite PK + scalar or wrong-arity tuple →
  *     "`<Model>: composite primary key requires a <N>-element array, got <id>`"
  *
@@ -87,12 +87,9 @@ export function normalizeFindArgs(
   const composite = Array.isArray(pk);
 
   if (args.length === 0) {
-    throw new RecordNotFound(
-      `Couldn't find ${modelName} with an empty list of ids`,
-      modelName,
-      String(pk),
-      [],
-    );
+    // Rails `find_with_ids` `when 0` (finder_methods.rb:508): a zero-arg /
+    // empty-id call raises "Couldn't find <Model> without an ID" (no id payload).
+    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, String(pk));
   }
 
   const [first, ...rest] = args;
@@ -156,12 +153,9 @@ export function normalizeFindArgs(
   }
 
   if (ids.length === 0) {
-    throw new RecordNotFound(
-      `Couldn't find ${modelName} with an empty list of ids`,
-      modelName,
-      String(pk),
-      [],
-    );
+    // Post-flatten empty (e.g. `find(null)`, `find([nil])`): Rails' `compact`
+    // drops them, leaving `when 0` → "without an ID".
+    throw new RecordNotFound(`Couldn't find ${modelName} without an ID`, modelName, String(pk));
   }
 
   if (composite) {
@@ -183,26 +177,68 @@ export function normalizeFindArgs(
 }
 
 /**
- * Raise the aggregate "couldn't find all" error, matching
- * `Relation.performFind`'s message shape for the caller's PK kind:
+ * Raise the aggregate "couldn't find all" error, composing Rails'
+ * `raise_record_not_found_exception!` multi-id message byte-for-byte
+ * (finder_methods.rb:431-432): the model name is pluralized and the
+ * `(found N results, but was looking for M).` suffix is appended.
  *   - simple PK  → `flatIds.join(", ")`, payload = flatIds.
- *   - composite  → `String(tuples)`    , payload = tuples[][].
+ *   - composite  → `String(tuples)`    , payload = tuples[][] (tuple
+ *     compaction/formatting is a separate concern; the pluralize + suffix
+ *     convergence applies to both kinds).
+ *
+ * `notFoundIds` (Rails' `ids_writer` passes `ids - found_ids`) appends the
+ * trailing "Couldn't find <Model> with <key> <ids>." sentence.
  */
 export function raiseNotFoundAll(
   modelName: string,
   pk: string | string[],
   normalized: NormalizedFindIds,
+  resultSize: number,
+  expectedSize: number,
   conditions = "",
+  notFoundIds?: unknown[],
 ): never {
   const { ids, tuples } = normalized;
   const messageIds = tuples ? String(tuples) : ids.join(", ");
   const payload = tuples ?? ids;
   throw new RecordNotFound(
-    `Couldn't find all ${modelName} with '${String(pk)}': (${messageIds})${conditions}`,
+    formatNotFoundAllMessage(
+      modelName,
+      String(pk),
+      messageIds,
+      conditions,
+      resultSize,
+      expectedSize,
+      notFoundIds,
+    ),
     modelName,
     String(pk),
     payload,
   );
+}
+
+/**
+ * Compose the "Couldn't find all …" message shared by `raiseNotFoundAll` and
+ * `raiseRecordNotFoundExceptionBang`, byte-for-byte with Rails'
+ * `raise_record_not_found_exception!` `else` branch (finder_methods.rb:431-433).
+ */
+function formatNotFoundAllMessage(
+  name: string,
+  key: string,
+  messageIds: string,
+  conditions: string,
+  resultSize: number | undefined,
+  expectedSize: number | undefined,
+  notFoundIds: unknown[] | undefined,
+): string {
+  let error = `Couldn't find all ${pluralize(name)} with '${key}': `;
+  error += `(${messageIds})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
+  if (notFoundIds) {
+    error +=
+      ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
+      ` with ${pluralize(key, notFoundIds.length)} ${notFoundIds.join(", ")}.`;
+  }
+  return error;
 }
 
 /**
@@ -287,7 +323,8 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
       rel = rel.or(this.where(orConditions[i]));
     }
     const records = await rel.toArray();
-    if (records.length !== tuples.length) raiseNotFoundAll(modelName, pk, normalized, conditions);
+    if (records.length !== tuples.length)
+      raiseNotFoundAll(modelName, pk, normalized, records.length, tuples.length, conditions);
     return wantArray ? records : records[0];
   }
 
@@ -315,7 +352,8 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
 
   // Simple PK, multiple: find(1, 2, 3) or find([1, 2, 3]).
   const records = await this.where({ [pk]: ids }).toArray();
-  if (records.length !== ids.length) raiseNotFoundAll(modelName, pk, normalized, conditions);
+  if (records.length !== ids.length)
+    raiseNotFoundAll(modelName, pk, normalized, records.length, ids.length, conditions);
   return records;
 }
 
@@ -656,13 +694,15 @@ export function raiseRecordNotFoundExceptionBang(
     throw new RecordNotFound(`Couldn't find ${name} with '${k}'=${ids}${conditions}`, name, k, ids);
   }
 
-  let error = `Couldn't find all ${pluralize(name)} with '${k}': `;
-  error += `(${wrapped.join(", ")})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
-  if (notFoundIds) {
-    error +=
-      ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
-      ` with ${pluralize(k, notFoundIds.length)} ${notFoundIds.join(", ")}.`;
-  }
+  const error = formatNotFoundAllMessage(
+    name,
+    k,
+    wrapped.join(", "),
+    conditions,
+    resultSize,
+    expectedSize,
+    notFoundIds,
+  );
   throw new RecordNotFound(error, name, k, ids);
 }
 
