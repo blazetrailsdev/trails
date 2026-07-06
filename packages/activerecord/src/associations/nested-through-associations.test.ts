@@ -199,11 +199,8 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   // has_many through
-  // Source: has_one
+  // Source: has_one (polymorphic, Club.sponsors `as: :sponsorable`)
   // Through: has_one through
-  // Direct load of nestedSponsors generates "no such column: sponsors.sponsor_club_id";
-  // the polymorphic FK resolution for Club.sponsors (as: "sponsorable") is wrong in the nested-through
-  // direct-query builder. Preload and joins paths work correctly.
   it("has many through has one through with has one source reflection", async () => {
     const mustache = sponsors("moustache_club_sponsor_for_groucho");
     const groucho = members("groucho");
