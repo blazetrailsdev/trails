@@ -10,7 +10,7 @@
  */
 import { describe, it, beforeAll, expect } from "vitest";
 import { Base } from "../base.js";
-import { setupFixtures } from "./fixtures.js";
+import { setupHandlerSuite } from "./setup-handler-suite.js";
 
 class HandlerResolvedPost extends Base {
   static {
@@ -31,7 +31,7 @@ class HandlerResolvedComment extends Base {
 describe("handler-resolved adapter (Phase D-0)", () => {
   // Bootstraps Base.connectionHandler and skips the global resetTestAdapterState()
   // for this suite. D-1..N test files use the same one-liner.
-  setupFixtures();
+  setupHandlerSuite();
 
   // Table laid via Base.connection — the connection itself resolves through
   // Base.connectionHandler, the Rails-shape resolution path D-1..N files use.

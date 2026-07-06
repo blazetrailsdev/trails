@@ -422,7 +422,7 @@ function useFixtures(
   const store: Record<string, Record<string, unknown>> = {};
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
-  // (before the pinned transaction opens) when useHandlerTransactionalFixtures is
+  // (before the pinned transaction opens) when transactional fixtures are
   // active, falling back to this per-test seed otherwise. Deferred to a follow-up
   // PR to keep this one under the LOC ceiling (fixtures-adoption follow-up).
   beforeEach(async () => {

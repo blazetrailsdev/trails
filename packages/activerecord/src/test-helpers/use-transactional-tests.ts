@@ -20,10 +20,10 @@ import {
  * survives across tests in the file. When the describe scope exits,
  * `resetTestAdapterState` runs exactly once to clean up for the next file.
  *
- * **When to use this vs `setupHandlerSuite + useHandlerTransactionalFixtures`:**
+ * **When to use this vs `setupHandlerSuite + withTransactionalFixtures`:**
  * Use `useTransactionalTests()` for self-contained test files that want the
  * handler bootstrapped automatically. Use `setupHandlerSuite()` +
- * `useHandlerTransactionalFixtures()` when the file is part of a suite that
+ * `withTransactionalFixtures(() => Base.connection)` when the file is part of a suite that
  * shares a long-lived handler across multiple describes — `setupHandlerSuite`
  * keeps the adapter alive across files whereas `useTransactionalTests` fires
  * `resetTestAdapterState` on exit (depth reaches zero), tearing down the pool.

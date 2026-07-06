@@ -11,8 +11,9 @@ import {
   defineJoinTableFixtures,
   isFixtureRef,
 } from "./define-fixtures.js";
-import { setupFixtures, fixtures } from "./fixtures.js";
-import { useHandlerTransactionalFixtures } from "./use-handler-transactional-fixtures.js";
+import { fixtures } from "./fixtures.js";
+import { setupHandlerSuite } from "./setup-handler-suite.js";
+import { withTransactionalFixtures } from "./with-transactional-fixtures.js";
 import { Author } from "./models/author.js";
 import { Post } from "./models/post.js";
 import { LiveParrot, DeadParrot } from "./models/parrot.js";
@@ -81,14 +82,14 @@ async function setupScopedEncryption(): Promise<() => void> {
 // Shield the WHOLE file from the global `resetTestAdapterState()` beforeEach
 // (test-setup-ar.ts), which drops every table on `Base.connection` — the
 // boot-laid canonical worker DB. The real-seeding describes below each shield
-// themselves (their `useHandlerTransactionalFixtures` push/pops the skip), but
+// themselves (their `withTransactionalFixtures` push/pops the skip), but
 // the mock-adapter describes above them do NOT: their tests trigger the reset
 // and wipe the canonical tables before any seeding describe's `beforeAll` runs.
 // The removed `defineSchema(TEST_SCHEMA)` beforeAll blocks used to paper over
 // this by recreating the tables after the wipe; a single file-level shield
 // keeps the boot-laid schema intact instead, so every seeding describe rides it
 // directly (transactional fixtures roll back their per-test writes).
-setupFixtures();
+setupHandlerSuite();
 
 // --- useFixtures ---
 
@@ -259,8 +260,8 @@ describe("useFixtures type contract", () => {
 // --- useFixtures by registry name (string[] overload, real seeding) ---
 
 describe("useFixtures by registry name", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // author_addresses listed first: authors.author_address_id ref() resolves to its
   // declared ids, so the target set must load before its dependent.
@@ -317,8 +318,8 @@ describe("useFixtures by registry name", () => {
 });
 
 describe("useFixtures seeds HABTM join tables (no model class)", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // categories + posts declare explicit ids, so they load BEFORE the join set —
   // categoriesPosts' category_id/post_id ref()s then resolve to those declared ids.
@@ -357,8 +358,8 @@ describe("useFixtures seeds HABTM join tables (no model class)", () => {
 });
 
 describe("useFixtures seeds a single-row HABTM join table", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   const { people, treasures, peoplesTreasures } = fixtures(
     ["people", "treasures", "peoplesTreasures"],
@@ -375,8 +376,8 @@ describe("useFixtures seeds a single-row HABTM join table", () => {
 // --- vertices + edges cross-fixture ref() ---
 
 describe("useFixtures vertices and edges", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // vertices must load before edges so edge ref()s resolve to declared vertex ids.
   const { vertices, edges } = fixtures(["vertices", "edges"], {
@@ -401,8 +402,8 @@ describe("useFixtures vertices and edges", () => {
 // --- timestamp auto-stamp (Rails' fill_timestamps) ---
 
 describe("useFixtures auto-stamps NOT NULL timestamps", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // people.michael declares neither created_at nor updated_at, but both columns
   // are NOT NULL — defineFixtures must fill them with the current time, mirroring
@@ -427,8 +428,8 @@ describe("useFixtures auto-stamps NOT NULL timestamps", () => {
 // --- string / non-integer declared primary keys ---
 
 describe("useFixtures with a string primary key", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // Subscriber sets `self.primary_key = "nick"` (a string column). The fixture
   // row declares `nick: "alterself"`; resolveDeclaredPk must use that string
@@ -456,8 +457,8 @@ describe("useFixtures with a string primary key", () => {
 // --- custom / absent PK column names (model defaults to `id`, schema differs) ---
 
 describe("useFixtures reconciles the PK column against the schema", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // Bulb declares no `primary_key`, so the model defaults to `id`, but the
   // `bulbs` table's PK column is `ID` (schema.rb: `primary_key: "ID"`). The
@@ -507,8 +508,8 @@ describe("useFixtures reconciles the PK column against the schema", () => {
 // --- composite primary keys ---
 
 describe("useFixtures seeds composite-primary-key tables", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // CpkOrder declares a composite model PK (`["shop_id", "id"]`) while the test
   // schema keeps a plain autoincrement `id`; Rails' composite_primary_key? is
@@ -557,8 +558,8 @@ describe("useFixtures seeds composite-primary-key tables", () => {
 // --- STI subclass standalone load ---
 
 describe("useFixtures resolves STI subclasses on standalone load", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // parrots.yml rows carry a custom inheritance column (`parrot_sti_class`)
   // pointing at LiveParrot/DeadParrot. Loading the base `parrots` set must
@@ -750,8 +751,8 @@ describe("fixtures() loads multiple same-table fixture sets in one call", () => 
 // seedable on the strictest engine. An entry that can't seed must move to the
 // registry's gap list, not stay exposed.
 describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
   // Encrypted entries (encryptedBooks…) reload through the encrypted attribute
   // type, which needs keys + the cleartext fallback. Configure (scoped) so the
   // seed loop can reload them, and restore after so this describe doesn't leak
@@ -787,8 +788,8 @@ describe("fixtureRegistry seeds against TEST_SCHEMA", () => {
 // --- encryption add-on bootstrap (opt-in addOn hook) ---
 
 describe("useFixtures bootstraps the encryption add-on for encrypted fixtures", () => {
-  setupFixtures();
-  useHandlerTransactionalFixtures();
+  setupHandlerSuite();
+  withTransactionalFixtures(() => Base.connection);
 
   // Reading encrypted fixtures back needs keys + the cleartext fallback. Configure
   // that here (scoped, with snapshot/restore) rather than in the addOn, so the
