@@ -65,7 +65,7 @@ describe("normalizeFindArgs — simple primary key", () => {
     });
   });
 
-  it("test_find_with_ids_with_no_id_passed", () => {
+  it("normalizeFindArgs zero-arg → RecordNotFound 'without an ID' shape", () => {
     try {
       normalizeFindArgs("Post", pk, []);
       expect.fail("should have thrown");
