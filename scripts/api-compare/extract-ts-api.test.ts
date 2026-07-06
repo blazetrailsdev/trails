@@ -279,6 +279,15 @@ describe("body call capture", () => {
     const m = cls.instanceMethods.find((m) => m.name === "run")!;
     expect(m.calls).toEqual(["joinsValues"]);
   });
+
+  it("does not credit an assignment target as a value read (write mirrors the setter)", () => {
+    // `this.joinsValues = x` mirrors Ruby's writer send `joins_values=`, not the
+    // reader `joins_values`; crediting the reader name would be unfaithful and
+    // make the call set depend on body shape. The RHS read `x.dup` still counts.
+    const cls = extractFromSource(`class Foo { reset(x) { this.joinsValues = x.dup; } }`);
+    const m = cls.instanceMethods.find((m) => m.name === "reset")!;
+    expect(m.calls).toEqual(["dup"]);
+  });
 });
 
 describe("body call capture — renamed-import aliases", () => {
