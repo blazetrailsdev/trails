@@ -306,6 +306,16 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
 }
 
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
+  // Rails runs `initialize_generated_modules` once per class from the
+  // `inherited` hook (attribute_methods.rb:265-272), seeding
+  // `@generated_attribute_methods` and the two generation flags before any
+  // accessor is defined. JS has no `inherited` hook, so — mirroring how
+  // `cachedFindByStatement` lazily calls `initializeFindByCache` — we run it
+  // here the first time a class generates its methods, gated on an *own*
+  // `_generatedAttributeMethods` so each subclass initializes exactly once.
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+    initializeGeneratedModules.call(this);
+  }
   // Rails' @attribute_methods_generated is a per-class ivar (nil for every
   // class regardless of superclass). JS properties are inheritable, so only an
   // *own* truthy flag counts as already-generated — an inherited `true` from a

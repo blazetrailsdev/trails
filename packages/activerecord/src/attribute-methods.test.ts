@@ -1258,6 +1258,19 @@ describe("initialize_generated_modules", () => {
     expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
   });
 
+  it("runs lazily via defineAttributeMethods without a direct call", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    // Declaring the attribute routes through defineAttributeMethods, which
+    // must seed the generated module — no explicit initializeGeneratedModules
+    // call in the test.
+    (Topic as any).defineAttributeMethods();
+    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+  });
+
   it("resets attribute-methods generation flags", () => {
     class Topic extends Base {
       static {
