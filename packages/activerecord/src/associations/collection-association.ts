@@ -94,7 +94,17 @@ export class CollectionAssociation extends Association {
    */
   async idsWriter(ids: unknown[]): Promise<void> {
     const Klass = this.klass as any;
-    const pk = Klass.primaryKey ?? "id";
+    // Rails `ids_writer`: `primary_key = reflection.association_primary_key`.
+    // For a through/custom-PK association this is the association's own key
+    // (e.g. `Category.primary_key == "name"`), not the target model's `id`, so
+    // the lookup + not-found message key must come from the rich reflection.
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (
+        n: string,
+      ) => { associationPrimaryKey?: string | string[] } | undefined;
+    };
+    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name);
+    const pk = richReflection?.associationPrimaryKey ?? Klass.primaryKey ?? "id";
     const filteredIds = (Array.isArray(ids) ? ids : [ids]).filter((id) => id != null && id !== "");
 
     let records: Base[];
