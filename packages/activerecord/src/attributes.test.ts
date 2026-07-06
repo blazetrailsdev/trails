@@ -493,13 +493,7 @@ describe("CustomPropertiesTest", () => {
 
   it("immutable_strings_by_default retains limit information", async () => {
     await withImmutableStrings(() => {
-      // Rails asserts `type_for_attribute("inferred_string").limit == 255`, but in
-      // trails the cast type never threads `column.limit`, so assert retention on
-      // the reflected column instead. Known gap, tracked by story 0043
-      // thread-column-limit-into-cast-type.
-      expect(
-        (OverloadedType.columnsHash() as Record<string, { limit?: number }>).inferred_string.limit,
-      ).toBe(255);
+      expect(OverloadedType.typeForAttribute("inferred_string").limit).toBe(255);
     });
   });
 
