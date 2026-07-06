@@ -2197,6 +2197,10 @@ describe("PersistenceTest", () => {
       static _tableName = "aircraft";
     }
     registerModel(MinimalisticAircraft);
+    // Reflect the `aircraft` columns onto the anonymous subclass so its `name`
+    // accessor is generated, matching Rails where the subclass reflects columns
+    // lazily on first use (mirrors the `becomes` block above).
+    await (MinimalisticAircraft as unknown as { loadSchema(): Promise<void> }).loadSchema();
 
     const before = (await Aircraft.count()) as number;
     const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as any;
