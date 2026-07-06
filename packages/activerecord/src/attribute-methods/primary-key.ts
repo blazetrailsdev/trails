@@ -93,6 +93,7 @@ interface PrimaryKeyInstance {
   constructor: unknown;
   _readAttribute(name: string): unknown;
   _writeAttribute(name: string, value: unknown): void;
+  writeAttribute(name: string, value: unknown): void;
 }
 
 /**
@@ -122,11 +123,18 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
       );
     }
     pk.forEach((col, i) => this._writeAttribute(col, (value as unknown[])[i]));
+  } else if (pk == null) {
+    // Key-less model: Rails does NOT install the PrimaryKey `id=` override
+    // without a primary key (`instance_method_already_implemented?` gates the
+    // ID_ATTRIBUTE_METHODS on `primary_key`), so `id=` is the regular writer for
+    // the literal `id` column. Mirror that by writing `id`: a model with an `id`
+    // column (`non_primary_keys`) gets the value, and one without (`dashboards`)
+    // raises MissingAttributeError like Rails. Route through the public
+    // `writeAttribute` (not the bridged `_writeAttribute`, which seeds an
+    // unreflected column and would swallow the dashboards raise).
+    this.writeAttribute("id", value);
   } else {
-    // A null pk (key-less table) reaches `_writeAttribute(null, …)`, which
-    // raises MissingAttributeError via the Null attribute — mirroring Rails
-    // `_write_attribute(@primary_key, value)` with a nil primary key.
-    this._writeAttribute(pk as string, value);
+    this._writeAttribute(pk, value);
   }
 }
 

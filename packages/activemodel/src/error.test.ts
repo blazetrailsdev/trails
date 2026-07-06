@@ -215,6 +215,9 @@ describe("ErrorTest", () => {
   it("generateMessage walks ancestor lookup chain", () => {
     class Parent extends Model {
       static i18nScope = "activemodel";
+      static {
+        this.attribute("name", "string");
+      }
       static lookupAncestors() {
         return [this];
       }
