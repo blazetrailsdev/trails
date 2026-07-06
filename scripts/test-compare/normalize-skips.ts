@@ -809,7 +809,7 @@ function categorize(relPath: string, describeName: string, testName: string): An
   }
 
   // --- Connection-related singletons ---
-  if (p === "invalid-connection.test.ts" || p === "disconnected.test.ts") {
+  if (p === "invalid-connection.test.ts") {
     const file = path.basename(p, ".test.ts");
     return {
       blocked: "connection-pool — invalid / disconnected connection handling gap",
