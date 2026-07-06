@@ -442,8 +442,11 @@ describe("RelationTest", () => {
   it("eager from() subquery projects the table star, not column aliases", async () => {
     const relation = Comment.includes("post").where({ "posts.type": "Post" }).order("id");
     const sql = await (Comment.select("*").from(relation) as any).toSql();
-    expect(sql).toContain('"comments".* FROM "comments" LEFT OUTER JOIN "posts"');
-    expect(sql).not.toMatch(/t0_r0/);
+    // Adapter-agnostic: strip identifier quoting (`"` on sqlite/postgres,
+    // backticks on mysql) so the shape assertion holds on every CI adapter.
+    const unquoted = sql.replace(/["`]/g, "");
+    expect(unquoted).toContain("comments.* FROM comments LEFT OUTER JOIN posts");
+    expect(unquoted).not.toMatch(/t0_r0/);
   });
 
   it("finding with subquery with eager loading in where", async () => {
