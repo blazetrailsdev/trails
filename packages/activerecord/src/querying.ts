@@ -7,6 +7,7 @@
 
 import { Notifications, isPlainObject as _isPlainObject } from "@blazetrails/activesupport";
 import type { Base } from "./base.js";
+import { threadedConnectionFor, withQueryConnection } from "./connection-handling.js";
 import type { Relation } from "./relation.js";
 import type { Result } from "./result.js";
 import type { AssociationSpec, JoinSpec } from "./relation/query-methods.js";
@@ -29,24 +30,34 @@ export async function findBySql<T extends typeof Base>(
 ): Promise<InstanceType<T>[]> {
   const resolvedOpts = typeof opts === "function" ? {} : (opts ?? {});
   const resolvedBlock = typeof opts === "function" ? opts : block;
-  const result = await _queryBySql.call(this, sql, binds, {
-    allowRetry: resolvedOpts.allowRetry,
-    preparable: resolvedOpts.preparable,
+  // Rails wraps only `_query_by_sql` in `with_connection`, running
+  // `_load_from_sql` outside the block (querying.rb#find_by_sql). We keep the
+  // load inside the wrap because, unlike Ruby's, trails' instantiation lazily
+  // resolves the schema through the connection getter — so leaving it outside
+  // re-leases the pool permanently under
+  // `permanent_connection_checkout = :deprecated | :disallowed`. Widening the
+  // wrap to cover the load keeps the release behavior faithful; it issues no
+  // extra SQL, so the query semantics are unchanged.
+  return withQueryConnection(this as unknown as typeof Base, async () => {
+    const result = await _queryBySql.call(this, sql, binds, {
+      allowRetry: resolvedOpts.allowRetry,
+      preparable: resolvedOpts.preparable,
+    });
+    return _loadFromSql.call<
+      T,
+      [
+        Record<string, unknown>[],
+        typeof resolvedBlock,
+        Record<string, { deserialize(value: unknown): unknown }>,
+      ],
+      InstanceType<T>[]
+    >(
+      this,
+      result.toArray(),
+      resolvedBlock,
+      result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
+    );
   });
-  return _loadFromSql.call<
-    T,
-    [
-      Record<string, unknown>[],
-      typeof resolvedBlock,
-      Record<string, { deserialize(value: unknown): unknown }>,
-    ],
-    InstanceType<T>[]
-  >(
-    this,
-    result.toArray(),
-    resolvedBlock,
-    result.columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
-  );
 }
 
 /**
@@ -83,10 +94,13 @@ export async function countBySql(
   const sanitized = typeof sql === "string" ? sql : (this.sanitizeSql(sql) ?? "");
   // Rails: connection.select_value(sanitize_sql(sql)).to_i
   // Our adapters return rows; extract the first scalar value.
-  const rows = await this.connection.execute(sanitized);
-  if (!rows[0]) return 0;
-  const firstValue = Object.values(rows[0])[0];
-  return Number(firstValue) || 0;
+  return withQueryConnection(this, async () => {
+    const adapter = threadedConnectionFor(this) ?? this.connection;
+    const rows = await adapter.execute(sanitized);
+    if (!rows[0]) return 0;
+    const firstValue = Object.values(rows[0])[0];
+    return Number(firstValue) || 0;
+  });
 }
 
 /**
@@ -119,7 +133,10 @@ export async function _queryBySql(
     allowRetry: opts.allowRetry ?? false,
   };
   if (opts.preparable != null) selectOpts.preparable = opts.preparable;
-  return this.connection.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, selectOpts);
+  // Read the connection threaded by the enclosing `withQueryConnection` wrap
+  // (findBySql), falling back to the deprecated getter for direct callers.
+  const adapter = threadedConnectionFor(this) ?? this.connection;
+  return adapter.selectAll(resolvedSql, `${this.name} Load`, resolvedBinds, selectOpts);
 }
 
 /**
