@@ -2155,17 +2155,12 @@ describe("PersistenceTest", () => {
 });
 
 // ==========================================================================
-// PersistenceTest — deviations tracked under RFC 0023-surfaced-deviations.
-// Both cases are ported at Rails-verbatim names but skipped pending a fix:
+// PersistenceTest — deviation tracked under RFC 0023-surfaced-deviations.
 //   * `update attribute in before validation respects callback chain` calls
 //     `update_attribute` (a DB write) from a `before_validation` callback.
 //     trails validations are sync-only, so an async `beforeValidation` throws
 //     "Async callback on sync chain". Tracked:
 //     rfcs/0023-surfaced-deviations/stories/async-before-validation-sync-chain.md
-//   * `persist inherited class with different table name` asserts the restricted
-//     `name` attribute round-trips through create/dirty-tracking, which trails
-//     does not do for `name`. Tracked:
-//     rfcs/0023-surfaced-deviations/stories/restricted-name-attribute-reader-and-dirty-tracking.md
 // ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
@@ -2197,7 +2192,7 @@ describe("PersistenceTest", () => {
     expect(counter).toBe(1);
   });
 
-  it.skip("persist inherited class with different table name", async () => {
+  it("persist inherited class with different table name", async () => {
     class MinimalisticAircraft extends Minimalistic {
       static _tableName = "aircraft";
     }
