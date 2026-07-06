@@ -269,6 +269,28 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
     expect(found?.title).toBe("a");
   });
 
+  it("toArray hydrates and caches the target — a second call returns the cached set", async () => {
+    // Rails `to_a` → `records` → `load_target` caches `@target` and marks the
+    // association loaded, so a subsequent `to_a` returns the cached records
+    // without re-querying. Prove the cache by inserting a matching row directly
+    // into the DB after the first load: a re-query would pick it up; the cached
+    // read must not.
+    const author = await Author.create({ name: "Cached" });
+    for (const title of ["a", "b"]) {
+      await Post.create({ title, body: title, author_id: author.id as number });
+    }
+    const proxy = association<Post>(author, "posts") as any;
+    const first = await proxy.toArray();
+    expect(first.map((p: Post) => p.title).sort()).toEqual(["a", "b"]);
+
+    // Out-of-band insert that a fresh query would return but the cache must not.
+    await Post.create({ title: "c", body: "c", author_id: author.id as number });
+    const second = await proxy.toArray();
+    expect(second.map((p: Post) => p.title).sort()).toEqual(["a", "b"]);
+    // Same cached instances, not re-materialized rows.
+    expect(second[0]).toBe(first[0]);
+  });
+
   it("toArray honors direct bang-mutation of inherited Relation state", async () => {
     // In-place bang mutations on CP (cp.whereBang/orderBang/limitBang)
     // change the inherited Relation state. `toArray()` routes through

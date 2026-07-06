@@ -767,14 +767,20 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Keep the cache-bypassing re-query path when either (a) an in-place bang
     // mutation (`whereBang`/`orderBang`/...) has diverged the proxy scope — this
     // is effectively a scoped AssociationRelation whose `to_a` runs
-    // `exec_queries` without touching the owner's cached target — or (b)
-    // `find_target?` is false: a new-record owner with no foreign key present.
-    // Rails' `load_target` only assigns/caches `@target` from a query when
-    // `find_target?` (or the target is stale); for the new-record-without-FK
-    // case it leaves the in-memory target untouched, which for a through
-    // association means re-traversing the in-memory chain (`post.author.books`
-    // …) on each read rather than caching a scoped subset.
-    if (this._cpMutated || !this._findTarget()) {
+    // `exec_queries` without touching the owner's cached target — or (b) the
+    // target is not yet loaded and `find_target?` is false: a new-record owner
+    // with no foreign key present. Rails' `load_target` only assigns/caches
+    // `@target` from a query when `find_target?` (or the target is stale); for
+    // the new-record-without-FK case it leaves the in-memory target untouched,
+    // which for a through association means re-traversing the in-memory chain
+    // (`post.author.books` …) on each read rather than caching a scoped subset.
+    //
+    // The `!_targetLoaded` guard is essential: `_findTarget()` short-circuits to
+    // `false` once loaded (mirroring Rails `find_target?` = `!loaded? && …`), so
+    // OR-ing on a bare `!_findTarget()` would send *every* post-load `toArray()`
+    // back down the re-query path and defeat caching entirely. `load()` is the
+    // hydrate/cache chokepoint for the already-loaded case (including staleness).
+    if (this._cpMutated || (!this._targetLoaded && !this._findTarget())) {
       const results = await this._execLoad();
       return this._mergeTargetLists(results);
     }
@@ -786,11 +792,22 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   //   so T[] is the correct contract here. Permanent divergence.
   async load(): Promise<T[]> {
     if (this._targetLoaded) {
-      // Mirror Rails `CollectionAssociation#reader`: `if stale_target? reload`.
-      // When the owner's foreign key has changed since the target was cached
-      // (`author = other`), the cache is stale and must be re-queried. Reset the
-      // wrapper so the post-load sync re-captures the new stale state (Rails
-      // `reload` → `reset` → `load_target`); otherwise return the cache.
+      // Mirror Rails `CollectionAssociation#reader` (collection_association.rb:34):
+      // `if stale_target? reload`. When the owner's foreign key has changed since
+      // the target was cached (`author = other`), the cache is stale and must be
+      // re-queried; otherwise return the cache.
+      //
+      // Rails runs this staleness check in `reader` (the `owner.pets` accessor),
+      // NOT in `load_target` — but in trails there is no separate `reader` entry
+      // point. The accessor (`association()` in associations.ts) returns the
+      // cached CollectionProxy directly, without Rails' `if stale_target? reload`.
+      // So `load()` — the single hydration chokepoint every read funnels through —
+      // is where the check must live to reproduce Rails' *observable* behavior:
+      // `owner.pets.to_a` after a foreign-key change reloads, because in Rails the
+      // `pets` accessor itself reloads before `to_a` ever runs. This does not make
+      // trails' `to_a` reload where Rails' wouldn't; it lands the same reload Rails
+      // performs one call-frame earlier, at the accessor trails collapses into the
+      // proxy.
       const wrapper = this._staleWrapper();
       if (!(wrapper?.isStaleTarget?.() ?? false)) return this._target;
       // Stale (owner FK changed since load): fall through to re-query. Clear
