@@ -172,6 +172,8 @@ import {
   isAttributeMethod as _isAttributeMethod,
   isDangerousAttributeMethod as _isDangerousAttributeMethod,
   defineAttributeMethods as _defineAttributeMethods,
+  initializeGeneratedModules as _initializeGeneratedModules,
+  GeneratedAttributeMethods,
   generateAliasAttributes as _generateAliasAttributes,
   attributesWithValues as _attributesWithValues,
   formatForInspect as _formatForInspect,
@@ -1413,6 +1415,8 @@ export class Base extends Model {
   // --- ModelSchema mixin (wired via extend() after class) ---
   // Mirrors: ActiveRecord::Attributes
   declare static defineAttribute: typeof _defineAttribute;
+  declare static initializeGeneratedModules: typeof _initializeGeneratedModules;
+  declare static _generatedAttributeMethods?: GeneratedAttributeMethods;
   declare static _defaultAttributes: typeof _arDefaultAttributes;
 
   // Mirrors: ActiveRecord::ModelSchema::ClassMethods
@@ -4701,6 +4705,7 @@ extend(Base, ModelSchema.ClassMethods);
 extend(Base, {
   defineAttribute: _defineAttribute,
   defineAttributeMethods: _defineAttributeMethods,
+  initializeGeneratedModules: _initializeGeneratedModules,
   generateAliasAttributes: _generateAliasAttributes,
   _defaultAttributes: _arDefaultAttributes,
 });

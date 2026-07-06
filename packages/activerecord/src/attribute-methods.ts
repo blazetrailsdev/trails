@@ -6,7 +6,10 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
-import { attributeForInspect as _attrForInspect } from "./core.js";
+import {
+  attributeForInspect as _attrForInspect,
+  initializeGeneratedModules as _coreInitializeGeneratedModules,
+} from "./core.js";
 import { writeAttribute as _writeAttribute } from "./readonly-attributes.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
 // toKey/id: inline to avoid a circular dependency (primary-key.ts imports
@@ -225,11 +228,20 @@ export function dangerousAttributeMethods(): Set<string> {
  * the `GeneratedAttributeMethods` instance stands in for Rails' namespace
  * constant. Resetting both flags to `false` re-arms those lazy paths so the
  * next accessor read regenerates against this class's schema.
+ *
+ * Rails chains this to `Core`'s `initialize_generated_modules` via `super`;
+ * this port mirrors that by delegating to the core version at the end. `Base`
+ * wires this attribute-methods entry point as the single static (see base.ts),
+ * so the super call reaches `generatedAssociationMethods` just as Rails' method
+ * ancestry does.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
   this._generatedAttributeMethods = new GeneratedAttributeMethods();
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
+  _coreInitializeGeneratedModules.call(
+    this as unknown as ThisParameterType<typeof _coreInitializeGeneratedModules>,
+  );
 }
 
 /**
