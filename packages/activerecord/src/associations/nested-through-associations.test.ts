@@ -32,6 +32,7 @@ import { Person } from "../test-helpers/models/person.js";
 import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Reader } from "../test-helpers/models/reader.js";
+import { assertNoQueries } from "../testing/query-assertions.js";
 
 registerModel(Author);
 registerModel(Post);
@@ -704,8 +705,10 @@ describe("NestedThroughAssociationsTest", () => {
   it("nested has many through with conditions on source associations preload", async () => {
     const blue = tags("blue");
     const [, , author] = await Author.includes("miscPostFirstBlueTags_2").order("authors.id");
-    const preloaded = (author.association("miscPostFirstBlueTags_2").target ?? []) as any[];
-    expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+    await assertNoQueries(false, async () => {
+      const preloaded = await author.miscPostFirstBlueTags_2.toArray();
+      expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+    });
   });
 
   it("through association preload doesnt reset source association if already preloaded", async () => {
@@ -714,9 +717,11 @@ describe("NestedThroughAssociationsTest", () => {
       posts: "firstBlueTags_2",
       miscPostFirstBlueTags_2: {},
     }).order("authors.id");
-    const firstPost = (author.association("posts").target as any[])[0];
-    const preloaded = (firstPost.association("firstBlueTags_2").target ?? []) as any[];
-    expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+    await assertNoQueries(false, async () => {
+      const firstPost = (await author.posts.toArray())[0];
+      const preloaded = await firstPost.firstBlueTags_2.toArray();
+      expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+    });
   });
 
   it("nested has many through with conditions on source associations preload via joins", async () => {
