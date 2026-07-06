@@ -32,7 +32,7 @@ import { Person } from "../test-helpers/models/person.js";
 import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Reader } from "../test-helpers/models/reader.js";
-import { assertNoQueries } from "../testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 
 registerModel(Author);
 registerModel(Post);
@@ -704,7 +704,15 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("nested has many through with conditions on source associations preload", async () => {
     const blue = tags("blue");
-    const [, , author] = await Author.includes("miscPostFirstBlueTags_2").order("authors.id");
+    // Rails asserts 2 queries around `.third` (one author + its collapsed
+    // preload). We load every author via `.order` (no LIMIT/OFFSET) and our
+    // preloader fires one query per nested-through stage — authors + posts +
+    // taggings + tags = 4. Pinning the count still guards the intermediate-table
+    // stripping against regressing into an extra fetch (Rails' intent).
+    let author!: Author;
+    await assertQueriesCount(4, false, async () => {
+      [, , author] = await Author.includes("miscPostFirstBlueTags_2").order("authors.id");
+    });
     await assertNoQueries(false, async () => {
       const preloaded = await author.miscPostFirstBlueTags_2.toArray();
       expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
