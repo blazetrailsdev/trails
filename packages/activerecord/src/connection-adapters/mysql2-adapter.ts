@@ -183,8 +183,20 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // shortcut. `Mysql2Adapter#reconnect` closes a nil `_client` as a no-op, so the
   // full path costs nothing extra on a fresh adapter and gains connect retries.
 
-  // Single persistent connection — mirrors Rails' @raw_connection.
-  private _client: mysql.Connection | null = null;
+  // Single persistent connection — mirrors Rails' @raw_connection. Unified onto
+  // the inherited base `_connection` slot rather than a parallel field: Rails
+  // has ONE `@raw_connection` ivar every adapter shares, so the live
+  // `mysql.Connection` lives IN `_connection`. `_client` is a thin typed
+  // accessor so the mysql2 lifecycle code reads the concrete driver handle,
+  // while the base run-loop guard (`_connection === null`), `active`,
+  // `isConnected`, and `secondsSinceLastActivity` all see the live handle with
+  // no sentinel. Mirrors PostgreSQLAdapter's `_rawConnection` accessor.
+  private get _client(): mysql.Connection | null {
+    return this._connection as unknown as mysql.Connection | null;
+  }
+  private set _client(value: mysql.Connection | null) {
+    this._connection = value as unknown as AbstractAdapter | null;
+  }
   // Serializes concurrent lazy-connect calls so only one createConnection
   // is in flight at a time. NOT nulled by disconnectBang() so close() can
   // still await it for clean teardown.
@@ -699,15 +711,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           );
         }
         if (this._connectingPromiseGen === gen) this._connectingPromise = null;
+        // Assigns the live handle into the base `_connection` slot (via the
+        // `_client` accessor) exactly as Rails' `@raw_connection = new_client`.
+        // The base run-loop guard `_connection === null` (abstract-adapter.ts)
+        // is now satisfied, so connectBang fires once per connect rather than
+        // on every withRawConnection call.
         this._client = conn;
-        // Populate the base `_connection` field so the run loop's
-        // `_connection === null` guard (abstract-adapter.ts) fires connectBang
-        // once per connect rather than on every withRawConnection call —
-        // matching Rails' `@raw_connection = new_client(...)` posture and the
-        // PostgreSQLAdapter, which likewise keeps `_connection` non-null while
-        // connected. mysql2 keeps the real handle in `_client`; `_connection`
-        // is just the non-null sentinel the base guard reads.
-        this._connection = this;
         this._stmtPool = null;
         this._activeState = true;
         // Configure the freshly-opened socket exactly as Rails does on every
@@ -1493,8 +1502,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // reconnectBang's own resetTransaction({ restore: … }) can swap it back in.
     // clearCache! / @raw_connection_dirty are reconnectBang's responsibility
     // (abstract_adapter.rb reconnect!), so they are deliberately not repeated
-    // here — only the raw-handle teardown and _connection reset are.
-    this._connection = null;
+    // here — only the raw-handle teardown. `_closeRawHandle` ends the live
+    // socket then nulls `_client`, which nulls the unified base `_connection`.
     this._closeRawHandle();
     this._activeState = true;
     // Re-establish the connection eagerly and PROPAGATE any connect failure —
@@ -1516,8 +1525,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // _connectingPromise (gen mismatch) and start a fresh attempt, while
     // close() can still await the old promise for clean teardown.
     this._connectGeneration++;
-    super.disconnectBang();
+    // Tear the raw handle down FIRST: `_closeRawHandle` reads `_client` to
+    // `end()` the live socket, but `_client` is unified onto the base
+    // `_connection` field, which `super.disconnectBang()` nulls — so ending the
+    // socket must happen before super, or the handle is lost and leaks.
     this._closeRawHandle();
+    super.disconnectBang();
   }
 
   /**
@@ -1565,9 +1578,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // _ensureClient() rather than adopted onto a discarded adapter.
     this._connectGeneration++;
     super.discardBang();
-    // Base discardBang is a no-op on `_connection`; null it here so a later
-    // re-open re-fires connectBang (the run-loop guard reads `_connection`).
-    this._connection = null;
     this._inTransaction = false;
     this._connectionConfigured = false;
     this._stmtPool?.detach();
@@ -1584,7 +1594,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async close(): Promise<void> {
     this._permanentlyClosed = true;
     this._connectGeneration++;
-    this._connection = null;
     this._inTransaction = false;
     this._connectionConfigured = false;
     this._stmtPool?.detach();

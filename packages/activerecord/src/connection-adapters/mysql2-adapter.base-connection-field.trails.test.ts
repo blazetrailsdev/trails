@@ -16,9 +16,11 @@ describe("Mysql2Adapter base _connection field", () => {
     vi.restoreAllMocks();
   });
 
-  function stubNewClient(): void {
-    const fakeConn = { end: () => Promise.resolve(), query: () => Promise.resolve() };
+  function stubNewClient(): { end: ReturnType<typeof vi.fn> } {
+    const end = vi.fn(() => Promise.resolve());
+    const fakeConn = { end, query: () => Promise.resolve() };
     vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
+    return { end };
   }
 
   function connectionOf(adapter: Mysql2Adapter): unknown {
@@ -37,12 +39,17 @@ describe("Mysql2Adapter base _connection field", () => {
   });
 
   it("nulls _connection on disconnectBang and repopulates it on the next connect", async () => {
-    stubNewClient();
+    const { end } = stubNewClient();
     const adapter = new Mysql2Adapter({ host: "localhost" });
 
     await adapter.connectBang();
     adapter.disconnectBang();
     expect(connectionOf(adapter)).toBeNull();
+    // Guards the teardown ordering: _client is unified onto the base
+    // _connection field, so _closeRawHandle() must end() the live socket
+    // BEFORE super.disconnectBang() nulls _connection — otherwise the handle is
+    // lost and the socket leaks.
+    expect(end).toHaveBeenCalledTimes(1);
 
     await adapter.connectBang();
     expect(connectionOf(adapter)).not.toBeNull();
