@@ -326,6 +326,8 @@ describe("defineFixtures", () => {
     // canonically (resolved through resolveFixtureId, like the HABTM path).
     expect(joinInsert).toContain(String(fixtureId("david")));
     expect(joinInsert).toMatch(/, 1\)/);
+    // The preflight consulted the through table by name before inserting.
+    expect((adapter as any).tableExists).toHaveBeenCalledWith("categorizations");
   });
 
   it("plain has_many :through label: unloaded through table surfaces a precise error, not 'no such table'", async () => {
