@@ -7,7 +7,11 @@ import { adapterType } from "./test-adapter.js";
 import type { TestDatabaseAdapter } from "./test-adapter.js";
 import { itIfSupports, adapterSupports } from "./test-helpers/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { dumpAllTableSchema, dumpTableSchema } from "./test-helpers/schema-dumping-helper.js";
+import {
+  dumpAllTableSchema,
+  dumpTableSchema,
+  FULL_DUMP_TIMEOUT_MS,
+} from "./test-helpers/schema-dumping-helper.js";
 import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
 
 // The first describe uses `fixtures({})` (canonical schema + reset shield);
@@ -48,8 +52,8 @@ async function withPostgresqlDatetimeType(type: string, fn: () => Promise<void>)
 // Give only the genuine full-dump cases explicit headroom via the options form
 // `it(name, { timeout }, fn)` (keeps the callback as the last arg); the
 // single-table `dumpCanonicalTable` cases stay on the default timeout, the global
-// timeout is untouched, and the (Rails-matching) test names are unchanged.
-const FULL_DUMP_TIMEOUT_MS = 30_000;
+// timeout is untouched, and the (Rails-matching) test names are unchanged. The
+// shared `FULL_DUMP_TIMEOUT_MS` lives beside `dumpAllTableSchema` in the helper.
 
 describe("SchemaDumperTest", () => {
   fixtures({}, { useTransactionalTests: false });

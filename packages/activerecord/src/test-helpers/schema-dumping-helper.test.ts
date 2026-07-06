@@ -3,7 +3,11 @@ import { Base } from "../base.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
-import { dumpAllTableSchema, dumpTableSchema } from "./schema-dumping-helper.js";
+import {
+  dumpAllTableSchema,
+  dumpTableSchema,
+  FULL_DUMP_TIMEOUT_MS,
+} from "./schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
@@ -28,13 +32,6 @@ async function createSdhTable(name: string, columns = "id INTEGER PRIMARY KEY"):
   createdTables.add(name);
   await adapter.executeMutation(`CREATE TABLE ${name} (${columns})`);
 }
-
-// `dumpAllTableSchema` dumps the entire database (~330 canonical tables in the
-// shared handler DB). On PostgreSQL under CI fork load that full-DB dump exceeds
-// the 5s default and flakes — the single-table `dumpTableSchema` cases stay fast
-// because they ignore every table but the one named. Match the sibling
-// `schema-dumper.test.ts` full-dump timeout rather than nudging the global one.
-const FULL_DUMP_TIMEOUT_MS = 30_000;
 
 describe("SchemaDumpingHelper", () => {
   afterEach(async () => {
