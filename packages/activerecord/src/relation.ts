@@ -3633,6 +3633,36 @@ export class Relation<T extends Base> {
       },
     );
     if (cteOuterJoinNodes.length > 0) joinNodes.unshift(...cteOuterJoinNodes);
+    // Mirror Rails build_join_buckets' `if joins_values.empty?` short-circuit
+    // (query_methods.rb:1838-1842), matching buildJoinBuckets' named_join /
+    // early-return branch (query-methods.ts:2784-2800). When left-outer
+    // associations are the ONLY joins — no inner joins_values, no raw join
+    // clauses, no eager stash (eagerJd or _eagerLoadAssociations), no cross-klass
+    // merged JDs, and no FROM-relation join sources on the manager — route the
+    // named left-outer associations through `namedJoins` (emitJoinPlan builds a
+    // single OuterJoin JoinDependency from them) instead of constructing a
+    // left-outer JD and folding it into the stash. This keeps the shape identical
+    // to the subquery `from(relation)` path; the stash-fold form happens to emit
+    // the same SQL only because an empty named JD's join_constraints coincide.
+    const pureLeftOuter =
+      eagerJd === undefined &&
+      manager.joinSourceCount === 0 &&
+      this._eagerLoadAssociations.length === 0 &&
+      this._namedInnerJoins.length === 0 &&
+      this._namedInnerJoinDeps.length === 0 &&
+      this._leftOuterJoinDeps.length === 0 &&
+      this._joinValues.length === 0 &&
+      this._joinClauses.length === 0;
+    if (pureLeftOuter && leftAssociations.length > 0) {
+      _qm.emitJoinPlan.call(this as any, manager, {
+        leadingJoins,
+        joinNodes,
+        stashedJoins: [...leftStashed],
+        namedJoins: leftAssociations as any,
+        aliases,
+      });
+      return;
+    }
     const leftOuterJd =
       leftAssociations.length > 0
         ? QueryMethodBangs.constructJoinDependency.call(

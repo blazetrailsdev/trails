@@ -31,4 +31,20 @@ describe("build_joins from(subquery) dedup", () => {
     expect((sql.match(/INNER JOIN/g) ?? []).length).toBe(1);
     expect(sql).not.toContain("LEFT OUTER JOIN");
   });
+
+  // The pure-left-outer live path (`_applyJoinsToManager`) now mirrors Rails'
+  // `if joins_values.empty?` short-circuit (query_methods.rb:1838-1842), routing
+  // the association through `named_join`/OuterJoin instead of a stashed
+  // JoinDependency — matching the `from(relation)` subquery path shape. Assert
+  // the two paths emit identical SQL for `left_outer_joins` with no inner joins.
+  it("pure left_outer_joins live path matches the from-subquery path SQL", () => {
+    const rel = Post.leftOuterJoins("author");
+    const liveSql = (rel as unknown as { toSql(): string }).toSql();
+    const subSql = (
+      Post.from(Post.leftOuterJoins("author"), "posts") as unknown as { toSql(): string }
+    ).toSql();
+    expect(liveSql).toContain("LEFT OUTER JOIN");
+    expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(1);
+    expect(subSql).toContain(liveSql.slice(liveSql.indexOf("LEFT OUTER JOIN")));
+  });
 });
