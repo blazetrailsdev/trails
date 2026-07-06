@@ -1071,6 +1071,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // silently swallowed it; the child's setter-dispatched assignment now
     // raises, so map the real columns.
     if (Array.isArray(foreignKey) || Array.isArray(primaryKey)) {
+      // Composite fk/pk: pair each foreign-key column with its owner primary-key
+      // column value. Fully parallel arrays (e.g. `foreign_key: [:author_id,
+      // :book_id]` / `primary_key: [:author_id, :id]`) pair by position; a mixed
+      // shape (scalar FK against a composite-PK target, or an array FK against a
+      // scalar PK) normalizes both to arrays and falls back to `pks[0]`, so a
+      // scalar side reads the leading key component. Coercing an array key to a
+      // string ("author_id,book_id") would produce an unknown attribute —
+      // tolerated only while construction swallowed it; the child's now
+      // setter-dispatched assignment raises, so map the real columns.
       const fks = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
       const pks = Array.isArray(primaryKey) ? primaryKey : [primaryKey];
       fks.forEach((fk, i) => {
