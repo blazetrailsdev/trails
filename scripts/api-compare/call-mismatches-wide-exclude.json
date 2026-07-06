@@ -13765,13 +13765,6 @@
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "ids_writer",
-    "call": "reflection",
-    "reason": "Equivalent (bucket b): reflection.association_primary_key is resolved via the shared associationPrimaryKey() helper (reads _reflectOnAssociation(this.reflection.name)), not inline in idsWriter; mirrors the ids_reader/reflection baseline entry."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/collection-association.ts",
-    "rubyName": "ids_writer",
     "call": "cast",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -13809,6 +13802,13 @@
     "rubyName": "ids_writer",
     "call": "raise_record_not_found_exception!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "ids_writer",
+    "call": "reflection",
+    "reason": "Equivalent (bucket b): reflection.association_primary_key is resolved via the shared associationPrimaryKey() helper (reads _reflectOnAssociation(this.reflection.name)), not inline in idsWriter; mirrors the ids_reader/reflection baseline entry."
   },
   {
     "package": "activerecord",
@@ -16235,13 +16235,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "initialize_generated_modules",
-    "call": "new",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "instance_method_already_implemented?",
     "call": "dangerous_attribute_method?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -18464,13 +18457,6 @@
     "rubyName": "initialize_type_map",
     "call": "alias_type",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/mysql2-adapter.ts",
-    "rubyName": "initialize_type_map",
-    "call": "lookup",
-    "reason": "Equivalent (bucket b): Rails' Type.lookup(:string, adapter: :mysql2) resolves the adapter-scoped Type::String.new(true: '1', false: '0'); trails hasn't ported the adapter-scoped Type.register(:string, adapter: :mysql2) registry, so we construct that mysql2 string inline as new StringType({trueString:'1', falseString:'0'}). Relocated here from abstract-mysql-adapter.ts when the char/varchar/enum/set registrations moved to the concrete adapter (mysql2_adapter.rb:40-49)."
   },
   {
     "package": "activerecord",
@@ -22363,6 +22349,13 @@
     "rubyName": "initialize",
     "call": "push",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2-adapter.ts",
+    "rubyName": "initialize_type_map",
+    "call": "lookup",
+    "reason": "Equivalent (bucket b): Rails' Type.lookup(:string, adapter: :mysql2) resolves the adapter-scoped Type::String.new(true: '1', false: '0'); trails hasn't ported the adapter-scoped Type.register(:string, adapter: :mysql2) registry, so we construct that mysql2 string inline as new StringType({trueString:'1', falseString:'0'}). Relocated here from abstract-mysql-adapter.ts when the char/varchar/enum/set registrations moved to the concrete adapter (mysql2_adapter.rb:40-49)."
   },
   {
     "package": "activerecord",
@@ -35955,8 +35948,22 @@
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_joins",
+    "call": "construct_join_dependency",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
     "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
   },
   {
     "package": "activerecord",
@@ -36039,8 +36046,22 @@
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
+    "call": "construct_join_dependency",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
     "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "left_outer_joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
   },
   {
     "package": "activerecord",
@@ -36069,34 +36090,6 @@
     "rubyName": "merge_outer_joins",
     "call": "relation",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_joins",
-    "call": "construct_join_dependency",
-    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_joins",
-    "call": "joins_values",
-    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_outer_joins",
-    "call": "construct_join_dependency",
-    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_outer_joins",
-    "call": "left_outer_joins_values",
-    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
   },
   {
     "package": "activerecord",
