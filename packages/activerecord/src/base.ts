@@ -1254,6 +1254,26 @@ export class Base extends Model {
     // Enum-only attrs (registered by `_enum` via `this.attribute()`) must NOT
     // block reflection — they're type overlays, not full schema declarations,
     // and the model still needs the DB to discover its other columns.
+    // The bail check reads `_attributeDefinitions`, which is copy-on-write and
+    // thus inherited from an ancestor until this class mutates it. A subclass
+    // that overrides `_tableName` (a non-STI subclass pointing at a different
+    // table) but has not yet reflected reads its ancestor's map — reflected
+    // against a *different* table. Bailing here would flag those foreign
+    // columns as known and never reflect this class's own table. Find the class
+    // that actually owns the map; if its `tableName` differs from ours, the
+    // inherited defs describe another table, so reflect instead of bailing.
+    let defsOwner: unknown = this;
+    while (defsOwner && !Object.prototype.hasOwnProperty.call(defsOwner, "_attributeDefinitions")) {
+      defsOwner = Object.getPrototypeOf(defsOwner);
+    }
+    if (
+      defsOwner &&
+      defsOwner !== this &&
+      (defsOwner as typeof Base).tableName !== this.tableName
+    ) {
+      return this.loadSchema();
+    }
+
     const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
     for (const [name, def] of this._attributeDefinitions) {
       const d = def as { virtual?: boolean; source?: string };
