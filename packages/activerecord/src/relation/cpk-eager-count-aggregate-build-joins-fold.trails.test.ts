@@ -115,6 +115,30 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     expect(countSql).toMatch(/\bid\b.*IN/i);
   });
 
+  it("eager_load(:assoc).order(non_pk_col).limit(n).count(column) routes the id fetch through columns_for_distinct", async () => {
+    await seedBooksDuplicateRevisions();
+    let count = 0;
+    const sqls = await captureSql(async () => {
+      // Order by a NON-pk column (title) that is NOT in the DISTINCT-pk select
+      // list. Without routing the ordered `SELECT DISTINCT author_id, id ...
+      // ORDER BY title` through the adapter's `columnsForDistinct` hook, PG /
+      // MySQL reject it ("ORDER BY expressions must appear in select list").
+      // titles Alpha(1,rev5) < Beta(2,rev5) < Gamma(3,rev9); limit(2) bounds to
+      // books 1 & 2 → COUNT(DISTINCT revision) over the two rev-5 rows = 1.
+      count = (await CpkBook.eagerLoad("chapters")
+        .order("cpk_books.title")
+        .limit(2)
+        .count("cpk_books.revision")) as number;
+    });
+    expect(count).toBe(1);
+    // The id-materialization query orders by the non-pk column; PG/MySQL alias
+    // it into the select list, sqlite leaves the pk projection unchanged — but
+    // in every case the ordered DISTINCT-pk fetch must run and be valid.
+    const idSql = sqls.find((s) => /DISTINCT.*cpk_books.*author_id/i.test(s) && /LIMIT 2/i.test(s));
+    expect(idSql).toBeTruthy();
+    expect(idSql).toMatch(/ORDER BY .*title/i);
+  });
+
   it("eager_load(:assoc).offset(n).count(column) bounds ROWS via the id fetch", async () => {
     await seedBooksDuplicateRevisions();
     // order+offset(1) drops book 1 (rev 5); remaining rows are books 2 (rev 5)
