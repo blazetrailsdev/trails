@@ -38377,13 +38377,6 @@
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
-    "call": "left_outer_joins_values",
-    "reason": "Body reads the private _leftOuterJoinsValues field, not the public leftOuterJoinsValues accessor; converging requires mergeOuterJoins to read the public accessor (separate source change)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/merger.ts",
-    "rubyName": "merge_outer_joins",
     "call": "left_outer_joins!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -39329,13 +39322,6 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "build_join_buckets",
-    "call": "left_outer_joins_values",
-    "reason": "Body reads the private _leftOuterJoinsValues field, not the public leftOuterJoinsValues accessor whose read the gate credits; the joins_values sibling already converged. Converging requires the join builder to read the public accessor (separate source change)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_join_buckets",
     "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -39370,13 +39356,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_join_dependencies",
-    "call": "left_outer_joins_values",
-    "reason": "Body reads the private _leftOuterJoinsValues field, not the public leftOuterJoinsValues accessor whose read the gate credits; the joins_values sibling already converged. Converging requires the join builder to read the public accessor (separate source change)."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
     "rubyName": "build_joins",
     "call": "concat",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -39401,13 +39380,6 @@
     "rubyName": "build_joins",
     "call": "join_constraints",
     "reason": "Bucket (b) equivalent: unify-join-emission-build-joins extracted the single Rails build_joins emission into the shared `emitJoinPlan` helper (delegated to by both `buildJoins` and `_applyJoinsToManager`). The `join_constraints` call still happens, one frame deeper in `emitJoinPlan` (which has no Rails counterpart), so the static call-set analyzer no longer sees it directly under build_joins. Behavior is identical."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "build_joins",
-    "call": "left_outer_joins_values",
-    "reason": "Body reads the private _leftOuterJoinsValues field, not the public leftOuterJoinsValues accessor whose read the gate credits; the joins_values sibling already converged. Converging requires the join builder to read the public accessor (separate source change)."
   },
   {
     "package": "activerecord",
