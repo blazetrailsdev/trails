@@ -1351,7 +1351,20 @@ export function extractClass(
     if (ts.isMethodDeclaration(member) && memberName) {
       const params = extractParameters(member.parameters);
       const optionKeys = extractOptionKeys(member.parameters, checker);
-      const calls = extractCalls(member.body);
+      // A host-class method whose whole body is a trivial delegation to a
+      // same-named module function pulled in via a namespace import — e.g.
+      // `buildJoins(arel) { _qm.buildJoins.call(this, arel); }` in relation.ts,
+      // where the real port lives in relation/query-methods.ts — is a Rails-layout
+      // wrapper (kept so api:compare finds the method where Rails declares it,
+      // see PR #4676), NOT a second body. Its extracted call-set is just the
+      // delegate name, so comparing it flags every Ruby call as phantom-missing
+      // (double-attribution). Suppress the wrapper's call-set so the canonical
+      // module-function candidate is the one compared; the method name still
+      // counts for presence/arity parity.
+      const calls =
+        namespaceSelfDelegationName(member.body, checker) === memberName
+          ? undefined
+          : extractCalls(member.body);
       const method: MethodInfo = {
         name: memberName,
         visibility,
@@ -1819,6 +1832,64 @@ function delegatedHelper(body: ts.Node | undefined): string | undefined {
     return callee.name.text;
   }
   return undefined;
+}
+
+/**
+ * If `body` is a trivial single-statement delegation to a same-named module
+ * function reached through a namespace-import object — `return NS.fn(...)`,
+ * `NS.fn(...)`, or the `.call`/`.apply` forms `NS.fn.call(this, ...)` — return
+ * that function's name, else undefined. Distinct from {@link delegatedHelper}
+ * (which handles `this.helper(...)` same-class delegation): here the callee's
+ * receiver is a bare identifier (a namespace alias like `_qm`), not `this`.
+ * Used to identify Rails-layout wrapper methods whose real body lives in the
+ * canonical module file, so the wrapper's meaningless call-set is suppressed.
+ */
+function namespaceSelfDelegationName(
+  body: ts.Node | undefined,
+  checker: ts.TypeChecker,
+): string | undefined {
+  if (!body || !ts.isBlock(body) || body.statements.length !== 1) return undefined;
+  const stmt = body.statements[0];
+  const expr = ts.isReturnStatement(stmt)
+    ? stmt.expression
+    : ts.isExpressionStatement(stmt)
+      ? stmt.expression
+      : undefined;
+  if (!expr || !ts.isCallExpression(expr)) return undefined;
+  let callee = expr.expression;
+  // Peel a trailing `.call` / `.apply` so `NS.fn.call(this, ...)` resolves to fn.
+  if (
+    ts.isPropertyAccessExpression(callee) &&
+    ts.isIdentifier(callee.name) &&
+    (callee.name.text === "call" || callee.name.text === "apply")
+  ) {
+    callee = callee.expression;
+  }
+  // The receiver must be a bare identifier (not `this` — `this.x` delegation is
+  // handled by delegatedHelper).
+  if (
+    !ts.isPropertyAccessExpression(callee) ||
+    !ts.isIdentifier(callee.expression) ||
+    !ts.isIdentifier(callee.name)
+  ) {
+    return undefined;
+  }
+  // …and it must positively resolve to a MODULE/namespace receiver, NOT a class.
+  // `QueryAttribute.withCastValue(...)` is an in-class instance→static delegation
+  // whose body has real reads (`this.name`, `this.type`) that must be kept; a
+  // namespace/module receiver (`_qm`, `_fm`, `ConnectionHandling` — all
+  // `import * as` / named module-object imports) is the Rails-layout wrapper we
+  // do want to drop. An UNRESOLVABLE receiver (no symbol — only reachable for a
+  // genuinely unbound identifier, i.e. non-compiling code) fails toward tracking
+  // rather than risk a false-positive suppression that silently drops a real
+  // call-set. A class receiver's symbol carries the Class flag (in a fully
+  // type-resolved program the alias resolves through to the imported class too);
+  // a namespace/module object does not.
+  let recvSym = checker.getSymbolAtLocation(callee.expression);
+  if (!recvSym) return undefined;
+  if (recvSym.flags & ts.SymbolFlags.Alias) recvSym = checker.getAliasedSymbol(recvSym);
+  if (recvSym.flags & ts.SymbolFlags.Class) return undefined;
+  return callee.name.text;
 }
 
 function extractParameters(params: ts.NodeArray<ts.ParameterDeclaration>): ParamInfo[] {
