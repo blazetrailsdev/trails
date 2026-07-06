@@ -17,9 +17,14 @@
  *
  * NOT reachable via any canonical shape (documented, not tested):
  *   - a *polymorphic inverse* (recursion landing on an inverse whose
- *     `options.as` yields `#{as}_id`): every reflection carrying `as` returns
- *     `#{as}_id` up front, before the `inverse_of` recursion, so a polymorphic
- *     reflection is never *reached as an inverse*;
+ *     `options.as` yields `#{as}_id`). The recursion is only entered when the
+ *     OUTER reflection has no `as` (the `if (options.as)` guard returns first),
+ *     and the reflection it recurses INTO is the outer's `inverse_of` target.
+ *     Only a has_one/has_many polymorphic reflection carries `as`, and its
+ *     inverse is always a polymorphic `belongs_to` (which carries
+ *     `polymorphic: true`, not `as`) — no canonical has_one/has_many names
+ *     another has-side polymorphic reflection as its `inverse_of`, so an
+ *     `as`-bearing reflection is never the thing recursed into;
  *   - a *composite* (`string[]`) inverse foreign key: every canonical
  *     collection whose inverse is composite already declares its own explicit
  *     `foreignKey`, short-circuiting before the recursion. The scalar case
