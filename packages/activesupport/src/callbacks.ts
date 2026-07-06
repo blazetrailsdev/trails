@@ -363,7 +363,7 @@ export interface FilterEnvironment {
 export class Before {
   readonly userCallback: (target: object, value: unknown) => unknown;
   readonly userConditions: Array<(target: object, value: unknown) => boolean>;
-  readonly haltedLambda: (target: object, fn: () => unknown) => boolean;
+  readonly terminator: ((target: object, fn: () => unknown) => boolean) | false | undefined;
   readonly filter: AnyCallback | string | symbol;
   readonly name: string;
 
@@ -376,33 +376,93 @@ export class Before {
   ) {
     this.userCallback = userCallback;
     this.userConditions = userConditions;
-    this.haltedLambda =
-      chainConfig.terminator === false
-        ? (_t: object, fn: () => unknown) => {
-            fn();
-            return false;
-          }
-        : (chainConfig.terminator ??
-          ((_t: object, fn: () => unknown) => {
-            try {
-              fn();
-              return false;
-            } catch (e) {
-              if (isAbortSignal(e)) return true;
-              throw e;
-            }
-          }));
+    // Keep the raw terminator so call() can distinguish false / custom / default
+    // and thread async correctly (Rails' halted_lambda is synchronous; JS
+    // callbacks may return a Promise, so the halt decision may be async).
+    this.terminator = chainConfig.terminator;
     this.filter = filter;
     this.name = name;
   }
 
-  call(env: FilterEnvironment): FilterEnvironment {
+  /**
+   * Mirrors Rails `Filters::Before#call` (callbacks.rb) with async threaded
+   * through: the default terminator halts on the abort sentinel (thrown sync or
+   * rejected async); a `false` terminator never halts but still awaits an async
+   * callback (a sentinel rejection propagates, matching the default-only
+   * `catch(:abort)` scope); a custom terminator owns the halt decision and does
+   * not support async callbacks. In `strict: "sync"` an async callback throws.
+   */
+  call(
+    env: FilterEnvironment,
+    opts?: RunCallbacksOptions,
+    chainName = "",
+  ): FilterEnvironment | Promise<FilterEnvironment> {
     const { target, value, halted } = env;
-    if (!halted && this.userConditions.every((c) => c(target, value))) {
-      const resultLambda = () => this.userCallback(target, value);
-      env.halted = this.haltedLambda(target, resultLambda);
+    if (halted || !this.userConditions.every((c) => c(target, value))) return env;
+
+    const terminatorFn = this.terminator;
+    const resultLambda = () => this.userCallback(target, value);
+
+    if (terminatorFn === false) {
+      const r = resultLambda();
+      if (!isThenable(r)) return env;
+      if (opts?.strict === "sync") {
+        swallowRejection(r);
+        throw new Error(`Async callback on sync chain "${chainName}" — before returned a Promise`);
+      }
+      // No catch: with the terminator disabled Rails does not scope
+      // `catch(:abort)`, so a sentinel rejection propagates as an error.
+      return Promise.resolve(r).then(() => env);
     }
-    return env;
+
+    if (terminatorFn) {
+      let cbResult: unknown;
+      const halt = terminatorFn(target, () => {
+        cbResult = resultLambda();
+        return cbResult;
+      });
+      if (isThenable(cbResult)) {
+        swallowRejection(cbResult);
+        if (opts?.strict === "sync") {
+          throw new Error(
+            `Async callback on sync chain "${chainName}" — before returned a Promise`,
+          );
+        }
+        throw new Error(
+          `Async before callback on chain "${chainName}" is unsupported with a custom terminator. ` +
+            `Custom terminators cannot evaluate Promise-returning callbacks. ` +
+            `Use the default terminator (halt via throwAbort()) or make all before callbacks synchronous.`,
+        );
+      }
+      if (halt) env.halted = true;
+      return env;
+    }
+
+    // Default terminator: Rails wraps the call in `catch(:abort)`.
+    let cbResult: unknown;
+    try {
+      cbResult = resultLambda();
+    } catch (e) {
+      if (!isAbortSignal(e)) throw e;
+      env.halted = true;
+      return env;
+    }
+    if (!isThenable(cbResult)) return env;
+    if (opts?.strict === "sync") {
+      swallowRejection(cbResult);
+      throw new Error(
+        `Async callback on sync chain "${chainName}" — before returned a Promise. ` +
+          `Validations are synchronous; move async work to a beforeSave/afterSave callback.`,
+      );
+    }
+    return Promise.resolve(cbResult).then(
+      () => env,
+      (e) => {
+        if (!isAbortSignal(e)) throw e;
+        env.halted = true;
+        return env;
+      },
+    );
   }
 
   apply(seq: CallbackSequence): CallbackSequence {
@@ -447,10 +507,21 @@ export class After {
     this.halting = chainConfig.skipAfterCallbacksIfTerminated ?? false;
   }
 
-  call(env: FilterEnvironment): FilterEnvironment {
+  call(
+    env: FilterEnvironment,
+    opts?: RunCallbacksOptions,
+    chainName = "",
+  ): FilterEnvironment | Promise<FilterEnvironment> {
     const { target, value, halted } = env;
     if ((!halted || !this.halting) && this.userConditions.every((c) => c(target, value))) {
-      this.userCallback(target, value);
+      const r = this.userCallback(target, value);
+      if (isThenable(r)) {
+        if (opts?.strict === "sync") {
+          swallowRejection(r);
+          throw new Error(`Async callback on sync chain "${chainName}" — after returned a Promise`);
+        }
+        return Promise.resolve(r).then(() => env);
+      }
     }
     return env;
   }
@@ -525,6 +596,10 @@ export class Callback {
     this.options = options;
     this.chainConfig = chainConfig;
     this.originalObject = originalObject;
+    // Rails' Callback#initialize eagerly builds `compiled` (callbacks.rb), so a
+    // String filter raises ArgumentError at set_callback time, not lazily on the
+    // first run_callbacks. Match that eager timing.
+    void this.compiled;
   }
 
   matches(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): boolean {
@@ -583,8 +658,12 @@ export class Callback {
       : this.options.unless
         ? [this.options.unless]
         : [];
-    for (const c of ifConds) userConditions.push((t) => c(t));
-    for (const c of unlessConds) userConditions.push((t) => !c(t));
+    // Forward `value` (env.value — the run_callbacks block's return) to each
+    // condition. ActiveModel's after-model-callback guard (`value != false`)
+    // reads it to skip after callbacks when the block returned false or the
+    // chain halted. Mirrors Rails conditions_lambdas + Conditionals::Value.
+    for (const c of ifConds) userConditions.push((t, v) => c(t, v));
+    for (const c of unlessConds) userConditions.push((t, v) => !c(t, v));
 
     // Mirrors ActiveSupport::Callbacks::CallTemplate.build: a Proc/block filter
     // compiles to InstanceExec{0,1,2} (run via instance_exec, so `self` is the
@@ -600,6 +679,12 @@ export class Callback {
           : arity > 0
             ? new InstanceExec1(this.filter as (target: object) => unknown)
             : new InstanceExec0(this.filter as () => unknown);
+    } else if (typeof this.filter === "string") {
+      // Rails Callback.build raises ArgumentError for a String filter; only a
+      // Symbol (method name) or a proc/block is permitted.
+      throw new Error(
+        `Passing string to define a callback is not supported: ${String(this.filter)}`,
+      );
     } else {
       callTemplate = new MethodCall(this.filter as PropertyKey);
     }
@@ -688,12 +773,37 @@ export class CallbackSequence {
     return this.callTemplate!.expand(env.target, env.value, block);
   }
 
-  invokeBefore(env: FilterEnvironment): void {
-    this.beforeList?.forEach((b) => b.call(env));
+  invokeBefore(
+    env: FilterEnvironment,
+    opts?: RunCallbacksOptions,
+    chainName = "",
+  ): void | Promise<void> {
+    return this._runFilters(this.beforeList, 0, env, opts, chainName);
   }
 
-  invokeAfter(env: FilterEnvironment): void {
-    this.afterList?.forEach((a) => a.call(env));
+  invokeAfter(
+    env: FilterEnvironment,
+    opts?: RunCallbacksOptions,
+    chainName = "",
+  ): void | Promise<void> {
+    return this._runFilters(this.afterList, 0, env, opts, chainName);
+  }
+
+  /** Run before/after filters in order, awaiting any that return a Promise. */
+  private _runFilters(
+    list: Array<Before | After> | null,
+    start: number,
+    env: FilterEnvironment,
+    opts: RunCallbacksOptions | undefined,
+    chainName: string,
+  ): void | Promise<void> {
+    if (!list) return;
+    for (let i = start; i < list.length; i++) {
+      const r = list[i].call(env, opts, chainName);
+      if (isThenable(r)) {
+        return Promise.resolve(r).then(() => this._runFilters(list, i + 1, env, opts, chainName));
+      }
+    }
   }
 
   invoke(
@@ -712,16 +822,55 @@ export class CallbackSequence {
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
     const callbackChain = this._callbackChain;
-    if (!callbackChain) {
-      const r = block?.();
-      if (!isThenable(r)) return true;
-      if (opts?.strict === "sync") {
-        swallowRejection(r);
-        throw new Error("Async block on chain with no callbacks");
-      }
-      return Promise.resolve(r).then(() => true);
+    // Interim: chains containing around callbacks are not final and still run
+    // through the bespoke engine. A follow-up story ports the around loop
+    // (Rails run_callbacks' invoke_sequence) onto the compiled sequence and
+    // retires _invoke. See callbacks-around-loop-drives-compiled-sequence.
+    if (!this.isFinal()) {
+      return callbackChain!._invoke(target, block, opts);
     }
-    return callbackChain._invoke(target, block, opts);
+
+    // Mirrors Rails run_callbacks' `if next_sequence.final?` branch:
+    // invoke_before → env.value = !halted && (!block || yield) → invoke_after.
+    const chainName = callbackChain?.name ?? "";
+    const env: FilterEnvironment = { target, halted: false, value: undefined };
+    const beforeDone = this.invokeBefore(env, opts, chainName);
+    if (isThenable(beforeDone)) {
+      return Promise.resolve(beforeDone).then(() => this._finishFinal(env, block, opts, chainName));
+    }
+    return this._finishFinal(env, block, opts, chainName);
+  }
+
+  private _finishFinal(
+    env: FilterEnvironment,
+    block: (() => unknown) | undefined,
+    opts: RunCallbacksOptions | undefined,
+    chainName: string,
+  ): boolean | Promise<boolean> {
+    // Rails: env.value = !env.halted && (!block_given? || yield)
+    if (env.halted) {
+      env.value = false;
+      const afterDone = this.invokeAfter(env, opts, chainName);
+      if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => false);
+      return false;
+    }
+    const y = block ? block() : true;
+    if (isThenable(y)) {
+      if (opts?.strict === "sync") {
+        swallowRejection(y);
+        throw new Error(`Async callback on sync chain "${chainName}" — block returned a Promise`);
+      }
+      return Promise.resolve(y).then((v) => {
+        env.value = v;
+        const afterDone = this.invokeAfter(env, opts, chainName);
+        if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => true);
+        return true;
+      });
+    }
+    env.value = y;
+    const afterDone = this.invokeAfter(env, opts, chainName);
+    if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => true);
+    return true;
   }
 
   // Back-reference set by CallbackChain.compile() for invoke() convenience
@@ -787,7 +936,13 @@ export class CallbackChain {
   }
 
   compile(): CallbackSequence {
-    const seq = new CallbackSequence();
+    // Mirrors Rails CallbackChain#compile: fold the chain in reverse, applying
+    // each callback's compiled filter onto the sequence. before/after mutate the
+    // (single) final sequence's lists; around wraps it in a new nested sequence.
+    let seq = new CallbackSequence();
+    for (let i = this.chain.length - 1; i >= 0; i--) {
+      seq = this.chain[i].compiled.apply(seq);
+    }
     seq._callbackChain = this;
     return seq;
   }

@@ -377,6 +377,23 @@ describe("Callbacks", () => {
       runCallbacks(target, "save");
       expect(target.log).toEqual(["run"]);
     });
+
+    it("forwards the block's return value (env.value) to after-callback conditions", () => {
+      // Mirrors ActiveModel's after-model-callback guard (`value != false`):
+      // the condition reads the run_callbacks block's return, so an after
+      // callback is skipped when the block returned false and runs otherwise.
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "after", (t: any) => t.log.push("after"), {
+        unless: (_t, value) => value === false,
+      });
+
+      runCallbacks(target, "save", () => false);
+      expect(target.log).toEqual([]);
+
+      runCallbacks(target, "save", () => "ok");
+      expect(target.log).toEqual(["after"]);
+    });
   });
 
   describe("prepend", () => {
@@ -1412,9 +1429,10 @@ describe("NotPermittedStringCallbackTest", () => {
   it("passing string callback is not permitted", () => {
     const target = {};
     defineCallbacks(target, "save");
-    // In our TS implementation, non-function callbacks throw at runtime
-    setCallback(target, "save", "before", "not-a-function" as any);
-    expect(() => runCallbacks(target, "save", () => {})).toThrow();
+    // Rails raises ArgumentError eagerly at registration (`before_save "tweedle"`),
+    // because Callback#initialize builds `compiled`. A String filter is rejected
+    // there, not lazily on the first runCallbacks.
+    expect(() => setCallback(target, "save", "before", "not-a-function" as any)).toThrow();
   });
 });
 
