@@ -124,6 +124,11 @@ describe("Relation private build-arel helpers", () => {
       expect(relation().arelColumn(lit)).toBe(lit);
     });
 
+    it("passes through a non-string Arel node without calling .match", () => {
+      const grouping = new Nodes.Grouping(new Nodes.SqlLiteral("id"));
+      expect(relation().arelColumn(grouping)).toBe(grouping);
+    });
+
     it("resolves table.column form via arelColumnWithTable", () => {
       const node = relation().arelColumn("authors.name");
       expect((node as any).relation?.name).toBe("authors");

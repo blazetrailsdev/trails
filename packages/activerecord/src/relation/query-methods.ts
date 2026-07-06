@@ -2259,11 +2259,14 @@ export function isTableNameMatches(this: QueryMethodsHost, from: unknown): boole
 /** @internal */
 export function arelColumn(
   this: QueryMethodsHost,
-  field: string | symbol,
+  field: string | symbol | Nodes.Node,
   fallback?: (attr: string) => unknown,
 ): unknown {
   const modelClass: any = (this as any)._modelClass;
   const table: any = modelClass?.arelTable;
+  // Rails: a raw Arel node has no columns_hash/table.column form; it falls to
+  // the block, else passes through unchanged (query_methods.rb:1996-2003).
+  if (field instanceof Nodes.Node) return fallback ? fallback(field as any) : field;
   const isSymbol = typeof field === "symbol";
   let fieldStr = isSymbol ? symbolToName(field) : field;
   fieldStr = modelClass?._attributeAliases?.[fieldStr] ?? fieldStr;
