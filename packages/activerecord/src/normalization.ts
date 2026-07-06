@@ -10,7 +10,7 @@
  * Mirrors: ActiveRecord::Normalization
  */
 
-import { Model, NormalizesArgs } from "@blazetrails/activemodel";
+import { Model, NormalizesArgs, SerializeCastValue } from "@blazetrails/activemodel";
 
 /**
  * NormalizedValueType — decorates an underlying cast type with a normalizer.
@@ -53,14 +53,16 @@ export class NormalizedValueType {
   }
 
   serializeCastValue(value: unknown): unknown {
-    const ct = this.castType as {
-      serializeCastValue?(v: unknown): unknown;
-      serialize?(v: unknown): unknown;
-    };
-    if (typeof ct.serializeCastValue === "function") {
-      return ct.serializeCastValue(value);
-    }
-    return typeof ct.serialize === "function" ? ct.serialize(value) : value;
+    // Rails: `serialize_cast_value(cast_type, value)` →
+    // `ActiveModel::Type::SerializeCastValue.serialize(cast_type, value)`, which
+    // dispatches on the cast type's own serialize-cast-value compatibility
+    // (`itself_if_serialize_cast_value_compatible`) rather than mere method
+    // presence. Route through the shared helper so this mirror and the live
+    // `normalizedValueType` share one dispatch rule.
+    return SerializeCastValue.serialize(
+      this.castType as unknown as Parameters<typeof SerializeCastValue.serialize>[0],
+      value,
+    );
   }
 
   private _normalize(value: unknown): unknown {
