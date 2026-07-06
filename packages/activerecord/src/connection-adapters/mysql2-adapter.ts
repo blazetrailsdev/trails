@@ -1582,6 +1582,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     this._connectionConfigured = false;
     this._stmtPool?.detach();
     this._stmtPool = null;
+    // Safe to read `_client` after `super.discardBang()` — unlike
+    // `disconnectBang`, the base `discardBang` (abstract-adapter.ts) is a true
+    // no-op that never touches `_connection`, so the live handle survives here
+    // (`_client` is the unified `_connection` field). No end() — discard! must
+    // not talk to the server; abandonRawSocket neutralizes the fd instead.
     const conn = this._client;
     this._client = null;
     abandonRawSocket(conn);
