@@ -18467,6 +18467,13 @@
   },
   {
     "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2-adapter.ts",
+    "rubyName": "initialize_type_map",
+    "call": "lookup",
+    "reason": "Equivalent (bucket b): Rails' Type.lookup(:string, adapter: :mysql2) resolves the adapter-scoped Type::String.new(true: '1', false: '0'); trails hasn't ported the adapter-scoped Type.register(:string, adapter: :mysql2) registry, so we construct that mysql2 string inline as new StringType({trueString:'1', falseString:'0'}). Relocated here from abstract-mysql-adapter.ts when the char/varchar/enum/set registrations moved to the concrete adapter (mysql2_adapter.rb:40-49)."
+  },
+  {
+    "package": "activerecord",
     "tsFile": "connection-adapters/abstract-mysql-adapter.ts",
     "rubyName": "mariadb?",
     "call": "match?",
