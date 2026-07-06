@@ -91,6 +91,9 @@ export class CollectionAssociation extends Association {
       return this.target.map(readKey);
     }
     if (this._associationIds) return this._associationIds;
+    // Rails plucks off `scope` here, not `load_target`: `scope().pluck()` must
+    // not mark the association loaded, so `record.misc_tag_ids` (a through
+    // association) does not preload `record.misc_tags`.
     const rel = this.scope();
     if (rel && typeof rel.pluck === "function") {
       this._associationIds = await rel.pluck(...keys);

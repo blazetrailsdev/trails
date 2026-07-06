@@ -91,11 +91,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return throughTargetScope(this, super["targetScope"]());
   }
 
-  // Rails' ids_reader: scope.pluck(*reflection.association_primary_key).
-  // Using scope().pluck() (matching the base idsReader path) avoids calling
-  // doAsyncFindTarget() → loadHasMany() → syncToAssociationInstance() which
-  // would mark the association as loaded — violating the Rails contract that
-  // `record.misc_tag_ids` does not preload `miscTags`.
   protected override staleState(): unknown {
     const vals = throughStaleState(this);
     if (!vals) return null;
