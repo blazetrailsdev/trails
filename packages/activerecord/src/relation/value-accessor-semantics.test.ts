@@ -41,10 +41,10 @@ describe("Relation value accessor Rails semantics", () => {
     ]);
   });
 
-  it("joins_values= places named joins ahead of raw joins (reader concat order)", () => {
+  it("joins_values= round-trips in insertion order (no named-before-raw reorder)", () => {
     const rel = relation();
     rel.joinsValues = ["RAW JOIN x", { category: {} }];
-    expect(rel.joinsValues).toEqual([{ category: {} }, "RAW JOIN x"]);
+    expect(rel.joinsValues).toEqual(["RAW JOIN x", { category: {} }]);
   });
 
   it("joins_values= overwrites prior join state", () => {

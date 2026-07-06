@@ -565,13 +565,43 @@ export class Relation<T extends Base> {
     // _selfJoinAlias) — used to attribute repeat counts to the right candidate.
     aliasBase?: string;
   }> = [];
-  private _joinValues: (string | Nodes.Join)[] = [];
+  // Single insertion-ordered backing store for `joins_values` (mirrors Rails'
+  // one `@values[:joins]` array). Every `.joins` argument lands here in call
+  // order — Arel join nodes and raw SQL strings alongside association names and
+  // nested-association hashes — so `joins_values=`/`joins_values` round-trip
+  // faithfully with no named-before-raw reorder. The named-vs-raw split the
+  // builders need is derived on read (`_namedInnerJoins` / `_joinValues`), not
+  // stored separately.
+  private _joinsValues: (AssociationSpec | string | Nodes.Join)[] = [];
   private _leftOuterJoinsValues: AssociationSpec[] = [];
+  // A `joins_values` entry is a "named" inner association join (resolved through
+  // JoinDependency) when it is a nested-association hash, a genuine Symbol
+  // (trails' signal for an association/CTE name, e.g. `joins(:name)`), or a
+  // string naming an association; everything else (Arel join nodes, raw SQL
+  // strings) is a raw join value. The two derived getters below partition
+  // `_joinsValues` by this rule — the same rule `joins` uses at insert time. A
+  // raw Symbol misrouted to `_joinValues` would reach the arel visitor and raise
+  // "Unknown node type: Symbol", so Symbols must land in `_namedInnerJoins`.
+  private _isNamedJoinValue(v: unknown): boolean {
+    return (
+      _isPlainObject(v) ||
+      typeof v === "symbol" ||
+      (typeof v === "string" && this._isAssociationName(v))
+    );
+  }
   // INNER `joins(:assoc)` association names (and nested hash/through specs),
   // resolved through JoinDependency — mirroring Rails' joins_values, which feed
   // build_join_dependencies so every node in the chain carries its base_klass
-  // and shares Rails' AliasTracker self-join aliasing.
-  private _namedInnerJoins: AssociationSpec[] = [];
+  // and shares Rails' AliasTracker self-join aliasing. Derived from the unified
+  // store so insertion order is preserved.
+  get _namedInnerJoins(): AssociationSpec[] {
+    return this._joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[];
+  }
+  // Raw join values (Arel `Nodes.Join` and non-association SQL strings). Derived
+  // from the unified store; the complement of `_namedInnerJoins`.
+  get _joinValues(): (string | Nodes.Join)[] {
+    return this._joinsValues.filter((v) => !this._isNamedJoinValue(v)) as (string | Nodes.Join)[];
+  }
   // Pre-built InnerJoin JoinDependencies from a cross-klass `merge` (Rails
   // merge_joins builds these against `other.klass` since the association names
   // can't resolve on the receiver's model).
@@ -1924,50 +1954,15 @@ export class Relation<T extends Base> {
     // longer a `(table, on)` heuristic to disambiguate against, so the flatten
     // is uniform.
     const flatArgs = _qm.flattenedArgs(args).filter((a) => !_qm.isBlankArgument(a));
+    // Rails joins! uses `joins_values |= args` — one array union over the whole
+    // set, deduplicating by eql?/hash (structural for Arel `Nodes.Binary`, plain
+    // strings, and Hash specs alike). structuralUnionEq mirrors that (=== first,
+    // then eql/structural), and a single unified store preserves insertion order
+    // across named and raw joins. The named-vs-raw partition the builders need is
+    // derived on read (see `_namedInnerJoins` / `_joinValues`).
     for (const arg of flatArgs) {
-      // Arel join node — stored as-is to preserve type (mirrors Rails joins_values).
-      // Rails joins! uses |= (array union), deduplicating by eql?/hash —
-      // structural for nodes (Arel::Nodes::Binary#eql?), strings, and hashes
-      // alike. structuralUnionEq (=== first, then eql/structural) matches all.
-      if (arg instanceof Nodes.Join) {
-        if (!rel._joinValues.some((v) => _qm.structuralUnionEq(v, arg))) rel._joinValues.push(arg);
-        continue;
-      }
-      // Nested association hash: joins({ post: "author" }) mirrors Rails
-      // joins(post: :author). Route through JoinDependency (InnerJoin) so the
-      // full nested chain is resolved — constructJoinDependency already walks
-      // AssociationSpec trees via walkAssociationTree/addTreeToJoinDependency.
-      // joins_values |= dedups structurally-equal Hash specs, so fold here too.
-      if (_isPlainObject(arg)) {
-        if (!rel._namedInnerJoins.some((v) => _qm.structuralUnionEq(v, arg)))
-          rel._namedInnerJoins.push(arg as AssociationSpec);
-        continue;
-      }
-      // Named association joins — both simple `joins(:assoc)` and nested-through
-      // chains route through JoinDependency (InnerJoin), matching Rails:
-      // joins_values feeds build_join_dependencies, so every node in the chain
-      // (base, through, target) is represented with its base_klass. This unifies
-      // AliasTracker self-join aliasing and table-klass lookups across simple and
-      // through joins; a non-association string falls through to a raw SQL join.
-      if (typeof arg === "string" && rel._isAssociationName(arg)) {
-        if (!rel._namedInnerJoins.some((v) => _qm.structuralUnionEq(v, arg)))
-          rel._namedInnerJoins.push(arg);
-        continue;
-      }
-      // A genuine Symbol is trails' signal for "association/CTE name" (vs a raw
-      // SQL string), mirroring Ruby's `joins(:name)`. Route it into
-      // `_namedInnerJoins` so `emitJoinPlan`'s `selectNamedJoins` can partition a
-      // `with(...)` CTE name out to `buildWithJoinNode(name, InnerJoin)`; a raw
-      // Symbol left in `_joinValues` would reach the arel visitor and raise
-      // "Unknown node type: Symbol".
-      if (typeof arg === "symbol") {
-        if (!rel._namedInnerJoins.some((v) => _qm.structuralUnionEq(v, arg)))
-          rel._namedInnerJoins.push(arg as unknown as AssociationSpec);
-        continue;
-      }
-      const joinValue = arg as string | Nodes.Join;
-      if (!rel._joinValues.some((v) => _qm.structuralUnionEq(v, joinValue)))
-        rel._joinValues.push(joinValue);
+      if (!rel._joinsValues.some((v) => _qm.structuralUnionEq(v, arg)))
+        rel._joinsValues.push(arg as AssociationSpec | string | Nodes.Join);
     }
     return rel;
   }
@@ -4654,41 +4649,26 @@ export class Relation<T extends Base> {
 
   /**
    * Mirrors: ActiveRecord::Relation#joins_values — Rails stores every `.joins`
-   * argument (association names and raw SQL/Arel joins) in one array; trails
-   * splits them into `_namedInnerJoins` (resolved through JoinDependency) and
-   * `_joinValues` (raw string/Arel), so the accessor recombines them.
+   * argument (association names and raw SQL/Arel joins) in one insertion-ordered
+   * array. trails backs that directly with `_joinsValues`, so the reader returns
+   * the stored array (a copy) and preserves the exact order in which joins were
+   * added. The named-vs-raw split the builders need is derived from this store
+   * on read (`_namedInnerJoins` / `_joinValues`).
    */
   get joinsValues(): (AssociationSpec | string | Nodes.Join)[] {
-    return [...this._namedInnerJoins, ...this._joinValues];
+    return [...this._joinsValues];
   }
   /**
-   * Split-routing writer for `joins_values=`. trails has no single field to
-   * round-trip (the reader concatenates `_namedInnerJoins` + `_joinValues`), so
-   * the setter re-routes each entry using the same rule as `joins` itself
-   * (relation.ts `joins`): Arel `Join` nodes and non-association strings go to
-   * `_joinValues`; association-name strings and nested-association hashes go to
-   * `_namedInnerJoins`. A value assigned then read back is preserved by
-   * category, but — matching the reader's concat order — named joins always
-   * precede raw joins regardless of their original interleaving. The
-   * SQL-emitted `_joinClauses` (the explicit-ON `leftJoins(table, on)` form and
+   * Writer for `joins_values=` (query_methods.rb:162-181, `@values[:joins] =
+   * value`). Assigns the unified backing store directly, so a value assigned
+   * then read back round-trips faithfully in insertion order. The SQL-emitted
+   * `_joinClauses` (the explicit-ON `leftJoins(table, on)` form and
    * where-association joins) are not part of `joins_values` and are left
    * untouched.
    */
   set joinsValues(value: (AssociationSpec | string | Nodes.Join)[]) {
     this.assertModifiableBang();
-    this._namedInnerJoins = [];
-    this._joinValues = [];
-    for (const arg of value) {
-      if (arg instanceof Nodes.Join) {
-        this._joinValues.push(arg);
-      } else if (_isPlainObject(arg)) {
-        this._namedInnerJoins.push(arg as AssociationSpec);
-      } else if (typeof arg === "string" && this._isAssociationName(arg)) {
-        this._namedInnerJoins.push(arg);
-      } else {
-        this._joinValues.push(arg as string | Nodes.Join);
-      }
-    }
+    this._joinsValues = [...value];
   }
 
   /** Mirrors: ActiveRecord::Relation#left_outer_joins_values */
@@ -7428,9 +7408,8 @@ export class Relation<T extends Base> {
     this._lockValue = source._lockValue;
     this._setOperation = source._setOperation;
     this._joinClauses = [...source._joinClauses];
-    this._joinValues = [...source._joinValues];
+    this._joinsValues = [...source._joinsValues];
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];
-    this._namedInnerJoins = [...source._namedInnerJoins];
     this._namedInnerJoinDeps = [...source._namedInnerJoinDeps];
     this._leftOuterJoinDeps = [...source._leftOuterJoinDeps];
     this._includesAssociations = [...source._includesAssociations];
