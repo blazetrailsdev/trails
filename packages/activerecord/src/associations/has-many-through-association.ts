@@ -91,11 +91,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return throughTargetScope(this, super["targetScope"]());
   }
 
-  // Rails' ids_reader: scope.pluck(*reflection.association_primary_key).
-  // Using scope().pluck() (matching the base idsReader path) avoids calling
-  // doAsyncFindTarget() → loadHasMany() → syncToAssociationInstance() which
-  // would mark the association as loaded — violating the Rails contract that
-  // `record.misc_tag_ids` does not preload `miscTags`.
   protected override staleState(): unknown {
     const vals = throughStaleState(this);
     if (!vals) return null;
@@ -112,26 +107,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
         : (record as any)[srcPk];
     }
     return super.primaryKeyValue(record);
-  }
-
-  override async idsReader(): Promise<unknown[]> {
-    if (this.isLoaded()) {
-      return this.target.map((r) => this.primaryKeyValue(r));
-    }
-    if (this.target.length > 0) {
-      return (await this.loadTarget()).map((r) => this.primaryKeyValue(r));
-    }
-    if (this._associationIds) return this._associationIds;
-    const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-    const refl = ctor._reflectOnAssociation?.(this.reflection.name);
-    const srcPk = refl?.sourceReflection?.associationPrimaryKey;
-    const pk = (typeof srcPk === "string" ? srcPk : null) ?? (this.klass as any).primaryKey;
-    const rel = this.scope();
-    if (rel && typeof rel.pluck === "function") {
-      this._associationIds = await rel.pluck(...(Array.isArray(pk) ? pk : [pk]));
-      return this._associationIds!;
-    }
-    return [];
   }
 
   /**
