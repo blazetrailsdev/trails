@@ -3714,6 +3714,48 @@ export class Relation<T extends Base> {
       },
     );
     if (cteOuterJoinNodes.length > 0) joinNodes.unshift(...cteOuterJoinNodes);
+    // Mirror Rails build_join_buckets' `if joins_values.empty?` short-circuit
+    // (query_methods.rb:1838-1842), matching buildJoinBuckets' named_join /
+    // early-return branch (query-methods.ts:2782-2789). When left-outer values
+    // exist but there are no inner joins_values, raw join clauses, or eager stash,
+    // route the resolved left-outer associations through `namedJoins` (emitJoinPlan
+    // builds one OuterJoin JoinDependency from them) instead of constructing a
+    // left-outer JD and folding it into the stash. This keeps the shape identical
+    // to the subquery `from(relation)` path.
+    //
+    // The four emptiness checks below mirror buildJoinBuckets exactly. The extra
+    // `eagerJd`/`manager.joinSourceCount` guards have no buildJoinBuckets analog —
+    // it is a pure bucket-builder with neither an eager-JD parameter nor a live
+    // manager — and are needed here because the short-circuit does NOT fold `eagerJd`
+    // into the stash (it is pushed in the non-short-circuit branch below). Cross-klass
+    // merged JDs (`_namedInnerJoinDeps`/`_leftOuterJoinDeps`) are deliberately NOT
+    // checked: like Rails, they ride the SAME emission regardless of branch —
+    // emitJoinPlan emits them directly from `this`, not from the plan — so
+    // short-circuiting with them present yields identical SQL (verified against the
+    // subquery path for a cross-klass `.merge`).
+    const pureLeftOuter =
+      eagerJd === undefined &&
+      manager.joinSourceCount === 0 &&
+      this._eagerLoadAssociations.length === 0 &&
+      this._namedInnerJoins.length === 0 &&
+      this._joinValues.length === 0 &&
+      this._joinClauses.length === 0;
+    // Fire whenever left_outer_joins_values is non-empty (Rails' `unless
+    // left_outer_joins_values.empty?`, query_methods.rb:1828), even when the
+    // resolved `leftAssociations` is empty — e.g. left_outer_joins_values held only
+    // a CTE symbol, already routed into `joinNodes` above. Rails returns early there
+    // too (`buckets[:named_join] = left_joins` with an empty `left_joins`); the
+    // empty-named early return emits the same SQL as the stash-fold path.
+    if (pureLeftOuter && this._leftOuterJoinsValues.length > 0) {
+      _qm.emitJoinPlan.call(this as any, manager, {
+        leadingJoins,
+        joinNodes,
+        stashedJoins: [...leftStashed],
+        namedJoins: leftAssociations as any,
+        aliases,
+      });
+      return;
+    }
     const leftOuterJd =
       leftAssociations.length > 0
         ? QueryMethodBangs.constructJoinDependency.call(

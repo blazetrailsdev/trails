@@ -2810,6 +2810,13 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
       // `_eagerLoadAssociations`, so both must be empty too — otherwise the
       // left-outer JD belongs in `stashed_join` (folded below), not `named_join`,
       // and the inner names would be dropped / double-emitted downstream.
+      //
+      // Cross-klass merged JDs (`_namedInnerJoinDeps`/`_leftOuterJoinDeps`, from a
+      // `.merge` against a different-model relation) are intentionally NOT part of
+      // this guard: emitJoinPlan emits them directly from `this` (not via any
+      // bucket), so they are appended regardless of which branch runs here. A
+      // pure-left-outer `.merge` therefore still emits its merged joins after the
+      // short-circuit — none are dropped.
       buckets.named_join.push(...namedLeft);
       buckets.stashed_join.push(...stashedLeft);
       return buckets;
