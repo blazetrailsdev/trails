@@ -430,6 +430,22 @@ describe("RelationTest", () => {
     expect((await Comment.select("a.*").from(relation, "a")).map((c) => c.id)).toEqual(expected);
   });
 
+  // trails-specific SQL-shape lock. Rails `build_from` (query_methods.rb:1783)
+  // resolves an eager-loading `from(relation)` via `apply_join_dependency` and
+  // then wraps `opts.arel.as(name)`. That `arel` is the plain `build_arel` — it
+  // does NOT run `JoinDependency#apply_column_aliases`, which Rails only applies
+  // in the `exec_queries`/`to_sql`/`pluck` paths when the OUTER relation is
+  // eager. So the folded subquery projects the qualified table star
+  // (`"comments".*`), NOT the `t0_r0…` aliased column list a standalone eager
+  // `toSql()` emits. This is Rails-correct, and shared with the where-subquery
+  // path (`relation-handler`); converging to `t0_r*` here would diverge.
+  it("eager from() subquery projects the table star, not column aliases", async () => {
+    const relation = Comment.includes("post").where({ "posts.type": "Post" }).order("id");
+    const sql = await (Comment.select("*").from(relation) as any).toSql();
+    expect(sql).toContain('"comments".* FROM "comments" LEFT OUTER JOIN "posts"');
+    expect(sql).not.toMatch(/t0_r0/);
+  });
+
   it("finding with subquery with eager loading in where", async () => {
     const relation = Comment.includes("post").where({ "posts.type": "Post" });
     const expected = (await relation.toArray()).map((c) => Number(c.id)).sort((a, b) => a - b);

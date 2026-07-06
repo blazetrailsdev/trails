@@ -2456,6 +2456,14 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // comprehensive builder rather than the projection-only `toArel`, so the
     // subquery stays a live AST: its binds parameterize and its retryability is
     // determined by the actual child nodes (not unconditionally disabled).
+    // `build_arel` projects the qualified table star (`"comments".*`) and does
+    // NOT run `JoinDependency#apply_column_aliases` — that column-alias
+    // projection (`t0_r0…`) is applied only in Rails' `exec_queries`/`to_sql`/
+    // `pluck` paths, when the OUTER relation is eager, never in `build_from`.
+    // So the folded eager subquery here emits plain star, matching Rails and
+    // the where-subquery path (`relation-handler`); this is intentional, not a
+    // shape deviation to converge away. See the
+    // `eager-from-subquery-column-alias-projection` story.
     const subArel =
       typeof resolved.buildArel === "function" ? resolved.buildArel() : resolved.toArel();
     return subArel.as(alias);
