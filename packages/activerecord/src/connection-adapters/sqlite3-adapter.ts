@@ -1212,12 +1212,28 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   lookupCastTypeFromColumn(column: {
     sqlType?: string | null;
     precision?: number | null;
+    limit?: number | null;
   }): import("@blazetrails/activemodel").Type {
     const base = this.lookupCastType(column.sqlType ?? "");
     if (column.precision != null) {
       if (base instanceof SQLiteDateTimeType)
         return new SQLiteDateTimeType({ precision: column.precision });
       if (base instanceof TimeType) return new TimeType({ precision: column.precision });
+    }
+    // Rails carries the full `sql_type` (e.g. `varchar(255)`) into
+    // `register_class_with_limit`, so `type_for_attribute(col).limit` returns
+    // the column limit. `fetchTypeMetadata` strips the `(N)` off the stored
+    // `sqlType`, so re-thread the limit from the column onto the cast type here.
+    if (column.limit != null && base.limit == null) {
+      return new (base.constructor as new (o: {
+        limit?: number;
+        precision?: number;
+        scale?: number;
+      }) => typeof base)({
+        limit: column.limit,
+        precision: base.precision,
+        scale: base.scale,
+      });
     }
     return base;
   }
