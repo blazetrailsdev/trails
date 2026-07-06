@@ -1048,13 +1048,11 @@ function _builtAssociationScope(
  * scope carrying `includes` (subsumed by the `klass.scope_attributes?` arm
  * below), so the remaining arms cover it.
  *
- * Deviation (tracked-pending-convergence): Rails statement-caches through
- * chains too, but we additionally treat multi-step (chain length > 1) chains
- * as skip and keep the proven per-load `take()` path. `get_bind_values`
- * (chain order) and the `params.bind` scope-build bind order currently
- * disagree for through/enum chains (wrong target returned), so caching them
- * is unsafe until that converges — story
- * `through-singular-association-statement-cache` (RFC 0023).
+ * Multi-step (through) chains statement-cache too, matching Rails — the base
+ * scope in `_loadSingularViaStatementCache` is the association's `target_scope`
+ * (which folds each intermediate reflection's `scope_for_association`, carrying
+ * the join model's STI `type_condition`), so the compiled SQL is complete and
+ * stable across owners.
  */
 function _skipSingularStatementCache(
   reflection: ReflectionLike,
@@ -1067,12 +1065,9 @@ function _skipSingularStatementCache(
   if (options.scope) return true;
   const refl = reflection as {
     hasScope?(): boolean;
-    chain?: unknown[];
     sourceReflection?: { activeRecord?: { defaultScopes?: unknown[] } } | null;
   };
   if (typeof refl.hasScope === "function" && refl.hasScope()) return true;
-  // Multi-step chains: defer to the take() path (see doc comment).
-  if (Array.isArray(refl.chain) && refl.chain.length > 1) return true;
   // `klass.scope_attributes?` (`scoping/default.rb:55`) =
   // `current_scope || default_scopes.any? || respond_to?(:default_scope)`. A
   // thread-local scope, any default scope, OR a method-form `default_scope`
@@ -1117,10 +1112,11 @@ async function _loadSingularViaStatementCache(
   // holder to `setTarget`/`loadedBang` — otherwise the cached target is never
   // marked loaded and every read re-queries. Only the "not registered" case is
   // swallowed; real construction bugs must surface.
+  let instance: { targetScope?: () => unknown } | undefined;
   const assocFn = (record as { association?: (n: string) => unknown }).association;
   if (typeof assocFn === "function") {
     try {
-      assocFn.call(record, assocName);
+      instance = assocFn.call(record, assocName) as typeof instance;
     } catch (e) {
       if (!(e instanceof AssociationNotFoundError)) throw e;
     }
@@ -1130,6 +1126,20 @@ async function _loadSingularViaStatementCache(
   // target_scope.merge!(AssociationScope.create { params.bind }.scope(self)) }`.
   // `associationScopeCache` memoizes the compiled StatementCache on the target
   // class (keyed by reflection + polymorphic owner type).
+  //
+  // The base is the association's `target_scope`, NOT a bare
+  // `_scopeForAssociation(targetModel)`. For a through association
+  // `ThroughAssociation#target_scope` folds each intermediate reflection's
+  // `klass.scope_for_association` into the query (through_association.rb) — this
+  // is what carries the join model's STI `type_condition` (e.g.
+  // `memberships.type = 1` for a `CurrentMembership` join) that
+  // `AssociationScope` alone does not emit. Falling back to
+  // `_scopeForAssociation` only when no Association instance exists (low-level
+  // loader paths that bypass `record.association(name)`).
+  const baseScope = (): Relation<Base> =>
+    (typeof instance?.targetScope === "function"
+      ? (instance.targetScope() as Relation<Base>)
+      : undefined) ?? _scopeForAssociation(targetModel);
   const sc = (
     reflection as unknown as {
       associationScopeCache(klass: typeof Base, owner: Base, block: () => unknown): unknown;
@@ -1142,7 +1152,7 @@ async function _loadSingularViaStatementCache(
         reflection: reflection as never,
         klass: targetModel,
       }) as Relation<Base>;
-      return _scopeForAssociation(targetModel).merge(built) as never;
+      return baseScope().merge(built) as never;
     }),
   ) as StatementCache;
   const chain = (reflection as unknown as { chain: never[] }).chain;
