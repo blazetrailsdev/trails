@@ -1728,6 +1728,28 @@ function extractCalls(node: ts.Node | undefined): string[] | undefined {
         // so calls-parity can flag a ported override that drops the super call.
         names.add("super");
       }
+    } else if (ts.isPropertyAccessExpression(n)) {
+      // A get-accessor READ (`this.joinsValues`) is the faithful TS mirror of a
+      // Ruby value-method call (`joins_values`) — Ruby has no attribute reads,
+      // only method sends, so a plain read IS a call there. Credit the property
+      // name so such reads count toward the ported call set, matching Ruby's
+      // reader-call semantics. Two accesses are NOT reads and are skipped:
+      //   - the callee of a CallExpression (`this.foo(...)`): the isCall branch
+      //     above already recorded `foo`, so crediting here double-records it;
+      //   - the target of an assignment (`this.foo = x`): that mirrors Ruby's
+      //     writer send `foo=`, not the reader `foo` — crediting the reader name
+      //     would be unfaithful (and makes the call set body-shape dependent).
+      const parent = n.parent;
+      const isCallCallee =
+        parent !== undefined && ts.isCallExpression(parent) && parent.expression === n;
+      const isAssignTarget =
+        parent !== undefined &&
+        ts.isBinaryExpression(parent) &&
+        parent.left === n &&
+        parent.operatorToken.kind === ts.SyntaxKind.EqualsToken;
+      if (!isCallCallee && !isAssignTarget) {
+        names.add(n.name.text);
+      }
     }
     ts.forEachChild(n, visit);
   };
