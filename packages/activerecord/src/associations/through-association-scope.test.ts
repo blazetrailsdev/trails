@@ -59,6 +59,18 @@ registerModel(Comment);
   scope: (rel: any) => rel.where("comments.body = 'don\\'t touch posts.title here'"),
 });
 
+// A literal ending in an escaped backslash (`'a\\'`, i.e. the string value `a\`)
+// immediately followed by a GENUINE through-table qualifier in the same raw-SQL
+// string. The `\\.` escape-pairing must consume `\\` as one unit and let the
+// quote close, so `posts.title` after it is still seen and relocated — pins that
+// the escaped-backslash-then-close-quote case is NOT over-swallowed.
+(Author as any).hasMany("commentsWithEscapedBackslashThenQualifier", {
+  className: "Comment",
+  through: "posts",
+  source: "comments",
+  scope: (rel: any) => rel.where("comments.body = 'a\\\\' AND posts.title = 'x'"),
+});
+
 // Positive control: a GENUINE through-table (`posts.`) qualifier — unquoted, a
 // real column reference — must still be relocated onto the through query. Pins
 // that stripping string literals does not break the true-positive path.
@@ -118,6 +130,19 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
 
     const scope = (loader as any)._buildThroughScope();
     expect(scope.toSql()).not.toContain("posts.title");
+  });
+
+  it("still sees a genuine qualifier after an escaped-backslash literal", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithEscapedBackslashThenQualifier");
+    const partition = (loader as any)._partitionReflectionWhere();
+    // The `'a\\'` literal closes correctly, so the trailing `posts.title` is a
+    // real through-table qualifier and the predicate relocates.
+    expect(partition.throughPredicates).toHaveLength(1);
+    expect(partition.sourcePredicates).toHaveLength(0);
+
+    const scope = (loader as any)._buildThroughScope();
+    expect(scope.toSql()).toContain("posts.title");
   });
 
   it("relocates a genuine through-table qualifier onto the through query", () => {

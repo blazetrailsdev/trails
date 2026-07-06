@@ -823,7 +823,11 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
  * single-quotes (`''`) and a backslash-escaped quote (`\'`), the latter being
  * MySQL/MariaDB's default (`NO_BACKSLASH_ESCAPES` off) — so a literal like
  * `'don\'t touch memberships.x'` is fully blanked rather than terminating early
- * at the escaped quote. Double-quoted tokens are SQL identifiers, not literals,
+ * at the escaped quote. The `\\.` alternative pairs each backslash with its
+ * following char, so an escaped backslash (`\\`) is consumed as one unit and a
+ * real close-quote right after it (`'a\\'`) still closes the literal — a
+ * subsequent genuine qualifier (`... 'a\\' AND posts.x ...`) stays exposed to
+ * the scan and is NOT swallowed. Double-quoted tokens are SQL identifiers, not literals,
  * so they are left intact. `?` placeholders in a BoundSqlLiteral are outside any
  * literal and unaffected.
  * @internal
