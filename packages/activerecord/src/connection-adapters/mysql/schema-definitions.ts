@@ -162,7 +162,10 @@ export class TableDefinition extends AbstractTableDefinition {
       (options as any).limit = (options as any).limit ?? 8;
       (options as any).primaryKey = true;
     } else if (resolvedType === "virtual") {
-      resolvedType = options.type ?? resolvedType;
+      // Rails: `type = options[:type]` with no fallback (mysql/schema_definitions.rb).
+      // A `t.virtual` without `type:` drops the type (nil), so the generated
+      // column renders with no SQL type before its `AS (...)` clause.
+      resolvedType = options.type as string;
     } else {
       const unsignedMatch = /^unsigned_(.+)$/.exec(resolvedType);
       if (unsignedMatch) {

@@ -510,7 +510,16 @@ export class SchemaCreation {
         // fragment carrying a value list or args — e.g. enum('text','blob') or
         // set('a','b') — must keep its quoted member values, where case is
         // significant.
-        if (!type || !String(type).trim()) {
+        // Rails' `type_to_sql` returns `type.to_s` for an unrecognized type, so
+        // a nil type (e.g. `t.virtual` with no `type:`) yields `""` — the column
+        // renders with no SQL type before its generated-column `AS (...)` clause.
+        // We keep the stricter blank-string guard for an explicitly empty type
+        // string (a likely developer typo), which never arises from a nil option.
+        if (type == null) {
+          sql = "";
+          break;
+        }
+        if (!String(type).trim()) {
           throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
         }
         sql = String(type);

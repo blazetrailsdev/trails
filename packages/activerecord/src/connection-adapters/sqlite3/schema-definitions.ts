@@ -43,7 +43,10 @@ export class TableDefinition extends AbstractTableDefinition {
     options: ColumnOptions = {},
   ): ColumnDefinition {
     if (type === ("virtual" as ColumnType)) {
-      type = options.type ?? ("string" as ColumnType);
+      // Rails: `type = options[:type]` with no fallback (sqlite3/schema_definitions.rb).
+      // Without `type:`, the type drops to nil and the generated column renders
+      // with no SQL type before its `AS (...)` clause.
+      type = options.type as ColumnType;
     }
     return super.newColumnDefinition(name, type, options);
   }

@@ -115,6 +115,19 @@ describe("TableDefinition", () => {
     expect(td.unlogged).toBe(true);
   });
 
+  it("drops the type for a virtual column with no type option (Rails no-fallback)", () => {
+    const td = new TableDefinition("articles");
+    const col = td.newColumnDefinition(
+      "full_name",
+      "virtual" as any,
+      {
+        as: "a || b",
+        stored: true,
+      } as any,
+    );
+    expect(col.type).toBeUndefined();
+  });
+
   it("newExclusionConstraintDefinition returns definition without pushing", () => {
     const td = new TableDefinition("products");
     const defn = td.newExclusionConstraintDefinition("price WITH =", { name: "pc" });
