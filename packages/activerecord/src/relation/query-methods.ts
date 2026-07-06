@@ -184,6 +184,9 @@ interface QueryMethodsHost {
   _isNamedJoinValue(v: unknown): boolean;
   readonly _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
+  // Public `left_outer_joins_values` value method (relation.ts getter); reads it
+  // over the backing field so extractCalls credits the Rails value-method read.
+  leftOuterJoinsValues: AssociationSpec[];
   readonly _namedInnerJoins: AssociationSpec[];
   // Pre-built InnerJoin JoinDependencies from a cross-klass merge (Rails
   // merge_joins builds these against `other.klass`); emitted via joinConstraints
@@ -2626,7 +2629,7 @@ export function buildJoinDependencies(this: QueryMethodsHost): JoinDependency[] 
     for (const a of specs) if (!joinNames.includes(a)) joinNames.push(a);
   };
   addNames(this.joinsValues.filter((v) => this._isNamedJoinValue(v)) as AssociationSpec[]);
-  addNames(this._leftOuterJoinsValues);
+  addNames(this.leftOuterJoinsValues);
   addNames(this._eagerLoadAssociations);
   addNames(this._includesAssociations);
 
@@ -2790,23 +2793,19 @@ export function buildJoinBuckets(this: QueryMethodsHost): Record<string, unknown
   // them to build stashed_left_joins. If joins_values is also empty, it returns
   // early with OuterJoin type and named_join populated. Otherwise the left-outer
   // JoinDependency is prepended to stashed_left_joins.
-  if (this._leftOuterJoinsValues.length > 0) {
+  const leftOuterJoinsValues = this.leftOuterJoinsValues;
+  if (leftOuterJoinsValues.length > 0) {
     const stashedLeft: JoinDependency[] = [];
-    assertValidLeftOuterJoinsBang(this._leftOuterJoinsValues);
+    assertValidLeftOuterJoinsBang(leftOuterJoinsValues);
     // Mirror Rails' block (query_methods.rb:1830-1836): a CTEJoin becomes an
     // OuterJoin join_node; any other non-association value raises.
-    const namedLeft = selectNamedJoins.call(
-      this,
-      this._leftOuterJoinsValues,
-      stashedLeft,
-      (left) => {
-        if (left instanceof CTEJoin) {
-          buckets.join_node.push(buildWithJoinNode.call(this, left.name, Nodes.OuterJoin));
-        } else {
-          throw argumentError("only Hash, Symbol and Array are allowed");
-        }
-      },
-    );
+    const namedLeft = selectNamedJoins.call(this, leftOuterJoinsValues, stashedLeft, (left) => {
+      if (left instanceof CTEJoin) {
+        buckets.join_node.push(buildWithJoinNode.call(this, left.name, Nodes.OuterJoin));
+      } else {
+        throw argumentError("only Hash, Symbol and Array are allowed");
+      }
+    });
 
     if (
       namedInner.length === 0 &&
@@ -3046,7 +3045,7 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   const hasRawJoins = joinsValues.some((v) => !this._isNamedJoinValue(v));
   const hasEagerAssocs =
     this._eagerLoadAssociations.length > 0 ||
-    this._leftOuterJoinsValues.length > 0 ||
+    this.leftOuterJoinsValues.length > 0 ||
     hasNamedInner ||
     this._namedInnerJoinDeps.length > 0 ||
     this._leftOuterJoinDeps.length > 0;

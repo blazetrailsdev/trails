@@ -162,7 +162,7 @@ export class Merger {
   // same-klass names fold into _leftOuterJoinsValues; cross-klass names build a
   // JoinDependency on `other` stashed in _leftOuterJoinDeps.
   private mergeOuterJoins(rel: any): void {
-    const otherLeft: unknown[] = this.other._leftOuterJoinsValues ?? [];
+    const otherLeft: unknown[] = this.other.leftOuterJoinsValues ?? [];
     const sameKlass = this.other._modelClass === rel._modelClass;
     if (sameKlass) {
       for (const v of otherLeft) {

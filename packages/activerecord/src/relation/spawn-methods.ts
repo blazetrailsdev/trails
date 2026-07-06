@@ -151,7 +151,7 @@ export function mergeBang(this: any, other: any): any {
         constructJoinDependency.call(other, crossKlassNamed as any, Nodes.InnerJoin),
       );
     }
-    for (const v of other._leftOuterJoinsValues ?? []) {
+    for (const v of other.leftOuterJoinsValues ?? []) {
       if (!this._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
         this._leftOuterJoinsValues.push(v);
     }
