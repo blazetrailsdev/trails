@@ -193,6 +193,31 @@ export class ThroughAssociation extends Association {
     } else if (sourceScope == null) {
       sourceScope = this._preloadScope;
     }
+
+    // When the source reflection is itself a nested-through association, our
+    // flattened reflection scope (join_scopes concatenates the whole chain's
+    // scopes) carries predicates that qualify the source sub-chain's own
+    // intermediate through tables — e.g. `misc_post_first_blue_tags_2`'s scope
+    // flattens `first_blue_tags_2`'s `taggings.comment = 'first'`. Propagating
+    // those onto the source preloader pushes them all the way down to the
+    // innermost target query (`SELECT tags.* … taggings.comment = ?`), where the
+    // intermediate table is not in the FROM clause — `no such column:
+    // taggings.comment`. The nested through re-derives them via its own
+    // reflection scope, so strip them from the propagated source scope rather
+    // than leak an unresolvable column reference.
+    const intermediateTables = this._sourceChainIntermediateTables();
+    if (sourceScope != null && intermediateTables.length > 0) {
+      const wc = sourceScope._whereClause;
+      if (wc != null && !wc.isEmpty()) {
+        const kept = wc.predicates.filter(
+          (pred: Nodes.Node) => !intermediateTables.some((t) => predicateReferencesTable(pred, t)),
+        );
+        if (kept.length !== wc.predicates.length) {
+          sourceScope = sourceScope._clone();
+          sourceScope._whereClause = new WhereClause(kept);
+        }
+      }
+    }
     const preloader = new Preloader({
       records: middleRecords,
       associations: [sourceRefl.name],
@@ -634,6 +659,42 @@ export class ThroughAssociation extends Association {
       } catch {
         /* polymorphic / unresolved association — leave predicate at source stage */
       }
+    }
+    return tables;
+  }
+
+  /**
+   * Table names of the source reflection's own through-chain intermediate steps
+   * (every chain table except its final target table). Empty when the source is
+   * not a nested-through reflection. Used to strip sub-chain predicates that the
+   * flattened reflection scope would otherwise leak onto the innermost source
+   * query (see `_getSourcePreloaders`).
+   * @internal
+   */
+  private _sourceChainIntermediateTables(): string[] {
+    const sourceRefl = this._sourceReflection;
+    if (!sourceRefl || !(sourceRefl as any).isThroughReflection?.()) return [];
+    let targetTable: string | null = null;
+    try {
+      targetTable = (sourceRefl.klass as any)?.tableName ?? null;
+    } catch {
+      targetTable = null;
+    }
+    const tables: string[] = [];
+    let chain: any[] = [];
+    try {
+      chain = (sourceRefl as any).chain ?? [];
+    } catch {
+      chain = [];
+    }
+    for (const link of chain) {
+      let t: string | null = null;
+      try {
+        t = link.klass?.tableName ?? null;
+      } catch {
+        t = null;
+      }
+      if (t != null && t !== targetTable && !tables.includes(t)) tables.push(t);
     }
     return tables;
   }

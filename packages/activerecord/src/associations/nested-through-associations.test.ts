@@ -32,6 +32,7 @@ import { Person } from "../test-helpers/models/person.js";
 import { Reference } from "../test-helpers/models/reference.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Reader } from "../test-helpers/models/reader.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 
 registerModel(Author);
 registerModel(Post);
@@ -696,17 +697,42 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((a) => a.id)).toContain(bob.id);
   });
 
-  // Direct load generates "no such column: posts.title" — the scope's table reference is unresolvable
-  // when the posts table is in a subquery context. The joins path works.
-  it.todo("nested has many through with conditions on source associations");
+  it("nested has many through with conditions on source associations", async () => {
+    const bob = authors("bob");
+    const blue = tags("blue");
+    const result = await bob.miscPostFirstBlueTags_2.toArray();
+    expect(result.map((t) => t.id)).toEqual([blue.id]);
+  });
 
-  // Preload path generates "no such column: taggings.comment" when loading firstBlueTags_2
-  // (scope: { taggings: { comment: "first" } }) as a nested preload source.
-  it.todo("nested has many through with conditions on source associations preload");
+  it("nested has many through with conditions on source associations preload", async () => {
+    const blue = tags("blue");
+    // Rails asserts 2 queries around `.third` (one author + its collapsed
+    // preload). We load every author via `.order` (no LIMIT/OFFSET) and our
+    // preloader fires one query per nested-through stage — authors + posts +
+    // taggings + tags = 4. Pinning the count still guards the intermediate-table
+    // stripping against regressing into an extra fetch (Rails' intent).
+    let author!: Author;
+    await assertQueriesCount(4, false, async () => {
+      [, , author] = await Author.includes("miscPostFirstBlueTags_2").order("authors.id");
+    });
+    await assertNoQueries(false, async () => {
+      const preloaded = await author.miscPostFirstBlueTags_2.toArray();
+      expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+    });
+  });
 
-  // Preloading firstBlueTags_2 (scope: { taggings: { comment: "first" } }) as a nested source
-  // generates "no such column: taggings.comment" in the nested-preload path.
-  it.todo("through association preload doesnt reset source association if already preloaded");
+  it("through association preload doesnt reset source association if already preloaded", async () => {
+    const blue = tags("blue");
+    const [, , author] = await Author.preload({
+      posts: "firstBlueTags_2",
+      miscPostFirstBlueTags_2: {},
+    }).order("authors.id");
+    await assertNoQueries(false, async () => {
+      const firstPost = (await author.posts.toArray())[0];
+      const preloaded = await firstPost.firstBlueTags_2.toArray();
+      expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+    });
+  });
 
   it("nested has many through with conditions on source associations preload via joins", async () => {
     const bob = authors("bob");
