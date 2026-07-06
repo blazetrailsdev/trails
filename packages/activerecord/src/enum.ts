@@ -147,6 +147,7 @@ export function installEnumAttribute(
 /** Minimal instance-side surface for enum-generated prototype callbacks. */
 interface EnumInstanceHost {
   updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
+  readAttribute(name: string): unknown;
   readAttributeForDatabase(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
 }
@@ -308,26 +309,44 @@ export class EnumMethods {
   /**
    * @internal
    * Define predicate, bang, and scope methods for a single enum value.
+   *
+   * `valueMethodName` is the trails camelCase value method name (e.g. `draft`,
+   * `americanBobtail`); the generated surface is the trails idiom of Rails'
+   * `#{value_method_name}?` / `#{value_method_name}!` / scope / `not_...`:
+   * the predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
+   * scope `{name}`, and the auto negative scope `not{Name}`.
    */
   defineEnumMethods(
     name: string,
     valueMethodName: string,
-    value: string | number,
+    value: EnumValue,
     scopes: boolean,
     instanceMethods: boolean,
   ): void {
     const klass = this.klass;
+    const capitalized = `${valueMethodName.charAt(0).toUpperCase()}${valueMethodName.slice(1)}`;
+    const predicateName = `is${capitalized}`;
+    const bangName = `${valueMethodName}Bang`;
+    const notName = `not${capitalized}`;
+    // Conflict detection lives in `_enum`'s dedicated pre-generation pass (it
+    // consults trails-specific state — the per-class `_enumMethodsModuleNames`
+    // set and the dangerous-method set — and runs before any method is defined,
+    // so it can't be routed through the interleaved Rails-style
+    // `detect_enum_conflict!` here without false-positiving on a prior value's
+    // auto `not*` scope). This generator only defines the surface.
     if (instanceMethods) {
-      detectEnumConflictBang.call(klass, name, `${valueMethodName}?`);
-      Object.defineProperty(klass.prototype, `${valueMethodName}?`, {
+      Object.defineProperty(klass.prototype, predicateName, {
         value: function (this: EnumInstanceHost) {
-          return this.readAttributeForDatabase(name) === value;
+          // Rails compares `#{name}_for_database == value`; trails stores the
+          // label, so serialize the stored label back to its database value
+          // (via castEnumValue) and compare. Robust on fresh/unsaved records
+          // where the raw `valueForDatabase` attribute path isn't wired yet.
+          return castEnumValue(klass, name, this.readAttribute(name)) === value;
         },
         writable: true,
         configurable: true,
       });
-      detectEnumConflictBang.call(klass, name, `${valueMethodName}!`);
-      Object.defineProperty(klass.prototype, `${valueMethodName}!`, {
+      Object.defineProperty(klass.prototype, bangName, {
         value: function (this: EnumInstanceHost) {
           // Returns update!'s result (true), mirroring Rails' bang setter.
           return this.updateBang({ [name]: value });
@@ -337,10 +356,7 @@ export class EnumMethods {
       });
     }
     if (scopes) {
-      const notName = `not${valueMethodName.charAt(0).toUpperCase()}${valueMethodName.slice(1)}`;
-      detectEnumConflictBang.call(klass, name, valueMethodName, true);
       klass.scope(valueMethodName, (rel: any) => rel.where({ [name]: value }));
-      detectEnumConflictBang.call(klass, name, notName, true);
       klass.scope(notName, (rel: any) => rel.whereNot({ [name]: value }));
     }
   }
@@ -613,58 +629,23 @@ export function _enum(
     detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
+  // Rails generates the per-value methods inside `_enum_methods_module`
+  // (enum.rb:251); route trails' generation through the same module so
+  // `EnumMethods.defineEnumMethods` is the single generator.
+  const methodsModule = this._enumMethodsModule();
   for (const [n, value] of Object.entries(mapping)) {
     const fullName = toCamel(methodName(n));
-    const capitalizedFullName = camelize(methodName(n));
-    const predicateName = `is${capitalizedFullName}`;
-    const bangName = `${fullName}Bang`;
-    const notScopeName = `not${capitalizedFullName}`;
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
 
-    this.scope(fullName, (rel: any) => rel.where({ [attrName]: value }));
-
+    // Route the value method name — and, when it differs, its special-char
+    // friendly alias — through the single generator, mirroring Rails' two
+    // `define_enum_methods` calls per value (enum.rb:265-278). This defines the
+    // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
+    // scope `{name}`, and the auto negative scope `not{Name}`.
+    methodsModule.defineEnumMethods(attrName, fullName, value, true, true);
     if (friendlyName !== fullName) {
-      this.scope(friendlyName, (rel: any) => rel.where({ [attrName]: value }));
-      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      this.scope(notFriendlyName, (rel: any) => rel.whereNot({ [attrName]: value }));
-      const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      Object.defineProperty(this.prototype, fp, {
-        value: function (this: Base) {
-          return this.readAttribute(attrName) === n;
-        },
-        writable: true,
-        configurable: true,
-      });
-      Object.defineProperty(this.prototype, `${friendlyName}Bang`, {
-        value: function (this: EnumInstanceHost) {
-          return this.updateBang({ [attrName]: value });
-        },
-        writable: true,
-        configurable: true,
-      });
+      methodsModule.defineEnumMethods(attrName, friendlyName, value, true, true);
     }
-
-    // Predicate: user.active? → user.isActive()
-    Object.defineProperty(this.prototype, predicateName, {
-      value: function (this: Base) {
-        return this.readAttribute(attrName) === n;
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    // Bang setter: user.active! → user.activeBang() persists via update!.
-    // Mirrors Rails: klass.define_method("#{value_method_name}!") { update!(name => value) }
-    Object.defineProperty(this.prototype, bangName, {
-      value: function (this: EnumInstanceHost) {
-        return this.updateBang({ [attrName]: value });
-      },
-      writable: true,
-      configurable: true,
-    });
-
-    // whereNot scope: Model.notDraft()
-    this.scope(notScopeName, (rel: any) => rel.whereNot({ [attrName]: value }));
 
     // Original-form predicate/bang for labels with special chars (spaces,
     // hyphens). Rails: define_method("American Bobtail?"), reachable via
@@ -691,8 +672,8 @@ export function _enum(
     // (or a subclass) that would generate the same predicate/bang raises
     // "already defined by another enum" — mirroring membership in Rails'
     // `_enum_methods_module`.
-    enumMethodNames.add(predicateName);
-    enumMethodNames.add(bangName);
+    enumMethodNames.add(`is${fullName.charAt(0).toUpperCase()}${fullName.slice(1)}`);
+    enumMethodNames.add(`${fullName}Bang`);
     if (friendlyName !== fullName) {
       enumMethodNames.add(`is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`);
       enumMethodNames.add(`${friendlyName}Bang`);
