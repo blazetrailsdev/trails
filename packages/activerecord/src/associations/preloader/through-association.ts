@@ -181,12 +181,22 @@ export class ThroughAssociation extends Association {
       return [];
     }
 
-    // Apply the per-owner reflection scope to source record loading so
+    // Apply this reflection's OWN scope to source record loading so
     // instance-dependent scopes filter the final target (e.g. only comments
     // mentioning the owner). Merge the user-supplied preload scope on top so
-    // it is not silently dropped when _reflectionScope is set. Predicates that
-    // reference the THROUGH table are stripped here and applied to the through
-    // query instead (see _buildThroughScope / _partitionReflectionWhere).
+    // it is not silently dropped when the reflection scope is set. Predicates
+    // that reference the THROUGH table are stripped here and applied to the
+    // through query instead (see _buildThroughScope / _partitionReflectionWhere).
+    //
+    // Rails structures nested-through preloading recursively per reflection:
+    // `source_preloaders` spawns a fresh Preloader on `source_reflection.name`,
+    // so a nested-through source re-derives its own sub-chain's scope at its own
+    // stage. We mirror that by routing only the outer reflection's own scope
+    // (via `_partitionReflectionWhere`, which draws from `_ownReflectionScope`)
+    // — never the flattened chain scope. Without this the sub-chain's own
+    // predicates (e.g. `first_blue_tags_2`'s `taggings.comment = 'first'`) would
+    // leak down to the innermost target query (`SELECT tags.* … taggings.comment`)
+    // where the intermediate table is not in the FROM clause.
     let sourceScope = this._partitionReflectionWhere().sourceScope;
     if (sourceScope != null && this._preloadScope != null) {
       sourceScope = sourceScope.merge(this._preloadScope);
@@ -194,30 +204,6 @@ export class ThroughAssociation extends Association {
       sourceScope = this._preloadScope;
     }
 
-    // When the source reflection is itself a nested-through association, our
-    // flattened reflection scope (join_scopes concatenates the whole chain's
-    // scopes) carries predicates that qualify the source sub-chain's own
-    // intermediate through tables — e.g. `misc_post_first_blue_tags_2`'s scope
-    // flattens `first_blue_tags_2`'s `taggings.comment = 'first'`. Propagating
-    // those onto the source preloader pushes them all the way down to the
-    // innermost target query (`SELECT tags.* … taggings.comment = ?`), where the
-    // intermediate table is not in the FROM clause — `no such column:
-    // taggings.comment`. The nested through re-derives them via its own
-    // reflection scope, so strip them from the propagated source scope rather
-    // than leak an unresolvable column reference.
-    const intermediateTables = this._sourceChainIntermediateTables();
-    if (sourceScope != null && intermediateTables.length > 0) {
-      const wc = sourceScope._whereClause;
-      if (wc != null && !wc.isEmpty()) {
-        const kept = wc.predicates.filter(
-          (pred: Nodes.Node) => !intermediateTables.some((t) => predicateReferencesTable(pred, t)),
-        );
-        if (kept.length !== wc.predicates.length) {
-          sourceScope = sourceScope._clone();
-          sourceScope._whereClause = new WhereClause(kept);
-        }
-      }
-    }
     const preloader = new Preloader({
       records: middleRecords,
       associations: [sourceRefl.name],
@@ -568,11 +554,16 @@ export class ThroughAssociation extends Association {
   }
 
   /**
-   * Split `_reflectionScope`'s WHERE predicates by referenced table: those that
-   * reference the through table go onto the through query, the rest (source /
-   * target table, unqualified) stay on the source preloader. Mirrors the intent
-   * of Rails' `through_scope` `reflection_scope.where_clause` copy
+   * Split this reflection's OWN scope's WHERE predicates by referenced table:
+   * those that reference the through table go onto the through query, the rest
+   * (source / target table, unqualified) stay on the source preloader. Mirrors
+   * the intent of Rails' `through_scope` `reflection_scope.where_clause` copy
    * (preloader/through_association.rb:117) without the single-query JOIN.
+   *
+   * Draws from `_ownReflectionScope`, not the flattened chain scope: a
+   * nested-through source re-derives its own sub-chain's scope at its own
+   * recursive preload stage (Rails' `source_preloaders`), so this reflection
+   * only routes what it itself declares.
    * @internal
    */
   private _partitionReflectionWhere(): {
@@ -582,7 +573,7 @@ export class ThroughAssociation extends Association {
   } {
     if (this._reflectionWherePartition !== undefined) return this._reflectionWherePartition;
 
-    const reflScope = this._reflectionScope ?? null;
+    const reflScope = this._ownReflectionScope();
     let result: {
       throughPredicates: Nodes.Node[];
       sourcePredicates: Nodes.Node[];
@@ -664,39 +655,49 @@ export class ThroughAssociation extends Association {
   }
 
   /**
-   * Table names of the source reflection's own through-chain intermediate steps
-   * (every chain table except its final target table). Empty when the source is
-   * not a nested-through reflection. Used to strip sub-chain predicates that the
-   * flattened reflection scope would otherwise leak onto the innermost source
-   * query (see `_getSourcePreloaders`).
+   * This reflection's OWN scope, excluding the source reflection's contribution.
+   *
+   * Branch passes `_reflectionScope` as the whole chain's flattened
+   * `join_scopes` (source_reflection.join_scopes + this reflection's own),
+   * merged. For a nested-through source that flattening carries the source
+   * sub-chain's own predicates (e.g. `first_blue_tags_2`'s
+   * `taggings.comment = 'first'`), which the recursive source preloader
+   * re-derives at its own stage — so this reflection must not also route them.
+   * We recompute the split by length: `join_scopes` returns
+   * `[...source_reflection.join_scopes, ...own]`, so the own scopes are the tail
+   * past the source reflection's own `join_scopes`. When the source is not a
+   * nested through, the tail is the entire scope, so `_reflectionScope` is
+   * returned unchanged (preserving instance-dependent scopes exactly).
    * @internal
    */
-  private _sourceChainIntermediateTables(): string[] {
+  private _ownReflectionScope(): any {
+    const reflScope = this._reflectionScope ?? null;
+    if (reflScope == null) return null;
+
     const sourceRefl = this._sourceReflection;
-    if (!sourceRefl || !(sourceRefl as any).isThroughReflection?.()) return [];
-    let targetTable: string | null = null;
+    if (!sourceRefl || !(sourceRefl as any).isThroughReflection?.()) return reflScope;
+
+    let table: any;
+    let predicateBuilder: any;
     try {
-      targetTable = (sourceRefl.klass as any)?.tableName ?? null;
+      table = (this.klass as any).arelTable;
+      predicateBuilder = (this.klass as any).predicateBuilder;
     } catch {
-      targetTable = null;
+      return reflScope;
     }
-    const tables: string[] = [];
-    let chain: any[] = [];
+
+    let full: any[];
+    let sourceScopes: any[];
     try {
-      chain = (sourceRefl as any).chain ?? [];
+      full = (this.reflection as any).joinScopes?.(table, predicateBuilder, this.klass) ?? [];
+      sourceScopes = (sourceRefl as any).joinScopes?.(table, predicateBuilder, this.klass) ?? [];
     } catch {
-      chain = [];
+      return reflScope;
     }
-    for (const link of chain) {
-      let t: string | null = null;
-      try {
-        t = link.klass?.tableName ?? null;
-      } catch {
-        t = null;
-      }
-      if (t != null && t !== targetTable && !tables.includes(t)) tables.push(t);
-    }
-    return tables;
+
+    const ownScopes = full.slice(sourceScopes.length);
+    if (ownScopes.length === 0) return null;
+    return ownScopes.reduce((acc: any, s: any) => acc.merge(s));
   }
 
   /** @internal */
