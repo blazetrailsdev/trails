@@ -138,9 +138,11 @@ describe("EagerAssociationTest", () => {
     "taggings",
   ]);
   beforeAll(async () => {
-    // Matey, Subscriber, Subscription, and Book auto-register on resolution of
-    // their requested fixture sets (#4348); only models without a requested
-    // fixture set need explicit registration here.
+    // Register every model the folded suites reference. Models with a requested
+    // fixture set auto-register on its resolution (#4348); STI subclasses,
+    // default-scope variants, and unfixtured models still need explicit
+    // registration, and re-registering the fixture-backed base models is
+    // idempotent, so listing the full set keeps the suite self-documenting.
     registerModel("PostWithDefaultScope", PostWithDefaultScope);
     registerModel(CpkOrder);
     registerModel(CpkBook);
@@ -1195,11 +1197,6 @@ describe("EagerAssociationTest", () => {
     });
   });
 
-  // The canonical HABTM tables (categories/posts/categories_posts/
-  // categorizations) ride the boot-laid canonical schema; any sibling-file shape
-  // drift on the shared per-worker DB is restored per-file by repairWorkerSchema
-  // (test-setup-dy.ts), so no per-block recreation is needed.
-
   it("has and belongs to many should not instantiate same records multiple times", async () => {
     // Rails (eager_test.rb): eager-loading `welcome` through two different HABTM
     // owners (general.posts and technology.posts) must reuse one instance
@@ -1244,10 +1241,6 @@ describe("EagerAssociationTest", () => {
       expect(await categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
     });
   });
-
-  // The canonical developers/projects/developers_projects tables ride the
-  // boot-laid canonical schema; per-file repairWorkerSchema (test-setup-dy.ts)
-  // restores any sibling-file shape drift on the shared per-worker DB.
 
   it("conditions on join table with include and limit", async () => {
     // Rails (eager_test.rb): three developers (david, jamis, poor_jamis) have a
