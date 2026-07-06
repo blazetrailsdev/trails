@@ -66,6 +66,26 @@ describe("TransactionCallbacksTest", () => {
     expect(currentTransaction()).toBe(originalTxn);
   });
 
+  it("call after commit after transaction commits", async () => {
+    class Topic extends Base {
+      declare title: string;
+
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    const history: string[] = [];
+    Topic.afterCommit(function () {
+      history.push("after_commit");
+    });
+    Topic.afterRollback(function () {
+      history.push("after_rollback");
+    });
+    const first = (await Topic.find(1)) as any;
+    await first.saveBang();
+    expect(history).toEqual(["after_commit"]);
+  });
+
   it("dont call any callbacks after transaction commits for invalid record", async () => {
     class Topic extends Base {
       declare title: string;

@@ -1773,25 +1773,3 @@ describe("ConcurrentTransactionTest", () => {
     // READ COMMITTED isolation across concurrent threads; JS is single-threaded.
   });
 });
-
-// ==========================================================================
-// trails-extra: a block-arg `tx.afterCommit(...)` registered inside an explicit
-// transaction fires once the transaction commits (no direct Rails counterpart;
-// guards the standalone `transaction(Model, (tx) => ...)` callback wiring).
-// ==========================================================================
-describe("TransactionTest", () => {
-  fixtures(["topics"]);
-
-  it("call after commit after transaction commits", async () => {
-    const log: string[] = [];
-
-    await transaction(Topic, async (tx) => {
-      tx.afterCommit(() => {
-        log.push("committed");
-      });
-      await Topic.create({ title: "Alice" });
-    });
-
-    expect(log).toEqual(["committed"]);
-  });
-});
