@@ -2095,8 +2095,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Thread binds through so a bound INSERT ... RETURNING reaches the driver,
     // matching Rails internal_execute(sql, name, binds). Transaction-control
     // callers pass none, keeping their byte-identical no-bind path (no rewrite).
-    const bindArray = binds.length > 0 ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
-    const runSql = binds.length > 0 ? this.rewriteBinds(sql, bindArray) : sql;
+    const hasBinds = binds.length > 0;
+    const bindArray = hasBinds ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
+    const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
+    // A bound query here is the exec_insert RETURNING read-back; mirror
+    // _instrumentedQueryOnClient by resetting the notice buffer up front and
+    // flushing after, so PG WARNING/NOTICE handling (db_warnings_action) is not
+    // dropped or misattributed to the next query. Transaction-control SQL passes
+    // no binds and keeps its byte-identical path (no reset/flush/rewrite).
+    if (hasBinds) this._noticeReceiverSqlWarnings = [];
     const payload: Record<string, unknown> = {
       sql: runSql,
       name,
@@ -2105,7 +2112,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       connection: this,
       row_count: 0,
     };
-    return Notifications.instrumentAsync("sql.active_record", payload, () =>
+    const queryPromise = Notifications.instrumentAsync("sql.active_record", payload, () =>
       // materializeTransactions is handled above (not delegated to
       // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
       // SAVEPOINT — keeps its exact pre-existing materialize semantics and the
@@ -2125,6 +2132,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         }
       }),
     );
+    if (!hasBinds) return queryPromise;
+    const result = await queryPromise;
+    this._flushWarnings(runSql);
+    return result;
   }
 
   /**
