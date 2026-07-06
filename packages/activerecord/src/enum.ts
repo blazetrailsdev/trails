@@ -147,6 +147,7 @@ export function installEnumAttribute(
 /** Minimal instance-side surface for enum-generated prototype callbacks. */
 interface EnumInstanceHost {
   updateBang(attrs: Record<string, unknown>): Promise<true | undefined>;
+  readAttribute(name: string): unknown;
   readAttributeForDatabase(name: string): unknown;
   writeAttribute(name: string, value: unknown): void;
 }
@@ -318,7 +319,7 @@ export class EnumMethods {
   defineEnumMethods(
     name: string,
     valueMethodName: string,
-    value: string | number,
+    value: EnumValue,
     scopes: boolean,
     instanceMethods: boolean,
   ): void {
@@ -340,9 +341,7 @@ export class EnumMethods {
           // label, so serialize the stored label back to its database value
           // (via castEnumValue) and compare. Robust on fresh/unsaved records
           // where the raw `valueForDatabase` attribute path isn't wired yet.
-          return (
-            castEnumValue(klass, name, (this as unknown as Base).readAttribute(name)) === value
-          );
+          return castEnumValue(klass, name, this.readAttribute(name)) === value;
         },
         writable: true,
         configurable: true,
@@ -643,9 +642,9 @@ export function _enum(
     // `define_enum_methods` calls per value (enum.rb:265-278). This defines the
     // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
     // scope `{name}`, and the auto negative scope `not{Name}`.
-    methodsModule.defineEnumMethods(attrName, fullName, value as string | number, true, true);
+    methodsModule.defineEnumMethods(attrName, fullName, value, true, true);
     if (friendlyName !== fullName) {
-      methodsModule.defineEnumMethods(attrName, friendlyName, value as string | number, true, true);
+      methodsModule.defineEnumMethods(attrName, friendlyName, value, true, true);
     }
 
     // Original-form predicate/bang for labels with special chars (spaces,
