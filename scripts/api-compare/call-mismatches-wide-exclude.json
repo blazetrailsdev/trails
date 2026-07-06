@@ -38404,6 +38404,34 @@
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "construct_join_dependency",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "construct_join_dependency",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "left_outer_joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
     "call": "empty?",
     "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."

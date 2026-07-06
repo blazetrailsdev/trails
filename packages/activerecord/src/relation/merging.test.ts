@@ -297,6 +297,23 @@ describe("RelationMergingTest", () => {
     expect((banged as any)._namedInnerJoinDeps.length).toBe(1);
   });
 
+  it("relation merging with cross-klass left outer joins builds a join dependency", () => {
+    // merger.rb:136-152 merge_outer_joins: like merge_joins, when
+    // `other.model != relation.model` the left_outer_joins names resolve against
+    // `other`'s klass, so they build an OuterJoin JoinDependency on `other` rather
+    // than folding into the receiver's left_outer_joins_values. `merge` and
+    // `mergeBang` must agree — mergeBang's old inline block skipped this split.
+    const source = Post.leftOuterJoins("author");
+    const merged = Comment.all().merge(source);
+    expect((merged as any)._leftOuterJoinsValues).toEqual([]);
+    expect((merged as any)._leftOuterJoinDeps.length).toBe(1);
+
+    const banged = Comment.all();
+    (banged as any).mergeBang(source);
+    expect((banged as any)._leftOuterJoinsValues).toEqual([]);
+    expect((banged as any)._leftOuterJoinDeps.length).toBe(1);
+  });
+
   it("relation merging with skip query cache", () => {
     expect(Post.all().merge(Post.all().skipQueryCacheBang()).skipQueryCacheValue).toBe(true);
   });
