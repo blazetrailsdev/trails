@@ -6,6 +6,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationSubscriber } from "@blazetrails/activesupport";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { topicFixtureData } from "./test-helpers/fixtures/topics.js";
+import { inMemoryDb } from "./test-adapter.js";
 
 // Mirrors `transaction_instrumentation_test.rb`, which runs under
 // `ActiveRecord::TestCase` with `self.use_transactional_tests = false` and
@@ -383,16 +384,68 @@ describe("TransactionInstrumentationTest", () => {
     expect(events).toHaveLength(1);
   });
 
-  // PERMANENT-SKIP (both cases): Rails wraps `test_transaction_instrumentation_on_failed_rollback`
-  // and `..._when_unmaterialized` in a single `unless in_memory_db?` block
+  // Rails wraps `test_transaction_instrumentation_on_failed_rollback` and
+  // `..._when_unmaterialized` in a single `unless in_memory_db?` block
   // (transaction_instrumentation_test.rb:390-417), so neither runs against an
   // in-memory database. A failed DB rollback drives `@connection.throw_away!`,
-  // discarding the connection — for the in-memory SQLite database the canonical
-  // adapter uses, that destroys the schema and breaks per-test teardown, exactly
-  // as Rails skips it. See UNPORTED_FILES.
-  it.skip("transaction instrumentation on failed rollback", () => {});
+  // discarding the connection — for an in-memory SQLite database that destroys
+  // the schema and breaks per-test teardown, so we mirror the gate and skip
+  // only when the adapter is genuinely in-memory (PG/MySQL lanes run these).
+  const describeNonInMemory = inMemoryDb() ? describe.skip : describe;
+  describeNonInMemory("failed rollback (non in-memory only)", () => {
+    it("transaction instrumentation on failed rollback", async () => {
+      const events: any[] = [];
+      Notifications.subscribe("transaction.active_record", (event: any) => {
+        events.push(event);
+      });
 
-  it.skip("transaction instrumentation on failed rollback when unmaterialized", () => {});
+      const MyError = class extends Error {};
+      // Rails stubs the leased connection's `rollback_db_transaction` to raise;
+      // the materialized transaction's ROLLBACK fails, so the manager throws the
+      // connection away and finishes the transaction as `:incomplete`.
+      const conn = Base.connection;
+      vi.spyOn(conn as any, "rollbackDbTransaction").mockImplementationOnce(async () => {
+        throw new MyError("rollback failed");
+      });
+
+      await expect(
+        Topic.transaction(async () => {
+          await topics("fifth").update({ title: "Ruby on Rails" });
+          throw new Rollback();
+        }),
+      ).rejects.toThrow(MyError);
+
+      expect(events).toHaveLength(1);
+      expect(events[0].payload.outcome).toBe("incomplete");
+    });
+
+    it("transaction instrumentation on failed rollback when unmaterialized", async () => {
+      const events: any[] = [];
+      Notifications.subscribe("transaction.active_record", (event: any) => {
+        events.push(event);
+      });
+
+      const MyError = class extends Error {};
+      // Rails stubs `transaction_manager.rollback_transaction` to simulate an
+      // error while the transaction is still unmaterialized — no BEGIN was ever
+      // issued, so no `transaction.active_record` notification fires even though
+      // the connection is discarded.
+      const conn = Base.connection;
+      vi.spyOn((conn as any).transactionManager, "rollbackTransaction").mockImplementationOnce(
+        async () => {
+          throw new MyError("rollback failed");
+        },
+      );
+
+      await expect(
+        Topic.transaction(async () => {
+          throw new Rollback();
+        }),
+      ).rejects.toThrow(MyError);
+
+      expect(events).toHaveLength(0);
+    });
+  });
 
   it("transaction instrumentation on broken subscription", async () => {
     const MyError = class extends Error {};
