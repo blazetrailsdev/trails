@@ -1271,6 +1271,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isSingular) {
       return this._createSingular(attrs, block, false);
     }
+    // Rails' `_create_record` raises before building or opening a transaction
+    // when the owner is unsaved (collection_association.rb:354-357).
+    if (this._record.isNewRecord()) {
+      throw new RecordNotSaved(`You cannot call create unless the parent is saved`, this._record);
+    }
     this._ensureThroughWritable();
     if (this._isThrough) {
       return (await this._createThrough(
@@ -3780,12 +3785,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (this._isSingular) {
       return this._createSingular(attrs, block, true);
     }
+    // Rails' `_create_record` raises before building or opening a transaction
+    // when the owner is unsaved (collection_association.rb:354-357).
+    if (this._record.isNewRecord()) {
+      throw new RecordNotSaved(`You cannot call create unless the parent is saved`, this._record);
+    }
     this._ensureThroughWritable();
     if (this._isThrough) {
-      const ctor = this._record.constructor as typeof Base;
-      if (this._record.isNewRecord()) {
-        throw new RecordNotSaved(`You cannot call create unless the parent is saved`);
-      }
       const record = this._buildThrough(attrs) as T;
       if (block) block(record);
       if (!fireAssocCallbacks(this._assocDef.options.beforeAdd, this._record, record, true)) {
