@@ -3321,6 +3321,15 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const byPk = new Map<string, T>();
     for (const r of records) byPk.set(keyForRecord(r), r);
 
+    // Rails calls `scope.raise_record_not_found_exception!`, so the message
+    // carries the association scope's WHERE clause (owner FK + scope
+    // conditions + STI type). Mirror that by threading the scope's
+    // `[WHERE …]` conditions clause into the not-found raisers. Computed
+    // lazily (only when raising) — building the scope relation is wasted
+    // work on the hot path where every id is found.
+    const conditionsClause = (): string =>
+      (this.scope() as { _conditionsClause(): string })._conditionsClause();
+
     // Composite + any-multi: always use the "Couldn't find all" shape
     // (matches performFind). Simple-PK single-id uses "with 'pk'=id".
     if (tuples || wantArray || ids.length > 1) {
@@ -3329,7 +3338,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const castedIds = ids.map(castId);
       const uniqueFoundKeys = new Set(castedIds.map(keyForCastedId).filter((k) => byPk.has(k)));
       if (uniqueFoundKeys.size !== ids.length) {
-        raiseNotFoundAll(targetModel.name, pk, normalized, uniqueFoundKeys.size, ids.length);
+        raiseNotFoundAll(
+          targetModel.name,
+          pk,
+          normalized,
+          uniqueFoundKeys.size,
+          ids.length,
+          conditionsClause(),
+        );
       }
       // Return in DB/load order, matching performFind.
       const wantedKeys = new Set(castedIds.map(keyForCastedId));
@@ -3340,7 +3356,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // Simple PK, single scalar id.
     const id = ids[0];
     const match = byPk.get(keyForCastedId(castId(id)));
-    if (!match) raiseNotFoundSingle(targetModel.name, pk as string, id);
+    if (!match) raiseNotFoundSingle(targetModel.name, pk as string, id, conditionsClause());
     return match;
   }
 
