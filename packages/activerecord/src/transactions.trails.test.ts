@@ -103,6 +103,24 @@ describe("TransactionTest", () => {
     });
   });
 
+  // trails-extra: a block-arg `tx.afterCommit(...)` registered on the explicit
+  // `transaction(Model, (tx) => ...)` handle fires once the transaction commits.
+  // No Rails counterpart (Rails registers commit callbacks on the model, not the
+  // transaction handle); guards the standalone block-arg callback wiring — the
+  // rollback twin is covered in transaction-callbacks.test.ts.
+  it("block-arg tx.afterCommit fires after the transaction commits", async () => {
+    const log: string[] = [];
+
+    await transaction(CanonicalTopic, async (tx) => {
+      tx.afterCommit(() => {
+        log.push("committed");
+      });
+      await CanonicalTopic.create({ title: "Alice" });
+    });
+
+    expect(log).toEqual(["committed"]);
+  });
+
   describe("after_failure_actions on PreparedStatementCacheExpired", () => {
     // Mirrors Rails' TransactionManager#after_failure_actions: when a
     // transaction fails with PreparedStatementCacheExpired we must drop
