@@ -1188,8 +1188,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // the column limit. `fetchTypeMetadata` strips the `(N)` off the stored
     // `sqlType`, so re-thread the limit from the column onto the cast type here.
     if (column.limit != null && base.limit == null) {
-      return new (base.constructor as new (o: { limit?: number }) => typeof base)({
+      return new (base.constructor as new (o: {
+        limit?: number;
+        precision?: number;
+        scale?: number;
+      }) => typeof base)({
         limit: column.limit,
+        precision: base.precision,
+        scale: base.scale,
       });
     }
     return base;
