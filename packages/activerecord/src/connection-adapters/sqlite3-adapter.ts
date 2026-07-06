@@ -1166,9 +1166,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#fetch_type_metadata.
    * Rails carries the full `sql_type` string and lets `lookup_cast_type`'s regex
-   * registrations parse precision/limit; trails' SQLite type map does not extract
-   * those, so we parse the `(N)` parameter here (precision for temporal types,
-   * limit otherwise) and store the base name in `sqlType`.
+   * registrations parse precision/limit. trails' SQLite type map extracts the
+   * limit at lookup time too (`register_class_with_limit`), so we keep the full
+   * `sql_type` in `sqlType` for limit-bearing families; temporal types keep the
+   * paren-stripped base (their precision is parsed here and threaded via
+   * `lookupCastTypeFromColumn`).
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
@@ -1200,8 +1202,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       limit = null;
       baseSqlType = raw;
     }
+    // Carry the full `sql_type` (with `(N)`) so limit-bearing type-map
+    // factories (`char`/`binary`/`text`/`int`/`float`) recover the limit via
+    // `extractLimit` at lookup time — Rails' `register_class_with_limit`
+    // mechanism. Temporal types keep the paren-stripped base so their exact
+    // (parenless) type-map keys still resolve; their precision is threaded
+    // separately in `lookupCastTypeFromColumn`.
     return new SqlTypeMetadata({
-      sqlType: baseSqlType,
+      sqlType: isDtPrec ? baseSqlType : raw,
       type: dslTypeName,
       limit,
       precision,
@@ -1212,28 +1220,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   lookupCastTypeFromColumn(column: {
     sqlType?: string | null;
     precision?: number | null;
-    limit?: number | null;
   }): import("@blazetrails/activemodel").Type {
     const base = this.lookupCastType(column.sqlType ?? "");
     if (column.precision != null) {
       if (base instanceof SQLiteDateTimeType)
         return new SQLiteDateTimeType({ precision: column.precision });
       if (base instanceof TimeType) return new TimeType({ precision: column.precision });
-    }
-    // Rails carries the full `sql_type` (e.g. `varchar(255)`) into
-    // `register_class_with_limit`, so `type_for_attribute(col).limit` returns
-    // the column limit. `fetchTypeMetadata` strips the `(N)` off the stored
-    // `sqlType`, so re-thread the limit from the column onto the cast type here.
-    if (column.limit != null && base.limit == null) {
-      return new (base.constructor as new (o: {
-        limit?: number;
-        precision?: number;
-        scale?: number;
-      }) => typeof base)({
-        limit: column.limit,
-        precision: base.precision,
-        scale: base.scale,
-      });
     }
     return base;
   }
@@ -3077,14 +3069,22 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     m.registerType("binary", new BinaryType());
     m.registerType("json", new JsonType());
     m.registerType("numeric", new DecimalWithoutScale());
-    // SQLite type affinity — regex matches for flexible type names
-    m.registerType(/int/i, undefined, (k) => (/bigint/i.test(k) ? sqlite3Int(8) : sqlite3Int()));
+    // SQLite type affinity — regex matches for flexible type names. Limit-bearing
+    // families recover the limit from the matched `sql_type` via
+    // `registerClassWithLimit`, mirroring Rails' `register_class_with_limit`
+    // (abstract_adapter.rb:919). `int` is registered separately because SQLite
+    // integers carry an 8-byte default limit (SQLite3Integer#_limit) when the
+    // `sql_type` supplies none, and `blob`/`clob` are aliases to
+    // `binary`/`text` (abstract_adapter.rb:899-900).
+    m.registerType(/int/i, undefined, (k) => sqlite3Int(this.extractLimit(k)));
     // Explicit "bigint" registered after /int/i so it takes priority on exact matches.
     m.registerType("bigint", sqlite3Int(8));
-    m.registerType(/char/i, undefined, () => new StringType());
-    m.registerType(/clob/i, undefined, () => new TextType());
-    m.registerType(/blob/i, undefined, () => new BinaryType());
-    m.registerType(/real|floa|doub/i, undefined, () => new FloatType());
+    this.registerClassWithLimit(m, /char/i, StringType);
+    this.registerClassWithLimit(m, /text/i, TextType);
+    this.registerClassWithLimit(m, /binary/i, BinaryType);
+    m.aliasType(/clob/i, "text");
+    m.aliasType(/blob/i, "binary");
+    this.registerClassWithLimit(m, /real|floa|doub/i, FloatType);
   }
 }
 
