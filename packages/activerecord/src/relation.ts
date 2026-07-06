@@ -790,7 +790,7 @@ export class Relation<T extends Base> {
    * type; throws if a different join to the same table is present (aliasing
    * not supported).
    */
-  whereAssociated(...assocNames: string[]): Relation<T> {
+  whereAssociated(assocNames: string[], skipJoinFor?: ReadonlySet<string>): Relation<T> {
     let rel: Relation<T> = this;
     for (const assocName of assocNames) {
       rel._requireAssociation(assocName);
@@ -808,19 +808,36 @@ export class Relation<T extends Base> {
       const aliasLength = (rel._conn() as any).tableAliasLength();
       const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
       let effectiveTable = target.table;
-      for (const join of target.joins) {
-        const alias = _addAssocJoin(
-          cloned._joinClauses,
-          "inner",
-          join,
-          assocName,
-          rel._modelClass as any,
-          ownerTable,
-          quoteTable,
-          tracker,
-          jdJoins,
-        );
-        if (alias && join.table === target.table) effectiveTable = alias;
+      // Rails' guard (query_methods.rb:91) skips re-joining an association
+      // already in joins_values / left_outer_joins_values. In trails the
+      // no-duplicate-join outcome is reached two ways depending on the shape:
+      //   - Self-join (owner and target share a table, e.g. Comment#children):
+      //     the join loop below routes through the unified alias tracker, which
+      //     dedups the pending join-value and this where-join onto one alias
+      //     (`children_comments`) — a single join whose alias the IS NOT NULL
+      //     predicate needs. This mirrors Rails' `class_name` branch, which
+      //     emits `not(:children => …)` resolving to that same alias. Skipping
+      //     here would strand `effectiveTable` on the base owner table and
+      //     misplace the predicate, so the guard must NOT skip self-joins.
+      //   - Distinct target table (e.g. Post#author): skip the redundant join;
+      //     `effectiveTable` stays the base table name, matching Rails' non-
+      //     class_name branch `not(reflection.table_name => …)`.
+      const skipJoin = skipJoinFor?.has(assocName) && target.table !== ownerTable;
+      if (!skipJoin) {
+        for (const join of target.joins) {
+          const alias = _addAssocJoin(
+            cloned._joinClauses,
+            "inner",
+            join,
+            assocName,
+            rel._modelClass as any,
+            ownerTable,
+            quoteTable,
+            tracker,
+            jdJoins,
+          );
+          if (alias && join.table === target.table) effectiveTable = alias;
+        }
       }
       const tgtTable = new Table(effectiveTable);
       for (const pk of target.pks) {
