@@ -700,6 +700,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         }
         if (this._connectingPromiseGen === gen) this._connectingPromise = null;
         this._client = conn;
+        // Populate the base `_connection` field so the run loop's
+        // `_connection === null` guard (abstract-adapter.ts) fires connectBang
+        // once per connect rather than on every withRawConnection call —
+        // matching Rails' `@raw_connection = new_client(...)` posture and the
+        // PostgreSQLAdapter, which likewise keeps `_connection` non-null while
+        // connected. mysql2 keeps the real handle in `_client`; `_connection`
+        // is just the non-null sentinel the base guard reads.
+        this._connection = this;
         this._stmtPool = null;
         this._activeState = true;
         // Configure the freshly-opened socket exactly as Rails does on every
@@ -1557,6 +1565,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // _ensureClient() rather than adopted onto a discarded adapter.
     this._connectGeneration++;
     super.discardBang();
+    // Base discardBang is a no-op on `_connection`; null it here so a later
+    // re-open re-fires connectBang (the run-loop guard reads `_connection`).
+    this._connection = null;
     this._inTransaction = false;
     this._connectionConfigured = false;
     this._stmtPool?.detach();
@@ -1573,6 +1584,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   async close(): Promise<void> {
     this._permanentlyClosed = true;
     this._connectGeneration++;
+    this._connection = null;
     this._inTransaction = false;
     this._connectionConfigured = false;
     this._stmtPool?.detach();
