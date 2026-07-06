@@ -329,7 +329,7 @@ describe("TransactionTest", () => {
   // delegation guard (`guardBaseMethodDelegation`) throws NotImplementedError for
   // `transaction` on a Relation, so the faithful body can't run yet. Retained
   // verbatim for the un-skip; tracked alongside [[transactions-test-rollback-restores-record-state]].
-  it.skip("transaction does not apply default scope", async () => {
+  it("transaction does not apply default scope", async () => {
     // Regression test for https://github.com/rails/rails/issues/50368
     const topic = (await Topic.find((topics("fifth") as any).id)) as any;
     await (Topic.whereNot({ id: topic.id }) as any).transaction(async () => {
