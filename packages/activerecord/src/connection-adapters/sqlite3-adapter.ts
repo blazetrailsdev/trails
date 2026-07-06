@@ -1166,50 +1166,48 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#fetch_type_metadata.
    * Rails carries the full `sql_type` string and lets `lookup_cast_type`'s regex
-   * registrations parse precision/limit. trails' SQLite type map extracts the
-   * limit at lookup time too (`register_class_with_limit`), so we keep the full
-   * `sql_type` in `sqlType` for limit-bearing families; temporal types keep the
-   * paren-stripped base (their precision is parsed here and threaded via
-   * `lookupCastTypeFromColumn`).
+   * registrations parse precision/limit. trails' SQLite type map extracts both the
+   * limit (`register_class_with_limit`) and temporal/decimal precision
+   * (`register_class_with_precision`) at lookup time, so we keep the full `sql_type`
+   * in `sqlType` and read the scalar hints off the cast type.
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
-    // Single-arg `(N)` only — limit/precision. Multi-arg types (`decimal(10,2)`)
+    // Single-arg `(N)` only — limit. Multi-arg types (`decimal(10,2)`)
     // deliberately don't match: `baseSqlType` keeps the parens and resolves via
     // `lookupCastType`'s `/decimal|numeric/i` regex registration (→ type
-    // "decimal"). So the DSL type still resolves; only the scalar limit/precision
+    // "decimal"). So the DSL type still resolves; only the scalar limit
     // hints are scoped to single-arg forms.
     const paramMatch = /\((\d+)\)/.exec(raw);
-    const isDtPrec = /^(datetime|timestamp|time)\b/i.test(raw);
-    let precision = isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
-    let limit = !isDtPrec && paramMatch ? parseInt(paramMatch[1], 10) : null;
+    let precision: number | null = null;
+    let limit = paramMatch ? parseInt(paramMatch[1], 10) : null;
     let scale: number | null = null;
-    let baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
-    const dslTypeName = (() => {
-      const t = this.lookupCastType(baseSqlType);
-      return t.type() !== "value" ? t.type() : baseSqlType.toLowerCase();
-    })();
-    // Decimal precision/scale must be read off the FULL type string, not the
-    // paren-stripped base: `paramMatch` mis-reads a single-arg `DECIMAL(55)` as
-    // a limit and drops the `(55)` from `baseSqlType`. Re-resolve from `raw` —
-    // as Rails' `fetch_type_metadata` carries the whole sql_type — so the cast
-    // type keeps precision/scale, and hold the full string as `sqlType` so the
-    // attribute cast type rounds to the declared precision (numericality).
-    if (dslTypeName === "decimal") {
-      const decimalCastType = this.lookupCastType(raw);
-      precision = decimalCastType.precision ?? null;
-      scale = decimalCastType.scale ?? null;
+    const baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
+    // Rails' fetch_type_metadata resolves the cast type from the whole sql_type;
+    // do the same so regex registrations parse precision/scale off the full string.
+    const castType = this.lookupCastType(raw);
+    const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
+    // Temporal (precision, via register_class_with_precision) and decimal
+    // (precision/scale) types carry their `(N[,M])` parameter on the cast type at
+    // lookup time — the single-arg `paramMatch` limit above mis-reads it (e.g.
+    // `DECIMAL(55)` as limit 55, dropping the parens from `baseSqlType`). For these,
+    // read the parameter off the cast type and hold the full sql_type in `sqlType`,
+    // matching Rails' fetch_type_metadata which carries the whole string.
+    if (
+      dslTypeName === "datetime" ||
+      dslTypeName === "time" ||
+      dslTypeName === "date" ||
+      dslTypeName === "decimal"
+    ) {
+      precision = castType.precision ?? null;
+      scale = castType.scale ?? null;
       limit = null;
-      baseSqlType = raw;
     }
-    // Carry the full `sql_type` (with `(N)`) so limit-bearing type-map
-    // factories (`char`/`binary`/`text`/`int`/`float`) recover the limit via
-    // `extractLimit` at lookup time — Rails' `register_class_with_limit`
-    // mechanism. Temporal types keep the paren-stripped base so their exact
-    // (parenless) type-map keys still resolve; their precision is threaded
-    // separately in `lookupCastTypeFromColumn`.
+    // Carry the full `sql_type` (with `(N)`) so limit-bearing type-map factories
+    // (`char`/`binary`/`text`/`int`/`float`) recover the limit via `extractLimit`
+    // at lookup time — Rails' `register_class_with_limit` mechanism.
     return new SqlTypeMetadata({
-      sqlType: isDtPrec ? baseSqlType : raw,
+      sqlType: raw,
       type: dslTypeName,
       limit,
       precision,
@@ -1221,13 +1219,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     sqlType?: string | null;
     precision?: number | null;
   }): import("@blazetrails/activemodel").Type {
-    const base = this.lookupCastType(column.sqlType ?? "");
-    if (column.precision != null) {
-      if (base instanceof SQLiteDateTimeType)
-        return new SQLiteDateTimeType({ precision: column.precision });
-      if (base instanceof TimeType) return new TimeType({ precision: column.precision });
-    }
-    return base;
+    // Precision (temporal/decimal) and limit both flow through the type-map
+    // factories at lookup time now, so — like Rails' SQLite3Adapter — no override
+    // beyond `lookup_cast_type(column.sql_type)` is needed.
+    return this.lookupCastType(column.sqlType ?? "");
   }
 
   get nativeTypeMap(): TypeMap {
@@ -3059,12 +3054,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     });
     m.registerType("decimal", new DecimalType());
     m.registerType("boolean", new BooleanType());
-    // better-sqlite3 returns datetime columns as TEXT; SQLiteDateTimeType converts
-    // offset-less strings to Temporal.Instant using the configured default_timezone.
-    m.registerType("date", new DateType());
-    m.registerType("datetime", new SQLiteDateTimeType());
-    m.registerType("timestamp", new SQLiteDateTimeType());
-    m.registerType("time", new TimeType());
+    // Temporal types resolve precision at lookup time via register_class_with_precision,
+    // mirroring AbstractAdapter#initialize_type_map so a raw `datetime(6)` reaches a
+    // precision-parsing factory. Registration order matters: /date/i and /time/i both
+    // match "datetime", so datetime is registered last — reverse-registration lookup
+    // matches it first (mirrors the base-map date/time/datetime ordering). better-sqlite3
+    // returns datetime columns as TEXT; SQLiteDateTimeType converts offset-less strings
+    // to Temporal.Instant using the configured default_timezone.
+    this.registerClassWithPrecision(m, /date/i, DateType);
+    this.registerClassWithPrecision(m, /time/i, TimeType);
+    this.registerClassWithPrecision(m, /datetime/i, SQLiteDateTimeType);
+    m.aliasType(/timestamp/i, "datetime");
     m.registerType("blob", new BinaryType());
     m.registerType("binary", new BinaryType());
     m.registerType("json", new JsonType());
