@@ -1629,13 +1629,42 @@ export const DatabaseStatements = {
   },
 
   async execInsert(
-    this: DatabaseStatementsDefaultsHost,
+    this: DatabaseStatementsDefaultsHost & {
+      supportsInsertReturning?(): boolean;
+      internalExecQuery?(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+      dirtyCurrentTransaction?(): void;
+      primaryKey?(table: string): string | string[] | null | undefined;
+      quoteColumnName?(name: string): string;
+    },
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    _pk?: string | false | null,
+    pk?: string | false | null,
     _sequenceName?: string | null,
-  ): Promise<number> {
+    returning?: string[] | null,
+  ): Promise<number | Result> {
+    const originalSql = sql;
+    // Mirror Rails' abstract `exec_insert`, which runs `sql_for_insert` before
+    // the query: append a RETURNING clause on adapters that support it so
+    // DB-populated columns (auto-increment PK, DB-computed defaults) come back
+    // on INSERT.
+    [sql, binds] = sqlForInsert.call(
+      this as unknown as DatabaseStatementsHost,
+      sql,
+      pk ?? null,
+      binds ?? [],
+      returning ?? null,
+    );
+    // sql_for_insert only ever appends, so a length change means a RETURNING
+    // clause was added. `executeMutation` (the scalar write primitive) surfaces
+    // only the generated id, so read the RETURNING row back through the query
+    // path instead, then mark the transaction dirty as `executeMutation` would
+    // (its rollback bookkeeping is skipped on the read path).
+    if (sql.length !== originalSql.length && this.internalExecQuery) {
+      const result = await this.internalExecQuery(sql, name ?? "SQL", binds);
+      this.dirtyCurrentTransaction?.();
+      return result;
+    }
     return this.executeMutation(sql, binds, name ?? "SQL");
   },
 

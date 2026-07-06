@@ -3442,28 +3442,17 @@ export class Base extends Model {
 
     this._pendingOperation = (async () => {
       // Rails Persistence#_create_record threads `_returning_columns_for_insert`
-      // into `_insert_record`. The single value trails' scalar adapters surface
-      // on INSERT (SQLite's lastInsertRowid, MySQL's insertId, or PG's first
-      // RETURNING column) is the DB-generated AUTO-INCREMENT value — unlike Rails,
-      // which reads back a full RETURNING row and zips every auto-populated column.
-      // So gate the faithful returning list to a single column for the live
-      // write-back: prefer the auto-increment column (rowid / serial / identity),
-      // else a lone returning column, else none (composite-PK falls back to the
-      // adapter's default id read-back, assigned to the first unset target).
+      // into `_insert_record` and zips EVERY auto-populated column
+      // (auto-increment PK plus DB-computed defaults) off the RETURNING row.
+      // Pass the full list to adapters that can emit RETURNING (PG, SQLite
+      // >= 3.35, MariaDB) so those non-PK columns come back on `create`.
+      // Adapters that can't (MySQL 8, older SQLite) surface only the scalar
+      // generated id, so leave `returning` null and fall back to writing that
+      // id into the first still-unset returning column below.
       const returningColumns = ctor._returningColumnsForInsert(adapter as any);
-      const insertCols = (ctor as any).columns() as {
-        name: string;
-        isAutoIncrementedByDb?(): boolean;
-      }[];
-      const autoIncColumn = insertCols.find(
-        (c) => typeof c.isAutoIncrementedByDb === "function" && c.isAutoIncrementedByDb(),
-      )?.name;
-      const returning =
-        autoIncColumn && returningColumns.includes(autoIncColumn)
-          ? [autoIncColumn]
-          : returningColumns.length === 1
-            ? returningColumns
-            : null;
+      const supportsReturning =
+        (adapter as { supportsInsertReturning?(): boolean }).supportsInsertReturning?.() ?? false;
+      const returning = supportsReturning && returningColumns.length > 0 ? returningColumns : null;
 
       // Route through the ported `_insert_record` class method
       // (ActiveRecord::Persistence::ClassMethods#_insert_record) rather than a
@@ -3490,8 +3479,8 @@ export class Base extends Model {
       if (returning) {
         // Explicit RETURNING: the adapter returns values positionally matched to
         // `returning`. Mirrors `_create_record`'s
-        // `returning_columns.zip(returning_values)`. `returning` is gated to a
-        // single column, so this preserves the single-value semantics.
+        // `returning_columns.zip(returning_values)` — every auto-populated
+        // column (PK plus DB-computed defaults) is written back.
         const returnValues = Array.isArray(rawReturn) ? rawReturn : [rawReturn];
         returning.forEach((column, i) => writeBack(column, returnValues[i]));
       } else {
