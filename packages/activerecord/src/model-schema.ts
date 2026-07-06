@@ -997,6 +997,7 @@ function applyColumnsHash(
       defaultValue,
       userProvided: false,
       source: "schema",
+      ...(typeof host.tableName === "string" ? { reflectedTable: host.tableName } : {}),
       ...(colLimit != null ? { limit: colLimit } : {}),
       ...(colDefaultFunction != null ? { defaultFunction: colDefaultFunction } : {}),
     });

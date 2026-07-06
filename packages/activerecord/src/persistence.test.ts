@@ -2206,4 +2206,32 @@ describe("PersistenceTest", () => {
 
     expect(((await Aircraft.last()) as any).name).toBe("Wright Glider");
   });
+
+  it("persist inherited class with different table name and predeclared attribute", async () => {
+    // Reflect the ancestor first so its `_attributeDefinitions` holds
+    // schema-sourced defs for the `minimalistics` table. The subclass below
+    // then forks (clones) that map when it declares an attribute, copying
+    // those foreign defs — the residual edge PR #4680 didn't cover.
+    await Minimalistic.create({});
+
+    class MinimalisticAircraft extends Minimalistic {
+      static _tableName = "aircraft";
+      static {
+        // Declaring a virtual attribute before the first reflection forks this
+        // subclass's `_attributeDefinitions`, copying the ancestor's foreign
+        // (minimalistics-table) schema defs. The subclass must still reflect
+        // its own `aircraft` table rather than trusting those copied defs.
+        this.attribute("wingspan", "integer", { virtual: true });
+      }
+    }
+    registerModel(MinimalisticAircraft);
+
+    const before = (await Aircraft.count()) as number;
+    const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as any;
+    aircraft.name = "Wright Glider";
+    await aircraft.save();
+    expect(await Aircraft.count()).toBe(before + 1);
+
+    expect(((await Aircraft.last()) as any).name).toBe("Wright Glider");
+  });
 });

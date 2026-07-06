@@ -37,6 +37,15 @@ interface AttributeDefinition {
    * `_defaultAttributes` so the default is deserialized rather than user-cast.
    */
   defaultFromSchema?: boolean;
+  /**
+   * For `source:"schema"` defs, the `tableName` the columns were reflected
+   * against. A non-STI subclass that overrides `_tableName` and declares an
+   * `attribute()` before reflecting forks (clones) its ancestor's map, copying
+   * the ancestor's schema defs — which describe a *different* table. Recording
+   * the reflected table lets `ensureSchemaLoaded` distinguish those foreign
+   * defs from ones reflected against this class's own table.
+   */
+  reflectedTable?: string;
 }
 
 /**
