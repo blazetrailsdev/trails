@@ -1237,6 +1237,10 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Rails: assert_valid_deferrable runs before `super` (the abstract
     // add_foreign_key, where the if_not_exists short-circuit lives).
     this.assertValidDeferrable(options.deferrable);
+    // Rails PG `add_foreign_key` is `assert_valid_deferrable(deferrable); super`,
+    // and the abstract `super` begins with `return unless use_foreign_keys?`.
+    // We replicate the abstract body inline here, so replicate the guard too.
+    if (!this.isUseForeignKeys()) return;
     if (options.ifNotExists === true) {
       const fks = await this.foreignKeys(fromTable);
       if (
