@@ -2197,14 +2197,6 @@ describe("PersistenceTest", () => {
       static _tableName = "aircraft";
     }
     registerModel(MinimalisticAircraft);
-    // Force the anonymous subclass to reflect its own `aircraft` columns so its
-    // `name` accessor is generated. Without this, `ensureSchemaLoaded`'s fast
-    // path (base.ts) sees the inherited, already-reflected `minimalistics` defs
-    // (id/expires_at, source:"schema") on the parent and bails to
-    // reconcileVirtualAttributes — never reflecting `aircraft`, so `name` is
-    // never defined and writes are silently dropped. Root-cause bug tracked in
-    // rfcs/0048-one-schema-no-drop-tests/stories/ensure-schema-loaded-respects-subclass-table-name.md
-    await (MinimalisticAircraft as unknown as { loadSchema(): Promise<void> }).loadSchema();
 
     const before = (await Aircraft.count()) as number;
     const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as any;
