@@ -115,19 +115,6 @@ describe("TableDefinition", () => {
     expect(td.unlogged).toBe(true);
   });
 
-  it("drops the type for a virtual column with no type option (Rails no-fallback)", () => {
-    const td = new TableDefinition("articles");
-    const col = td.newColumnDefinition(
-      "full_name",
-      "virtual" as any,
-      {
-        as: "a || b",
-        stored: true,
-      } as any,
-    );
-    expect(col.type).toBeUndefined();
-  });
-
   it("newExclusionConstraintDefinition returns definition without pushing", () => {
     const td = new TableDefinition("products");
     const defn = td.newExclusionConstraintDefinition("price WITH =", { name: "pc" });
@@ -189,6 +176,16 @@ describe("TableDefinition#toSql", () => {
     td.string("name");
     expect(toSql(td)).toMatch(/^CREATE TABLE/);
     expect(toSql(td)).not.toContain("UNLOGGED");
+  });
+
+  it("drops the type for a virtual column with no type option (Rails no-fallback)", () => {
+    const td = new TableDefinition("articles", { id: false });
+    td.column("full_name", "virtual" as any, { as: "a || b", stored: true } as any);
+    const col = td.columns.find((c) => c.name === "full_name")!;
+    expect(col.type).toBeUndefined();
+    const sql = toSql(td);
+    expect(sql).toContain('"full_name"  GENERATED ALWAYS AS (a || b) STORED');
+    expect(sql).not.toContain("varchar");
   });
 
   it("emits exclusion constraint in CREATE TABLE", () => {
