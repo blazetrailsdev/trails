@@ -41,6 +41,9 @@ describe("SQLite3Adapter type-map limit threading", () => {
       ["binary(16)", "binary", 16],
       ["int(11)", "integer", 11],
       ["float(24)", "float", 24],
+      // blob/clob alias to binary/text and must thread the limit through them.
+      ["blob(8)", "binary", 8],
+      ["clob(5)", "text", 5],
     ] as const) {
       const type = castType(sqlType);
       expect(type.type()).toBe(expectedType);

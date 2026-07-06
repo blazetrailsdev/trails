@@ -3070,23 +3070,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     m.registerType("json", new JsonType());
     m.registerType("numeric", new DecimalWithoutScale());
     // SQLite type affinity — regex matches for flexible type names. Limit-bearing
-    // families parse the limit from the matched `sql_type` string via
-    // `extractLimit`, mirroring Rails' `register_class_with_limit`
-    // (abstract_adapter.rb:919). SQLite integers default to an 8-byte limit
-    // (SQLite3Integer#_limit) when the `sql_type` carries none.
+    // families recover the limit from the matched `sql_type` via
+    // `registerClassWithLimit`, mirroring Rails' `register_class_with_limit`
+    // (abstract_adapter.rb:919). `int` is registered separately because SQLite
+    // integers carry an 8-byte default limit (SQLite3Integer#_limit) when the
+    // `sql_type` supplies none, and `blob`/`clob` are aliases to
+    // `binary`/`text` (abstract_adapter.rb:899-900).
     m.registerType(/int/i, undefined, (k) => sqlite3Int(this.extractLimit(k)));
     // Explicit "bigint" registered after /int/i so it takes priority on exact matches.
     m.registerType("bigint", sqlite3Int(8));
-    m.registerType(/char/i, undefined, (k) => new StringType({ limit: this.extractLimit(k) }));
-    m.registerType(/text/i, undefined, (k) => new TextType({ limit: this.extractLimit(k) }));
-    m.registerType(/binary/i, undefined, (k) => new BinaryType({ limit: this.extractLimit(k) }));
-    m.registerType(/clob/i, undefined, (k) => new TextType({ limit: this.extractLimit(k) }));
-    m.registerType(/blob/i, undefined, (k) => new BinaryType({ limit: this.extractLimit(k) }));
-    m.registerType(
-      /real|floa|doub/i,
-      undefined,
-      (k) => new FloatType({ limit: this.extractLimit(k) }),
-    );
+    this.registerClassWithLimit(m, /char/i, StringType);
+    this.registerClassWithLimit(m, /text/i, TextType);
+    this.registerClassWithLimit(m, /binary/i, BinaryType);
+    m.aliasType(/clob/i, "text");
+    m.aliasType(/blob/i, "binary");
+    this.registerClassWithLimit(m, /real|floa|doub/i, FloatType);
   }
 }
 
