@@ -13765,6 +13765,13 @@
     "package": "activerecord",
     "tsFile": "associations/collection-association.ts",
     "rubyName": "ids_writer",
+    "call": "reflection",
+    "reason": "Equivalent (bucket b): reflection.association_primary_key is resolved via the shared associationPrimaryKey() helper (reads _reflectOnAssociation(this.reflection.name)), not inline in idsWriter; mirrors the ids_reader/reflection baseline entry."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/collection-association.ts",
+    "rubyName": "ids_writer",
     "call": "cast",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
