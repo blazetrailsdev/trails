@@ -1523,16 +1523,27 @@ describe("HasManyThroughAssociationsTest", () => {
     const company = await Company.find(companies("rails_core").id);
     const dev = (await Developer.first())!;
     const ids = [dev.id as number, -9999];
+    // Rails asserts the full message, including the trailing `not_found_ids`
+    // sentence (`klass.all.raise_record_not_found_exception!(…, not_found_ids)`).
     await expect(association(company, "developers").setIds(ids)).rejects.toThrow(
-      /RecordNotFound|Couldn't find/,
+      `Couldn't find all Developers with 'id': (${dev.id}, -9999) (found 1 results, but was looking for 2). Couldn't find Developer with id -9999.`,
     );
   });
 
   it("collection singular ids through setter raises exception when invalid ids set", async () => {
     const david = await Author.find(authors("david").id);
     const ids = [(categories("general") as any).name, "Unknown"];
+    // NOTE: the exact Rails message here is
+    //   "Couldn't find all Categories with 'name': (General, Unknown) (found 1
+    //    results, but was looking for 2). Couldn't find Category with name Unknown."
+    // trails' `idsWriter` currently resolves the target key as 'id' rather than
+    // Rails' `reflection.association_primary_key` ('name'), so it finds 0 and
+    // emits the wrong key. That pk-resolution divergence is tracked separately
+    // (story: idswriter-association-primary-key-resolution); this assertion stays
+    // loose until it is fixed. The `not_found_ids` suffix itself is asserted
+    // exactly by the simple-PK developers case above.
     await expect(association(david, "essayCategories").setIds(ids)).rejects.toThrow(
-      /RecordNotFound|Couldn't find/,
+      /Couldn't find all Categories.*\(found \d+ results, but was looking for 2\)\. Couldn't find/,
     );
   });
 

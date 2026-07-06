@@ -185,6 +185,9 @@ export function normalizeFindArgs(
  *   - composite  → `String(tuples)`    , payload = tuples[][] (tuple
  *     compaction/formatting is a separate concern; the pluralize + suffix
  *     convergence applies to both kinds).
+ *
+ * `notFoundIds` (Rails' `ids_writer` passes `ids - found_ids`) appends the
+ * trailing "Couldn't find <Model> with <key> <ids>." sentence.
  */
 export function raiseNotFoundAll(
   modelName: string,
@@ -193,16 +196,49 @@ export function raiseNotFoundAll(
   resultSize: number,
   expectedSize: number,
   conditions = "",
+  notFoundIds?: unknown[],
 ): never {
   const { ids, tuples } = normalized;
   const messageIds = tuples ? String(tuples) : ids.join(", ");
   const payload = tuples ?? ids;
   throw new RecordNotFound(
-    `Couldn't find all ${pluralize(modelName)} with '${String(pk)}': (${messageIds})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`,
+    formatNotFoundAllMessage(
+      modelName,
+      String(pk),
+      messageIds,
+      conditions,
+      resultSize,
+      expectedSize,
+      notFoundIds,
+    ),
     modelName,
     String(pk),
     payload,
   );
+}
+
+/**
+ * Compose the "Couldn't find all …" message shared by `raiseNotFoundAll` and
+ * `raiseRecordNotFoundExceptionBang`, byte-for-byte with Rails'
+ * `raise_record_not_found_exception!` `else` branch (finder_methods.rb:431-433).
+ */
+function formatNotFoundAllMessage(
+  name: string,
+  key: string,
+  messageIds: string,
+  conditions: string,
+  resultSize: number | undefined,
+  expectedSize: number | undefined,
+  notFoundIds: unknown[] | undefined,
+): string {
+  let error = `Couldn't find all ${pluralize(name)} with '${key}': `;
+  error += `(${messageIds})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
+  if (notFoundIds) {
+    error +=
+      ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
+      ` with ${pluralize(key, notFoundIds.length)} ${notFoundIds.join(", ")}.`;
+  }
+  return error;
 }
 
 /**
@@ -658,13 +694,15 @@ export function raiseRecordNotFoundExceptionBang(
     throw new RecordNotFound(`Couldn't find ${name} with '${k}'=${ids}${conditions}`, name, k, ids);
   }
 
-  let error = `Couldn't find all ${pluralize(name)} with '${k}': `;
-  error += `(${wrapped.join(", ")})${conditions} (found ${resultSize} results, but was looking for ${expectedSize}).`;
-  if (notFoundIds) {
-    error +=
-      ` Couldn't find ${pluralize(name, notFoundIds.length)}` +
-      ` with ${pluralize(k, notFoundIds.length)} ${notFoundIds.join(", ")}.`;
-  }
+  const error = formatNotFoundAllMessage(
+    name,
+    k,
+    wrapped.join(", "),
+    conditions,
+    resultSize,
+    expectedSize,
+    notFoundIds,
+  );
   throw new RecordNotFound(error, name, k, ids);
 }
 

@@ -130,6 +130,23 @@ export class CollectionAssociation extends Association {
     // Reuse the shared "Couldn't find all" builder (also used by performFind)
     // so there is a single not-found message source.
     if (records.length !== filteredIds.length) {
+      // Rails `ids_writer` (collection_association.rb:79-81):
+      //   found_ids = records.map { |r| r._read_attribute(primary_key) }
+      //   not_found_ids = ids - found_ids
+      //   klass.all.raise_record_not_found_exception!(ids, records.size, ids.size, primary_key, not_found_ids)
+      // The `not_found_ids` sentence is appended to the message.
+      const keyFor = (v: unknown): string =>
+        Array.isArray(v) ? v.map(String).join(",") : String(v);
+      const foundKeys = new Set(
+        records.map((r) =>
+          keyFor(
+            Array.isArray(pk)
+              ? pk.map((col: string) => (r as any)._readAttribute(col))
+              : (r as any)._readAttribute(pk),
+          ),
+        ),
+      );
+      const notFoundIds = filteredIds.filter((id) => !foundKeys.has(keyFor(id)));
       raiseNotFoundAll(
         Klass.name,
         pk,
@@ -140,6 +157,8 @@ export class CollectionAssociation extends Association {
         },
         records.length,
         filteredIds.length,
+        "",
+        notFoundIds,
       );
     }
 

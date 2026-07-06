@@ -762,9 +762,18 @@ describe("CollectionProxy#find — in-memory not-found message fidelity", () => 
     } catch (e) {
       const err = e as RecordNotFound;
       expect(err).toBeInstanceOf(RecordNotFound);
-      // In-memory scan → no `[WHERE …]` conditions clause (unlike the SQL path).
-      expect(err.message).toBe(
-        `Couldn't find all Clients with 'id': (${realId}, 999999) (found 1 results, but was looking for 2).`,
+      // Pluralized model name + found/expected suffix (this story's convergence).
+      // Rails' in-memory `find` routes through `scope.raise_record_not_found_
+      // exception!`, so the message also carries the association scope's
+      // `[WHERE …]` clause; trails' in-memory path omits it today (tracked
+      // separately: story in-memory-collection-find-conditions-clause). The
+      // regex therefore tolerates an optional conditions clause rather than
+      // ratifying its absence.
+      expect(err.message).toMatch(
+        new RegExp(
+          `^Couldn't find all Clients with 'id': \\(${realId}, 999999\\).*` +
+            `\\(found 1 results, but was looking for 2\\)\\.$`,
+        ),
       );
     }
   });
