@@ -694,17 +694,30 @@ describe("NestedThroughAssociationsTest", () => {
     expect(result.map((a) => a.id)).toContain(bob.id);
   });
 
-  // Direct load generates "no such column: posts.title" — the scope's table reference is unresolvable
-  // when the posts table is in a subquery context. The joins path works.
-  it.todo("nested has many through with conditions on source associations");
+  it("nested has many through with conditions on source associations", async () => {
+    const bob = authors("bob");
+    const blue = tags("blue");
+    const result = await bob.miscPostFirstBlueTags_2.toArray();
+    expect(result.map((t) => t.id)).toEqual([blue.id]);
+  });
 
-  // Preload path generates "no such column: taggings.comment" when loading firstBlueTags_2
-  // (scope: { taggings: { comment: "first" } }) as a nested preload source.
-  it.todo("nested has many through with conditions on source associations preload");
+  it("nested has many through with conditions on source associations preload", async () => {
+    const blue = tags("blue");
+    const [, , author] = await Author.includes("miscPostFirstBlueTags_2").order("authors.id");
+    const preloaded = (author.association("miscPostFirstBlueTags_2").target ?? []) as any[];
+    expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+  });
 
-  // Preloading firstBlueTags_2 (scope: { taggings: { comment: "first" } }) as a nested source
-  // generates "no such column: taggings.comment" in the nested-preload path.
-  it.todo("through association preload doesnt reset source association if already preloaded");
+  it("through association preload doesnt reset source association if already preloaded", async () => {
+    const blue = tags("blue");
+    const [, , author] = await Author.preload({
+      posts: "firstBlueTags_2",
+      miscPostFirstBlueTags_2: {},
+    }).order("authors.id");
+    const firstPost = (author.association("posts").target as any[])[0];
+    const preloaded = (firstPost.association("firstBlueTags_2").target ?? []) as any[];
+    expect(preloaded.map((t) => t.id)).toEqual([blue.id]);
+  });
 
   it("nested has many through with conditions on source associations preload via joins", async () => {
     const bob = authors("bob");
