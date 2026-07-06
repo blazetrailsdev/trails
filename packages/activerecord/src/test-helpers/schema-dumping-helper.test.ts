@@ -29,6 +29,13 @@ async function createSdhTable(name: string, columns = "id INTEGER PRIMARY KEY"):
   await adapter.executeMutation(`CREATE TABLE ${name} (${columns})`);
 }
 
+// `dumpAllTableSchema` dumps the entire database (~330 canonical tables in the
+// shared handler DB). On PostgreSQL under CI fork load that full-DB dump exceeds
+// the 5s default and flakes — the single-table `dumpTableSchema` cases stay fast
+// because they ignore every table but the one named. Match the sibling
+// `schema-dumper.test.ts` full-dump timeout rather than nudging the global one.
+const FULL_DUMP_TIMEOUT_MS = 30_000;
+
 describe("SchemaDumpingHelper", () => {
   afterEach(async () => {
     for (const t of createdTables) {
@@ -83,7 +90,7 @@ describe("SchemaDumpingHelper", () => {
     expect(SchemaDumper.ignoreTables).toBe(before);
   });
 
-  it("dumpAllTableSchema honors the ignore list", async () => {
+  it("dumpAllTableSchema honors the ignore list", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     await createSdhTable("sdh_keep");
     await createSdhTable("sdh_skip");
 
