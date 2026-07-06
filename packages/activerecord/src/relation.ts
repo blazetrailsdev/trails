@@ -790,7 +790,7 @@ export class Relation<T extends Base> {
    * type; throws if a different join to the same table is present (aliasing
    * not supported).
    */
-  whereAssociated(...assocNames: string[]): Relation<T> {
+  whereAssociated(assocNames: string[], skipJoinFor?: ReadonlySet<string>): Relation<T> {
     let rel: Relation<T> = this;
     for (const assocName of assocNames) {
       rel._requireAssociation(assocName);
@@ -808,19 +808,27 @@ export class Relation<T extends Base> {
       const aliasLength = (rel._conn() as any).tableAliasLength();
       const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
       let effectiveTable = target.table;
-      for (const join of target.joins) {
-        const alias = _addAssocJoin(
-          cloned._joinClauses,
-          "inner",
-          join,
-          assocName,
-          rel._modelClass as any,
-          ownerTable,
-          quoteTable,
-          tracker,
-          jdJoins,
-        );
-        if (alias && join.table === target.table) effectiveTable = alias;
+      // Rails' guard (query_methods.rb:91) skips re-joining an association
+      // already in joins_values / left_outer_joins_values. A self-join
+      // (owner and target share a table) needs its own alias, resolved by the
+      // unified alias tracker below, so the guard only applies when the target
+      // is a distinct table whose base name the IS NOT NULL predicate can use.
+      const skipJoin = skipJoinFor?.has(assocName) && target.table !== ownerTable;
+      if (!skipJoin) {
+        for (const join of target.joins) {
+          const alias = _addAssocJoin(
+            cloned._joinClauses,
+            "inner",
+            join,
+            assocName,
+            rel._modelClass as any,
+            ownerTable,
+            quoteTable,
+            tracker,
+            jdJoins,
+          );
+          if (alias && join.table === target.table) effectiveTable = alias;
+        }
       }
       const tgtTable = new Table(effectiveTable);
       for (const pk of target.pks) {

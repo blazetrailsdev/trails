@@ -39154,22 +39154,8 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "associated",
-    "call": "joins_values",
-    "reason": "Divergent port: trails where.associated does not guard on existing joins_values/left_outer_joins_values before joining (Rails query_methods.rb:91), so it reads neither accessor. Genuine behavioral divergence, not a read-crediting gap."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "associated",
     "call": "joins!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "associated",
-    "call": "left_outer_joins_values",
-    "reason": "Divergent port: trails where.associated does not guard on existing joins_values/left_outer_joins_values before joining (Rails query_methods.rb:91), so it reads neither accessor. Genuine behavioral divergence, not a read-crediting gap."
   },
   {
     "package": "activerecord",

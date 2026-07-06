@@ -43,8 +43,10 @@ import { foreignKey } from "@blazetrails/activesupport";
  */
 export interface WhereChainScope<R> {
   whereNot(conditions: Record<string, unknown>): R;
-  whereAssociated(...associationNames: string[]): R;
+  whereAssociated(associationNames: string[], skipJoinFor?: ReadonlySet<string>): R;
   whereMissing(...associationNames: string[]): R;
+  joinsValues: unknown[];
+  leftOuterJoinsValues: unknown[];
   exists(conditions?: unknown): Promise<boolean>;
 }
 
@@ -66,8 +68,21 @@ export class WhereChain<R = any> {
   }
 
   associated(...associationNames: string[]): R {
-    for (const name of associationNames) this.scopeAssociationReflection(name);
-    return this._scope.whereAssociated(...associationNames);
+    // Mirror Rails' guard (query_methods.rb:91): skip the join for any
+    // association already present in joins_values / left_outer_joins_values,
+    // so an already-joined association does not get a duplicate join.
+    const skipJoinFor = new Set<string>();
+    for (const name of associationNames) {
+      const reflection = this.scopeAssociationReflection(name) as { name?: string } | undefined;
+      const reflectionName = reflection?.name ?? name;
+      if (
+        this._scope.joinsValues.includes(reflectionName) ||
+        this._scope.leftOuterJoinsValues.includes(reflectionName)
+      ) {
+        skipJoinFor.add(name);
+      }
+    }
+    return this._scope.whereAssociated(associationNames, skipJoinFor);
   }
 
   missing(...associationNames: string[]): R {
