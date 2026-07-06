@@ -24,6 +24,30 @@ import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
+/**
+ * Per-adapter default column limits, mirroring the `:limit` keys carried by
+ * each adapter's `NATIVE_DATABASE_TYPES` hash. Rails' `type_to_sql` reads that
+ * hash (`native = native_database_types[type]`) and fills a missing limit
+ * generically via `limit ||= native[:limit]` (abstract/schema_statements.rb:1404).
+ * The only non-nil default across our three adapters is MySQL's `:string`
+ * (`limit: 255`, abstract_mysql_adapter.rb:33); sqlite3 (`{ name: "varchar" }`,
+ * sqlite3_adapter.rb:71) and PostgreSQL (`{ name: "character varying" }`,
+ * postgresql_adapter.rb:136) carry none, so a bare `t.string` stays unbounded.
+ * Keying the defaults off a table — rather than `adapterName` branches inside
+ * each `type_to_sql` case — keeps the native-type knowledge in one place and
+ * mirrors Rails' structure. (Only the default *limit* varies by adapter here;
+ * PostgreSQL derives its distinct `character varying` type name in its own
+ * `typeToSql` override, so the shared visitor emits a single `VARCHAR` name.)
+ */
+const NATIVE_TYPE_LIMITS: Record<
+  "sqlite" | "postgres" | "mysql",
+  Partial<Record<ColumnType, number>>
+> = {
+  sqlite: {},
+  postgres: {},
+  mysql: { string: 255 },
+};
+
 type Definition =
   | TableDefinition
   | AlterTable
@@ -377,20 +401,15 @@ export class SchemaCreation {
   typeToSql(type: ColumnType, options: ColumnOptions = {}): string {
     let sql: string;
     switch (type) {
-      case "string":
+      case "string": {
         // Rails derives the default limit from the adapter's native-type hash
-        // (`type_to_sql`: `limit ||= native[:limit]`). Only MySQL's
-        // `NATIVE_DATABASE_TYPES[:string]` carries `limit: 255`
-        // (abstract_mysql_adapter.rb:33); sqlite3 (`{ name: "varchar" }`,
-        // sqlite3_adapter.rb:71) and PostgreSQL (`{ name: "character varying" }`,
-        // postgresql_adapter.rb:136) have no default length, so a bare
-        // `t.string` stays unbounded (nil limit) there.
-        if (this.adapterName === "mysql") {
-          sql = `VARCHAR(${options.limit ?? 255})`;
-        } else {
-          sql = options.limit != null ? `VARCHAR(${options.limit})` : "VARCHAR";
-        }
+        // (`type_to_sql`: `limit ||= native[:limit]`). {@link NATIVE_TYPE_LIMITS}
+        // supplies that default per adapter — MySQL's `:string` is 255, sqlite3
+        // and PostgreSQL carry none, so a bare `t.string` stays unbounded there.
+        const limit = options.limit ?? NATIVE_TYPE_LIMITS[this.adapterName].string;
+        sql = limit != null ? `VARCHAR(${limit})` : "VARCHAR";
         break;
+      }
       case "text":
         sql = "TEXT";
         break;
