@@ -212,13 +212,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   // Normalized config stored for reconnect.
   private _poolConfig: mysql.PoolOptions & MysqlAdapterOptions;
   private _inTransaction = false;
-  // Gates configureConnection() to exactly once per physical connection.
-  // Mirrors PostgreSQLAdapter's `_connectionConfigured`: the eager connect
-  // path (_ensureClient) configures the fresh socket and flips this true, so
-  // the argless configureConnection() that reconnectBang's
-  // attemptConfigureConnection issues is a no-op (no double-configure). Reset
-  // to false whenever the raw handle is torn down so the next connect
-  // re-configures — matching Rails' connect-time `configure_connection`.
+  // Gates the connect-once portion of configureConnection() (super/checkVersion
+  // + any future connect-time-only logic) to exactly once per physical
+  // connection. Mirrors PostgreSQLAdapter's `_connectionConfigured`: the eager
+  // connect path (_ensureClient) configures the fresh socket and flips this
+  // true, so the argless configureConnection() that reconnectBang's
+  // attemptConfigureConnection issues re-runs only the (idempotent) timezone
+  // reseed, not the gated work. Reset to false whenever the raw handle is torn
+  // down so the next connect re-configures — matching Rails' connect-time
+  // `configure_connection`.
   private _connectionConfigured = false;
   // Per-adapter StatementPool. Single connection → single pool.
   // Cleared on disconnect/reconnect; re-created on first query after reconnect.
@@ -1611,13 +1613,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /** @internal */
   override configureConnection(): void {
-    // Gate on a boolean so the persistent connection is configured exactly once
-    // per physical socket — whether reached via the eager connect path
-    // (_ensureClient) or reconnectBang's argless attemptConfigureConnection.
-    // Mirrors PostgreSQLAdapter#configureConnection's _maybeConfigureConnection
-    // gate. Reset to false on raw-handle teardown so the next connect re-runs.
-    if (this._connectionConfigured) return;
-    this._connectionConfigured = true;
     // In Rails this sets @raw_connection.query_options[:as] = :array and
     // database_timezone on the single raw connection. We have a single
     // persistent connection here too; mysql2's typeCast handles temporal
@@ -1625,7 +1620,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // The database_timezone equivalent ({@link databaseTimezone}) is seeded
     // from the global default here and re-synced per-query in perform_query,
     // mirroring Rails' `query_options[:database_timezone] = default_timezone`.
+    // This reseed is UNGATED: Rails reassigns database_timezone on every
+    // configure_connection call, and the value is not connect-once state (it
+    // also re-syncs per query), so it runs whenever configureConnection is
+    // invoked.
     this._syncDatabaseTimezone();
+    // Connect-once work (checkVersion and any future connect-time-only logic)
+    // is gated so it runs exactly once per physical socket — whether reached
+    // via the eager connect path (_ensureClient) or reconnectBang's argless
+    // attemptConfigureConnection. Mirrors PostgreSQLAdapter's
+    // _maybeConfigureConnection gate. Reset to false on raw-handle teardown so
+    // the next connect re-runs it.
+    if (this._connectionConfigured) return;
+    this._connectionConfigured = true;
     super.configureConnection();
   }
 
