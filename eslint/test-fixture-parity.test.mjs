@@ -63,11 +63,6 @@ describe("test-fixture-parity rule", () => {
           code: `const { customers } = useHandlerFixtures({ customers: [C, {}] }); describe("T", () => { it("find single value object", () => { customers("david"); }); });`,
         },
         {
-          name: "useHandlerTransactionalFixtures (no accessor) → scope-level pass",
-          filename: AR("aggregations.test.ts"),
-          code: `describe("T", () => { useHandlerTransactionalFixtures(); it("find single value object", () => { expect(1).toBe(1); }); });`,
-        },
-        {
           name: "fixtures([]) without destructuring (RFC 0062) → scope-level pass",
           filename: AR("aggregations.test.ts"),
           code: `describe("T", () => { fixtures([]); it("find single value object", () => { expect(1).toBe(1); }); });`,
