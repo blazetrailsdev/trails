@@ -101,6 +101,7 @@ import {
   decorateAttributes,
   pendingAttributeModifications as _pendingAttributeModificationsHelper,
   resetDefaultAttributesBang as _resetDefaultAttributesBangHelper,
+  resetDefaultAttributes as _resetDefaultAttributesHelper,
   resolveAttributeName as _resolveAttributeNameHelper,
   resolveTypeName as _resolveTypeNameHelper,
   hookAttributeType as _hookAttributeTypeHelper,
@@ -386,11 +387,7 @@ export class Model {
    * so a single `cast` casts then normalizes.
    */
   static normalizeValueFor(name: string, value: unknown): unknown {
-    if (typeof this.typeForAttribute === "function") {
-      return this.typeForAttribute(name).cast(value);
-    }
-    const def = this._attributeDefinitions.get(name);
-    return def ? def.type.cast(value) : value;
+    return this.typeForAttribute(name).cast(value);
   }
 
   /**
@@ -424,20 +421,39 @@ export class Model {
   /**
    * Re-apply normalization decorators onto `_attributeDefinitions` once columns
    * are reflected — the query-side lookup (`type_for_attribute`, `TypeCaster::Map`)
-   * reads that store. Mirrors AR's `applyPendingEncryptions` replay; idempotent
-   * via the `_normalizationDecorator` token guard, so it never grows the pending
-   * queue or double-wraps on repeated calls.
+   * reads that store. Mirrors AR's `applyPendingEncryptions` replay.
+   *
+   * Unlike `normalizes` this mutates `_attributeDefinitions` DIRECTLY rather than
+   * routing through `decorateAttributes`: the durable `PendingDecorator` that
+   * `normalizes` already pushed replays on every `_defaultAttributes` rebuild, so
+   * pushing another one here would grow `_pendingAttributeModifications` without
+   * bound each time a schema reload resets a column's type back to raw. The
+   * `_normalizationDecorator` token guard keeps this idempotent and no-op once the
+   * stored type already carries the decoration.
    *
    * @internal
    */
   static applyPendingNormalizations(): void {
     if (!this._normalizations || this._normalizations.size === 0) return;
     const defs = this._attributeDefinitions;
+    if (!defs) return;
+    let mutated = false;
     for (const [name, entry] of this._normalizations) {
-      const def = defs?.get?.(name);
+      const def = defs.get(name);
       if (!def) continue; // column not reflected yet; re-invoked once it appears
       if (normalizedValueToken(def.type) === entry) continue; // already applied
-      this.decorateAttributes([name], this._normalizationDecorator(name));
+      const newType = this._normalizationDecorator(name)(name, def.type);
+      if (!newType) continue; // decorator declined (already decorated by this entry)
+      if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
+        this._attributeDefinitions = new Map(defs);
+      }
+      this._attributeDefinitions.set(name, { ...def, type: newType });
+      mutated = true;
+    }
+    // Invalidate the cached default AttributeSet (and subclasses') so the next
+    // rebuild seeds from the freshly-decorated `_attributeDefinitions`.
+    if (mutated) {
+      _resetDefaultAttributesHelper(this as unknown as AttributeHostInternals);
     }
   }
 
