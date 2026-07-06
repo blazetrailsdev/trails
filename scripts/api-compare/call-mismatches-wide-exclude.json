@@ -31476,105 +31476,105 @@
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "concat",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "construct_join_dependency",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "distinct_relation_for_primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "eager_load_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "except",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "includes_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "joins_values",
-    "reason": "Mixin-host attribution artifact: the real port lives in relation/query-methods.ts (build_joins/build_join_buckets/build_join_dependencies now credit this.joinsValues after value-accessor read-crediting landed and dropped from the baseline). The relation.ts host candidate carries no resolvable body — a pre-existing compare double-attribution, not an accessor-read gap."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "left_outer_joins_values",
-    "reason": "Mixin-host attribution artifact: the real port lives in relation/query-methods.ts (build_joins/build_join_buckets/build_join_dependencies now credit this.joinsValues after value-accessor read-crediting landed and dropped from the baseline). The relation.ts host candidate carries no resolvable body — a pre-existing compare double-attribution, not an accessor-read gap."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "reflections",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "select_association_list",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "using_limitable_reflections?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
     "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Bucket-(b) faithful equivalent: apply_join_dependency is ported as Relation#applyJoinDependency (relation.ts, folded into build_from) — it clears the eager specs and re-applies them via leftOuterJoins (Rails' Arel::Nodes::OuterJoin outcome). Rails' internal sends are performed in helpers rather than the method body: the eager_load_values | includes_values / joins_values / left_outer_joins_values reads and the using_limitable_reflections? test live in _applyJoinDependencyIsLimitable -> _eagerReflectionsAreLimitable / _joinsReflectionsAreLimitable + usingLimitableReflections, and the has_limit_or_offset? + distinct_relation_for_primary_key / skip_query_cache_if_necessary / with_connection materialization path is the deferred branch that throws NotImplementedError (tracked by relation-handler-distinct-pk-materialization). Not a divergence."
   },
   {
     "package": "activerecord",
@@ -33365,13 +33365,6 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "compute_cache_version",
-    "call": "apply_join_dependency",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "compute_cache_version",
     "call": "arel",
     "reason": "Confirmed equivalent (RFC 0047): the TS body builds the Arel manager via _buildArel/toArel (the build_arel port that arel() delegates to) rather than the memoized arel reader; surfaced when arel() gained its Rails-faithful aliases param (query_methods.rb:1594). See PR #4518."
   },
@@ -33625,13 +33618,6 @@
     "tsFile": "relation.ts",
     "rubyName": "delete_all",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "delete_all",
-    "call": "apply_join_dependency",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -34444,13 +34430,6 @@
     "tsFile": "relation.ts",
     "rubyName": "execute_simple_calculation",
     "call": "wrap",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "exists?",
-    "call": "apply_join_dependency",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -37830,111 +37809,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "concat",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "construct_join_dependency",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "distinct_relation_for_primary_key",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "eager_load_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "except",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "includes_values",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "joins_values",
-    "reason": "Divergent port: trails applyJoinDependency uses the preloader path (finder-methods.ts) and reads neither joins_values nor left_outer_joins_values. Genuine divergence."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "left_outer_joins_values",
-    "reason": "Divergent port: trails applyJoinDependency uses the preloader path (finder-methods.ts) and reads neither joins_values nor left_outer_joins_values. Genuine divergence."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "reflections",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "select_association_list",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "using_limitable_reflections?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "apply_join_dependency",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
     "rubyName": "construct_relation_for_exists",
     "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -38252,13 +38126,6 @@
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "raise_record_not_found_exception!",
     "call": "wrap",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "using_limitable_reflections?",
-    "call": "none?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

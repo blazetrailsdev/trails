@@ -3834,7 +3834,7 @@ export class Relation<T extends Base> {
     // thread through to the recursion (`apply_join_dependency(eager_loading: false)
     // .exists?(conditions)`) — the hardcoded `false` skips the limit/offset guard.
     if (this._eagerLoadingForSql()) {
-      return this.applyJoinDependencyForArel(false).exists(conditions);
+      return this.applyJoinDependency(false).exists(conditions);
     }
     // Mirrors Rails FinderMethods#construct_relation_for_exists
     // (finder_methods.rb:438): shape the existence probe and apply the argument's
@@ -4067,7 +4067,7 @@ export class Relation<T extends Base> {
         // Surface the same explicit NotImplementedError the cache_version path
         // raises for this shape (tracked by
         // 0023-surfaced-deviations/composite-pk-distinct-relation-materialization).
-        if (Array.isArray(basePk)) this.applyJoinDependencyForArel();
+        if (Array.isArray(basePk)) this.applyJoinDependency();
         // Rails apply_join_dependency, for a limit/offset over a collection
         // reflection, replaces the relation via distinct_relation_for_primary_key
         // (finder_methods.rb:463): execute a query to materialize the limited
@@ -4257,7 +4257,7 @@ export class Relation<T extends Base> {
     let stmtAst;
     if (typeof primaryKey === "string" || Array.isArray(primaryKey)) {
       const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependencyForArel(this._groupColumns.length === 0)._buildArel()
+        ? this.applyJoinDependency(this._groupColumns.length === 0)._buildArel()
         : this._buildArel();
       arel.source.left = table;
       const havingAst = this._havingClause.isEmpty() ? null : this._havingClause.ast;
@@ -4341,7 +4341,7 @@ export class Relation<T extends Base> {
       // implicitly here (the no-arg default, finder_methods.rb:457), so a
       // grouped delete skips the limit/offset materialization guard.
       const arel = this._eagerLoadingForSql()
-        ? this.applyJoinDependencyForArel(this._groupColumns.length === 0)._buildArel()
+        ? this.applyJoinDependency(this._groupColumns.length === 0)._buildArel()
         : this._buildArel();
       // Mirrors `relation.rb:1024` (`arel.source.left = table`): force the FROM
       // target back to the bare table before `compile_delete`. For the common
@@ -5220,7 +5220,7 @@ export class Relation<T extends Base> {
    * when `eager_loading` is truthy.
    * @internal
    */
-  applyJoinDependencyForArel(eagerLoading = true): Relation<T> {
+  applyJoinDependency(eagerLoading = true): Relation<T> {
     if (!this._eagerLoadingForSql()) return this;
     const eagerSpecs = [
       ...new Set([...this._eagerLoadAssociations, ...this._includesAssociations]),
@@ -7311,7 +7311,7 @@ export class Relation<T extends Base> {
           // `_materializeLimitedIds` (shared with the pluck eager-limit path) has
           // no composite-PK support (Rails' zip/transpose over
           // `Array(primary_key)`), so a composite PK falls through to the
-          // synchronous applyJoinDependencyForArel below, which surfaces the
+          // synchronous applyJoinDependency below, which surfaces the
           // unsupported combination as an explicit NotImplementedError rather
           // than emitting a wrong single-column `"col1,col2"` predicate.
           const limitedIds = await this._materializeLimitedIds(jd, pk);
@@ -7322,7 +7322,7 @@ export class Relation<T extends Base> {
           // Composite-PK, non-limitable eager limit/offset: unsupported here —
           // surfaces NotImplementedError rather than a wrong predicate. Tracked
           // by 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
-          collection = this.applyJoinDependencyForArel();
+          collection = this.applyJoinDependency();
         } else {
           collection = rel.leftOuterJoins(joinableSpecs);
         }
@@ -8013,16 +8013,6 @@ export class Relation<T extends Base> {
   /** @internal */
   private constructRelationForExists(conditions: unknown): any {
     return _fm.constructRelationForExists(this as any, conditions);
-  }
-
-  /** @internal */
-  private applyJoinDependency(eagerLoading: boolean): any {
-    return _fm.applyJoinDependency(this as any, eagerLoading);
-  }
-
-  /** @internal */
-  private isUsingLimitableReflections(reflections: unknown[]): boolean {
-    return _fm.isUsingLimitableReflections(reflections);
   }
 
   /** @internal */
