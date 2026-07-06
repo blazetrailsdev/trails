@@ -25,6 +25,8 @@ describe("WhereChain associated join guard (trails)", () => {
     const sql = Post.joins("author").where().associated("author").toSql();
     expect(authorsJoinCount(sql)).toBe(1);
     expect(sql).toMatch(/INNER JOIN/i);
+    // The IS NOT NULL predicate still lands on the (unaliased) target table.
+    expect(sql).toMatch(/["`]?authors["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
   });
 
   it("does not add an inner join when a left outer join is already present", () => {
@@ -32,5 +34,6 @@ describe("WhereChain associated join guard (trails)", () => {
     expect(authorsJoinCount(sql)).toBe(1);
     expect(sql).toMatch(/LEFT OUTER JOIN/i);
     expect(sql).not.toMatch(/INNER JOIN/i);
+    expect(sql).toMatch(/["`]?authors["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
   });
 });
