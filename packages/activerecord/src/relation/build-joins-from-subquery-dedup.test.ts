@@ -21,6 +21,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 // `registerModel`.
 import "../test-helpers/canonical-model-index.js";
 import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
 
 describe("build_joins from(subquery) dedup", () => {
   fixtures([]);
@@ -51,5 +52,21 @@ describe("build_joins from(subquery) dedup", () => {
     // as the subquery `from(relation)` path — not just a coincidentally-similar one.
     expect(joinFragment(liveSql)).not.toBe("");
     expect(joinFragment(liveSql)).toBe(joinFragment(subSql));
+  });
+
+  // Exercise the conditions the `pureLeftOuter` guard adds beyond a naive
+  // "left-outer only" check: a cross-klass `.merge` pushes an OuterJoin
+  // JoinDependency into `_leftOuterJoinDeps` (merger.ts mergeOuterJoins). The
+  // guard does NOT gate on that array — emitJoinPlan emits merged deps directly
+  // from `this` regardless of branch — so the short-circuit must still emit BOTH
+  // the base left-outer join AND the merged one, identically to the subquery path.
+  it("emits cross-klass merged left_outer_joins on the live path like the from-subquery path", () => {
+    const build = () => Post.leftOuterJoins("comments").merge(Comment.leftOuterJoins("post"));
+    const liveSql = (build() as unknown as { toSql(): string }).toSql();
+    const subSql = (Post.from(build(), "posts") as unknown as { toSql(): string }).toSql();
+    // Base `comments` join + the merged cross-klass `post` JoinDependency.
+    expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(2);
+    // The whole FROM…joins structure of the live path is the subquery's inner query.
+    expect(subSql).toContain(liveSql.slice(liveSql.indexOf('FROM "posts"')));
   });
 });
