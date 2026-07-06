@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
-import { Base, association, registerModel } from "../index.js";
+import { Base, association, registerModel, RecordNotFound } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 // Opt this file into the canonical-model autoload index (Zeitwerk analog):
 // `Comment`, `Tagging`, `Tag`, and `Owner` — association targets with no
@@ -22,6 +22,7 @@ import { Tag } from "../test-helpers/models/tag.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Toy } from "../test-helpers/models/toy.js";
+import { Firm } from "../test-helpers/models/company.js";
 
 // `authors`, `posts`, `cpkAuthors`, `cpkBooks`, `pets`, and `toys` are declared
 // fixture sets below, so their models (`Author`, `Post`, `CpkAuthor`, `CpkBook`,
@@ -735,5 +736,36 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
     await Post.create({ title: "drop", body: "2", author_id: authorId });
 
     expect((await proxy.first()).id).toBe(kept.id);
+  });
+});
+
+// The in-memory `CollectionProxy#find` path (loaded `inverse_of` collection,
+// scanned in memory) must emit the identical not-found message as the SQL
+// `performFind` path — Rails routes both through
+// `raise_record_not_found_exception!`, so a missing id in a multi-id lookup
+// pluralizes the model name and appends the found/expected suffix.
+// `Firm has_many :clients_of_firm, inverse_of: :firm` is the canonical loaded
+// inverse-of collection (same fixture setup as the BigInt-key-match test).
+describe("CollectionProxy#find — in-memory not-found message fidelity", () => {
+  const { companies } = fixtures(["companies"]);
+
+  it("emits the pluralized aggregate message for a missing id in a loaded inverse_of collection", async () => {
+    const firm = await Firm.find(companies("first_firm").id);
+    const proxy = association<Base>(firm, "clientsOfFirm");
+    const clients = await proxy.load();
+    expect(clients.length).toBeGreaterThan(0);
+    const realId = clients[0].id as number;
+
+    try {
+      await proxy.find([realId, 999999]);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err).toBeInstanceOf(RecordNotFound);
+      // In-memory scan → no `[WHERE …]` conditions clause (unlike the SQL path).
+      expect(err.message).toBe(
+        `Couldn't find all Clients with 'id': (${realId}, 999999) (found 1 results, but was looking for 2).`,
+      );
+    }
   });
 });
