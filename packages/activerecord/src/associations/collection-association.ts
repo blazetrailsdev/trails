@@ -130,11 +130,17 @@ export class CollectionAssociation extends Association {
     // Reuse the shared "Couldn't find all" builder (also used by performFind)
     // so there is a single not-found message source.
     if (records.length !== filteredIds.length) {
-      raiseNotFoundAll(Klass.name, pk, {
-        ids: filteredIds,
-        wantArray: true,
-        tuples: Array.isArray(pk) ? (filteredIds as unknown[][]) : null,
-      });
+      raiseNotFoundAll(
+        Klass.name,
+        pk,
+        {
+          ids: filteredIds,
+          wantArray: true,
+          tuples: Array.isArray(pk) ? (filteredIds as unknown[][]) : null,
+        },
+        records.length,
+        filteredIds.length,
+      );
     }
 
     this.replace(records);

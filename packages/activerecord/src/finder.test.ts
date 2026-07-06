@@ -1226,7 +1226,19 @@ describe("FinderTest", () => {
 
   it("find with ids with no id passed", async () => {
     const { Post } = makeModel();
-    expect(await Post.find([])).toEqual([]);
+    // Rails test_find_with_ids_with_no_id_passed: a zero-arg find raises
+    // RecordNotFound "Couldn't find <Model> without an ID" (find_with_ids
+    // `when 0`), carrying model + primary_key.
+    try {
+      await (Post.find as (...ids: unknown[]) => Promise<unknown>).call(Post);
+      expect.fail("should have thrown");
+    } catch (e) {
+      const err = e as RecordNotFound;
+      expect(err).toBeInstanceOf(RecordNotFound);
+      expect(err.message).toBe("Couldn't find Post without an ID");
+      expect(err.model).toBe("Post");
+      expect(err.primaryKey).toBe("id");
+    }
   });
 
   it("find with ids with id out of range", async () => {
@@ -1426,7 +1438,11 @@ describe("FinderTest", () => {
       expect.unreachable("should throw");
     } catch (e: any) {
       expect(e).toBeInstanceOf(RecordNotFound);
-      expect(e.message).toContain("999999");
+      // Rails raise_record_not_found_exception! multi-id: pluralized model
+      // name + "(found N results, but was looking for M)." suffix.
+      expect(e.message).toBe(
+        `Couldn't find all Topics with 'id': (${t.id}, 999999) (found 1 results, but was looking for 2).`,
+      );
     }
   });
 

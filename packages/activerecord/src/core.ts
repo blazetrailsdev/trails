@@ -853,11 +853,13 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // attribute definitions that lazy reflection populates.
   await this.ensureSchemaLoaded();
   if (ids.length === 0) {
+    // Rails Core#find delegates a zero-arg call to `super` → `find_with_ids`,
+    // whose `when 0` branch raises "Couldn't find <Model> without an ID"
+    // (finder_methods.rb:508), no id payload.
     throw new RecordNotFound(
-      `Couldn't find ${this.name} with an empty list of ids`,
+      `Couldn't find ${this.name} without an ID`,
       this.name,
       String(this.primaryKey),
-      [],
     );
   }
   // Rails Core#find fast-path: a single supported scalar id on a simple

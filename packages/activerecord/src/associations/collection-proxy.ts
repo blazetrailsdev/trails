@@ -3329,7 +3329,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       const castedIds = ids.map(castId);
       const uniqueFoundKeys = new Set(castedIds.map(keyForCastedId).filter((k) => byPk.has(k)));
       if (uniqueFoundKeys.size !== ids.length) {
-        raiseNotFoundAll(targetModel.name, pk, normalized);
+        raiseNotFoundAll(targetModel.name, pk, normalized, uniqueFoundKeys.size, ids.length);
       }
       // Return in DB/load order, matching performFind.
       const wantedKeys = new Set(castedIds.map(keyForCastedId));

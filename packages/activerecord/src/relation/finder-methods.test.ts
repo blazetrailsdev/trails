@@ -65,17 +65,16 @@ describe("normalizeFindArgs — simple primary key", () => {
     });
   });
 
-  it("find() → RecordNotFound with empty-list shape", () => {
+  it("test_find_with_ids_with_no_id_passed", () => {
     try {
       normalizeFindArgs("Post", pk, []);
       expect.fail("should have thrown");
     } catch (e) {
       expect(e).toBeInstanceOf(RecordNotFound);
       const err = e as RecordNotFound;
-      expect(err.message).toBe("Couldn't find Post with an empty list of ids");
+      expect(err.message).toBe("Couldn't find Post without an ID");
       expect(err.model).toBe("Post");
       expect(err.primaryKey).toBe("id");
-      expect(err.id).toEqual([]);
     }
   });
 
@@ -263,25 +262,27 @@ describe("normalizeFindArgs — composite primary key", () => {
     }
   });
 
-  it("find() → empty-list shape, same as simple PK", () => {
-    expect(() => normalizeFindArgs("Order", pk, [])).toThrow(/empty list of ids/);
+  it("find() → without-an-ID shape, same as simple PK", () => {
+    expect(() => normalizeFindArgs("Order", pk, [])).toThrow(/without an ID/);
   });
 });
 
 describe("raiseNotFoundAll", () => {
-  it("simple PK: flatIds.join(', ') + flatIds payload", () => {
+  it("simple PK: pluralized name + found/expected suffix + flatIds payload", () => {
     const normalized = { ids: [1, 2, 3], wantArray: true, tuples: null };
     try {
-      raiseNotFoundAll("Post", "id", normalized);
+      raiseNotFoundAll("Post", "id", normalized, 2, 3);
       expect.fail("should have thrown");
     } catch (e) {
       const err = e as RecordNotFound;
-      expect(err.message).toBe("Couldn't find all Post with 'id': (1, 2, 3)");
+      expect(err.message).toBe(
+        "Couldn't find all Posts with 'id': (1, 2, 3) (found 2 results, but was looking for 3).",
+      );
       expect(err.id).toEqual([1, 2, 3]);
     }
   });
 
-  it("composite: String(tuples) (comma, no space) + tuples payload", () => {
+  it("composite: String(tuples) (comma, no space) + suffix + tuples payload", () => {
     const normalized = {
       ids: [
         [1, 2],
@@ -294,11 +295,13 @@ describe("raiseNotFoundAll", () => {
       ],
     };
     try {
-      raiseNotFoundAll("Order", ["shop_id", "id"], normalized);
+      raiseNotFoundAll("Order", ["shop_id", "id"], normalized, 1, 2);
       expect.fail("should have thrown");
     } catch (e) {
       const err = e as RecordNotFound;
-      expect(err.message).toBe("Couldn't find all Order with 'shop_id,id': (1,2,3,4)");
+      expect(err.message).toBe(
+        "Couldn't find all Orders with 'shop_id,id': (1,2,3,4) (found 1 results, but was looking for 2).",
+      );
       expect(err.id).toEqual([
         [1, 2],
         [3, 4],
