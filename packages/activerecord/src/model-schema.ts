@@ -315,6 +315,42 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
 type DatabaseAdapterLike = { schemaCache?: unknown };
 
 /**
+ * Connection-safe read of the cached column hash for `klass`'s table.
+ *
+ * Used by `_defaultAttributes` to seed schema columns via `Attribute.fromDatabase`
+ * (Rails' `columns_hash.transform_values { Attribute.from_database(...) }`) without
+ * ever touching `.connection` — which would permanently check out a connection on
+ * every record construction. Only reads the threaded (in-query) connection's warm
+ * schema cache; returns `{}` when none is available, so the caller falls back to
+ * the attribute-definition view.
+ */
+export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
+  const target = isStiSubclass(klass) ? getStiBase(klass) : klass;
+  // Prefer the threaded (in-query) connection's warm cache — never touches
+  // `.connection`, so it is safe on the hot `new Model()` construction path.
+  try {
+    const conn = threadedConnectionFor(target) as { schemaCache?: unknown } | null;
+    const cache = conn?.schemaCache as
+      | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
+      | undefined;
+    const hash = cache?.getCachedColumnsHash?.(target.tableName);
+    if (hash) return hash;
+  } catch {
+    /* fall through */
+  }
+  // No threaded connection (e.g. a bare `new Book()` outside any query): fall
+  // back to `columnsHash`, which resolves the same warm cache via the model's
+  // connection. Wrapped in try/catch so a table-less model or a disallowed
+  // permanent checkout degrades to the attribute-definition view rather than
+  // raising during construction.
+  try {
+    return columnsHash.call(target);
+  } catch {
+    return {};
+  }
+}
+
+/**
  * Return content columns (excluding PK, FKs, and timestamps).
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#content_columns
@@ -941,22 +977,10 @@ function applyColumnsHash(
     }
     const existing = host._attributeDefinitions.get(name);
     if (existing && (existing.userProvided ?? true)) {
-      // A user-declared type override (e.g. an enum) whose default is meant to
-      // come from the schema column: refresh the column default onto the def so
-      // `_defaultAttributes` can seed it via from_database. The user-declared
-      // type is preserved; only the schema-sourced default is (re)injected.
-      // Mirrors Rails, where the column default lives on the column and enum's
-      // `build_from_user` preserves it.
-      if ((existing as { defaultFromSchema?: boolean }).defaultFromSchema) {
-        const colDefault = (column as { default?: unknown }).default ?? null;
-        const colDefaultFn =
-          (column as { defaultFunction?: string | null }).defaultFunction ?? null;
-        host._attributeDefinitions.set(name, {
-          ...existing,
-          defaultValue: colDefault,
-          ...(colDefaultFn != null ? { defaultFunction: colDefaultFn } : {}),
-        });
-      }
+      // A user-declared type override (e.g. an enum) preserves its type across
+      // reflection. The schema column's default is NOT merged onto the def;
+      // `_defaultAttributes` seeds it via from_database directly from the cached
+      // column (Rails' column-seed-then-replay), then replays the user override.
       continue;
     }
 
