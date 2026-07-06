@@ -3078,6 +3078,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // Explicit "bigint" registered after /int/i so it takes priority on exact matches.
     m.registerType("bigint", sqlite3Int(8));
     m.registerType(/char/i, undefined, (k) => new StringType({ limit: this.extractLimit(k) }));
+    m.registerType(/text/i, undefined, (k) => new TextType({ limit: this.extractLimit(k) }));
+    m.registerType(/binary/i, undefined, (k) => new BinaryType({ limit: this.extractLimit(k) }));
     m.registerType(/clob/i, undefined, (k) => new TextType({ limit: this.extractLimit(k) }));
     m.registerType(/blob/i, undefined, (k) => new BinaryType({ limit: this.extractLimit(k) }));
     m.registerType(
