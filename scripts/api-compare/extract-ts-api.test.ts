@@ -108,12 +108,15 @@ describe("body call capture", () => {
     );
     const save = cls.instanceMethods.find((m) => m.name === "save")!;
     // PropertyAccess callee → final identifier; bare call → identifier;
-    // sorted + de-duped (runCallbacks appears twice, recorded once).
-    expect(save.calls).toEqual(["helper", "runCallbacks", "touch"]);
+    // sorted + de-duped (runCallbacks appears twice, recorded once). The
+    // intermediate read `obj.nested` in `obj.nested.touch()` is credited as
+    // `nested` — a non-callee property read mirrors a Ruby method send.
+    expect(save.calls).toEqual(["helper", "nested", "runCallbacks", "touch"]);
   });
 
   it("omits calls entirely for a body that invokes nothing", () => {
-    const cls = extractFromSource(`class Foo { id() { return this._id; } }`);
+    // No calls and no property reads — a pure arithmetic return.
+    const cls = extractFromSource(`class Foo { id() { return 1 + 2; } }`);
     const id = cls.instanceMethods.find((m) => m.name === "id")!;
     expect(id.calls).toBeUndefined();
   });
@@ -177,7 +180,8 @@ describe("body call capture", () => {
         }
       }`,
     );
-    const expected = ["constructor", "typeCast"];
+    // `_x` is the non-callee read inside `typeCast(this._x)`, credited as a call.
+    const expected = ["_x", "constructor", "typeCast"];
     expect(direct.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
     expect(bound.instanceMethods.find((m) => m.name === "build")!.calls).toEqual(expected);
   });
@@ -193,6 +197,7 @@ describe("body call capture", () => {
       }`,
     );
     expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "_x",
       "constructor",
       "makePool",
     ]);
@@ -247,6 +252,58 @@ describe("body call capture", () => {
     const byName = Object.fromEntries(methods.map((m) => [m.name, m.calls]));
     expect(byName["where"]).toEqual(["buildWhere", "spawn"]);
     expect(byName["toArrow"]).toEqual(["records"]);
+  });
+
+  it("credits a get-accessor value READ as a call (Ruby reader-call semantics)", () => {
+    // `this.joinsValues` is the faithful TS mirror of Ruby's `joins_values`
+    // method send — a bare read, since Ruby has no attribute reads, only calls.
+    // The accessor-backed value read must be credited to the ported call set.
+    const cls = extractFromSource(
+      `class Foo {
+        buildJoins() {
+          const j = this.joinsValues;
+          return this.leftOuterJoinsValues.concat(j);
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "buildJoins")!;
+    expect(m.calls).toEqual(["concat", "joinsValues", "leftOuterJoinsValues"]);
+  });
+
+  it("does not double-record a call's callee property as a value read", () => {
+    // `this.joinsValues(...)` — the callee `joinsValues` is recorded ONCE by the
+    // call branch; the read-crediting branch must skip the callee access so the
+    // name is not counted twice (it is de-duped anyway, but the branch must not
+    // fire on a callee).
+    const cls = extractFromSource(`class Foo { run() { this.joinsValues(); } }`);
+    const m = cls.instanceMethods.find((m) => m.name === "run")!;
+    expect(m.calls).toEqual(["joinsValues"]);
+  });
+
+  it("does not credit an assignment target as a value read (write mirrors the setter)", () => {
+    // `this.joinsValues = x` mirrors Ruby's writer send `joins_values=`, not the
+    // reader `joins_values`; crediting the reader name would be unfaithful and
+    // make the call set depend on body shape. The RHS read `x.dup` still counts.
+    const cls = extractFromSource(`class Foo { reset(x) { this.joinsValues = x.dup; } }`);
+    const m = cls.instanceMethods.find((m) => m.name === "reset")!;
+    expect(m.calls).toEqual(["dup"]);
+  });
+
+  it("does not credit a destructuring-assignment target as a value read", () => {
+    // A property access nested in a destructuring LHS is still a write, mirroring
+    // the `foo=` setter — array-pattern (`[this.foo] = arr`) and object-pattern
+    // (`({ a: this.bar } = obj)`) targets must be skipped, while the RHS reads
+    // (`arr.pop`, `obj.build`) are still credited.
+    const cls = extractFromSource(
+      `class Foo {
+        reset(arr, obj) {
+          [this.foo] = arr.pop();
+          ({ a: this.bar } = obj.build());
+        }
+      }`,
+    );
+    const m = cls.instanceMethods.find((m) => m.name === "reset")!;
+    expect(m.calls).toEqual(["build", "pop"]);
   });
 });
 
