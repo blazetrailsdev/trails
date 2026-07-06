@@ -195,14 +195,44 @@ describe("SerializationTest", () => {
   });
 
   it("nested include", () => {
-    class Person extends Model {
+    // Rails test_nested_include: `@user.friends.first.friends = [@user]` then
+    // `serializable_hash(include: { friends: { include: :friends } })` recurses
+    // one level — David's friends [Joe, Sue] each serialize their own friends
+    // (Joe's is [David], Sue's is []).
+    class User extends Model {
       static {
         this.attribute("name", "string");
+        this.attribute("email", "string");
+        this.attribute("gender", "string");
       }
     }
-    const p = new Person({ name: "test" });
-    const hash = p.serializableHash();
-    expect(hash).toHaveProperty("name", "test");
+    const david = new User({ name: "David", email: "david@example.com", gender: "male" });
+    const joe = new User({ name: "Joe", email: "joe@example.com", gender: "male" });
+    const sue = new User({ name: "Sue", email: "sue@example.com", gender: "female" });
+    setAssociationAccessors(joe, { friends: [david] });
+    setAssociationAccessors(sue, { friends: [] });
+    setAssociationAccessors(david, { friends: [joe, sue] });
+
+    const hash = david.serializableHash({ include: { friends: { include: "friends" } } });
+    expect(hash).toEqual({
+      name: "David",
+      email: "david@example.com",
+      gender: "male",
+      friends: [
+        {
+          name: "Joe",
+          email: "joe@example.com",
+          gender: "male",
+          friends: [{ name: "David", email: "david@example.com", gender: "male" }],
+        },
+        {
+          name: "Sue",
+          email: "sue@example.com",
+          gender: "female",
+          friends: [],
+        },
+      ],
+    });
   });
 
   it("multiple includes with options", () => {
