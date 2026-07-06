@@ -61,8 +61,8 @@ export class RelationHandler {
   // distinct_relation_for_primary_key materialization branch
   // (finder_methods.rb:463). Matches relation.ts's own call site (~L3542).
   private applyJoinDependency(value: any): any {
-    return typeof value?.applyJoinDependencyForArel === "function"
-      ? value.applyJoinDependencyForArel(value._groupColumns?.length === 0)
+    return typeof value?.applyJoinDependency === "function"
+      ? value.applyJoinDependency(value._groupColumns?.length === 0)
       : value;
   }
 

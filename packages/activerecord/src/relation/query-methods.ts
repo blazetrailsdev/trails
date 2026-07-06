@@ -2441,15 +2441,15 @@ export function buildFrom(this: QueryMethodsHost): unknown {
     // `apply_join_dependency` first (Rails build_from). This folds the eager
     // `includes`/`eager_load` into LEFT OUTER JOINs so a WHERE that references
     // the joined table (e.g. `posts.type`) resolves inside the subquery.
-    // `applyJoinDependencyForArel` clones internally, so the caller's relation
+    // `applyJoinDependency` clones internally, so the caller's relation
     // is not mutated.
     let resolved: any = opts;
     if (
       typeof opts._eagerLoadingForSql === "function" &&
       opts._eagerLoadingForSql() &&
-      typeof opts.applyJoinDependencyForArel === "function"
+      typeof opts.applyJoinDependency === "function"
     ) {
-      resolved = opts.applyJoinDependencyForArel(opts._groupColumns?.length === 0);
+      resolved = opts.applyJoinDependency(opts._groupColumns?.length === 0);
     }
     // Rails build_from wraps `opts.arel.as(name)`, where `arel` is the full
     // `build_arel` — joins, HAVING, nested FROM, LOCK, CTEs, etc. Use the
