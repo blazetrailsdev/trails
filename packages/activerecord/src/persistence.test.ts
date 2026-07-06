@@ -1908,7 +1908,12 @@ describe("QueryConstraintsTest", () => {
 // ==========================================================================
 describe("PersistenceTest", () => {
   registerModel(Default);
-  fixtures([]);
+  // The adapter-specific `defaults` table is built and dropped with DDL inside
+  // each test; MySQL implicitly commits on DDL, which detonates a wrapping
+  // transactional-fixtures savepoint (ROLLBACK TO SAVEPOINT then fails). Run this
+  // suite non-transactionally — the `defaults` table is torn down in a `finally`
+  // regardless — matching the other DDL-driven suites.
+  fixtures([], { useTransactionalTests: false });
 
   async function buildDefaultsTable() {
     const connection = Base.connection;

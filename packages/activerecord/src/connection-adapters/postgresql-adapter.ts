@@ -2334,6 +2334,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           binds,
           returning,
         );
+        // A multi-column RETURNING list is the auto-populated-columns read-back
+        // (Rails `_create_record` zips every returning column). `super.execInsert`
+        // routes through `executeMutation`, which collapses the row to its first
+        // column, so run the INSERT here and hand back the whole `Result` — the
+        // same write-path scaffolding (withRawConnection materializes and dirties
+        // the transaction) the `pk === false` branch above uses. A single-column
+        // list keeps the `super`/`executeMutation` path (scalar id + prepared-
+        // statement-cache retry).
+        if (returning.length > 1) {
+          const preprocessed = this.preprocessQuery(sqlWithReturning);
+          return this.withRawConnection(async (conn) => {
+            const client = conn as unknown as pg.Client;
+            return this._instrumentedQueryOnClient(
+              client,
+              preprocessed,
+              name ?? "SQL",
+              resolvedBinds,
+            );
+          });
+        }
         return super.execInsert(sqlWithReturning, name, resolvedBinds, pk, sequenceName, returning);
       }
       return super.execInsert(sql, name, binds, pk, sequenceName, returning);

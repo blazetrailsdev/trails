@@ -1629,50 +1629,14 @@ export const DatabaseStatements = {
   },
 
   async execInsert(
-    this: DatabaseStatementsDefaultsHost & {
-      supportsInsertReturning?(): boolean;
-      internalExecQuery?(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
-      dirtyCurrentTransaction?(): void;
-      primaryKey?(table: string): string | string[] | null | undefined;
-      quoteColumnName?(name: string): string;
-    },
+    this: DatabaseStatementsDefaultsHost,
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    pk?: string | false | null,
+    _pk?: string | false | null,
     _sequenceName?: string | null,
-    returning?: string[] | null,
-  ): Promise<number | Result> {
-    // Mirror Rails' abstract `exec_insert`, which runs `sql_for_insert` before
-    // the query so a caller-named RETURNING column list surfaces the
-    // DB-populated columns (auto-increment PK, DB-computed defaults) on INSERT.
-    // Only engage when the caller asks for RETURNING columns and the statement
-    // does not already carry a RETURNING clause — this keeps the mixin a
-    // no-op for PostgreSQL, whose own `execInsert` override appends RETURNING
-    // itself and then delegates here via `super` (a second append would emit
-    // an invalid double `RETURNING`).
-    const wantsReturning = returning != null && returning.length > 0 && !/\sRETURNING\s/i.test(sql);
-    if (wantsReturning) {
-      const [returningSql, returningBinds] = sqlForInsert.call(
-        this as unknown as DatabaseStatementsHost,
-        sql,
-        pk ?? null,
-        binds ?? [],
-        returning ?? null,
-      );
-      // `sql_for_insert` appends a clause only on adapters that support
-      // `RETURNING`; when it does, `executeMutation` (the scalar write
-      // primitive) would surface just the generated id, so read the full
-      // RETURNING row back through the query path instead — SQLite's
-      // `executeMutation` `.run()` path drops those rows entirely. Mark the
-      // transaction dirty as `executeMutation` would, since its rollback
-      // bookkeeping is skipped on the read path.
-      if (returningSql.length !== sql.length && this.internalExecQuery) {
-        const result = await this.internalExecQuery(returningSql, name ?? "SQL", returningBinds);
-        this.dirtyCurrentTransaction?.();
-        return result;
-      }
-    }
+    _returning?: string[] | null,
+  ): Promise<number> {
     return this.executeMutation(sql, binds, name ?? "SQL");
   },
 

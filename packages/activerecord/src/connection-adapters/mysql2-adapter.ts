@@ -3,6 +3,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
+import { sqlForInsert } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
@@ -509,6 +510,41 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::DatabaseStatements#perform_query
    * (the `prepare:` keyword routing) + Rails' exec_query tolerating no-result DML.
    */
+  /**
+   * Mirrors Rails' abstract `exec_insert` → `sql_for_insert` → `internal_exec_query`
+   * for the multi-column RETURNING read-back. MariaDB supports `INSERT ...
+   * RETURNING`, but the `executeMutation` write primitive returns only the
+   * generated id, so a multi-column auto-populated-columns list (Rails
+   * `_create_record` zips every returning column) would lose the non-PK values.
+   * Route that case through `execQuery` — bind-aware, and its `withRawConnection`
+   * materializes and dirties the transaction — to hand back the full `Result`.
+   * Single-column / no-RETURNING inserts (and MySQL 8, which lacks insert
+   * returning, so `sql_for_insert` appends nothing) keep the `executeMutation`
+   * path via `super`.
+   */
+  override async execInsert(
+    sql: string,
+    name?: string | null,
+    binds: unknown[] = [],
+    pk?: string | false | null,
+    sequenceName?: string | null,
+    returning?: string[] | null,
+  ): Promise<Result | number> {
+    if (returning && returning.length > 1) {
+      const [returningSql, returningBinds] = sqlForInsert.call(
+        this as never,
+        sql,
+        pk ?? null,
+        binds,
+        returning,
+      );
+      if (/\sRETURNING\s/i.test(returningSql)) {
+        return this.execQuery(returningSql, name ?? "SQL", returningBinds);
+      }
+    }
+    return super.execInsert(sql, name, binds, pk, sequenceName, returning);
+  }
+
   override async execQuery(
     sql: string,
     name?: string | null,
@@ -2012,3 +2048,8 @@ function initializeTypeMap(m: any): never {
   mysql2CastResult;
 
 dirtiesQueryCache(Mysql2Adapter, "executeMutation");
+// The multi-column RETURNING read-back in `execInsert` runs through `execQuery`
+// (a read primitive that does not dirty the cache) rather than `executeMutation`,
+// so dirty `execInsert` too; the single-column path delegates to
+// `executeMutation` via `super`, where the double-clear is a harmless no-op.
+dirtiesQueryCache(Mysql2Adapter, "execInsert");
