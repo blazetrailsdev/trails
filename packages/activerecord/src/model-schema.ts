@@ -1054,6 +1054,10 @@ function applyColumnsHash(
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
 
   encryptionHooks.applyPendingEncryptions(host);
+  // Re-apply normalization decorators now that columns are reflected, so the
+  // query-side type lookup (`type_for_attribute` / `TypeCaster::Map`) sees the
+  // decorated cast type. Mirrors the `applyPendingEncryptions` replay above.
+  (host as { applyPendingNormalizations?(): void }).applyPendingNormalizations?.();
 
   // Now the DB column set is authoritative: re-run the ignoreCase
   // `original_<name>` requirement so a genuinely absent column raises even when
@@ -1090,6 +1094,7 @@ function applyColumnsHash(
     }
     originatingHost._attributeDefinitions = baseDefs;
     encryptionHooks.applyPendingEncryptions(originatingHost);
+    (originatingHost as { applyPendingNormalizations?(): void }).applyPendingNormalizations?.();
     // Recompute the reflected column set against the subclass's own
     // `ignoredColumns` — an STI subclass may ignore a different set than its
     // base, so reusing the base's `reflectedColumnNames` could check against the
