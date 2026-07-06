@@ -242,6 +242,95 @@ describe("body call capture", () => {
     ]);
   });
 
+  it("suppresses the call-set of a same-named namespace-delegation wrapper", () => {
+    // `buildJoins(arel) { _qm.buildJoins.call(this, arel); }` in relation.ts is a
+    // Rails-layout wrapper whose real body lives in relation/query-methods.ts. Its
+    // literal call-set (`buildJoins`, `call`) would flag every Ruby call as
+    // phantom-missing, so the wrapper contributes no call-set — the canonical
+    // module-function candidate is the one compare uses instead.
+    const cls = extractFromSource(
+      `import * as _qm from "./query-methods.js";
+       import * as _fm from "./finder-methods.js";
+       class Foo {
+        private buildJoins(arel) { _qm.buildJoins.call(this, arel); }
+        private buildJoinDependencies() { return _qm.buildJoinDependencies.call(this); }
+        applyJoinDependency(eager) { return _fm.applyJoinDependency(this, eager); }
+      }`,
+    );
+    const byName = Object.fromEntries(cls.instanceMethods.map((m) => [m.name, m.calls]));
+    expect(byName["buildJoins"]).toBeUndefined();
+    expect(byName["buildJoinDependencies"]).toBeUndefined();
+    // Direct-call form (no `.call`) is also a self-delegation.
+    expect(byName["applyJoinDependency"]).toBeUndefined();
+  });
+
+  it("suppresses a same-named static namespace-delegation wrapper", () => {
+    // `Base.establishConnection` delegates to `ConnectionHandling.establishConnection`.
+    const cls = extractFromSource(
+      `import * as ConnectionHandling from "./connection-handling.js";
+       class Foo {
+        static establishConnection(config) { return ConnectionHandling.establishConnection(this, config); }
+      }`,
+    );
+    expect(cls.classMethods.find((m) => m.name === "establishConnection")!.calls).toBeUndefined();
+  });
+
+  it("does NOT suppress a namespace delegation to a DIFFERENTLY-named function", () => {
+    // Only a wrapper whose delegate matches its own name is the double-attributed
+    // duplicate; a rename-delegation is a genuine (thin) body worth comparing.
+    const cls = extractFromSource(
+      `import * as _qm from "./query-methods.js";
+       class Foo { buildJoins(arel) { _qm.emitJoinPlan.call(this, arel); } }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
+      "call",
+      "emitJoinPlan",
+    ]);
+  });
+
+  it("does NOT suppress a same-named delegation whose receiver is unbound", () => {
+    // A receiver that resolves to no symbol (only possible for a genuinely unbound
+    // identifier — non-compiling code) fails toward tracking: keep the extracted
+    // call-set rather than risk a false-positive suppression that drops a real body.
+    const cls = extractFromSource(
+      `class Foo { buildJoins(arel) { unbound.buildJoins.call(this, arel); } }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "buildJoins")!.calls).toEqual([
+      "buildJoins",
+      "call",
+    ]);
+  });
+
+  it("does NOT suppress a `this`-delegation with a matching name (delegatedHelper path)", () => {
+    // A same-class `this.helper()` delegation is handled by delegatedHelper, not
+    // suppressed — its helper's call-set is unioned in as usual.
+    const cls = extractFromSource(
+      `class Foo {
+        build() { return this.build_(); }
+        private build_() { return new Pool(); }
+      }`,
+    );
+    expect(cls.instanceMethods.find((m) => m.name === "build")!.calls).toEqual([
+      "build_",
+      "constructor",
+    ]);
+  });
+
+  it("does NOT suppress an in-class instance→static delegation (class receiver)", () => {
+    // `QueryAttribute#withCastValue` delegates to its own static of the same name,
+    // but the body has real reads (`this.name`, `this.type`) that must be kept.
+    // The receiver is a CLASS, not a namespace/module, so it is not a wrapper.
+    const cls = extractFromSource(
+      `class QueryAttribute {
+        static withCastValue(name, value, type) { return new QueryAttribute(name, value, type); }
+        withCastValue(value) { return QueryAttribute.withCastValue(this.name, value, this.type); }
+      }`,
+      "QueryAttribute",
+    );
+    const inst = cls.instanceMethods.find((m) => m.name === "withCastValue")!;
+    expect(inst.calls).toEqual(["name", "type", "withCastValue"]);
+  });
+
   it("captures calls in object-literal mixin methods (include(Host, Mod) pattern)", () => {
     const methods = objectLiteralMethods(
       `export const QueryMethods = {
