@@ -4,8 +4,10 @@
  * Mirrors: ActiveRecord::SpawnMethods
  */
 
+import { Nodes } from "@blazetrails/arel";
+
 import { Merger, HashMerger } from "./merger.js";
-import { argumentError, structuralUnionEq } from "./query-methods.js";
+import { argumentError, constructJoinDependency, structuralUnionEq } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
@@ -119,15 +121,35 @@ export function mergeBang(this: any, other: any): any {
         ...(this._eagerLoadAssociations ?? []),
         ...other._eagerLoadAssociations,
       ];
-    // mergeJoins: fold other.joinsValues in a single ordered pass so the source's
-    // cross-category (named/raw) insertion order survives, matching Rails'
-    // `joins_values |= other.joins_values` union. Raw joins append; same-klass
-    // named specs dedup by `structuralUnionEq`.
+    // mergeJoins — kept identical to Merger#mergeJoins (merger.ts) so merge() and
+    // merge!() stay aligned. Fold other.joinsValues in a single ordered pass so the
+    // source's cross-category (named/raw) insertion order survives, matching Rails'
+    // `joins_values |= other.joins_values` (merger.rb merge_joins). Raw joins union
+    // structurally (Arel node `eql`, else reference); same-klass named specs dedup
+    // by `structuralUnionEq`; cross-klass named (merger.rb:122 `other.model !=
+    // relation.model`) build a single InnerJoin JoinDependency on `other`.
     this._joinClauses.push(...(other._joinClauses ?? []));
+    const sameKlass = other._modelClass === this._modelClass;
+    const crossKlassNamed: unknown[] = [];
     for (const v of other.joinsValues ?? []) {
-      if (!other._isNamedJoinValue(v)) this._joinsValues.push(v);
-      else if (!this._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
-        this._joinsValues.push(v);
+      if (!other._isNamedJoinValue(v)) {
+        const dup = (this._joinValues as unknown[]).some((existing) =>
+          typeof v?.eql === "function" && v?.constructor === (existing as any)?.constructor
+            ? v.eql(existing)
+            : v === existing,
+        );
+        if (!dup) this._joinsValues.push(v);
+      } else if (sameKlass) {
+        if (!this._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
+          this._joinsValues.push(v);
+      } else {
+        crossKlassNamed.push(v);
+      }
+    }
+    if (crossKlassNamed.length > 0) {
+      this._namedInnerJoinDeps.push(
+        constructJoinDependency.call(other, crossKlassNamed as any, Nodes.InnerJoin),
+      );
     }
     for (const v of other._leftOuterJoinsValues ?? []) {
       if (!this._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
