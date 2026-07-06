@@ -30,14 +30,13 @@ import {
   SpecialComment,
   SubSpecialComment,
 } from "../test-helpers/models/comment.js";
-import { Tag, OrderedTag } from "../test-helpers/models/tag.js";
+import { OrderedTag } from "../test-helpers/models/tag.js";
 import { Tagging } from "../test-helpers/models/tagging.js";
 import { Reader, LazyReader } from "../test-helpers/models/reader.js";
 import { Person } from "../test-helpers/models/person.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Owner } from "../test-helpers/models/owner.js";
 import { Category, SpecialCategory } from "../test-helpers/models/category.js";
-import { Categorization } from "../test-helpers/models/categorization.js";
 import {
   Developer,
   EagerDeveloperWithDefaultScope,
@@ -57,7 +56,6 @@ import { ShardedBlog, ShardedBlogPost, ShardedComment } from "../test-helpers/mo
 import { captureSql } from "../testing/sql-capture.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Membership } from "../test-helpers/models/membership.js";
-import { Club } from "../test-helpers/models/club.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
 import { Contract } from "../test-helpers/models/contract.js";
@@ -66,7 +64,6 @@ import { Essay } from "../test-helpers/models/essay.js";
 import { Job } from "../test-helpers/models/job.js";
 import { Matey } from "../test-helpers/models/matey.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
-import { Reference } from "../test-helpers/models/reference.js";
 import { CpkOrder, CpkBook, CpkOrderAgreement } from "../test-helpers/models/cpk.js";
 
 // Mirrors eager_test.rb's `find_all_ordered` helper.
@@ -95,6 +92,14 @@ describe("EagerAssociationTest", () => {
     categories,
     members,
     clubs,
+    comments,
+    developers,
+    projects,
+    authorAddresses,
+    pets,
+    taggings,
+    jobs,
+    references,
   } = fixtures([
     "authors",
     "authorFavorites",
@@ -105,6 +110,8 @@ describe("EagerAssociationTest", () => {
     "people",
     "readers",
     "categories",
+    "categoriesPosts",
+    "categorizations",
     "companies",
     "accounts",
     "developers",
@@ -121,11 +128,17 @@ describe("EagerAssociationTest", () => {
     "subscriptions",
     "books",
     "tags",
+    "jobs",
+    "owners",
+    "pets",
+    "references",
+    "taggings",
   ]);
   beforeAll(async () => {
-    // Matey, Subscriber, Subscription, and Book auto-register on resolution of
-    // their requested fixture sets (#4348); only models without a requested
-    // fixture set need explicit registration here.
+    // Models with a requested fixture set auto-register on its resolution
+    // (#4348), so only models WITHOUT a fixture set need explicit registration
+    // here: the CPK/scope-only models, STI subclasses (Firm/Client on companies,
+    // SpecialPost/StiPost/…), and the default-scope Developer variants.
     registerModel("PostWithDefaultScope", PostWithDefaultScope);
     registerModel(CpkOrder);
     registerModel(CpkBook);
@@ -133,6 +146,21 @@ describe("EagerAssociationTest", () => {
     registerModel(Mentor);
     registerModel(Contract);
     registerModel(AuditLog);
+    registerModel(SpecialPost);
+    registerModel(StiPost);
+    registerModel(SubSpecialComment);
+    registerModel(PostWithDefaultInclude);
+    registerModel(SpecialComment);
+    registerModel(VerySpecialComment);
+    registerModel(LazyReader);
+    registerModel(SpecialCategory);
+    registerModel(Firm);
+    registerModel(Client);
+    registerModel(EagerDeveloperWithDefaultScope);
+    registerModel(EagerDeveloperWithClassMethodDefaultScope);
+    registerModel(EagerDeveloperWithLambdaDefaultScope);
+    registerModel(EagerDeveloperWithBlockDefaultScope);
+    registerModel(EagerDeveloperWithCallableDefaultScope);
   });
   it("should work inverse of with eager load", async () => {
     const author = authors("david");
@@ -1140,117 +1168,6 @@ describe("EagerAssociationTest", () => {
       expect(clubs).toHaveLength(3);
     });
   });
-});
-
-describe("EagerLoadingTooManyIdsTest", () => {
-  // Opt out of transactional fixtures: the 65536-row seed below is committed
-  // once in `beforeAll` (via chunked insertAll) and torn down manually in
-  // `afterAll`, rather than reseeded/rolled back per test.
-  fixtures({}, { useTransactionalTests: false });
-  // Mirrors the citations.yml fixture: 65536 rows (id 0..65535, book2_id i*i).
-  // The point of these tests is that preload/eager_load split an IN clause whose
-  // id list exceeds the adapter's bind-parameter limit, so the row count must be
-  // the real fixture size. The per-row reload in fixtures is too slow
-  // at this scale, so seed via chunked insertAll (no reload) and clean up after.
-  const TOTAL = 65536;
-  beforeAll(async () => {
-    registerModel(Citation);
-    registerModel(Book);
-    const rows: { id: number; book2_id: number }[] = [];
-    for (let i = 0; i < TOTAL; i++) rows.push({ id: i, book2_id: i * i });
-    // 2-column rows → ≤ 65535 placeholders/insert on MySQL/MariaDB at this chunk.
-    for (let i = 0; i < rows.length; i += 10_000) {
-      await Citation.insertAll(rows.slice(i, i + 10_000));
-    }
-  }, 180_000);
-
-  afterAll(async () => {
-    await Base.connection.executeMutation("DELETE FROM citations");
-  }, 60_000);
-
-  // Generous timeout: building the IN-split preload over the full 65536-row set
-  // is slow on the MySQL-family lanes, well past the 5s default. The fixture
-  // size is the point — it must exceed the adapter's bind-parameter limit to
-  // force IN-splitting.
-  it("preloading too many ids", async () => {
-    expect((await Citation.preload("referenceOf")).length).toBe(await Citation.count());
-  }, 120_000);
-
-  // `eager_load(:citations)` is a 65536-row self-LEFT-JOIN on `citation_id`.
-  // Rails' `t.references :citation` indexes that column, so the join is an
-  // indexed lookup rather than the O(n²) nested-loop scan it degrades to on the
-  // MySQL-family lanes without the index (that scan was >360s and poisoned the
-  // shared connection). With the canonical `citations` schema now carrying the
-  // Rails-faithful `index_citations_on_citation_id`, the join runs within budget.
-  it("eager loading too many ids", async () => {
-    expect(await Citation.all().eagerLoad("citations").offset(0).size()).toBe(
-      await Citation.count(),
-    );
-  }, 120_000);
-});
-
-// ==========================================================================
-// EagerAssociationTest (sharded composite-query_constraints fixtures) — preloading
-// `Sharded::BlogPost#comments` (a has_many keyed by [blog_id, blog_post_id]) must
-// emit a composite IN clause: `blog_id IN (...) AND blog_post_id IN (...)`. Same
-// describe name so test:compare matches the Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
-  registerModel("ShardedBlog", ShardedBlog);
-  registerModel("ShardedBlogPost", ShardedBlogPost);
-  registerModel("ShardedComment", ShardedComment);
-
-  it("preloading belongs_to association SQL", async () => {
-    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
-    const posts = ShardedBlogPost.where({ blog_id: blogIds }).includes("comments");
-
-    const sqls = await captureSql(async () => {
-      const loaded = (await posts.toArray()) as Base[];
-      // Exercise the public reader (Rails: `posts.map(&:comments)`); the size
-      // is the post count (3), populated from the preload, not a fresh query.
-      const commentsCollection = await Promise.all(
-        loaded.map((p) => (p as any).comments.toArray() as Promise<Base[]>),
-      );
-      expect(commentsCollection.length).toBe(3);
-      expect(commentsCollection.flat()).toHaveLength(4);
-    });
-    const sql = sqls[sqls.length - 1];
-
-    // Rails (eager_test.rb:1698-1700) builds the pattern from `quote_table_name`,
-    // which is adapter-specific (double-quotes on sqlite/pg, backticks on mysql),
-    // so derive the quoting from the live adapter rather than hardcoding it.
-    const conn = Base.connection;
-    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-    const quotedBlogId = escape(conn.quoteTableName("sharded_comments.blog_id"));
-    const quotedBlogPostId = escape(conn.quoteTableName("sharded_comments.blog_post_id"));
-    expect(sql).toMatch(
-      new RegExp(`WHERE ${quotedBlogId} IN \\(.+\\) AND ${quotedBlogPostId} IN \\(.+\\)`),
-    );
-  });
-});
-
-// ==========================================================================
-// EagerAssociationTest (HABTM, canonical fixtures) — `Post has_and_belongs_to_many
-// :categories` / `Category has_and_belongs_to_many :posts` use the canonical
-// Post/Category/Categorization models + real categories/posts/categories_posts/
-// categorizations fixtures, so they need the fixture-backed handler suite. The
-// main block above declares ad-hoc per-test models against a local schema.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { posts, categories } = fixtures([
-    "categories",
-    "posts",
-    "categoriesPosts",
-    "categorizations",
-  ]);
-  // The canonical HABTM tables (categories/posts/categories_posts/
-  // categorizations) ride the boot-laid canonical schema; any sibling-file shape
-  // drift on the shared per-worker DB is restored per-file by repairWorkerSchema
-  // (test-setup-dy.ts), so no per-block recreation is needed.
-  registerModel(Post);
-  registerModel(Category);
-  registerModel(Categorization);
 
   it("has and belongs to many should not instantiate same records multiple times", async () => {
     // Rails (eager_test.rb): eager-loading `welcome` through two different HABTM
@@ -1296,25 +1213,6 @@ describe("EagerAssociationTest", () => {
       expect(await categorizationCount(categoryOf(loaded[1], categories("general").id))).toBe(2);
     });
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (HABTM, canonical Developer fixtures) — the
-// `conditions on join table` test eager-loads `Developer has_and_belongs_to_many
-// :projects` and filters on a column of the `developers_projects` join table.
-// It needs the canonical Developer/Project models + real developers/projects/
-// developers_projects fixtures, so it lives in its own fixture-backed handler
-// suite (the main block above declares ad-hoc per-test models). Same describe
-// name as the other EagerAssociationTest blocks so test:compare matches it to
-// the Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  fixtures(["developers", "projects", "developersProjects"]);
-  // The canonical developers/projects/developers_projects tables ride the
-  // boot-laid canonical schema; per-file repairWorkerSchema (test-setup-dy.ts)
-  // restores any sibling-file shape drift on the shared per-worker DB.
-  registerModel(Developer);
-  registerModel(Project);
 
   it("conditions on join table with include and limit", async () => {
     // Rails (eager_test.rb): three developers (david, jamis, poor_jamis) have a
@@ -1396,23 +1294,6 @@ describe("EagerAssociationTest", () => {
       .limit(5);
     expect(developers).toHaveLength(5);
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical developers/projects fixtures) — ports of the
-// eager_test.rb `default_scope { includes(:projects) }` cluster. Each
-// EagerDeveloperWith*DefaultScope model uses `developers` with a HABTM
-// `projects` association eager-loaded by its default scope, so accessing
-// `developer.projects` after the initial load issues no further queries.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { developers } = fixtures(["developers", "projects", "developersProjects"]);
-  registerModel(Project);
-  registerModel(EagerDeveloperWithDefaultScope);
-  registerModel(EagerDeveloperWithClassMethodDefaultScope);
-  registerModel(EagerDeveloperWithLambdaDefaultScope);
-  registerModel(EagerDeveloperWithBlockDefaultScope);
-  registerModel(EagerDeveloperWithCallableDefaultScope);
 
   async function projectIds(): Promise<unknown[]> {
     return (await Project.order("id")).map((p) => p.id);
@@ -1485,38 +1366,6 @@ describe("EagerAssociationTest", () => {
       expect(loaded.map((p) => p.id)).toEqual(projects);
     });
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Post/Author/Comment + join-table fixtures) —
-// ports of eager_test.rb cases that combine eager-loading with conditions /
-// order / select / limit on a *joined* table (joins + includes), conditions on
-// join models, default-scope association conditions, and the joins+includes
-// collapse-to-one-query path. Needs the taggings/tags/author_addresses/readers/
-// people fixtures in addition to the Post/Author/Comment set. Same describe name
-// as the other EagerAssociationTest blocks so test:compare matches the Rails
-// `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { authors, posts, people, authorAddresses } = fixtures([
-    "authors",
-    "posts",
-    "comments",
-    "taggings",
-    "tags",
-    "authorAddresses",
-    "readers",
-    "people",
-  ]);
-  registerModel(Post);
-  registerModel(Author);
-  registerModel(AuthorAddress);
-  registerModel(Comment);
-  registerModel(Tag);
-  registerModel(Tagging);
-  registerModel(Reader);
-  registerModel(LazyReader);
-  registerModel(Person);
 
   it("eager loading with order on joined table preloads", async () => {
     let loaded: Post[] = [];
@@ -1752,35 +1601,6 @@ describe("EagerAssociationTest", () => {
     const author = aa.association("author").target as Author;
     expect(await (author as any).posts.count()).toBe((author as any).posts.target.length);
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Post/Author/Comment/Category fixtures) — ports
-// of eager_test.rb cases that exercise plain preloading/eager-loading over the
-// real Post/Author/Comment/Category models + their fixtures. Same describe name
-// as the other EagerAssociationTest blocks so test:compare matches the Rails
-// `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { authors, posts, comments, categories, people } = fixtures([
-    "authors",
-    "posts",
-    "comments",
-    "categories",
-    "categoriesPosts",
-    "people",
-    "readers",
-  ]);
-  registerModel(Post);
-  registerModel(SpecialPost);
-  registerModel(Author);
-  registerModel(Comment);
-  registerModel(VerySpecialComment);
-  registerModel(Category);
-  registerModel(SpecialCategory);
-  registerModel(Categorization);
-  registerModel(Person);
-  registerModel(Reader);
 
   it("loading with multiple associations", async () => {
     const loaded = await Post.all().includes("comments", "author", "categories").order("posts.id");
@@ -2272,18 +2092,6 @@ describe("EagerAssociationTest", () => {
       expect(await (one as any).categories.length()).toBe(2);
     });
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Pet/Owner fixtures) — ports the belongs_to +
-// foreign-key eager-loading case over the real Pet/Owner models. Same describe
-// name as the other EagerAssociationTest blocks so test:compare matches the
-// Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { pets } = fixtures(["owners", "pets"]);
-  registerModel(Pet);
-  registerModel(Owner);
 
   it("eager association loading with belongs to and foreign keys", async () => {
     const pets = await Pet.all().includes("owner");
@@ -2295,19 +2103,6 @@ describe("EagerAssociationTest", () => {
     const lastPet = owner.association("lastPet").target as Pet;
     expect(lastPet.id).toBe(pets("parrot").id);
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical AuthorFavorite/Author fixtures) — ports the
-// belongs_to inferred-foreign-key eager-loading case over the real
-// AuthorFavorite/Author models. Same describe name as the other
-// EagerAssociationTest blocks so test:compare matches the Rails
-// `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { authors } = fixtures(["authors", "authorFavorites"]);
-  registerModel(Author);
-  registerModel(AuthorFavorite);
 
   it("eager association loading with belongs to inferred foreign key from association name", async () => {
     const authorFavorite = (await AuthorFavorite.all()
@@ -2319,20 +2114,6 @@ describe("EagerAssociationTest", () => {
       );
     });
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Firm/Client fixtures) — ports the
-// attribute-alias + self-join where-hash case over the real Firm/Client models
-// (both on the `companies` table). Same describe name as the other
-// EagerAssociationTest blocks so test:compare matches the Rails
-// `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { companies } = fixtures(["companies"]);
-  registerModel(Company);
-  registerModel(Firm);
-  registerModel(Client);
 
   it("test_attribute_alias_in_where_references_association_name", async () => {
     const firm = (await Firm.includes("clients")
@@ -2342,21 +2123,6 @@ describe("EagerAssociationTest", () => {
     const clients = (await (firm as any).clients.toArray()) as Base[];
     expect(clients.map((c) => Number(c.id))).toEqual([Number(companies("first_client").id)]);
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (companies + accounts fixtures) — `has_one
-// :account_using_primary_key` keys Account.firm_id off Firm.firm_id (the
-// association's `primary_key: "firm_id"`), so eager/preloading it returns the
-// signals37 account for first_firm (firm_id 1). Same describe name so
-// test:compare matches the Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { accounts } = fixtures(["companies", "accounts"]);
-  registerModel(Company);
-  registerModel(Firm);
-  registerModel(Client);
-  registerModel(Account);
 
   it("preload has one using primary key", async () => {
     const expected = accounts("signals37");
@@ -2379,17 +2145,6 @@ describe("EagerAssociationTest", () => {
       expect(account.id).toBe(expected.id);
     });
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Sponsor/Member polymorphic fixtures) — ports
-// the custom `foreign_type` preload case (Sponsor#thing reuses the
-// sponsorable_* columns via `foreign_type:`/`foreign_key:`).
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { sponsors, members } = fixtures(["members", "sponsors"]);
-  registerModel(Sponsor);
-  registerModel(Member);
 
   it("preloading polymorphic with custom foreign type", async () => {
     const grouchoId = members("groucho").id;
@@ -2403,17 +2158,6 @@ describe("EagerAssociationTest", () => {
       expect(thing.id).toBe(grouchoId);
     });
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Author/Essay polymorphic fixtures) — ports the
-// existential-predicate preload cases over Essay#writer (polymorphic belongs_to,
-// primary_key: name).
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { authors } = fixtures(["authors", "essays"]);
-  registerModel(Author);
-  registerModel(Essay);
 
   it("preloading with a polymorphic association and using the existential predicate but also using a select", async () => {
     const david = await Author.find(authors("david").id);
@@ -2434,19 +2178,6 @@ describe("EagerAssociationTest", () => {
     await (david as any).essays.includes("writer").exists();
     await (david as any).essays.includes("owner").where("name IS NOT NULL").exists();
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Post/Tag/Tagging fixtures) — ports the
-// polymorphic has_many :through (`tags` through polymorphic `taggings`) cases
-// that reference the joined `tags` table via `references`/`eager_load`.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { posts, taggings } = fixtures(["posts", "tags", "taggings"]);
-  registerModel(Post);
-  registerModel(SpecialPost);
-  registerModel(Tag);
-  registerModel(Tagging);
 
   it("polymorphic type condition", async () => {
     let post = await Post.all().includes("taggings").find(posts("thinking").id);
@@ -2471,19 +2202,6 @@ describe("EagerAssociationTest", () => {
     const post = (await Post.eagerLoad("tags").where("tags.name = ?", "General").first()) as Post;
     expect(post.id).toBe(posts("welcome").id);
   });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical Job/Person/Reference fixtures) — ports the
-// eager_test.rb cases that exercise eager loading over quoted table and column
-// names. Same describe name as the other EagerAssociationTest blocks so
-// test:compare matches the Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { jobs, references, people } = fixtures(["jobs", "references", "people"]);
-  registerModel(Job);
-  registerModel(Reference);
-  registerModel(Person);
 
   it("eager load belongs to quotes table and column names", async () => {
     const job = await Job.includes("idealReference").find(jobs("unicyclist").id);
@@ -2525,142 +2243,11 @@ describe("EagerAssociationTest", () => {
       expect(sorted.map((j) => j.id)).toEqual([jobs("unicyclist").id, jobs("magician").id]);
     });
   });
-});
 
-// ==========================================================================
-// EagerAssociationTest — composite query_constraints / CPK preloading.
-// Canonical Sharded::* and Cpk::* models + fixtures; mirrors eager_test.rb's
-// composite-key preloading cases.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { shardedBlogs, shardedBlogPosts, shardedComments } = fixtures([
-    "shardedBlogs",
-    "shardedBlogPosts",
-    "shardedComments",
-    "shardedTags",
-    "shardedBlogPostsTags",
-  ]);
-
-  // fixtures loads the rows but does not register the models under the
-  // class names the associations resolve by; register them here (dynamic import
-  // keeps these out of the file's top-level scope).
-  beforeAll(async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
-    registerModel("ShardedBlog", sharded.ShardedBlog);
-    registerModel("ShardedBlogPost", sharded.ShardedBlogPost);
-    registerModel("ShardedComment", sharded.ShardedComment);
-    registerModel("ShardedTag", sharded.ShardedTag);
-    registerModel("ShardedBlogPostTag", sharded.ShardedBlogPostTag);
-    const cpk = await import("../test-helpers/models/cpk.js");
-    registerModel("CpkPost", cpk.CpkPost);
-    registerModel("CpkComment", cpk.CpkComment);
-  });
-
-  it("preloading belongs_to association associated by a composite query_constraints", async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
-    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
-    const posts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds }).includes(
-      "comments",
-    )) as any[];
-    expect(posts.every((post) => post.association("comments").isLoaded())).toBe(true);
-
-    const greatPostId = shardedBlogPosts("great_post_blog_one").id;
-    const post = posts.find((p) => p.id === greatPostId);
-    const expectedComments = (await sharded.ShardedComment.where({
-      blog_id: post.blog_id,
-      blog_post_id: post.id,
-    })) as any[];
-    const loaded = post.association("comments").target as any[];
-    expect(loaded.map((c) => c.id).sort()).toEqual(expectedComments.map((c) => c.id).sort());
-  });
-
-  it("preloading has_many association associated by a composite query_constraints", async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
-    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
-    const comments = (await sharded.ShardedComment.where({ blog_id: blogIds }).includes(
-      "blogPost",
-    )) as any[];
-    expect(comments.every((comment) => comment.association("blogPost").isLoaded())).toBe(true);
-
-    const greatCommentId = shardedComments("great_comment_blog_post_one").id;
-    const comment = comments.find((c) => c.id === greatCommentId);
-    const blogPost = comment.association("blogPost").target;
-    expect(blogPost.id).toBe(shardedBlogPosts("great_post_blog_one").id);
-  });
-
-  it("preloading has_many through association associated by a composite query_constraints", async () => {
-    const sharded = await import("../test-helpers/models/sharded.js");
-    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
-    const blogPosts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds }).includes(
-      "tags",
-    )) as any[];
-    expect(blogPosts.every((post) => post.association("tags").isLoaded())).toBe(true);
-
-    const expectedPost = shardedBlogPosts("great_post_blog_one");
-    const expectedTags = (await sharded.ShardedBlogPostTag.where({
-      blog_id: expectedPost.blog_id,
-      blog_post_id: expectedPost.id,
-    })) as any[];
-    const expectedTagIds = expectedTags.map((t) => t.tag_id);
-    expect(expectedTagIds.length).toBeGreaterThan(0);
-
-    const blogPost = blogPosts.find((p) => p.id === expectedPost.id);
-    const loadedTags = blogPost.association("tags").target as any[];
-    expect(loadedTags.map((t) => Number(t.id)).sort((a, b) => a - b)).toEqual(
-      expectedTagIds.map(Number).sort((a, b) => a - b),
-    );
-  });
-
-  it("preloading belongs_to CPK model with one of the keys being shared between models", async () => {
-    const cpk = await import("../test-helpers/models/cpk.js");
-    const post1 = (await cpk.CpkPost.create({
-      title: "post1",
-      author: "the_same_author",
-    })) as any;
-    await cpk.CpkComment.create({
-      commentable_title: post1.title,
-      commentable_author: post1.author,
-      text: "great post1!",
-    });
-
-    const post2 = (await cpk.CpkPost.create({
-      title: "post2",
-      author: "the_same_author",
-    })) as any;
-    await cpk.CpkComment.create({
-      commentable_title: post2.title,
-      commentable_author: post2.author,
-      text: "great post2!",
-    });
-
-    const comments = (await cpk.CpkComment.all().eagerLoad("post")) as any[];
-    const actual: Record<string, string> = {};
-    for (const comment of comments) {
-      actual[comment.text] = comment.association("post").target.title;
-    }
-    expect(actual).toEqual({ "great post1!": "post1", "great post2!": "post2" });
-  });
-});
-
-// ==========================================================================
-// EagerAssociationTest (canonical STI Post/Comment fixtures) — ports the
-// preload/eager-load-through-STI-join-model cases over the real Author / Post /
-// StiPost / SpecialPost / Comment / SpecialComment models. Same describe name as
-// the other EagerAssociationTest blocks so test:compare matches the Rails
-// `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { authors } = fixtures(["authors", "posts", "comments"]);
   enableSti(Post);
   enableSti(Comment);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(SpecialPost);
   registerSubclass(SpecialPost);
-  registerModel(StiPost);
   registerSubclass(StiPost);
-  registerModel(Comment);
-  registerModel(SpecialComment);
   registerSubclass(SpecialComment);
 
   it("preloading with has one through an sti with after initialize", async () => {
@@ -2705,29 +2292,12 @@ describe("EagerAssociationTest", () => {
       .first()) as Author;
     expect(author.association("specialNonexistentPostComments").target).toEqual([]);
   });
-});
 
-// ==========================================================================
-// EagerAssociationTest (canonical STI Post/Comment fixtures) — ports the
-// inheritance / association-inheritance cases over the real STI
-// Post/SpecialPost and Comment/SpecialComment/VerySpecialComment models +
-// their fixtures. Same describe name as the other EagerAssociationTest blocks
-// so test:compare matches the Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { posts } = fixtures(["authors", "posts", "comments"]);
-  registerModel(Author);
   enableSti(Post);
-  registerModel(Post);
-  registerModel(SpecialPost);
   registerSubclass(SpecialPost);
   enableSti(Comment);
-  registerModel(Comment);
-  registerModel(SpecialComment);
   registerSubclass(SpecialComment);
-  registerModel(SubSpecialComment);
   registerSubclass(SubSpecialComment);
-  registerModel(VerySpecialComment);
   registerSubclass(VerySpecialComment);
 
   it("eager with inheritance", async () => {
@@ -2748,40 +2318,10 @@ describe("EagerAssociationTest", () => {
       expect(specialComment).toBeInstanceOf(SpecialComment);
     }
   });
-});
 
-// ==========================================================================
-// EagerAssociationTest (canonical Author/Post/Comment/Tag has_many-through
-// fixtures) — ports the `eager with has many through *` cluster over the real
-// Author / Post (+ STI SpecialPost/StiPost) / Comment / Person / Tag models and
-// their fixtures. Same describe name as the other EagerAssociationTest blocks so
-// test:compare matches the Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { authors, comments, people, posts } = fixtures([
-    "authors",
-    "posts",
-    "comments",
-    "people",
-    "readers",
-    "authorFavorites",
-    "taggings",
-    "tags",
-  ]);
   enableSti(Post);
-  registerModel(Author);
-  registerModel(Post);
-  registerModel(SpecialPost);
   registerSubclass(SpecialPost);
-  registerModel(StiPost);
   registerSubclass(StiPost);
-  registerModel(PostWithDefaultInclude);
-  registerModel(Comment);
-  registerModel(Person);
-  registerModel(Reader);
-  registerModel(Tag);
-  registerModel(Tagging);
-  registerModel(AuthorFavorite);
 
   it("eager with has many through", async () => {
     const michael = people("michael") as any;
@@ -2889,44 +2429,17 @@ describe("EagerAssociationTest", () => {
     }
     expect(error).toBeUndefined();
   });
-});
 
-// ==========================================================================
-// EagerAssociationTest (canonical Member/Membership/Club fixtures) — ports the
-// has_one-through-join-model-with-conditions-on-the-through case over the real
-// Member / Membership / Club models. Same describe name as the other
-// EagerAssociationTest blocks so test:compare matches the Rails
-// `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { members } = fixtures(["members", "memberships", "clubs"]);
-  registerModel(Member);
   enableSti(Membership);
-  registerModel(Membership);
-  registerModel(Club);
 
   it("eager with has one through join model with conditions on the through", async () => {
     const member = await Member.all().includes("favoriteClub").find(members("some_other_guy").id);
     expect(member.association("favoriteClub").target ?? null).toBeNull();
   });
-});
 
-// ==========================================================================
-// EagerAssociationTest (canonical Firm/Account fixtures) — ports the
-// has_one-dependent-does-not-destroy-dependent case over the real STI
-// Company/Firm + Account models. Same describe name as the other
-// EagerAssociationTest blocks so test:compare matches the Rails
-// `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { companies } = fixtures(["companies", "accounts"]);
-  registerModel(Company);
   enableSti(Company);
-  registerModel(Firm);
   registerSubclass(Firm);
-  registerModel(Client);
   registerSubclass(Client);
-  registerModel(Account);
 
   it("eager with has one dependent does not destroy dependent", async () => {
     const firstFirm = companies("first_firm") as Firm;
@@ -2943,43 +2456,9 @@ describe("EagerAssociationTest", () => {
       (await reloaded.loadHasOne("account"))!.id,
     );
   });
-});
 
-// ==========================================================================
-// EagerAssociationTest (canonical Author/Post/Comment/Category + Project/Member
-// fixtures) — ports of eager_test.rb's preloading has_many-through,
-// instance-dependent, and scoping cases onto the real registry models. Same
-// describe name as the other EagerAssociationTest blocks so test:compare matches
-// the Rails `EagerAssociationTest` class.
-// ==========================================================================
-describe("EagerAssociationTest", () => {
-  const { authors, posts, developers, projects } = fixtures([
-    "authors",
-    "posts",
-    "comments",
-    "categories",
-    "categoriesPosts",
-    "categorizations",
-    "developers",
-    "projects",
-    "developersProjects",
-    "members",
-    "memberships",
-    "clubs",
-  ]);
-  registerModel(Post);
-  registerModel(Author);
   enableSti(Comment);
-  registerModel(Comment);
-  registerModel(VerySpecialComment);
-  registerModel(Category);
-  registerModel(Categorization);
-  registerModel(Developer);
-  registerModel(Project);
-  registerModel(Member);
   enableSti(Membership);
-  registerModel(Membership);
-  registerModel(Club);
 
   it("preloading has many through with implicit source", async () => {
     const authorList = (await Author.includes("verySpecialComments")).sort(
@@ -3122,6 +2601,194 @@ describe("EagerAssociationTest", () => {
   });
 });
 
-// ==========================================================================
-// HasManyThroughAssociationsTest — targets associations/has_many_through_associations_test.rb
-// ==========================================================================
+describe("EagerLoadingTooManyIdsTest", () => {
+  // Opt out of transactional fixtures: the 65536-row seed below is committed
+  // once in `beforeAll` (via chunked insertAll) and torn down manually in
+  // `afterAll`, rather than reseeded/rolled back per test.
+  fixtures({}, { useTransactionalTests: false });
+  // Mirrors the citations.yml fixture: 65536 rows (id 0..65535, book2_id i*i).
+  // The point of these tests is that preload/eager_load split an IN clause whose
+  // id list exceeds the adapter's bind-parameter limit, so the row count must be
+  // the real fixture size. The per-row reload in fixtures is too slow
+  // at this scale, so seed via chunked insertAll (no reload) and clean up after.
+  const TOTAL = 65536;
+  beforeAll(async () => {
+    registerModel(Citation);
+    registerModel(Book);
+    const rows: { id: number; book2_id: number }[] = [];
+    for (let i = 0; i < TOTAL; i++) rows.push({ id: i, book2_id: i * i });
+    // 2-column rows → ≤ 65535 placeholders/insert on MySQL/MariaDB at this chunk.
+    for (let i = 0; i < rows.length; i += 10_000) {
+      await Citation.insertAll(rows.slice(i, i + 10_000));
+    }
+  }, 180_000);
+
+  afterAll(async () => {
+    await Base.connection.executeMutation("DELETE FROM citations");
+  }, 60_000);
+
+  // Generous timeout: building the IN-split preload over the full 65536-row set
+  // is slow on the MySQL-family lanes, well past the 5s default. The fixture
+  // size is the point — it must exceed the adapter's bind-parameter limit to
+  // force IN-splitting.
+  it("preloading too many ids", async () => {
+    expect((await Citation.preload("referenceOf")).length).toBe(await Citation.count());
+  }, 120_000);
+
+  // `eager_load(:citations)` is a 65536-row self-LEFT-JOIN on `citation_id`.
+  // Rails' `t.references :citation` indexes that column, so the join is an
+  // indexed lookup rather than the O(n²) nested-loop scan it degrades to on the
+  // MySQL-family lanes without the index (that scan was >360s and poisoned the
+  // shared connection). With the canonical `citations` schema now carrying the
+  // Rails-faithful `index_citations_on_citation_id`, the join runs within budget.
+  it("eager loading too many ids", async () => {
+    expect(await Citation.all().eagerLoad("citations").offset(0).size()).toBe(
+      await Citation.count(),
+    );
+  }, 120_000);
+});
+
+describe("EagerAssociationTest", () => {
+  const { shardedBlogs } = fixtures(["shardedBlogs", "shardedBlogPosts", "shardedComments"]);
+  registerModel("ShardedBlog", ShardedBlog);
+  registerModel("ShardedBlogPost", ShardedBlogPost);
+  registerModel("ShardedComment", ShardedComment);
+
+  it("preloading belongs_to association SQL", async () => {
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const posts = ShardedBlogPost.where({ blog_id: blogIds }).includes("comments");
+
+    const sqls = await captureSql(async () => {
+      const loaded = (await posts.toArray()) as Base[];
+      // Exercise the public reader (Rails: `posts.map(&:comments)`); the size
+      // is the post count (3), populated from the preload, not a fresh query.
+      const commentsCollection = await Promise.all(
+        loaded.map((p) => (p as any).comments.toArray() as Promise<Base[]>),
+      );
+      expect(commentsCollection.length).toBe(3);
+      expect(commentsCollection.flat()).toHaveLength(4);
+    });
+    const sql = sqls[sqls.length - 1];
+
+    // Rails (eager_test.rb:1698-1700) builds the pattern from `quote_table_name`,
+    // which is adapter-specific (double-quotes on sqlite/pg, backticks on mysql),
+    // so derive the quoting from the live adapter rather than hardcoding it.
+    const conn = Base.connection;
+    const escape = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+    const quotedBlogId = escape(conn.quoteTableName("sharded_comments.blog_id"));
+    const quotedBlogPostId = escape(conn.quoteTableName("sharded_comments.blog_post_id"));
+    expect(sql).toMatch(
+      new RegExp(`WHERE ${quotedBlogId} IN \\(.+\\) AND ${quotedBlogPostId} IN \\(.+\\)`),
+    );
+  });
+});
+
+describe("EagerAssociationTest", () => {
+  const { shardedBlogs, shardedBlogPosts, shardedComments } = fixtures([
+    "shardedBlogs",
+    "shardedBlogPosts",
+    "shardedComments",
+    "shardedTags",
+    "shardedBlogPostsTags",
+  ]);
+
+  // fixtures loads the rows but does not register the models under the
+  // class names the associations resolve by; register them here (dynamic import
+  // keeps these out of the file's top-level scope).
+  beforeAll(async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    registerModel("ShardedBlog", sharded.ShardedBlog);
+    registerModel("ShardedBlogPost", sharded.ShardedBlogPost);
+    registerModel("ShardedComment", sharded.ShardedComment);
+    registerModel("ShardedTag", sharded.ShardedTag);
+    registerModel("ShardedBlogPostTag", sharded.ShardedBlogPostTag);
+    const cpk = await import("../test-helpers/models/cpk.js");
+    registerModel("CpkPost", cpk.CpkPost);
+    registerModel("CpkComment", cpk.CpkComment);
+  });
+
+  it("preloading belongs_to association associated by a composite query_constraints", async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const posts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds }).includes(
+      "comments",
+    )) as any[];
+    expect(posts.every((post) => post.association("comments").isLoaded())).toBe(true);
+
+    const greatPostId = shardedBlogPosts("great_post_blog_one").id;
+    const post = posts.find((p) => p.id === greatPostId);
+    const expectedComments = (await sharded.ShardedComment.where({
+      blog_id: post.blog_id,
+      blog_post_id: post.id,
+    })) as any[];
+    const loaded = post.association("comments").target as any[];
+    expect(loaded.map((c) => c.id).sort()).toEqual(expectedComments.map((c) => c.id).sort());
+  });
+
+  it("preloading has_many association associated by a composite query_constraints", async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const comments = (await sharded.ShardedComment.where({ blog_id: blogIds }).includes(
+      "blogPost",
+    )) as any[];
+    expect(comments.every((comment) => comment.association("blogPost").isLoaded())).toBe(true);
+
+    const greatCommentId = shardedComments("great_comment_blog_post_one").id;
+    const comment = comments.find((c) => c.id === greatCommentId);
+    const blogPost = comment.association("blogPost").target;
+    expect(blogPost.id).toBe(shardedBlogPosts("great_post_blog_one").id);
+  });
+
+  it("preloading has_many through association associated by a composite query_constraints", async () => {
+    const sharded = await import("../test-helpers/models/sharded.js");
+    const blogIds = [shardedBlogs("sharded_blog_one").id, shardedBlogs("sharded_blog_two").id];
+    const blogPosts = (await sharded.ShardedBlogPost.where({ blog_id: blogIds }).includes(
+      "tags",
+    )) as any[];
+    expect(blogPosts.every((post) => post.association("tags").isLoaded())).toBe(true);
+
+    const expectedPost = shardedBlogPosts("great_post_blog_one");
+    const expectedTags = (await sharded.ShardedBlogPostTag.where({
+      blog_id: expectedPost.blog_id,
+      blog_post_id: expectedPost.id,
+    })) as any[];
+    const expectedTagIds = expectedTags.map((t) => t.tag_id);
+    expect(expectedTagIds.length).toBeGreaterThan(0);
+
+    const blogPost = blogPosts.find((p) => p.id === expectedPost.id);
+    const loadedTags = blogPost.association("tags").target as any[];
+    expect(loadedTags.map((t) => Number(t.id)).sort((a, b) => a - b)).toEqual(
+      expectedTagIds.map(Number).sort((a, b) => a - b),
+    );
+  });
+
+  it("preloading belongs_to CPK model with one of the keys being shared between models", async () => {
+    const cpk = await import("../test-helpers/models/cpk.js");
+    const post1 = (await cpk.CpkPost.create({
+      title: "post1",
+      author: "the_same_author",
+    })) as any;
+    await cpk.CpkComment.create({
+      commentable_title: post1.title,
+      commentable_author: post1.author,
+      text: "great post1!",
+    });
+
+    const post2 = (await cpk.CpkPost.create({
+      title: "post2",
+      author: "the_same_author",
+    })) as any;
+    await cpk.CpkComment.create({
+      commentable_title: post2.title,
+      commentable_author: post2.author,
+      text: "great post2!",
+    });
+
+    const comments = (await cpk.CpkComment.all().eagerLoad("post")) as any[];
+    const actual: Record<string, string> = {};
+    for (const comment of comments) {
+      actual[comment.text] = comment.association("post").target.title;
+    }
+    expect(actual).toEqual({ "great post1!": "post1", "great post2!": "post2" });
+  });
+});
