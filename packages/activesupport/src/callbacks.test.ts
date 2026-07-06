@@ -1429,9 +1429,10 @@ describe("NotPermittedStringCallbackTest", () => {
   it("passing string callback is not permitted", () => {
     const target = {};
     defineCallbacks(target, "save");
-    // In our TS implementation, non-function callbacks throw at runtime
-    setCallback(target, "save", "before", "not-a-function" as any);
-    expect(() => runCallbacks(target, "save", () => {})).toThrow();
+    // Rails raises ArgumentError eagerly at registration (`before_save "tweedle"`),
+    // because Callback#initialize builds `compiled`. A String filter is rejected
+    // there, not lazily on the first runCallbacks.
+    expect(() => setCallback(target, "save", "before", "not-a-function" as any)).toThrow();
   });
 });
 

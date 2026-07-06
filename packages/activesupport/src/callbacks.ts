@@ -596,6 +596,10 @@ export class Callback {
     this.options = options;
     this.chainConfig = chainConfig;
     this.originalObject = originalObject;
+    // Rails' Callback#initialize eagerly builds `compiled` (callbacks.rb), so a
+    // String filter raises ArgumentError at set_callback time, not lazily on the
+    // first run_callbacks. Match that eager timing.
+    void this.compiled;
   }
 
   matches(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): boolean {
