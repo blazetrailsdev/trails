@@ -204,7 +204,12 @@ describe("NestedThroughAssociationsTest", () => {
   // Direct load of nestedSponsors generates "no such column: sponsors.sponsor_club_id";
   // the polymorphic FK resolution for Club.sponsors (as: "sponsorable") is wrong in the nested-through
   // direct-query builder. Preload and joins paths work correctly.
-  it.todo("has many through has one through with has one source reflection");
+  it("has many through has one through with has one source reflection", async () => {
+    const mustache = sponsors("moustache_club_sponsor_for_groucho");
+    const groucho = members("groucho");
+    const result = await groucho.nestedSponsors.toArray();
+    expect(result.map((s) => s.id)).toEqual([mustache.id]);
+  });
 
   it("has many through has one through with has one source reflection preload", async () => {
     const mustache = sponsors("moustache_club_sponsor_for_groucho");
