@@ -119,16 +119,19 @@ export function mergeBang(this: any, other: any): any {
         ...(this._eagerLoadAssociations ?? []),
         ...other._eagerLoadAssociations,
       ];
-    // mergeJoins (preserve original order across all join stores)
+    // mergeJoins: fold other.joinsValues in a single ordered pass so the source's
+    // cross-category (named/raw) insertion order survives, matching Rails'
+    // `joins_values |= other.joins_values` union. Raw joins append; same-klass
+    // named specs dedup by `structuralUnionEq`.
     this._joinClauses.push(...(other._joinClauses ?? []));
-    this._joinsValues.push(...(other._joinValues ?? []));
+    for (const v of other.joinsValues ?? []) {
+      if (!other._isNamedJoinValue(v)) this._joinsValues.push(v);
+      else if (!this._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
+        this._joinsValues.push(v);
+    }
     for (const v of other._leftOuterJoinsValues ?? []) {
       if (!this._leftOuterJoinsValues.some((seen: unknown) => structuralUnionEq(seen, v)))
         this._leftOuterJoinsValues.push(v);
-    }
-    for (const v of other._namedInnerJoins ?? []) {
-      if (!this._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
-        this._joinsValues.push(v);
     }
     this._namedInnerJoinDeps.push(...(other._namedInnerJoinDeps ?? []));
     this._leftOuterJoinDeps.push(...(other._leftOuterJoinDeps ?? []));

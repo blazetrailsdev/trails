@@ -113,35 +113,42 @@ export class Merger {
     // same join node) would otherwise duplicate the join and make its columns
     // ambiguous. Dedup structurally via the Arel node's `eql` (falling back to
     // reference/`===` for strings and nodes without it).
+    // Rails `relation.joins_values |= other.joins_values` (merger.rb) is a single
+    // ordered array union preserving `other`'s exact insertion order across the
+    // named/raw boundary, so a source whose joins interleave (e.g.
+    // `joins(:a, "RAW", :b)`) folds in as `[a, RAW, b]`, not `[RAW, a, b]`. We
+    // walk `other.joinsValues` once, unioning each entry per its category:
+    //   - raw joins union structurally (Arel node `eql`, else reference);
+    //   - same-klass named specs dedup by `structuralUnionEq`.
+    // Cross-klass named (Hash | Symbol/String | Array — every shape Rails treats
+    // as an association) can't resolve on the receiver, so they're collected and
+    // built into a single InnerJoin JoinDependency on `other` (whose AliasTracker
+    // handles nested-through / HABTM) rather than folded into _joinsValues; this
+    // mirrors Rails' `else` branch where `others` (the raw joins) still append in
+    // order via `joins!(join_dependency, *others)`.
     const otherJoinsValues = (this.other.joinsValues ?? []) as unknown[];
-    const otherRawJoins = otherJoinsValues.filter((v) => !this.other._isNamedJoinValue(v));
-    for (const v of otherRawJoins) {
-      const dup = (rel._joinValues as unknown[]).some((existing) =>
-        typeof (v as any)?.eql === "function" && v?.constructor === (existing as any)?.constructor
-          ? (v as any).eql(existing)
-          : v === existing,
-      );
-      if (!dup) rel._joinsValues.push(v);
-    }
-    // Rails merge_joins (merger.rb): when other.klass == relation.klass the
-    // association names union directly into joins_values; otherwise Merger builds
-    // a single InnerJoin JoinDependency against other.klass and stashes it. We
-    // mirror both: same-klass names fold into _namedInnerJoins (resolved on the
-    // receiver); cross-klass names (Hash | Symbol/String | Array — every shape
-    // Rails treats as an association) build a JoinDependency on `other` whose
-    // AliasTracker handles nested-through / HABTM correctly.
     const sameKlass = this.other._modelClass === rel._modelClass;
-    const otherNamed: unknown[] = otherJoinsValues.filter((v) => this.other._isNamedJoinValue(v));
-    if (sameKlass) {
-      for (const v of otherNamed) {
+    const crossKlassNamed: unknown[] = [];
+    for (const v of otherJoinsValues) {
+      if (!this.other._isNamedJoinValue(v)) {
+        const dup = (rel._joinValues as unknown[]).some((existing) =>
+          typeof (v as any)?.eql === "function" && v?.constructor === (existing as any)?.constructor
+            ? (v as any).eql(existing)
+            : v === existing,
+        );
+        if (!dup) rel._joinsValues.push(v);
+      } else if (sameKlass) {
         // joins_values |= dedups structurally-equal Hash specs (eql?/hash), so a
         // same-klass merge folds an equal spec — not by JS reference identity.
         if (!rel._namedInnerJoins.some((seen: unknown) => structuralUnionEq(seen, v)))
           rel._joinsValues.push(v);
+      } else {
+        crossKlassNamed.push(v);
       }
-    } else if (otherNamed.length > 0) {
+    }
+    if (crossKlassNamed.length > 0) {
       rel._namedInnerJoinDeps.push(
-        constructJoinDependency.call(this.other, otherNamed as any, Nodes.InnerJoin),
+        constructJoinDependency.call(this.other, crossKlassNamed as any, Nodes.InnerJoin),
       );
     }
     // Carry forward any cross-klass dependencies the source already accumulated.
