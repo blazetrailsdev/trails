@@ -2437,23 +2437,10 @@ export function buildFrom(this: QueryMethodsHost): unknown {
   if (opts && typeof opts.toArel === "function") {
     name ??= "subquery";
     const alias = String(name);
-    // A set-operation relation (union/intersect/except) has no projection-only
-    // SelectManager — its SQL is a compound node. Mirror Rails `build_from` +
-    // `SelectManager#as`: wrap the compound node as a derived table whose alias
-    // is a `SqlLiteral`, so the visitor renders it bare (Rails' `quote_table_name`
-    // returns SqlLiterals unchanged) and the alias is caller-trusted like Rails —
-    // no identifier gate. Its binds parameterize through the outer collector (no
-    // string inlining / `$N`→`?` rewrite). Operands handle their own eager loading
-    // inside `_buildSetOperationNode`, so the applyJoinDependency clone below is
-    // skipped for this branch.
-    if (opts._setOperation) {
-      return new Nodes.TableAlias(opts._buildSetOperationNode(), arelSql(alias));
-    }
     // No identifier gate: Rails' `build_from` stores the caller-provided
     // `subquery_name` verbatim and wraps it in a `SqlLiteral` via
-    // `SelectManager#as`, so the alias is caller-trusted (same trust model as
-    // the set-op branch above). A regex guard here was stricter than Rails and
-    // left the two `from(Relation)` paths asymmetric.
+    // `SelectManager#as`, so the alias is caller-trusted. A regex guard here was
+    // stricter than Rails and left the two `from(Relation)` paths asymmetric.
     // When the from-value is a Relation that needs eager loading (Rails
     // `opts.eager_loading?`), derive the from clause via
     // `apply_join_dependency` first (Rails build_from). This folds the eager

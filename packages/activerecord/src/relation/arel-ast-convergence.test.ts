@@ -1,15 +1,13 @@
 /**
  * Verification for RFC 0022 (relation-arel-ast-convergence).
  *
- * After the three clusters landed — CTE/UnionAll body as an arel AST
- * (`build_with_expression_from_value`), set operations as arel Union/UnionAll/
- * Intersect/Except nodes threaded through a single bind collector
- * (`_toSqlSetOperation`), and from()/pluck threaded through the SelectManager
- * (`build_from`) — the read path emits SQL by compiling one arel node through
- * the dialect visitor instead of assembling strings.
+ * After the clusters landed — CTE/UnionAll body as an arel AST
+ * (`build_with_expression_from_value`) and from()/pluck threaded through the
+ * SelectManager (`build_from`) — the read path emits SQL by compiling one arel
+ * node through the dialect visitor instead of assembling strings.
  *
- * These spot-checks drive the *relation* API (`Relation#with` / `#union` /
- * `#intersect` / `#except` / `#from`) and inspect the compiled SQL +
+ * These spot-checks drive the *relation* API (`Relation#with` / `#from`) and
+ * inspect the compiled SQL +
  * threaded binds, so a regression back to string assembly in the relation
  * layer fails here. `_toSql()` is the pre-substitution compile (public
  * `toSql()` inlines bind values for human-readable output, mirroring Rails
@@ -80,31 +78,6 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
       expect(sql).toContain(placeholder1);
       expect(sql).toContain(placeholder2);
       expect(bindValues(rel)).toEqual(["alice", "bob"]);
-    });
-  });
-
-  // Cluster 2: set operations are arel nodes whose binds thread through one
-  // collector (`_toSqlSetOperation`) — retired the right-side `$N` renumber.
-  describe("Relation#union / #intersect / #except bind threading", () => {
-    function unionRelation() {
-      return Post.where({ author: "alice" }).union(Post.where({ author: "bob" }));
-    }
-
-    it("numbers binds globally across both operands", () => {
-      const rel = unionRelation();
-      const sql = rawSql(rel);
-      expect(sql).toContain("UNION");
-      expect(sql).toContain(placeholder1);
-      expect(sql).toContain(placeholder2);
-      // Exactly two binds (no third operand placeholder) → one global collector.
-      expect(bindValues(rel)).toEqual(["alice", "bob"]);
-    });
-
-    it("renders intersect and except as compound SELECTs", () => {
-      const a = Post.where({ author: "alice" });
-      const b = Post.where({ author: "bob" });
-      expect(rawSql(a.intersect(b))).toContain("INTERSECT");
-      expect(rawSql(a.exceptRelation(b))).toContain("EXCEPT");
     });
   });
 

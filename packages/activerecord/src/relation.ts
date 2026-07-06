@@ -547,10 +547,6 @@ export class Relation<T extends Base> {
    */
   _seedWherePredicates: readonly unknown[] = [];
   private _lockValue: string | null = null;
-  private _setOperation: {
-    type: "union" | "unionAll" | "intersect" | "except";
-    other: Relation<T>;
-  } | null = null;
   private _joinClauses: Array<{
     type: "inner" | "left";
     table: string;
@@ -1837,56 +1833,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * UNION with another relation.
-   *
-   * Mirrors: ActiveRecord::Relation#union
-   */
-  union(other: Relation<T>): Relation<T> {
-    const rel = this._clone();
-    rel._setOperation = { type: "union", other };
-    return rel;
-  }
-
-  /**
-   * UNION ALL with another relation.
-   *
-   * Mirrors: ActiveRecord::Relation#union_all
-   */
-  unionAll(other: Relation<T>): Relation<T> {
-    const rel = this._clone();
-    rel._setOperation = { type: "unionAll", other };
-    return rel;
-  }
-
-  /**
-   * INTERSECT with another relation.
-   *
-   * Mirrors: ActiveRecord::Relation#intersect
-   */
-  intersect(other: Relation<T>): Relation<T> {
-    const rel = this._clone();
-    rel._setOperation = { type: "intersect", other };
-    return rel;
-  }
-
-  /**
-   * SQL `EXCEPT` set operation with another relation.
-   *
-   * trails-only — Rails has no `EXCEPT` set-operation method (it exposes
-   * `union`/`union_all`/`intersect` only). This is the SQL set-operation
-   * sibling of {@link union}/{@link intersect}; the bare `except` name is
-   * reserved for Rails' `SpawnMethods#except` value-key remover below.
-   *
-   * @internal No Rails equivalent.
-   */
-  exceptRelation(other?: Relation<T>): Relation<T> {
-    if (!other) return this._clone();
-    const rel = this._clone();
-    rel._setOperation = { type: "except", other };
-    return rel;
-  }
-
-  /**
    * Remove the specified query parts, keeping everything else.
    *
    * Mirrors: ActiveRecord::SpawnMethods#except — `relation_with
@@ -2914,8 +2860,8 @@ export class Relation<T extends Base> {
       // _compileSelectSql captures the SELECT's retryability and bind values
       // into _lastSelectRetryable/_lastSelectBinds at compile time. Reading the
       // visitor's collector here would be wrong: from(ArelNode) recompiles and
-      // resets it, and set operations compile each side separately.
-      const allowRetry = this._setOperation ? false : this._lastSelectRetryable;
+      // resets it.
+      const allowRetry = this._lastSelectRetryable;
       const result = await this._conn().selectAll(
         sql,
         `${this._modelClass.name} Load`,
@@ -2953,19 +2899,6 @@ export class Relation<T extends Base> {
       ...this._preloadAssociations,
       ...this._includesAssociations.filter((n) => !promotedIncludes.includes(n)),
     ];
-    // Set-op operands all instantiate as this model class, and the compound
-    // bypasses the eager JOIN (operands stay arity-compatible), so the *other*
-    // operand's includes/eager/preload specs load as preloads against the full
-    // result set rather than being silently dropped. (`this` is the left/loaded
-    // relation; its own specs are handled above + in the eager branch.)
-    if (this._setOperation) {
-      const other = this._setOperation.other;
-      preloadAssocs.push(
-        ...other._eagerLoadAssociations,
-        ...other._includesAssociations,
-        ...other._preloadAssociations,
-      );
-    }
     if (preloadAssocs.length > 0 && this._records.length > 0) {
       await this._preloadAssociationsForRecords(this._records, preloadAssocs);
       if (token !== this._loadToken) return [];
@@ -3589,7 +3522,7 @@ export class Relation<T extends Base> {
   /**
    * Whether an eager-load query degrades to plain SQL + preloading instead of
    * building a JoinDependency. trails can't emit the aliased eager JOIN under a
-   * composite PK, CTEs, a set operation, or a FROM override, so eager specs are
+   * composite PK, CTEs, or a FROM override, so eager specs are
    * preloaded in those cases (a capability gap — Rails always JOINs). Kept in
    * one place so the `toArray` builder (`_executeEagerLoad`), the `toSql`
    * builder (`_buildEagerSql`), and the calculation/exists raise-check
@@ -3598,12 +3531,7 @@ export class Relation<T extends Base> {
    */
   private _eagerLoadBypassesJoinDependency(): boolean {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    return (
-      Array.isArray(basePk) ||
-      this._ctes.length > 0 ||
-      !!this._setOperation ||
-      !this._fromClause.isEmpty()
-    );
+    return Array.isArray(basePk) || this._ctes.length > 0 || !this._fromClause.isEmpty();
   }
 
   /**
@@ -5485,14 +5413,6 @@ export class Relation<T extends Base> {
     // it through the connection, which inlines binds during AST traversal via
     // the SubstituteBinds collector. No cached node, no bespoke quoter, no
     // post-hoc string pass.
-    if (this._setOperation) {
-      // The set-operation visitors wrap the compound SELECT in `( ... )` for
-      // embedded use. As a standalone statement SQLite rejects the leading
-      // paren, so strip the single enclosing pair the visitor added (operand
-      // parens for ORDER/LIMIT/OFFSET sides use no inner space, so are kept).
-      const raw = this._toSqlViaConnection(this._buildSetOperationNode());
-      return raw.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
-    }
     if (this._eagerLoadingForSql()) {
       const manager = this._buildEagerOperandManager();
       if (manager !== null) {
@@ -5543,79 +5463,21 @@ export class Relation<T extends Base> {
   }
 
   private _toSql(): string {
-    if (this._setOperation) {
-      return this._toSqlSetOperation();
+    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
+    if (this._eagerLoadingForSql()) {
+      const eagerSql = this._buildEagerSql();
+      if (eagerSql !== null) return eagerSql;
+      // If _buildEagerSql returns null (e.g. unresolvable association),
+      // fall through to plain SQL so toSql() always returns something useful.
     }
-    return this._toSqlWithoutSetOp();
-  }
 
-  /**
-   * Compose the set operation as an Arel Union/UnionAll/Intersect/Except node
-   * from each side's fully-built SelectManager — projections, joins, wheres,
-   * from(), the eager-load join dependency, CTEs, and annotate() comments are
-   * all encoded in the operand AST — then let the visitor emit the compound
-   * through a single collector. One collector numbers every bind globally by
-   * construction, so PG `$N` placeholders are correct without post-processing:
-   * no manual right-side renumbering and no per-side bind concatenation. The
-   * cross-adapter paren difference (SQLite strips parens around compound-SELECT
-   * operands; PG/MySQL parenthesize) lives in the arel visitors, not here.
-   */
-  private _toSqlSetOperation(): string {
-    const node = this._buildSetOperationNode();
-    const v = this._arelVisitor();
-    const [raw, binds, retryable, preparable] = v.compileWithBinds(node);
-    this._lastSelectRetryable = retryable;
-    // Apply the same over-limit inline fallback the plain SELECT gets: a
-    // union/intersect/except operand can carry a large multi-value `IN`/`NOT IN`
-    // (`HomogeneousIn`) whose binds would otherwise overflow the parameter cap.
-    const compound = this._applyBindLimitFallback(
-      node,
-      raw,
-      this._typeCastBinds(binds),
-      preparable,
-    );
-    // The set-operation visitors wrap the compound SELECT in `( ... )` for
-    // embedded use (subquery / derived table). As a standalone statement
-    // SQLite rejects the leading paren, so strip the single enclosing pair the
-    // visitor added (operand-level parens for ORDER/LIMIT/OFFSET sides use no
-    // inner space and are preserved).
-    return compound.replace(/^\(\s+/, "").replace(/\s+\)$/, "");
-  }
-
-  /**
-   * Compose this relation's set operation as an Arel
-   * Union/UnionAll/Intersect/Except node from each side's operand SelectManager.
-   * Shared by the standalone `_toSqlSetOperation` path and `from()` derived-table
-   * embedding, so a `from(a.union(b), "alias")` threads through the same live AST
-   * (binds parameterized by the outer collector) rather than inlined SQL.
-   * @internal
-   */
-  _buildSetOperationNode(): Nodes.Node {
-    const leftManager = this._buildSetOperationOperandManager();
-    const rightManager = this._setOperation!.other._buildSetOperationOperandManager();
-    return leftManager[this._setOperation!.type](rightManager) as unknown as Nodes.Node;
-  }
-
-  /**
-   * Build the SelectManager for this relation as a set-operation operand: the
-   * base select projections, then folds CTEs (`WITH`) and annotate() comments
-   * into the operand AST so they thread through the compound's single collector
-   * instead of being spliced into the compiled SQL string per side.
-   *
-   * An eager-load operand is deliberately NOT compiled through its
-   * JoinDependency manager here: that emits the wide `t0_r*` aliased column list
-   * + LEFT OUTER JOINs, which (a) make the operand arity-incompatible with the
-   * other side of the UNION (DBs reject differing column counts) and (b) cannot
-   * be JoinDependency-instantiated, since the compound executes through the
-   * `_eagerLoadBypassesJoinDependency` branch and reads rows as plain models.
-   * So each operand keeps the plain projection (arity stays compatible) and the
-   * eager associations load via that bypass branch's `_preloadAssociationsForRecords`
-   * — Rails has no `Relation#union`, so there is no JD-through-union path to mirror.
-   */
-  private _buildSetOperationOperandManager(): SelectManager {
-    const manager = this._buildSelectManager();
-    this._applyCtesAndAnnotationsToManager(manager);
-    return manager;
+    // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
+    // annotate() comments are folded into the manager AST by `_buildArel`, so a
+    // single collector numbers every bind in document order (CTE binds precede
+    // the main query's; PG `$N` placeholders fall out correctly by
+    // construction) — replacing the former post-compile string splice and its
+    // manual `$N` renumbering.
+    return this._compileSelectSql(this._buildArel());
   }
 
   // Mirrors: ActiveRecord::Relation#eager_loading?
@@ -5850,9 +5712,7 @@ export class Relation<T extends Base> {
    * Build the SelectManager for this relation: projections, joins, wheres,
    * order, distinct, limit/offset, group, having, lock, hints, and from(). Does
    * NOT apply the eager-load join dependency, annotate() comments, or CTE
-   * prefix — those remain in _toSqlWithoutSetOp. Used both for plain SELECT
-   * compilation and as each side of a set operation (where the arel Union* node
-   * composes the two managers).
+   * prefix — those are layered on in `_buildArel` / `_toSql`.
    */
   private _buildSelectManager(aliases?: AliasTracker): SelectManager {
     // `this.table` is the model's arel_table unless the relation was built on a
@@ -5903,24 +5763,6 @@ export class Relation<T extends Base> {
     if (fromNode !== undefined && fromNode !== null) manager.from(fromNode as any);
 
     return manager;
-  }
-
-  private _toSqlWithoutSetOp(): string {
-    // Eager loading: emit JoinDependency SQL (mirrors Rails to_sql + eager_loading?)
-    if (this._eagerLoadingForSql()) {
-      const eagerSql = this._buildEagerSql();
-      if (eagerSql !== null) return eagerSql;
-      // If _buildEagerSql returns null (e.g. unresolvable association),
-      // fall through to plain SQL so toSql() always returns something useful.
-    }
-
-    // Compile the converged `build_arel` manager directly. CTEs (`WITH`) and
-    // annotate() comments are folded into the manager AST by `_buildArel`, so a
-    // single collector numbers every bind in document order (CTE binds precede
-    // the main query's; PG `$N` placeholders fall out correctly by
-    // construction) — replacing the former post-compile string splice and its
-    // manual `$N` renumbering.
-    return this._compileSelectSql(this._buildArel());
   }
 
   private _combineNodes(nodes: Nodes.Node[]): Nodes.Node | null {
@@ -6065,16 +5907,16 @@ export class Relation<T extends Base> {
    * Resolve this relation to the Arel SelectStatement node used as a CTE body,
    * mirroring Rails' `build_with_expression_from_value` Relation branch
    * (`value.arel(.ast)`). `_buildSelectManager` threads joins/wheres/from/having
-   * — matching `_toSqlWithoutSetOp` minus the CTE/eager/annotate prefix — so a
+   * — matching `_toSql` minus the CTE/eager/annotate prefix — so a
    * recursive body's string JOIN survives (with_recursive). Returns null for
-   * relations whose SQL `_buildSelectManager` does not fully encode (set-op or
-   * eager-load bodies), letting the caller fall back to pre-rendered SQL.
+   * relations whose SQL `_buildSelectManager` does not fully encode (eager-load
+   * bodies), letting the caller fall back to pre-rendered SQL.
    * `nested` is accepted to mirror Rails' threading; both branches resolve to the
    * AST node since trails' Cte/UnionAll operands must be visitable nodes.
    * @internal
    */
   _cteBodyArelNode(_nested = false): Nodes.Node | null {
-    if (this._setOperation || this._eagerLoadingForSql()) return null;
+    if (this._eagerLoadingForSql()) return null;
     return this._buildSelectManager().ast as unknown as Nodes.Node;
   }
 
@@ -7465,7 +7307,6 @@ export class Relation<T extends Base> {
     this._havingClause = source._havingClause.clone();
     this._isNone = source._isNone;
     this._lockValue = source._lockValue;
-    this._setOperation = source._setOperation;
     this._joinClauses = [...source._joinClauses];
     this._joinsValues = [...source._joinsValues];
     this._leftOuterJoinsValues = [...source._leftOuterJoinsValues];

@@ -289,22 +289,14 @@ describe("BindParameterTest", () => {
 
   // Trails-specific coverage for the over-limit inline fallback on paths beyond
   // count(): Rails funnels every arel compile through `to_sql_and_binds`
-  // (database_statements.rb:36-38), but trails compiles the main SELECT and each
-  // set-operation operand through their own helpers, which must apply the same
-  // fallback. A large multi-value `IN` now builds a real-bind `HomogeneousIn`,
-  // so without the fallback these overflow the adapter's bind-params cap.
+  // (database_statements.rb:36-38), but trails compiles the main SELECT through
+  // its own helper, which must apply the same fallback. A large multi-value `IN`
+  // now builds a real-bind `HomogeneousIn`, so without the fallback these
+  // overflow the adapter's bind-params cap.
   it("materializes a record load whose IN exceeds the bind-params cap", async () => {
     const conn = (await Topic.leaseConnection()) as any;
     const ids = Array.from({ length: conn.bindParamsLength() + 1 }, (_, i) => i + 1);
     const topics = await Topic.where({ id: ids });
-    expect(topics.length).toBe(await Topic.count());
-  });
-
-  it("materializes a set-operation whose operand IN exceeds the bind-params cap", async () => {
-    const conn = (await Topic.leaseConnection()) as any;
-    const ids = Array.from({ length: conn.bindParamsLength() + 1 }, (_, i) => i + 1);
-    const rel = Topic.where({ id: ids }).union(Topic.where({ id: ids }));
-    const topics = await rel.toArray();
     expect(topics.length).toBe(await Topic.count());
   });
 
