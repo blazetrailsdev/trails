@@ -9,13 +9,15 @@
  * `destroyBy`/`deleteBy` shorthands. Test names are kept verbatim per CLAUDE.md.
  */
 import { describe, it, expect } from "vitest";
-import { RecordInvalid } from "./index.js";
+import { RecordInvalid, registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { repairValidations } from "./test-helpers/repair-validations.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
 import { Item as CanonicalItem } from "./test-helpers/models/item.js";
 import { ClothingItem } from "./test-helpers/models/clothing-item.js";
+import { Minimalistic } from "./test-helpers/models/minimalistic.js";
+import { Aircraft } from "./test-helpers/models/aircraft.js";
 import { captureSql } from "./testing/sql-capture.js";
 
 describe("PersistenceTest (trails)", () => {
@@ -180,5 +182,60 @@ describe("PersistenceTest (trails)", () => {
 
     const reloaded = await ClothingItem.findBy({ id: clothingItem.id });
     expect(reloaded?.description).toBe("Lovely green t-shirt");
+  });
+});
+
+describe("PersistenceTest (trails)", () => {
+  fixtures(["topics"]);
+
+  // Trails-only edge with no Rails counterpart (Rails keys attribute methods
+  // per-class off the class's own `table_name`, model_schema.rb): the residual
+  // case PR #4680 left uncovered. A non-STI subclass that overrides
+  // `_tableName` AND declares an `attribute()` before its first reflection
+  // forks its own `_attributeDefinitions`, copying the ancestor's foreign
+  // schema defs. `ensureSchemaLoaded` must still reflect the subclass's own
+  // table rather than trusting those copied defs and silently dropping writes.
+  // Mirrors `persist inherited class with different table name` (the Rails
+  // test in persistence.test.ts) plus a predeclared virtual attribute.
+  it("persist inherited class with different table name and predeclared attribute", async () => {
+    // Reflect the ancestor first so its `_attributeDefinitions` holds
+    // schema-sourced defs for the `minimalistics` table — the state the
+    // subclass's map is forked from.
+    await Minimalistic.create({});
+
+    class MinimalisticAircraft extends Minimalistic {
+      static _tableName = "aircraft";
+      static {
+        this.attribute("wingspan", "integer", { virtual: true });
+      }
+    }
+    registerModel(MinimalisticAircraft);
+
+    // Evict `aircraft` from the adapter schema cache so the sync reconcile path
+    // cannot find its columns — the cold-cache condition under which the bug
+    // bites (otherwise a warm cross-file cache masks it). Only clears the
+    // sibling `Aircraft`'s reflection, not the subclass's copied foreign defs.
+    Aircraft.resetColumnInformation();
+
+    const before = (await Aircraft.count()) as number;
+    const aircraft = (await MinimalisticAircraft.create({ name: "Wright Flyer" })) as unknown as {
+      name: string | null;
+      wingspan: unknown;
+      save: () => Promise<unknown>;
+    };
+    aircraft.name = "Wright Glider";
+    await aircraft.save();
+    expect(await Aircraft.count()).toBe(before + 1);
+
+    // The subclass reflected its own `aircraft` table: the write persisted
+    // (without the fix, `reconcileVirtualAttributes` never learns `name` and the
+    // insert silently drops it, reading back `null`).
+    const last = (await Aircraft.last()) as unknown as { name: string | null } | null;
+    expect(last?.name).toBe("Wright Glider");
+    // The foreign `expires_at` column (copied from the `minimalistics` map) is
+    // gone, and the predeclared virtual attribute survives the reflection.
+    expect(MinimalisticAircraft.columnNames()).not.toContain("expires_at");
+    expect(MinimalisticAircraft.columnNames()).toContain("name");
+    expect(aircraft.wingspan).toBeNull();
   });
 });
