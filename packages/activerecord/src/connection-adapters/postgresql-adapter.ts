@@ -1360,6 +1360,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * chaining them here would interleave with the maintenance tail during
    * connect.
    *
+   * A few other pinned-client sites deliberately stay direct because routing
+   * them onto the shared tail would deadlock or defeat their purpose, NOT for
+   * lack of coverage: `_maybeConfigureConnection` / the reset reconfigure run
+   * *inside* the `_inFlightReset` barrier that IS the tail (self-await), the
+   * DEALLOCATE / ROLLBACK / DISCARD ALL maintenance ops already chain via
+   * `_enqueueMaintenance`, `execRollbackDbTransaction`'s `ROLLBACK` follows a
+   * `_cancelAnyRunningQuery` that must not be made to wait on the query it just
+   * cancelled, and the memoized `server_version` bootstrap probe runs before the
+   * client is in normal service.
+   *
    * @internal
    */
   private async _serializePinnedQuery<R>(client: pg.Client, fn: () => Promise<R>): Promise<R> {
@@ -2163,7 +2173,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // "there is no parameter $1".
       const pgBinds = binds.map((v) => this._bindForPg(v));
       const rewritten = this.rewriteBinds(sql, pgBinds);
-      const result = await client.query(`${clause} ${rewritten}`, pgBinds);
+      const result = await this._serializePinnedQuery(client, () =>
+        client.query(`${clause} ${rewritten}`, pgBinds),
+      );
       const printer = new ExplainPrettyPrinter();
       return printer.pp(result.rows);
     });
@@ -3115,7 +3127,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     const client = await this._acquireFreshClient();
     const [sql, param] = _pgAdvisoryLockSql("pg_try_advisory_lock", "locked", lockId);
-    const result = await client.query(sql, [param]);
+    const result = await this._serializePinnedQuery(client, () => client.query(sql, [param]));
     return result.rows[0]?.locked === true;
   }
 
@@ -3123,7 +3135,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!this._rawConnection) return false;
     const client = await this._acquireFreshClient();
     const [sql, param] = _pgAdvisoryLockSql("pg_advisory_unlock", "unlocked", lockId);
-    const result = await client.query(sql, [param]);
+    const result = await this._serializePinnedQuery(client, () => client.query(sql, [param]));
     return result.rows[0]?.unlocked === true;
   }
 
