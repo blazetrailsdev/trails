@@ -846,6 +846,23 @@ export async function performCount(
             this._applyJoinsToManager(idSubquery, makeEagerJd());
             this._applyWheresToManager(idSubquery, table);
             this._applyOrderToManager(idSubquery, table);
+            // Rails `distinct_relation_for_primary_key` builds the DISTINCT
+            // select via `columns_for_distinct(primary_key_columns,
+            // order_values)`: PG/MySQL reject `SELECT DISTINCT id ... ORDER BY
+            // <non-selected>`, so those adapters prepend the (aliased) order
+            // expressions to the select list. Re-project through the adapter
+            // hook so the ordered composite-pk id fetch is valid cross-adapter
+            // (sqlite's base hook returns the pk columns unchanged). The pk
+            // columns keep their names, so the by-name `row[c]` tuple
+            // extraction below still finds them.
+            const pkColumns = pk.map(
+              (c: string) =>
+                `${this._conn().quoteTableName(table.name)}.${this._conn().quoteColumnName(c)}`,
+            );
+            const distinctSelect = this._conn().columnsForDistinct(pkColumns, idSubquery.orders);
+            idSubquery.projections = (
+              Array.isArray(distinctSelect) ? distinctSelect : [distinctSelect]
+            ).map((s) => new Nodes.SqlLiteral(s));
             applyFromToManager(this, idSubquery);
             if (this._limitValue !== null) idSubquery.take(this._limitValue);
             if (this._offsetValue !== null) idSubquery.skip(this._offsetValue);
