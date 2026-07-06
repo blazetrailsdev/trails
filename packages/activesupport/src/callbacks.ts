@@ -254,6 +254,8 @@ export class Callback {
  * Mirrors: ActiveSupport::Callbacks::CallbackSequence (compile → invoke).
  */
 export class CallbackSequence {
+  constructor(private readonly callbackChain: CallbackChain) {}
+
   invoke(
     target: object,
     block: (() => unknown) | undefined,
@@ -269,21 +271,8 @@ export class CallbackSequence {
     block?: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
-    const callbackChain = this._callbackChain;
-    if (!callbackChain) {
-      const r = block?.();
-      if (!isThenable(r)) return true;
-      if (opts?.strict === "sync") {
-        swallowRejection(r);
-        throw new Error("Async block on chain with no callbacks");
-      }
-      return Promise.resolve(r).then(() => true);
-    }
-    return callbackChain._invoke(target, block, opts);
+    return this.callbackChain._invoke(target, block, opts);
   }
-
-  // Back-reference set by CallbackChain.compile() for invoke() convenience
-  _callbackChain: CallbackChain | null = null;
 }
 
 // ---------------------------------------------------------------------------
@@ -345,9 +334,7 @@ export class CallbackChain {
   }
 
   compile(): CallbackSequence {
-    const seq = new CallbackSequence();
-    seq._callbackChain = this;
-    return seq;
+    return new CallbackSequence(this);
   }
 
   get isEmpty(): boolean {
