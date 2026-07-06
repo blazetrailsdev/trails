@@ -2098,17 +2098,10 @@ export class MigrationContext {
     }
     // Delegate DDL/type generation to the adapter's SchemaStatements — the
     // single Rails-faithful source — rather than the bespoke `_mapType` builder.
+    // The adapter's addColumn also owns comment application (PostgreSQL emits a
+    // separate COMMENT ON COLUMN; MySQL inlines it in the visitor), so we do not
+    // re-apply it here.
     await this.schema.addColumn(table, column, type, _options ?? {});
-    // SchemaStatements#addColumn inlines the comment for adapters that support
-    // comments in CREATE (MySQL); adapters that can't (PostgreSQL) need the
-    // separate COMMENT ON COLUMN, mirroring Rails' add_column path.
-    if (
-      _options &&
-      "comment" in _options &&
-      (this.connection as any).supportsComments?.() &&
-      !(this.connection as any).supportsCommentsInCreate?.()
-    )
-      await this.changeColumnComment(table, column, (_options as any).comment ?? null);
     if (!this._columns.has(table)) this._columns.set(table, new Set());
     this._columns.get(table)!.add(column);
     if (!this._columnMeta.has(table)) this._columnMeta.set(table, new Map());
@@ -2172,10 +2165,11 @@ export class MigrationContext {
     _options?: ColumnOptions,
   ): Promise<void> {
     // Delegate DDL/type generation to the adapter's SchemaStatements rather than
-    // the bespoke `_mapType` builder — the single Rails-faithful source.
+    // the bespoke `_mapType` builder — the single Rails-faithful source. The
+    // adapter's changeColumn also owns comment application (PostgreSQL emits a
+    // separate COMMENT ON COLUMN; MySQL inlines it via changeColumnForAlter), so
+    // we do not re-apply it here.
     await this.schema.changeColumn(table, column, type, _options ?? {});
-    if (_options && "comment" in _options && (this.connection as any).supportsComments?.())
-      await this.changeColumnComment(table, column, (_options as any).comment ?? null);
     const meta = this._columnMeta.get(table);
     if (meta && meta.has(column)) {
       const entry = meta.get(column)!;
