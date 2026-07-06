@@ -85,7 +85,12 @@ export type { SerializeOptions, SerializableHash } from "./serialization.js";
 // can import as `JSONSerializer` or alias on import.
 export { JSON as JSONSerializer } from "./serializers/json.js";
 export { Type } from "./type/value.js";
-export { normalizedValueType } from "./type/normalized-value.js";
+export {
+  normalizedValueType,
+  isNormalizedValueType,
+  normalizedValueToken,
+  unwrapNormalization,
+} from "./type/normalized-value.js";
 export { typeRegistry } from "./type/registry.js";
 
 export { StringType } from "./type/string.js";

@@ -10,53 +10,51 @@
  * Mirrors: ActiveRecord::Normalization
  */
 
-import { Model, NormalizesArgs } from "@blazetrails/activemodel";
+import { Model, NormalizesArgs, Type, normalizedValueType } from "@blazetrails/activemodel";
 
 /**
  * NormalizedValueType — decorates an underlying cast type with a normalizer.
  * When cast() is called, the value is first cast by the underlying type,
  * then the normalizer is applied.
  *
+ * This is the api:compare mirror of Rails' `ActiveRecord::Normalization::NormalizedValueType`.
+ * The SINGLE live implementation is ActiveModel's `normalizedValueType`
+ * (`activemodel/src/type/normalized-value.ts`), which `Model.normalizes` wires
+ * onto the attribute's cast type via `decorate_attributes` so one type governs
+ * both the write and query paths. This class delegates to it so there is no
+ * second normalization implementation.
+ *
  * Mirrors: ActiveRecord::Normalization::NormalizedValueType
  */
 export class NormalizedValueType {
-  readonly castType: { cast(value: unknown): unknown; serialize?(value: unknown): unknown };
+  readonly castType: Type;
   readonly normalizer: (value: unknown) => unknown;
   readonly normalizeNil: boolean;
+  private readonly _delegate: Type;
 
   constructor(options: {
-    castType: { cast(value: unknown): unknown; serialize?(value: unknown): unknown };
+    castType: Type;
     normalizer: (value: unknown) => unknown;
     normalizeNil?: boolean;
   }) {
     this.castType = options.castType;
     this.normalizer = options.normalizer;
     this.normalizeNil = options.normalizeNil ?? false;
+    this._delegate = normalizedValueType(this.castType, this.normalizer, this.normalizeNil);
   }
 
   cast(value: unknown): unknown {
-    const castValue = this.castType.cast(value);
-    return this._normalize(castValue);
+    return this._delegate.cast(value);
   }
 
   serialize(value: unknown): unknown {
-    const castValue = this.cast(value);
-    return this.serializeCastValue(castValue);
+    return this._delegate.serialize(value);
   }
 
   serializeCastValue(value: unknown): unknown {
-    const ct = this.castType as any;
-    if (typeof ct.serializeCastValue === "function") {
-      return ct.serializeCastValue(value);
-    }
-    return typeof ct.serialize === "function" ? ct.serialize(value) : value;
-  }
-
-  private _normalize(value: unknown): unknown {
-    if (value === null || value === undefined) {
-      if (!this.normalizeNil) return value;
-    }
-    return this.normalizer(value);
+    return (
+      this._delegate as unknown as { serializeCastValue(v: unknown): unknown }
+    ).serializeCastValue(value);
   }
 }
 
@@ -95,7 +93,9 @@ export function normalizeAttribute(record: InstanceType<typeof Model>, name: str
 /**
  * Apply the normalizer proc to a value, skipping nil unless normalize_nil is set.
  *
- * Mirrors: ActiveRecord::Normalization::NormalizedValueType#normalize (private)
+ * Mirrors: ActiveRecord::Normalization::NormalizedValueType#normalize (private).
+ * The live normalization lives in ActiveModel's `normalizedValueType`; this stays
+ * for api:compare discoverability and shares its nil-skip semantics.
  *
  * @internal
  */

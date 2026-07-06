@@ -1088,6 +1088,7 @@ export class Base extends Model {
       delete (this.prototype as any).id;
     }
     encryptionHooks.applyPendingEncryptions(this);
+    this.applyPendingNormalizations();
   }
 
   /**

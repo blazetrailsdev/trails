@@ -61,6 +61,15 @@ export class QueryAttribute extends Attribute {
     return super.valueForDatabase;
   }
 
+  // A query bind may hold an un-cast raw value (StatementCache substitution binds
+  // via `withCastValue` without casting), so serialize through the FULL `serialize`
+  // path — which, for a NormalizedValueType, casts+normalizes the raw value before
+  // serializing (mirroring `type_for_attribute(name).serialize`). The base
+  // `_valueForDatabase` fast-path is only correct for already-cast persisted values.
+  protected override _valueForDatabase(): unknown {
+    return this.type.serialize(this.value);
+  }
+
   isNil(): boolean {
     return this.valueBeforeTypeCast === null || this.valueBeforeTypeCast === undefined;
   }

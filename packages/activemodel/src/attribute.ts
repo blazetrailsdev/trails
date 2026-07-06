@@ -1,4 +1,5 @@
 import { Type } from "./type/value.js";
+import { isNormalizedValueType } from "./type/normalized-value.js";
 import { typeRegistry } from "./type/registry.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 
@@ -168,6 +169,16 @@ export abstract class Attribute {
 
   /** @internal */
   protected _valueForDatabase(): unknown {
+    // A NormalizedValueType wraps the cast type so `serialize` re-normalizes a
+    // raw value (for query binds). On the persistence path `this.value` is
+    // already cast+normalized, so route through the cast-value fast path to
+    // avoid double-applying a non-idempotent normalizer. Rails: persisted
+    // attributes serialize via `SerializeCastValue.serialize(type, value)`.
+    if (isNormalizedValueType(this.type)) {
+      return (
+        this.type as unknown as { serializeCastValue(v: unknown): unknown }
+      ).serializeCastValue(this.value);
+    }
     return this.type.serialize(this.value);
   }
 

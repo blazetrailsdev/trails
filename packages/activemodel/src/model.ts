@@ -26,6 +26,12 @@ import {
   lookupAncestors as translationLookupAncestors,
 } from "./translation.js";
 import { Type } from "./type/value.js";
+import {
+  normalizedValueType,
+  isNormalizedValueType,
+  normalizedValueToken,
+  unwrapNormalization,
+} from "./type/normalized-value.js";
 import { AttributeSet } from "./attribute-set.js";
 import { ModelLike, ModelName } from "./naming.js";
 import { DirtyTracker, initInternals as dirtyInitInternals } from "./dirty.js";
@@ -320,7 +326,17 @@ export class Model {
       } else {
         this._normalizations.set(attr, { fns: [fn], applyToNil });
       }
+      // Rails `normalizes` is one call to `decorate_attributes`, wrapping the
+      // attribute's cast type in a NormalizedValueType so a SINGLE type governs
+      // the write path (assignment/cast) and the query path
+      // (`type_for_attribute(name).cast/serialize`). The decorator is idempotent
+      // (see `_normalizationDecorator`) so the immediate apply + pending replay
+      // never double-wrap a non-idempotent normalizer.
+      this.decorateAttributes([attr], this._normalizationDecorator(attr));
     }
+    // AR reflects columns after the class body runs, so at declaration time the
+    // decorate above no-ops on a not-yet-reflected column. `applyPendingNormalizations`
+    // re-runs once the column appears (wired next to `applyPendingEncryptions`).
 
     // Rails' ActiveRecord::Normalization registers
     // `before_validation :normalize_changed_in_place_attributes` at include
@@ -358,36 +374,71 @@ export class Model {
    * Mirrors: ActiveRecord::Base#normalize_attribute
    */
   normalizeAttribute(name: string): void {
-    const ctor = this.constructor as typeof Model;
-    const current = this.readAttribute(name);
-    const normalized = ctor._applyNormalization(name, current);
-    if (normalized !== current) {
-      this._attributes.writeCastValue(name, normalized);
-    }
+    // Rails: `self[name] = self[name]` — re-assign so the decorated cast type
+    // re-normalizes the current (possibly changed-in-place) value.
+    this.writeAttribute(name, this.readAttribute(name));
   }
 
   /**
    * Normalize a value for a given attribute without a record.
-   * Mirrors: ActiveRecord::Base.normalize_value_for
+   * Mirrors: ActiveRecord::Base.normalize_value_for — `type_for_attribute(name).cast(value)`.
+   * The attribute's cast type already carries the NormalizedValueType decoration,
+   * so a single `cast` casts then normalizes.
    */
   static normalizeValueFor(name: string, value: unknown): unknown {
+    if (typeof this.typeForAttribute === "function") {
+      return this.typeForAttribute(name).cast(value);
+    }
     const def = this._attributeDefinitions.get(name);
-    const result = def ? def.type.cast(value) : value;
-    return this._applyNormalization(name, result);
+    return def ? def.type.cast(value) : value;
   }
 
   /**
-   * Apply all normalizations for the given attribute.
+   * Build the idempotent NormalizedValueType decorator for `name`. Reused by
+   * `normalizes` (immediate apply + pending replay) and `applyPendingNormalizations`
+   * (post-reflection). The `_normalizations` entry object is the identity token:
+   * a decorator returns `null` (no change) when the cast type is already wrapped
+   * with the SAME entry, and unwraps+rewraps when a different/older one is found
+   * (so subclass stacking replaces the parent's wrap with the fuller combined set).
+   *
+   * @internal
    */
-  static _applyNormalization(name: string, value: unknown): unknown {
-    const norm = this._normalizations.get(name);
-    if (!norm) return value;
-    if (value == null && !norm.applyToNil) return value;
-    let result = value;
-    for (const fn of norm.fns) {
-      result = fn(result);
+  static _normalizationDecorator(name: string): (n: string, castType: Type) => Type {
+    return (_n: string, castType: Type): Type => {
+      const entry = this._normalizations.get(name);
+      if (!entry) return castType;
+      if (normalizedValueToken(castType) === entry) {
+        return null as unknown as Type;
+      }
+      const base = isNormalizedValueType(castType) ? unwrapNormalization(castType) : castType;
+      const fns = entry.fns;
+      const normalizer = (value: unknown): unknown => {
+        let result = value;
+        for (const fn of fns) result = fn(result);
+        return result;
+      };
+      return normalizedValueType(base, normalizer, entry.applyToNil, entry);
+    };
+  }
+
+  /**
+   * Re-apply normalization decorators onto `_attributeDefinitions` once columns
+   * are reflected — the query-side lookup (`type_for_attribute`, `TypeCaster::Map`)
+   * reads that store. Mirrors AR's `applyPendingEncryptions` replay; idempotent
+   * via the `_normalizationDecorator` token guard, so it never grows the pending
+   * queue or double-wraps on repeated calls.
+   *
+   * @internal
+   */
+  static applyPendingNormalizations(): void {
+    if (!this._normalizations || this._normalizations.size === 0) return;
+    const defs = this._attributeDefinitions;
+    for (const [name, entry] of this._normalizations) {
+      const def = defs?.get?.(name);
+      if (!def) continue; // column not reflected yet; re-invoked once it appears
+      if (normalizedValueToken(def.type) === entry) continue; // already applied
+      this.decorateAttributes([name], this._normalizationDecorator(name));
     }
-    return result;
   }
 
   /**
@@ -1600,10 +1651,11 @@ export class Model {
 
   /** @internal */
   _writeAttribute(name: string, value: unknown): void {
-    const ctor = this.constructor as typeof Model;
     this._attributes.writeFromUser(name, value);
+    // `fetchValue` reads the attribute's cast value; the cast type carries the
+    // NormalizedValueType decoration (see `normalizes`), so normalization is
+    // already applied here — no separate imperative hook.
     let newValue = this._attributes.fetchValue(name);
-    newValue = ctor._applyNormalization(name, newValue);
     newValue = this._applyNullifyBlanks(name, newValue);
     if (newValue !== this._attributes.fetchValue(name)) {
       this._attributes.writeCastValue(name, newValue);
