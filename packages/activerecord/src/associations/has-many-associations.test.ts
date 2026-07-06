@@ -15,6 +15,7 @@ import {
   enableSti,
   registerSubclass,
   RecordNotFound,
+  RecordNotSaved,
 } from "../index.js";
 import {
   Company,
@@ -285,6 +286,32 @@ describe("HasManyAssociationsTest", () => {
     expect(await firstFirm.clientsOfFirm.toArray()).toContain(bad);
     const reloaded = (await firstFirm.clientsOfFirm.reload()) as any[];
     expect(reloaded).not.toContain(bad);
+  });
+
+  it("create with bang on has many when parent is new raises", async () => {
+    const firm = new HmFirm();
+    let error: any;
+    try {
+      await (firm as any).plainClients.createBang({ name: "Whoever" });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotSaved);
+    expect(error.message).toBe("You cannot call create unless the parent is saved");
+    expect(error.record).toBe(firm);
+  });
+
+  it("regular create on has many when parent is new raises", async () => {
+    const firm = new HmFirm();
+    let error: any;
+    try {
+      await (firm as any).plainClients.create({ name: "Whoever" });
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotSaved);
+    expect(error.message).toBe("You cannot call create unless the parent is saved");
+    expect(error.record).toBe(firm);
   });
 
   it("destroying", async () => {
