@@ -1260,18 +1260,21 @@ export class Base extends Model {
     // table) but has not yet reflected reads its ancestor's map — reflected
     // against a *different* table. Bailing here would flag those foreign
     // columns as known and never reflect this class's own table. Find the class
-    // that actually owns the map; if its `tableName` differs from ours, the
-    // inherited defs describe another table, so reflect instead of bailing.
+    // that actually owns the map; if it is a table-backed class whose
+    // `tableName` differs from ours, the inherited defs describe another table,
+    // so reflect instead of bailing. The `typeof ... === "string"` guard keeps
+    // us on the fast path when the owner is a table-less root (e.g. the
+    // activemodel `Model`, which has no `tableName` getter) — that case falls
+    // through to the loop below rather than spuriously forcing a reflection.
     let defsOwner: unknown = this;
     while (defsOwner && !Object.prototype.hasOwnProperty.call(defsOwner, "_attributeDefinitions")) {
       defsOwner = Object.getPrototypeOf(defsOwner);
     }
-    if (
-      defsOwner &&
-      defsOwner !== this &&
-      (defsOwner as typeof Base).tableName !== this.tableName
-    ) {
-      return this.loadSchema();
+    if (defsOwner && defsOwner !== this) {
+      const ownerTable = (defsOwner as { tableName?: unknown }).tableName;
+      if (typeof ownerTable === "string" && ownerTable !== this.tableName) {
+        return this.loadSchema();
+      }
     }
 
     const enumNames = (this as any)._enums as Map<string, unknown> | undefined;
