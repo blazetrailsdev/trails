@@ -1665,12 +1665,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // Rails' extract_new_default_value only unwraps a Hash when it carries BOTH
     // :from and :to (schema_statements.rb:1820); a bare structured default like
     // `{}` is the literal default, not a changes hash.
-    const isChanges =
-      typeof defaultOrChanges === "object" &&
-      defaultOrChanges !== null &&
-      "from" in defaultOrChanges &&
-      "to" in defaultOrChanges;
-    const newDefault = isChanges ? (defaultOrChanges as { to: unknown }).to : defaultOrChanges;
+    const newDefault = this.schemaStatements().extractNewDefaultValue(defaultOrChanges);
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
     await this.alterTable(tableName, (columns) => {
       if (columns[columnName]) {

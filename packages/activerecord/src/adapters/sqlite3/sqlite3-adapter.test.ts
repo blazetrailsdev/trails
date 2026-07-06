@@ -101,6 +101,16 @@ describeIfSqlite("SQLite3AdapterTest", () => {
     expect(col?.default).toEqual("{}");
   });
 
+  it("change column default treats a bare to object as a literal default", async () => {
+    // Rails' extract_new_default_value only unwraps a Hash carrying BOTH :from
+    // and :to; `{ to: 1 }` without :from is the literal default, not a changes
+    // hash (schema_statements.rb:1820).
+    adapter.exec(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" json)`);
+    await adapter.changeColumnDefault("json_defs", "options", { to: 1 });
+    const col = (await adapter.columns("json_defs")).find((c) => c.name === "options");
+    expect(col?.default).toEqual('{"to":1}');
+  });
+
   it("change column serializes a structured json default", async () => {
     adapter.exec(`CREATE TABLE "json_defs" ("id" INTEGER PRIMARY KEY, "options" TEXT)`);
     await adapter.changeColumn("json_defs", "options", "json", { default: {} });
