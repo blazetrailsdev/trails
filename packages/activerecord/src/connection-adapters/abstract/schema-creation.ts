@@ -26,15 +26,18 @@ import { ArgumentError } from "@blazetrails/activemodel";
 
 /**
  * Per-adapter default column limits, mirroring the `:limit` keys carried by
- * each adapter's `NATIVE_DATABASE_TYPES` hash. Rails' `type_to_sql` derives a
- * missing limit generically via `limit ||= native[:limit]`
- * (abstract/schema_statements.rb:1404); the only non-nil default across our
- * three adapters is MySQL's `:string` (`limit: 255`, abstract_mysql_adapter.rb:33).
- * sqlite3 (`{ name: "varchar" }`, sqlite3_adapter.rb:71) and PostgreSQL
- * (`{ name: "character varying" }`, postgresql_adapter.rb:136) carry no default
- * length, so a bare `t.string` stays unbounded there. Keying the defaults off a
- * table — rather than `adapterName` branches inside each `type_to_sql` case —
- * keeps the native-type knowledge in one place and mirrors Rails' structure.
+ * each adapter's `NATIVE_DATABASE_TYPES` hash. Rails' `type_to_sql` reads that
+ * hash (`native = native_database_types[type]`) and fills a missing limit
+ * generically via `limit ||= native[:limit]` (abstract/schema_statements.rb:1404).
+ * The only non-nil default across our three adapters is MySQL's `:string`
+ * (`limit: 255`, abstract_mysql_adapter.rb:33); sqlite3 (`{ name: "varchar" }`,
+ * sqlite3_adapter.rb:71) and PostgreSQL (`{ name: "character varying" }`,
+ * postgresql_adapter.rb:136) carry none, so a bare `t.string` stays unbounded.
+ * Keying the defaults off a table — rather than `adapterName` branches inside
+ * each `type_to_sql` case — keeps the native-type knowledge in one place and
+ * mirrors Rails' structure. (Only the default *limit* varies by adapter here;
+ * PostgreSQL derives its distinct `character varying` type name in its own
+ * `typeToSql` override, so the shared visitor emits a single `VARCHAR` name.)
  */
 const NATIVE_TYPE_LIMITS: Record<
   "sqlite" | "postgres" | "mysql",
