@@ -312,35 +312,38 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
 
   it("addForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
     // Rails: add_foreign_key begins with `return unless use_foreign_keys?`.
+    // StubAdapter inherits AbstractAdapter.supports_foreign_keys? == false, so
+    // use_foreign_keys? is false through the real composition (no stubbing of
+    // the aggregate) — the guard must short-circuit before any SQL is emitted.
     let executed = false;
     class NoFkAdapter extends StubAdapter {
-      isUseForeignKeys() {
-        return false;
-      }
       executeMutation(_sql: string) {
         executed = true;
         return Promise.resolve(0);
       }
     }
     const stub = new NoFkAdapter();
+    expect((stub as any).isUseForeignKeys()).toBe(false);
     await stub.addForeignKey("articles", "authors", { column: "author_id" });
     expect(executed).toBe(false);
   });
 
   it("removeForeignKey is a no-op when use_foreign_keys? is false (Rails guard)", async () => {
     // Rails: remove_foreign_key begins with `return unless use_foreign_keys?`.
+    // Without the guard this would reach foreign_key_for! and raise; the guard
+    // makes it a silent no-op when the adapter doesn't support foreign keys.
     let executed = false;
     class NoFkAdapter extends StubAdapter {
-      isUseForeignKeys() {
-        return false;
-      }
       executeMutation(_sql: string) {
         executed = true;
         return Promise.resolve(0);
       }
     }
     const stub = new NoFkAdapter();
-    await stub.removeForeignKey("articles", { name: "fk_whatever" });
+    expect((stub as any).isUseForeignKeys()).toBe(false);
+    await expect(
+      stub.removeForeignKey("articles", { name: "fk_whatever" }),
+    ).resolves.toBeUndefined();
     expect(executed).toBe(false);
   });
 
