@@ -413,8 +413,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // (node-pg's "already executing a query" deprecation, the wire-protocol-desync
   // seam). Each op chains onto the previous; query-acquisition paths drain this
   // (alongside _inFlightReset) before yielding the socket so a pending DEALLOCATE
-  // can't race the next user query. This is the narrow maintenance-op serializer;
-  // the full per-query mutex is the sibling pg-pinned-client-query-serializer-mutex.
+  // can't race the next user query. It is ALSO the tail the full per-query mutex
+  // (`_serializePinnedQuery`) chains onto, so user queries, DEALLOCATE, ROLLBACK,
+  // and DISCARD ALL all serialize on this one chain — a single wire, no overlap.
   private _maintenanceTail: Promise<void> = Promise.resolve();
   // Accumulates PG NOTICE/WARNING messages fired during the current query.
   // Cleared before each query; processed by _flushWarnings after.
@@ -1334,6 +1335,60 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Serialize a single `client.query` on the pinned `pg.Client` against every
+   * other query (and maintenance op) on that same client, so no two ever
+   * overlap on the wire. node-pg's own request queue is insufficient under the
+   * write-path query volume: two calls that interleave desync the wire protocol
+   * and leave the connection idle-in-transaction (the
+   * `client.query() … already executing a query` deprecation is that seam). This
+   * is the general per-query mutex the sibling
+   * `pg-serialize-fire-and-forget-client-query-sites` maintenance serializer
+   * anticipated (see `_maintenanceTail`).
+   *
+   * It shares the one `_maintenanceTail` chain so DEALLOCATE / ROLLBACK /
+   * DISCARD ALL and user queries all serialize on a single tail — a maintenance
+   * op enqueued mid-query lands after it, and a query issued after an eviction's
+   * DEALLOCATE lands after that. Each call chains a fresh gate onto the tail and
+   * releases it once `fn` settles; the granularity is one `client.query`, never
+   * a whole `withRawConnection` block, so re-entrant/retry paths (which re-issue
+   * sequentially) each re-acquire without ever awaiting their own outstanding
+   * gate — no self-deadlock.
+   *
+   * Configure-time queries run on a not-yet-published client
+   * (`client !== _rawConnection`) and bypass the mutex: they already run direct
+   * on `client.query()` before the connection is acquirable (RFC 0013), and
+   * chaining them here would interleave with the maintenance tail during
+   * connect.
+   *
+   * A few other pinned-client sites deliberately stay direct because routing
+   * them onto the shared tail would deadlock or defeat their purpose, NOT for
+   * lack of coverage: `_maybeConfigureConnection` / the reset reconfigure run
+   * *inside* the `_inFlightReset` barrier that IS the tail (self-await), the
+   * DEALLOCATE / ROLLBACK / DISCARD ALL maintenance ops already chain via
+   * `_enqueueMaintenance`, `execRollbackDbTransaction`'s `ROLLBACK` follows a
+   * `_cancelAnyRunningQuery` that must not be made to wait on the query it just
+   * cancelled, and the memoized `server_version` bootstrap probe runs before the
+   * client is in normal service.
+   *
+   * @internal
+   */
+  private async _serializePinnedQuery<R>(client: pg.Client, fn: () => Promise<R>): Promise<R> {
+    if (client !== this._rawConnection) return fn();
+    const prev = this._maintenanceTail;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    this._maintenanceTail = prev.then(() => gate);
+    await prev.catch(() => {});
+    try {
+      return await fn();
+    } finally {
+      release();
+    }
+  }
+
+  /**
    * Tear down the single StatementPool. Called from `close()` /
    * `reconnect()` only — commit/rollback keep the pool attached
    * because PG prepared statements are session-scoped, not
@@ -1380,24 +1435,31 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         const stmtName = this._preparedNameFor(client, sql);
         onPrepared?.(stmtName);
         // `_preparedNameFor` may have evicted an LRU entry, queueing its
-        // DEALLOCATE on the maintenance tail. Drain it before issuing this
-        // query so the DEALLOCATE lands on an idle client rather than racing
-        // the query that triggered the eviction. Mirrors Rails, where
-        // StatementPool#[]= deallocs the evicted entry inline (under the
-        // connection lock) before the new query is sent
+        // DEALLOCATE on the maintenance tail. The serializer captures that tail
+        // (with the DEALLOCATE already enqueued) and awaits it before issuing,
+        // so the DEALLOCATE lands on an idle client rather than racing the query
+        // that triggered the eviction — subsuming the old explicit drain.
+        // Mirrors Rails, where StatementPool#[]= deallocs the evicted entry
+        // inline (under the connection lock) before the new query is sent
         // (statement_pool.rb:31, postgresql_adapter.rb:307).
-        await this._maintenanceTail;
-        return (await client.query({
-          name: stmtName,
-          text: sql,
-          values: binds,
-          ...queryExtra,
-        })) as R;
+        return this._serializePinnedQuery(
+          client,
+          () =>
+            client.query({
+              name: stmtName,
+              text: sql,
+              values: binds,
+              ...queryExtra,
+            }) as Promise<R>,
+        );
       }
       if (queryExtra.rowMode) {
-        return (await client.query({ text: sql, values: binds, ...queryExtra })) as R;
+        return this._serializePinnedQuery(
+          client,
+          () => client.query({ text: sql, values: binds, ...queryExtra }) as Promise<R>,
+        );
       }
-      return (await client.query(sql, binds)) as R;
+      return this._serializePinnedQuery(client, () => client.query(sql, binds) as Promise<R>);
     };
     const isTxConn = client === this._rawConnection;
     if (isTxConn) this._queryInFlight = true;
@@ -1692,9 +1754,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             // fails and we re-run without it.
             payload.sql = withReturning;
             try {
-              if (useSavepoint) await client.query(`SAVEPOINT "${spName}"`);
+              if (useSavepoint)
+                await this._serializePinnedQuery(client, () =>
+                  client.query(`SAVEPOINT "${spName}"`),
+                );
               const result = await this._runQuery(client, withReturning, binds);
-              if (useSavepoint) await client.query(`RELEASE SAVEPOINT "${spName}"`);
+              if (useSavepoint)
+                await this._serializePinnedQuery(client, () =>
+                  client.query(`RELEASE SAVEPOINT "${spName}"`),
+                );
               payload.row_count = result.rowCount ?? 0;
               if (result.rows.length > 1) {
                 return result.rowCount ?? result.rows.length;
@@ -1713,8 +1781,12 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
               // originally written for.
               if (err instanceof PreparedStatementCacheExpired) throw err;
               if (useSavepoint) {
-                await client.query(`ROLLBACK TO SAVEPOINT "${spName}"`).catch(() => {});
-                await client.query(`RELEASE SAVEPOINT "${spName}"`).catch(() => {});
+                await this._serializePinnedQuery(client, () =>
+                  client.query(`ROLLBACK TO SAVEPOINT "${spName}"`),
+                ).catch(() => {});
+                await this._serializePinnedQuery(client, () =>
+                  client.query(`RELEASE SAVEPOINT "${spName}"`),
+                ).catch(() => {});
               }
               payload.sql = pgSql;
               const result = await this._runQuery(client, pgSql, binds);
@@ -2101,7 +2173,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // "there is no parameter $1".
       const pgBinds = binds.map((v) => this._bindForPg(v));
       const rewritten = this.rewriteBinds(sql, pgBinds);
-      const result = await client.query(`${clause} ${rewritten}`, pgBinds);
+      const result = await this._serializePinnedQuery(client, () =>
+        client.query(`${clause} ${rewritten}`, pgBinds),
+      );
       const printer = new ExplainPrettyPrinter();
       return printer.pp(result.rows);
     });
@@ -2431,8 +2505,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async exec(sql: string): Promise<void> {
     await this.withRawConnection(async (conn) => {
+      const client = conn as unknown as pg.Client;
       try {
-        await (conn as unknown as pg.Client).query(sql);
+        await this._serializePinnedQuery(client, () => client.query(sql));
       } catch (e) {
         // The bare driver `exec()` is the DDL path for schema statements.
         // Unlike `execute()`/`executeMutation()`, it bypasses bind rewriting,
@@ -3052,7 +3127,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async getAdvisoryLock(lockId: number | bigint | string): Promise<boolean> {
     const client = await this._acquireFreshClient();
     const [sql, param] = _pgAdvisoryLockSql("pg_try_advisory_lock", "locked", lockId);
-    const result = await client.query(sql, [param]);
+    const result = await this._serializePinnedQuery(client, () => client.query(sql, [param]));
     return result.rows[0]?.locked === true;
   }
 
@@ -3060,7 +3135,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     if (!this._rawConnection) return false;
     const client = await this._acquireFreshClient();
     const [sql, param] = _pgAdvisoryLockSql("pg_advisory_unlock", "unlocked", lockId);
-    const result = await client.query(sql, [param]);
+    const result = await this._serializePinnedQuery(client, () => client.query(sql, [param]));
     return result.rows[0]?.unlocked === true;
   }
 
