@@ -1643,27 +1643,35 @@ export const DatabaseStatements = {
     _sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<number | Result> {
-    const originalSql = sql;
     // Mirror Rails' abstract `exec_insert`, which runs `sql_for_insert` before
-    // the query: append a RETURNING clause on adapters that support it so
-    // DB-populated columns (auto-increment PK, DB-computed defaults) come back
-    // on INSERT.
-    [sql, binds] = sqlForInsert.call(
-      this as unknown as DatabaseStatementsHost,
-      sql,
-      pk ?? null,
-      binds ?? [],
-      returning ?? null,
-    );
-    // sql_for_insert only ever appends, so a length change means a RETURNING
-    // clause was added. `executeMutation` (the scalar write primitive) surfaces
-    // only the generated id, so read the RETURNING row back through the query
-    // path instead, then mark the transaction dirty as `executeMutation` would
-    // (its rollback bookkeeping is skipped on the read path).
-    if (sql.length !== originalSql.length && this.internalExecQuery) {
-      const result = await this.internalExecQuery(sql, name ?? "SQL", binds);
-      this.dirtyCurrentTransaction?.();
-      return result;
+    // the query so a caller-named RETURNING column list surfaces the
+    // DB-populated columns (auto-increment PK, DB-computed defaults) on INSERT.
+    // Only engage when the caller asks for RETURNING columns and the statement
+    // does not already carry a RETURNING clause — this keeps the mixin a
+    // no-op for PostgreSQL, whose own `execInsert` override appends RETURNING
+    // itself and then delegates here via `super` (a second append would emit
+    // an invalid double `RETURNING`).
+    const wantsReturning = returning != null && returning.length > 0 && !/\sRETURNING\s/i.test(sql);
+    if (wantsReturning) {
+      const [returningSql, returningBinds] = sqlForInsert.call(
+        this as unknown as DatabaseStatementsHost,
+        sql,
+        pk ?? null,
+        binds ?? [],
+        returning ?? null,
+      );
+      // `sql_for_insert` appends a clause only on adapters that support
+      // `RETURNING`; when it does, `executeMutation` (the scalar write
+      // primitive) would surface just the generated id, so read the full
+      // RETURNING row back through the query path instead — SQLite's
+      // `executeMutation` `.run()` path drops those rows entirely. Mark the
+      // transaction dirty as `executeMutation` would, since its rollback
+      // bookkeeping is skipped on the read path.
+      if (returningSql.length !== sql.length && this.internalExecQuery) {
+        const result = await this.internalExecQuery(returningSql, name ?? "SQL", returningBinds);
+        this.dirtyCurrentTransaction?.();
+        return result;
+      }
     }
     return this.executeMutation(sql, binds, name ?? "SQL");
   },
