@@ -827,9 +827,16 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
  * following char, so an escaped backslash (`\\`) is consumed as one unit and a
  * real close-quote right after it (`'a\\'`) still closes the literal — a
  * subsequent genuine qualifier (`... 'a\\' AND posts.x ...`) stays exposed to
- * the scan and is NOT swallowed. Double-quoted tokens are SQL identifiers, not literals,
- * so they are left intact. `?` placeholders in a BoundSqlLiteral are outside any
- * literal and unaffected.
+ * the scan and is NOT swallowed. `?` placeholders in a BoundSqlLiteral are
+ * outside any literal and unaffected.
+ *
+ * Only single-quoted literals are tokenized; double-quoted identifiers are not
+ * tracked. That leaves one narrow gap: two double-quoted identifiers each
+ * containing a stray apostrophe (e.g. `"note's"`) can have their apostrophes
+ * paired as a bogus literal, blanking a genuine qualifier between them. This
+ * needs apostrophe-bearing quoted identifiers — pathological for canonical
+ * table/column names — so it is left as an accepted limitation rather than
+ * carrying a full SQL tokenizer here.
  * @internal
  */
 function stripSqlStringLiterals(sql: string): string {
