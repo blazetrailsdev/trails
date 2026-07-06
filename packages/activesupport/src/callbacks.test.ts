@@ -377,6 +377,23 @@ describe("Callbacks", () => {
       runCallbacks(target, "save");
       expect(target.log).toEqual(["run"]);
     });
+
+    it("forwards the block's return value (env.value) to after-callback conditions", () => {
+      // Mirrors ActiveModel's after-model-callback guard (`value != false`):
+      // the condition reads the run_callbacks block's return, so an after
+      // callback is skipped when the block returned false and runs otherwise.
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "after", (t: any) => t.log.push("after"), {
+        unless: (_t, value) => value === false,
+      });
+
+      runCallbacks(target, "save", () => false);
+      expect(target.log).toEqual([]);
+
+      runCallbacks(target, "save", () => "ok");
+      expect(target.log).toEqual(["after"]);
+    });
   });
 
   describe("prepend", () => {
