@@ -557,6 +557,11 @@ export async function execInsertReturningReadback(
   returning: string[] | null | undefined,
 ): Promise<Result | undefined> {
   if (!returning || returning.length <= 1) return undefined;
+  // Gate on the capability flag sql_for_insert itself checks
+  // (supports_insert_returning?) rather than sniffing the generated SQL — on a
+  // backend without INSERT ... RETURNING (MySQL 8) sql_for_insert appends
+  // nothing, so the caller keeps its executeMutation fast path.
+  if (!this.supportsInsertReturning?.()) return undefined;
   const [returningSql, returningBinds] = sqlForInsert.call(
     this as never,
     sql,
@@ -564,7 +569,6 @@ export async function execInsertReturningReadback(
     binds,
     returning,
   );
-  if (!/\sRETURNING\s/i.test(returningSql)) return undefined;
   // Dispatch through the instance so SQLite's bind-aware internalExecQuery
   // override (`.all()`) is used; PG/MySQL fall to the mixed-in default.
   const run = (this.internalExecQuery ?? internalExecQuery).bind(this);

@@ -1147,7 +1147,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
               this as any,
               conn,
               driverSql,
-              driverBinds,
+              binds,
               driverBinds,
               { prepare },
             );
@@ -1159,7 +1159,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // The loop already translated for its retry classification; guard
         // against re-translating an ActiveRecordError (see execute()).
         const translated =
-          e instanceof ActiveRecordError ? e : await this._translateAndEnrich(e, driverSql, []);
+          e instanceof ActiveRecordError
+            ? e
+            : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;

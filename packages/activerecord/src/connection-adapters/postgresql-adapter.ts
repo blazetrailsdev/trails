@@ -2126,9 +2126,17 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           payload.row_count = count;
           return result;
         } catch (e: any) {
-          payload.exception = e;
-          payload.exception_object = e;
-          throw e;
+          // A bound query is the exec_insert RETURNING read-back: translate with
+          // sql + binds here (mirroring _instrumentedQueryOnClient) so a
+          // constraint violation surfaces as RecordNotUnique/InvalidForeignKey
+          // carrying statement context. withRawConnection re-catches this AR
+          // error and passes it through unchanged; its own translate would
+          // otherwise re-wrap with null sql / empty binds. Transaction-control
+          // SQL (no binds) keeps the raw rethrow, matching pre-PR behavior.
+          const translated = hasBinds ? this._translateException(e, runSql, bindArray) : e;
+          payload.exception = translated;
+          payload.exception_object = translated;
+          throw translated;
         }
       }),
     );
