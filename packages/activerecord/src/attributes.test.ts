@@ -207,11 +207,11 @@ describe("CustomPropertiesTest", () => {
     const data = new OverloadedType({ non_existent_decimal: 1 });
 
     expect(data.non_existent_decimal).toEqual(new BigDecimal(1));
-    // Rails raises UnknownAttributeError constructing UnoverloadedType with a key
-    // that has no attribute; trails currently ignores unknown construction keys.
-    // Tracked by RFC 0046 converge-construction-unknown-attribute-strict.
-    const u = new UnoverloadedType({ non_existent_decimal: 1 } as any);
-    expect((u as any).non_existent_decimal).toBeUndefined();
+    // UnoverloadedType has no `non_existent_decimal` attribute, so constructing
+    // with the key raises UnknownAttributeError, like Rails.
+    expect(() => new UnoverloadedType({ non_existent_decimal: 1 } as any)).toThrow(
+      "unknown attribute 'non_existent_decimal'",
+    );
   });
 
   it("model with nonexistent attribute with default value can be saved", async () => {

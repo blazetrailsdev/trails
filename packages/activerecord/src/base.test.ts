@@ -244,9 +244,16 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    // Should not throw when setting unknown attributes
-    const u = new User({ name: "test", unknown: "value" } as any);
-    expect(u.name).toBe("test");
+    // Mirrors Rails: constructing with a genuinely-unknown key raises
+    // UnknownAttributeError (attribute_assignment.rb:56-58), carrying the key.
+    let error: unknown;
+    try {
+      new User({ name: "test", unknown: "value" } as any);
+    } catch (e) {
+      error = e;
+    }
+    expect((error as { name?: string })?.name).toBe("UnknownAttributeError");
+    expect((error as { attribute?: string })?.attribute).toBe("unknown");
   });
 
   it("many mutations", async () => {

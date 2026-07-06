@@ -29,6 +29,7 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   Model,
+  MissingAttributeError,
   Type,
   typeRegistry,
   pushPendingDecorator,
@@ -668,6 +669,27 @@ function _extractAssociationAttrs(
 }
 
 /**
+ * Collect every `<assoc>Attributes` nested-attribute setter key registered on
+ * `ctor` and its ancestors (the same registry `_reapplyNestedAttrSetters`
+ * walks). Used to hold nested-attribute keys out of the Model constructor's
+ * setter-dispatching assignment so they fire post-super, once the association
+ * caches exist.
+ * @internal
+ */
+function _collectNestedAttributeSetterKeys(ctor: typeof Base | undefined): Set<string> {
+  const keys = new Set<string>();
+  let cls: unknown = ctor;
+  while (cls && cls !== Object) {
+    const own = Object.getOwnPropertyDescriptor(cls, "_nestedAttributeSetterKeys");
+    if (own?.value instanceof Set) {
+      for (const k of own.value as Set<string>) keys.add(k);
+    }
+    cls = Object.getPrototypeOf(cls);
+  }
+  return keys;
+}
+
+/**
  * Route a constructor-form composite primary key (`new Model({ id: [a, b] })`)
  * through the `id=` setter so each key column is populated. Rails dispatches all
  * `assign_attributes` keys through `public_send("#{k}=")`, but trails' Model
@@ -681,8 +703,29 @@ function _applyCompositePrimaryKey(
   attrs: Record<string, unknown>,
 ): void {
   const pk = (ctor as { primaryKey?: unknown }).primaryKey;
-  if (Array.isArray(pk) && Array.isArray((attrs as { id?: unknown }).id)) {
-    (record as unknown as { id: unknown }).id = (attrs as { id: unknown }).id;
+  if (!Array.isArray(pk) || !Object.prototype.hasOwnProperty.call(attrs, "id")) return;
+  const idVal = (attrs as { id: unknown }).id;
+  if (Array.isArray(idVal)) {
+    // `id: [a, b]` routes through the `id=` setter, which spreads across the key
+    // columns. Held out of super() so no phantom scalar `id` attribute is made.
+    (record as unknown as { id: unknown }).id = idVal;
+    return;
+  }
+  // A scalar `id` on a composite-PK model is not a composite assignment: the
+  // `id=` setter (setId) rejects a non-array. Write it straight to the `id`
+  // column if the model has one (e.g. a table with a real `id` column and a
+  // model-level composite PK), matching the pre-setter-dispatch constructor
+  // that wrote it via `writeAttribute` during construction. A model with no
+  // scalar `id` column resolves to the Null attribute → MissingAttributeError,
+  // which stays lenient here (the deferred composite-PK path Rails never treats
+  // as an unknown-attribute error).
+  try {
+    (record as unknown as { _writeAttribute: (n: string, v: unknown) => void })._writeAttribute(
+      "id",
+      idVal,
+    );
+  } catch (error) {
+    if (!(error instanceof MissingAttributeError)) throw error;
   }
 }
 
@@ -3077,10 +3120,22 @@ export class Base extends Model {
       // (`public_send("id=")`) never creates one.
       if (
         Array.isArray((ctor2 as { primaryKey?: unknown }).primaryKey) &&
-        Array.isArray(attrs.id)
+        Object.prototype.hasOwnProperty.call(attrs, "id")
       ) {
         attrsForSuper = Object.fromEntries(
           Object.entries(attrsForSuper).filter(([k]) => k !== "id"),
+        );
+      }
+      // Nested-attribute keys (`<assoc>Attributes`) are re-dispatched through
+      // their generated setter post-super by `_reapplyNestedAttrSetters` — once
+      // the association proxies exist. Drop them from `attrsForSuper` so super()'s
+      // `_assignAttributes` (which now dispatches setters, not raw writes) doesn't
+      // fire the nested setter mid-construction, before `initInternals` has wired
+      // the association caches.
+      const _nestedKeys = _collectNestedAttributeSetterKeys(ctor2);
+      if (_nestedKeys.size > 0) {
+        attrsForSuper = Object.fromEntries(
+          Object.entries(attrsForSuper).filter(([k]) => !_nestedKeys.has(k)),
         );
       }
       const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };

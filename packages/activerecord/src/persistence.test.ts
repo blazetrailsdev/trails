@@ -342,7 +342,7 @@ describe("PersistenceTest", () => {
         this.beforeUpdate(() => throwAbort());
       }
     }
-    const t = await Klass.create({ title: "New Topic", authorName: "Not David" });
+    const t = await Klass.create({ title: "New Topic", author_name: "Not David" });
 
     await expect((t as any).updateAttributeBang("title", "super_title")).rejects.toThrow(
       RecordNotSaved,

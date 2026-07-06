@@ -74,7 +74,6 @@ import {
   attributeMethodPatterns,
   isAttributeMethodPatterns,
   isRespondToWithoutAttributes,
-  MissingAttributeError,
 } from "./attribute-methods.js";
 import {
   _assignAttribute as attrAssignOne,
@@ -1486,11 +1485,8 @@ export class Model {
   _dirty!: DirtyTracker;
 
   /**
-   * True only while the constructor is assigning its initial attribute bag.
-   * trails' constructor writes every key through `writeAttribute` directly
-   * (rather than Rails' `assign_attributes` → per-key setter dispatch). The
-   * loop swallows the strict `MissingAttributeError` `writeFromUser` now raises
-   * so construction stays lenient for not-yet-modeled names; this flag lets the
+   * True only while the constructor is assigning its initial attribute bag
+   * through `assign_attributes` (per-key setter dispatch). This flag lets the
    * AR write path detect the window (e.g. composite-PK `id=` remap) without
    * re-raising mid-construction.
    *
@@ -1571,35 +1567,20 @@ export class Model {
     // Attributes#initialize — @attributes = self.class._default_attributes.deep_dup
     this._attributes = ctor._defaultAttributes().deepDup();
 
-    // API#initialize — assign through writeAttribute (casting, normalization).
-    // Dispatches through this (so subclass overrides apply), matching Rails.
+    // API#initialize — assign_attributes(attributes) (api.rb:80-82). Each key is
+    // routed through `_assignAttribute` → setter dispatch, exactly like Rails'
+    // `_assign_attribute` (attribute_assignment.rb:67-75): a key with a writer
+    // (a framework-generated attribute setter, a user-defined `set name`, or a
+    // nested-attribute `<assoc>Attributes=` setter) dispatches through it, and a
+    // genuinely-unknown, writer-less key routes to `attributeWriterMissing`
+    // (→ `UnknownAttributeError`). The `_initializingAttributes` window lets the
+    // AR write path detect construction (e.g. composite-PK `id=` remap) without
+    // re-raising mid-construction. Empty bag is a no-op — mirrors
+    // `assign_attributes`' `return if new_attributes.empty?` (so a subclass
+    // `_assignAttributes` override isn't invoked for `new Model({})`).
     this._initializingAttributes = true;
     try {
-      for (const [key, value] of Object.entries(attrs)) {
-        try {
-          this.writeAttribute(key, value);
-        } catch (error) {
-          // trails' constructor writes every key through `writeAttribute`
-          // directly, rather than Rails' `assign_attributes` → `_assign_attribute`
-          // (api.rb:80-82, attribute_assignment.rb:67-75), which dispatches a key
-          // with a writer and routes a writer-less key to `attribute_writer_missing`
-          // (→ `UnknownAttributeError`). The loop relies on construction staying
-          // lenient for not-yet-modeled names: nested-attribute keys
-          // (`commentsAttributes`, re-applied by `_reapplyNestedAttrSetters`),
-          // composite-PK string keys, and — pre-existing trails behavior, NOT a
-          // regression of this PR (origin/main's lazy `write_from_user` stored
-          // them rather than raising) — genuinely unknown keys.
-          //
-          // Converging this window to Rails (raise `UnknownAttributeError` for a
-          // writer-less key) is a distinct, broad convergence: it requires the
-          // constructor to setter-dispatch like `assign_attributes`, and it
-          // surfaces a cluster of tests that ratified the leniency
-          // (base `initialize with invalid attribute`, the cpk-string nested
-          // path, etc.). Tracked as RFC 0046 story
-          // `converge-construction-unknown-attribute-strict`.
-          if (!(error instanceof MissingAttributeError)) throw error;
-        }
-      }
+      if (Object.keys(attrs).length > 0) this._assignAttributes(attrs);
     } finally {
       this._initializingAttributes = false;
     }
