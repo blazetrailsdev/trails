@@ -819,9 +819,12 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
 /**
  * Blank out single-quoted SQL string literals (keeping length via spaces) so a
  * `<table>.` qualifier scan does not match a table name embedded in literal
- * text. Doubled single-quotes (`''`, SQL's escaped quote) are consumed as part
- * of the literal. Double-quoted tokens are SQL identifiers, not literals, so
- * they are left intact. `?` placeholders in a BoundSqlLiteral are outside any
+ * text. Both escape forms inside a literal are consumed: SQL-standard doubled
+ * single-quotes (`''`) and a backslash-escaped quote (`\'`), the latter being
+ * MySQL/MariaDB's default (`NO_BACKSLASH_ESCAPES` off) — so a literal like
+ * `'don\'t touch memberships.x'` is fully blanked rather than terminating early
+ * at the escaped quote. Double-quoted tokens are SQL identifiers, not literals,
+ * so they are left intact. `?` placeholders in a BoundSqlLiteral are outside any
  * literal and unaffected.
  * @internal
  */
@@ -830,7 +833,7 @@ function stripSqlStringLiterals(sql: string): string {
   // qualifier scan below does not match a table name inside quoted text. The
   // result is never executed as SQL.
   // eslint-disable-next-line blazetrails/no-raw-sql
-  return sql.replace(/'(?:[^']|'')*'/g, (lit) => " ".repeat(lit.length));
+  return sql.replace(/'(?:[^'\\]|''|\\.)*'/g, (lit) => " ".repeat(lit.length));
 }
 
 /**

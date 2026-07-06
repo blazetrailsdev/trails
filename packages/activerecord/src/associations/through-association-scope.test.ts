@@ -48,6 +48,17 @@ registerModel(Comment);
   scope: (rel: any) => rel.where("comments.body = 'mention posts.title here'"),
 });
 
+// Same false-positive class but with a BACKSLASH-escaped quote inside the
+// literal (`\'`) — MySQL/MariaDB's default escaping. A regex that only knows
+// `''` escaping would terminate the literal early at the backslash-escaped
+// quote and leave `posts.` exposed to the scan.
+(Author as any).hasMany("commentsWithBackslashLiteralThroughRef", {
+  className: "Comment",
+  through: "posts",
+  source: "comments",
+  scope: (rel: any) => rel.where("comments.body = 'don\\'t touch posts.title here'"),
+});
+
 // Positive control: a GENUINE through-table (`posts.`) qualifier — unquoted, a
 // real column reference — must still be relocated onto the through query. Pins
 // that stripping string literals does not break the true-positive path.
@@ -96,6 +107,17 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     // And the through query must not carry the source predicate.
     const scope = (loader as any)._buildThroughScope();
     expect(scope.toSql()).not.toContain("mention posts.title here");
+  });
+
+  it("does not relocate when a backslash-escaped-quote literal embeds the through table name", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithBackslashLiteralThroughRef");
+    const partition = (loader as any)._partitionReflectionWhere();
+    expect(partition.throughPredicates).toHaveLength(0);
+    expect(partition.sourcePredicates).toHaveLength(1);
+
+    const scope = (loader as any)._buildThroughScope();
+    expect(scope.toSql()).not.toContain("posts.title");
   });
 
   it("relocates a genuine through-table qualifier onto the through query", () => {
