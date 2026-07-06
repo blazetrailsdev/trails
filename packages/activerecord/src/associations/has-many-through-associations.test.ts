@@ -1490,6 +1490,12 @@ describe("HasManyThroughAssociationsTest", () => {
     );
   });
 
+  it("collection singular ids getter through with custom primary key", async () => {
+    const david = await Author.find(authors("david").id);
+    const catIds = await (david as any).essayCategoryIds;
+    expect([...catIds].sort()).toEqual([(categories("general") as any).name]);
+  });
+
   it("collection singular ids setter", async () => {
     const company = await Company.find(companies("rails_core").id);
     const dev = (await Developer.first())!;

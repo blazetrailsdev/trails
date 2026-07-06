@@ -65,21 +65,51 @@ export class CollectionAssociation extends Association {
    * Returns an array of primary key values from the target.
    */
   async idsReader(): Promise<unknown[]> {
+    // Rails `ids_reader` plucks `reflection.association_primary_key` in all
+    // three branches, not the target model's own primary key. For a
+    // custom-PK association (e.g. `Category.primary_key == "name"`, or a
+    // has_many with an explicit `primary_key:`) this is the association's own
+    // key, so the reader must resolve it off the rich reflection (as
+    // `idsWriter` does) rather than reading `klass.primaryKey`.
+    const pk = this.associationPrimaryKey();
+    const keys = Array.isArray(pk) ? pk : [pk];
+    const readKey = (r: Base): unknown => {
+      const vals = keys.map((key) =>
+        typeof (r as any)._readAttribute === "function"
+          ? (r as any)._readAttribute(key)
+          : (r as any)[key],
+      );
+      return vals.length === 1 ? vals[0] : vals;
+    };
     if (this.isLoaded()) {
-      return this.target.map((r) => this.primaryKeyValue(r));
+      return this.target.map(readKey);
     }
     if (this.target.length > 0) {
       await this.loadTarget();
-      return this.target.map((r) => this.primaryKeyValue(r));
+      return this.target.map(readKey);
     }
     if (this._associationIds) return this._associationIds;
-    const pk = (this.klass as any).primaryKey ?? "id";
     const rel = this.scope();
     if (rel && typeof rel.pluck === "function") {
-      this._associationIds = await rel.pluck(...(Array.isArray(pk) ? pk : [pk]));
+      this._associationIds = await rel.pluck(...keys);
       return this._associationIds!;
     }
     return [];
+  }
+
+  /**
+   * Resolves the association's `association_primary_key` off the rich
+   * reflection (as `idsWriter` does), falling back to the target model's
+   * primary key. Mirrors `reflection.association_primary_key`.
+   */
+  protected associationPrimaryKey(): string | string[] {
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (
+        n: string,
+      ) => { associationPrimaryKey?: string | string[] } | undefined;
+    };
+    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name);
+    return richReflection?.associationPrimaryKey ?? (this.klass as any).primaryKey ?? "id";
   }
 
   /**
@@ -98,13 +128,7 @@ export class CollectionAssociation extends Association {
     // For a through/custom-PK association this is the association's own key
     // (e.g. `Category.primary_key == "name"`), not the target model's `id`, so
     // the lookup + not-found message key must come from the rich reflection.
-    const ctor = this.owner.constructor as typeof Base & {
-      _reflectOnAssociation?: (
-        n: string,
-      ) => { associationPrimaryKey?: string | string[] } | undefined;
-    };
-    const richReflection = ctor._reflectOnAssociation?.(this.reflection.name);
-    const pk = richReflection?.associationPrimaryKey ?? Klass.primaryKey ?? "id";
+    const pk = this.associationPrimaryKey();
     const filteredIds = (Array.isArray(ids) ? ids : [ids]).filter((id) => id != null && id !== "");
 
     let records: Base[];

@@ -114,26 +114,6 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return super.primaryKeyValue(record);
   }
 
-  override async idsReader(): Promise<unknown[]> {
-    if (this.isLoaded()) {
-      return this.target.map((r) => this.primaryKeyValue(r));
-    }
-    if (this.target.length > 0) {
-      return (await this.loadTarget()).map((r) => this.primaryKeyValue(r));
-    }
-    if (this._associationIds) return this._associationIds;
-    const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-    const refl = ctor._reflectOnAssociation?.(this.reflection.name);
-    const srcPk = refl?.sourceReflection?.associationPrimaryKey;
-    const pk = (typeof srcPk === "string" ? srcPk : null) ?? (this.klass as any).primaryKey;
-    const rel = this.scope();
-    if (rel && typeof rel.pluck === "function") {
-      this._associationIds = await rel.pluck(...(Array.isArray(pk) ? pk : [pk]));
-      return this._associationIds!;
-    }
-    return [];
-  }
-
   /**
    * Mirrors Rails' HasManyThroughAssociation#insert_record
    * (has_many_through_association.rb:24-34):
