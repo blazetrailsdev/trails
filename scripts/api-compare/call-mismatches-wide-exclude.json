@@ -41751,6 +41751,13 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "raise_record_not_found_exception!",
+    "call": "pluralize",
+    "reason": "bucket (b) equivalent: name.pluralize / key.pluralize are invoked via the shared formatNotFoundAllMessage helper (same file, PR #4665), which composes the Rails message for both raiseRecordNotFoundExceptionBang and raiseNotFoundAll; the call moved out of the port body but is still made."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "raise_record_not_found_exception!",
     "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
