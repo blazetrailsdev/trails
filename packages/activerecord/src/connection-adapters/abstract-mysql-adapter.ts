@@ -1801,23 +1801,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
 
     // Base types (mirrors AbstractAdapter#initialize_type_map via super)
     m.registerType(/^boolean/i, undefined, () => new BooleanType());
-    // MySQL registers char/varchar/enum/set with a String type whose
-    // boolean coercions are "1"/"0" rather than the ActiveModel default
-    // "t"/"f", so a boolean assigned to a string column round-trips as
-    // 1/0. Mirrors mysql2_adapter.rb's `Type.register(:string, ...)` block
-    // (`Type::String.new(true: "1", false: "0")`) and its char/enum/set
-    // registrations.
-    // char/varchar thread `extract_limit(sql_type)` onto the type
-    // (mysql2_adapter.rb:43-46, `register_type(%r(char)i)`), so
-    // `type_for_attribute(col).limit` reflects the column limit. enum/set
-    // register the limitless string (mysql2_adapter.rb:48-49).
-    const mysqlStringWithLimit = (sqlType: string) =>
-      new StringType({ trueString: "1", falseString: "0", limit: this.extractLimit(sqlType) });
-    const mysqlString = () => new StringType({ trueString: "1", falseString: "0" });
-    m.registerType(/^char/i, undefined, mysqlStringWithLimit);
-    m.registerType(/^varchar/i, undefined, mysqlStringWithLimit);
-    m.registerType(/^enum/i, undefined, mysqlString);
-    m.registerType(/^set/i, undefined, mysqlString);
+    // NOTE: char/varchar/enum/set string registrations do NOT belong here —
+    // they bind mysql2/trilogy-specific `"1"`/`"0"` boolean-string behavior to
+    // a concrete client, so Rails registers them in the concrete
+    // `Mysql2Adapter#initialize_type_map` (mysql2_adapter.rb:40-49), not in
+    // `AbstractMysqlAdapter#initialize_type_map` (abstract_mysql_adapter.rb:711,
+    // which has no such registration). See Mysql2Adapter.initializeTypeMap.
     m.registerType(/^binary/i, undefined, () => new BinaryType());
     m.registerType(/^varbinary/i, undefined, () => new BinaryType());
     m.registerType(/^date$/i, new DateType());
