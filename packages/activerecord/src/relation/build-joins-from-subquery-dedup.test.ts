@@ -38,13 +38,18 @@ describe("build_joins from(subquery) dedup", () => {
   // JoinDependency — matching the `from(relation)` subquery path shape. Assert
   // the two paths emit identical SQL for `left_outer_joins` with no inner joins.
   it("pure left_outer_joins live path matches the from-subquery path SQL", () => {
-    const rel = Post.leftOuterJoins("author");
-    const liveSql = (rel as unknown as { toSql(): string }).toSql();
+    const joinFragment = (sql: string): string => {
+      const m = sql.match(/LEFT OUTER JOIN [^)]*/);
+      return (m?.[0] ?? "").trim();
+    };
+    const liveSql = (Post.leftOuterJoins("author") as unknown as { toSql(): string }).toSql();
     const subSql = (
       Post.from(Post.leftOuterJoins("author"), "posts") as unknown as { toSql(): string }
     ).toSql();
-    expect(liveSql).toContain("LEFT OUTER JOIN");
     expect((liveSql.match(/LEFT OUTER JOIN/g) ?? []).length).toBe(1);
-    expect(subSql).toContain(liveSql.slice(liveSql.indexOf("LEFT OUTER JOIN")));
+    // The short-circuited live path emits the exact same LEFT OUTER JOIN clause
+    // as the subquery `from(relation)` path — not just a coincidentally-similar one.
+    expect(joinFragment(liveSql)).not.toBe("");
+    expect(joinFragment(liveSql)).toBe(joinFragment(subSql));
   });
 });
