@@ -75,4 +75,20 @@ describe("Mysql2Adapter base _connection field", () => {
     await adapter.close();
     expect(connectionOf(adapter)).toBeNull();
   });
+
+  it("run loop fires connectBang once per connect, not once per query", async () => {
+    stubNewClient();
+    const adapter = new Mysql2Adapter({ host: "localhost" });
+    const connectSpy = vi.spyOn(adapter, "connectBang");
+
+    // Each withRawConnection call hits the base run-loop guard
+    // (`_connection === null` → connectBang). With _connection populated on the
+    // first connect, subsequent queries must NOT re-fire connectBang.
+    const opts = { materializeTransactions: false, allowRetry: false } as const;
+    await adapter.withRawConnection(opts, () => undefined);
+    await adapter.withRawConnection(opts, () => undefined);
+    await adapter.withRawConnection(opts, () => undefined);
+
+    expect(connectSpy).toHaveBeenCalledTimes(1);
+  });
 });
