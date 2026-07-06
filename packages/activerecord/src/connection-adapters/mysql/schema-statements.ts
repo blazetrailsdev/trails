@@ -14,7 +14,7 @@ import { Column } from "./column.js";
 import { SchemaStatements as BaseSchemaStatements } from "../abstract/schema-statements.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./schema-creation.js";
 import { CreateIndexDefinition, ForeignKeyDefinition } from "../abstract/schema-definitions.js";
-import { unquoteIdentifier } from "./quoting.js";
+import { quoteColumnName, unquoteIdentifier } from "./quoting.js";
 import type { AddIndexOptions } from "../abstract/schema-definitions.js";
 
 /**
@@ -890,7 +890,7 @@ export async function indexes(
   Array<{
     table: string;
     name: string;
-    columns: string[];
+    columns: string[] | string;
     unique: boolean;
     using?: string;
     type?: string;
@@ -922,6 +922,7 @@ export async function indexes(
       comment?: string;
       lengths: Record<string, number>;
       orders: Record<string, string>;
+      expressions: Record<string, string>;
     }
   >();
   let currentIndex: string | null = null;
@@ -952,6 +953,7 @@ export async function indexes(
         comment,
         lengths: {},
         orders: {},
+        expressions: {},
       });
     }
 
@@ -966,6 +968,7 @@ export async function indexes(
       let expr = String(rawExpr).replace(/\\'/g, "'");
       if (!expr.startsWith("(")) expr = `(${expr})`;
       entry.columns.push(expr);
+      entry.expressions[expr] = expr;
       if (desc) entry.orders[expr] = "desc";
     } else {
       const column = String((r.Column_name ?? r.COLUMN_NAME) as string);
@@ -977,16 +980,33 @@ export async function indexes(
     }
   }
   return Array.from(byIndex.entries()).map(
-    ([name, { columns, unique, using, type, comment, lengths, orders }]) => ({
-      table: tableName,
-      name,
-      columns,
-      unique,
-      ...(using !== undefined ? { using } : {}),
-      ...(type !== undefined ? { type } : {}),
-      ...(comment !== undefined ? { comment } : {}),
-      ...(Object.keys(lengths).length > 0 ? { lengths } : {}),
-      ...(Object.keys(orders).length > 0 ? { orders } : {}),
-    }),
+    ([name, { columns, unique, using, type, comment, lengths, orders, expressions }]) => {
+      const base = {
+        table: tableName,
+        name,
+        unique,
+        ...(using !== undefined ? { using } : {}),
+        ...(type !== undefined ? { type } : {}),
+        ...(comment !== undefined ? { comment } : {}),
+      };
+      // Mirrors Rails' final `.map`: a functional (expression) index collapses
+      // its columns array into a single SQL string via addOptionsForIndexColumns,
+      // baking prefix length and DESC/ASC order inline. Non-expression columns
+      // are quoted; expression columns pass through their parenthesized form.
+      // The separate lengths/orders Records are consumed here and dropped.
+      if (Object.keys(expressions).length > 0) {
+        const quotedColumns = new Map<string, string>(
+          columns.map((c) => [c, expressions[c] ?? quoteColumnName(c)]),
+        );
+        addOptionsForIndexColumns(quotedColumns, { order: orders, length: lengths });
+        return { ...base, columns: Array.from(quotedColumns.values()).join(", ") };
+      }
+      return {
+        ...base,
+        columns,
+        ...(Object.keys(lengths).length > 0 ? { lengths } : {}),
+        ...(Object.keys(orders).length > 0 ? { orders } : {}),
+      };
+    },
   );
 }
