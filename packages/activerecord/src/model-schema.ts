@@ -319,10 +319,15 @@ type DatabaseAdapterLike = { schemaCache?: unknown };
  *
  * Used by `_defaultAttributes` to seed schema columns via `Attribute.fromDatabase`
  * (Rails' `columns_hash.transform_values { Attribute.from_database(...) }`) without
- * ever touching `.connection` — which would permanently check out a connection on
- * every record construction. Only reads the threaded (in-query) connection's warm
- * schema cache; returns `{}` when none is available, so the caller falls back to
- * the attribute-definition view.
+ * ever touching `.connection` — which under the default `permanentConnectionCheckout`
+ * would permanently lease a connection on every record construction. Reads the warm
+ * schema cache off an already-available connection only: the threaded (in-query)
+ * connection, else a connection the pool has already leased. Returns `{}` when
+ * neither is available (a bare `new Model()` with no active connection); the caller
+ * then seeds that column from its attribute definition instead. Any real DB column
+ * whose default matters here has already pinned a connection via the
+ * `!_schemaLoaded` reflection in `_defaultAttributes`, so `{}` is only reached for
+ * columns that carry no client-side default anyway.
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
   const target = isStiSubclass(klass) ? getStiBase(klass) : klass;
@@ -344,16 +349,7 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
   } catch {
     /* fall through */
   }
-  // No connection available at all (e.g. a bare `new Book()` before any query):
-  // fall back to `columnsHash`, which resolves the same warm cache via the
-  // model's connection. Wrapped in try/catch so a table-less model or a
-  // disallowed permanent checkout degrades to the attribute-definition view
-  // rather than raising during construction.
-  try {
-    return columnsHash.call(target);
-  } catch {
-    return {};
-  }
+  return {};
 }
 
 /**

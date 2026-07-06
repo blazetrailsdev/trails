@@ -88,7 +88,8 @@ export function enumTypeFor(name: string, mapping: Record<string, EnumValue>): E
  * stores the label string (via EnumType.cast on write), the getter returns it,
  * and assignment runs `assertValidValue`.
  *
- * Mirrors: ActiveRecord::Enum#_enum calling `klass.attribute(name, enum_type)`.
+ * Mirrors: ActiveRecord::Enum#_enum calling `attribute(name, **options)` then
+ * `decorate_attributes([name]) { |_n, subtype| EnumType.new(...) }` (enum.rb:238-247).
  *
  * @internal
  */
