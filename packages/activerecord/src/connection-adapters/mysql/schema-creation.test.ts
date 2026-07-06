@@ -189,6 +189,16 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
     );
   });
 
+  it("drops the type for a virtual column with no type option (Rails no-fallback)", () => {
+    const td = new MyTd("t", { id: false });
+    td.column("full_name", "virtual" as any, { as: "CONCAT(a, b)" } as any);
+    const col = td.columns.find((c) => c.name === "full_name")!;
+    expect(col.type).toBeUndefined();
+    const sql = toSql(td);
+    expect(sql).toContain("`full_name`  AS (CONCAT(a, b))");
+    expect(sql).not.toContain("varchar");
+  });
+
   it("honors id: false (no primary key column)", () => {
     const td = new MyTd("logs", { id: false });
     td.string("body");

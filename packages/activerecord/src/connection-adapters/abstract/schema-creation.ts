@@ -494,13 +494,13 @@ export class SchemaCreation {
         else if (this.adapterName === "mysql") sql = "BIGINT AUTO_INCREMENT PRIMARY KEY";
         else sql = "INTEGER PRIMARY KEY AUTOINCREMENT NOT NULL";
         break;
-      case "virtual": {
-        // Resolve to the real column type declared via options.type (Rails pattern:
-        // newColumnDefinition maps :virtual → options[:type] before SQL generation).
-        const realType =
-          ((options as Record<string, unknown>)["type"] as ColumnType | undefined) ?? "string";
-        return this.typeToSql(realType, options);
-      }
+      // No `:virtual` case: Rails' `type_to_sql` (schema_statements.rb:1385) has
+      // no `:virtual` in `native_database_types`, so `type_to_sql(:virtual)`
+      // returns `type.to_s` → "virtual" via the pass-through below. The
+      // :virtual → options[:type] mapping happens only in `newColumnDefinition`
+      // (with no fallback), so `o.type` is never literally "virtual" by the time
+      // it reaches this visitor — a `?? options.type ?? "string"` fallback here
+      // would contradict that no-fallback semantics.
       default: {
         // Pass-through for adapter-specific type strings (e.g.
         // "timestamptz", "inet", "hstore", custom PG enum names).
@@ -510,7 +510,16 @@ export class SchemaCreation {
         // fragment carrying a value list or args — e.g. enum('text','blob') or
         // set('a','b') — must keep its quoted member values, where case is
         // significant.
-        if (!type || !String(type).trim()) {
+        // Rails' `type_to_sql` returns `type.to_s` for an unrecognized type, so
+        // a nil type (e.g. `t.virtual` with no `type:`) yields `""` — the column
+        // renders with no SQL type before its generated-column `AS (...)` clause.
+        // We keep the stricter blank-string guard for an explicitly empty type
+        // string (a likely developer typo), which never arises from a nil option.
+        if (type == null) {
+          sql = "";
+          break;
+        }
+        if (!String(type).trim()) {
           throw new Error(`Column has an empty or blank type — specify a valid SQL type`);
         }
         sql = String(type);

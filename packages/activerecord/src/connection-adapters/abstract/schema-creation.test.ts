@@ -13,6 +13,20 @@ describe("SchemaCreation#typeToSql blank type guard", () => {
   });
 });
 
+describe("SchemaCreation#typeToSql virtual / nil pass-through", () => {
+  it("returns '' for a nil type (Rails type_to_sql: type.to_s of nil)", () => {
+    expect(new SchemaCreation("sqlite").typeToSql(undefined as any)).toBe("");
+  });
+
+  it("passes 'virtual' through verbatim, with no options.type/string fallback", () => {
+    // Rails' type_to_sql has no :virtual case, so type_to_sql(:virtual) → "virtual".
+    // The :virtual → options[:type] mapping is newColumnDefinition-only.
+    expect(
+      new SchemaCreation("sqlite").typeToSql("virtual" as any, { type: "integer" } as any),
+    ).toBe("virtual");
+  });
+});
+
 describe("SchemaCreation drop-constraint visitors", () => {
   it("visit_DropForeignKey emits DROP CONSTRAINT with a quoted name", () => {
     const sc = new SchemaCreation("postgres") as any;

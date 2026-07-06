@@ -178,6 +178,16 @@ describe("TableDefinition#toSql", () => {
     expect(toSql(td)).not.toContain("UNLOGGED");
   });
 
+  it("drops the type for a virtual column with no type option (Rails no-fallback)", () => {
+    const td = new TableDefinition("articles", { id: false });
+    td.column("full_name", "virtual" as any, { as: "a || b", stored: true } as any);
+    const col = td.columns.find((c) => c.name === "full_name")!;
+    expect(col.type).toBeUndefined();
+    const sql = toSql(td);
+    expect(sql).toContain('"full_name"  GENERATED ALWAYS AS (a || b) STORED');
+    expect(sql).not.toContain("varchar");
+  });
+
   it("emits exclusion constraint in CREATE TABLE", () => {
     const td = new TableDefinition("meetings", { id: false });
     td.exclusionConstraint("room WITH =, during WITH &&", { name: "no_overlap", using: "gist" });

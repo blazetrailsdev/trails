@@ -217,7 +217,10 @@ export class TableDefinition extends AbstractTableDefinition {
     options: ColumnOptions = {},
   ): ColumnDefinition {
     if ((type as string) === "virtual") {
-      type = options.type ?? type;
+      // Rails: `type = options[:type]` with no fallback (postgresql/schema_definitions.rb).
+      // Without `type:`, the type drops to nil and the generated column renders
+      // with no SQL type before its `GENERATED ALWAYS AS (...) STORED` clause.
+      type = options.type as ColumnType;
     }
     const def = super.newColumnDefinition(name, type, options);
     // Record the physical storage type for datetime-family columns so the
