@@ -13,6 +13,15 @@ import type { SchemaSource } from "../schema-dumper.js";
  */
 
 /**
+ * Timeout for a whole-database dump (`dumpAllTableSchema`). The shared handler
+ * DB carries ~330 canonical tables, and on PostgreSQL under CI fork load that
+ * full dump runs just past vitest's 5s default and flakes. 30s is the ceiling
+ * both full-dump suites apply; single-table `dumpTableSchema` cases stay on the
+ * default because they ignore every table but the one named.
+ */
+export const FULL_DUMP_TIMEOUT_MS = 30_000;
+
+/**
  * Dump only the named `tables` from `source`, as a schema-DSL string.
  *
  * Mirrors `SchemaDumpingHelper#dump_table_schema(*tables)`: ignore every data

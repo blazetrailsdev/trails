@@ -3,7 +3,11 @@ import { Base } from "../base.js";
 import { SchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
 import { setupHandlerSuite } from "./setup-handler-suite.js";
-import { dumpAllTableSchema, dumpTableSchema } from "./schema-dumping-helper.js";
+import {
+  dumpAllTableSchema,
+  dumpTableSchema,
+  FULL_DUMP_TIMEOUT_MS,
+} from "./schema-dumping-helper.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
 
 let adapter: DatabaseAdapter;
@@ -83,7 +87,7 @@ describe("SchemaDumpingHelper", () => {
     expect(SchemaDumper.ignoreTables).toBe(before);
   });
 
-  it("dumpAllTableSchema honors the ignore list", async () => {
+  it("dumpAllTableSchema honors the ignore list", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     await createSdhTable("sdh_keep");
     await createSdhTable("sdh_skip");
 
