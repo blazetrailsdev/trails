@@ -144,6 +144,7 @@ interface AttributeMethodsHost {
   _attributeDefinitions: Map<string, any>;
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
+  _generatedAttributeMethods?: GeneratedAttributeMethods;
   _attributeAliases?: Record<string, string>;
   _dangerousAttributeMethods?: Set<string>;
   _ignoredColumns?: string[];
@@ -208,10 +209,27 @@ export function dangerousAttributeMethods(): Set<string> {
   return _dangerousMethodsCache;
 }
 
+/**
+ * Rails (attribute_methods.rb ClassMethods#initialize_generated_modules):
+ *
+ *   @generated_attribute_methods = const_set(:GeneratedAttributeMethods, GeneratedAttributeMethods.new)
+ *   private_constant :GeneratedAttributeMethods
+ *   @attribute_methods_generated = false
+ *   @alias_attributes_mass_generated = false
+ *   include @generated_attribute_methods
+ *   super
+ *
+ * trails installs generated accessors directly onto the class prototype in
+ * `defineAttributeMethods`/`generateAliasAttributes` (the lazy self-init path,
+ * like `initializeFindByCache`) rather than into a separately-mixed module, so
+ * the `GeneratedAttributeMethods` instance stands in for Rails' namespace
+ * constant. Resetting both flags to `false` re-arms those lazy paths so the
+ * next accessor read regenerates against this class's schema.
+ */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  if (!this._attributeMethodsGenerated) {
-    this._attributeMethodsGenerated = false;
-  }
+  this._generatedAttributeMethods = new GeneratedAttributeMethods();
+  this._attributeMethodsGenerated = false;
+  this._aliasAttributesMassGenerated = false;
 }
 
 /**
