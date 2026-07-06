@@ -265,6 +265,38 @@ describe("RelationMergingTest", () => {
     expect(await comments.count()).toBe(1);
   });
 
+  it("relation merging preserves interleaved named/raw joins order", () => {
+    // Rails' `joins_values |= other.joins_values` is a single ordered array union
+    // that preserves the source relation's exact insertion order across the
+    // named/raw boundary — `joins(:a, "RAW", :b)` folds in as `[a, RAW, b]`, not
+    // reordered to `[RAW, a, b]`.
+    const rawJoin = "INNER JOIN authors ON authors.id = posts.author_id";
+    const source = Post.joins("comments", rawJoin, "author");
+    // `merge` routes through Merger#mergeJoins...
+    const merged = Post.all().merge(source);
+    expect(merged.joinsValues).toEqual(["comments", rawJoin, "author"]);
+    // ...and `mergeBang` folds field-by-field; both must preserve the order.
+    const banged = Post.all();
+    (banged as any).mergeBang(source);
+    expect(banged.joinsValues).toEqual(["comments", rawJoin, "author"]);
+  });
+
+  it("relation merging with cross-klass joins builds a join dependency", () => {
+    // merger.rb:122-132: when `other.model != relation.model`, association names
+    // resolve against `other`'s klass, not the receiver — they must NOT be pushed
+    // into the receiver's joins_values (which would resolve them on the wrong
+    // model). `merge` and `mergeBang` must agree here.
+    const source = Post.joins("author");
+    const merged = Comment.all().merge(source);
+    expect(merged.joinsValues).toEqual([]);
+    expect((merged as any)._namedInnerJoinDeps.length).toBe(1);
+
+    const banged = Comment.all();
+    (banged as any).mergeBang(source);
+    expect(banged.joinsValues).toEqual([]);
+    expect((banged as any)._namedInnerJoinDeps.length).toBe(1);
+  });
+
   it("relation merging with skip query cache", () => {
     expect(Post.all().merge(Post.all().skipQueryCacheBang()).skipQueryCacheValue).toBe(true);
   });
