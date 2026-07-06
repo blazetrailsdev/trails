@@ -1757,6 +1757,78 @@ describe("PersistenceTest", () => {
 });
 
 // ==========================================================================
+// PersistenceTest — PK populated by a BEFORE INSERT trigger (not RETURNING /
+// last_insert_id). The `pk_autopopulated_by_a_trigger_records` table + trigger
+// live only in the adapter-specific schemas (postgresql_specific_schema.rb:204,
+// mysql2_specific_schema.rb:85), both guarded `if supports_insert_returning?`.
+// The Rails test is additionally `!current_adapter?(:SQLite3Adapter)`, so gate
+// on `adapterType !== "sqlite" && adapterSupports("insert_returning")`.
+// ==========================================================================
+const runsTriggerPk = adapterType !== "sqlite" && adapterSupports("insert_returning");
+describe("PersistenceTest", () => {
+  registerModel(PkAutopopulatedByATriggerRecord);
+  fixtures([]);
+  beforeAll(async () => {
+    if (!runsTriggerPk) return;
+    const connection = Base.connection;
+    //   create_table :pk_autopopulated_by_a_trigger_records, force: true, id: false do |t|
+    //     t.integer :id, null: false
+    //   end
+    await connection.createTable(
+      "pk_autopopulated_by_a_trigger_records",
+      { id: false, force: true },
+      (t) => {
+        t.integer("id", { null: false });
+      },
+    );
+    if (adapterType === "postgres") {
+      // postgresql_specific_schema.rb:206 — trigger computes MAX(id) + 1.
+      await connection.execute(`
+        CREATE OR REPLACE FUNCTION populate_column()
+        RETURNS TRIGGER AS $$
+        DECLARE
+          max_value INTEGER;
+        BEGIN
+            SELECT MAX(id) INTO max_value FROM pk_autopopulated_by_a_trigger_records;
+            NEW.id = COALESCE(max_value, 0) + 1;
+            RETURN NEW;
+        END;
+        $$ LANGUAGE plpgsql;
+      `);
+      await connection.execute(`
+        CREATE TRIGGER before_insert_trigger
+        BEFORE INSERT ON pk_autopopulated_by_a_trigger_records
+        FOR EACH ROW
+        EXECUTE FUNCTION populate_column();
+      `);
+    } else {
+      // mysql2_specific_schema.rb:89 — inline SET trigger.
+      await connection.execute(`
+        CREATE TRIGGER before_insert_trigger
+        BEFORE INSERT ON pk_autopopulated_by_a_trigger_records
+        FOR EACH ROW
+        SET NEW.id = (SELECT COALESCE(MAX(id), 0) + 1 FROM pk_autopopulated_by_a_trigger_records);
+      `);
+    }
+  });
+
+  afterAll(async () => {
+    if (!runsTriggerPk) return;
+    await Base.connection.dropTable("pk_autopopulated_by_a_trigger_records", { ifExists: true });
+  });
+
+  it.skipIf(!runsTriggerPk)(
+    "model with no auto populated fields still returns primary key after insert",
+    async () => {
+      const record = await PkAutopopulatedByATriggerRecord.create();
+
+      expect((record as any).id).not.toBeNull();
+      expect((record as any).id).toBeGreaterThan(0);
+    },
+  );
+});
+
+// ==========================================================================
 // becomes + restricted-name dirty tracking (persistence_test.rb:473)
 // ==========================================================================
 describe("PersistenceTest", () => {
