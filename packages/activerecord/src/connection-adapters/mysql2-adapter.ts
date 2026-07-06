@@ -10,6 +10,8 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
+import { StringType } from "@blazetrails/activemodel";
+import { TypeMap } from "../type/type-map.js";
 import {
   AbstractAdapter,
   Version,
@@ -26,7 +28,6 @@ import {
   DatabaseConnectionError,
   MismatchedForeignKey,
   NoDatabaseError,
-  NotImplementedError,
   SQLWarning,
 } from "../errors.js";
 import { Result } from "../result.js";
@@ -112,6 +113,35 @@ class Mysql2StatementPool extends MysqlStatementPool {
  * connection — no inner pool layer.
  */
 export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapter {
+  /**
+   * Mirrors: Mysql2Adapter#initialize_type_map (mysql2_adapter.rb:40-49).
+   *
+   * `super` registers the shared MySQL types. On top of that the concrete
+   * mysql2 adapter binds char/varchar/enum/set to a `StringType` whose boolean
+   * coercions are `"1"`/`"0"` rather than the ActiveModel default `"t"`/`"f"`,
+   * so a boolean assigned to a string column round-trips as 1/0 — this mirrors
+   * the `Type.register(:string, adapter: :mysql2)` block. char/varchar thread
+   * `extract_limit(sql_type)` onto the type (`register_type(%r(char)i)`), so
+   * `type_for_attribute(col).limit` reflects the column limit; enum/set register
+   * the limitless string. These are NOT in AbstractMysqlAdapter because they
+   * bind mysql2-specific behavior to a concrete client.
+   */
+  static override initializeTypeMap(m: TypeMap): void {
+    super.initializeTypeMap(m);
+    m.registerType(
+      /char/i,
+      undefined,
+      (sqlType) =>
+        new StringType({ trueString: "1", falseString: "0", limit: this.extractLimit(sqlType) }),
+    );
+    m.registerType(
+      /^enum/i,
+      undefined,
+      () => new StringType({ trueString: "1", falseString: "0" }),
+    );
+    m.registerType(/^set/i, undefined, () => new StringType({ trueString: "1", falseString: "0" }));
+  }
+
   // Cached liveness state — true until a failure is observed (ping fail,
   // disconnect, permanent close). Set false by disconnectBang(); restored to
   // true by reconnectBang() and by successful activeAsync().
@@ -2058,14 +2088,6 @@ function isMysql2ConnectionError(e: unknown): boolean {
     code === "EHOSTUNREACH" ||
     code === "ENETUNREACH" ||
     code === "EPIPE"
-  );
-}
-
-/** @internal */
-function initializeTypeMap(m: any): never {
-  // @nie disposition=port-real rails=activerecord/lib/active_record/connection_adapters/mysql2_adapter.rb:40 cluster=mysql-mysql2-adapter
-  throw new NotImplementedError(
-    "ActiveRecord::ConnectionAdapters::Mysql2Adapter#initialize_type_map is not implemented",
   );
 }
 
