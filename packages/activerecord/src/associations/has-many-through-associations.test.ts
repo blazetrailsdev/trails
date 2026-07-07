@@ -2376,6 +2376,16 @@ describe("HasManyThroughAssociationsTest", () => {
     await (blogPost as any).tags.delete(tag);
     const remaining = await (blogPost as any).tags.reload();
     expect(remaining.map((t: any) => Number(t.id))).not.toContain(Number(tag.id));
+
+    // No behavior change for the single-PK case: a through whose source
+    // association_primary_key is the target model's own scalar "id" still
+    // resolves to that single value (not wrapped in an array).
+    const post = await Post.find(posts("welcome").id);
+    const people = await (post as any).people.toArray();
+    expect(people.length).toBeGreaterThan(0);
+    const singleKey = (post as any).association("people").primaryKeyValue(people[0]);
+    expect(Array.isArray(singleKey)).toBe(false);
+    expect(Number(singleKey)).toBe(Number(people[0].id));
   });
 
   it("loading cpk association with unpersisted owner", async () => {
