@@ -266,7 +266,7 @@ describe("MySQL::TableDefinition#toSql via SchemaCreation.accept", () => {
   it("skips FK emission when host adapter has foreignKeys disabled", () => {
     const host = {
       supportsForeignKeys: () => true,
-      config: { foreignKeys: false },
+      _config: { foreignKeys: false },
     };
     const td = new MyTd("posts", { adapter: host });
     td.bigint("author_id");

@@ -454,6 +454,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         "when initializing an Active Record adapter with a config hash, that should be the only argument",
       );
     }
+    // Mirrors Rails abstract_adapter.rb — `@config = config`. Persist the full
+    // config hash so config-driven getters (`foreign_keys_enabled?`,
+    // default_timezone, etc.) read the real values rather than the empty
+    // default. The object branch below destructures adapter-level keys off it,
+    // but the untouched hash is what `_config`-reading helpers consult.
+    if (typeof config === "object" && config !== null) {
+      this._config = { ...(config as Record<string, unknown>) };
+    }
     if (typeof config === "string") {
       let waitTimeout: number | undefined;
       let uri = config;

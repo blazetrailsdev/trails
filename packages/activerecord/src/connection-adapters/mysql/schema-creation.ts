@@ -57,8 +57,6 @@ export interface VisitorHostAdapter {
    * synchronously and yields false when cold — warm via `getDatabaseVersion`. */
   supportsIndexSortOrder?(): boolean;
   isMariadb?(): boolean;
-  /** Mirrors `SchemaStatements#isForeignKeysEnabled` (`adapter.config?.foreignKeys !== false`). */
-  config?: { foreignKeys?: boolean };
   /** Quoting surface consulted polymorphically by the visitor when the real adapter is
    * threaded; absent on the host-less (unit-test) path, which falls back to the standalone
    * MySQL helpers in {@link mysqlSchemaQuoter}. */
@@ -206,11 +204,14 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal Mirrors Rails' `use_foreign_keys?` (`supports_foreign_keys? &&
-   * foreign_keys_enabled?`). The enabled half reads `adapter.config.foreignKeys`, matching
+   * foreign_keys_enabled?`). The enabled half reads `adapter._config.foreignKeys`, matching
    * `SchemaStatements#isForeignKeysEnabled`. */
   protected useForeignKeys(): boolean {
     const supports = this._hostAdapter?.supportsForeignKeys?.() ?? true;
-    const enabled = this._hostAdapter?.config?.foreignKeys !== false;
+    // `_config` is protected on the real adapter, so read it via a narrow cast
+    // (mirrors `SchemaStatements#isForeignKeysEnabled`).
+    const host = this._hostAdapter as { _config?: { foreignKeys?: boolean } } | undefined;
+    const enabled = host?._config?.foreignKeys !== false;
     return supports && enabled;
   }
 

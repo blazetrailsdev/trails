@@ -2457,7 +2457,10 @@ export class SchemaStatements {
   /** @internal */
   isForeignKeysEnabled(): boolean {
     const adapter = this.adapter as any;
-    return adapter.config?.foreignKeys !== false;
+    // Rails: `foreign_keys_enabled?` is `@config.fetch(:foreign_keys, true)`.
+    // AbstractAdapter stores its config in `_config` (there is no `config`
+    // getter), so read the real config hash; a missing key defaults to true.
+    return adapter._config?.foreignKeys !== false;
   }
 
   /** @internal */

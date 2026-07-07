@@ -159,3 +159,38 @@ describe("deprecated raw-connection initialize overload", () => {
     });
   });
 });
+
+// Rails: `AbstractAdapter#initialize` stores `@config = config`, and
+// `foreign_keys_enabled?` reads `@config.fetch(:foreign_keys, true)`
+// (schema_statements.rb:1783). The concrete adapters must persist the config
+// hash into `_config` so a `foreignKeys: false` config actually disables FK DDL
+// through the real constructor path — not just a test stub.
+describe("config-hash constructor retains foreignKeys in _config", () => {
+  type FkGuards = {
+    isForeignKeysEnabled(): boolean;
+    isUseForeignKeys(): boolean;
+  };
+  const guards = (adapter: PostgreSQLAdapter | Mysql2Adapter) => adapter as unknown as FkGuards;
+
+  it("PostgreSQLAdapter honors foreignKeys:false and defaults to true", () => {
+    const disabled = new PostgreSQLAdapter({ foreignKeys: false });
+    expect(disabled.supportsForeignKeys()).toBe(true);
+    expect(guards(disabled).isForeignKeysEnabled()).toBe(false);
+    expect(guards(disabled).isUseForeignKeys()).toBe(false);
+
+    const enabled = new PostgreSQLAdapter({});
+    expect(guards(enabled).isForeignKeysEnabled()).toBe(true);
+    expect(guards(enabled).isUseForeignKeys()).toBe(true);
+  });
+
+  it("Mysql2Adapter honors foreignKeys:false and defaults to true", () => {
+    const disabled = new Mysql2Adapter({ foreignKeys: false, _fakeConnection: true } as never);
+    expect(disabled.supportsForeignKeys()).toBe(true);
+    expect(guards(disabled).isForeignKeysEnabled()).toBe(false);
+    expect(guards(disabled).isUseForeignKeys()).toBe(false);
+
+    const enabled = new Mysql2Adapter({ _fakeConnection: true } as never);
+    expect(guards(enabled).isForeignKeysEnabled()).toBe(true);
+    expect(guards(enabled).isUseForeignKeys()).toBe(true);
+  });
+});
