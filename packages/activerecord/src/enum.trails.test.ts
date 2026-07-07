@@ -4,18 +4,21 @@
  * `assertValidEnumDefinitionValues`, `assertValidEnumOptions`,
  * `detectNegativeEnumConditionsBang`, and the `setEnumWarn` warning hook).
  */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
   castEnumValue,
   detectNegativeEnumConditionsBang,
+  enumTypeOf,
   EnumType,
   setEnumWarn,
 } from "./enum.js";
 import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
+import { fixtures } from "./test-helpers/fixtures.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 
 describe("Enum name conflict detection", () => {
   // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
@@ -344,5 +347,47 @@ describe("Enum subtype resolved from the reflected column type", () => {
     // round-trips the label through the decimal subtype.
     const caster = new MapCaster(Book);
     expect(caster.typeCastForDatabase("status", "written")).toEqual(new DecimalType().serialize(1));
+  });
+});
+
+// The harder case the explicit-`attribute(...)` block above does NOT cover: an
+// enum whose subtype comes purely from SCHEMA REFLECTION. `numeric_data`'s
+// `decimal_number` is a real `decimal` column, so an integer-valued enum on it
+// must delegate to the reflected `DecimalType`, even though (a) mapping-shape
+// inference would guess `integer` and (b) reflection skips the userProvided
+// enum def, leaving `_attributeDefinitions` carrying the pre-reflection integer
+// EnumType — so the reflected subtype only lives in the replayed AttributeSet.
+describe("Enum subtype resolved from a schema-reflected column type", () => {
+  fixtures(["books"]);
+
+  class NumericEnum extends Base {
+    static _tableName = "numeric_data";
+    static {
+      this.enum("decimal_number", { low: 0, mid: 1, high: 2 });
+    }
+  }
+
+  beforeAll(async () => {
+    await rebuildCanonicalTables(Base.connection, ["numeric_data"]);
+    await NumericEnum.loadSchema();
+  });
+
+  it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {
+    const type = enumTypeOf(NumericEnum, "decimal_number");
+    expect(type).toBeInstanceOf(EnumType);
+    expect(type!.subtype).toBe("decimal");
+    expect(type!.subtypeType()).toBeInstanceOf(DecimalType);
+  });
+
+  it("serializes labels through the reflected decimal subtype on both read paths", () => {
+    // castEnumValue (predicate/read) and TypeCaster::Map (query) must both
+    // resolve the reflected EnumType, coercing the mapped value through decimal.
+    expect(castEnumValue(NumericEnum, "decimal_number", "mid")).toEqual(
+      new DecimalType().serialize(1),
+    );
+    const caster = new MapCaster(NumericEnum);
+    expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(
+      new DecimalType().serialize(1),
+    );
   });
 });

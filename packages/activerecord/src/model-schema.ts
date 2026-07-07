@@ -1018,6 +1018,20 @@ function applyColumnsHash(
       // reflection. The schema column's default is NOT merged onto the def;
       // `_defaultAttributes` seeds it via from_database directly from the cached
       // column (Rails' column-seed-then-replay), then replays the user override.
+      //
+      // Enums are the exception that still needs the reflected column type:
+      // Rails resolves the enum subtype from the column's real `Type::Value`
+      // inside `decorate_attributes` (enum.rb:239-246). Our column-seed-then-
+      // replay seeds the override itself, so the reflected type would never
+      // reach the enum decorator otherwise. Compute it here (the adapter is in
+      // hand) and stash it on the def so `enumTypeFrom` delegates to it.
+      const enums = (host as unknown as { _enums?: Map<string, unknown> })._enums;
+      if (enums?.has(name) && typeof adapter.lookupCastTypeFromColumn === "function") {
+        const reflected = adapter.lookupCastTypeFromColumn(column) as Type | null;
+        if (reflected) {
+          (existing as { enumReflectedSubtype?: Type }).enumReflectedSubtype = reflected;
+        }
+      }
       continue;
     }
 

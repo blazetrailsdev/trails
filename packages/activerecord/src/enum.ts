@@ -61,7 +61,15 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
  * so the EnumType always delegates cast/serialize/deserialize to the actual
  * column type.
  *
- * Two edge cases mirror the surrounding replay machinery rather than Rails
+ * The reflected column type is the authoritative source. trails' column-seed-
+ * then-replay seeds the enum override itself (not the raw column type, unlike
+ * Rails), so the `reflected` argument the decorator receives at replay time is
+ * the pre-reflection EnumType, not the column's `Type::Value`. Schema
+ * reflection therefore stashes the real column cast type on the attribute def
+ * as `enumReflectedSubtype` (model-schema.ts, where the adapter is in hand);
+ * prefer it when present.
+ *
+ * Two fallbacks mirror the surrounding replay machinery rather than Rails
  * directly: an already-decorated EnumType is unwrapped to its own subtype (a
  * re-replay), and — because trails' decorator also runs eagerly at
  * class-definition time, before the schema is reflected — a still-default
@@ -69,16 +77,23 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
  * shapes so pre-reflection casts are not identity no-ops.
  */
 function enumTypeFrom(
+  klass: typeof Base,
+  attribute: string,
   name: string,
   mapping: Record<string, EnumValue>,
   reflected: Type,
   raiseOnInvalidValues: boolean,
 ): EnumType {
+  const defs = (klass as unknown as { _attributeDefinitions?: Map<string, unknown> })
+    ._attributeDefinitions;
+  const stashed = (defs?.get(attribute) as { enumReflectedSubtype?: Type } | undefined)
+    ?.enumReflectedSubtype;
+  const source = stashed ?? reflected;
   let subtype: ValueType<unknown>;
-  if (reflected instanceof EnumType) {
-    subtype = reflected.subtypeType();
+  if (source instanceof EnumType) {
+    subtype = source.subtypeType();
   } else {
-    const rv = reflected as ValueType<unknown>;
+    const rv = source as ValueType<unknown>;
     subtype = rv.type() === "value" ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
   }
   return new EnumType(name, new Map(Object.entries(mapping)), subtype, raiseOnInvalidValues);
@@ -135,7 +150,7 @@ export function installEnumAttribute(
   // _defaultAttributes replay, so once the schema is loaded `reflected` is the
   // column's real Type::Value and the EnumType delegates to it.
   klass.decorateAttributes([attribute], (_name: string, reflected: Type) =>
-    enumTypeFrom(name, mapping, reflected, raiseOnInvalidValues),
+    enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues),
   );
 
   // Define the getter after attribute() so the EnumType is already in
@@ -881,18 +896,26 @@ export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
 /**
  * Fetch the single registered EnumType for an enum attribute — the one source
  * of truth built lazily from the reflected column type via the
- * `decorateAttributes` decorator. Resolves through `typeForAttribute` (the
- * replayed AttributeSet), so it returns the reflected-subtype EnumType rather
- * than the pre-reflection one that a userProvided `_attributeDefinitions` entry
- * still carries. Returns null when the attribute isn't an enum on this class.
+ * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
+ * (`_defaultAttributes`), NOT `_attributeDefinitions`: reflection skips a
+ * userProvided enum def, so its `type` stays the pre-reflection (mapping-shape-
+ * inferred) EnumType, whereas the replayed decorator rebuilds the EnumType from
+ * the reflected column subtype. Returns null when the attribute isn't an enum
+ * on this class.
  *
  * @internal
  */
 export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
-  if (!klass._enums?.has(attribute)) return null;
-  const type = (klass as unknown as { typeForAttribute(n: string): Type }).typeForAttribute(
-    attribute,
-  );
+  const host = klass as unknown as {
+    _enums?: Map<string, unknown>;
+    _attributeAliases?: Record<string, string>;
+    loadSchema(): void;
+    _defaultAttributes(): { getAttribute(n: string): { type: Type } };
+  };
+  const resolved = host._attributeAliases?.[attribute] ?? attribute;
+  if (!host._enums?.has(resolved)) return null;
+  host.loadSchema();
+  const type = host._defaultAttributes().getAttribute(resolved).type;
   return type instanceof EnumType ? type : null;
 }
 
