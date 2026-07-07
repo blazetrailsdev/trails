@@ -66,11 +66,9 @@ export function formatPlainDateForSql(value: Temporal.PlainDate): string {
  *   ...
  *   # PG#quoted_date then suffixes " BC" for proleptic years <= 0.
  *
- * Differs from {@link formatInstantForSql} in two Rails-faithful ways: the
- * fractional part is a fixed 6-digit microsecond field (not a trimmed 3/6/9 group)
- * and is capped at microseconds — matching PG's `timestamp` resolution — so a
- * nil-precision nanosecond value never reaches the wire as 7–9 digits. The " BC"
- * suffix is what the abstract formatters omit.
+ * Shares the fixed-6 microsecond fraction ({@link microsecondFraction}) with the
+ * abstract/MySQL formatters; the only PG-specific behavior is the " BC" suffix
+ * appended for proleptic years <= 0.
  */
 function pgDateTimeLiteral(
   year: number,
