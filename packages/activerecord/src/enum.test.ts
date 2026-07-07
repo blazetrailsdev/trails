@@ -419,10 +419,32 @@ describe("EnumTest", () => {
   });
 
   // Rails: `status_before_type_cast` returns the raw stored integer.
-  it.skip("attribute_before_type_cast", () => {});
+  it("attribute_before_type_cast", () => {
+    expect((book as any).statusBeforeTypeCast).toBe(2);
+    expect((book as any).status).toBe("published");
+
+    (book as any).status = "published";
+
+    expect((book as any).statusBeforeTypeCast).toBe("published");
+    expect((book as any).status).toBe("published");
+  });
   // Rails: `status_for_database` returns the serialized integer.
-  it.skip("attribute_for_database", () => {});
-  it.skip("attributes_for_database", () => {});
+  it("attribute_for_database", () => {
+    expect((book as any).statusForDatabase).toBe(2);
+    expect((book as any).status).toBe("published");
+
+    (book as any).status = "published";
+
+    expect((book as any).statusForDatabase).toBe(2);
+    expect((book as any).status).toBe("published");
+  });
+  it("attributes_for_database", () => {
+    expect((book as any).attributesForDatabase().status).toBe(2);
+
+    (book as any).status = "published";
+
+    expect((book as any).attributesForDatabase().status).toBe(2);
+  });
 
   it("invalid definition values raise an ArgumentError", () => {
     // Rails wraps each in `Class.new(ActiveRecord::Base) { self.table_name =
