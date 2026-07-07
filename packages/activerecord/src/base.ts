@@ -426,6 +426,10 @@ export type PrimaryKeyValue = PrimaryKeyScalar | PrimaryKeyScalar[];
 var _RelationCtor: (new (modelClass: typeof Base, table?: any) => any) | undefined;
 // eslint-disable-next-line no-var
 var _wrapWithScopeProxy: ((rel: any) => any) | undefined;
+// eslint-disable-next-line no-var
+var _relationClassResolver:
+  | ((model: typeof Base) => new (model: typeof Base, table?: any) => any)
+  | undefined;
 
 /** @internal Called by relation.ts to register itself. */
 export function _setRelationCtor(ctor: new (modelClass: typeof Base) => any): void {
@@ -435,6 +439,24 @@ export function _setRelationCtor(ctor: new (modelClass: typeof Base) => any): vo
 /** @internal Called by relation.ts to register the scope proxy wrapper. */
 export function _setScopeProxyWrapper(wrapper: (rel: any) => any): void {
   _wrapWithScopeProxy = wrapper;
+}
+
+/**
+ * @internal Called by relation.ts to register the per-model `Relation`
+ * subclass resolver (`relationClassFor`). Base relations are constructed from
+ * the returned per-model subclass so generated relation methods resolve as real
+ * methods via its prototype carrier (Rails' `relation_class_for`). Falls back to
+ * the shared `Relation` ctor until registered.
+ */
+export function _setRelationClassResolver(
+  resolver: (model: typeof Base) => new (model: typeof Base, table?: any) => any,
+): void {
+  _relationClassResolver = resolver;
+}
+
+/** @internal The per-model `Relation` subclass ctor, or the shared ctor. */
+function _relationCtorFor(this: void, model: typeof Base): new (m: typeof Base, t?: any) => any {
+  return _relationClassResolver ? _relationClassResolver(model) : _RelationCtor!;
 }
 
 /**
@@ -2088,7 +2110,7 @@ export class Base extends Model {
     // adds below is qualified by that same table — so a self-referential
     // through doesn't end up with the STI predicate on the FROM table and
     // the source-type predicate on the alias.
-    const rel = new _RelationCtor(this, table);
+    const rel = new (_relationCtorFor(this))(this, table);
     return this._applyStiTypeCondition(_wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel);
   }
 
@@ -2101,7 +2123,7 @@ export class Base extends Model {
     if (!_RelationCtor) {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
-    const rel = new _RelationCtor(this, table);
+    const rel = new (_relationCtorFor(this))(this, table);
     return _wrapWithScopeProxy ? _wrapWithScopeProxy(rel) : rel;
   }
 
@@ -2128,7 +2150,7 @@ export class Base extends Model {
       throw new Error("Relation not loaded. Import relation.ts first.");
     }
     const buildBase = () => {
-      const r = new _RelationCtor!(this);
+      const r = new (_relationCtorFor(this))(this);
       return _wrapWithScopeProxy ? _wrapWithScopeProxy(r) : r;
     };
     const rel = DefaultScoping.buildDefaultScope(this, buildBase, allQueries) ?? buildBase();

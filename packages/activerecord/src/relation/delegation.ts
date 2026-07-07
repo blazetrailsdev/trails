@@ -28,6 +28,9 @@ import { _relationFamilySlot, _relationFamilyState } from "./uncacheable-methods
 
 type AnyCallable = (...args: any[]) => any;
 
+/** Constructor shape of the shared `Relation` class and its per-model subclasses. */
+type RelationCtor = new (modelClass: typeof Base, table?: any) => any;
+
 /**
  * The Delegation module interface.
  *
@@ -49,16 +52,46 @@ export interface Delegation {
 export interface ClassSpecificRelation {}
 
 /**
- * GeneratedRelationMethods — container for dynamically generated
- * relation methods (e.g., scopes that are compiled into methods).
+ * GeneratedRelationMethods — the per-model module of dynamically generated
+ * relation methods. Rails builds one anonymous module per model
+ * (delegation.rb:71-91) and `include`s it into every delegate subclass, so a
+ * generated delegator becomes a **real method** resolved by normal method
+ * lookup rather than by re-entering `method_missing`.
+ *
+ * trails has no per-model subclass by default (relations are shared classes
+ * dispatched through a `Proxy`), so this module carries the generated methods
+ * on the **prototype carriers** it has been `include`d into (via
+ * {@link GeneratedRelationMethods.includeInto}, Rails'
+ * `delegate.include generated_relation_methods`). `generate` writes each
+ * delegator onto every carrier already registered, so a `Reflect.get` on a
+ * relation whose prototype chain contains a carrier resolves the delegator as a
+ * real method — no side-table consulted in the `Proxy` `get` trap.
  *
  * Mirrors: ActiveRecord::Delegation::GeneratedRelationMethods
  */
 export class GeneratedRelationMethods {
   private _methods: Map<string, AnyCallable> = new Map();
+  private _carriers: object[] = [];
 
   generate(name: string, fn: AnyCallable): void {
     this._methods.set(name, fn);
+    for (const carrier of this._carriers) {
+      (carrier as Record<string, AnyCallable>)[name] = fn;
+    }
+  }
+
+  /**
+   * `include` this module into a delegate prototype carrier — install every
+   * already-generated method as a real own property and register the carrier so
+   * future {@link generate}s propagate to it. Mirrors Rails'
+   * `DelegateCache#include_relation_methods` (delegation.rb:57-60).
+   */
+  includeInto(carrier: object): void {
+    if (this._carriers.includes(carrier)) return;
+    this._carriers.push(carrier);
+    for (const [name, fn] of this._methods) {
+      (carrier as Record<string, AnyCallable>)[name] = fn;
+    }
   }
 
   get(name: string): AnyCallable | undefined {
@@ -255,66 +288,92 @@ export function initializeRelationDelegateCache(): void {
 }
 
 /**
- * Per-model cache of generated relation-method delegators.
- *
- * Deviation (tracked-pending-convergence): Rails creates ONE per-model
- * `GeneratedRelationMethods` module (delegation.rb:71-91) and `include`s it
- * into all four dynamically-built delegate subclasses — Relation /
- * CollectionProxy / AssociationRelation / DisableJoinsAssociationRelation
- * (delegation.rb:32-45) — so cached delegators become **real methods** resolved
- * by normal Ruby method lookup and `method_missing` is never re-entered.
- *
- * trails relations are not per-model subclasses: every model shares the same
- * `Relation` / `CollectionProxy` classes dispatched through a `Proxy` `get`
- * trap, so we cache the generated delegators in this per-model WeakMap
- * side-table and consult it inside the trap (`wrapWithScopeProxy` here,
- * `wrapCollectionProxy` in associations.ts) instead of installing real methods.
- *
- * This story (`generated-relation-methods-real-method-mechanism`, RFC 0023)
- * *evaluated* converging to real methods and **deferred** it: a faithful port
- * needs four per-model prototype carriers (one object cannot serve four
- * prototype chains) fed by one generate, plus `Object.setPrototypeOf` on every
- * relation/proxy at construction — a known V8 megamorphic deopt that would
- * likely worsen, not improve, the only non-fidelity motivation (per-call Map
- * lookup vs direct dispatch). Observable behavior is already faithful (the
- * `uncacheableMethods` gate and cache-after-first-call are implemented), so the
- * deviation is mechanism-only. The implementation, if prioritized, is tracked
- * by story `delegation-generated-methods-per-model-prototype-carrier` (RFC
- * 0023). Until then the gate is implemented for fidelity but not load-bearing:
- * `Reflect.get(target, prop)` returns the proxy's real method before this
- * side-table is consulted, so a generated copy can never clobber a subclass
- * method (in Rails the shared module would).
+ * The memoized per-model `GeneratedRelationMethods` module — Rails'
+ * `DelegateCache#generated_relation_methods` (delegation.rb:63-68). Touched only
+ * at generate/construct time (not inside the `Proxy` `get` trap), so it is a
+ * module registry, not a hot-path lookup side-table: the generated methods it
+ * holds are installed as real methods on the per-model prototype carriers it is
+ * `include`d into and are resolved by ordinary prototype lookup.
  */
-const _generatedMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
+const _generatedRelationMethodsByModel = new WeakMap<typeof Base, GeneratedRelationMethods>();
 
-function generatedMethodsFor(modelClass: typeof Base): GeneratedRelationMethods {
-  let methods = _generatedMethodsByModel.get(modelClass);
+/**
+ * The memoized per-model `GeneratedRelationMethods` module for `modelClass`.
+ *
+ * Mirrors: ActiveRecord::Delegation::DelegateCache#generated_relation_methods
+ */
+export function generatedRelationMethods(modelClass: typeof Base): GeneratedRelationMethods {
+  let methods = _generatedRelationMethodsByModel.get(modelClass);
   if (!methods) {
     methods = new GeneratedRelationMethods();
-    _generatedMethodsByModel.set(modelClass, methods);
+    _generatedRelationMethodsByModel.set(modelClass, methods);
   }
   return methods;
 }
 
+/**
+ * Rails' `DelegateCache#include_relation_methods` (delegation.rb:57-60):
+ * `delegate.include generated_relation_methods` installs the per-model module's
+ * generated methods as real methods on a delegate prototype carrier.
+ */
+export function includeRelationMethods(carrier: object, methods: GeneratedRelationMethods): void {
+  methods.includeInto(carrier);
+}
+
+/**
+ * Per-model prototype carrier for the Relation delegate class. Rails builds a
+ * per-model delegate subclass and `include`s the model's
+ * `GeneratedRelationMethods` module into it (`relation_class_for`,
+ * delegation.rb:32-45,144). trails' analogue is a lazily-created per-model
+ * `Relation` subclass whose prototype carries the generated methods: relations
+ * built for `modelClass` (via `Base._buildDefaultRelation` &c.) are constructed
+ * from this subclass, so a generated delegator resolves as a real method by
+ * ordinary prototype lookup — no side-table consulted in the `Proxy` `get` trap.
+ *
+ * The carrier is the subclass **prototype**, set once at subclass creation, so
+ * no per-instance `Object.setPrototypeOf` runs on the relation construction hot
+ * path (the V8 megamorphic-deopt the parent story flagged).
+ *
+ * Mirrors: ActiveRecord::Delegation::ClassMethods#relation_class_for
+ */
+const _relationClassByModel = new WeakMap<typeof Base, RelationCtor>();
+
+export function relationClassFor(modelClass: typeof Base): RelationCtor {
+  let subclass = _relationClassByModel.get(modelClass);
+  if (!subclass) {
+    // The `relation` family slot is always registered (relation.ts, at module
+    // init) before any relation is constructed, so this cast is safe at runtime.
+    const baseRelation = _relationFamilySlot.relation as unknown as new (
+      ...args: never[]
+    ) => object;
+    subclass = class extends baseRelation {} as RelationCtor;
+    // A class expression assigned to a `let` infers `.name` from the variable
+    // (`"subclass"`), which would leak through `Relation#inspect`'s
+    // `this.constructor.name`. Rails' `ClassSpecificRelation::ClassMethods#name`
+    // (delegation.rb:111-115) returns `superclass.name` so a per-model delegate
+    // still reports the base relation class name — mirror that here.
+    Object.defineProperty(subclass, "name", {
+      value: (baseRelation as { name: string }).name,
+      configurable: true,
+    });
+    _relationClassByModel.set(modelClass, subclass);
+    includeRelationMethods(subclass.prototype, generatedRelationMethods(modelClass));
+  }
+  return subclass;
+}
+
+/**
+ * Cache a class-method delegation for `modelClass` as a real generated relation
+ * method (delegation.rb:127-129) — installed onto every per-model prototype
+ * carrier so subsequent calls resolve it by ordinary prototype lookup rather
+ * than re-running the `Proxy` miss path.
+ */
 export function generateRelationMethod(
   modelClass: typeof Base,
   name: string,
   fn: AnyCallable,
 ): void {
-  generatedMethodsFor(modelClass).generate(name, fn);
-}
-
-/**
- * Look up a previously generated relation method for `modelClass`, or
- * `undefined` if none has been cached. Lets `wrapCollectionProxy`
- * (associations.ts) resolve cached delegations without reaching into the
- * module-private WeakMap.
- */
-export function lookupGeneratedRelationMethod(
-  modelClass: typeof Base,
-  name: string,
-): AnyCallable | undefined {
-  return _generatedMethodsByModel.get(modelClass)?.get(name);
+  generatedRelationMethods(modelClass).generate(name, fn);
 }
 
 /**
@@ -506,12 +565,13 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 
       const modelClass = target._modelClass as typeof Base;
 
-      // Check generated relation methods scoped to this model (mirrors Rails' GeneratedRelationMethods)
-      const genMethods = _generatedMethodsByModel.get(modelClass as any);
-      if (genMethods?.has(prop)) {
-        const fn = genMethods.get(prop)!;
-        return (...args: any[]) => fn.apply(target, args);
-      }
+      // Generated relation methods (Rails' GeneratedRelationMethods) now resolve
+      // as real methods via the top-of-trap `Reflect.get` above: they live on
+      // the per-model `Relation` subclass prototype (`relationClassFor`), which
+      // is this `target`'s prototype, so no explicit side-table branch is needed
+      // here. The `uncacheableMethods` gate below is therefore load-bearing — a
+      // subclass-only method (e.g. CollectionProxy#target) is never generated,
+      // so a generated copy can never shadow it.
       if (modelClass._scopes.has(prop)) {
         return (...args: any[]) => {
           const scopeFn = modelClass._scopes.get(prop)!;
@@ -573,46 +633,6 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       return value;
     },
   });
-}
-
-/**
- * Rails' `ClassMethods#relation_class_for` (delegation.rb:144): the per-model
- * delegate subclass into which the model's `GeneratedRelationMethods` module is
- * `include`d. trails has no per-model subclass (see the deviation documented on
- * `_generatedMethodsByModel`), so this returns the carrier type backing the
- * per-model cache instead. Not yet wired into the Proxy dispatch path — kept as
- * the structural counterpart pending convergence (story
- * `delegation-generated-methods-per-model-prototype-carrier`).
- *
- * @internal
- */
-function relationClassFor(klass: typeof Base): typeof GeneratedRelationMethods {
-  return GeneratedRelationMethods;
-}
-
-/**
- * Rails' `DelegateCache#include_relation_methods` (delegation.rb:57-60):
- * `delegate.include generated_relation_methods` installs the per-model module's
- * generated methods as real methods on the delegate subclass. trails' analogue
- * copies them onto a target object; not yet wired (same deferral as above).
- *
- * @internal
- */
-function includeRelationMethods(target: object, methods: GeneratedRelationMethods): void {
-  for (const [name, fn] of methods.entries()) {
-    (target as any)[name] = fn;
-  }
-}
-
-/**
- * Rails' `DelegateCache#generated_relation_methods` (delegation.rb:63-68): the
- * memoized per-model `GeneratedRelationMethods` module. trails resolves it from
- * the `_generatedMethodsByModel` side-table.
- *
- * @internal
- */
-function generatedRelationMethods(modelClass: typeof Base): GeneratedRelationMethods {
-  return _generatedMethodsByModel.get(modelClass) ?? new GeneratedRelationMethods();
 }
 
 /**

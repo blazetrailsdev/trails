@@ -10,7 +10,6 @@ import {
   delegateEnumerableMethod,
   classMethodDelegator,
   generateRelationMethod,
-  lookupGeneratedRelationMethod,
   uncacheableMethods,
   DELEGATION_RECORD_METHOD_NAMES,
   delegateRecordMethodSync,
@@ -3244,16 +3243,14 @@ function wrapCollectionProxy<T extends Base = Base>(
         });
       }
 
-      // Cached class-method delegation (delegation.rb:127-129) resolves like a
-      // real method — ahead of the scope/array `method_missing` fallbacks — to
-      // match `wrapWithScopeProxy`'s generated-method lookup ordering. The cache
-      // only ever holds non-scope, non-array class-method delegations (scopes
-      // and array methods are intercepted below and never reach the branch that
-      // populates it), so this ordering can't shadow them.
-      const generated = lookupGeneratedRelationMethod(target.model, prop);
-      if (generated) {
-        return (...args: any[]) => generated.apply(target.scope(), args);
-      }
+      // Class-method delegations resolve through the `Reflect.get(scope, prop,
+      // scope)` fallback below: `target.scope()` returns an `AssociationRelation`
+      // wrapped by `wrapWithScopeProxy`, whose miss path runs the
+      // `classMethodDelegator` (delegation.rb:118-131). This CollectionProxy
+      // delegate class is NOT yet on the per-model prototype carrier — only the
+      // base `Relation` is (story
+      // `delegation-remaining-delegate-class-prototype-carriers` tracks the
+      // rest) — so no real-method / side-table branch belongs here.
 
       // Array-method delegation (sync fast-path) — when already loaded, delegate
       // synchronously against `target.target` (the hydrated records array).
