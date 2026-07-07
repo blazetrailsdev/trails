@@ -49,6 +49,7 @@ import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
+  AdapterError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -1176,7 +1177,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // ConnectionNotEstablished / NoDatabaseError (mirrors Rails' connect →
       // new_client) rather than surfacing the raw pg driver error. newClient
       // tears the partial client down on failure.
-      const newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
+      let newClient: pg.Client;
+      try {
+        newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
+      } catch (error) {
+        // Mirrors Rails' `PostgreSQLAdapter#connect`: `rescue
+        // ConnectionNotEstablished => ex; raise ex.set_pool(@pool)`. Attach the
+        // originating pool (a NullPool for a standalone adapter) so
+        // `error.connection_pool` is set on a connect-time failure.
+        if (error instanceof ConnectionNotEstablished) {
+          error.setPool(this.pool);
+        } else if (error instanceof AdapterError) {
+          error.setConnectionPool(this.pool);
+        }
+        throw error;
+      }
       // Guard against a close / disconnect / discard / reconnect
       // that raced with the in-flight connect(). If the adapter was
       // torn down between the await above and this point, do NOT
@@ -4158,6 +4173,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * `ConnectionAdapters::PostgreSQL::DatabaseStatements#translate_exception`.
    */
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    const translated = this._translateExceptionClass(e, sql, binds);
+    // Mirrors Rails' translate_exception_class, which stamps the originating
+    // pool onto every translated error (`error.connection_pool = pool`). For a
+    // standalone adapter that pool is a NullPool. Use setPool/setConnectionPool
+    // (both guarded) so a pool attached at raise-time isn't overwritten.
+    if (translated instanceof ConnectionNotEstablished) {
+      translated.setPool(this.pool);
+    } else if (translated instanceof AdapterError) {
+      translated.setConnectionPool(this.pool);
+    }
+    return translated;
+  }
+
+  private _translateExceptionClass(e: unknown, sql: string, binds: unknown[]): Error {
     if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
     const code = (e as { code?: string }).code;
     const msg = e.message;
