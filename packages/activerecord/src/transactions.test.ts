@@ -1469,19 +1469,13 @@ describe("TransactionTest", () => {
     });
   });
 
-  // CONVERGENCE-PENDING (lazy-transaction materialization on an unprepared
-  // statement): Rails runs this on every adapter and expects
+  // Rails runs this on every adapter and expects
   // `Topic.transaction { Topic.where("1=1").first }` to emit BEGIN|COMMIT
-  // (transactions_test.rb:1485). On sqlite trails materializes and passes, but
-  // on PG/MySQL trails does not materialize the pending lazy transaction for a
-  // no-bind unprepared SELECT, so no BEGIN is emitted and the assertion finds
-  // zero queries. Rather than gate to sqlite (which would silently pass there
-  // and hide the PG/MySQL gap), this is an explicit skipped faithful port that
-  // surfaces the divergence on every adapter; tracked by
-  // [[transactions-test-rollback-restores-record-state]] (see
-  // thread-collector-preparable-for-statement-cache). Un-skip once the PG/MySQL
-  // unprepared-statement materialization path converges.
-  it.skip("unprepared statement materializes transaction", async () => {
+  // (transactions_test.rb:1485): a no-bind unprepared SELECT inside an open
+  // lazy transaction materializes it. The read path funnels through
+  // `with_raw_connection` (materializeTransactions defaults true), so the
+  // pending lazy transaction is materialized on sqlite, PG, and MySQL alike.
+  it("unprepared statement materializes transaction", async () => {
     await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
       await Topic.transaction(async () => {
         await Topic.where("1=1").first();

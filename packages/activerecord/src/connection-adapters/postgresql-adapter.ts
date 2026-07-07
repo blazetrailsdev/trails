@@ -932,10 +932,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
-    // Note: we do NOT call materializeTransactions() here. If a lazy tx
-    // is pending but un-materialized, a SELECT sees pre-tx state — which
-    // is correct read-before-write semantics.
-
     // Release the query client BEFORE any loadAdditionalTypes call —
     // that path re-enters execute() and acquires its own pooled client,
     // and holding both would consume 2 connections per query during
@@ -965,8 +961,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       payload,
       async () => {
         try {
+          // Materialize the pending lazy transaction before the query, mirroring
+          // Rails' raw_execute (materialize_transactions defaults true). A no-bind
+          // unprepared SELECT inside an open lazy transaction thus emits BEGIN,
+          // matching sqlite/MySQL and the Rails
+          // `unprepared statement materializes transaction` assertion.
           const r = await this.withRawConnection(
-            { materializeTransactions: false, allowRetry: options?.allowRetry ?? false },
+            { materializeTransactions: true, allowRetry: options?.allowRetry ?? false },
             async (conn) => {
               const client = conn as unknown as pg.Client;
               try {

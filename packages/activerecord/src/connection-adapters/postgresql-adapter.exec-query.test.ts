@@ -107,7 +107,11 @@ describe("PostgreSQLAdapter#execQuery", () => {
     expect(result.columnTypes.guid).toBeInstanceOf(Uuid);
   });
 
-  it("does not materialize a pending lazy transaction", async () => {
+  it("materializes a pending lazy transaction", async () => {
+    // Mirrors Rails' raw_execute (materialize_transactions defaults true): the
+    // general read path materializes any pending lazy transaction so a SELECT
+    // inside `transaction { }` emits BEGIN. Only SCHEMA/transaction-control
+    // internal calls opt out.
     adapter = makeAdapter(async () => ({ rows: [], fields: [] }));
     const materializeSpy = vi
       .spyOn(
@@ -116,7 +120,7 @@ describe("PostgreSQLAdapter#execQuery", () => {
       )
       .mockResolvedValue(undefined);
     await adapter.execQuery("SELECT 1");
-    expect(materializeSpy).not.toHaveBeenCalled();
+    expect(materializeSpy).toHaveBeenCalled();
   });
 });
 
