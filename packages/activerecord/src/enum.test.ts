@@ -549,6 +549,29 @@ describe("EnumTest", () => {
     expect(record.aliased_status).toBe("proposed");
   });
 
+  // trails-only: Rails resolves `alias_attribute` per-operation, so the enum
+  // works regardless of whether the alias or the enum is declared first. Rails'
+  // own suite only exercises alias-then-enum; this mirrors those assertions for
+  // the reverse (enum-then-alias) order.
+  it("enum with alias_attribute declared after enum", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("aliased_status", ["proposed", "written", "published"] as any);
+        this.aliasAttribute("aliased_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    let record: any = await (Klass as any).proposed().create();
+    expect(record.isProposed()).toBe(true);
+    expect(record.aliased_status).toBe("proposed");
+
+    record = await (Klass as any).find(record.id);
+    expect(record.isProposed()).toBe(true);
+    expect(record.aliased_status).toBe("proposed");
+  });
+
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
     expect((book as any).isAuthorVisibilityInvisible()).toBe(false);
