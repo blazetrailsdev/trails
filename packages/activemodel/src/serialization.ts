@@ -156,75 +156,55 @@ export interface SerializeOptions {
  * (serialization.rb:167 `alias :read_attribute_for_serialization :send`).
  * Public in Rails (declared before the `private` section) and overridable.
  *
- * Mirrors `send(key)`, keying off member *existence* (`key in record`, the JS
- * analog of `respond_to?`): a reader that exists and returns `undefined` yields
- * `undefined` (nil) rather than raising; a value member (getter / data property,
- * including a user override of a declared attribute's reader) is returned and a
- * function member (`def name; …; end` / `attr_accessor :name`) is invoked.
+ * Pure `send(key)`: keying off member *existence* (`key in record`, the JS
+ * analog of `respond_to?`), a value member (getter / data property, including a
+ * user override of a declared attribute's reader) is returned, a function member
+ * (`def name; …; end` / `attr_accessor :name`) is invoked, a present member that
+ * yields `undefined` (nil) does not raise, and a missing member raises like
+ * `send`'s `NoMethodError`. There is no `attributes`/`readAttribute` fallback: a
+ * storeless host that surfaces values only through an `attributes` hash must
+ * expose per-key readers (Rails `attr_accessor` parity) — a reader-less key
+ * raises `NoMethodError` like Ruby `send`.
  *
- * The one divergence: on an `_attributes`-backed record (trails Model / AR), a
- * *function*-valued member means `key` names a method, not an attribute reader
- * — e.g. `attribute("toJSON")`, which cannot install a getter because `toJSON`
- * is structurally reserved by `JSON.stringify`; invoking it would recurse
- * infinitely. Such keys read the store instead (pinned by the "attribute named
- * toJSON does not shadow Model#toJSON" test). A value-returning getter still
- * wins, so a reader override is honored; only method-named attributes divert.
- *
- * When a storeless host exposes no per-key reader, trails'
- * `ActiveModel::Serializers::JSON` host contract surfaces values through the
- * `attributes` hash (the `attributes`-getter pattern its mixin tests pin across
- * several model shapes, where `attributes` is the only data source). That hash
- * backs the named reader before a name with no reader and no attribute entry
- * raises like `send`'s `NoMethodError`. A real Rails-shaped model never reaches
- * this tier — its declared attributes carry readers or are `_attributes`-backed.
+ * The one JS-structural divergence: on an `_attributes`-backed record (trails
+ * Model / AR) a declared attribute whose name collides with a framework method
+ * on the prototype — the canonical case is `attribute("toJSON")`, which
+ * `attribute()` cannot install a getter for because `toJSON` is reserved by
+ * `JSON.stringify` — resolves `record[key]` to that method, and invoking it
+ * would recurse infinitely (serializableHash → read → toJSON → asJson → …). For
+ * such a *store attribute* whose member is a function, we read the stored value
+ * instead (pinned by "attribute named toJSON does not shadow Model#toJSON"). A
+ * value-returning member still wins (reader overrides honored), and a function
+ * member that is NOT a store attribute is a genuine method and is invoked.
  */
 export function readAttributeForSerialization(record: SerializationRecord, key: string): unknown {
   const attrStore = record._attributes as AttributeStore;
   const hasStore =
     (attrStore && typeof (attrStore as { fetchValue?: unknown }).fetchValue === "function") ||
     attrStore instanceof Map;
-  const reader = (record as Record<string, unknown>)[key];
 
-  if (hasStore) {
-    // `send(key)`: a value-returning reader (generated getter or user override)
-    // wins. A function member is a method-named attribute (toJSON) that must
-    // read its stored value, not be invoked — and an absent getter (getterless
-    // declared attribute) also reads the store.
-    if (typeof reader !== "function" && key in (record as object)) return reader;
+  const inRecord = key in (record as object);
+  const reader = inRecord ? (record as Record<string, unknown>)[key] : undefined;
+
+  // `send(key)`: a value-returning member (generated getter or user override)
+  // wins.
+  if (inRecord && typeof reader !== "function") return reader;
+
+  // A store attribute reads its stored value: covers a store-backed record with
+  // no installed accessor (a bare `_attributes` Map / AttributeSet) and a
+  // reserved-name declared attribute (e.g. toJSON) whose function member would
+  // recurse if invoked.
+  if (hasStore && storeHasKey(attrStore, key)) {
     return attrStore instanceof Map
       ? attrStore.get(key)
       : (attrStore as { fetchValue(k: string): unknown }).fetchValue(key);
   }
 
-  if (key in (record as object)) {
-    return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
-  }
-  if (record.readAttribute) return record.readAttribute(key);
-  if (record.attributes && key in record.attributes) return record.attributes[key];
+  // A genuine function member is invoked (`send`); an absent member raises like
+  // `send`'s `NoMethodError`.
+  if (inRecord) return (reader as () => unknown).call(record);
   throw new Error(`undefined method '${key}' for an instance of ${record.constructor.name}`);
 }
-
-/**
- * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
- * (serialization.rb:158-160)
- *
- *   def attribute_names_for_serialization
- *     attributes.keys
- *   end
- *
- * Models can override this hook to scope which attributes appear.
- * Trails has multiple attribute storage shapes (AttributeSet via
- * `_attributes`, Map, plain object) so the fallback walks them in
- * order. Virtual attributes (acceptance/confirmation) are filtered
- * out — they aren't real attributes and shouldn't surface in JSON.
- *
- * @internal Rails-private helper.
- */
-type AttributeStore =
-  | { keys(): string[]; fetchValue(key: string): unknown }
-  | Map<string, unknown>
-  | null
-  | undefined;
 
 /** @internal */
 export function attributeNamesForSerialization(record: SerializationRecord): string[] {
@@ -254,6 +234,28 @@ export function attributeNamesForSerialization(record: SerializationRecord): str
 }
 
 /**
+ * Mirrors: ActiveModel::Serialization#attribute_names_for_serialization
+ * (serialization.rb:158-160)
+ *
+ *   def attribute_names_for_serialization
+ *     attributes.keys
+ *   end
+ *
+ * Models can override this hook to scope which attributes appear.
+ * Trails has multiple attribute storage shapes (AttributeSet via
+ * `_attributes`, Map, plain object) so the fallback walks them in
+ * order. Virtual attributes (acceptance/confirmation) are filtered
+ * out — they aren't real attributes and shouldn't surface in JSON.
+ *
+ * @internal Rails-private helper.
+ */
+type AttributeStore =
+  | { keys(): string[]; fetchValue(key: string): unknown }
+  | Map<string, unknown>
+  | null
+  | undefined;
+
+/**
  * Mirrors: ActiveModel::Serialization#serializable_attributes
  * (serialization.rb:162-164)
  *
@@ -261,10 +263,9 @@ export function attributeNamesForSerialization(record: SerializationRecord): str
  *     attribute_names.index_with { |n| read_attribute_for_serialization(n) }
  *   end
  *
- * Builds a `{ name → value }` hash by reading each attribute via the
- * attribute store fall-through (AttributeSet → Map → readAttribute →
- * plain attributes). The Rails analogue dispatches through
- * `read_attribute_for_serialization` (aliased to `send` by default).
+ * Builds a `{ name → value }` hash by dispatching each key through
+ * `read_attribute_for_serialization` (aliased to `send` by default), so a
+ * per-key reader / store attribute is read for every name.
  *
  * @internal Rails-private helper.
  */
@@ -346,6 +347,15 @@ export function serializableAddIncludes(
       callback(assocName, records, assocOpts);
     }
   }
+}
+
+/** Whether `key` is a stored attribute on an `_attributes` store (Map or AttributeSet). */
+function storeHasKey(attrStore: AttributeStore, key: string): boolean {
+  if (attrStore instanceof Map) return attrStore.has(key);
+  if (attrStore && typeof (attrStore as { keys?: unknown }).keys === "function") {
+    return (attrStore as { keys(): string[] }).keys().includes(key);
+  }
+  return false;
 }
 
 /** Whether `options` carries at least one `:include` entry to (maybe) load. */

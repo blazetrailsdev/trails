@@ -94,6 +94,35 @@ describe("SerializationTest", () => {
     expect(() => readAttributeForSerialization(host, "nope")).toThrow(/undefined method 'nope'/);
   });
 
+  it("read_attribute_for_serialization raises NoMethodError-style for a reader-less attributes key", () => {
+    // Rails `alias :… :send` has no `attributes`-hash fallback: a storeless host
+    // that names a key in `attributes` but exposes no reader for it fails loud
+    // like `send(:name)`, not silently serialize the hash value.
+    const host = {
+      attributes: { name: "x" },
+      constructor: { name: "Host" },
+    } as unknown as SerializationRecord;
+    expect(() => readAttributeForSerialization(host, "name")).toThrow(/undefined method 'name'/);
+  });
+
+  it("read_attribute_for_serialization invokes a method reader on an _attributes-backed record", () => {
+    // Rails `send(:greeting)` calls the method even on a record with an attribute
+    // store; a genuine method (not a declared attribute) is invoked, not read
+    // from the store.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+      greeting(): string {
+        return "Hi " + (this.readAttribute("name") as string);
+      }
+    }
+    const p = new Person({ name: "Bob" });
+    expect(readAttributeForSerialization(p as unknown as SerializationRecord, "greeting")).toBe(
+      "Hi Bob",
+    );
+  });
+
   it("include option with empty association", () => {
     // Rails: `@user.friends = []` then `serializable_hash(include: :friends)`
     // yields `friends: []` — the accessor exists and returns an empty array.
