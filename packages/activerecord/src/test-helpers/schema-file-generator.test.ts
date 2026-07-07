@@ -504,14 +504,18 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
     expect(gen.some((r) => r.columns === PARITY_EXPRESSION_INDEX)).toBe(false);
   });
 
-  it("drops sub-part index length: for non-MySQL adapters (both emitters)", async () => {
+  // Both emitters now pass `length:` through unconditionally on every adapter —
+  // the MySQL-only gating moved down to the abstract SchemaCreation visitor,
+  // which drops sub-part length on non-MySQL (matching Rails), so the DDL stays
+  // valid while the emitters stay in lockstep.
+  it("passes sub-part index length: through on non-MySQL adapters (both emitters)", async () => {
     for (const adapter of ["postgres", "sqlite"] as const) {
       const [gen, canon] = await Promise.all([
         generatorIndexes(GENERATOR_SCHEMA, adapter),
         canonicalIndexes(PARITY_INDEXES, adapter, true),
       ]);
-      expect(gen.every((r) => r.options.length === undefined)).toBe(true);
-      expect(canon.every((r) => normalizeIndexOptions(r.options).length === undefined)).toBe(true);
+      expect(gen.some((r) => r.options.length !== undefined)).toBe(true);
+      expect(canon.some((r) => normalizeIndexOptions(r.options).length !== undefined)).toBe(true);
     }
   });
 

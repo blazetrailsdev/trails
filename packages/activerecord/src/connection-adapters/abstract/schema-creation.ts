@@ -304,8 +304,12 @@ export class SchemaCreation {
   }
 
   /**
-   * Mirrors Rails `quoted_columns_for_index`: quote each column name and append
-   * its length/order/opclass decoration.
+   * Mirrors Rails' abstract `quoted_columns_for_index`: quote each column name
+   * and append its order/opclass decoration. Sub-part index lengths (`col(N)`)
+   * are MySQL-only and are NOT applied here — Rails decorates them exclusively
+   * in `AbstractMysqlAdapter#add_index_length`, and the MySQL SchemaCreation's
+   * `quotedColumns` override carries that in trails. Applying `length` on
+   * PostgreSQL/SQLite emits invalid DDL (`("name"(10))`).
    */
   protected quotedColumnsForIndex(
     columnNames: string[],
@@ -318,8 +322,6 @@ export class SchemaCreation {
     return columnNames
       .map((c) => {
         let col = this.adapter.quoteIdentifier(c);
-        const len = typeof options.lengths === "number" ? options.lengths : options.lengths[c];
-        if (len) col += `(${len})`;
         if (this.supportsIndexSortOrder()) {
           const order = typeof options.orders === "string" ? options.orders : options.orders[c];
           if (order) col += ` ${order.toUpperCase()}`;
