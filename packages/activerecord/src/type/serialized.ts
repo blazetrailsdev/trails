@@ -128,6 +128,30 @@ export class Serialized extends ValueType {
     return dumped;
   }
 
+  // Rails' Type::Serialized inherits `changed?` from Type::Value, which is
+  // `old_value != new_value`. In Ruby that `!=` is value equality, so two
+  // structurally-equal deserialized collections (e.g. the `[]` Array default
+  // an explicit `nil` assignment casts to vs. the record's original `[]`) are
+  // not a change. JS `!==` is reference equality and would flag them as
+  // changed, marking `Topic.new(content: nil)` dirty. Restore Ruby's value
+  // semantics for the value-comparable defaults (Array/Hash), matching the
+  // same distinction `isValueComparable` draws for `default_value?`.
+  override isChanged(
+    oldValue: unknown,
+    newValue: unknown,
+    _newValueBeforeTypeCast?: unknown,
+  ): boolean {
+    if (oldValue === newValue) return false;
+    if (isValueComparable(oldValue) && isValueComparable(newValue)) {
+      try {
+        return canonicalKey(oldValue) !== canonicalKey(newValue);
+      } catch {
+        return true;
+      }
+    }
+    return true;
+  }
+
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
     if (value === null || value === undefined) return false;
     const rawNewValue = encoded(this, value);
