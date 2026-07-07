@@ -19,6 +19,7 @@ import {
   type RenameKeyOptions,
   htmlEscape,
   resetCallbacks as asResetCallbacks,
+  BigDecimal,
 } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
@@ -2382,9 +2383,15 @@ export class Model {
         !(value instanceof Temporal.PlainDateTime) &&
         !(value instanceof Temporal.PlainDate) &&
         !(value instanceof Temporal.PlainTime) &&
-        !(value instanceof Temporal.ZonedDateTime)
+        !(value instanceof Temporal.ZonedDateTime) &&
+        // boundary: a decimal attribute materializes as a BigDecimal object,
+        // but Rails serializes BigDecimal#to_xml as a scalar `type="decimal"`
+        // leaf (its `to_s`), not a nested object of its digit parts.
+        !(value instanceof BigDecimal)
       ) {
         xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}</${tag}>\n`;
+      } else if (value instanceof BigDecimal) {
+        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "decimal")}>${this._escapeXml(value.toString())}</${tag}>\n`;
         // boundary: legacy Date values serialize as ISO 8601 dateTime XML.
       } else if (value instanceof Date) {
         xml += `${indent}<${tag}${typeAttr("dateTime")}>${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
