@@ -1106,10 +1106,10 @@ export class TableDefinition {
       return adapter.foreignKeyOptions(this.tableName, toTable, { ...options });
     }
     const result: Record<string, unknown> = { ...options };
-    if (!result.column) {
-      // Mirror foreign_key_column_for: strip table_name_prefix/suffix (and the
-      // trails schema-qualifier) before singularizing, so a prefixed to_table
-      // still yields the bare `<singular>_id` default column.
+    // Mirror foreign_key_column_for: strip table_name_prefix/suffix (and the
+    // trails schema-qualifier) before singularizing, so a prefixed to_table
+    // still yields the bare `<singular>_<pk>` default column.
+    const columnFor = (pk: string): string => {
       const prefix = adapter.tableNamePrefix ?? "";
       const suffix = adapter.tableNameSuffix ?? "";
       let base = toTable.replace(/^.*\./, "");
@@ -1117,7 +1117,15 @@ export class TableDefinition {
         const stripped = base.match(new RegExp(`^${prefix}(.+)${suffix}$`));
         if (stripped) base = stripped[1];
       }
-      result.column = `${singularize(base)}_id`;
+      return `${singularize(base)}_${pk}`;
+    };
+    if (!result.column) {
+      // Mirror foreign_key_options: a composite primary_key array maps each PK
+      // column to its own foreign-key column; the scalar branch always derives
+      // from the literal "id" (schema_statements.rb:1246-1267).
+      result.column = Array.isArray(result.primaryKey)
+        ? (result.primaryKey as string[]).map((pk) => columnFor(pk))
+        : columnFor("id");
     }
     if (!result.name) {
       const cols = Array.isArray(result.column) ? result.column : [result.column];
