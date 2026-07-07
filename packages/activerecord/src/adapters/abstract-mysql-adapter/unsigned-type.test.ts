@@ -27,17 +27,26 @@ describeIfMysql("Mysql2Adapter", () => {
     await adapter.close();
   });
 
-  function unsignedTypeModel(): typeof Base {
+  async function unsignedTypeModel(): Promise<typeof Base> {
     class UnsignedType extends Base {
       static _tableName = "unsigned_types";
     }
     UnsignedType.adapter = adapter;
+    // Reflect the real columns (PK included) up front so the post-INSERT
+    // write-back (`_performInsert` → `_writeAttribute("id", insertedId)`)
+    // targets a reflected `id` attribute under strict `writeFromUser`, without
+    // the internal-write bridge. Explicit warming (as in mysql-boolean's
+    // `BooleanType.loadSchema()`) keeps the reflected `unsigned` metadata the
+    // range-check assertions rely on — declaring `id` via `attribute()` would
+    // instead suppress DB reflection (ensureSchemaLoaded bails on a concrete
+    // user attr), hiding the unsigned columns.
+    await UnsignedType.loadSchema();
     return UnsignedType;
   }
 
   describe("UnsignedTypeTest", () => {
     it("unsigned int max value is in range", async () => {
-      const UnsignedType = unsignedTypeModel();
+      const UnsignedType = await unsignedTypeModel();
       const expected = await UnsignedType.create({ unsigned_integer: 4294967295 });
       expect(expected).toBeTruthy();
       const found = await UnsignedType.findBy({ unsigned_integer: 4294967295 });
@@ -45,7 +54,7 @@ describeIfMysql("Mysql2Adapter", () => {
     });
 
     it("minus value is out of range", async () => {
-      const UnsignedType = unsignedTypeModel();
+      const UnsignedType = await unsignedTypeModel();
       await expect(UnsignedType.create({ unsigned_integer: -10 })).rejects.toThrow(
         ActiveModelRangeError,
       );
