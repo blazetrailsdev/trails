@@ -1094,7 +1094,12 @@ function collectionAssociationTests(
   it("should be possible to destroy a record", async () => {
     for (const trueVariable of ["1", 1, "true", true]) {
       const { pirate, child1, child2 } = await buildSetup();
-      const record = await proxy(await Pirate.find(pirate.id)).createBang({
+      // Rails: `record = @pirate.reload.public_send(@association_name).create!(...)`
+      // — reload resets the loaded association so the new record joins the same
+      // pirate's collection (rather than a separate `find`, which would leave
+      // this pirate's cached target stale and out of sync with the DB row).
+      await pirate.reload();
+      const record = await proxy(pirate).createBang({
         name: "Grace OMalley",
       });
       const params = await alternateParams(child1, child2);

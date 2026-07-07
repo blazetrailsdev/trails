@@ -214,7 +214,11 @@ describe("ReflectionTest", () => {
     expect((await h2.chefLists.toArray()).length).toBe(1);
     expect(await h2.chefLists.count()).toBe(1);
 
-    await SC2ChefList.where({ employable_list_id: hotel.id }).deleteAll();
+    // Rails clears via the association writer (`hotel.mocktail_designers = []`),
+    // which deletes the underlying chef_list join rows AND prunes the in-memory
+    // targets of both this and the through (`chef_lists`) association. A bare
+    // out-of-band `deleteAll` would leave `to_a`'s now-cached target stale.
+    await h2.mocktailDesigners.replace([]);
 
     expect((await h2.mocktailDesigners.toArray()).length).toBe(0);
     expect(await h2.mocktailDesigners.count()).toBe(0);
@@ -278,7 +282,10 @@ describe("ReflectionTest", () => {
     const bh1r = await SC3Author.find(author.id).then((a: any) => a.bestHardbacks.toArray());
     expect(bh1r.length).toBe(1);
 
-    await SC3Book.where({ author_id: author.id }).deleteAll();
+    // Rails clears via the writer (`author.best_hardbacks = []`), which deletes
+    // the through `books` join rows and empties the cached target; a bare
+    // out-of-band `deleteAll` would leave `to_a`'s now-cached target stale.
+    await a3.bestHardbacks.replace([]);
 
     expect((await a3.bestHardbacks.toArray()).length).toBe(0);
     const bh2r = await SC3Author.find(author.id).then((a: any) => a.bestHardbacks.toArray());
