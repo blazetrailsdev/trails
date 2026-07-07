@@ -155,9 +155,10 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: st
  *
  *   - `ActiveRecord::Railtie` re-exports `Railties::ControllerRuntime`
  *     (railtie.rb:267 — `on_load(:action_controller) { include … }`); the port
- *     lives in `trailties/controller-runtime.ts`. Its source
- *     `railties/controller_runtime.rb` is unported (Railties / ActionController
- *     integration not ported yet).
+ *     lives in `trailties/controller-runtime.ts`. Its source (vendored at
+ *     `activerecord/lib/active_record/railties/controller_runtime.rb`, matched
+ *     by the `railties/controller_runtime.rb` UNPORTED_FILES pattern) is
+ *     unported (Railties / ActionController integration not ported yet).
  *   - The association error classes `include DidYouMean::Correctable`
  *     (associations/errors.rb:18,47,88); `Correctable#detailed_message` is
  *     ported inline as `detailedMessage` in `associations/errors.ts`.
