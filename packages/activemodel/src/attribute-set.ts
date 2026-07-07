@@ -123,15 +123,16 @@ export class AttributeSet {
   ): void {
     this.assertNotFrozen();
     const existing = this.attributes.get(name);
-    if (existing) {
+    if (existing && type == null) {
       this.attributes.set(name, existing.withValueFromDatabase(value));
     } else {
-      // An unknown column (e.g. a computed/aliased extra `select`) is not in the
-      // schema, so there is no declared cast type. Rails type-casts it with the
-      // result set's `column_types` slice; thread that type here when supplied,
-      // falling back to the identity `value` type. Mirrors
-      // ActiveModel::AttributeSet::Builder#build_from_database casting unknown
-      // keys via `types[name]`.
+      // Either an unknown column (e.g. a computed/aliased extra `select`) with no
+      // declared cast type, or a supplied override type that must win even for a
+      // known column. Rails' LazyAttributeHash resolves each name via
+      // `additional_types[name] || types[name]`, so the result set's
+      // `column_types` slice takes precedence over the schema type when present;
+      // thread it here when supplied, falling back to the identity `value` type.
+      // Mirrors ActiveModel::AttributeSet::Builder#build_from_database.
       // `fromDatabase` is typed for the full `Type`, but only `deserialize` is
       // exercised for an unknown column — one localized cast here keeps the
       // public param structural and the call sites cast-free.
