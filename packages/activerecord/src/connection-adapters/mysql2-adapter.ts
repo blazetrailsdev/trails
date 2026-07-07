@@ -3,7 +3,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { ExplainOption } from "./abstract/database-statements.js";
-import { sqlForInsert } from "./abstract/database-statements.js";
+import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import type { MysqlAdapterOptions } from "./pool-config.js";
 import {
   AbstractMysqlAdapter,
@@ -582,18 +582,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {
-    if (returning && returning.length > 1) {
-      const [returningSql, returningBinds] = sqlForInsert.call(
-        this as never,
-        sql,
-        pk ?? null,
-        binds,
-        returning,
-      );
-      if (/\sRETURNING\s/i.test(returningSql)) {
-        return this.execQuery(returningSql, name ?? "SQL", returningBinds);
-      }
-    }
+    const readback = await execInsertReturningReadback.call(
+      this as never,
+      sql,
+      name,
+      binds,
+      pk,
+      returning,
+    );
+    if (readback !== undefined) return readback;
     return super.execInsert(sql, name, binds, pk, sequenceName, returning);
   }
 
@@ -1121,7 +1118,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     {
       materializeTransactions = true,
       allowRetry = false,
-    }: { materializeTransactions?: boolean; allowRetry?: boolean } = {},
+      binds = [],
+    }: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] } = {},
   ): Promise<Mysql2RawResult> {
     sql = this.preprocessQuery(sql);
     if (materializeTransactions) {
@@ -1129,12 +1127,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       await this.materializeTransactions();
     }
     const driverSql = this.mysqlQuote(sql);
+    // Thread binds through so a bound INSERT ... RETURNING (MariaDB) reaches the
+    // driver, matching Rails internal_execute(sql, name, binds). Transaction-
+    // control callers pass none, keeping their byte-identical no-bind path.
+    const driverBinds = binds.length > 0 ? this.mysqlBinds(binds) : [];
     const txPublicInt = this.currentTransaction().userTransaction;
     const payload: Record<string, unknown> = {
       sql: driverSql,
       name,
-      binds: [],
-      type_casted_binds: [],
+      binds: driverBinds,
+      type_casted_binds: typeCastedBinds(driverBinds),
       connection: this,
       row_count: 0,
       transaction: txPublicInt.isOpen() ? txPublicInt : null,
@@ -1186,7 +1188,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             // internal_execute → raw_execute → cast_result. Array-mode rows keep
             // duplicate column names that the old hash-keyed conn.query collapsed.
             const conn = rawConn as unknown as mysql.Connection;
-            const rawResult = await mysql2PerformQuery.call(this as any, conn, driverSql, [], []);
+            const prepare = this._shouldPrepare(binds);
+            if (prepare) this._trackPrepared(conn, driverSql);
+            const rawResult = await mysql2PerformQuery.call(
+              this as any,
+              conn,
+              driverSql,
+              binds,
+              driverBinds,
+              { prepare },
+            );
             payload.row_count = rawResult.affectedRows;
             return rawResult;
           },
@@ -1195,7 +1206,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // The loop already translated for its retry classification; guard
         // against re-translating an ActiveRecordError (see execute()).
         const translated =
-          e instanceof ActiveRecordError ? e : await this._translateAndEnrich(e, driverSql, []);
+          e instanceof ActiveRecordError
+            ? e
+            : await this._translateAndEnrich(e, driverSql, driverBinds);
         payload.exception = translated;
         payload.exception_object = translated;
         throw translated;

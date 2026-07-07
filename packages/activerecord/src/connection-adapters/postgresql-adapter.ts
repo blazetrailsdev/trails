@@ -86,6 +86,7 @@ import {
   temporalToBindString,
   extractTableRefFromInsertSql,
   sqlForInsert,
+  execInsertReturningReadback,
 } from "./abstract/database-statements.js";
 import { makeGetTypeParser } from "./postgresql/temporal-type-parsers.js";
 
@@ -2086,19 +2087,32 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     {
       materializeTransactions = true,
       allowRetry = false,
-    }: { materializeTransactions?: boolean; allowRetry?: boolean } = {},
+      binds = [],
+    }: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] } = {},
   ): Promise<unknown> {
     sql = preprocessQuery.call(this as any, sql);
     if (materializeTransactions) await this.materializeTransactions();
+    // Thread binds through so a bound INSERT ... RETURNING reaches the driver,
+    // matching Rails internal_execute(sql, name, binds). Transaction-control
+    // callers pass none, keeping their byte-identical no-bind path (no rewrite).
+    const hasBinds = binds.length > 0;
+    const bindArray = hasBinds ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
+    const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
+    // A bound query here is the exec_insert RETURNING read-back; mirror
+    // _instrumentedQueryOnClient by resetting the notice buffer up front and
+    // flushing after, so PG WARNING/NOTICE handling (db_warnings_action) is not
+    // dropped or misattributed to the next query. Transaction-control SQL passes
+    // no binds and keeps its byte-identical path (no reset/flush/rewrite).
+    if (hasBinds) this._noticeReceiverSqlWarnings = [];
     const payload: Record<string, unknown> = {
-      sql,
+      sql: runSql,
       name,
-      binds: [],
-      type_casted_binds: [],
+      binds,
+      type_casted_binds: bindArray,
       connection: this,
       row_count: 0,
     };
-    return Notifications.instrumentAsync("sql.active_record", payload, () =>
+    const queryPromise = Notifications.instrumentAsync("sql.active_record", payload, () =>
       // materializeTransactions is handled above (not delegated to
       // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
       // SAVEPOINT — keeps its exact pre-existing materialize semantics and the
@@ -2107,17 +2121,29 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
         const client = conn as unknown as pg.Client;
         try {
-          const result = await this._runQuery(client, sql, [], { rowMode: "array" });
+          const result = await this._runQuery(client, runSql, bindArray, { rowMode: "array" });
           const count = result.rowCount ?? result.rows.length;
           payload.row_count = count;
           return result;
         } catch (e: any) {
-          payload.exception = e;
-          payload.exception_object = e;
-          throw e;
+          // A bound query is the exec_insert RETURNING read-back: translate with
+          // sql + binds here (mirroring _instrumentedQueryOnClient) so a
+          // constraint violation surfaces as RecordNotUnique/InvalidForeignKey
+          // carrying statement context. withRawConnection re-catches this AR
+          // error and passes it through unchanged; its own translate would
+          // otherwise re-wrap with null sql / empty binds. Transaction-control
+          // SQL (no binds) keeps the raw rethrow, matching pre-PR behavior.
+          const translated = hasBinds ? this._translateException(e, runSql, bindArray) : e;
+          payload.exception = translated;
+          payload.exception_object = translated;
+          throw translated;
         }
       }),
     );
+    if (!hasBinds) return queryPromise;
+    const result = await queryPromise;
+    this._flushWarnings(runSql);
+    return result;
   }
 
   /**
@@ -2394,6 +2420,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       });
     }
     if (this._useInsertReturning) {
+      // A multi-column RETURNING list is the auto-populated-columns read-back
+      // (Rails `_create_record` zips every returning column). The shared helper
+      // runs it through the bind-aware internalExecQuery (which materializes) and
+      // dirties the transaction, handing back the whole Result — `super`/
+      // `executeMutation` would collapse the row to its first column. A single-
+      // column list falls through to the `super`/`executeMutation` fast path
+      // (scalar id + prepared-statement-cache retry).
+      const readback = await execInsertReturningReadback.call(
+        this as never,
+        sql,
+        name,
+        binds,
+        pk,
+        returning,
+      );
+      if (readback !== undefined) return readback;
       // When the caller names RETURNING columns (a custom-named serial/identity
       // PK), append them up front via sql_for_insert so executeMutation reads the
       // DB-generated value back from the right column instead of falling back to
@@ -2408,26 +2450,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           binds,
           returning,
         );
-        // A multi-column RETURNING list is the auto-populated-columns read-back
-        // (Rails `_create_record` zips every returning column). `super.execInsert`
-        // routes through `executeMutation`, which collapses the row to its first
-        // column, so run the INSERT here and hand back the whole `Result` — the
-        // same write-path scaffolding (withRawConnection materializes and dirties
-        // the transaction) the `pk === false` branch above uses. A single-column
-        // list keeps the `super`/`executeMutation` path (scalar id + prepared-
-        // statement-cache retry).
-        if (returning.length > 1) {
-          const preprocessed = this.preprocessQuery(sqlWithReturning);
-          return this.withRawConnection(async (conn) => {
-            const client = conn as unknown as pg.Client;
-            return this._instrumentedQueryOnClient(
-              client,
-              preprocessed,
-              name ?? "SQL",
-              resolvedBinds,
-            );
-          });
-        }
         return super.execInsert(sqlWithReturning, name, resolvedBinds, pk, sequenceName, returning);
       }
       return super.execInsert(sql, name, binds, pk, sequenceName, returning);

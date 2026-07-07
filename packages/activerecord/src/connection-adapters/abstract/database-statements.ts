@@ -104,8 +104,17 @@ export interface DatabaseStatementsHost {
   internalExecute?(
     sql: string,
     name?: string,
-    opts?: { materializeTransactions?: boolean },
+    opts?: { materializeTransactions?: boolean; binds?: unknown[] },
   ): Promise<unknown>;
+  /** @internal */
+  internalExecQuery?(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    opts?: { prepare?: boolean; allowRetry?: boolean },
+  ): Promise<Result>;
+  /** @internal */
+  dirtyCurrentTransaction?(): void;
   /** @internal */
   rawExecute?(sql: string, name?: string, binds?: unknown[]): Promise<unknown>;
   /** @internal */
@@ -520,6 +529,52 @@ export function execInsert(
     returning ?? null,
   );
   return internalExecQuery.call(this as DatabaseStatementsHost, sql, name ?? "SQL", binds);
+}
+
+/**
+ * Shared multi-column RETURNING read-back for exec_insert.
+ *
+ * Rails' abstract exec_insert runs sql_for_insert then internal_exec_query,
+ * returning the full RETURNING row. trails' adapters keep an executeMutation
+ * fast path for single-column / no-RETURNING inserts (lastInsertRowid +
+ * prepared-statement-cache retry), so this helper handles ONLY the multi-column
+ * auto-populated-columns read-back (Rails `_create_record` zips every returning
+ * column): it appends the RETURNING columns via sql_for_insert and runs the
+ * bound INSERT through the adapter's bind-aware internalExecQuery (which
+ * materializes the transaction) to hand back the whole Result, dirtying the
+ * transaction as executeMutation would. Returns undefined when the caller should
+ * keep its fast path (≤1 returning column, or sql_for_insert produced no
+ * RETURNING clause — e.g. MySQL 8, which lacks INSERT ... RETURNING).
+ *
+ * @internal
+ */
+export async function execInsertReturningReadback(
+  this: DatabaseStatementsHost,
+  sql: string,
+  name: string | null | undefined,
+  binds: unknown[],
+  pk: string | false | null | undefined,
+  returning: string[] | null | undefined,
+): Promise<Result | undefined> {
+  if (!returning || returning.length <= 1) return undefined;
+  // Gate on the capability flag sql_for_insert itself checks
+  // (supports_insert_returning?) rather than sniffing the generated SQL — on a
+  // backend without INSERT ... RETURNING (MySQL 8) sql_for_insert appends
+  // nothing, so the caller keeps its executeMutation fast path.
+  if (!this.supportsInsertReturning?.()) return undefined;
+  const [returningSql, returningBinds] = sqlForInsert.call(
+    this as never,
+    sql,
+    pk ?? null,
+    binds,
+    returning,
+  );
+  // Dispatch through the instance so SQLite's bind-aware internalExecQuery
+  // override (`.all()`) is used; PG/MySQL fall to the mixed-in default.
+  const run = (this.internalExecQuery ?? internalExecQuery).bind(this);
+  const result = await run(returningSql, name ?? "SQL", returningBinds);
+  this.dirtyCurrentTransaction?.();
+  return result;
 }
 
 /**
@@ -1377,7 +1432,10 @@ export async function internalExecQuery(
     const tm = (this as any)._transactionManager as TransactionManager | undefined;
     if (tm) await tm.materializeTransactions();
     if (this?.internalExecute) {
-      const rawResult = await this.internalExecute(sql, sqlName);
+      // Thread binds through so a bound INSERT ... RETURNING reaches the driver
+      // (Rails internal_exec_query(sql, name, binds) → internal_execute). trails
+      // carries binds in the opts object rather than positionally.
+      const rawResult = await this.internalExecute(sql, sqlName, { binds });
       return this.castResult ? this.castResult(rawResult) : normalizeResult(rawResult);
     }
     if (binds && binds.length > 0) {

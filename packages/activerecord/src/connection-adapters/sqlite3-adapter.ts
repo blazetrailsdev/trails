@@ -26,7 +26,7 @@ import {
   canRemoveIndexByName,
 } from "./abstract/schema-statements.js";
 import { dirtiesQueryCache } from "./abstract/query-cache.js";
-import { sqlForInsert } from "./abstract/database-statements.js";
+import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   ReadOnlyError,
@@ -648,20 +648,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     _sequenceName?: string | null,
     returning?: string[] | null,
   ): Promise<Result | number> {
-    if (returning && returning.length > 1) {
-      const [returningSql, returningBinds] = sqlForInsert.call(
-        this as never,
-        sql,
-        pk ?? null,
-        binds,
-        returning,
-      );
-      if (/\sRETURNING\s/i.test(returningSql)) {
-        const result = await this.internalExecQuery(returningSql, name ?? "SQL", returningBinds);
-        this.dirtyCurrentTransaction();
-        return result;
-      }
-    }
+    const readback = await execInsertReturningReadback.call(
+      this as never,
+      sql,
+      name,
+      binds,
+      pk,
+      returning,
+    );
+    if (readback !== undefined) return readback;
     return this.executeMutation(sql, binds, name ?? "SQL");
   }
 
