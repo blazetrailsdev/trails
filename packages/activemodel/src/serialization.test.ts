@@ -858,6 +858,22 @@ describe("toXml()", () => {
     expect(xml).toContain('<id type="integer">7</id>');
   });
 
+  it("serializes a decimal attribute as a scalar type=decimal, not a nested object", () => {
+    // A decimal attribute materializes as a BigDecimal object carrying
+    // sign/intDigits/fracDigits. Rails serializes BigDecimal#to_xml as a
+    // scalar `type="decimal"` leaf (its `to_s`), not nested sub-tags.
+    class Widget extends Model {
+      static {
+        this.attribute("price", "decimal");
+      }
+    }
+    const w = new Widget({ price: "9.99" });
+    const xml = w.toXml();
+    expect(xml).toContain('<price type="decimal">9.99</price>');
+    expect(xml).not.toContain("<intDigits>");
+    expect(xml).not.toContain("<fracDigits>");
+  });
+
   it("supports custom root element", () => {
     class User extends Model {
       static {
