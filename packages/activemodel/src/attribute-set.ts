@@ -123,22 +123,43 @@ export class AttributeSet {
   ): void {
     this.assertNotFrozen();
     const existing = this.attributes.get(name);
-    if (existing && type == null) {
+    if (existing) {
       this.attributes.set(name, existing.withValueFromDatabase(value));
     } else {
-      // Either an unknown column (e.g. a computed/aliased extra `select`) with no
-      // declared cast type, or a supplied override type that must win even for a
-      // known column. Rails' LazyAttributeHash resolves each name via
-      // `additional_types[name] || types[name]`, so the result set's
-      // `column_types` slice takes precedence over the schema type when present;
-      // thread it here when supplied, falling back to the identity `value` type.
-      // Mirrors ActiveModel::AttributeSet::Builder#build_from_database.
+      // An unknown column (e.g. a computed/aliased extra `select`) is not in the
+      // schema, so there is no declared cast type. Rails type-casts it with the
+      // result set's `column_types` slice; thread that type here when supplied,
+      // falling back to the identity `value` type. Mirrors
+      // ActiveModel::AttributeSet::Builder#build_from_database casting unknown
+      // keys via `types[name]`.
       // `fromDatabase` is typed for the full `Type`, but only `deserialize` is
       // exercised for an unknown column — one localized cast here keeps the
       // public param structural and the call sites cast-free.
       const colType = (type as import("./type/value.js").Type) ?? typeRegistry.lookup("value");
       this.attributes.set(name, Attribute.fromDatabase(name, value, colType));
     }
+  }
+
+  /**
+   * Force a database value to be cast through the supplied `type`, replacing any
+   * existing (schema-declared) attribute. Unlike {@link writeFromDatabase}, whose
+   * known-column path keeps the declared cast type, this always wins — mirroring
+   * how Rails' `LazyAttributeHash` resolves each name via
+   * `additional_types[name] || types[name]`, letting an explicit per-attribute
+   * `types` override supersede the schema type. Used only by the public
+   * `instantiate(attributes, types)` entry point; the result-set hydration path
+   * still ignores column types for known columns.
+   */
+  overrideFromDatabase(
+    name: string,
+    value: unknown,
+    type: { deserialize(value: unknown): unknown },
+  ): void {
+    this.assertNotFrozen();
+    this.attributes.set(
+      name,
+      Attribute.fromDatabase(name, value, type as import("./type/value.js").Type),
+    );
   }
 
   writeFromUser(name: string, value: unknown): unknown {
