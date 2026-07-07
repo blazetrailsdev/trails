@@ -182,8 +182,7 @@ interface SerializerEntry {
   decorator: (name: string, castType: Type) => Type;
 }
 
-/** @internal */
-export function columnSerializers(modelClass: typeof Base): Map<string, SerializerEntry> {
+function columnSerializers(modelClass: typeof Base): Map<string, SerializerEntry> {
   const cls = modelClass as unknown as { _columnSerializers?: Map<string, SerializerEntry> };
   // Fork per-class (copying the parent's entries) so a subclass `serialize` never
   // mutates the shared base map — mirrors `_normalizations`' own-property guard.
@@ -228,7 +227,9 @@ export function applyPendingSerializations(modelClass: typeof Base): void {
   for (const [name, entry] of serializers) {
     const def = defs.get(name);
     if (!def) continue; // column not reflected yet; re-invoked once it appears
-    if (def.type instanceof Serialized && def.type.coder === entry.coder) continue; // applied
+    // The decorator returns the same type reference when it's already wrapped by
+    // this coder (idempotency guard), so this both no-ops the applied case and
+    // re-wraps a freshly-reflected raw column.
     const newType = entry.decorator(name, def.type);
     if (newType === def.type) continue;
     if (!Object.prototype.hasOwnProperty.call(modelClass, "_attributeDefinitions")) {
