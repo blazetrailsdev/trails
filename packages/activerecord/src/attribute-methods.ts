@@ -6,7 +6,10 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
-import { attributeForInspect as _attrForInspect } from "./core.js";
+import {
+  attributeForInspect as _attrForInspect,
+  initializeGeneratedModules as _coreInitializeGeneratedModules,
+} from "./core.js";
 import { writeAttribute as _writeAttribute } from "./readonly-attributes.js";
 import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js";
 // toKey/id: inline to avoid a circular dependency (primary-key.ts imports
@@ -144,6 +147,7 @@ interface AttributeMethodsHost {
   _attributeDefinitions: Map<string, any>;
   _attributeMethodsGenerated?: boolean;
   _aliasAttributesMassGenerated?: boolean;
+  _generatedAttributeMethods?: GeneratedAttributeMethods;
   _attributeAliases?: Record<string, string>;
   _dangerousAttributeMethods?: Set<string>;
   _ignoredColumns?: string[];
@@ -208,10 +212,36 @@ export function dangerousAttributeMethods(): Set<string> {
   return _dangerousMethodsCache;
 }
 
+/**
+ * Rails (attribute_methods.rb ClassMethods#initialize_generated_modules):
+ *
+ *   @generated_attribute_methods = const_set(:GeneratedAttributeMethods, GeneratedAttributeMethods.new)
+ *   private_constant :GeneratedAttributeMethods
+ *   @attribute_methods_generated = false
+ *   @alias_attributes_mass_generated = false
+ *   include @generated_attribute_methods
+ *   super
+ *
+ * trails installs generated accessors directly onto the class prototype in
+ * `defineAttributeMethods`/`generateAliasAttributes` (the lazy self-init path,
+ * like `initializeFindByCache`) rather than into a separately-mixed module, so
+ * the `GeneratedAttributeMethods` instance stands in for Rails' namespace
+ * constant. Resetting both flags to `false` re-arms those lazy paths so the
+ * next accessor read regenerates against this class's schema.
+ *
+ * Rails chains this to `Core`'s `initialize_generated_modules` via `super`;
+ * this port mirrors that by delegating to the core version at the end. `Base`
+ * wires this attribute-methods entry point as the single static (see base.ts),
+ * so the super call reaches `generatedAssociationMethods` just as Rails' method
+ * ancestry does.
+ */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  if (!this._attributeMethodsGenerated) {
-    this._attributeMethodsGenerated = false;
-  }
+  this._generatedAttributeMethods = new GeneratedAttributeMethods();
+  this._attributeMethodsGenerated = false;
+  this._aliasAttributesMassGenerated = false;
+  _coreInitializeGeneratedModules.call(
+    this as unknown as ThisParameterType<typeof _coreInitializeGeneratedModules>,
+  );
 }
 
 /**
@@ -276,6 +306,16 @@ export function isAttributeMethodsGenerated(this: AttributeMethodsHost): boolean
 }
 
 export function defineAttributeMethods(this: AttributeMethodsHost): boolean {
+  // Rails runs `initialize_generated_modules` once per class from the
+  // `inherited` hook (attribute_methods.rb:265-272), seeding
+  // `@generated_attribute_methods` and the two generation flags before any
+  // accessor is defined. JS has no `inherited` hook, so — mirroring how
+  // `cachedFindByStatement` lazily calls `initializeFindByCache` — we run it
+  // here the first time a class generates its methods, gated on an *own*
+  // `_generatedAttributeMethods` so each subclass initializes exactly once.
+  if (!Object.prototype.hasOwnProperty.call(this, "_generatedAttributeMethods")) {
+    initializeGeneratedModules.call(this);
+  }
   // Rails' @attribute_methods_generated is a per-class ivar (nil for every
   // class regardless of superclass). JS properties are inheritable, so only an
   // *own* truthy flag counts as already-generated — an inherited `true` from a

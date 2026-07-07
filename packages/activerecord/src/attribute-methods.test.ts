@@ -8,6 +8,7 @@ import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { TimeWithZone, TimeZone } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 
+import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
@@ -1237,5 +1238,61 @@ describe("attribute_alias arelTable integration", () => {
     }
     const attr = User.arelTable.get("login");
     expect(attr.name).toBe("username");
+  });
+});
+
+// ==========================================================================
+// AttributeMethods::ClassMethods#initialize_generated_modules
+// (attribute_methods.rb:42) — targets attribute_methods_test.rb
+// ==========================================================================
+describe("initialize_generated_modules", () => {
+  fixtures([]);
+
+  it("generated attribute methods ancestors have correct module", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.initializeGeneratedModules();
+    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+  });
+
+  it("runs lazily via defineAttributeMethods without a direct call", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    // Declaring the attribute routes through defineAttributeMethods, which
+    // must seed the generated module — no explicit initializeGeneratedModules
+    // call in the test.
+    (Topic as any).defineAttributeMethods();
+    expect(Topic._generatedAttributeMethods).toBeInstanceOf(GeneratedAttributeMethods);
+  });
+
+  it("resets attribute-methods generation flags", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    // Simulate already-generated state, then prove the reset fires.
+    (Topic as any)._attributeMethodsGenerated = true;
+    (Topic as any)._aliasAttributesMassGenerated = true;
+    Topic.initializeGeneratedModules();
+    expect((Topic as any)._attributeMethodsGenerated).toBe(false);
+    expect((Topic as any)._aliasAttributesMassGenerated).toBe(false);
+  });
+
+  it("chains to Core#initialize_generated_modules via super", () => {
+    class Topic extends Base {
+      static {
+        this.attribute("title", "string");
+      }
+    }
+    Topic.initializeGeneratedModules();
+    // Core's version initializes the generated-association-methods set.
+    expect((Topic as any)._generatedAssociationMethods).toBeInstanceOf(Set);
   });
 });
