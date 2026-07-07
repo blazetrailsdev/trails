@@ -489,6 +489,63 @@ describe("SchemaCacheTest", () => {
     expect(cache.isCached("gone")).toBe(false);
   });
 
+  it("refreshBang clears the entry when reflection fails", async () => {
+    // A transient failure (connection error / failed lease) should fall back to
+    // clearing so the next async load re-reflects rather than serving a
+    // now-untrustworthy entry. refreshBang swallows the error internally.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+    expect(cache.isCached("users")).toBe(true);
+
+    const fakeConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => {
+        throw new Error("boom");
+      },
+      indexes: async () => [],
+    };
+    await cache.refreshBang(new FakePool(fakeConn), "users");
+    expect(cache.isCached("users")).toBe(false);
+  });
+
+  it("refreshBang failure does not wipe a newer refresh's data", async () => {
+    // The failure fallback is generation-gated too: an older refresh that
+    // rejects AFTER a newer one has already written must NOT clear the fresh
+    // entry, or it would reintroduce the race on the error path.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+
+    let releaseSlow: () => void;
+    const slow = new Promise<void>((r) => (releaseSlow = r));
+    const failingOlderConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => {
+        await slow;
+        throw new Error("older refresh failed late");
+      },
+      indexes: async () => [],
+    };
+    const newerConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => [makeColumn("id", "integer"), makeColumn("fresh", "varchar(255)")],
+      indexes: async () => [],
+    };
+
+    const older = cache.refreshBang(new FakePool(failingOlderConn), "users");
+    const newer = cache.refreshBang(new FakePool(newerConn), "users");
+    await newer;
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+
+    // Older refresh now rejects — its gated fallback must not clear the entry.
+    releaseSlow!();
+    await older;
+    expect(cache.isCached("users")).toBe(true);
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+  });
+
   it("refreshBang lets the latest-initiated refresh win regardless of resolution order", async () => {
     // Two overlapping refreshes (e.g. a quick double reset): the second one is
     // initiated later, so its result must win even if the first's DB round-trip

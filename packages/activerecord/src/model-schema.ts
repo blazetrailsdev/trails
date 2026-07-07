@@ -769,17 +769,16 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
   // rather than going cold, and the refresh overwrites the entry once the
   // async reflection lands so a later schema change is still picked up.
   // Fire-and-forget for the same reason as the boot warm — reset_column_
-  // information is sync and cannot block on introspection. On a reflection
-  // failure, fall back to a plain clear so the next async load re-reflects
-  // rather than serving a now-untrustworthy entry forever.
+  // information is sync and cannot block on introspection. refreshBang handles
+  // its own failure fallback internally (a generation-gated clear), so the
+  // caller only swallows the settled promise; clearing here would bypass that
+  // gate and let a stale failed refresh wipe a newer one's good data.
   if (
     SchemaReflection.eagerLoadSchemaCache &&
     connectionSource &&
     typeof cache?.refreshBang === "function"
   ) {
-    void cache.refreshBang(connectionSource, table).catch(() => {
-      cache?.clearDataSourceCacheBang?.(null, table);
-    });
+    void cache.refreshBang(connectionSource, table).catch(() => {});
     return;
   }
   if (typeof cache?.clearDataSourceCacheBang === "function") {

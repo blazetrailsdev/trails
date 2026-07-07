@@ -273,41 +273,55 @@ export class SchemaCache {
     const generation = (this._refreshGeneration.get(tableName) ?? 0) + 1;
     this._refreshGeneration.set(tableName, generation);
     const isLatest = () => this._refreshGeneration.get(tableName) === generation;
-    await withConnection(pool, async (connection) => {
-      // Ask the connection directly rather than `this.dataSourceExists`, whose
-      // cached `true` (warmed alongside the columns we're refreshing) would
-      // never re-detect a table dropped since. When the connection can't answer,
-      // assume it still exists and refresh the columns anyway.
-      const exists =
-        typeof connection.dataSourceExists === "function"
-          ? await connection.dataSourceExists(tableName)
-          : true;
-      if (!exists) {
-        if (isLatest()) this.clearDataSourceCacheBang(connection, tableName);
-        return;
-      }
-      // Gather all three reflections before touching the cache so the write is
-      // a single consistent block. The `typeof` guards mirror the existing
-      // `primaryKeys`/`columns`/`indexes` methods (and `add`); every real
-      // adapter inherits all three from abstract SchemaStatements, so a partial
-      // reflection never happens in production.
-      const pk =
-        typeof connection.primaryKey === "function"
-          ? ((await connection.primaryKey(tableName)) ?? null)
-          : undefined;
-      const cols =
-        typeof connection.columns === "function" ? await connection.columns(tableName) : undefined;
-      const idx =
-        typeof connection.indexes === "function" ? await connection.indexes(tableName) : undefined;
-      // Re-check after every await: a newer refresh may have started (and
-      // possibly already written) while ours was in flight; leave its result.
-      if (!isLatest()) return;
-      // Primary keys first so setColumns' reconcilePrimaryKeyFlags sees the
-      // fresh authoritative key (mirrors `add`'s ordering).
-      if (pk !== undefined) this.setPrimaryKeys(tableName, pk);
-      if (cols !== undefined) this.setColumns(tableName, cols);
-      if (idx !== undefined) this._indexes.set(tableName, idx);
-    });
+    try {
+      await withConnection(pool, async (connection) => {
+        // Ask the connection directly rather than `this.dataSourceExists`, whose
+        // cached `true` (warmed alongside the columns we're refreshing) would
+        // never re-detect a table dropped since. When the connection can't
+        // answer, assume it still exists and refresh the columns anyway.
+        const exists =
+          typeof connection.dataSourceExists === "function"
+            ? await connection.dataSourceExists(tableName)
+            : true;
+        if (!exists) {
+          if (isLatest()) this.clearDataSourceCacheBang(connection, tableName);
+          return;
+        }
+        // Gather all three reflections before touching the cache so the write is
+        // a single consistent block. The `typeof` guards mirror the existing
+        // `primaryKeys`/`columns`/`indexes` methods (and `add`); every real
+        // adapter inherits all three from abstract SchemaStatements, so a partial
+        // reflection never happens in production.
+        const pk =
+          typeof connection.primaryKey === "function"
+            ? ((await connection.primaryKey(tableName)) ?? null)
+            : undefined;
+        const cols =
+          typeof connection.columns === "function"
+            ? await connection.columns(tableName)
+            : undefined;
+        const idx =
+          typeof connection.indexes === "function"
+            ? await connection.indexes(tableName)
+            : undefined;
+        // Re-check after every await: a newer refresh may have started (and
+        // possibly already written) while ours was in flight; leave its result.
+        if (!isLatest()) return;
+        // Primary keys first so setColumns' reconcilePrimaryKeyFlags sees the
+        // fresh authoritative key (mirrors `add`'s ordering).
+        if (pk !== undefined) this.setPrimaryKeys(tableName, pk);
+        if (cols !== undefined) this.setColumns(tableName, cols);
+        if (idx !== undefined) this._indexes.set(tableName, idx);
+      });
+    } catch {
+      // Reflection failed (e.g. a transient connection error or a failed lease).
+      // Fall back to clearing so the next async load re-reflects rather than
+      // serving a now-untrustworthy entry — but ONLY if we're still the latest
+      // refresh. Clearing unconditionally would let a stale, failed refresh wipe
+      // out a newer refresh's already-written good data, reintroducing the very
+      // race the generation gate prevents on the success path.
+      if (isLatest()) this.clearDataSourceCacheBang(null, tableName);
+    }
   }
 
   async columns(pool: unknown, tableName: string): Promise<Column[] | undefined> {
