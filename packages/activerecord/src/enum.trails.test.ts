@@ -367,9 +367,12 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
     }
   }
 
+  // Deliberately do NOT await `NumericEnum.loadSchema()` here: `enumTypeOf`
+  // must reflect synchronously from the warm schema cache on its own (the same
+  // sync path `Base.typeForAttribute` uses). Awaiting the async loader first
+  // would mask a regression where the helper fire-and-forgets reflection.
   beforeAll(async () => {
     await rebuildCanonicalTables(Base.connection, ["numeric_data"]);
-    await NumericEnum.loadSchema();
   });
 
   it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {

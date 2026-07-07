@@ -9,6 +9,9 @@ import {
 } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
 import { isDangerousClassMethod } from "./scoping/named.js";
+// The synchronous schema reflector (warm-cache path), NOT the async
+// `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
+import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -909,12 +912,17 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   const host = klass as unknown as {
     _enums?: Map<string, unknown>;
     _attributeAliases?: Record<string, string>;
-    loadSchema(): void;
     _defaultAttributes(): { getAttribute(n: string): { type: Type } };
   };
   const resolved = host._attributeAliases?.[attribute] ?? attribute;
   if (!host._enums?.has(resolved)) return null;
-  host.loadSchema();
+  // Reflect synchronously from the warm schema cache before reading the
+  // attribute set — the SAME path `Base.typeForAttribute` uses (base.ts). The
+  // public `Base.loadSchema()` is async and would fire-and-forget, letting a
+  // caller read the pre-reflection (mapping-inferred) EnumType; this sync
+  // reflection stashes `enumReflectedSubtype` and rebuilds `_defaultAttributes`
+  // before we read it, so the reflected subtype is already in place.
+  reflectSchemaSync.call(klass);
   const type = host._defaultAttributes().getAttribute(resolved).type;
   return type instanceof EnumType ? type : null;
 }
