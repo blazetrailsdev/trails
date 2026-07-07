@@ -478,12 +478,8 @@ describe("SerializedAttributeTest", () => {
       }
     }
     // Rails: Topic.new(content: nil) with content_changed? → false.
-    // In Rails, nil casts to [] (the Array default) and the record is not dirty.
-    // Deviation: trails marks explicitly-assigned nil as changed before casting,
-    // so new ArrayTopic({ content: null }) returns attributeChanged("content") = true.
-    // This mirrors only the partial invariant (fresh record with no explicit
-    // content assignment is not dirty). The explicit-nil case is a tracked deviation.
-    const topic = new ArrayTopic();
+    // nil casts to [] (the Array default) and the record is not dirty.
+    const topic = new ArrayTopic({ content: null } as any);
     expect(topic.attributeChanged("content")).toBe(false);
   });
 
