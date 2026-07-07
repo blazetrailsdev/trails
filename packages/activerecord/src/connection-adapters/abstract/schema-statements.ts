@@ -1676,7 +1676,12 @@ export class SchemaStatements {
   }
 
   foreignKeyColumnFor(tableName: string, columnName = "id"): string {
-    const name = tableName.replace(/^.*\./, "");
+    // Rails' foreign_key_column_for strips table_name_prefix/suffix before
+    // singularizing (schema_statements.rb:1241-1244), so the default column is
+    // derived from the bare table name even when new_foreign_key_definition
+    // threads a prefixed to_table through. (The leading schema-qualifier strip
+    // is a trails addition for PG's `schema.table` form.)
+    const name = this.stripTableNamePrefixAndSuffix(tableName.replace(/^.*\./, ""));
     return `${singularize(name)}_${columnName}`;
   }
 

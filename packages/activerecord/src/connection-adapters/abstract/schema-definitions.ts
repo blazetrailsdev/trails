@@ -1107,7 +1107,16 @@ export class TableDefinition {
     }
     const result: Record<string, unknown> = { ...options };
     if (!result.column) {
-      const base = toTable.replace(/^.*\./, "");
+      // Mirror foreign_key_column_for: strip table_name_prefix/suffix (and the
+      // trails schema-qualifier) before singularizing, so a prefixed to_table
+      // still yields the bare `<singular>_id` default column.
+      const prefix = adapter.tableNamePrefix ?? "";
+      const suffix = adapter.tableNameSuffix ?? "";
+      let base = toTable.replace(/^.*\./, "");
+      if (prefix || suffix) {
+        const stripped = base.match(new RegExp(`^${prefix}(.+)${suffix}$`));
+        if (stripped) base = stripped[1];
+      }
       result.column = `${singularize(base)}_id`;
     }
     if (!result.name) {

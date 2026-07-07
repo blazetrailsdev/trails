@@ -129,6 +129,15 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(makeStatements().stripTableNamePrefixAndSuffix("users")).toBe("users");
   });
 
+  it("foreignKeyColumnFor strips table_name_prefix/suffix before singularizing", () => {
+    const ss = makeStatements({ tableNamePrefix: "app_", tableNameSuffix: "_v2" });
+    // Rails foreign_key_column_for strips prefix/suffix, so the prefixed
+    // to_table `app_rockets_v2` yields `rocket_id`, not `app_rocket_v2_id`.
+    expect(ss.foreignKeyColumnFor("app_rockets_v2")).toBe("rocket_id");
+    expect(ss.foreignKeyColumnFor("app_rockets_v2", "uuid")).toBe("rocket_uuid");
+    expect(makeStatements().foreignKeyColumnFor("rockets")).toBe("rocket_id");
+  });
+
   it("foreignKeyName generates hash name", () => {
     const ss = makeStatements();
     expect(ss.foreignKeyName("users", { name: "my_fk", column: "org_id" })).toBe("my_fk");
