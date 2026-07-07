@@ -343,6 +343,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         class UuidAssocPost extends Base {
           static tableName = "uuid_assoc_posts";
           static {
+            // Declare the real uuid PK so strict writeFromUser's post-INSERT id write-back has a known column.
+            this.attribute("id", "uuid");
             this.hasMany("uuidAssocComments", {
               className: "UuidAssocComment",
               foreignKey: "uuid_assoc_post_id",
@@ -352,6 +354,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         class UuidAssocComment extends Base {
           static tableName = "uuid_assoc_comments";
           static {
+            // Declare the real uuid PK so strict writeFromUser's post-INSERT id write-back has a known column.
+            this.attribute("id", "uuid");
             this.belongsTo("uuidAssocPost", {
               className: "UuidAssocPost",
               foreignKey: "uuid_assoc_post_id",
@@ -629,6 +633,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         class UuidUniq extends Base {
           static tableName = "uuid_uniqueness_validation_test";
           static {
+            // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+            this.attribute("id", "integer");
             this.validatesUniqueness("guid", { caseSensitive: false });
           }
         }
@@ -885,6 +891,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class UuidPostCls extends Base {
         static tableName = "pg_uuid_posts";
         static {
+          // Declare the real uuid PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "uuid");
           this.hasMany("uuidComments", {
             className: "UuidCommentInverse",
             foreignKey: "uuid_post_id",
@@ -895,6 +903,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class UuidCommentCls extends Base {
         static tableName = "pg_uuid_comments";
         static {
+          // Declare the real uuid PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "uuid");
           this.belongsTo("uuidPost", {
             className: "UuidPostInverse",
             foreignKey: "uuid_post_id",
@@ -963,6 +973,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class UuidForumCls extends Base {
         static tableName = "pg_uuid_dj_forums";
         static {
+          // Declare the real uuid PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "uuid");
           // Rails: has_many :uuid_posts, -> { order("title DESC") } — the
           // ordering scope exercises the delegate-cache path the test name calls out.
           this.hasMany("uuidPosts", {
@@ -986,6 +998,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class UuidPostCls extends Base {
         static tableName = "pg_uuid_dj_posts";
         static {
+          // Declare the real uuid PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "uuid");
           this.belongsTo("uuidForum", {
             className: "UuidForumDj",
             foreignKey: "uuid_forum_id",
@@ -999,6 +1013,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class UuidCommentCls extends Base {
         static tableName = "pg_uuid_dj_comments";
         static {
+          // Declare the real uuid PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "uuid");
           this.belongsTo("uuidPost", {
             className: "UuidPostDj",
             foreignKey: "uuid_post_id",

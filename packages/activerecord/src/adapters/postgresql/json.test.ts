@@ -85,6 +85,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         class JsonStringCast extends Base {
           static {
             this.tableName = "json_string_cast";
+            // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+            this.attribute("id", "integer");
           }
         }
         JsonStringCast.adapter = adapter;

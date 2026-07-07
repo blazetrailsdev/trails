@@ -61,6 +61,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     await adapter.loadAdditionalTypes();
     class PostgresqlRangesCls extends Base {
       static tableName = "postgresql_ranges";
+      static {
+        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+        this.attribute("id", "integer");
+      }
     }
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
@@ -69,6 +73,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_ranges";
       static timeZoneAwareAttributes = true;
       static timeZoneAwareTypes = [...Base.timeZoneAwareTypes, "tsrange", "tstzrange"];
+      static {
+        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+        this.attribute("id", "integer");
+      }
     }
     await PostgresqlRangesTzCls.loadSchema();
     PostgresqlRangesTz = PostgresqlRangesTzCls;

@@ -46,6 +46,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_times";
       static {
         this.adapter = a;
+        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+        this.attribute("id", "integer");
         this.attribute("time_interval", "string");
         this.attribute("scaled_time_interval", "interval");
       }
@@ -68,6 +70,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_oids";
       static {
         this.adapter = a;
+        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+        this.attribute("id", "integer");
       }
     }
     await PostgresqlOid.loadSchema();

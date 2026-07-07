@@ -12,6 +12,8 @@ import { Base } from "../../index.js";
 class XmlDataType extends Base {
   static {
     this.tableName = "xml_data_type";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
   }
 }
 

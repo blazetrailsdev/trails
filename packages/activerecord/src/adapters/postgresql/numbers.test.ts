@@ -10,6 +10,8 @@ import { Base } from "../../index.js";
 class PostgresqlNumber extends Base {
   static {
     this.tableName = "postgresql_numbers";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
   }
 }
 

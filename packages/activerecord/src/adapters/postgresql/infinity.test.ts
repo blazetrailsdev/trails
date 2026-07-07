@@ -42,6 +42,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       static tableName = "postgresql_infinities";
       static {
         this.adapter = a;
+        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+        this.attribute("id", "integer");
       }
     }
     await PostgresqlInfinity.loadSchema();
@@ -129,6 +131,8 @@ describeIfPg("PostgreSQLAdapter", () => {
           static timeZoneAwareAttributes = true;
           static {
             this.adapter = a;
+            // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+            this.attribute("id", "integer");
           }
         }
         await PostgresqlInfinity.loadSchema();

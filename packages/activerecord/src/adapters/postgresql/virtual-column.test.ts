@@ -39,6 +39,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     class VirtualColumnCls extends Base {
       static tableName = "virtual_columns";
+      static {
+        // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+        this.attribute("id", "integer");
+      }
     }
     await VirtualColumnCls.loadSchema();
     VirtualColumn = VirtualColumnCls;

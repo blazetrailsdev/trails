@@ -358,6 +358,8 @@ describeIfPg("PostgreSQLAdapter", () => {
         // raises UnknownAttributeError for an unmodeled key. `updated_at` reflects
         // from the timestamp column (keeping its infinity-capable OID decoder).
         static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
           this.attribute("name", "string");
         }
       }

@@ -12,6 +12,8 @@ import { ValueType } from "@blazetrails/activemodel";
 class PostgresqlComposite extends Base {
   static {
     this.tableName = "postgresql_composites";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
   }
 }
 
