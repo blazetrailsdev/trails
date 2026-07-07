@@ -196,11 +196,10 @@ function generateCode(
       if (index.where !== undefined) optEntries.push(`where: ${JSON.stringify(index.where)}`);
       if (index.name !== undefined) optEntries.push(`name: ${JSON.stringify(index.name)}`);
       if (index.order !== undefined) optEntries.push(`order: ${JSON.stringify(index.order)}`);
-      // Sub-part prefix length is MySQL-only DDL (the abstract SchemaCreation
-      // visitor emits `col(n)` unconditionally, which is invalid on PG/SQLite).
-      // Mirror schema-types.ts and drop it for non-MySQL adapters.
-      if (index.length !== undefined && adapterName === "mysql")
-        optEntries.push(`length: ${JSON.stringify(index.length)}`);
+      // Sub-part prefix length is MySQL-only DDL, but the abstract SchemaCreation
+      // visitor now drops it on non-MySQL adapters (matching Rails), so emitting it
+      // unconditionally is safe — it is silently ignored on PG/SQLite.
+      if (index.length !== undefined) optEntries.push(`length: ${JSON.stringify(index.length)}`);
       if (index.nullsNotDistinct) optEntries.push(`nullsNotDistinct: true`);
       if (index.using !== undefined) optEntries.push(`using: ${JSON.stringify(index.using)}`);
       if (index.type !== undefined) optEntries.push(`type: ${JSON.stringify(index.type)}`);

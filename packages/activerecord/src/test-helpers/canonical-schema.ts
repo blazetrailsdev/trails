@@ -157,9 +157,11 @@ interface TableMeta {
  * Apply a table's collected indexes with the schema.rb gating both surviving
  * schema loaders share: an expression index (`"(lower(x))"` — a string column
  * with non-word chars) is skipped on adapters without
- * `supports_expression_index?`, and the MySQL-only sub-part `length:` is dropped
- * elsewhere (the abstract SchemaCreation visitor would emit invalid `col(n)` DDL
- * on PG/SQLite). Exported so the `schema-file-generator.ts` parity guard can pin
+ * `supports_expression_index?`. The MySQL-only sub-part `length:` no longer
+ * needs gating here — the abstract SchemaCreation visitor now drops it on
+ * non-MySQL adapters (matching Rails), so it is passed through unconditionally
+ * and silently ignored on PG/SQLite. Exported so the `schema-file-generator.ts`
+ * parity guard can pin
  * `generateSchemaFile` against the *real* gating code here — this module outlives
  * `defineSchema` (RFC 0059 phase 4 retires the DSL), so the guard anchors to a
  * survivor, not a copy.
@@ -179,13 +181,12 @@ export async function emitTableIndexes(
   for (const { columns, opts } of indexes) {
     const isExpression = typeof columns === "string" && /\W/.test(columns);
     if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
-    const length = adapter.adapterName === "mysql" ? opts.length : undefined;
     await ss.addIndex(table, columns, {
       unique: opts.unique,
       where: opts.where,
       name: opts.name,
       order: opts.order as Record<string, string> | undefined,
-      length,
+      length: opts.length,
       nullsNotDistinct: opts.nullsNotDistinct,
       using: opts.using,
       type: opts.type,

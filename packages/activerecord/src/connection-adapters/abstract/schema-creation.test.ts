@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
+import { CreateIndexDefinition, IndexDefinition } from "./schema-definitions.js";
 
 describe("SchemaCreation#typeToSql blank type guard", () => {
   it("throws a descriptive error for an empty custom type", () => {
@@ -63,6 +64,24 @@ describe("SchemaCreation quoting delegations", () => {
     expect(sc.quoteColumnName("title")).toBe('"title"');
     expect(sc.quoteTableName("posts")).toBe('"posts"');
   });
+});
+
+describe("SchemaCreation#quotedColumnsForIndex sub-part length gating", () => {
+  // Sub-part index lengths (`col(N)`) are MySQL-only DDL. Rails applies them
+  // exclusively in AbstractMysqlAdapter#add_index_length; the abstract visitor
+  // must NOT, or it emits invalid `("name"(10))` on PG/SQLite.
+  for (const adapter of ["postgres", "sqlite"] as const) {
+    it(`does not append sub-part length on ${adapter}`, () => {
+      const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
+        lengths: { title: 10 },
+      });
+      const sql = (new SchemaCreation(adapter) as any).visitCreateIndexDefinition(
+        new CreateIndexDefinition(idx, false),
+      );
+      expect(sql).not.toContain("(10)");
+      expect(sql).toContain('("title")');
+    });
+  }
 });
 
 describe("SchemaCreation#typeToSql decimal precision/scale", () => {
