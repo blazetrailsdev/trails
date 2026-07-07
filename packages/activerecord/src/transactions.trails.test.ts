@@ -242,6 +242,10 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
   // popped — so isRestorable() refuses to restore a parent whose child savepoint
   // op may have partially executed after a reconnect. Exercised here on sqlite
   // (which shares the internalExecute finally); the mysql2/PG paths are the same.
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
   it("createSavepoint dirties the current (parent) transaction frame", async () => {
     const { adapter } = makeSQLiteTopic();
     const tm = adapter.transactionManager;
@@ -266,11 +270,10 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
       // dirty the parent, mirroring Rails' `ensure` firing on the raise path.
       const driver = (adapter as unknown as { driver: { exec: (s: string) => Promise<unknown> } })
         .driver;
-      const spy = vi
-        .spyOn(driver, "exec")
-        .mockRejectedValueOnce(new Error("server closed the connection unexpectedly"));
+      vi.spyOn(driver, "exec").mockRejectedValueOnce(
+        new Error("server closed the connection unexpectedly"),
+      );
       await expect(adapter.rollbackToSavepoint("sp_x")).rejects.toThrow();
-      spy.mockRestore();
       expect(tm.isRestorable()).toBe(false);
     });
   });
