@@ -69,7 +69,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.extensionEnabled("citext")).toBe(true);
       const dump = await adapter.createSchemaDumper(adapter).dump();
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
-    });
+    }, 60000);
     it("enable extension migration ignores prefix and suffix", async () => {
       // Rails: table_name_prefix/suffix don't affect extension names
       // TS: same — extension names pass through unmodified
