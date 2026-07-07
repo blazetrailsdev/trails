@@ -10,8 +10,10 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
-import { StringType } from "@blazetrails/activemodel";
+import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { TypeMap } from "../type/type-map.js";
+import * as Type from "../type.js";
+import { UnsignedInteger } from "../type/unsigned-integer.js";
 import {
   AbstractAdapter,
   Version,
@@ -126,18 +128,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
-    m.registerType(
-      /char/i,
-      undefined,
-      (sqlType) =>
-        new StringType({ trueString: "1", falseString: "0", limit: this.extractLimit(sqlType) }),
-    );
-    m.registerType(
-      /^enum/i,
-      undefined,
-      () => new StringType({ trueString: "1", falseString: "0" }),
-    );
-    m.registerType(/^set/i, undefined, () => new StringType({ trueString: "1", falseString: "0" }));
+    m.registerType(/char/i, undefined, (sqlType) => {
+      const limit = this.extractLimit(sqlType);
+      return Type.lookup("string", { adapter: "mysql2", limit });
+    });
+    m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql2" }));
+    m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
   }
 
   // Cached liveness state — true until a failure is observed (ping fail,
@@ -2142,3 +2138,24 @@ dirtiesQueryCache(Mysql2Adapter, "executeMutation");
 // so dirty `execInsert` too; the single-column path delegates to
 // `executeMutation` via `super`, where the double-clear is a harmless no-op.
 dirtiesQueryCache(Mysql2Adapter, "execInsert");
+
+// Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
+// mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`
+// (not the ActiveModel default `"t"`/`"f"`) so a boolean assigned to a string
+// column round-trips as 1/0; `initializeTypeMap` resolves char/varchar/enum/set
+// through `Type.lookup(:string, adapter: :mysql2)`.
+Type.register("immutable_string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+  return new ImmutableStringType({
+    trueString: "1",
+    falseString: "0",
+    ...((args as Record<string, unknown>) ?? {}),
+  });
+});
+Type.register("string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+  return new StringType({
+    trueString: "1",
+    falseString: "0",
+    ...((args as Record<string, unknown>) ?? {}),
+  });
+});
+Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });

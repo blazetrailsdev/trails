@@ -106,7 +106,10 @@ export function register(
   _registry.register(typeName, klass, options, block);
 }
 
-export function lookup(symbol: string, options?: { adapter?: string }): Type {
+export function lookup(
+  symbol: string,
+  options?: { adapter?: string; [key: string]: unknown },
+): Type {
   const adapter = options?.adapter ?? currentAdapterName();
   return _registry.lookup(symbol, { ...options, adapter });
 }
