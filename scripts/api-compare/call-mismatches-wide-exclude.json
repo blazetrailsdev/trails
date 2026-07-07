@@ -27422,13 +27422,6 @@
     "package": "activerecord",
     "tsFile": "enum.ts",
     "rubyName": "detect_enum_conflict!",
-    "call": "dangerous_class_method?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "enum.ts",
-    "rubyName": "detect_enum_conflict!",
     "call": "method_defined_within?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

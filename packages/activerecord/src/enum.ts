@@ -8,6 +8,7 @@ import {
   typeRegistry,
 } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
+import { isDangerousClassMethod } from "./scoping/named.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -586,8 +587,11 @@ export function _enum(
     // Active Record instance methods — a plain user override (`def published!;
     // super; end`) is allowed and simply wins over the generated method, so we
     // must not raise merely because the name exists on the prototype.
-    // Mirrors enum.rb's `dangerous_attribute_method?` gate; class scopes still
-    // guard against any pre-existing class method.
+    // Mirrors enum.rb's `dangerous_attribute_method?` gate; the value/`not*`
+    // scope names are class methods, so they only conflict with a *dangerous*
+    // class method (`dangerous_class_method?` — RESTRICTED_CLASS_METHODS plus
+    // methods `Base` itself defines), never a scope inherited from a parent
+    // enum or a user static on the model/an ancestor.
     if (dangerousMethods.has(predicateName))
       raiseConflictError.call(this, attribute, predicateName);
     if (enumMethodNames.has(predicateName))
@@ -595,9 +599,9 @@ export function _enum(
     if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
     if (enumMethodNames.has(bangName))
       raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
-    if (fullName in (this as object))
+    if (isDangerousClassMethod(fullName))
       raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    if (notScopeName in (this as object))
+    if (isDangerousClassMethod(notScopeName))
       raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
     if (friendlyName !== fullName) {
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
@@ -609,10 +613,10 @@ export function _enum(
         raiseConflictError.call(this, attribute, friendlyBang);
       if (enumMethodNames.has(friendlyBang))
         raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
-      if (friendlyName in (this as object))
+      if (isDangerousClassMethod(friendlyName))
         raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
       const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (notFriendlyName in (this as object))
+      if (isDangerousClassMethod(notFriendlyName))
         raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
     }
   }
@@ -740,10 +744,13 @@ export function detectEnumConflictBang(
   // user override or an `alias_attribute` reader on the model (or an ancestor)
   // is NOT treated as a conflict — only genuine framework methods are.
   if (_klassMethod) {
-    // `columns` etc. live on `Base` and are inherited, so a subclass carries
-    // them; user statics on the model that shadow nothing on Base are the rare
-    // false-positive noted for the pre-existing class-method path.
-    if (methodName in (this as object)) {
+    // Rails' `dangerous_class_method?` is a fixed RESTRICTED_CLASS_METHODS list
+    // plus the methods `Base` itself defines (never a subclass or intermediate
+    // ancestor). `isDangerousClassMethod` walks statics from `Base`, so a
+    // user/scope class method on the model or an intermediate ancestor whose
+    // name matches an enum's `pluralize(name)` no longer false-positives — while
+    // reserved names like `columns` (defined on `Base`) still raise.
+    if (isDangerousClassMethod(methodName)) {
       raiseConflictError.call(this, enumName, methodName, { type: "class" });
     }
     return;

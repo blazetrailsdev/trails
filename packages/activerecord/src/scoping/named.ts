@@ -33,7 +33,7 @@ const INTRINSIC_FUNCTION_PROPS = new Set(["length", "name", "prototype"]);
  * (existing scopes, user class methods) and Kernel methods are not dangerous —
  * the walk starts at `Base`, never the model subclass.
  */
-function isDangerousClassMethod(name: string): boolean {
+export function isDangerousClassMethod(name: string): boolean {
   if (RESTRICTED_CLASS_METHODS.has(name)) return true;
   if (INTRINSIC_FUNCTION_PROPS.has(name)) return false;
   let klass: any = Base;
