@@ -4755,11 +4755,13 @@ extend(Base, {
   assertValidEnumDefinitionValues: _EnumModule.assertValidEnumDefinitionValues,
   assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
   detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
-  // Wrap ActiveModel's `aliasAttribute` so that declaring `alias_attribute`
-  // AFTER `enum` on the same name re-points the enum at its backing column —
-  // Rails resolves the alias per-operation, so order is irrelevant there.
-  // Call Model's static directly (not via the prototype chain) to stay
-  // recursion-free for subclasses, whose superclass is now this wrapper.
+  // Rails' ActiveRecord overrides `alias_attribute` to call `super` then run
+  // its own AR-side generation (attribute_methods.rb:66). trails mirrors that
+  // AR-level override here so declaring `alias_attribute` AFTER `enum` on the
+  // same name re-points the enum at its backing column — Rails resolves the
+  // alias per-operation, so order is irrelevant there. We invoke Model's static
+  // directly (trails' `super`) rather than via the prototype chain, which would
+  // recurse for subclasses whose superclass is now this very wrapper.
   aliasAttribute(this: typeof Base, newName: string, oldName: string): void {
     (Model as unknown as { aliasAttribute(n: string, o: string): void }).aliasAttribute.call(
       this,
