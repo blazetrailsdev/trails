@@ -9,8 +9,8 @@ import {
   CheckConstraintDefinition,
   ColumnDefinition,
   ForeignKeyDefinition,
-  foreignKeyOptionsStoredKeys,
   TableDefinition as AbstractTableDefinition,
+  type AddForeignKeyOptions,
   type ColumnOptions,
   type ColumnType,
   type ReferentialAction,
@@ -1263,23 +1263,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // deferrable / NOT VALID / action / schema-qualified-name decoration, so no
     // bespoke inline SQL is needed here.
     const fkOptions = this.foreignKeyOptions(fromTable, toTable, options);
-    const fkDef = new ForeignKeyDefinition(
-      fromTable,
-      toTable,
-      fkOptions.column as string | string[],
-      (fkOptions.primaryKey as string) ?? "id",
-      fkOptions.name as string,
-      fkOptions.onDelete as ReferentialAction | undefined,
-      fkOptions.onUpdate as ReferentialAction | undefined,
-      fkOptions.deferrable as "immediate" | "deferred" | undefined,
-      fkOptions.validate as boolean | undefined,
-      // Mirror Rails' foreign_key_options stored-key set for consistency with
-      // the DSL path; this FK only builds SQL and is never queried via
-      // isDefinedFor.
-      foreignKeyOptionsStoredKeys(options),
-    );
     const at = this.pg.createAlterTable(fromTable);
-    at.addForeignKey(fkDef);
+    // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
+    // (now converged): it applies table_name_prefix/suffix and re-runs
+    // foreign_key_options idempotently (column/name already filled above).
+    at.addForeignKey(toTable, fkOptions as Partial<AddForeignKeyOptions>);
     await this.pg.exec(this.pg.schemaCreation.accept(at));
   }
 

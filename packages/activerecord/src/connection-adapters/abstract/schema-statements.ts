@@ -23,7 +23,6 @@ import {
   ChangeColumnDefaultDefinition,
   CreateIndexDefinition,
   ForeignKeyDefinition,
-  foreignKeyOptionsStoredKeys,
   CheckConstraintDefinition,
   type AddForeignKeyOptions,
   type AddIndexOptions,
@@ -812,22 +811,11 @@ export class SchemaStatements {
     // mixed-in method on the prototype.
     const opts = this.foreignKeyOptions(fromTable, toTable, options as Record<string, unknown>);
     const at = this.createAlterTable(fromTable);
-    const fkDef = new ForeignKeyDefinition(
-      fromTable,
-      toTable,
-      opts.column as string | string[],
-      (opts.primaryKey as string | string[] | undefined) ?? "id",
-      opts.name as string,
-      opts.onDelete as ForeignKeyDefinition["onDelete"],
-      opts.onUpdate as ForeignKeyDefinition["onUpdate"],
-      opts.deferrable as ForeignKeyDefinition["deferrable"],
-      opts.validate as boolean | undefined,
-      // Mirror Rails' foreign_key_options stored-key set (column/name always,
-      // others when explicitly passed) for consistency with the DSL path; this
-      // FK only builds SQL and is never queried via isDefinedFor.
-      foreignKeyOptionsStoredKeys(options),
-    );
-    at.addForeignKey(fkDef);
+    // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
+    // (now converged) rather than building the FK def inline: it applies
+    // table_name_prefix/suffix to to_table and re-runs foreign_key_options
+    // idempotently (column/name already filled above), mirroring Rails.
+    at.addForeignKey(toTable, opts as Partial<AddForeignKeyOptions>);
     await this.adapter.executeMutation(this.schemaCreation.accept(at));
   }
 

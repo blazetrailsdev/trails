@@ -48,6 +48,24 @@ export type PrimaryKeyType = "uuid";
 export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action" | "set_default";
 
 /**
+ * The adapter surface {@link TableDefinition.newForeignKeyDefinition} reads
+ * beyond {@link SchemaQuoter}: the table_name_prefix/suffix (Rails reads these
+ * off `ActiveRecord::Base`) and the converged `foreign_key_options` that fills
+ * the default column and SHA256 `fk_rails_<hex>` name. All optional — the bare
+ * ABSTRACT_SCHEMA_QUOTER path exposes none and falls back locally.
+ * @internal
+ */
+export interface ForeignKeyOptionsAdapter {
+  tableNamePrefix?: string;
+  tableNameSuffix?: string;
+  foreignKeyOptions(
+    fromTable: string,
+    toTable: string,
+    options: Record<string, unknown>,
+  ): Record<string, unknown>;
+}
+
+/**
  * Mirrors: ActiveRecord::ConnectionAdapters::ColumnDefinition
  */
 export class ColumnDefinition {
@@ -742,8 +760,16 @@ export class AlterTable {
     this.adds.push(new AddColumnDefinition(colDef));
   }
 
-  addForeignKey(fk: ForeignKeyDefinition): void {
-    this.foreignKeyAdds.push(fk);
+  addForeignKey(toTable: string, options: Partial<AddForeignKeyOptions> = {}): void {
+    // Mirrors Rails' AlterTable#add_foreign_key, which routes through
+    // `@td.new_foreign_key_definition(to_table, options)` so the FK def picks up
+    // table_name_prefix/suffix and the converged foreign_key_options defaults.
+    if (!this._td) {
+      throw new Error(
+        "AlterTable#addForeignKey requires a backing TableDefinition (construct via createAlterTable)",
+      );
+    }
+    this.foreignKeyAdds.push(this._td.newForeignKeyDefinition(toTable, options));
   }
 
   dropForeignKey(name: string): void {
@@ -1038,23 +1064,59 @@ export class TableDefinition {
     toTable: string,
     options: Partial<AddForeignKeyOptions> = {},
   ): ForeignKeyDefinition {
-    const pk = options.primaryKey ?? "id";
-    const col = options.column ?? `${singularize(toTable.split(".").at(-1) ?? toTable)}_${pk}`;
+    // Mirrors Rails' TableDefinition#new_foreign_key_definition: apply
+    // table_name_prefix/suffix to to_table, then route the column/name defaults
+    // through the adapter's foreign_key_options (SHA256 `fk_rails_<hex>` name).
+    const adapter = this._adapter as Partial<ForeignKeyOptionsAdapter>;
+    const prefix = adapter.tableNamePrefix ?? "";
+    const suffix = adapter.tableNameSuffix ?? "";
+    const prefixedToTable = `${prefix}${toTable}${suffix}`;
+    const opts = this._foreignKeyOptions(prefixedToTable, options);
     return new ForeignKeyDefinition(
       this.tableName,
-      toTable,
-      col,
-      pk,
-      options.name ?? `fk_${this.tableName}_${col}`,
-      options.onDelete,
-      options.onUpdate,
-      options.deferrable,
-      options.validate,
+      prefixedToTable,
+      opts.column as string | string[],
+      (opts.primaryKey as string | string[] | undefined) ?? "id",
+      opts.name as string,
+      opts.onDelete as ReferentialAction | undefined,
+      opts.onUpdate as ReferentialAction | undefined,
+      opts.deferrable as "immediate" | "deferred" | false | undefined,
+      opts.validate as boolean | undefined,
       // Mirror Rails' foreign_key_options stored-key set so a key we defaulted
       // (e.g. primaryKey "id") is sliced out by isDefinedFor rather than
       // mismatching.
       foreignKeyOptionsStoredKeys(options),
     );
+  }
+
+  /**
+   * Delegate to the adapter's `foreignKeyOptions` (which fills the default
+   * column and SHA256 `fk_rails_<hex>` name) when available. The bare
+   * ABSTRACT_SCHEMA_QUOTER path (used in unit tests that construct a
+   * TableDefinition directly) lacks it, so fall back to the same
+   * derivation as SchemaStatements#foreignKeyOptions / foreignKeyName.
+   * @internal
+   */
+  private _foreignKeyOptions(
+    toTable: string,
+    options: Partial<AddForeignKeyOptions>,
+  ): Record<string, unknown> {
+    const adapter = this._adapter as Partial<ForeignKeyOptionsAdapter>;
+    if (typeof adapter.foreignKeyOptions === "function") {
+      return adapter.foreignKeyOptions(this.tableName, toTable, { ...options });
+    }
+    const result: Record<string, unknown> = { ...options };
+    if (!result.column) {
+      const base = toTable.replace(/^.*\./, "");
+      result.column = `${singularize(base)}_id`;
+    }
+    if (!result.name) {
+      const cols = Array.isArray(result.column) ? result.column : [result.column];
+      const identifier = `${this.tableName}_${cols.join("_and_")}_fk`;
+      const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
+      result.name = `fk_rails_${hex}`;
+    }
+    return result;
   }
 
   newCheckConstraintDefinition(
