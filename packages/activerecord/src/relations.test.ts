@@ -931,6 +931,18 @@ describe("RelationTest", () => {
     // reflection, so it crosses the model boundary untouched.
     const merged = Comment.joins("post").merge(Post.eagerLoad("readers")) as any;
     expect(merged._eagerLoadAssociations).toContain("readers");
+
+    // merge! (in-place) shares Merger#merge in Rails; trails routes both through
+    // the same foldMerge* helpers, so the cross-model reflection-nesting applies
+    // identically — the bang path must nest `{ post: [:readers] }`, not ask
+    // Comment to preload `:readers` directly.
+    const bang = Comment.joins("post") as any;
+    bang.mergeBang(Post.preload("readers").where({ title: "Uhuu" }));
+    expect(bang._preloadAssociations).toEqual([{ post: ["readers"] }]);
+    const bangComment = (await bang.toArray())[0];
+    const bangPost = bangComment.association("post");
+    expect(bangPost.isLoaded()).toBe(true);
+    expect(bangPost.target.association("readers").isLoaded()).toBe(true);
   });
 
   it("preloading with associations default scopes and merges", async () => {

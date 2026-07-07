@@ -3,6 +3,7 @@ import { assertValidKeys } from "@blazetrails/activesupport";
 
 import { arelColumns } from "./query-methods.js";
 import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
+import { foldMergeEagerLoad, foldMergePreloads } from "./merge-preloads.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -75,53 +76,16 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
-  // Rails merges :eager_load as a NORMAL_VALUE through Merger#merge's generic
-  // loop (merger.rb:52-68) — it is NOT part of merge_preloads. eager_load!
-  // (query_methods.rb) always unions (`eager_load_values |= args`), never gated
-  // on model equality and never nested under a reflection, so it crosses the
-  // model boundary untouched. Kept out of mergePreloads to mirror that split.
+  // Thin wrappers over the shared folders (merge-preloads.ts) so merge() and
+  // merge!() (spawn-methods mergeBang) fold preload/includes/eager_load through
+  // the same code and cannot drift, while api:compare still maps merger.rb's
+  // merge_preloads to this file.
   private mergeEagerLoad(rel: any): void {
-    if (this.other._eagerLoadAssociations && this.other._eagerLoadAssociations.length > 0) {
-      rel._eagerLoadAssociations = [
-        ...(rel._eagerLoadAssociations ?? []),
-        ...this.other._eagerLoadAssociations,
-      ];
-    }
+    foldMergeEagerLoad(rel, this.other);
   }
 
-  // Mirrors Rails' Merger#merge_preloads (merger.rb:96-115). Same-model merges
-  // union the preload/includes values straight across. A cross-model merge (e.g.
-  // Comment.joins(:post).merge(Post.preload(:readers))) instead nests them under
-  // the reflection on the receiver whose class_name is the other model's name,
-  // so Comment preloads `{ post: [:readers] }` — carrying Post's preload through
-  // the association boundary rather than asking Comment to preload `:readers`.
   private mergePreloads(rel: any): void {
-    const otherPreloads = this.other._preloadAssociations ?? [];
-    const otherIncludes = this.other._includesAssociations ?? [];
-    if (otherPreloads.length === 0 && otherIncludes.length === 0) return;
-
-    if (this.other._modelClass === rel._modelClass) {
-      if (otherPreloads.length > 0) {
-        rel._preloadAssociations = [...(rel._preloadAssociations ?? []), ...otherPreloads];
-      }
-      if (otherIncludes.length > 0) {
-        rel._includesAssociations = [...(rel._includesAssociations ?? []), ...otherIncludes];
-      }
-      return;
-    }
-
-    const otherName = this.other._modelClass?.name;
-    const reflection = rel._modelClass
-      .reflectOnAllAssociations()
-      .find((r: any) => r.className === otherName);
-    if (!reflection) return;
-
-    if (otherPreloads.length > 0) {
-      rel._preloadAssociations.push({ [reflection.name]: otherPreloads });
-    }
-    if (otherIncludes.length > 0) {
-      rel._includesAssociations.push({ [reflection.name]: otherIncludes });
-    }
+    foldMergePreloads(rel, this.other);
   }
 
   // Thin wrappers over the shared folders (merge-joins.ts) so merge() and

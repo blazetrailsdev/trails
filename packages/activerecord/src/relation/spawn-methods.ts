@@ -7,6 +7,7 @@
 import { Merger, HashMerger } from "./merger.js";
 import { argumentError } from "./query-methods.js";
 import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
+import { foldMergeEagerLoad, foldMergePreloads } from "./merge-preloads.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
@@ -104,22 +105,12 @@ export function mergeBang(this: any, other: any): any {
     ) {
       this._fromClause = other._fromClause;
     }
-    // mergePreloads
-    if (other._preloadAssociations?.length > 0)
-      this._preloadAssociations = [
-        ...(this._preloadAssociations ?? []),
-        ...other._preloadAssociations,
-      ];
-    if (other._includesAssociations?.length > 0)
-      this._includesAssociations = [
-        ...(this._includesAssociations ?? []),
-        ...other._includesAssociations,
-      ];
-    if (other._eagerLoadAssociations?.length > 0)
-      this._eagerLoadAssociations = [
-        ...(this._eagerLoadAssociations ?? []),
-        ...other._eagerLoadAssociations,
-      ];
+    // mergeEagerLoad / mergePreloads — shared with Merger (merger.ts) via the
+    // foldMerge* helpers so merge() and merge!() fold preload/includes/eager_load
+    // identically (same-model union vs cross-model reflection-nesting) and can't
+    // drift.
+    foldMergeEagerLoad(this, other);
+    foldMergePreloads(this, other);
     // mergeJoins / mergeOuterJoins — shared with Merger (merger.ts) via the
     // foldMerge* helpers so merge() and merge!() fold joins identically and can't
     // drift.
