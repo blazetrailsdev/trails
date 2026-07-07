@@ -1472,6 +1472,19 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.macro;
   }
 
+  /**
+   * Rails' ThroughReflection has no `association_scope_cache` of its own and
+   * doesn't inherit one (it extends `AbstractReflection`, not
+   * `AssociationReflection`); it reaches the method via the catch-all
+   * `delegate(*delegate_methods, to: :delegate_reflection)` at the tail of the
+   * class (reflection.rb:1221-1224). Mirror that single delegation so a through
+   * singular load statement-caches on the delegate reflection's key
+   * (`Association#find_target`, association.rb:262).
+   */
+  associationScopeCache(klass: typeof Base, owner: any, block: () => any): any {
+    return this.delegateReflection.associationScopeCache(klass, owner, block);
+  }
+
   get options(): Record<string, unknown> {
     return this.delegateReflection.options;
   }

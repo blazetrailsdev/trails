@@ -15,14 +15,17 @@
  * synthetic `cache_*` tables.
  */
 import { describe, it, expect, beforeAll, afterEach, vi } from "vitest";
-import { registerModel } from "../index.js";
-import { loadHasMany, loadBelongsTo } from "../associations.js";
+import { registerModel, enableSti, registerSubclass } from "../index.js";
+import { loadHasMany, loadBelongsTo, loadHasOne } from "../associations.js";
 import { AssociationScope } from "./association-scope.js";
 import { StatementCache } from "../statement-cache.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Member } from "../test-helpers/models/member.js";
+import { Club } from "../test-helpers/models/club.js";
+import { Membership, CurrentMembership } from "../test-helpers/models/membership.js";
 
 describe("Association scope cache", () => {
   const { authors, posts } = fixtures(["authors", "posts", "comments"]);
@@ -145,5 +148,49 @@ describe("Association scope cache", () => {
     expect(assoc1._cachedScope).toBeDefined();
     expect(assoc2._cachedScope).toBeDefined();
     expect(assoc1._cachedScope).not.toBe(assoc2._cachedScope);
+  });
+});
+
+describe("Association scope cache — through singular loads", () => {
+  const { members, clubs } = fixtures(["memberTypes", "members", "clubs", "memberships"]);
+
+  beforeAll(async () => {
+    registerModel(Member);
+    registerModel(Club);
+    enableSti(Membership);
+    registerModel(Membership);
+    registerModel(CurrentMembership);
+    registerSubclass(CurrentMembership);
+    await Member.loadSchema();
+    await Club.loadSchema();
+    await Membership.loadSchema();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it("has_one :through singular loads compile once, reuse across owners, and filter the join model's STI type", async () => {
+    // `Member has_one :club, through: :current_membership` — the join model
+    // `CurrentMembership` is an STI subclass over an *enum* `type` column.
+    // groucho holds BOTH a CurrentMembership → boring_club AND a plain
+    // Membership → moustache_club, so a correct load must carry the join
+    // model's `memberships.type = <CurrentMembership>` condition (folded in via
+    // `ThroughAssociation#target_scope`) — otherwise it returns the wrong club.
+    const groucho = await Member.find(members("groucho").id);
+    const blarpy = await Member.find(members("blarpy_winkup").id);
+
+    const spy = vi.spyOn(StatementCache, "create");
+
+    const c1 = await loadHasOne(groucho, "club", { through: "currentMembership" });
+    expect((c1 as any)?.id).toBe(clubs("boring_club").id);
+    const afterFirst = spy.mock.calls.length;
+    expect(afterFirst).toBe(1);
+
+    // Second owner's load reuses the compiled statement — no recompile — and
+    // still resolves through its OWN current membership.
+    const c2 = await loadHasOne(blarpy, "club", { through: "currentMembership" });
+    expect((c2 as any)?.id).toBe(clubs("outrageous_club").id);
+    expect(spy.mock.calls.length).toBe(afterFirst);
   });
 });
