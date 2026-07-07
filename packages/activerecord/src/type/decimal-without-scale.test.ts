@@ -41,6 +41,15 @@ describe("DecimalWithoutScale", () => {
     expect(type.cast("9999999999")).toBe(9999999999);
   });
 
+  it("carries genuine bignums as bigint without precision loss", () => {
+    const type = new DecimalWithoutScale();
+    // Rails' DecimalWithoutScale < BigInteger reads back an unbounded Integer;
+    // 2**62 exceeds float64's exact-integer range, so it must stay a bigint
+    // (routing through a plain JS number would round to 4611686018427388000).
+    expect(type.cast(2n ** 62n)).toBe(2n ** 62n);
+    expect(type.cast("4611686018427387904")).toBe(2n ** 62n);
+  });
+
   it("typeCastForSchema quotes the value as a string", () => {
     const type = new DecimalWithoutScale();
     expect(type.typeCastForSchema("1.5")).toBe('"1.5"');
