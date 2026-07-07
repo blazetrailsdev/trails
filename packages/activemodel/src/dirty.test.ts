@@ -126,9 +126,13 @@ describe("DirtyTest", () => {
 
   it("previous value is preserved when changed after save", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    expect(p.changedAttributes).toEqual({});
     p.writeAttribute("name", "Bob");
+    // Rails asserts `changed_attributes` — a name->old-value hash.
+    expect(p.changedAttributes).toEqual({ name: "Alice" });
     p.changesApplied();
     p.writeAttribute("name", "Charlie");
+    expect(p.changedAttributes).toEqual({ name: "Bob" });
     expect(p.previousChanges).toEqual({ name: ["Alice", "Bob"] });
     expect(p.changes).toEqual({ name: ["Bob", "Charlie"] });
   });
