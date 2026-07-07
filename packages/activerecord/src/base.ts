@@ -4755,6 +4755,19 @@ extend(Base, {
   assertValidEnumDefinitionValues: _EnumModule.assertValidEnumDefinitionValues,
   assertValidEnumOptions: _EnumModule.assertValidEnumOptions,
   detectNegativeEnumConditionsBang: _EnumModule.detectNegativeEnumConditionsBang,
+  // Wrap ActiveModel's `aliasAttribute` so that declaring `alias_attribute`
+  // AFTER `enum` on the same name re-points the enum at its backing column —
+  // Rails resolves the alias per-operation, so order is irrelevant there.
+  // Call Model's static directly (not via the prototype chain) to stay
+  // recursion-free for subclasses, whose superclass is now this wrapper.
+  aliasAttribute(this: typeof Base, newName: string, oldName: string): void {
+    (Model as unknown as { aliasAttribute(n: string, o: string): void }).aliasAttribute.call(
+      this,
+      newName,
+      oldName,
+    );
+    _EnumModule.reresolveEnumAlias(this, newName, oldName);
+  },
 });
 extend(Base, {
   collectingQueriesForExplain: _collectingQueriesForExplain,
