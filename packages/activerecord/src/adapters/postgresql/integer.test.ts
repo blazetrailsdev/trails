@@ -6,7 +6,7 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 
 // Rails: 2.gigabytes = 2 * 1024 * 1024 * 1024
-const TWO_GB = 2n * 1024n * 1024n * 1024n;
+const TWO_GB = 2 * 1024 * 1024 * 1024;
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;

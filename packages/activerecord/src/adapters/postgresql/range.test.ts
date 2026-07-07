@@ -934,24 +934,24 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
     it("create int8range", async () => {
       // Rails: assert_equal_round_trip(@new_range, :int8_range, Range.new(30, 50, true))
-      // BigIntegerType.castValue returns BigInt; bounds round-trip as 30n/50n.
+      // BigIntegerType keeps safe-range bounds as JS numbers; they round-trip as 30/50.
       const range = new Range(30, 50, true);
       const r = await PostgresqlRanges.create({ int8_range: range });
       await r.reload();
       const result = r.int8_range as Range;
       expect(result).toBeInstanceOf(Range);
-      expect(result.begin).toBe(30n);
-      expect(result.end).toBe(50n);
+      expect(result.begin).toBe(30);
+      expect(result.end).toBe(50);
       expect(result.excludeEnd).toBe(true);
     });
     it("update int8range", async () => {
       // Rails: assert_equal_round_trip => 60000...10000000; assert_nil_round_trip => 39999...39999 (empty → nil)
-      // BigIntegerType.castValue returns BigInt; bounds round-trip as bigint values.
+      // BigIntegerType keeps safe-range bounds as JS numbers.
       const range = new Range(60000, 10000000, true);
       const r = await PostgresqlRanges.create({ int8_range: range });
       await r.reload();
-      expect((r.int8_range as Range).begin).toBe(60000n);
-      expect((r.int8_range as Range).end).toBe(10000000n);
+      expect((r.int8_range as Range).begin).toBe(60000);
+      expect((r.int8_range as Range).end).toBe(10000000);
       // [39999,39999) is empty in int8range → null on reload
       r.int8_range = new Range(39999, 39999, true);
       await r.saveBang();
@@ -984,9 +984,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       await PostgresqlRanges.updateAll({ int8_range: new Range(1, 100, false) });
       const first = await PostgresqlRanges.first();
       expect(first!.int8_range).toBeInstanceOf(Range);
-      expect((first!.int8_range as Range).begin).toBe(BigInt(1));
+      expect((first!.int8_range as Range).begin).toBe(1);
       // PG normalises [1,100] → [1,101) for discrete int8range (Rails: 1...101)
-      expect((first!.int8_range as Range).end).toBe(BigInt(101));
+      expect((first!.int8_range as Range).end).toBe(101);
       expect((first!.int8_range as Range).excludeEnd).toBe(true);
     });
     it("ranges correctly escape input", async () => {

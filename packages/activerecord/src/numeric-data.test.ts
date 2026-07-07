@@ -56,8 +56,8 @@ describe("NumericDataTest", () => {
     expect(typeof m1!.world_population).toBe("bigint");
     expect(m1!.world_population).toBe(2n ** 62n);
 
-    expect(typeof m1!.my_house_population).toBe("bigint");
-    expect(m1!.my_house_population).toBe(3n);
+    expect(typeof m1!.my_house_population).toBe("number");
+    expect(m1!.my_house_population).toBe(3);
 
     expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
     expect((m1!.bank_balance as BigDecimal).toString("F")).toBe("1586.43");
@@ -83,8 +83,8 @@ describe("NumericDataTest", () => {
     expect(typeof m1!.world_population).toBe("bigint");
     expect(m1!.world_population).toBe(2n ** 62n);
 
-    expect(typeof m1!.my_house_population).toBe("bigint");
-    expect(m1!.my_house_population).toBe(3n);
+    expect(typeof m1!.my_house_population).toBe("number");
+    expect(m1!.my_house_population).toBe(3);
 
     expect(m1!.bank_balance).toBeInstanceOf(BigDecimal);
     expect((m1!.bank_balance as BigDecimal).toString("F")).toBe("1586.43");
