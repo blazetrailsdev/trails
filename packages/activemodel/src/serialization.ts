@@ -63,9 +63,15 @@ export function serializableHash(
       : attributeNamesForSerialization(record);
 
   if (options.only != null) {
-    const only = rubyArray(options.only);
-    keys = keys.filter((k) => only.includes(k));
+    // Rails: `Array(only).map(&:to_s) & attribute_names`. `Array#&` orders by
+    // the left operand and dedupes, so the result follows `only`'s order — not
+    // the model's declared order — keeping only names the model actually has.
+    const present = new Set(keys);
+    const seen = new Set<string>();
+    keys = rubyArray(options.only).filter((k) => present.has(k) && !seen.has(k) && seen.add(k));
   } else if (options.except != null) {
+    // Rails: `attribute_names -= Array(except).map(&:to_s)` keeps
+    // `attribute_names`' order, dropping the excluded names.
     const except = rubyArray(options.except);
     keys = keys.filter((k) => !except.includes(k));
   }

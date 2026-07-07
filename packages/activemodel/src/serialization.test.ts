@@ -469,9 +469,9 @@ describe("SerializationTest", () => {
     }
     const p = new Person({ name: "Alice", age: 25, email: "a@b.com" });
     const result = p.serializableHash({ only: ["email", "name"] });
-    const keys = Object.keys(result);
-    expect(keys).toContain("email");
-    expect(keys).toContain("name");
+    // Rails `Array(only) & attribute_names` orders by the `only:` list, not the
+    // model's declared `name, age, email` order.
+    expect(Object.keys(result)).toEqual(["email", "name"]);
     expect(result.age).toBeUndefined();
   });
 
