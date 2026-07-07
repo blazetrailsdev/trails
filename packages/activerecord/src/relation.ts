@@ -11,7 +11,7 @@ import {
 import type { Base } from "./base.js";
 import { withQueryConnection, threadedConnectionFor } from "./connection-handling.js";
 import { exceedsBindParamsLimit } from "./connection-adapters/abstract/database-limits.js";
-import { _setRelationCtor, _setScopeProxyWrapper } from "./base.js";
+import { _setRelationCtor, _setScopeProxyWrapper, _setRelationClassResolver } from "./base.js";
 import {
   ActiveRecordError,
   ConnectionNotEstablished,
@@ -85,6 +85,7 @@ import {
 } from "./relation/batches.js";
 import {
   wrapWithScopeProxy,
+  relationClassFor,
   DelegationMethods,
   type ToSentenceOptions,
   type ToXmlOptions,
@@ -7283,7 +7284,12 @@ export class Relation<T extends Base> {
    * chains like `blog.posts.where(...).order(...)`.
    */
   protected _newRelation(): Relation<T> {
-    return new Relation<T>(this._modelClass);
+    // Spawn from the per-model `Relation` subclass carrier (`relationClassFor`)
+    // so cloned relations keep the prototype that carries generated relation
+    // methods — otherwise `.where(...).someClassMethod()` would spawn a bare
+    // shared `Relation` and lose the real-method resolution.
+    const ctor = relationClassFor(this._modelClass as unknown as typeof Base);
+    return new ctor(this._modelClass) as Relation<T>;
   }
 
   /**
@@ -8049,6 +8055,7 @@ applyThenable(Relation.prototype);
 // Register Relation with Base to break the circular dependency.
 _setRelationCtor(Relation as any);
 _setScopeProxyWrapper(wrapWithScopeProxy);
+_setRelationClassResolver(relationClassFor);
 
 /** @internal */
 async function computeCacheKey(
