@@ -1,4 +1,5 @@
 import { Type, ValueType } from "@blazetrails/activemodel";
+import { enumTypeOf } from "../enum.js";
 
 /**
  * Casts attribute values for database operations using the model's
@@ -15,11 +16,15 @@ export class Map {
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
     // Rails' `model.type_caster` (TypeCaster::Map → `klass.type_for_attribute`)
-    // is EnumType-aware: an enum attribute resolves to its registered EnumType,
-    // whose `serialize` maps the label → the stored database value. Enums are
-    // decorated onto `_attributeDefinitions` via `decorateAttributes`, so
-    // `typeForAttribute` already returns that EnumType — no separate enum path
-    // is needed here.
+    // is EnumType-aware: an enum attribute serializes the label → its stored
+    // database value. Resolve the enum through `enumTypeOf` (the replayed
+    // AttributeSet) rather than the local `_attributeDefinitions` O(1) cache:
+    // that cache keeps the pre-reflection EnumType, whose subtype was inferred
+    // from the mapping shape, whereas the AttributeSet carries the EnumType
+    // built from the reflected column type. `whereValuesHash` / `scopeForCreate`
+    // round-trip the label through the same reflected type.
+    const enumType = enumTypeOf(this._klass, attrName);
+    if (enumType) return enumType.serialize(value);
     const type = this.typeForAttribute(attrName);
     return type.serialize(value);
   }

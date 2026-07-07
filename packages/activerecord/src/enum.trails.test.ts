@@ -15,6 +15,7 @@ import {
 } from "./enum.js";
 import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
+import { Map as MapCaster } from "./type-caster/map.js";
 
 describe("Enum name conflict detection", () => {
   // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
@@ -335,5 +336,13 @@ describe("Enum subtype resolved from the reflected column type", () => {
     // registered EnumType, coercing through the decimal subtype exactly as the
     // reflected DecimalType would.
     expect(castEnumValue(Book, "status", "written")).toEqual(new DecimalType().serialize(1));
+  });
+
+  it("serializes through the reflected subtype on the query type-caster path too", () => {
+    // The predicate builder's TypeCaster::Map serialize path must resolve the
+    // same reflected EnumType (not the pre-reflection one), so where(status:)
+    // round-trips the label through the decimal subtype.
+    const caster = new MapCaster(Book);
+    expect(caster.typeCastForDatabase("status", "written")).toEqual(new DecimalType().serialize(1));
   });
 });

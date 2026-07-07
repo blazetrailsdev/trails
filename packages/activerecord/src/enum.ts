@@ -881,10 +881,14 @@ export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
 /**
  * Fetch the single registered EnumType for an enum attribute — the one source
  * of truth built lazily from the reflected column type via the
- * `decorateAttributes` decorator. Returns null when the attribute isn't an
- * enum on this class.
+ * `decorateAttributes` decorator. Resolves through `typeForAttribute` (the
+ * replayed AttributeSet), so it returns the reflected-subtype EnumType rather
+ * than the pre-reflection one that a userProvided `_attributeDefinitions` entry
+ * still carries. Returns null when the attribute isn't an enum on this class.
+ *
+ * @internal
  */
-function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
+export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
   if (!klass._enums?.has(attribute)) return null;
   const type = (klass as unknown as { typeForAttribute(n: string): Type }).typeForAttribute(
     attribute,
