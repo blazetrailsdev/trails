@@ -71,6 +71,8 @@ export interface ToTagOptions extends RenameKeyOptions {
   skipTypes?: boolean | number;
   /** Overrides `DEFAULT_ENCODINGS[type]` for the `encoding=` attribute. */
   encoding?: string;
+  /** Explicit child tag name for array elements; defaults to the singularized root. */
+  children?: string;
   /** Set by `to_tag` when recursing; the tag name passed to nested `toXml`. */
   root?: unknown;
   /** Always true once inside `to_tag` (no XML instruction on nested docs). */
@@ -227,17 +229,19 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
 /**
  * Emit an array as `<root type="array">` wrapping one child tag per element.
  *
- * Mirrors: Array#to_xml (conversions.rb:200-207) — the root is renamed first,
- * then the child name is `root.singularize` of the *renamed* root, so a
- * `camelize`/`dasherize` root propagates to the children. `toTag` renames each
- * child again, matching Rails' `to_tag(children, value, options)`.
+ * Mirrors: Array#to_xml (conversions.rb:200-208) — the root is renamed first,
+ * then `children = options.delete(:children) || root.singularize` (of the
+ * *renamed* root), so a `camelize`/`dasherize` root propagates to the children
+ * and callers can override the child name. `toTag` renames each child again,
+ * matching Rails' `to_tag(children, value, options)`; `children` is consumed
+ * at this level and not forwarded to the element tags.
  */
 function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void {
   const root = renameKey(keyToString(key), options);
   options.builder.openTag(root, options.skipTypes ? {} : { type: "array" });
-  const children = singularize(root);
+  const children = options.children ?? singularize(root);
   for (const item of values) {
-    toTag(children, item, { ...options, type: undefined, root: children });
+    toTag(children, item, { ...options, type: undefined, children: undefined, root: children });
   }
   options.builder.closeTag(root);
 }

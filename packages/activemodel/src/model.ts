@@ -15,6 +15,7 @@ import {
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
   underscore,
+  singularize,
   renameKey,
   toTag,
   type RenameKeyOptions,
@@ -2420,15 +2421,19 @@ export class Model {
         const tag = renameKey(tagKey, renameOptions);
         const arrayType = skipTypes ? "" : ` type="array"`;
         xml += `${indent}<${tag}${arrayType}>\n`;
+        // Array children are named for the singularized (renamed) root, per
+        // Array#to_xml (`children = root.singularize`) — e.g. `<tag>` under
+        // `<tags type="array">`, not a generic `<item>`.
+        const children = singularize(tag);
         const itemBuilder = leafBuilder(indent + "  ");
         for (const item of value) {
           if (isPlainRecord(item)) {
-            xml += `${indent}  <item>\n${this._hashToXml(item, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </item>\n`;
+            xml += `${indent}  <${children}>\n${this._hashToXml(item, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </${children}>\n`;
           } else {
             // Route every scalar element through `toTag` so it keeps Rails'
             // inferred `type=`, `nil="true"`, and per-type formatting (a Date
             // element stays a `dateTime` leaf, not an expanded hash).
-            toTag("item", item, { builder: itemBuilder, skipTypes, ...renameOptions });
+            toTag(children, item, { builder: itemBuilder, skipTypes, ...renameOptions });
           }
         }
         xml += `${indent}</${tag}>\n`;
