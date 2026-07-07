@@ -53,6 +53,25 @@ describe("Enum name conflict detection", () => {
     }).toThrow(/already defined by another enum/);
   });
 
+  // Rails runs the `?`/`!` `detect_enum_conflict!` calls *only* inside
+  // `if instance_methods` (enum.rb:303-311), so a second enum that opts out of
+  // instance methods can reuse a value-method name a prior enum generated — no
+  // predicate/bang is defined, so there is nothing to conflict with.
+  it("does not raise when a second enum reuses a value method but disables instance methods", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.attribute("state", "integer");
+          this.enum("status", { active: 0, archived: 1 });
+          this.enum("state", { active: 0, closed: 1 }, { instanceMethods: false });
+        }
+      }
+      new Klass();
+    }).not.toThrow();
+  });
+
   // The *cross-class* counterpart — a subclass enum reusing a value method a
   // parent enum generated — is permitted by Rails (`_enum_methods_module` is a
   // per-class, non-inherited class-instance variable, enum.rb:326-332). The

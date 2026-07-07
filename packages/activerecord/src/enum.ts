@@ -98,6 +98,7 @@ export function installEnumAttribute(
   klass: typeof Base,
   attribute: string,
   enumType: EnumType,
+  attributeOptions?: { default?: unknown },
 ): void {
   // Rails' _enum uses `attribute(name)` (bare) + `decorate_attributes`, layering
   // the EnumType on top of the column-seeded FromDatabase attribute so the enum
@@ -109,7 +110,16 @@ export function installEnumAttribute(
   // type to the EnumType). cast(0) on an EnumType yields null; deserialize(0)
   // yields the "default" label — so the column-default path is exactly what makes
   // the enum default work, recovered here without any special-casing.
-  klass.attribute(attribute);
+  // Rails' `_enum` forwards its leftover kwargs (e.g. `default:`) into
+  // `attribute(name, **options)` (enum.rb:237), so the macro-level `default:`
+  // seeds the attribute default and flows through the EnumType on read. Pass a
+  // bare `attribute(name)` when there are no options to preserve the
+  // column-seeded FromDatabase attribute.
+  if (attributeOptions && "default" in attributeOptions) {
+    klass.attribute(attribute, { default: attributeOptions.default });
+  } else {
+    klass.attribute(attribute);
+  }
   klass.decorateAttributes([attribute], (_name: string, _subtype: Type) => enumType);
 
   // Define the getter after attribute() so the EnumType is already in
@@ -371,6 +381,7 @@ export function enumMethod(
     scopes?: boolean;
     instanceMethods?: boolean;
     validate?: boolean | Record<string, unknown>;
+    default?: unknown;
   },
 ): void {
   _enum.call(this, attribute, mapping, options);
@@ -399,6 +410,7 @@ export function _enum(
     scopes?: boolean;
     instanceMethods?: boolean;
     validate?: boolean | Record<string, unknown>;
+    default?: unknown;
   },
 ): void {
   if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
@@ -521,7 +533,18 @@ export function _enum(
   // rather than raising on write, so the type must not raise.
   const validate = options?.validate ?? false;
   const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype, !validate);
-  installEnumAttribute(this, attrName, enumType);
+  installEnumAttribute(
+    this,
+    attrName,
+    enumType,
+    options && "default" in options ? { default: options.default } : undefined,
+  );
+
+  // Rails' `_enum` takes `scopes: true, instance_methods: true` keyword
+  // defaults; `scopes: false` suppresses per-value scope generation and
+  // `instance_methods: false` suppresses predicate/bang generation.
+  const scopesEnabled = options?.scopes !== false;
+  const instanceMethodsEnabled = options?.instanceMethods !== false;
 
   // Conflict-detection pass, then the generation pass — both ported from the
   // former standalone `defineEnum`, now folded in so `_enum` is the single enum
@@ -575,49 +598,63 @@ export function _enum(
       valueMethodNames.push(friendlyName);
     }
 
-    if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
-    if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
-    if (definedNames.has(fullName))
-      raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    definedNames.add(predicateName);
-    definedNames.add(bangName);
-    definedNames.add(fullName);
-
-    // Instance value methods (predicate/bang) only conflict with *dangerous*
-    // Active Record instance methods — a plain user override (`def published!;
-    // super; end`) is allowed and simply wins over the generated method, so we
-    // must not raise merely because the name exists on the prototype.
-    // Mirrors enum.rb's `dangerous_attribute_method?` gate; the value/`not*`
-    // scope names are class methods, so they only conflict with a *dangerous*
-    // class method (`dangerous_class_method?` — RESTRICTED_CLASS_METHODS plus
-    // methods `Base` itself defines), never a scope inherited from a parent
-    // enum or a user static on the model/an ancestor.
-    if (dangerousMethods.has(predicateName))
-      raiseConflictError.call(this, attribute, predicateName);
-    if (enumMethodNames.has(predicateName))
-      raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
-    if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
-    if (enumMethodNames.has(bangName))
-      raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
-    if (isDangerousClassMethod(fullName))
-      raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    if (isDangerousClassMethod(notScopeName))
-      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    // Rails runs `detect_enum_conflict!` for the `?`/`!` methods *only* inside
+    // `if instance_methods` and for the value/`not_` scopes *only* inside
+    // `if scopes` (enum.rb:302-321). Gate each family the same way so an enum
+    // opting out of a surface also opts out of its conflict checks — e.g.
+    // `instance_methods: false` must not raise on a predicate-name collision it
+    // will never generate.
+    if (instanceMethodsEnabled) {
+      if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
+      if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+      definedNames.add(predicateName);
+      definedNames.add(bangName);
+      // Instance value methods (predicate/bang) only conflict with *dangerous*
+      // Active Record instance methods — a plain user override (`def published!;
+      // super; end`) is allowed and simply wins over the generated method, so we
+      // must not raise merely because the name exists on the prototype.
+      // Mirrors enum.rb's `dangerous_attribute_method?` gate.
+      if (dangerousMethods.has(predicateName))
+        raiseConflictError.call(this, attribute, predicateName);
+      if (enumMethodNames.has(predicateName))
+        raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
+      if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+      if (enumMethodNames.has(bangName))
+        raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
+    }
+    if (scopesEnabled) {
+      if (definedNames.has(fullName))
+        raiseConflictError.call(this, attribute, fullName, { type: "class" });
+      definedNames.add(fullName);
+      // The value/`not*` scope names are class methods, so they only conflict
+      // with a *dangerous* class method (`dangerous_class_method?` —
+      // RESTRICTED_CLASS_METHODS plus methods `Base` itself defines), never a
+      // scope inherited from a parent enum or a user static on the model/an
+      // ancestor.
+      if (isDangerousClassMethod(fullName))
+        raiseConflictError.call(this, attribute, fullName, { type: "class" });
+      if (isDangerousClassMethod(notScopeName))
+        raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    }
     if (friendlyName !== fullName) {
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
       const friendlyBang = `${friendlyName}Bang`;
-      if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
-      if (enumMethodNames.has(fp))
-        raiseConflictError.call(this, attribute, fp, { source: "another enum" });
-      if (dangerousMethods.has(friendlyBang))
-        raiseConflictError.call(this, attribute, friendlyBang);
-      if (enumMethodNames.has(friendlyBang))
-        raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
-      if (isDangerousClassMethod(friendlyName))
-        raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
-      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (isDangerousClassMethod(notFriendlyName))
-        raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+      if (instanceMethodsEnabled) {
+        if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
+        if (enumMethodNames.has(fp))
+          raiseConflictError.call(this, attribute, fp, { source: "another enum" });
+        if (dangerousMethods.has(friendlyBang))
+          raiseConflictError.call(this, attribute, friendlyBang);
+        if (enumMethodNames.has(friendlyBang))
+          raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
+      }
+      if (scopesEnabled) {
+        if (isDangerousClassMethod(friendlyName))
+          raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
+        const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+        if (isDangerousClassMethod(notFriendlyName))
+          raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+      }
     }
   }
 
@@ -625,7 +662,7 @@ export function _enum(
   // negative scope (`not*`) would clash with a positively-named element, and
   // skips the check entirely when scopes are disabled.
   // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`.
-  if (options?.scopes !== false) {
+  if (scopesEnabled) {
     detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
@@ -642,16 +679,28 @@ export function _enum(
     // `define_enum_methods` calls per value (enum.rb:265-278). This defines the
     // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
     // scope `{name}`, and the auto negative scope `not{Name}`.
-    methodsModule.defineEnumMethods(attrName, fullName, value, true, true);
+    methodsModule.defineEnumMethods(
+      attrName,
+      fullName,
+      value,
+      scopesEnabled,
+      instanceMethodsEnabled,
+    );
     if (friendlyName !== fullName) {
-      methodsModule.defineEnumMethods(attrName, friendlyName, value, true, true);
+      methodsModule.defineEnumMethods(
+        attrName,
+        friendlyName,
+        value,
+        scopesEnabled,
+        instanceMethodsEnabled,
+      );
     }
 
     // Original-form predicate/bang for labels with special chars (spaces,
     // hyphens). Rails: define_method("American Bobtail?"), reachable via
     // bracket notation only.
     const originalName = methodName(n);
-    if (/[^\w\x80-\uffff]/.test(originalName)) {
+    if (instanceMethodsEnabled && /[^\w\x80-\uffff]/.test(originalName)) {
       Object.defineProperty(this.prototype, `is${originalName}`, {
         value: function (this: Base) {
           return this.readAttribute(attrName) === n;
@@ -671,12 +720,16 @@ export function _enum(
     // Record the generated instance-method names so a later enum on this class
     // (or a subclass) that would generate the same predicate/bang raises
     // "already defined by another enum" — mirroring membership in Rails'
-    // `_enum_methods_module`.
-    enumMethodNames.add(`is${fullName.charAt(0).toUpperCase()}${fullName.slice(1)}`);
-    enumMethodNames.add(`${fullName}Bang`);
-    if (friendlyName !== fullName) {
-      enumMethodNames.add(`is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`);
-      enumMethodNames.add(`${friendlyName}Bang`);
+    // `_enum_methods_module`. Only record when the predicate/bang were actually
+    // defined (`instance_methods: false` defines neither, so a later enum reusing
+    // the name must not conflict).
+    if (instanceMethodsEnabled) {
+      enumMethodNames.add(`is${fullName.charAt(0).toUpperCase()}${fullName.slice(1)}`);
+      enumMethodNames.add(`${fullName}Bang`);
+      if (friendlyName !== fullName) {
+        enumMethodNames.add(`is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`);
+        enumMethodNames.add(`${friendlyName}Bang`);
+      }
     }
   }
 

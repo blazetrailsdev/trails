@@ -702,9 +702,17 @@ describe("EnumTest", () => {
     expect((new K() as any).status).toBe("published");
   });
 
-  // Rails: `enum :status, [...], default: :published` — the macro-level
-  // `default:` option is not yet wired into the trails enum macro.
-  it.skip("overloaded default by :default", () => {});
+  it("overloaded default by :default", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written", "published"] as any, {
+          default: "published",
+        });
+      }
+    }
+    expect((new K() as any).status).toBe("published");
+  });
 
   // Rails: the legacy `:_default` / `:_prefix` / `:_suffix` / `:_scopes` /
   // `:_instance_methods` options must raise — covered behaviorally in
@@ -716,8 +724,29 @@ describe("EnumTest", () => {
   it.skip(":_instance_methods is invalid in the new API", () => {});
 
   // Rails: `scopes: false` / `instance_methods: false` opt-outs.
-  it.skip("scopes can be disabled by :scopes", () => {});
-  it.skip("default methods can be disabled by :instance_methods", () => {});
+  it("scopes can be disabled by :scopes", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("status", "integer");
+        this.enum("status", ["proposed", "written"] as any, { scopes: false });
+      }
+    }
+    expect((K as any).proposed).toBeUndefined();
+  });
+
+  it("default methods can be disabled by :instance_methods", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.attribute("status", "integer");
+        this.enum("status", ["proposed", "written"] as any, { instanceMethods: false });
+      }
+    }
+    const instance = new K();
+    expect((instance as any).isProposed).toBeUndefined();
+    expect((instance as any).proposedBang).toBeUndefined();
+  });
 
   it("query state by predicate with :prefix", () => {
     class K extends Base {
