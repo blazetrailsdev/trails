@@ -13,9 +13,9 @@
  * drops it in a finally.
  *
  * test_serial_sequence / test_default_sequence_name run against the canonical
- * `accounts` table ("public.accounts_id_seq"), as in Rails. `ensureCanonicalTables`
- * lays the canonical `accounts` only if absent (idempotent, no drop), so it
- * cannot corrupt sibling suites in the shared PG lane. The `error.connection_pool`
+ * `accounts` table ("public.accounts_id_seq"), as in Rails, loaded through the
+ * `fixtures(["accounts"])` helper (Rails' ambient `accounts` fixture, with
+ * `use_transactional_tests = false`). The `error.connection_pool`
  * (NullPool / pool identity) assertions from Rails' connection-error,
  * serial-sequence, and invalid-index tests are ported faithfully — a standalone
  * trails adapter carries a NullPool that connect-time and query-time errors
@@ -25,7 +25,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
-import { ensureCanonicalTables } from "../../test-helpers/canonical-schema.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,
@@ -104,6 +104,13 @@ async function withExtensionEnabled(
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
+  // Rails' PostgreSQLAdapterTest runs with `use_transactional_tests = false`
+  // and the ambient `accounts` fixture (test_serial_sequence /
+  // test_default_sequence_name assert `public.accounts_id_seq`). Load the
+  // canonical `accounts` through the fixtures helper on the shared connection —
+  // the same physical DB the standalone `adapter` below connects to.
+  fixtures(["accounts"], { useTransactionalTests: false });
+
   let adapter: PostgreSQLAdapter;
   let savedWarningsAction: typeof PostgreSQLAdapter.dbWarningsAction;
   let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
@@ -331,7 +338,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("serial sequence", async () => {
-      await ensureCanonicalTables(adapter, ["accounts"]);
       expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
       const error = await adapter.serialSequence("zomg", "id").then(
         () => null,
@@ -342,7 +348,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("default sequence name", async () => {
-      await ensureCanonicalTables(adapter, ["accounts"]);
       expect(await adapter.defaultSequenceName("accounts", "id")).toBe("public.accounts_id_seq");
       expect(await adapter.defaultSequenceName("accounts")).toBe("public.accounts_id_seq");
     });
