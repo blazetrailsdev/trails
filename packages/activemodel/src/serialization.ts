@@ -62,10 +62,18 @@ export function serializableHash(
       ? instanceAttrNames.call(record)
       : attributeNamesForSerialization(record);
 
-  if (options.only) {
-    keys = keys.filter((k) => options.only!.includes(k));
-  } else if (options.except) {
-    keys = keys.filter((k) => !options.except!.includes(k));
+  if (options.only != null) {
+    // Rails: `Array(only).map(&:to_s) & attribute_names`. `Array#&` orders by
+    // the left operand and dedupes, so the result follows `only`'s order — not
+    // the model's declared order — keeping only names the model actually has.
+    const present = new Set(keys);
+    const seen = new Set<string>();
+    keys = rubyArray(options.only).filter((k) => present.has(k) && !seen.has(k) && seen.add(k));
+  } else if (options.except != null) {
+    // Rails: `attribute_names -= Array(except).map(&:to_s)` keeps
+    // `attribute_names`' order, dropping the excluded names.
+    const except = rubyArray(options.except);
+    keys = keys.filter((k) => !except.includes(k));
   }
 
   const result = serializableAttributes(record, keys);
@@ -139,8 +147,10 @@ export interface Serialization {
  * Serialization options.
  */
 export interface SerializeOptions {
-  only?: string[];
-  except?: string[];
+  // Rails coerces via `Array(only).map(&:to_s)`, so a scalar (`only: "name"`)
+  // and a list (`only: ["name"]`) are equivalent. See `rubyArray`.
+  only?: string | string[];
+  except?: string | string[];
   methods?: string[];
   // Mirrors Rails `:include` polymorphism: a single name, an array of
   // names, a hash of name → opts, or — like `include: [:posts, { comments: {} }]`
@@ -693,6 +703,18 @@ function _coerceForJson(
     return out;
   }
   return value;
+}
+
+/**
+ * Ruby `Array(x).map(&:to_s)`: coerce `only`/`except` to a list of strings.
+ * `nil`/`undefined` → `[]`, a scalar → `[scalar]`, a list → itself, with every
+ * entry stringified so `only: :name` (symbol), `only: "name"`, and
+ * `only: ["name"]` all behave identically (serialization.rb:130-133).
+ */
+function rubyArray(value: string | string[] | null | undefined): string[] {
+  if (value == null) return [];
+  const list = Array.isArray(value) ? value : [value];
+  return list.map((entry) => String(entry));
 }
 
 /**

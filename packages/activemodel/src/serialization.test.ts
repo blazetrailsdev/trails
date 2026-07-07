@@ -200,6 +200,45 @@ describe("SerializationTest", () => {
     expect(hash["age"]).toBeUndefined();
   });
 
+  it("only include with scalar coerces via Array() like an array", () => {
+    // Rails `Array(only).map(&:to_s)`: `only: "name"` equals `only: ["name"]`
+    // (serialization.rb:130). trails must not substring-match a scalar string.
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    const p = new Person({ name: "Alice", age: 25 });
+    const hash = p.serializableHash({ only: "name" });
+    expect(hash["name"]).toBe("Alice");
+    expect(hash["age"]).toBeUndefined();
+  });
+
+  it("except include with scalar coerces via Array() like an array", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    const p = new Person({ name: "Alice", age: 25 });
+    const hash = p.serializableHash({ except: "age" });
+    expect(hash["name"]).toBe("Alice");
+    expect(hash["age"]).toBeUndefined();
+  });
+
+  it("asJson accepts a scalar only like the array form", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.attribute("age", "integer");
+      }
+    }
+    const p = new Person({ name: "Alice", age: 25 });
+    expect(p.asJson({ only: "name" })).toEqual(p.asJson({ only: ["name"] }));
+  });
+
   it("should raise NoMethodError for non existing method", () => {
     class Person extends Model {
       static {
@@ -430,9 +469,9 @@ describe("SerializationTest", () => {
     }
     const p = new Person({ name: "Alice", age: 25, email: "a@b.com" });
     const result = p.serializableHash({ only: ["email", "name"] });
-    const keys = Object.keys(result);
-    expect(keys).toContain("email");
-    expect(keys).toContain("name");
+    // Rails `Array(only) & attribute_names` orders by the `only:` list, not the
+    // model's declared `name, age, email` order.
+    expect(Object.keys(result)).toEqual(["email", "name"]);
     expect(result.age).toBeUndefined();
   });
 
