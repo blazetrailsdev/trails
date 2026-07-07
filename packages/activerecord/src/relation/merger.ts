@@ -30,6 +30,7 @@ export class Merger {
     this.mergeSingleValues(rel);
     this.mergeClauses(rel);
     this.mergeCtes(rel);
+    this.mergeEagerLoad(rel);
     this.mergePreloads(rel);
     this.mergeJoins(rel);
     this.mergeOuterJoins(rel);
@@ -74,8 +75,22 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
-  // Mirrors Rails' Merger#merge_preloads (merger.rb). Same-model merges union
-  // the preload/includes values straight across. A cross-model merge (e.g.
+  // Rails merges :eager_load as a NORMAL_VALUE through Merger#merge's generic
+  // loop (merger.rb:52-68) — it is NOT part of merge_preloads. eager_load!
+  // (query_methods.rb) always unions (`eager_load_values |= args`), never gated
+  // on model equality and never nested under a reflection, so it crosses the
+  // model boundary untouched. Kept out of mergePreloads to mirror that split.
+  private mergeEagerLoad(rel: any): void {
+    if (this.other._eagerLoadAssociations && this.other._eagerLoadAssociations.length > 0) {
+      rel._eagerLoadAssociations = [
+        ...(rel._eagerLoadAssociations ?? []),
+        ...this.other._eagerLoadAssociations,
+      ];
+    }
+  }
+
+  // Mirrors Rails' Merger#merge_preloads (merger.rb:96-115). Same-model merges
+  // union the preload/includes values straight across. A cross-model merge (e.g.
   // Comment.joins(:post).merge(Post.preload(:readers))) instead nests them under
   // the reflection on the receiver whose class_name is the other model's name,
   // so Comment preloads `{ post: [:readers] }` — carrying Post's preload through
@@ -83,10 +98,7 @@ export class Merger {
   private mergePreloads(rel: any): void {
     const otherPreloads = this.other._preloadAssociations ?? [];
     const otherIncludes = this.other._includesAssociations ?? [];
-    const otherEager = this.other._eagerLoadAssociations ?? [];
-    if (otherPreloads.length === 0 && otherIncludes.length === 0 && otherEager.length === 0) {
-      return;
-    }
+    if (otherPreloads.length === 0 && otherIncludes.length === 0) return;
 
     if (this.other._modelClass === rel._modelClass) {
       if (otherPreloads.length > 0) {
@@ -94,9 +106,6 @@ export class Merger {
       }
       if (otherIncludes.length > 0) {
         rel._includesAssociations = [...(rel._includesAssociations ?? []), ...otherIncludes];
-      }
-      if (otherEager.length > 0) {
-        rel._eagerLoadAssociations = [...(rel._eagerLoadAssociations ?? []), ...otherEager];
       }
       return;
     }

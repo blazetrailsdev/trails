@@ -925,6 +925,12 @@ describe("RelationTest", () => {
     const readersAssoc2 = postAssoc.target.association("readers");
     expect(readersAssoc2.isLoaded()).toBe(true);
     expect(readersAssoc2.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
+
+    // Rails merges :eager_load as a NORMAL_VALUE (merger.rb) — a straight union
+    // via eager_load!, never gated on model equality nor nested under a
+    // reflection, so it crosses the model boundary untouched.
+    const merged = Comment.joins("post").merge(Post.eagerLoad("readers")) as any;
+    expect(merged._eagerLoadAssociations).toContain("readers");
   });
 
   it("preloading with associations default scopes and merges", async () => {
