@@ -32,7 +32,6 @@ import {
 } from "../errors.js";
 import { Result } from "../result.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
-import { Column } from "./column.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
   buildColumnTypes,
@@ -53,7 +52,6 @@ import type { SchemaSource } from "../schema-dumper.js";
 import { SchemaDumper as MysqlSchemaDumper } from "./mysql/schema-dumper.js";
 import { abandonRawSocket } from "./abandon-raw-socket.js";
 import {
-  columns as mysqlColumns,
   foreignKeys as mysqlForeignKeys,
   indexes as mysqlIndexes,
   parseMysqlName as mysqlParseName,
@@ -1428,11 +1426,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     if (names.length === 0) return null;
     if (names.length === 1) return names[0];
     return names;
-  }
-
-  /** Delegates to {@link mysqlColumns} in `mysql/schema-statements.ts`. */
-  async columns(tableName: string): Promise<Column[]> {
-    return mysqlColumns.call(this, tableName);
   }
 
   /** Delegates to {@link mysqlIndexes} in `mysql/schema-statements.ts`. */
