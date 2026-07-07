@@ -3,6 +3,7 @@ import { assertValidKeys } from "@blazetrails/activesupport";
 
 import { arelColumns } from "./query-methods.js";
 import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
+import { reflectOnAllAssociations } from "../reflection.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -74,24 +75,44 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
+  // Mirrors Rails' Merger#merge_preloads (merger.rb). Same-model merges union
+  // the preload/includes values straight across. A cross-model merge (e.g.
+  // Comment.joins(:post).merge(Post.preload(:readers))) instead nests them under
+  // the reflection on the receiver whose class_name is the other model's name,
+  // so Comment preloads `{ post: [:readers] }` — carrying Post's preload through
+  // the association boundary rather than asking Comment to preload `:readers`.
   private mergePreloads(rel: any): void {
-    if (this.other._preloadAssociations && this.other._preloadAssociations.length > 0) {
-      rel._preloadAssociations = [
-        ...(rel._preloadAssociations ?? []),
-        ...this.other._preloadAssociations,
-      ];
+    const otherPreloads = this.other._preloadAssociations ?? [];
+    const otherIncludes = this.other._includesAssociations ?? [];
+    const otherEager = this.other._eagerLoadAssociations ?? [];
+    if (otherPreloads.length === 0 && otherIncludes.length === 0 && otherEager.length === 0) {
+      return;
     }
-    if (this.other._includesAssociations && this.other._includesAssociations.length > 0) {
-      rel._includesAssociations = [
-        ...(rel._includesAssociations ?? []),
-        ...this.other._includesAssociations,
-      ];
+
+    if (this.other._modelClass === rel._modelClass) {
+      if (otherPreloads.length > 0) {
+        rel._preloadAssociations = [...(rel._preloadAssociations ?? []), ...otherPreloads];
+      }
+      if (otherIncludes.length > 0) {
+        rel._includesAssociations = [...(rel._includesAssociations ?? []), ...otherIncludes];
+      }
+      if (otherEager.length > 0) {
+        rel._eagerLoadAssociations = [...(rel._eagerLoadAssociations ?? []), ...otherEager];
+      }
+      return;
     }
-    if (this.other._eagerLoadAssociations && this.other._eagerLoadAssociations.length > 0) {
-      rel._eagerLoadAssociations = [
-        ...(rel._eagerLoadAssociations ?? []),
-        ...this.other._eagerLoadAssociations,
-      ];
+
+    const otherName = this.other._modelClass?.name;
+    const reflection = reflectOnAllAssociations(rel._modelClass).find(
+      (r: any) => r.className === otherName,
+    );
+    if (!reflection) return;
+
+    if (otherPreloads.length > 0) {
+      rel._preloadAssociations.push({ [reflection.name]: otherPreloads });
+    }
+    if (otherIncludes.length > 0) {
+      rel._includesAssociations.push({ [reflection.name]: otherIncludes });
     }
   }
 

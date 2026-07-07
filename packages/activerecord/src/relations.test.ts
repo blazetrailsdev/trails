@@ -899,10 +899,32 @@ describe("RelationTest", () => {
     expect(await query.size()).toBe(1);
   });
 
-  it.skip("preloading with associations and merges", async () => {
-    // BLOCKED: relations — Rails asserts result_comment.post.readers is already loaded
-    // (no extra queries) after Comment.joins(:post).merge(Post.preload(:readers)...).
-    // Cross-model preload propagation through merge is not yet implemented in Trails.
+  it("preloading with associations and merges", async () => {
+    const post = await Post.createBang({ title: "Uhuu", body: "body" });
+    const reader = await Reader.createBang({ post_id: post.id, person_id: 1 });
+    const comment = await Comment.createBang({ post_id: post.id, body: "body" });
+
+    const postRel = Post.preload("readers").joins("readers").where({ title: "Uhuu" });
+    let resultComment = (await Comment.joins("post").merge(postRel))[0];
+    expect(Number(resultComment.id)).toBe(Number(comment.id));
+
+    let postAssoc = (resultComment as any).association("post");
+    expect(postAssoc.isLoaded()).toBe(true);
+    expect(Number(postAssoc.target.id)).toBe(Number(post.id));
+    const readersAssoc = postAssoc.target.association("readers");
+    expect(readersAssoc.isLoaded()).toBe(true);
+    expect(readersAssoc.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
+
+    const postRel2 = Post.includes("readers").where({ title: "Uhuu" });
+    resultComment = (await Comment.joins("post").merge(postRel2).first())!;
+    expect(Number(resultComment.id)).toBe(Number(comment.id));
+
+    postAssoc = (resultComment as any).association("post");
+    expect(postAssoc.isLoaded()).toBe(true);
+    expect(Number(postAssoc.target.id)).toBe(Number(post.id));
+    const readersAssoc2 = postAssoc.target.association("readers");
+    expect(readersAssoc2.isLoaded()).toBe(true);
+    expect(readersAssoc2.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
   });
 
   it("preloading with associations default scopes and merges", async () => {
