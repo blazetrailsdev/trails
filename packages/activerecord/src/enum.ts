@@ -923,6 +923,11 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   // reflection stashes `enumReflectedSubtype` and rebuilds `_defaultAttributes`
   // before we read it, so the reflected subtype is already in place.
   reflectSchemaSync.call(klass);
+  // Mirror `Base.typeForAttribute`'s guard: a typeless enum (no backing column,
+  // no explicit `attribute` type) must raise rather than silently serialize
+  // through the pre-reflection fallback (Rails raises from the enum
+  // `decorate_attributes` block, enum.rb:240-245).
+  assertEnumTypeDeclared(klass, resolved);
   const type = host._defaultAttributes().getAttribute(resolved).type;
   return type instanceof EnumType ? type : null;
 }

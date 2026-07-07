@@ -19,6 +19,7 @@ import { Base } from "./index.js";
 import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { Book } from "./test-helpers/models/book.js";
 
 describe("Enum name conflict detection", () => {
   // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
@@ -391,6 +392,30 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
     const caster = new MapCaster(NumericEnum);
     expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(
       new DecimalType().serialize(1),
+    );
+  });
+});
+
+// The `enumTypeOf` serialize path must preserve `Base.typeForAttribute`'s
+// `assertEnumTypeDeclared` guard: a typeless enum (no backing column, no
+// explicit `attribute` type) raises rather than silently serializing through
+// the mapping-shape fallback. Rails raises from the enum `decorate_attributes`
+// block when the subtype is `ActiveModel::Type.default_value` (enum.rb:240-245).
+describe("Enum with an undeclared type raises on the serialize path", () => {
+  // Reflect `books` so `typeless_genre` resolves to a NullColumn (no synthesize
+  // fallback), the condition under which the guard fires.
+  fixtures(["books"]);
+
+  class TypelessBook extends Book {
+    static {
+      this.enum("typeless_genre", { adventure: 0, comic: 1 });
+    }
+  }
+
+  it("castEnumValue raises for an enum with no column and no explicit type", async () => {
+    await TypelessBook.loadSchema();
+    expect(() => castEnumValue(TypelessBook, "typeless_genre", "comic")).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in/,
     );
   });
 });
