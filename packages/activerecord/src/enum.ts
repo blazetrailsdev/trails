@@ -527,8 +527,22 @@ export function _enum(
   // explicitly typed via `attribute(name, type)` is queued for a deferred check
   // (`_enumsPendingTypeCheck`) that `typeForAttribute` runs post-loadSchema and
   // clears once a backing column is confirmed. See `assertEnumTypeDeclared`.
+  // "Explicitly typed" means the user declared a concrete attribute *type*
+  // (`attribute(name, "integer")`), NOT merely a default (`attribute(name,
+  // { default })`) or nothing. Rails pushes a `PendingType` only when a type is
+  // present (attribute_registration.rb:12-18); a default-only / type-less
+  // attribute keeps the fallback `value` type until the column reflects, so its
+  // subtype must still come from the column (enum decorates the column type,
+  // enum.rb:238-248). Requiring a user-provided def AND a concrete (non-`value`)
+  // type distinguishes the two: a default-only attribute's type is still the
+  // `value` default at `enum` time, so it is treated as column-reflected.
   const existingDef = (this as any)._attributeDefinitions?.get(attrName);
-  const explicitlyTyped = existingDef?.source === "user" || existingDef?.userProvided === true;
+  const existingTypeName =
+    typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
+  const explicitlyTyped =
+    (existingDef?.source === "user" || existingDef?.userProvided === true) &&
+    existingTypeName != null &&
+    existingTypeName !== "value";
   const pendingHost = this as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
     if (!Object.prototype.hasOwnProperty.call(this, "_enumsPendingTypeCheck")) {

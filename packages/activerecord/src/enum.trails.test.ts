@@ -368,6 +368,18 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
     }
   }
 
+  // A default-only `attribute(name, { default })` (no explicit type) must still
+  // resolve the subtype from the reflected column — Rails pushes only a
+  // PendingDefault, so the column type governs. A prior version marked any
+  // user-provided def as "explicitly typed" and skipped reflection here.
+  class DefaultOnlyNumericEnum extends Base {
+    static _tableName = "numeric_data";
+    static {
+      this.attribute("decimal_number", { default: 0 });
+      this.enum("decimal_number", { low: 0, mid: 1, high: 2 });
+    }
+  }
+
   // Deliberately do NOT await `NumericEnum.loadSchema()` here: `enumTypeOf`
   // must reflect synchronously from the warm schema cache on its own (the same
   // sync path `Base.typeForAttribute` uses). Awaiting the async loader first
@@ -398,6 +410,16 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
     expect(castEnumValue(NumericEnum, "decimal_number", "mid")).toEqual(subtype.serialize(1));
     const caster = new MapCaster(NumericEnum);
     expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(subtype.serialize(1));
+  });
+
+  it("resolves the reflected subtype for a default-only attribute (no explicit type)", () => {
+    const type = enumTypeOf(DefaultOnlyNumericEnum, "decimal_number");
+    expect(type).toBeInstanceOf(EnumType);
+    // A default-only attribute is NOT "explicitly typed", so reflection still
+    // supplies the column subtype ("decimal") rather than the integer the
+    // mapping shape implies.
+    expect(type!.subtype).toBe("decimal");
+    expect(type!.subtypeType().type()).toBe("decimal");
   });
 });
 
