@@ -69,6 +69,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(await adapter.extensionEnabled("citext")).toBe(true);
       const dump = await adapter.createSchemaDumper(adapter).dump();
       expect(dump).toContain(`await ctx.enableExtension("citext");`);
+      // A full PG schema dump under 6-fork parallel load legitimately exceeds
+      // vitest's 5s default (I/O contention, not a logic bug). Bump to 60s,
+      // matching the sibling dump tests in schema-dumper.trails.test.ts. See
+      // project_schema_dumper_trails_pg_schema_migrations_flake.
     }, 60000);
     it("enable extension migration ignores prefix and suffix", async () => {
       // Rails: table_name_prefix/suffix don't affect extension names
