@@ -347,6 +347,44 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(executed).toBe(false);
   });
 
+  it("addForeignKey/removeForeignKey no-op when config foreign_keys:false despite supports_foreign_keys?", async () => {
+    // Rails: use_foreign_keys? == supports_foreign_keys? && foreign_keys_enabled?,
+    // where foreign_keys_enabled? reads @config.fetch(:foreign_keys, true). An
+    // adapter that supports FKs but is configured `foreign_keys: false` must
+    // still no-op the FK mutators. isForeignKeysEnabled reads the adapter's real
+    // config hash (_config), so this exercises the config-driven disable path.
+    let executed = false;
+    class DisabledFkAdapter extends StubAdapter {
+      constructor() {
+        super();
+        (this as any)._config = { foreignKeys: false };
+      }
+      supportsForeignKeys() {
+        return true;
+      }
+      executeMutation(_sql: string) {
+        executed = true;
+        return Promise.resolve(0);
+      }
+    }
+    const stub = new DisabledFkAdapter();
+    expect(stub.supportsForeignKeys()).toBe(true);
+    expect((stub as any).isForeignKeysEnabled()).toBe(false);
+    expect((stub as any).isUseForeignKeys()).toBe(false);
+    await stub.addForeignKey("articles", "authors", { column: "author_id" });
+    await expect(
+      stub.removeForeignKey("articles", { name: "fk_whatever" }),
+    ).resolves.toBeUndefined();
+    expect(executed).toBe(false);
+  });
+
+  it("isForeignKeysEnabled defaults to true when config omits foreign_keys (Rails fetch default)", () => {
+    // Rails: foreign_keys_enabled? is @config.fetch(:foreign_keys, true), so a
+    // config with no :foreign_keys key yields true.
+    const stub = new StubAdapter();
+    expect((stub as any).isForeignKeysEnabled()).toBe(true);
+  });
+
   it("validColumnDefinitionOptions includes ifExists (Rails OPTION_NAMES)", () => {
     const stub = new StubAdapter();
     const opts = (stub as any).validColumnDefinitionOptions() as string[];

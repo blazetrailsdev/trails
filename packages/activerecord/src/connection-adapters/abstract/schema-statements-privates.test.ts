@@ -154,7 +154,7 @@ describe("SchemaStatements privates (PR 8)", () => {
 
   it("isForeignKeysEnabled reads config.foreignKeys", () => {
     expect(makeStatements().isForeignKeysEnabled()).toBe(true);
-    expect(makeStatements({ config: { foreignKeys: false } }).isForeignKeysEnabled()).toBe(false);
+    expect(makeStatements({ _config: { foreignKeys: false } }).isForeignKeysEnabled()).toBe(false);
   });
 
   it("checkConstraintName", () => {
