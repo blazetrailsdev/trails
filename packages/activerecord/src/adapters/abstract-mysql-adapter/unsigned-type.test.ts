@@ -31,6 +31,10 @@ describeIfMysql("Mysql2Adapter", () => {
     class UnsignedType extends Base {
       static _tableName = "unsigned_types";
     }
+    // Declare the auto-increment PK so the post-INSERT write-back
+    // (`_performInsert` → `_writeAttribute("id", insertedId)`) targets a real
+    // column under strict `writeFromUser`, without the internal-write bridge.
+    UnsignedType.attribute("id", "integer");
     UnsignedType.adapter = adapter;
     return UnsignedType;
   }
