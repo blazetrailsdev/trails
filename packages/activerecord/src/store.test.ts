@@ -261,11 +261,7 @@ describe("StoreTest", () => {
     expect(user.settings).toBeInstanceOf(HashWithIndifferentAccess);
   });
 
-  // trails: Serialized#cast shortcuts pre-encoded strings to deserialize() directly,
-  // whereas Rails Mutable#cast does deserialize(serialize(value)) — the serialize leg
-  // runs as_regular_hash("somedata") → {} → "{}" so load is called with valid JSON and
-  // the error is swallowed silently. Tracked against Serialized#cast preEncoded shortcut.
-  it.skip("convert store attributes from any format other than Hash or HashWithIndifferentAccess losing the data", () => {
+  it("convert store attributes from any format other than Hash or HashWithIndifferentAccess losing the data", () => {
     (john as any).json_data = "somedata";
     (john as any).height = "low";
     expect((john as any).json_data).toBeInstanceOf(HashWithIndifferentAccess);

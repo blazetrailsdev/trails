@@ -81,8 +81,9 @@ describe("SerializedAttributeTest", () => {
       static {
         this._tableName = "topics";
         // Rails: serialize(:content, type: Hash, default: { key: "value" }).
-        // trails' serialize() has no `default:` option, so we pre-register via attribute().
-        this.attribute("content", "text", { default: '{"key":"value"}' });
+        // trails' serialize() has no `default:` option, so we pre-register via
+        // attribute() with the hash default — Serialized#cast serializes it first.
+        this.attribute("content", "text", { default: { key: "value" } });
         serialize(this, "content", { type: HashObject });
       }
     }
@@ -94,7 +95,7 @@ describe("SerializedAttributeTest", () => {
     class CustomDefaultTopic extends Topic {
       static {
         this._tableName = "topics";
-        this.attribute("content", "text", { default: '{"key":"value"}' });
+        this.attribute("content", "text", { default: { key: "value" } });
         serialize(this, "content", { type: HashObject });
       }
     }
@@ -216,10 +217,7 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const myobj = new Date("2008-01-01T01:00:00Z").toISOString();
-    // Pass as pre-serialized JSON so the cast path receives a JSON-encoded string.
-    const topic = await (
-      await JsonTopic.create({ content: JSON.stringify(myobj) as any })
-    ).reload();
+    const topic = await (await JsonTopic.create({ content: myobj as any })).reload();
     expect((topic as any).content).toEqual(myobj);
   });
 
@@ -230,10 +228,7 @@ describe("SerializedAttributeTest", () => {
       }
     }
     const myobj = "Yes";
-    // Pass as pre-serialized JSON so the JSON coder can deserialize it on read.
-    const topic = await (
-      await JsonTopic.create({ content: JSON.stringify(myobj) as any })
-    ).reload();
+    const topic = await (await JsonTopic.create({ content: myobj as any })).reload();
     expect((topic as any).content).toEqual(myobj);
   });
 
@@ -449,9 +444,9 @@ describe("SerializedAttributeTest", () => {
         serialize(this, "content", { coder: "json" });
       }
     }
-    const t = await JsonTopic.create({ content: JSON.stringify("first") as any });
+    const t = await JsonTopic.create({ content: "first" as any });
     expect((t as any).content).toBe("first");
-    await t.updateColumn("content", JSON.stringify(["second"]));
+    await t.updateColumn("content", ["second"]);
     expect((t as any).content).toEqual(["second"]); // in-memory, before reload
     const reloaded = await JsonTopic.find(t.id as number);
     expect((reloaded as any).content).toEqual(["second"]);
@@ -463,9 +458,9 @@ describe("SerializedAttributeTest", () => {
         serialize(this, "content", { coder: "json" });
       }
     }
-    const t = await JsonTopic.create({ content: JSON.stringify("first") as any });
+    const t = await JsonTopic.create({ content: "first" as any });
     expect((t as any).content).toBe("first");
-    await t.updateAttribute("content", JSON.stringify("second"));
+    await t.updateAttribute("content", "second");
     expect((t as any).content).toBe("second");
     const reloaded = await JsonTopic.find(t.id as number);
     expect((reloaded as any).content).toBe("second");
@@ -649,7 +644,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     class DefaultTopic extends Topic {
       static {
         this._tableName = "topics";
-        this.attribute("content", "text", { default: '{"key":"value"}' });
+        this.attribute("content", "text", { default: { key: "value" } });
         serialize(this, "content", { type: HashObject });
       }
     }
@@ -673,7 +668,7 @@ describe("SerializedAttributeTestWithYamlSafeLoad", () => {
     class DefaultTopic extends Topic {
       static {
         this._tableName = "topics";
-        this.attribute("content", "text", { default: '{"key":"value"}' });
+        this.attribute("content", "text", { default: { key: "value" } });
         serialize(this, "content", { type: HashObject });
       }
     }

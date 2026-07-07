@@ -222,19 +222,13 @@ export class HashAccessor {
       const raw = object.readAttribute(attribute);
       const obj = this._writeHash(raw);
       obj[key] = value;
-      // Structured types (json/jsonb/hstore) store plain objects; text/string columns
-      // store JSON-encoded strings. Use the column's type name to decide. A
-      // `serialize`-wrapped column (Type::Serialized) is text-backed — its coder
-      // round-trips a JSON string — so look through to the wrapped subtype.
-      let castType = (object.constructor as any).typeForAttribute?.(attribute);
-      if (castType?.isSerialized?.() && castType.subtype) castType = castType.subtype;
-      const typeName = castType?.name;
-      const isStringBacked =
-        !typeName ||
-        typeName === "string" ||
-        typeName === "text" ||
-        typeName === "immutable_string";
-      object.writeAttribute(attribute, isStringBacked ? JSON.stringify(obj) : obj);
+      // Mirror Rails: write the plain hash back and let the column's type encode
+      // it. Serialized columns (text-backed store) run Serialized#cast, which is
+      // `deserialize(serialize(hash))` — the coder JSON-encodes the hash — while
+      // structured types (json/jsonb/hstore) store the object directly. Writing a
+      // hash (not a pre-encoded JSON string) is required for the serialize-first
+      // cast to round-trip; a raw string would be flattened to {} by the coder.
+      object.writeAttribute(attribute, obj);
     }
   }
 

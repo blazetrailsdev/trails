@@ -131,6 +131,10 @@ describe("SerializationTest", () => {
       author as unknown as { serializedPosts: { create(attrs: object): Promise<unknown> } }
     ).serializedPosts.create({ title: "Hello" });
 
+    // `title` is coderless-`serialize`-wrapped, so it persists as the default
+    // (YAML) coder's encoded form (`YAML.dump("Hello") == "Hello\n"`). trails'
+    // query layer does not re-serialize a serialized-attribute predicate, so the
+    // WHERE must use that pre-serialized string to match the stored value.
     const results = await Author.joins("serializedPosts").where({
       name: "David",
       serialized_posts: { title: "Hello" },

@@ -95,26 +95,11 @@ export class Serialized extends ValueType {
   }
 
   cast(value: unknown): unknown {
-    // A string (or null) is treated as an already-encoded payload and
-    // deserialized directly. A structured value (Hash/Array/coder object) is
-    // round-tripped through the coder — `deserialize(serialize(value))` — so
-    // assigning e.g. a class-coder instance loads back through the coder.
-    // Mirrors ActiveModel::Type::Helpers::Mutable#cast for the structured case
-    // while still accepting pre-serialized string assignments.
-    //
-    // Binary subtypes (bytea) are the exception: a raw user string is a value
-    // to encode, not a wire-format payload. Routing it straight to the
-    // subtype's deserialize would send it through unescape_bytea, which maps
-    // each character to a single byte (latin1) and mangles non-ASCII input.
-    // Encoding it first (serialize → TextEncoder UTF-8) keeps the bytes the
-    // UTF-8 bridge in `deserialize` expects, matching Rails' Mutable#cast.
-    const preEncoded =
-      value === null ||
-      value === undefined ||
-      (typeof value === "string" && !this.subtype.isBinary());
-    if (preEncoded) {
-      return this.deserialize(value);
-    }
+    // Rails: ActiveModel::Type::Helpers::Mutable#cast is always
+    // `deserialize(serialize(value))`. Serializing first means a value the
+    // coder can't round-trip (e.g. a non-Hash string like "somedata" through
+    // IndifferentCoder) is normalized by `serialize` into a valid payload
+    // rather than fed raw into `coder.load`, which would raise on JSON.parse.
     return this.deserialize(this.serialize(value));
   }
 
@@ -168,12 +153,6 @@ export class Serialized extends ValueType {
   }
 
   assertValidValue(value: unknown): void {
-    // trails accepts pre-serialized string payloads on assignment (see `cast`),
-    // so a raw string is not yet the decoded object the coder validates — the
-    // coder's `load` re-validates the decoded result on read. Rails only sees
-    // already-decoded objects here because its Mutable#cast never accepts a
-    // raw payload, so it has no equivalent guard.
-    if (typeof value === "string") return;
     if (this.coder.assertValidValue) {
       this.coder.assertValidValue(value);
     }
