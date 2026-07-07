@@ -2355,6 +2355,29 @@ describe("HasManyThroughAssociationsTest", () => {
     );
   });
 
+  it("through association resolves composite source association primary key", async () => {
+    // Sharded::BlogPost#tags is has_many through blog_post_tags; the source
+    // belongs_to :tag targets a query-constraints model (Sharded::Tag,
+    // [blog_id, id]), so the association_primary_key is composite [blog_id, id]
+    // even though Tag's own primary_key is the single "id". primaryKeyValue —
+    // used by the delete/find comparison paths in CollectionAssociation — must
+    // key off the composite association_primary_key, not the target model's PK.
+    const blogPost = await ShardedBlogPost.find(shardedBlogPosts("great_post_blog_one").id);
+    const tags = await (blogPost as any).tags.toArray();
+    expect(tags.length).toBeGreaterThan(0);
+    const tag = tags[0];
+
+    const assoc = (blogPost as any).association("tags");
+    const key = assoc.primaryKeyValue(tag);
+    expect(Array.isArray(key)).toBe(true);
+    expect([...key].map(Number)).toEqual([Number(tag.blog_id), Number(tag.id)]);
+
+    // delete-by-record drops the join row and prunes the composite-keyed target.
+    await (blogPost as any).tags.delete(tag);
+    const remaining = await (blogPost as any).tags.reload();
+    expect(remaining.map((t: any) => Number(t.id))).not.toContain(Number(tag.id));
+  });
+
   it("loading cpk association with unpersisted owner", async () => {
     const order = await CpkOrder.create({ shop_id: 1 });
     const book = new (await import("../test-helpers/models/cpk.js").then(

@@ -97,16 +97,23 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     return vals.length === 1 ? vals[0] : JSON.stringify(vals);
   }
 
+  /**
+   * Resolve the record's key by the association's `association_primary_key`
+   * (for a through reflection this delegates to
+   * `sourceReflection.associationPrimaryKey`, `reflection.ts:1710-1711`), not
+   * the target model's own `klass.primaryKey`. Converges the delete/find
+   * comparison paths in `CollectionAssociation` onto the same resolution
+   * `idsReader` uses via the shared `associationPrimaryKey()` helper, so a
+   * composite (array) source PK compares by every source-key column instead of
+   * falling back to the target model's PK.
+   */
   protected override primaryKeyValue(record: Base): unknown {
-    const ctor = this.owner.constructor as { _reflectOnAssociation?: (n: string) => any };
-    const refl = ctor._reflectOnAssociation?.(this.reflection.name);
-    const srcPk = refl?.sourceReflection?.associationPrimaryKey;
-    if (typeof srcPk === "string") {
-      return typeof (record as any)._readAttribute === "function"
-        ? (record as any)._readAttribute(srcPk)
-        : (record as any)[srcPk];
-    }
-    return super.primaryKeyValue(record);
+    const pk = this.associationPrimaryKey();
+    const read = (key: string) =>
+      typeof (record as any)._readAttribute === "function"
+        ? (record as any)._readAttribute(key)
+        : (record as any)[key];
+    return Array.isArray(pk) ? pk.map(read) : read(pk);
   }
 
   /**
