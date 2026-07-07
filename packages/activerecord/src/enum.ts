@@ -98,6 +98,7 @@ export function installEnumAttribute(
   klass: typeof Base,
   attribute: string,
   enumType: EnumType,
+  attributeOptions?: { default?: unknown },
 ): void {
   // Rails' _enum uses `attribute(name)` (bare) + `decorate_attributes`, layering
   // the EnumType on top of the column-seeded FromDatabase attribute so the enum
@@ -109,7 +110,16 @@ export function installEnumAttribute(
   // type to the EnumType). cast(0) on an EnumType yields null; deserialize(0)
   // yields the "default" label — so the column-default path is exactly what makes
   // the enum default work, recovered here without any special-casing.
-  klass.attribute(attribute);
+  // Rails' `_enum` forwards its leftover kwargs (e.g. `default:`) into
+  // `attribute(name, **options)` (enum.rb:237), so the macro-level `default:`
+  // seeds the attribute default and flows through the EnumType on read. Pass a
+  // bare `attribute(name)` when there are no options to preserve the
+  // column-seeded FromDatabase attribute.
+  if (attributeOptions && "default" in attributeOptions) {
+    klass.attribute(attribute, { default: attributeOptions.default });
+  } else {
+    klass.attribute(attribute);
+  }
   klass.decorateAttributes([attribute], (_name: string, _subtype: Type) => enumType);
 
   // Define the getter after attribute() so the EnumType is already in
@@ -371,6 +381,7 @@ export function enumMethod(
     scopes?: boolean;
     instanceMethods?: boolean;
     validate?: boolean | Record<string, unknown>;
+    default?: unknown;
   },
 ): void {
   _enum.call(this, attribute, mapping, options);
@@ -399,6 +410,7 @@ export function _enum(
     scopes?: boolean;
     instanceMethods?: boolean;
     validate?: boolean | Record<string, unknown>;
+    default?: unknown;
   },
 ): void {
   if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
@@ -521,7 +533,18 @@ export function _enum(
   // rather than raising on write, so the type must not raise.
   const validate = options?.validate ?? false;
   const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype, !validate);
-  installEnumAttribute(this, attrName, enumType);
+  installEnumAttribute(
+    this,
+    attrName,
+    enumType,
+    options && "default" in options ? { default: options.default } : undefined,
+  );
+
+  // Rails' `_enum` takes `scopes: true, instance_methods: true` keyword
+  // defaults; `scopes: false` suppresses per-value scope generation and
+  // `instance_methods: false` suppresses predicate/bang generation.
+  const scopesEnabled = options?.scopes !== false;
+  const instanceMethodsEnabled = options?.instanceMethods !== false;
 
   // Conflict-detection pass, then the generation pass — both ported from the
   // former standalone `defineEnum`, now folded in so `_enum` is the single enum
@@ -642,16 +665,28 @@ export function _enum(
     // `define_enum_methods` calls per value (enum.rb:265-278). This defines the
     // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
     // scope `{name}`, and the auto negative scope `not{Name}`.
-    methodsModule.defineEnumMethods(attrName, fullName, value, true, true);
+    methodsModule.defineEnumMethods(
+      attrName,
+      fullName,
+      value,
+      scopesEnabled,
+      instanceMethodsEnabled,
+    );
     if (friendlyName !== fullName) {
-      methodsModule.defineEnumMethods(attrName, friendlyName, value, true, true);
+      methodsModule.defineEnumMethods(
+        attrName,
+        friendlyName,
+        value,
+        scopesEnabled,
+        instanceMethodsEnabled,
+      );
     }
 
     // Original-form predicate/bang for labels with special chars (spaces,
     // hyphens). Rails: define_method("American Bobtail?"), reachable via
     // bracket notation only.
     const originalName = methodName(n);
-    if (/[^\w\x80-\uffff]/.test(originalName)) {
+    if (instanceMethodsEnabled && /[^\w\x80-\uffff]/.test(originalName)) {
       Object.defineProperty(this.prototype, `is${originalName}`, {
         value: function (this: Base) {
           return this.readAttribute(attrName) === n;
