@@ -3243,11 +3243,14 @@ function wrapCollectionProxy<T extends Base = Base>(
         });
       }
 
-      // Generated class-method delegations (delegation.rb:127-129) now resolve
-      // as real methods on the per-model `Relation` subclass prototype
-      // (`relationClassFor`): `target.scope()` is such a subclass instance, so
-      // the `Reflect.get(scope, prop, scope)` fallback below picks them up with
-      // the scope as receiver — no explicit side-table branch needed here.
+      // Class-method delegations resolve through the `Reflect.get(scope, prop,
+      // scope)` fallback below: `target.scope()` returns an `AssociationRelation`
+      // wrapped by `wrapWithScopeProxy`, whose miss path runs the
+      // `classMethodDelegator` (delegation.rb:118-131). This CollectionProxy
+      // delegate class is NOT yet on the per-model prototype carrier — only the
+      // base `Relation` is (story
+      // `delegation-remaining-delegate-class-prototype-carriers` tracks the
+      // rest) — so no real-method / side-table branch belongs here.
 
       // Array-method delegation (sync fast-path) — when already loaded, delegate
       // synchronously against `target.target` (the hydrated records array).

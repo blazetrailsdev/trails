@@ -35,6 +35,17 @@ describe("generated relation methods — per-model prototype carrier", () => {
     expect(rel.anotherGenerated()).toBe(42);
   });
 
+  it("reports the base Relation class name (per-model carrier stays anonymous)", () => {
+    // Rails' ClassSpecificRelation::ClassMethods#name returns superclass.name so
+    // `Relation#inspect` (`this.constructor.name`) reads "Relation", not the
+    // anonymous per-model subclass identifier.
+    const carrier = relationClassFor(Post as never);
+    expect(carrier.name).toBe("Relation");
+    expect((Post.limit(2) as unknown as { constructor: { name: string } }).constructor.name).toBe(
+      "Relation",
+    );
+  });
+
   it("gives distinct models distinct carriers (no cross-model leakage)", () => {
     generateRelationMethod(Post as never, "postOnly", () => "post");
     expect(relationClassFor(Post as never)).not.toBe(relationClassFor(Comment as never));

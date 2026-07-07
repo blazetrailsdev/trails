@@ -347,6 +347,15 @@ export function relationClassFor(modelClass: typeof Base): RelationCtor {
       ...args: never[]
     ) => object;
     subclass = class extends baseRelation {} as RelationCtor;
+    // A class expression assigned to a `let` infers `.name` from the variable
+    // (`"subclass"`), which would leak through `Relation#inspect`'s
+    // `this.constructor.name`. Rails' `ClassSpecificRelation::ClassMethods#name`
+    // (delegation.rb:111-115) returns `superclass.name` so a per-model delegate
+    // still reports the base relation class name — mirror that here.
+    Object.defineProperty(subclass, "name", {
+      value: (baseRelation as { name: string }).name,
+      configurable: true,
+    });
     _relationClassByModel.set(modelClass, subclass);
     includeRelationMethods(subclass.prototype, generatedRelationMethods(modelClass));
   }
