@@ -351,6 +351,9 @@ export interface AbstractAdapter {
     fn?: (t: Table) => void | Promise<void>,
   ): Promise<void>;
   tableAliasFor(tableName: string): string;
+  // Provided by the DatabaseLimits mixin (included below); tableAliasFor
+  // resolves it through here rather than a duplicate on SchemaStatements.
+  tableAliasLength(): number;
   nativeDatabaseTypes(): Record<string, unknown>;
   dataSources(): Promise<string[]>;
   isDataSourceExists(name: string): Promise<boolean>;
