@@ -322,7 +322,7 @@ export class CpkOrderAgreement extends Base {
   static _tableName = "cpk_order_agreements";
 
   static {
-    this.belongsTo("order", { className: "CpkOrder", primaryKey: "id" });
+    this.belongsTo("order", { className: "CpkOrder" });
   }
 }
 
@@ -343,7 +343,7 @@ export class CpkOrderTag extends Base {
 
   static {
     this.belongsTo("tag", { className: "CpkTag" });
-    this.belongsTo("order", { className: "CpkOrder", primaryKey: "id" });
+    this.belongsTo("order", { className: "CpkOrder" });
   }
 }
 

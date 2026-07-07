@@ -2279,46 +2279,34 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             sourceRefl?.isPolymorphic?.()
               ? sourceRefl.associationPrimaryKeyFor?.(this.model)
               : sourceRefl?.associationPrimaryKey;
-          let sourceJoinAttrs: Record<string, unknown>;
-          if (Array.isArray(sourceFk)) {
-            const sourcePk = resolveSourcePk();
-            const sourcePkCols = Array.isArray(sourcePk) ? sourcePk : sourcePk ? [sourcePk] : [];
-            if (sourcePkCols.length !== sourceFk.length) {
-              throw new ConfigurationError(
-                `Through association "${this._assocName}" has a composite source foreign key ` +
-                  `(${sourceFk.join(", ")}) whose length does not match the target primary key ` +
-                  `(${sourcePkCols.join(", ")}).`,
-              );
-            }
-            sourceJoinAttrs = {};
-            for (let i = 0; i < sourceFk.length; i++) {
-              sourceJoinAttrs[sourceFk[i]] = record._readAttribute(sourcePkCols[i]);
-            }
-          } else {
-            const targetPk = (record.constructor as typeof Base).primaryKey;
-            let targetPkCol: string;
-            if (Array.isArray(targetPk)) {
-              // Mirrors BelongsToReflection#association_primary_key: use options[:primary_key]
-              // when set, or fall back to "id" when it is part of the composite PK.
-              const srcPk = resolveSourcePk();
-              if (typeof srcPk === "string") {
-                targetPkCol = srcPk;
-              } else if (targetPk.includes("id")) {
-                targetPkCol = "id";
-              } else {
-                throw new ConfigurationError(
-                  `Through association "${this._assocName}" has a composite-PK target "${(record.constructor as typeof Base).name}" but no scalar primaryKey on the source reflection. Specify primaryKey: "<col>" on the source belongs_to.`,
-                );
-              }
-            } else {
-              // Use the source reflection's association_primary_key when set —
-              // e.g. a belongs_to with primaryKey: "name" means the join FK
-              // references category.name, not category.id. For a polymorphic
-              // source, resolveSourcePk() keys off `this.model` (reflection.klass).
-              const srcPk = resolveSourcePk();
-              targetPkCol = (typeof srcPk === "string" ? srcPk : null) ?? targetPk;
-            }
-            sourceJoinAttrs = { [sourceFk]: record._readAttribute(targetPkCol) };
+          // Mirrors Rails' ThroughAssociation#construct_join_attributes
+          // (through_association.rb:57-66): fill the join FK columns from the
+          // source reflection's `association_primary_key`, read off the pushed
+          // record, pairing columns positionally. `association_primary_key`
+          // (BelongsToReflection#association_primary_key, reflection.rb:927-938 —
+          // ported at reflection.ts:1375) already resolves the shape correctly:
+          // an explicit array `primaryKey` or query-constraint key stays
+          // composite, and only a plain composite PK collapses to its "id"
+          // component. So this reads that value verbatim — no extra scalar-FK
+          // collapse, which would wrongly flatten an explicit composite key.
+          // A composite belongsTo source therefore writes every FK component
+          // (matching Rails' `{ source_reflection.name => records }` belongs_to
+          // assignment); the composite-PK target no longer trips a trails-only
+          // ConfigurationError. The remaining throw is a genuine arity mismatch
+          // (a scalar FK against a still-composite key is a malformed source).
+          const sourceFkCols = Array.isArray(sourceFk) ? sourceFk : [sourceFk];
+          const rawSourcePk = resolveSourcePk() ?? (record.constructor as typeof Base).primaryKey;
+          const sourcePkCols = Array.isArray(rawSourcePk) ? rawSourcePk : [rawSourcePk];
+          if (sourceFkCols.length !== sourcePkCols.length) {
+            throw new ConfigurationError(
+              `Through association "${this._assocName}" has a source foreign key ` +
+                `(${sourceFkCols.join(", ")}) whose length does not match the source ` +
+                `association_primary_key (${sourcePkCols.join(", ")}).`,
+            );
+          }
+          const sourceJoinAttrs: Record<string, unknown> = {};
+          for (let i = 0; i < sourceFkCols.length; i++) {
+            sourceJoinAttrs[sourceFkCols[i]] = record._readAttribute(sourcePkCols[i]);
           }
           // Polymorphic source (e.g. `source: :taggable, source_type: "Post"`):
           // set the join's `<source>_type` column so the belongs_to resolves to
