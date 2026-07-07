@@ -330,7 +330,10 @@ import {
   writeStoreAttributeMethod as _writeStoreAttributeMethod,
   storeAccessorForMethod as _storeAccessorForMethod,
 } from "./store.js";
-import { serialize as _serializeAttribute } from "./serialize.js";
+import {
+  serialize as _serializeAttribute,
+  applyPendingSerializations as _applyPendingSerializations,
+} from "./serialize.js";
 import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
@@ -1160,6 +1163,7 @@ export class Base extends Model {
     }
     encryptionHooks.applyPendingEncryptions(this);
     this.applyPendingNormalizations();
+    _applyPendingSerializations(this as unknown as typeof Base);
   }
 
   /**
