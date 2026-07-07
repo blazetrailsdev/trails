@@ -2431,27 +2431,15 @@ export class Model {
           }
         }
         xml += `${indent}</${tag}>\n`;
-      } else if (value === null || value === undefined) {
-        emit();
-      } else if (value instanceof BigDecimal) {
-        emit(castTypeName ?? "decimal");
-      } else if (value instanceof Date) {
-        emit("dateTime");
       } else if (typeof value === "number") {
+        // ActiveModel serializes every JS `number` as `integer` (it cannot see
+        // the DB scale); a float column supplies its cast type explicitly.
         emit(castTypeName ?? "integer");
-      } else if (typeof value === "boolean") {
-        emit(castTypeName ?? "boolean");
-      } else if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
-        emit("dateTime");
-      } else if (value instanceof Temporal.ZonedDateTime) {
-        emit("dateTime");
-      } else if (value instanceof Temporal.PlainDate) {
-        emit("date");
-      } else if (value instanceof Temporal.PlainTime) {
-        emit("time");
       } else {
-        // BigInt/string-materialized numeric columns (bigint ids on PG/MariaDB,
-        // decimals as strings) carry a cast type; bare strings emit no `type=`.
+        // Every remaining leaf — nil, boolean, BigDecimal, Date, the Temporal
+        // types, and strings — is typed by `toTag`'s own inference, with the
+        // cast/column type (bigint ids, string-materialized decimals) overriding
+        // it so the `type=` attribute stays adapter-agnostic.
         emit(castTypeName);
       }
     }
