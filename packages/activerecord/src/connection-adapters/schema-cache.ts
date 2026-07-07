@@ -75,6 +75,12 @@ export class SchemaCache {
   private _primaryKeys = new Map<string, string | string[] | null>();
   private _dataSourceExists = new Map<string, boolean>();
   private _indexes = new Map<string, unknown[]>();
+  // Monotonic per-table counter bumped at the start of every `refreshBang` so
+  // overlapping fire-and-forget refreshes serialize deterministically: a
+  // later-initiated refresh always wins regardless of DB round-trip ordering.
+  // Never reset (not even by clearDataSourceCacheBang) — resetting could let an
+  // older in-flight refresh's captured generation collide with a fresh one.
+  private _refreshGeneration = new Map<string, number>();
   private _version: string | number | null = null;
   // When non-null, records the name of every table passed to
   // `clearDataSourceCacheBang` — i.e. every table touched by DDL
@@ -230,6 +236,92 @@ export class SchemaCache {
         await this.indexes(connection, tableName);
       }
     });
+  }
+
+  /**
+   * Re-introspect a single table and overwrite its cached columns / primary
+   * keys / indexes **in place**, without the intermediate delete that
+   * {@link clearDataSourceCacheBang} performs. Unlike {@link add} it bypasses
+   * the per-entry `has` guards, so it re-reads even a table that is already
+   * warm.
+   *
+   * Used to re-establish the eager warm after `resetColumnInformation`
+   * (model-schema.ts) under {@link SchemaReflection.eagerLoadSchemaCache}:
+   * keeping the prior DB-sourced entry live until the fresh reflection lands
+   * means a synchronous `Model.columnNames()` issued between the reset and the
+   * refresh settling still takes the warm, DB-sourced branch — excluding
+   * virtual `attribute()` declarations — rather than going cold. When the table
+   * no longer exists its entry is cleared.
+   *
+   * Overlapping refreshes on the same table serialize via a per-table
+   * generation counter: the latest-initiated refresh always wins, so a stale
+   * reflection whose round-trip resolves last no-ops instead of clobbering the
+   * newer one.
+   *
+   * @internal trails-only — Rails has no analogue because
+   * `reset_column_information` reflects synchronously on the next `column_names`
+   * access (`schema_cache.columns`), which the async layer cannot.
+   */
+  async refreshBang(pool: unknown, tableName: string): Promise<void> {
+    if (isSchemaCacheIgnoredTable(tableName)) return;
+    // Claim a generation up front (synchronously, before any await) so a second
+    // refresh started while this one is in flight supersedes it: our writes
+    // below are gated on still owning the latest generation, so a stale
+    // reflection whose round-trip resolves last no-ops instead of clobbering
+    // the newer one and leaving the cache warm-but-stale. Rails sidesteps this
+    // by reflecting synchronously inline in `reset_column_information`.
+    const generation = (this._refreshGeneration.get(tableName) ?? 0) + 1;
+    this._refreshGeneration.set(tableName, generation);
+    const isLatest = () => this._refreshGeneration.get(tableName) === generation;
+    try {
+      await withConnection(pool, async (connection) => {
+        // Ask the connection directly rather than `this.dataSourceExists`, whose
+        // cached `true` (warmed alongside the columns we're refreshing) would
+        // never re-detect a table dropped since. When the connection can't
+        // answer, assume it still exists and refresh the columns anyway.
+        const exists =
+          typeof connection.dataSourceExists === "function"
+            ? await connection.dataSourceExists(tableName)
+            : true;
+        if (!exists) {
+          if (isLatest()) this.clearDataSourceCacheBang(connection, tableName);
+          return;
+        }
+        // Gather all three reflections before touching the cache so the write is
+        // a single consistent block. The `typeof` guards mirror the existing
+        // `primaryKeys`/`columns`/`indexes` methods (and `add`); every real
+        // adapter inherits all three from abstract SchemaStatements, so a partial
+        // reflection never happens in production.
+        const pk =
+          typeof connection.primaryKey === "function"
+            ? ((await connection.primaryKey(tableName)) ?? null)
+            : undefined;
+        const cols =
+          typeof connection.columns === "function"
+            ? await connection.columns(tableName)
+            : undefined;
+        const idx =
+          typeof connection.indexes === "function"
+            ? await connection.indexes(tableName)
+            : undefined;
+        // Re-check after every await: a newer refresh may have started (and
+        // possibly already written) while ours was in flight; leave its result.
+        if (!isLatest()) return;
+        // Primary keys first so setColumns' reconcilePrimaryKeyFlags sees the
+        // fresh authoritative key (mirrors `add`'s ordering).
+        if (pk !== undefined) this.setPrimaryKeys(tableName, pk);
+        if (cols !== undefined) this.setColumns(tableName, cols);
+        if (idx !== undefined) this._indexes.set(tableName, idx);
+      });
+    } catch {
+      // Reflection failed (e.g. a transient connection error or a failed lease).
+      // Fall back to clearing so the next async load re-reflects rather than
+      // serving a now-untrustworthy entry — but ONLY if we're still the latest
+      // refresh. Clearing unconditionally would let a stale, failed refresh wipe
+      // out a newer refresh's already-written good data, reintroducing the very
+      // race the generation gate prevents on the success path.
+      if (isLatest()) this.clearDataSourceCacheBang(null, tableName);
+    }
   }
 
   async columns(pool: unknown, tableName: string): Promise<Column[] | undefined> {
@@ -609,11 +701,18 @@ export class SchemaReflection {
    * on-disk cache (if any) as a base, then tops it up by introspection.
    *
    * Off by default — the boot-time introspection cost is opt-in, mirroring how
-   * Rails apps choose between a committed dump and live reflection. Note the
-   * documented async limitation: after `resetColumnInformation` clears a
-   * table's entry, the warm is NOT synchronously re-established (the adapter
-   * data-source cache cannot reload without awaiting); the model stays cold for
-   * that table until the next async schema load or a fresh connection.
+   * Rails apps choose between a committed dump and live reflection.
+   *
+   * The warm is also re-established after `resetColumnInformation`
+   * (model-schema.ts): rather than clearing the table's entry (which would go
+   * cold), the reset kicks off a fire-and-forget {@link SchemaCache#refreshBang}
+   * that re-introspects and overwrites the entry **in place**. The prior
+   * DB-sourced entry stays live until the fresh reflection lands, so a
+   * synchronous `Model.columnNames()` issued right after the reset still
+   * excludes virtual `attribute()` declarations without an intervening
+   * `await ensureSchemaLoaded()`, and a later schema change is picked up once
+   * the refresh settles. (The flag-off default still clears, matching Rails'
+   * `clear_data_source_cache!`.)
    */
   static eagerLoadSchemaCache = false;
 

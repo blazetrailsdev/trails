@@ -451,6 +451,140 @@ describe("SchemaCacheTest", () => {
     expect(cache.isCached("users")).toBe(false);
   });
 
+  it("refreshBang overwrites a warm entry in place without a cold window", async () => {
+    // Backs the eager-warm re-establish after resetColumnInformation: unlike
+    // clearDataSourceCacheBang, the prior DB-sourced entry stays cached the
+    // whole time (isCached never flips false), then converges to the fresh
+    // reflection once the async refresh settles.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+    cache.setPrimaryKeys("users", "id");
+    expect(cache.isCached("users")).toBe(true);
+
+    const fakeConn = {
+      primaryKey: async () => "id",
+      dataSourceExists: async () => true,
+      columns: async () => [
+        makeColumn("id", "integer", { primaryKey: true }),
+        makeColumn("name", "varchar(255)"),
+      ],
+      indexes: async () => [{ name: "idx_users_name", columns: ["name"] }],
+    };
+    const refresh = cache.refreshBang(new FakePool(fakeConn), "users");
+    // Still warm (old shape) while the refresh is in flight.
+    expect(cache.isCached("users")).toBe(true);
+    await refresh;
+
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "name"]);
+    expect((await cache.indexes(null, "users")).length).toBe(1);
+  });
+
+  it("refreshBang clears the entry when the table no longer exists", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("gone", [makeColumn("id", "integer")]);
+    expect(cache.isCached("gone")).toBe(true);
+
+    const fakeConn = { dataSourceExists: async () => false };
+    await cache.refreshBang(new FakePool(fakeConn), "gone");
+    expect(cache.isCached("gone")).toBe(false);
+  });
+
+  it("refreshBang clears the entry when reflection fails", async () => {
+    // A transient failure (connection error / failed lease) should fall back to
+    // clearing so the next async load re-reflects rather than serving a
+    // now-untrustworthy entry. refreshBang swallows the error internally.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+    expect(cache.isCached("users")).toBe(true);
+
+    const fakeConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => {
+        throw new Error("boom");
+      },
+      indexes: async () => [],
+    };
+    await cache.refreshBang(new FakePool(fakeConn), "users");
+    expect(cache.isCached("users")).toBe(false);
+  });
+
+  it("refreshBang failure does not wipe a newer refresh's data", async () => {
+    // The failure fallback is generation-gated too: an older refresh that
+    // rejects AFTER a newer one has already written must NOT clear the fresh
+    // entry, or it would reintroduce the race on the error path.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+
+    let releaseSlow: () => void;
+    const slow = new Promise<void>((r) => (releaseSlow = r));
+    const failingOlderConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => {
+        await slow;
+        throw new Error("older refresh failed late");
+      },
+      indexes: async () => [],
+    };
+    const newerConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => [makeColumn("id", "integer"), makeColumn("fresh", "varchar(255)")],
+      indexes: async () => [],
+    };
+
+    const older = cache.refreshBang(new FakePool(failingOlderConn), "users");
+    const newer = cache.refreshBang(new FakePool(newerConn), "users");
+    await newer;
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+
+    // Older refresh now rejects — its gated fallback must not clear the entry.
+    releaseSlow!();
+    await older;
+    expect(cache.isCached("users")).toBe(true);
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+  });
+
+  it("refreshBang lets the latest-initiated refresh win regardless of resolution order", async () => {
+    // Two overlapping refreshes (e.g. a quick double reset): the second one is
+    // initiated later, so its result must win even if the first's DB round-trip
+    // resolves last — otherwise a stale reflection would clobber the newer one
+    // and leave the cache warm-but-stale with no further trigger to correct it.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+
+    // First (older) refresh: slow columns() that resolves after the second.
+    let releaseSlow: () => void;
+    const slow = new Promise<void>((r) => (releaseSlow = r));
+    const slowConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => {
+        await slow;
+        return [makeColumn("id", "integer"), makeColumn("stale", "varchar(255)")];
+      },
+      indexes: async () => [],
+    };
+    // Second (newer) refresh: resolves immediately with the winning shape.
+    const fastConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => [makeColumn("id", "integer"), makeColumn("fresh", "varchar(255)")],
+      indexes: async () => [],
+    };
+
+    const older = cache.refreshBang(new FakePool(slowConn), "users");
+    const newer = cache.refreshBang(new FakePool(fastConn), "users");
+    await newer;
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+
+    // Now let the older, stale refresh finish — it must no-op, not overwrite.
+    releaseSlow!();
+    await older;
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+  });
+
   it("records touched tables between recordTouchedTables and takeTouchedTables", () => {
     const cache = new SchemaCache();
     // No recording window: clears are not tracked.
