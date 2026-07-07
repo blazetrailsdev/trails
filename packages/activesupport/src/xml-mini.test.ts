@@ -144,11 +144,14 @@ describe("ToTagTest", () => {
 
   it("#to_tag accepts ActiveSupport::TimeWithZone types", () => {
     // A zoned wall-clock exposing #xmlschema (the TimeWithZone contract): its
-    // local offset is preserved, matching Rails' `time.xmlschema`.
-    const timeWithZone = {
-      xmlschema: () => "1993-02-24T13:00:00+01:00",
-    };
-    toTag("b", timeWithZone, options);
+    // local offset is preserved, matching Rails' `time.xmlschema`. Modeled as a
+    // class instance (like the real TimeWithZone), so it is a leaf, not a hash.
+    class TimeWithZone {
+      xmlschema() {
+        return "1993-02-24T13:00:00+01:00";
+      }
+    }
+    toTag("b", new TimeWithZone(), options);
     expect(builder.target()).toBe('<b type="dateTime">1993-02-24T13:00:00+01:00</b>');
   });
 

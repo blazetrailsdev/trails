@@ -151,7 +151,9 @@ function inferTypeName(value: unknown): string | undefined {
   ) {
     return "dateTime";
   }
-  return undefined;
+  // Rails: `type_name ||= value.class.name if value && !value.respond_to?(:to_str)`
+  // — an arbitrary object (no known mapping, not a string) is typed by its class.
+  return (value as { constructor?: { name?: string } }).constructor?.name;
 }
 
 /** `key.to_s`: a symbol key renders as its name, everything else via `String`. */
@@ -159,23 +161,18 @@ function keyToString(key: unknown): string {
   return typeof key === "symbol" ? (key.description ?? "") : String(key);
 }
 
+/**
+ * Whether a value is the trails analog of a Ruby `Hash` for `to_tag`. Rails
+ * only routes an object through `Hash#to_xml` (field expansion) when it
+ * `respond_to?(:to_xml)` — a plain Hash does, an arbitrary object does not.
+ * We mirror that by restricting the hash path to plain objects (`{}`-literals /
+ * null-prototype records); class instances fall through to the leaf path, where
+ * `inferTypeName` supplies `value.class.name` as their `type=` (xml_mini.rb:133).
+ */
 function isHash(value: unknown): value is Record<string, unknown> {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    !Array.isArray(value) &&
-    // boundary: a JS Date is a dateTime leaf, not a nested hash.
-    !(value instanceof Date) &&
-    !(value instanceof BigDecimal) &&
-    !(value instanceof Temporal.PlainDate) &&
-    !(value instanceof Temporal.PlainTime) &&
-    !(value instanceof Temporal.PlainDateTime) &&
-    !(value instanceof Temporal.Instant) &&
-    !(value instanceof Temporal.ZonedDateTime) &&
-    !(value instanceof Temporal.Duration) &&
-    typeof (value as { xmlschema?: unknown }).xmlschema !== "function" &&
-    typeof (value as { toXml?: unknown }).toXml !== "function"
-  );
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 /**
@@ -228,30 +225,37 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
 }
 
 /**
- * Emit an array as `<key type="array">` wrapping one child tag per element,
- * named for the singularized key. Mirrors: Array#to_xml routing through to_tag.
+ * Emit an array as `<root type="array">` wrapping one child tag per element.
+ *
+ * Mirrors: Array#to_xml (conversions.rb:200-207) — the root is renamed first,
+ * then the child name is `root.singularize` of the *renamed* root, so a
+ * `camelize`/`dasherize` root propagates to the children. `toTag` renames each
+ * child again, matching Rails' `to_tag(children, value, options)`.
  */
 function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void {
-  const name = String(key);
-  options.builder.openTag(name, options.skipTypes ? {} : { type: "array" });
-  const child = singularize(name);
+  const root = renameKey(keyToString(key), options);
+  options.builder.openTag(root, options.skipTypes ? {} : { type: "array" });
+  const children = singularize(root);
   for (const item of values) {
-    toTag(child, item, { ...options, type: undefined, root: child });
+    toTag(children, item, { ...options, type: undefined, root: children });
   }
-  options.builder.closeTag(name);
+  options.builder.closeTag(root);
 }
 
 /**
- * Emit a hash as `<key>` wrapping one tag per entry. Mirrors: Hash#to_xml
- * routing through to_tag — the wrapper carries no `type=`, entries are renamed.
+ * Emit a hash as `<root>` wrapping one tag per entry.
+ *
+ * Mirrors: Hash#to_xml (conversions.rb:85-90) — the root is renamed before it
+ * is opened (the wrapper carries no `type=`), and each entry routes through
+ * `to_tag`, which renames the entry key.
  */
 function emitHash(key: unknown, hash: Record<string, unknown>, options: ToTagOptions): void {
-  const name = String(key);
-  options.builder.openTag(name, {});
+  const root = renameKey(keyToString(key), options);
+  options.builder.openTag(root, {});
   for (const [k, v] of Object.entries(hash)) {
     toTag(k, v, { ...options, type: undefined, root: k });
   }
-  options.builder.closeTag(name);
+  options.builder.closeTag(root);
 }
 
 /**
