@@ -588,7 +588,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     cacheAssoc(company, "clients", [client]);
     const saved = await company.save();
     expect(saved).toBe(true);
-    expect(Number(client.client_of)).toBe(Number(company.id));
+    expect(client.client_of).toBe(company.id);
   });
 
   it("parent should not get saved with duplicate children records", async () => {
@@ -620,7 +620,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const saved = await company.save();
     expect(saved).toBe(true);
     expect(client.isNewRecord()).toBe(false);
-    expect(Number(client.client_of)).toBe(Number(company.id));
+    expect(client.client_of).toBe(company.id);
   });
 
   it("assign ids", async () => {
@@ -1087,7 +1087,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     cacheAssoc(firm, "account", account);
     await firm.save();
     expect(account.isNewRecord()).toBe(false);
-    expect(Number(account.firm_id)).toBe(Number(firm.id));
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("build before either saved", async () => {
@@ -1098,7 +1098,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     await firm.save();
     expect(firm.isNewRecord()).toBe(false);
     expect(account.isNewRecord()).toBe(false);
-    expect(Number(account.firm_id)).toBe(Number(firm.id));
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("assignment before parent saved", async () => {
@@ -1107,7 +1107,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const account = new Account({ credit_limit: 300 });
     cacheAssoc(firm, "account", account);
     await firm.save();
-    expect(Number(account.firm_id)).toBe(Number(firm.id));
+    expect(account.firm_id).toBe(firm.id);
   });
 
   it("assignment before either saved", async () => {
@@ -1445,7 +1445,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(log).toContain("before_save");
     expect(log).toContain("after_save");
     expect(child.isNewRecord()).toBe(false);
-    expect(Number(child._readAttribute("employable_id"))).toBe(Number(parent.id));
+    expect(child._readAttribute("employable_id")).toBe(parent.id);
     expect(child._readAttribute("employable_type")).toBe("PolyParent");
   });
   it("callbacks on child when child autosaves parent", async () => {
@@ -1562,7 +1562,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     expect(log).toContain("parent_before_save");
     expect(log).toContain("parent_after_save");
     expect(parent.isNewRecord()).toBe(false);
-    expect(Number(child._readAttribute("employable_id"))).toBe(Number(parent.id));
+    expect(child._readAttribute("employable_id")).toBe(parent.id);
     expect(child._readAttribute("employable_type")).toBe("PolyAsParent");
   });
 
@@ -1572,7 +1572,7 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     const account = await Account.create({ credit_limit: 600, firm_id: firm.id });
     cacheAssoc(firm, "account", account);
     await firm.save();
-    expect(Number(account.firm_id)).toBe(Number(firm.id));
+    expect(account.firm_id).toBe(firm.id);
   });
 });
 
@@ -1622,7 +1622,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
     expect(ship.isNewRecord()).toBe(false);
-    expect(Number(ship.pirate_id)).toBe(Number(pirate.id));
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it("changed for autosave should handle cycles", async () => {
@@ -1982,7 +1982,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     cacheAssoc(cake, "chef", chef);
     await cake.save();
     expect(chef._readAttribute("employable_type")).toBe("SwapCakeDesigner");
-    expect(Number(chef._readAttribute("employable_id"))).toBe(Number(cake.id));
+    expect(chef._readAttribute("employable_id")).toBe(cake.id);
 
     // Reassign chef to drink — polymorphic type column flips even when
     // employable_id may collide. autosave on drink should re-persist the chef.
@@ -1990,7 +1990,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     cacheAssoc(drink, "chef", chef);
     await drink.save();
     expect(chef._readAttribute("employable_type")).toBe("SwapDrinkDesigner");
-    expect(Number(chef._readAttribute("employable_id"))).toBe(Number(drink.id));
+    expect(chef._readAttribute("employable_id")).toBe(drink.id);
   });
 });
 
@@ -2129,7 +2129,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     cacheAssoc(post, "author", author);
     await post.save();
     expect(author.isNewRecord()).toBe(false);
-    expect(Number(post.author_id)).toBe(Number(author.id));
+    expect(post.author_id).toBe(author.id);
   });
 
   it("assignment before either saved", async () => {
@@ -2150,7 +2150,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     await post.save();
     expect(post.isNewRecord()).toBe(false);
     expect(author.isNewRecord()).toBe(false);
-    expect(Number(post.author_id)).toBe(Number(author.id));
+    expect(post.author_id).toBe(author.id);
   });
 
   it("store association in two relations with one save", async () => {
@@ -2162,19 +2162,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     setBilling(order, customer);
     setShipping(order, customer);
     expect(await order.save()).toBe(true);
-    expect(Number(((await order.association("billing").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
-    expect(Number(((await order.association("shipping").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
     await order.reload();
-    expect(Number(((await order.association("billing").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
-    expect(Number(((await order.association("shipping").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
     expect(await Order.count()).toBe(numOrders + 1);
     expect(await Customer.count()).toBe(numCustomers + 1);
   });
@@ -2187,19 +2179,11 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     setBilling(order, customer);
     setShipping(order, customer);
     expect(await order.save()).toBe(true);
-    expect(Number(((await order.association("billing").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
-    expect(Number(((await order.association("shipping").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
     await order.reload();
-    expect(Number(((await order.association("billing").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
-    expect(Number(((await order.association("shipping").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
     expect(await Order.count()).toBe(numOrders + 1);
     expect(await Customer.count()).toBe(numCustomers + 1);
   });
@@ -2212,24 +2196,16 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     setBilling(order, customer);
     setShipping(order, customer);
     expect(await order.save()).toBe(true);
-    expect(Number(((await order.association("billing").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
-    expect(Number(((await order.association("shipping").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
     await order.reload();
     customer = new Customer({ name: "C2" });
     setBilling(order, customer);
     setShipping(order, customer);
     expect(await order.save()).toBe(true);
     await order.reload();
-    expect(Number(((await order.association("billing").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
-    expect(Number(((await order.association("shipping").loadTarget()) as Base).id)).toBe(
-      Number(customer.id),
-    );
+    expect(((await order.association("billing").loadTarget()) as Base).id).toBe(customer.id);
+    expect(((await order.association("shipping").loadTarget()) as Base).id).toBe(customer.id);
     expect(await Order.count()).toBe(numOrders + 1);
     expect(await Customer.count()).toBe(numCustomers + 2);
   });
@@ -2263,7 +2239,7 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     setBelongsTo(sponsor, "sponsorable", member, { polymorphic: true });
     await sponsor.save();
     const reloaded = await PolySponsor.find(sponsor.id!);
-    expect(Number(reloaded.sponsorable_id)).toBe(Number(member.id));
+    expect(reloaded.sponsorable_id).toBe(member.id);
     expect(reloaded.sponsorable_type).toBe("PolyMember");
   });
 
@@ -2401,7 +2377,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
     expect(pirate.isNewRecord()).toBe(false);
-    expect(Number(ship.pirate_id)).toBe(Number(pirate.id));
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it("should automatically save bang the associated model", async () => {
@@ -2519,7 +2495,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     const ship = new Ship({ name: "FK", pirate_id: pirate.id });
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
-    expect(Number(ship.pirate_id)).toBe(Number(pirate.id));
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it("should save if previously saved", async () => {
@@ -2860,7 +2836,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await pirate.save();
     expect(pirate.catchphrase).toBe("Ahoy!");
     expect(ship.isNewRecord()).toBe(false);
-    expect(Number(ship.pirate_id)).toBe(Number(pirate.id));
+    expect(ship.pirate_id).toBe(pirate.id);
   });
 
   it("autosave does not pass through non custom validation contexts", async () => {
@@ -2995,7 +2971,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await author.save();
     expect(book.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
-    expect(Number(book.author_id)).toBe(Number(author.id));
+    expect(book.author_id).toBe(author.id);
   });
 
   it("autosave has one association callbacks get called once", async () => {
@@ -3036,7 +3012,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await user.save();
     expect(profile.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
-    expect(Number(profile.author_id)).toBe(Number(user.id));
+    expect(profile.author_id).toBe(user.id);
   });
 
   it("autosave belongs to association callbacks get called once", async () => {
@@ -3077,7 +3053,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     await post.save();
     expect(author.isNewRecord()).toBe(false);
     expect(saveCount).toBe(1);
-    expect(Number(post.author_id)).toBe(Number(author.id));
+    expect(post.author_id).toBe(author.id);
   });
 
   it("default belongs_to saves new associated record and propagates the FK", async () => {
@@ -3116,7 +3092,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     cacheAssoc(post, "author", author);
     await post.save();
     expect(author.isNewRecord()).toBe(false);
-    expect(Number(post.author_id)).toBe(Number(author.id));
+    expect(post.author_id).toBe(author.id);
   });
 
   it("belongs_to autosave with mismatched composite FK/PK uses zip semantics", async () => {
@@ -3160,7 +3136,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     cacheAssoc(child, "parent", parent);
     await child.save();
     expect(parent.isNewRecord()).toBe(false);
-    expect(Number(child.parent_id)).toBe(Number(parent.id));
+    expect(child.parent_id).toBe(parent.id);
     // Trailing FK "group" was dropped from the zip; the existing
     // owner value must survive untouched (no overwrite to undefined/null).
     expect(child.group).toBe("us-west");
@@ -3251,7 +3227,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     cacheAssoc(child, "parent", parent);
     await child.save();
     expect(parent.isNewRecord()).toBe(false);
-    expect(Number(child.author_id)).toBe(Number(parent.id));
+    expect(child.author_id).toBe(parent.id);
     // The dropped ("name", nil) pair didn't attempt to write — no throw,
     // no spurious column write.
   });
@@ -4043,7 +4019,7 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
     await pirate.save();
     expect(log).toContain("pirate_created");
     expect(pirate.isNewRecord()).toBe(false);
-    expect(Number(ship.pirate_id)).toBe(Number(pirate.id));
+    expect(ship.pirate_id).toBe(pirate.id);
     expect(ship.isNewRecord()).toBe(false);
   });
 
@@ -4653,7 +4629,7 @@ describe("should update children when autosave is true and parent is new but chi
     expect(parent.isNewRecord()).toBe(false);
     const reloaded = await UcChild.find(child.id);
     expect(reloaded.name).toBe("updated");
-    expect(Number(reloaded.readAttribute("author_id"))).toBe(Number(parent.id));
+    expect(reloaded.readAttribute("author_id")).toBe(parent.id);
   });
   it("should automatically save the associated models", async () => {
     class NAutoTag extends Base {

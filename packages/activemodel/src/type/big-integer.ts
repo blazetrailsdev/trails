@@ -22,12 +22,24 @@ export class BigIntegerType extends IntegerType {
     return Number.POSITIVE_INFINITY;
   }
 
-  /** @internal Rails-private helper. */
+  /**
+   * @internal Rails-private helper.
+   *
+   * Ruby has a single unbounded `Integer`, so Rails represents every id the
+   * same way regardless of magnitude. Trails is `number`-backed, so we keep a
+   * safe-range integer (`[MIN_SAFE_INTEGER, MAX_SAFE_INTEGER]`) as a plain JS
+   * `number` and only carry a `bigint` (under a `number` cast) for genuine
+   * bignums beyond float64's exact-integer range. This matches
+   * `IntegerType#castValue` and gives pg/MariaDB the same "safe-range integer
+   * is a number" contract better-sqlite3/mysql2 already honor, so a default
+   * `bigint` PK, `pluck`, collection `ids`, and an `integer` FK holding the
+   * same value all compare `===`.
+   */
   protected override castValue(value: unknown): number | null {
-    if (typeof value === "bigint") return value as unknown as number;
+    if (typeof value === "bigint") return this.narrow(value);
     if (typeof value === "number") {
       if (isNaN(value) || !isFinite(value)) return null;
-      return BigInt(Math.trunc(value)) as unknown as number;
+      return this.narrow(BigInt(Math.trunc(value)));
     }
     if (typeof value === "string") {
       const trimmed = value.trim();
@@ -38,9 +50,20 @@ export class BigIntegerType extends IntegerType {
       // BigInt() rejects a leading "+"; strip it first.
       const lead = trimmed.match(/^([+-]?\d+)/)?.[1];
       if (!lead) return null;
-      return BigInt(lead.startsWith("+") ? lead.slice(1) : lead) as unknown as number;
+      return this.narrow(BigInt(lead.startsWith("+") ? lead.slice(1) : lead));
     }
     return super.castValue(value);
+  }
+
+  /**
+   * Collapse a `bigint` to a JS `number` when it fits float64's safe-integer
+   * range; otherwise keep the `bigint` (carried under a `number` cast, the
+   * technique the type primitives use to stay `ValueType<number>`-backed while
+   * preserving precision for out-of-range bignums).
+   */
+  private narrow(value: bigint): number {
+    const num = Number(value);
+    return Number.isSafeInteger(num) ? num : (value as unknown as number);
   }
 
   override serialize(value: unknown): unknown {
