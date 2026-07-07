@@ -294,6 +294,9 @@ export interface TrailsAdapterOptions {
   // Mirrors: database.yml `advisory_locks` — set false to disable advisory
   // locking (read by `advisoryLocksEnabled?`). Defaults to true.
   advisoryLocks?: boolean | string;
+  // Mirrors: database.yml `foreign_keys` — set false to disable foreign-key DDL
+  // (read by `foreignKeysEnabled?` / `isUseForeignKeys`). Defaults to true.
+  foreignKeys?: boolean;
 }
 
 /**
