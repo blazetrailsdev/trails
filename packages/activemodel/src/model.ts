@@ -2420,23 +2420,28 @@ export class Model {
       } else if (Array.isArray(value)) {
         const tag = renameKey(tagKey, renameOptions);
         const arrayType = skipTypes ? "" : ` type="array"`;
-        xml += `${indent}<${tag}${arrayType}>\n`;
-        // Array children are named for the singularized (renamed) root, per
-        // Array#to_xml (`children = root.singularize`) — e.g. `<tag>` under
-        // `<tags type="array">`, not a generic `<item>`.
-        const children = singularize(tag);
-        const itemBuilder = leafBuilder(indent + "  ");
-        for (const item of value) {
-          if (isPlainRecord(item)) {
-            xml += `${indent}  <${children}>\n${this._hashToXml(item, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </${children}>\n`;
-          } else {
-            // Route every scalar element through `toTag` so it keeps Rails'
-            // inferred `type=`, `nil="true"`, and per-type formatting (a Date
-            // element stays a `dateTime` leaf, not an expanded hash).
-            toTag(children, item, { builder: itemBuilder, skipTypes, ...renameOptions });
+        if (value.length === 0) {
+          // Rails emits an empty array as the self-closing `<tag type="array"/>`.
+          xml += `${indent}<${tag}${arrayType}/>\n`;
+        } else {
+          xml += `${indent}<${tag}${arrayType}>\n`;
+          // Array children are named for the singularized (renamed) root, per
+          // Array#to_xml (`children = root.singularize`) — e.g. `<tag>` under
+          // `<tags type="array">`, not a generic `<item>`.
+          const children = singularize(tag);
+          const itemBuilder = leafBuilder(indent + "  ");
+          for (const item of value) {
+            if (isPlainRecord(item)) {
+              xml += `${indent}  <${children}>\n${this._hashToXml(item, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </${children}>\n`;
+            } else {
+              // Route every scalar element through `toTag` so it keeps Rails'
+              // inferred `type=`, `nil="true"`, and per-type formatting (a Date
+              // element stays a `dateTime` leaf, not an expanded hash).
+              toTag(children, item, { builder: itemBuilder, skipTypes, ...renameOptions });
+            }
           }
+          xml += `${indent}</${tag}>\n`;
         }
-        xml += `${indent}</${tag}>\n`;
       } else if (typeof value === "number") {
         // ActiveModel serializes every JS `number` as `integer` (it cannot see
         // the DB scale); a float column supplies its cast type explicitly.

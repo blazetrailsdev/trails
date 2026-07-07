@@ -190,4 +190,16 @@ describe("ToTagTest", () => {
     toTag(Symbol("New   York"), 33, options);
     expect(builder.target()).toBe('<New---York type="integer">33</New---York>');
   });
+
+  // trails coverage beyond Rails' ToTagTest, exercising the XmlMini `binary`
+  // formatter/encoding and the empty-array self-closing form.
+  it("#to_tag base64-encodes binary types and sets the encoding attribute", () => {
+    toTag("b", "hello", { ...options, type: "binary" });
+    expect(builder.target()).toBe('<b type="binary" encoding="base64">aGVsbG8=\n</b>');
+  });
+
+  it("#to_tag emits an empty array as a self-closing tag", () => {
+    toTag("b", [], options);
+    expect(builder.target()).toBe('<b type="array"/>');
+  });
 });

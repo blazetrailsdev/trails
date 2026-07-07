@@ -96,7 +96,20 @@ const FORMATTING: Record<string, (value: unknown) => string> = {
   time: (value) => (value instanceof Temporal.PlainTime ? value.toString() : String(value)),
   dateTime: formatDateTime,
   duration: (value) => (value instanceof Temporal.Duration ? value.toString() : String(value)),
+  binary: encode64,
 };
+
+/**
+ * Base64-encode binary content, mirroring Ruby's `Base64.encode64`: MIME line
+ * wrapping at 60 characters, each line (including the last) terminated by `\n`.
+ * Accepts a byte array or a binary (Latin-1) string, matching how Rails' binary
+ * columns arrive.
+ */
+function encode64(value: unknown): string {
+  const bytes =
+    typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value as Uint8Array);
+  return bytes.toString("base64").replace(/(.{60})/g, "$1\n") + "\n";
+}
 
 function formatDateTime(value: unknown): string {
   // boundary: legacy JS Date values serialize as ISO 8601 dateTime.
@@ -238,7 +251,14 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
  */
 function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void {
   const root = renameKey(keyToString(key), options);
-  options.builder.openTag(root, options.skipTypes ? {} : { type: "array" });
+  const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
+  // Rails special-cases an empty array to `builder.tag!(root, attributes)` with
+  // no block — the self-closing `<root type="array"/>` form.
+  if (values.length === 0) {
+    options.builder.tag(root, undefined, attributes);
+    return;
+  }
+  options.builder.openTag(root, attributes);
   const children = options.children ?? singularize(root);
   for (const item of values) {
     toTag(children, item, { ...options, type: undefined, children: undefined, root: children });
