@@ -3,7 +3,6 @@ import { assertValidKeys } from "@blazetrails/activesupport";
 
 import { arelColumns } from "./query-methods.js";
 import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
-import { reflectOnAllAssociations } from "../reflection.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -103,9 +102,9 @@ export class Merger {
     }
 
     const otherName = this.other._modelClass?.name;
-    const reflection = reflectOnAllAssociations(rel._modelClass).find(
-      (r: any) => r.className === otherName,
-    );
+    const reflection = rel._modelClass
+      .reflectOnAllAssociations()
+      .find((r: any) => r.className === otherName);
     if (!reflection) return;
 
     if (otherPreloads.length > 0) {
