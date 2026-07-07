@@ -13,9 +13,10 @@
  * drops it in a finally.
  *
  * test_serial_sequence / test_default_sequence_name run against the canonical
- * `accounts` table ("public.accounts_id_seq"), as in Rails, loaded through the
- * `fixtures(["accounts"])` helper (Rails' ambient `accounts` fixture, with
- * `use_transactional_tests = false`). The `error.connection_pool`
+ * `accounts` table ("public.accounts_id_seq"), as in Rails, where the table is
+ * laid globally by test/schema/schema.rb. trails provisions it through the
+ * canonical `fixtures(["accounts"])` surface, scoped to just those two tests so
+ * the rest of the file doesn't seed it. The `error.connection_pool`
  * (NullPool / pool identity) assertions from Rails' connection-error,
  * serial-sequence, and invalid-index tests are ported faithfully — a standalone
  * trails adapter carries a NullPool that connect-time and query-time errors
@@ -104,13 +105,6 @@ async function withExtensionEnabled(
 }
 
 describeIfPg("PostgreSQLAdapter", () => {
-  // Rails' PostgreSQLAdapterTest runs with `use_transactional_tests = false`
-  // and the ambient `accounts` fixture (test_serial_sequence /
-  // test_default_sequence_name assert `public.accounts_id_seq`). Load the
-  // canonical `accounts` through the fixtures helper on the shared connection —
-  // the same physical DB the standalone `adapter` below connects to.
-  fixtures(["accounts"], { useTransactionalTests: false });
-
   let adapter: PostgreSQLAdapter;
   let savedWarningsAction: typeof PostgreSQLAdapter.dbWarningsAction;
   let savedWarningsIgnore: typeof PostgreSQLAdapter.dbWarningsIgnore;
@@ -337,19 +331,27 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
-    it("serial sequence", async () => {
-      expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
-      const error = await adapter.serialSequence("zomg", "id").then(
-        () => null,
-        (e) => e,
-      );
-      expect(error).toBeInstanceOf(StatementInvalid);
-      expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
-    });
+    // Rails' `accounts` table exists globally from test/schema/schema.rb; these
+    // two tests read only the `id` column's sequence, no fixture rows. Provision
+    // the canonical `accounts` through the fixtures helper scoped to just this
+    // pair (not the whole file) so the ~60 unrelated tests don't seed/reseed it.
+    describe("serial_sequence", () => {
+      fixtures(["accounts"], { useTransactionalTests: false });
 
-    it("default sequence name", async () => {
-      expect(await adapter.defaultSequenceName("accounts", "id")).toBe("public.accounts_id_seq");
-      expect(await adapter.defaultSequenceName("accounts")).toBe("public.accounts_id_seq");
+      it("serial sequence", async () => {
+        expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
+        const error = await adapter.serialSequence("zomg", "id").then(
+          () => null,
+          (e) => e,
+        );
+        expect(error).toBeInstanceOf(StatementInvalid);
+        expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
+      });
+
+      it("default sequence name", async () => {
+        expect(await adapter.defaultSequenceName("accounts", "id")).toBe("public.accounts_id_seq");
+        expect(await adapter.defaultSequenceName("accounts")).toBe("public.accounts_id_seq");
+      });
     });
 
     it("default sequence name bad table", async () => {
