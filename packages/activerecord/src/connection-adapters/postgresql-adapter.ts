@@ -49,6 +49,7 @@ import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
+  AdapterError,
   ConnectionFailed,
   ConnectionNotEstablished,
   DatabaseAlreadyExists,
@@ -1177,7 +1178,21 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // ConnectionNotEstablished / NoDatabaseError (mirrors Rails' connect →
       // new_client) rather than surfacing the raw pg driver error. newClient
       // tears the partial client down on failure.
-      const newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
+      let newClient: pg.Client;
+      try {
+        newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
+      } catch (error) {
+        // Mirrors Rails' `PostgreSQLAdapter#connect`: `rescue
+        // ConnectionNotEstablished => ex; raise ex.set_pool(@pool)`. Rails
+        // rescues ONLY ConnectionNotEstablished (which includes
+        // DatabaseConnectionError). A NoDatabaseError from new_client is a
+        // StatementInvalid, which Rails' connect does not rescue — it
+        // propagates with connection_pool == nil — so it must not be stamped.
+        if (error instanceof ConnectionNotEstablished) {
+          error.setPool(this.pool);
+        }
+        throw error;
+      }
       // Guard against a close / disconnect / discard / reconnect
       // that raced with the in-flight connect(). If the adapter was
       // torn down between the await above and this point, do NOT
@@ -4169,60 +4184,73 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * `ConnectionAdapters::PostgreSQL::DatabaseStatements#translate_exception`.
    */
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
-    const code = (e as { code?: string }).code;
-    const msg = e.message;
-    const cause = e;
-    switch (code) {
-      case "23505": // unique_violation
-        return new RecordNotUnique(msg, { sql, binds, cause });
-      case "23503": // foreign_key_violation
-        return new InvalidForeignKey(msg, { sql, binds, cause });
-      case "23502": // not_null_violation
-        return new NotNullViolation(msg, { sql, binds, cause });
-      case "22001": // string_data_right_truncation
-        return new ValueTooLong(msg, { sql, binds, cause });
-      case "22003": // numeric_value_out_of_range
-        return new ActiveRecordRangeError(msg, { sql, binds, cause });
-      case "40001": // serialization_failure
-        return new SerializationFailure(msg, { sql, binds, cause });
-      case "40P01": // deadlock_detected
-        return new Deadlocked(msg, { sql, binds, cause });
-      case "42P04": // duplicate_database
-        return new DatabaseAlreadyExists(msg, { sql, binds, cause });
-      case "55P03": // lock_not_available
-        return new LockWaitTimeout(msg, { sql, binds, cause });
-      case "57014": // query_canceled
-        return new QueryCanceled(msg, { sql, binds, cause });
-      case "57P01": // admin_shutdown (pg_terminate_backend or server restart)
-        return new ConnectionNotEstablished(msg, { cause });
-      default:
-        // A severed connection (08xxx, "Connection terminated", pg's
-        // "Client has encountered a connection error", …) surfaces as a
-        // generic Error or non-DatabaseError; map it to ConnectionNotEstablished
-        // so callers see the lost connection rather than a raw driver error.
-        //
-        // Rails' translate_exception (postgresql_adapter.rb:801-821) additionally
-        // splits a libpq PG::ConnectionBad whose message ends with "\n" into
-        // ConnectionFailed (vs ConnectionNotEstablished for the pg-internal case).
-        // That distinction is a libpq PQerrorMessage artifact; node-pg is pure JS
-        // with no libpq layer and doesn't carry the pg-internal/libpq split, so
-        // there is no reliable signal to reproduce it — every severed-connection
-        // error maps to ConnectionNotEstablished here.
-        if (PostgreSQLAdapter._isConnectionError(e)) {
+    const build = (): Error => {
+      if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
+      const code = (e as { code?: string }).code;
+      const msg = e.message;
+      const cause = e;
+      switch (code) {
+        case "23505": // unique_violation
+          return new RecordNotUnique(msg, { sql, binds, cause });
+        case "23503": // foreign_key_violation
+          return new InvalidForeignKey(msg, { sql, binds, cause });
+        case "23502": // not_null_violation
+          return new NotNullViolation(msg, { sql, binds, cause });
+        case "22001": // string_data_right_truncation
+          return new ValueTooLong(msg, { sql, binds, cause });
+        case "22003": // numeric_value_out_of_range
+          return new ActiveRecordRangeError(msg, { sql, binds, cause });
+        case "40001": // serialization_failure
+          return new SerializationFailure(msg, { sql, binds, cause });
+        case "40P01": // deadlock_detected
+          return new Deadlocked(msg, { sql, binds, cause });
+        case "42P04": // duplicate_database
+          return new DatabaseAlreadyExists(msg, { sql, binds, cause });
+        case "55P03": // lock_not_available
+          return new LockWaitTimeout(msg, { sql, binds, cause });
+        case "57014": // query_canceled
+          return new QueryCanceled(msg, { sql, binds, cause });
+        case "57P01": // admin_shutdown (pg_terminate_backend or server restart)
           return new ConnectionNotEstablished(msg, { cause });
-        }
-        // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
-        // 5-char shape alone isn't enough — Node system errors like
-        // `EPIPE` / `EBADF` also match it, so gating on
-        // instanceof pg.DatabaseError avoids re-tagging socket /
-        // network failures as StatementInvalid with misleading
-        // sql/binds attached.
-        if (e instanceof pg.DatabaseError && e instanceof StatementInvalid === false) {
-          return new StatementInvalid(msg, { sql, binds, cause });
-        }
-        return e;
+        default:
+          // A severed connection (08xxx, "Connection terminated", pg's
+          // "Client has encountered a connection error", …) surfaces as a
+          // generic Error or non-DatabaseError; map it to ConnectionNotEstablished
+          // so callers see the lost connection rather than a raw driver error.
+          //
+          // Rails' translate_exception (postgresql_adapter.rb:801-821) additionally
+          // splits a libpq PG::ConnectionBad whose message ends with "\n" into
+          // ConnectionFailed (vs ConnectionNotEstablished for the pg-internal case).
+          // That distinction is a libpq PQerrorMessage artifact; node-pg is pure JS
+          // with no libpq layer and doesn't carry the pg-internal/libpq split, so
+          // there is no reliable signal to reproduce it — every severed-connection
+          // error maps to ConnectionNotEstablished here.
+          if (PostgreSQLAdapter._isConnectionError(e)) {
+            return new ConnectionNotEstablished(msg, { cause });
+          }
+          // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
+          // 5-char shape alone isn't enough — Node system errors like
+          // `EPIPE` / `EBADF` also match it, so gating on
+          // instanceof pg.DatabaseError avoids re-tagging socket /
+          // network failures as StatementInvalid with misleading
+          // sql/binds attached.
+          if (e instanceof pg.DatabaseError && e instanceof StatementInvalid === false) {
+            return new StatementInvalid(msg, { sql, binds, cause });
+          }
+          return e;
+      }
+    };
+    const translated = build();
+    // Mirrors Rails' PostgreSQLAdapter#translate_exception, which builds every
+    // translated error with `connection_pool: @pool`. For a standalone adapter
+    // that pool is a NullPool. Use setPool/setConnectionPool (both guarded) so
+    // a pool attached at raise-time isn't overwritten.
+    if (translated instanceof ConnectionNotEstablished) {
+      translated.setPool(this.pool);
+    } else if (translated instanceof AdapterError) {
+      translated.setConnectionPool(this.pool);
     }
+    return translated;
   }
 
   async dropDatabase(name: string): Promise<void> {

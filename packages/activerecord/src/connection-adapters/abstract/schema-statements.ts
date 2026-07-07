@@ -1498,9 +1498,12 @@ export class SchemaStatements {
       if (options?.valid !== undefined && (idx as { valid?: boolean }).valid !== options.valid)
         return false;
       if (targetCols == null) return true;
-      return (
-        targetCols.length === idx.columns.length && targetCols.every((c, i) => c === idx.columns[i])
-      );
+      // Mirrors Rails `Array(self.columns) == Array(columns).map(&:to_s)`:
+      // an expression index carries its columns as a single String, which
+      // `Array()` wraps into a one-element array, so a matching expression
+      // passed as `column_name` compares equal.
+      const idxCols = Array.isArray(idx.columns) ? idx.columns : [idx.columns];
+      return targetCols.length === idxCols.length && targetCols.every((c, i) => c === idxCols[i]);
     });
   }
 

@@ -12,32 +12,21 @@
  * `withExampleTable`: it creates the ephemeral `ex` table, runs the block, and
  * drops it in a finally.
  *
- * Tracked deviations (RFC 0023 surfaced-deviations, story
- * pg-adapter-test-port-surfaced-deviations):
- *   - test_connection_error / test_reconnection_error /
- *     test_reconnect_after_bad_connection_on_check_version / test_bad_connection
- *     / test_bad_connection_to_postgres_database / test_serial_sequence /
- *     test_invalid_index assert on `error.connection_pool` (NullPool / pool
- *     identity). A standalone trails adapter connects lazily and wraps a
- *     `pg.Client`, so those pool-identity assertions are not applicable; the
- *     bodies exercise the equivalent trails path and assert the translated error
- *     class instead.
- *   - test_serial_sequence / test_default_sequence_name use the ambient
- *     `accounts` fixture ("public.accounts_id_seq"). trails adapter tests have
- *     no ambient fixtures, and recreating the shared canonical `accounts` in
- *     the parallel PG lane would corrupt sibling suites, so the identical
- *     sequence-name derivation is exercised against the ephemeral `ex` table
- *     ("public.ex_id_seq").
- *   - test_expression_index also asserts
- *     `index_exists?(expr, name: "expression") == true`; trails `indexExists`
- *     returns false for expression indexes. That sub-assertion is deferred
- *     pending an impl fix; the index columns are asserted faithfully. See story
- *     pg-adapter-test-port-surfaced-deviations.
+ * test_serial_sequence / test_default_sequence_name run against the canonical
+ * `accounts` table ("public.accounts_id_seq"), as in Rails, where the table is
+ * laid globally by test/schema/schema.rb. trails provisions it through the
+ * canonical `fixtures(["accounts"])` surface, scoped to just those two tests so
+ * the rest of the file doesn't seed it. The `error.connection_pool`
+ * (NullPool / pool identity) assertions from Rails' connection-error,
+ * serial-sequence, and invalid-index tests are ported faithfully — a standalone
+ * trails adapter carries a NullPool that connect-time and query-time errors
+ * surface via `connection_pool`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,
@@ -46,6 +35,7 @@ import {
   SQLWarning,
   StatementInvalid,
 } from "../../errors.js";
+import { NullPool } from "../../connection-adapters/abstract/connection-pool.js";
 import { QueryAttribute } from "../../relation/query-attribute.js";
 import { Value, Integer } from "../../type.js";
 import { withSecondAdapter } from "../../test-helpers/second-connection.js";
@@ -141,7 +131,12 @@ describeIfPg("PostgreSQLAdapter", () => {
   describe("PostgreSQLAdapterTest", () => {
     it("connection error", async () => {
       const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
-      await expect(bad.execute("SELECT 1")).rejects.toThrow();
+      const error = await bad.execute("SELECT 1").then(
+        () => null,
+        (e) => e,
+      );
+      expect(error).toBeInstanceOf(ConnectionNotEstablished);
+      expect((error as ConnectionNotEstablished).connectionPool).toBeInstanceOf(NullPool);
       await bad.close();
     });
 
@@ -163,8 +158,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         .mockImplementation((() => fakeClient) as never);
       const a = new PostgreSQLAdapter(PG_TEST_URL);
       try {
-        await expect(a.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionNotEstablished);
-        await expect(a.execute("SELECT 1")).rejects.toThrow("actual bad connection error");
+        const error = await a.execute("SELECT 1").then(
+          () => null,
+          (e) => e,
+        );
+        expect(error).toBeInstanceOf(ConnectionNotEstablished);
+        expect((error as Error).message).toContain("actual bad connection error");
+        expect((error as ConnectionNotEstablished).connectionPool).toBe(a.pool);
       } finally {
         clientSpy.mockRestore();
         await a.close().catch(() => {});
@@ -179,7 +179,11 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("bad connection to postgres database", async () => {
       const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
-      await expect(bad.execute("SELECT 1")).rejects.toThrow();
+      const error = await bad.execute("SELECT 1").then(
+        () => null,
+        (e) => e,
+      );
+      expect((error as ConnectionNotEstablished).connectionPool).toBe(bad.pool);
       await bad.close();
     });
 
@@ -327,17 +331,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
-    it("serial sequence", async () => {
-      await withExampleTable(adapter, async () => {
-        expect(await adapter.serialSequence("ex", "id")).toBe("public.ex_id_seq");
-        await expect(adapter.serialSequence("zomg", "id")).rejects.toBeInstanceOf(StatementInvalid);
-      });
-    });
+    // Rails' `accounts` table exists globally from test/schema/schema.rb; these
+    // two tests read only the `id` column's sequence, no fixture rows. Provision
+    // the canonical `accounts` through the fixtures helper scoped to just this
+    // pair (not the whole file) so the ~60 unrelated tests don't seed/reseed it.
+    describe("serial_sequence", () => {
+      fixtures(["accounts"], { useTransactionalTests: false });
 
-    it("default sequence name", async () => {
-      await withExampleTable(adapter, async () => {
-        expect(await adapter.defaultSequenceName("ex", "id")).toBe("public.ex_id_seq");
-        expect(await adapter.defaultSequenceName("ex")).toBe("public.ex_id_seq");
+      it("serial sequence", async () => {
+        expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
+        const error = await adapter.serialSequence("zomg", "id").then(
+          () => null,
+          (e) => e,
+        );
+        expect(error).toBeInstanceOf(StatementInvalid);
+        expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
+      });
+
+      it("default sequence name", async () => {
+        expect(await adapter.defaultSequenceName("accounts", "id")).toBe("public.accounts_id_seq");
+        expect(await adapter.defaultSequenceName("accounts")).toBe("public.accounts_id_seq");
       });
     });
 
@@ -569,8 +582,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         await adapter.addIndex("ex", expr, { name: "expression" });
         const index = (await adapter.indexes("ex")).find((idx) => idx.name === "expression");
         expect(index!.columns).toBe(expr);
-        // Deferred: Rails also asserts index_exists?(expr, name: "expression") == true;
-        // trails indexExists returns false for expression indexes (see header).
+        expect(await adapter.indexExists("ex", expr, { name: "expression" })).toBe(true);
       });
     });
 
@@ -604,7 +616,7 @@ describeIfPg("PostgreSQLAdapter", () => {
         }
         expect(error).toBeInstanceOf(RecordNotUnique);
         expect((error as Error).message).toMatch(/could not create unique index/);
-        // (Rails also asserts error.connection_pool identity — omitted, see header.)
+        expect((error as RecordNotUnique).connectionPool).toBe(adapter.pool);
 
         // A failed CONCURRENTLY unique index is left behind but marked invalid.
         expect(await adapter.indexExists("ex", "number", { name: "invalid_index" })).toBe(true);

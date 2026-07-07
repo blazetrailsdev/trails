@@ -393,6 +393,15 @@ export class ConnectionPool implements ReapablePool {
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
+          // Don't fabricate a method for serialization/promise probes. When this
+          // proxy is reachable from an error's `connectionPool` (Rails stamps
+          // the pool onto every translated error), a serializer or `await`
+          // walks keys like `then`/`toJSON`/`Symbol.*`; returning a callable
+          // there would run `conn.then()` etc. against a raw connection that has
+          // no such method (`conn[prop] is not a function`).
+          if (typeof prop === "symbol" || prop === "then" || prop === "toJSON") {
+            return undefined;
+          }
           return (...args: unknown[]) => {
             return pool.withConnection((conn) => (conn as any)[prop](...args));
           };
