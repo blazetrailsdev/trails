@@ -41,8 +41,11 @@ export const ALLOW = new Set(["packages/activerecord/src/test-helpers/canonical-
 
 /** True when `source` resolves to the canonical-schema test helper module. */
 function isCanonicalSchemaModule(source) {
-  // Match any relative path ending in test-helpers/canonical-schema(.js).
-  return /(?:^|\/)test-helpers\/canonical-schema(?:\.js)?$/.test(source);
+  // Match on the module basename regardless of directory depth so a
+  // same-directory import from inside test-helpers/ (`./canonical-schema.js`)
+  // is caught, not just the `../../test-helpers/canonical-schema.js` form. The
+  // repo has a single canonical-schema module, so basename matching is safe.
+  return /(?:^|\/)canonical-schema(?:\.js)?$/.test(source);
 }
 
 /** @type {import("eslint").Rule.RuleModule} */
