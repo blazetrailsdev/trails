@@ -1285,12 +1285,12 @@ describe("TransactionCallbacksTest", () => {
       const topicClone = (await TopicWithCallbacksOnDestroy.find(topic.id)) as any;
 
       topic.beforeDestroyForTransaction = async () => {
-        await topicClone.update({ author_name: "Test Author Clone" });
+        await topicClone.updateBang({ author_name: "Test Author Clone" });
         await topicClone.destroy();
       };
 
       await transaction(TopicWithCallbacksOnDestroy, async () => {
-        await topic.update({ author_name: "Test Author" });
+        await topic.updateBang({ author_name: "Test Author" });
         await topic.destroy();
         throw new Rollback();
       });
