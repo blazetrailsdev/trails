@@ -213,9 +213,14 @@ describe("EnumTest", () => {
     // Rails also asserts `@book.cover = "hard"` — `cover` enum not on canonical Book.
   });
 
-  // Rails reads `@book.changed_attributes[:status]` (old-value hash); trails'
-  // `changedAttributes` is a string[] of names, not a name→old-value map.
-  it.skip("enum changed attributes", () => {});
+  it("enum changed attributes", () => {
+    const oldStatus = (book as any).status;
+    const oldLanguage = (book as any).language;
+    (book as any).status = "proposed";
+    (book as any).language = "spanish";
+    expect(book.changedAttributes["status"]).toBe(oldStatus);
+    expect(book.changedAttributes["language"]).toBe(oldLanguage);
+  });
 
   it("enum value after write symbol", () => {
     (book as any).status = "proposed";

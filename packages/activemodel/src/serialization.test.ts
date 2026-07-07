@@ -1063,6 +1063,6 @@ describe("fromJson", () => {
     u.changesApplied();
     u.fromJson('{"name":"Updated"}');
     expect(u.changed).toBe(true);
-    expect(u.changedAttributes).toContain("name");
+    expect(u.changedAttributeNamesToSave).toContain("name");
   });
 });

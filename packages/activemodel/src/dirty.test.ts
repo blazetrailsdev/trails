@@ -58,8 +58,8 @@ describe("DirtyTest", () => {
   it("list of changed attribute keys", () => {
     const p = new DirtyPerson({ name: "Alice", age: 25 });
     p.writeAttribute("name", "Bob");
-    expect(p.changedAttributes).toContain("name");
-    expect(p.changedAttributes).not.toContain("age");
+    expect(p.changedAttributeNamesToSave).toContain("name");
+    expect(p.changedAttributeNamesToSave).not.toContain("age");
   });
 
   it("changes to attribute values", () => {
@@ -126,9 +126,13 @@ describe("DirtyTest", () => {
 
   it("previous value is preserved when changed after save", () => {
     const p = new DirtyPerson({ name: "Alice" });
+    expect(p.changedAttributes).toEqual({});
     p.writeAttribute("name", "Bob");
+    // Rails asserts `changed_attributes` — a name->old-value hash.
+    expect(p.changedAttributes).toEqual({ name: "Alice" });
     p.changesApplied();
     p.writeAttribute("name", "Charlie");
+    expect(p.changedAttributes).toEqual({ name: "Bob" });
     expect(p.previousChanges).toEqual({ name: ["Alice", "Bob"] });
     expect(p.changes).toEqual({ name: ["Bob", "Charlie"] });
   });
@@ -173,7 +177,7 @@ describe("DirtyTest", () => {
     const b = new Bare();
     // Should not throw
     expect(b.changed).toBe(false);
-    expect(b.changedAttributes).toEqual([]);
+    expect(b.changedAttributeNamesToSave).toEqual([]);
   });
 
   class Person extends Model {
@@ -245,14 +249,14 @@ describe("Dirty Tracking", () => {
   it("not changed initially", () => {
     const p = new Person({ name: "dean", age: 30 });
     expect(p.changed).toBe(false);
-    expect(p.changedAttributes).toEqual([]);
+    expect(p.changedAttributeNamesToSave).toEqual([]);
   });
 
   it("setting attribute will result in change", () => {
     const p = new Person({ name: "dean" });
     p.writeAttribute("name", "sam");
     expect(p.changed).toBe(true);
-    expect(p.changedAttributes).toContain("name");
+    expect(p.changedAttributeNamesToSave).toContain("name");
   });
 
   it("attributeWas returns original value", () => {
@@ -475,13 +479,13 @@ describe("clearAttributeChanges clears forced-dirty state", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._dirty.forceChange("ratio", NaN);
-    expect(m.changedAttributes).toContain("ratio");
+    expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.clearAttributeChanges(["ratio"]);
     // After clearAttributeChanges, _forcedNames must also be cleared so a
     // subsequent type-equal write does not re-appear as dirty.
     m.writeAttribute("ratio", "NaN");
-    expect(m.changedAttributes).not.toContain("ratio");
+    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 });
 
@@ -498,12 +502,12 @@ describe("clearAttributeChanges", () => {
     p.changesApplied();
     p.writeAttribute("name", "Bob");
     p.writeAttribute("age", 31);
-    expect(p.changedAttributes).toContain("name");
-    expect(p.changedAttributes).toContain("age");
+    expect(p.changedAttributeNamesToSave).toContain("name");
+    expect(p.changedAttributeNamesToSave).toContain("age");
 
     p.clearAttributeChanges(["name"]);
-    expect(p.changedAttributes).not.toContain("name");
-    expect(p.changedAttributes).toContain("age");
+    expect(p.changedAttributeNamesToSave).not.toContain("name");
+    expect(p.changedAttributeNamesToSave).toContain("age");
   });
 });
 
@@ -738,7 +742,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const item = new Item({ count: 10 });
     item.changesApplied();
     item.writeAttribute("count", "abc");
-    expect(item.changedAttributes).toContain("count");
+    expect(item.changedAttributeNamesToSave).toContain("count");
   });
 
   it("force-change is cleared by restoreAttributes — forced flag must not survive restore", () => {
@@ -752,13 +756,13 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._dirty.forceChange("ratio", NaN);
-    expect(m.changedAttributes).toContain("ratio");
+    expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.restoreAttributes();
     // After restoreAttributes(), _forcedNames must be cleared so a subsequent
     // type-equal write does not re-appear as dirty.
     m.writeAttribute("ratio", "NaN");
-    expect(m.changedAttributes).not.toContain("ratio");
+    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 
   it("force-change is cleared by changesApplied — forced state must not leak across save boundaries", () => {
@@ -772,13 +776,13 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m._dirty.forceChange("ratio", NaN);
-    expect(m.changedAttributes).toContain("ratio");
+    expect(m.changedAttributeNamesToSave).toContain("ratio");
 
     m.changesApplied();
     // After changesApplied(), _forcedNames must be cleared so the next
     // type-equal write does not appear dirty.
     m.writeAttribute("ratio", "NaN");
-    expect(m.changedAttributes).not.toContain("ratio");
+    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 
   it("force-change survives a subsequent type-equal write — NaN-to-NaN case", () => {
@@ -795,7 +799,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     m.changesApplied();
     m._dirty.forceChange("ratio", NaN); // mirrors attribute_will_change!
     m.writeAttribute("ratio", "NaN"); // type-equal write
-    expect(m.changedAttributes).toContain("ratio");
+    expect(m.changedAttributeNamesToSave).toContain("ratio");
     // The "was" side must be the cloned pre-mutation snapshot from forceChange,
     // not the snapshot original, to preserve Rails' attribute_will_change! semantics.
     expect(m.changes["ratio"]).toEqual([NaN, NaN]);
@@ -815,7 +819,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     // exercises the fixed isEqualNan path (now compares against the cast value,
     // not the raw string).
     m.writeAttribute("ratio", "NaN");
-    expect(m.changedAttributes).not.toContain("ratio");
+    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
     expect(m.changes).not.toHaveProperty("ratio");
   });
 
@@ -833,7 +837,7 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const item = new Item({ count: 1 });
     item.changesApplied();
     item.writeAttribute("count", true);
-    expect(item.changedAttributes).toContain("count");
+    expect(item.changedAttributeNamesToSave).toContain("count");
   });
 
   it("float attribute NaN → non-NaN → NaN clears dirty state on revert", () => {
@@ -847,9 +851,9 @@ describe("numeric type.isChanged integration via dirty tracking", () => {
     const m = new Metric({ ratio: NaN });
     m.changesApplied();
     m.writeAttribute("ratio", 1.0);
-    expect(m.changedAttributes).toContain("ratio");
+    expect(m.changedAttributeNamesToSave).toContain("ratio");
     m.writeAttribute("ratio", "NaN");
-    expect(m.changedAttributes).not.toContain("ratio");
+    expect(m.changedAttributeNamesToSave).not.toContain("ratio");
   });
 });
 

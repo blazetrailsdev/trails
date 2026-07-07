@@ -321,7 +321,7 @@ describe("AttributeMethodsTest", () => {
     const p = new Person({ name: "Alice" });
     p.changesApplied();
     p.writeAttribute("nickname", "Ally");
-    expect(p.changedAttributes).toEqual(["name"]);
+    expect(p.changedAttributeNamesToSave).toEqual(["name"]);
     expect(p.changes).toEqual({ name: ["Alice", "Ally"] });
   });
 

@@ -25,7 +25,7 @@ import {
  */
 export interface Dirty {
   readonly changed: boolean;
-  readonly changedAttributes: string[];
+  readonly changedAttributes: Record<string, unknown>;
   readonly changes: Record<string, [unknown, unknown]>;
   readonly previousChanges: Record<string, [unknown, unknown]>;
   readonly mutationsFromDatabase: Record<string, [unknown, unknown]>;
@@ -162,7 +162,14 @@ export class DirtyTracker {
     }
   }
 
-  get changedAttributes(): string[] {
+  /**
+   * Names of all attributes with pending (unsaved) changes.
+   *
+   * Mirrors: ActiveModel::AttributeMutationTracker#changed_attribute_names
+   * (surfaced by Rails' `changed_attribute_names_to_save`), NOT
+   * `changed_attributes` — see `changedAttributes` for the name->old-value map.
+   */
+  get changedAttributeNames(): string[] {
     const names = Array.from(this._changedAttributes.keys());
     this._attrs?.forEach((attr, name) => {
       if (!this._changedAttributes.has(name) && attr.type.isMutable() && attr.changedInPlace()) {
@@ -170,6 +177,25 @@ export class DirtyTracker {
       }
     });
     return names;
+  }
+
+  /**
+   * Map of each changed attribute's name to its *old* (pre-change) value.
+   *
+   * Mirrors: ActiveModel::Dirty#changed_attributes
+   * -> `mutations_from_database.changed_values`, a name->original-value hash.
+   */
+  get changedAttributes(): Record<string, unknown> {
+    const result: Record<string, unknown> = {};
+    for (const [name, change] of this._changedAttributes) {
+      result[name] = change[0];
+    }
+    this._attrs?.forEach((attr, name) => {
+      if (!Object.hasOwn(result, name) && attr.type.isMutable() && attr.changedInPlace()) {
+        result[name] = attr.originalValue;
+      }
+    });
+    return result;
   }
 
   get changes(): Record<string, [unknown, unknown]> {

@@ -88,7 +88,7 @@ async function withTravel(offsetMs: number, fn: () => Promise<void>): Promise<vo
 function checkPirateAfterSaveFailure(pirate: Rec): void {
   expect(pirate.changed).toBe(true);
   expect(pirate.attributeChanged("parrot_id")).toBe(true);
-  expect(pirate.changedAttributes).toEqual(["parrot_id"]);
+  expect(pirate.changedAttributeNamesToSave).toEqual(["parrot_id"]);
   expect(pirate.attributeWas("parrot_id")).toBeNull();
 }
 
@@ -430,18 +430,18 @@ describe("DirtyTest", () => {
   it("object should be changed if any attribute is changed", async () => {
     const pirate = new Pirate() as Rec;
     expect(pirate.changed).toBe(false);
-    expect(pirate.changedAttributes).toEqual([]);
+    expect(pirate.changedAttributeNamesToSave).toEqual([]);
     expect(pirate.changes).toEqual({});
 
     pirate.catchphrase = "arrr";
     expect(pirate.changed).toBe(true);
     expect(pirate.attributeWas("catchphrase")).toBeNull();
-    expect(pirate.changedAttributes).toEqual(["catchphrase"]);
+    expect(pirate.changedAttributeNamesToSave).toEqual(["catchphrase"]);
     expect(pirate.changes).toEqual({ catchphrase: [null, "arrr"] });
 
     await pirate.save();
     expect(pirate.changed).toBe(false);
-    expect(pirate.changedAttributes).toEqual([]);
+    expect(pirate.changedAttributeNamesToSave).toEqual([]);
     expect(pirate.changes).toEqual({});
   });
 
@@ -472,7 +472,7 @@ describe("DirtyTest", () => {
     const parrot = await Parrot.createBang({ name: "Lorre" });
     pirate.parrot = parrot;
     expect(pirate.changed).toBe(true);
-    expect(pirate.changedAttributes).toEqual(["parrot_id"]);
+    expect(pirate.changedAttributeNamesToSave).toEqual(["parrot_id"]);
   });
 
   it("attribute should be compared with type cast", () => {

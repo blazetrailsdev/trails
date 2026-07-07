@@ -79,7 +79,7 @@ describe("TimestampTest", () => {
     expect(developer.salary).toBe(previousSalary + 10000);
     expect(developer.attributeChanged("salary")).toBe(true);
     expect(developer.changed).toBe(true);
-    expect(developer.changedAttributes).toEqual(["salary"]);
+    expect(developer.changedAttributeNamesToSave).toEqual(["salary"]);
     expect((developer as any).isSavedChanges()).toBe(true);
     expect(Object.keys(developer.savedChanges).sort()).toEqual([
       "legacy_updated_at",

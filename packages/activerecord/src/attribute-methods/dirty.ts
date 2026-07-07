@@ -11,7 +11,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 
 interface DirtyRecord {
   changed: boolean;
-  changedAttributes: string[];
+  changedAttributes: Record<string, unknown>;
   changes: Record<string, [unknown, unknown]>;
   previousChanges: Record<string, [unknown, unknown]>;
   readAttribute(name: string): unknown;
