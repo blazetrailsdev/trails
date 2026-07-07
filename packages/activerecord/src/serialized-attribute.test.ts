@@ -302,16 +302,40 @@ describe("SerializedAttributeTest", () => {
     expect((found as any).content).toEqual(settings);
   });
 
-  it.skip("where by serialized attribute with array", () => {
-    // PERMANENT-SKIP: needs serialized-attribute where support.
+  it("where by serialized attribute with array", async () => {
+    class ArrayTopic extends Topic {
+      static {
+        serialize(this, "content", { type: Array });
+      }
+    }
+    const settings = [{ color: "green" }];
+    const topic = await ArrayTopic.create({ content: settings as any });
+    const found = await ArrayTopic.where({ content: settings }).take();
+    expect((found as any)?.id).toBe(topic.id);
   });
 
-  it.skip("where by serialized attribute with hash", () => {
-    // PERMANENT-SKIP: needs serialized-attribute where support.
+  it("where by serialized attribute with hash", async () => {
+    class HashTopic extends Topic {
+      static {
+        serialize(this, "content", { type: HashObject });
+      }
+    }
+    const settings = { color: "green" };
+    const topic = await HashTopic.create({ content: settings as any });
+    const found = await HashTopic.where({ content: settings }).take();
+    expect((found as any)?.id).toBe(topic.id);
   });
 
-  it.skip("where by serialized attribute with hash in array", () => {
-    // PERMANENT-SKIP: needs serialized-attribute where support.
+  it("where by serialized attribute with hash in array", async () => {
+    class HashTopic extends Topic {
+      static {
+        serialize(this, "content", { type: HashObject });
+      }
+    }
+    const settings = { color: "green" };
+    const topic = await HashTopic.create({ content: settings as any });
+    const found = await HashTopic.where({ content: [settings, { herring: "red" }] }).take();
+    expect((found as any)?.id).toBe(topic.id);
   });
 
   it("serialized default class", async () => {
