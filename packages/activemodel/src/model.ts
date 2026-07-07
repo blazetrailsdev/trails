@@ -217,8 +217,14 @@ function _xmlTypeInfo(
     serializableAddIncludes(record as SerializationRecord, options, (assocName, records, opts) => {
       const subValue = hash[assocName];
       // A collection include flattens to an array of hashes; a singular include
-      // to one hash. Every element of a collection shares a model class, so the
-      // representative (first) record's type info applies to all `<item>`s.
+      // to one hash. Deriving `type=` needs only the elements' column/cast
+      // types, and every element of one `has_many`/`has_one` shares them: the
+      // association targets a single model class, and STI subclasses ride the
+      // same table with the same column types. (Rails polymorphism is a
+      // `belongs_to`/singular concept, not a per-element property of a
+      // collection.) So the representative (first) record's type map applies to
+      // all `<item>`s. A record whose column types genuinely diverge from the
+      // first would just fall back to runtime inference for the mismatch.
       let repRecord: unknown;
       let repHash: unknown;
       if (Array.isArray(subValue)) {
