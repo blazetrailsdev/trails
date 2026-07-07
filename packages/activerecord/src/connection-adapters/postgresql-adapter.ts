@@ -4173,11 +4173,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * `ConnectionAdapters::PostgreSQL::DatabaseStatements#translate_exception`.
    */
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    const translated = this._translateExceptionClass(e, sql, binds);
-    // Mirrors Rails' translate_exception_class, which stamps the originating
-    // pool onto every translated error (`error.connection_pool = pool`). For a
-    // standalone adapter that pool is a NullPool. Use setPool/setConnectionPool
-    // (both guarded) so a pool attached at raise-time isn't overwritten.
+    const translated = this._buildTranslatedException(e, sql, binds);
+    // Mirrors Rails' PostgreSQLAdapter#translate_exception, which builds every
+    // translated error with `connection_pool: @pool`. For a standalone adapter
+    // that pool is a NullPool. Use setPool/setConnectionPool (both guarded) so
+    // a pool attached at raise-time isn't overwritten.
     if (translated instanceof ConnectionNotEstablished) {
       translated.setPool(this.pool);
     } else if (translated instanceof AdapterError) {
@@ -4186,7 +4186,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return translated;
   }
 
-  private _translateExceptionClass(e: unknown, sql: string, binds: unknown[]): Error {
+  private _buildTranslatedException(e: unknown, sql: string, binds: unknown[]): Error {
     if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
     const code = (e as { code?: string }).code;
     const msg = e.message;
