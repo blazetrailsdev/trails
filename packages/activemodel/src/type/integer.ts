@@ -135,8 +135,7 @@ export class IntegerType extends NumericValueType {
       return Math.trunc(value);
     }
     if (typeof value === "bigint") {
-      const num = Number(value);
-      return Number.isSafeInteger(num) ? num : (value as unknown as number);
+      return this.narrowBigInt(value);
     }
     const parsed = parseInt(String(value), 10);
     return isNaN(parsed) ? null : parsed;
@@ -197,5 +196,20 @@ export class IntegerType extends NumericValueType {
    */
   protected _limit(): number {
     return this.limit ?? DEFAULT_LIMIT;
+  }
+
+  /**
+   * Collapse a `bigint` to a JS `number` when it fits float64's safe-integer
+   * range; otherwise keep the `bigint` (carried under a `number` cast, the
+   * technique the numeric type primitives use to stay `ValueType<number>`-backed
+   * while preserving precision for out-of-range bignums). `Number.isSafeInteger`
+   * on the converted value is exact at the boundary — `2**53` and any bigint
+   * that rounds down onto it both fail the guard, so no precision is lost.
+   *
+   * @internal Rails-private helper.
+   */
+  protected narrowBigInt(value: bigint): number {
+    const num = Number(value);
+    return Number.isSafeInteger(num) ? num : (value as unknown as number);
   }
 }
