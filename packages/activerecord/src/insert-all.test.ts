@@ -105,17 +105,11 @@ async function withRecordTimestamps(
 }
 
 describe("InsertAllTest", () => {
-  fixtures(["authors", "books"], {
-    // These two raise a DB-level RecordNotUnique; a PG unique violation aborts
-    // the surrounding transaction and poisons transactional-fixtures teardown,
-    // so run them unwrapped (the per-test fixture reseed cleans up). The other
-    // raising tests fail in find_unique_index_for (ArgumentError) before any SQL.
-    usesTransaction: [
-      "insert all raises on duplicate records",
-      "insert all will raise if duplicates are skipped only for a certain conflict target",
-      "insert all and upsert all with index finding options",
-    ],
-  });
+  // Some tests raise a DB-level RecordNotUnique (a PG unique violation aborts
+  // the transaction); they still run transactionally because the fixture
+  // teardown skips its redundant DELETEs while the pinned transaction is open,
+  // so the abort no longer poisons the rollback.
+  fixtures(["authors", "books"]);
 
   beforeAll(async () => {
     ReadonlyNameBook.attrReadonly("name");

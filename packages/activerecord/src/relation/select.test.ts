@@ -28,21 +28,13 @@ describe("SelectTest", () => {
   // ("Welcome to the weblog") drives the `UPPER(title)` assertions and its
   // `greetings` comment ("Thank you for the welcome") drives the merge tests.
   //
-  // The four `not exists` / `invalid nested field` tests deliberately issue a
-  // SELECT against a non-existent column. On PostgreSQL that aborts the
-  // surrounding transaction ("current transaction is aborted…"), which would
-  // poison the shared transactional-fixtures rollback at teardown. They read no
-  // fixture rows (only assert `to_sql` + that the query raises), so they opt out
-  // of the wrapping transaction via `usesTransaction` and run in autocommit —
-  // the failed statement then errors cleanly without leaving an aborted txn.
-  fixtures(["posts", "comments"], {
-    usesTransaction: [
-      "select with not exists field",
-      "select with hash with not exists field",
-      "select with hash array value with not exists field",
-      "select with invalid nested field",
-    ],
-  });
+  // The `not exists` / `invalid nested field` tests deliberately SELECT against
+  // a non-existent column, which raises `StatementInvalid` and aborts the PG
+  // transaction. They still run transactionally: the fixture teardown skips its
+  // redundant DELETEs while the pinned transaction is open, so the abort no
+  // longer poisons the rollback (mirrors Rails, which runs these transactionally
+  // with no opt-out).
+  fixtures(["posts", "comments"]);
   // `posts`/`comments` ride the boot-laid canonical schema (RFC 0059 Phase 1);
   // per-file `repairWorkerSchema` restores any sibling shape drift before this
   // suite runs, so no defensive recreate is needed.
