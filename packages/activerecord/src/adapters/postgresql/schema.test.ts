@@ -921,6 +921,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class Article extends Base {
         static {
           this.tableName = '"my.schema".articles';
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
         }
       }
       await Article.loadSchema();

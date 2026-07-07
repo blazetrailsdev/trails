@@ -28,6 +28,8 @@ class TagCollection {
 class Hstore extends Base {
   static {
     this.tableName = "hstores";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
     this.storeAccessor("settings", { accessors: ["language", "timezone"] });
   }
 }

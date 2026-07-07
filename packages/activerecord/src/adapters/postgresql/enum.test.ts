@@ -13,7 +13,7 @@ import { fixtures } from "../../test-helpers/fixtures.js";
 class PostgresqlEnum extends Base {
   static {
     this.tableName = "postgresql_enums";
-    // Declare the PK for strict writeFromUser (raw-created table, not warmed).
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
     this.attribute("id", "integer");
     this.enum(
       "current_mood",

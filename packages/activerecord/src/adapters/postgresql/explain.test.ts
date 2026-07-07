@@ -46,6 +46,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       // queries.
       class ExRelation extends Base {
         static {
+          this.attribute("id", "integer");
           this.attribute("name", "string");
         }
       }
@@ -63,11 +64,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       const { registerModel } = await import("../../index.js");
       class ExAuthor extends Base {
         static {
+          this.attribute("id", "integer");
           this.attribute("name", "string");
         }
       }
       class ExBook extends Base {
         static {
+          this.attribute("id", "integer");
           this.attribute("title", "string");
           this.attribute("ex_author_id", "integer");
         }
@@ -136,11 +139,13 @@ describeIfPg("PostgreSQLAdapter", () => {
       const { registerModel } = await import("../../index.js");
       class OpAuthor extends Base {
         static {
+          this.attribute("id", "integer");
           this.attribute("name", "string");
         }
       }
       class OpPost extends Base {
         static {
+          this.attribute("id", "integer");
           this.attribute("title", "string");
           this.attribute("op_author_id", "integer");
         }

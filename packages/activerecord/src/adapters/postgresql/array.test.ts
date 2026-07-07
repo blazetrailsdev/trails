@@ -94,6 +94,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       }
       class PgArraySerialized extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArraySerialized.loadSchema();
       serialize(PgArraySerialized, "tags", { coder: MyTags });
@@ -112,6 +116,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.addColumn("pg_arrays", "score", "integer", { array: true, default: [4, 4, 2] });
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       // Rails: assert_equal([4, 4, 2], PgArray.column_defaults["score"])
@@ -126,6 +134,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       // Rails: assert_equal(["foo", "bar"], PgArray.column_defaults["names"])
@@ -221,6 +233,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.changeColumnDefault("pg_arrays", "tags", []);
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       // Rails: assert_equal [], PgArray.column_defaults["tags"]
@@ -292,6 +308,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("with multi dimensional empty strings", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const arr = [
@@ -309,6 +329,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("with arbitrary whitespace", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const arr = [
@@ -365,6 +389,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       await (adapter as any).insertFixture({ tags: tagValues }, "pg_arrays");
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const last = await (PgArrays as any).last();
@@ -374,6 +402,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("attribute for inspect for array field", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays();
@@ -385,6 +417,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("attribute for inspect for array field for large array", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays();
@@ -452,6 +488,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: x = PgArray.create!(hstores: [{ a: "a" }, { b: "b" }]); x.hstores.first["a"] = "c"
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const x = await (PgArrays as any).create({
@@ -472,6 +512,10 @@ describeIfPg("PostgreSQLAdapter", () => {
         class PgArrays extends Base {
           static tableName = "pg_arrays";
           static timeZoneAwareAttributes = true;
+          static {
+            // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+            this.attribute("id", "integer");
+          }
         }
         await PgArrays.loadSchema();
         const timeString = "2020-06-15T10:00:00-07:00";
@@ -496,6 +540,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("assigning non array value", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "not-an-array" } as any);
@@ -509,6 +557,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("assigning empty string", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "" } as any);
@@ -522,6 +574,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("assigning valid pg array literal", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const record = new PgArrays({ tags: "{1,2,3}" } as any);
@@ -536,6 +592,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     it("where by attribute with array", async () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const tags = ["black", "blue"];
@@ -555,6 +615,8 @@ describeIfPg("PostgreSQLAdapter", () => {
       class PgArrays extends Base {
         static tableName = "pg_arrays";
         static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
           this.validatesUniqueness("tags");
         }
       }
@@ -585,6 +647,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       // Rails: time = Time.now.change(usec: 123); record = PgArray.create!(timestamps: [time])
       class PgArrays extends Base {
         static tableName = "pg_arrays";
+        static {
+          // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+          this.attribute("id", "integer");
+        }
       }
       await PgArrays.loadSchema();
       const time = Temporal.Now.instant()

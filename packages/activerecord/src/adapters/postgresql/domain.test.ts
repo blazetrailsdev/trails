@@ -13,6 +13,8 @@ import { Column as PgColumn } from "../../connection-adapters/postgresql/column.
 class PostgresqlDomain extends Base {
   static {
     this.tableName = "postgresql_domains";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
   }
 }
 

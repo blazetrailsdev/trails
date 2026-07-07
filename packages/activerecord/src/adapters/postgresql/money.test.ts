@@ -16,6 +16,8 @@ import type { Column as PgColumn } from "../../connection-adapters/postgresql/co
 class PostgresqlMoney extends Base {
   static {
     this.tableName = "postgresql_moneys";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
     this.validates("depth", { numericality: true });
   }
 }

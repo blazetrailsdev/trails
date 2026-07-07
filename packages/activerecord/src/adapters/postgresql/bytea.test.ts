@@ -14,6 +14,8 @@ import { Column as PgColumn } from "../../connection-adapters/postgresql/column.
 class ByteaDataType extends Base {
   static {
     this.tableName = "bytea_data_type";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
   }
 }
 

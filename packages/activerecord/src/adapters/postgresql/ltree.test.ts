@@ -14,6 +14,8 @@ import type { TableDefinition as PgTableDefinition } from "../../connection-adap
 class Ltree extends Base {
   static {
     this.tableName = "ltrees";
+    // Declare the real PK so strict writeFromUser's post-INSERT id write-back has a known column.
+    this.attribute("id", "integer");
   }
   declare path: string;
 }
