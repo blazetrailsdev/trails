@@ -1440,7 +1440,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     Array<{
       table: string;
       name: string;
-      columns: string[];
+      columns: string[] | string;
       unique: boolean;
       using?: string;
       type?: string;
@@ -1453,6 +1453,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       {
         schemaQuery: this.schemaQuery.bind(this),
         quoteTableName: this.quoteTableName.bind(this),
+        supportsIndexSortOrder: this.supportsIndexSortOrder.bind(this),
       },
       tableName,
     );

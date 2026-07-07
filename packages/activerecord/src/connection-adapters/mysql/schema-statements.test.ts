@@ -433,9 +433,10 @@ describe("MySQL::SchemaStatements", () => {
 
   // Minimal IndexesHost: indexes() reads via schemaQuery and quotes the table
   // name. Stub schemaQuery to return the `SHOW KEYS FROM` rows MySQL yields.
-  const indexHost = (rows: Record<string, unknown>[]) => ({
+  const indexHost = (rows: Record<string, unknown>[], sortOrderSupported = true) => ({
     schemaQuery: async () => rows,
     quoteTableName: (n: string) => `\`${n}\``,
+    supportsIndexSortOrder: () => sortOrderSupported,
   });
 
   it("indexes: surfaces per-column prefix lengths from Sub_part", async () => {
@@ -490,8 +491,77 @@ describe("MySQL::SchemaStatements", () => {
       ]),
       "pages",
     );
-    expect(idx[0].columns).toEqual(["(lower(`title`))"]);
-    expect(idx[0].orders).toEqual({ "(lower(`title`))": "desc" });
+    // Mirrors Rails' final `.map`: a functional index collapses its columns
+    // into a single SQL string via add_options_for_index_columns, with the
+    // DESC order baked inline and no separate orders/lengths Records.
+    expect(idx[0].columns).toBe("(lower(`title`)) DESC");
+    expect(idx[0].orders).toBeUndefined();
+    expect(idx[0].lengths).toBeUndefined();
+  });
+
+  it("indexes: collapses functional-index columns into a single SQL string", async () => {
+    const idx = await indexes.call(
+      indexHost([
+        {
+          Key_name: "index_pages_on_lower_title_and_pos",
+          Column_name: null,
+          Expression: "lower(`title`)",
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: null,
+          Collation: "A",
+        },
+        {
+          Key_name: "index_pages_on_lower_title_and_pos",
+          Column_name: "position",
+          Expression: null,
+          Non_unique: 1,
+          Index_type: "BTREE",
+          Sub_part: 4,
+          Collation: "D",
+        },
+      ]),
+      "pages",
+    );
+    // Expression columns pass through their parenthesized form; plain columns
+    // are quoted with prefix length and DESC order baked in.
+    expect(idx[0].columns).toBe("(lower(`title`)), `position`(4) DESC");
+    expect(idx[0].orders).toBeUndefined();
+    expect(idx[0].lengths).toBeUndefined();
+  });
+
+  it("indexes: omits functional-index order when sort order is unsupported", async () => {
+    // Mirrors Rails' add_options_for_index_columns super gate on
+    // supports_index_sort_order? — false on MariaDB < 10.8.1 / MySQL < 8.0.1,
+    // which drops the DESC/ASC suffix even when Collation="D". Prefix length
+    // (via MySQL's add_index_length, ungated) is still baked in.
+    const idx = await indexes.call(
+      indexHost(
+        [
+          {
+            Key_name: "index_pages_on_lower_title_and_pos",
+            Column_name: null,
+            Expression: "lower(`title`)",
+            Non_unique: 1,
+            Index_type: "BTREE",
+            Sub_part: null,
+            Collation: "D",
+          },
+          {
+            Key_name: "index_pages_on_lower_title_and_pos",
+            Column_name: "position",
+            Expression: null,
+            Non_unique: 1,
+            Index_type: "BTREE",
+            Sub_part: 4,
+            Collation: "D",
+          },
+        ],
+        false,
+      ),
+      "pages",
+    );
+    expect(idx[0].columns).toBe("(lower(`title`)), `position`(4)");
   });
 });
 
