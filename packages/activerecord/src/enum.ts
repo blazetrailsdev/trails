@@ -694,9 +694,14 @@ export function _enum(
 
   // Mapping accessor under the pluralized attribute name (e.g. User.statuses
   // for `status`). Rails: `singleton_class.define_method(name.to_s.pluralize)`.
+  // Rails returns the frozen `pairs` hash (enum.rb) so callers can't mutate the
+  // canonical mapping — `Book.statuses["bad"] = 40` raises "can't modify frozen".
+  // Freeze once and hand back the same object so mutation attempts throw a
+  // TypeError in strict mode.
+  const frozenMapping = Object.freeze({ ...mapping });
   Object.defineProperty(this, pluralize(attribute), {
     get() {
-      return { ...mapping };
+      return frozenMapping;
     },
     configurable: true,
   });

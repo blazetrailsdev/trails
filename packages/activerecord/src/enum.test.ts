@@ -520,11 +520,58 @@ describe("EnumTest", () => {
   it.skip("validate inclusion of value in array", () => {});
 
   // Rails: `book.status_change` / per-class & inheritable enum redefinition.
-  it.skip("enums are distinct per class", () => {});
-  it.skip("enums are inheritable", () => {});
+  it("enums are distinct per class", async () => {
+    class Klass1 extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written"] as any);
+      }
+    }
+    class Klass2 extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["drafted", "uploaded"] as any);
+      }
+    }
 
-  // Rails: `Book.statuses` is frozen; trails returns a mutable copy.
-  it.skip("attempting to modify enum raises error", () => {});
+    const book1 = await (Klass1 as any).proposed().createBang();
+    book1.status = "written";
+    expect(book1.statusChange()).toEqual(["proposed", "written"]);
+
+    const book2 = await (Klass2 as any).drafted().createBang();
+    book2.status = "uploaded";
+    expect(book2.statusChange()).toEqual(["drafted", "uploaded"]);
+  });
+
+  it("enums are inheritable", async () => {
+    class Subklass1 extends Book {}
+    class Subklass2 extends Book {
+      static {
+        this.enum("status", ["drafted", "uploaded"] as any);
+      }
+    }
+
+    const book1 = await (Subklass1 as any).proposed().createBang();
+    book1.status = "written";
+    expect(book1.statusChange()).toEqual(["proposed", "written"]);
+
+    const book2 = await (Subklass2 as any).drafted().createBang();
+    book2.status = "uploaded";
+    expect(book2.statusChange()).toEqual(["drafted", "uploaded"]);
+  });
+
+  // Rails: `Book.statuses` is frozen; a mutation raises "can't modify frozen".
+  // In trails the mapping is a frozen plain object, so mutation/deletion throws
+  // a TypeError in strict mode.
+  it("attempting to modify enum raises error", () => {
+    expect(() => {
+      (Book as any).statuses["bad_enum"] = 40;
+    }).toThrow(TypeError);
+
+    expect(() => {
+      delete (Book as any).statuses["published"];
+    }).toThrow(TypeError);
+  });
 
   it("declare multiple enums with prefix: true", () => {
     class K extends Base {
