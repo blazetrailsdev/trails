@@ -65,78 +65,6 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
 const enumTypeCache = new WeakMap<object, EnumType>();
 
 /**
- * Per-class record of each `enum` install, keyed by the declared enum name.
- * Lets a later `alias_attribute` on that name replay the install against the
- * backing column (order-independent alias resolution). @internal
- */
-interface EnumInstall {
-  column: string;
-  enumType: EnumType;
-  valueMethods: Array<[string, EnumValue]>;
-}
-const enumInstallRegistry = new WeakMap<object, Map<string, EnumInstall>>();
-
-/**
- * Re-point an enum at its backing column when `alias_attribute :<aliasName>,
- * :<columnName>` is declared AFTER `enum :<aliasName>`. At `enum` time the alias
- * didn't exist, so storage/type/reader/predicate/scope were keyed off the
- * un-aliased name; here we move them to the backing column. Rails resolves the
- * alias per-operation (`attribute_aliases[attr] || attr`) so order never
- * matters — this recovers that behavior for the reverse order.
- *
- * @internal
- */
-export function reresolveEnumAlias(klass: object, aliasName: string, columnName: string): void {
-  if (aliasName === columnName) return;
-  const install = enumInstallRegistry.get(klass)?.get(aliasName);
-  // Only act on an enum keyed off the (formerly un-aliased) name.
-  if (!install || install.column !== aliasName) return;
-
-  const base = klass as typeof Base;
-  const host = klass as unknown as {
-    _enums: Map<string, Record<string, EnumValue>>;
-    _enumsPendingTypeCheck?: Set<string>;
-    _attributeDefinitions: Map<string, unknown>;
-  };
-
-  // Move the mapping in the `_enums` registry (copy-on-write to avoid mutating
-  // a Map shared with a parent class).
-  const mapping = host._enums.get(aliasName);
-  if (mapping) {
-    if (!Object.prototype.hasOwnProperty.call(klass, "_enums")) {
-      host._enums = new Map(host._enums);
-    }
-    host._enums.delete(aliasName);
-    host._enums.set(columnName, mapping);
-  }
-
-  // The pending-type marker followed the alias name; the backing column
-  // resolves its own type, so drop it.
-  const pending = host._enumsPendingTypeCheck;
-  if (pending?.has(aliasName)) {
-    if (!Object.prototype.hasOwnProperty.call(klass, "_enumsPendingTypeCheck")) {
-      host._enumsPendingTypeCheck = new Set(pending);
-    }
-    host._enumsPendingTypeCheck!.delete(aliasName);
-  }
-
-  // Drop the phantom attribute definition installed on the alias name so the
-  // record stops carrying a spurious column and the alias accessor (which
-  // `aliasAttribute` just defined) delegates cleanly to the backing column.
-  host._attributeDefinitions.delete(aliasName);
-
-  // Re-install the EnumType on the backing column and regenerate the value
-  // methods/scopes keyed off it. `defineEnumMethods` overwrites configurably
-  // and runs no conflict checks, so replaying doesn't re-trip "already defined".
-  installEnumAttribute(base, columnName, install.enumType);
-  const methodsModule = base._enumMethodsModule();
-  for (const [valueMethodName, value] of install.valueMethods) {
-    methodsModule.defineEnumMethods(columnName, valueMethodName, value, true, true);
-  }
-  install.column = columnName;
-}
-
-/**
  * Build (and cache) an EnumType for the deserialize/serialize helpers below
  * from the canonical `_enums` mapping. The subtype only governs the
  * integer/string coercion fallback, so infer it from the mapping's value
@@ -498,11 +426,19 @@ export function _enum(
   // `where(...)` hit the backing attribute; the value-method *names* still
   // derive from the enum labels (unaffected by the alias). Mirrors Rails, where
   // the aliased attribute delegates to its target everywhere.
-  // The alias is resolved eagerly here, so declaring `enum` before
-  // `alias_attribute` leaves everything keyed off the un-aliased name. Rails
-  // resolves the alias per-operation (order never matters); trails recovers the
-  // reverse order by re-pointing the enum at the backing column when the alias
-  // is later declared — see `reresolveEnumAlias`, invoked from `aliasAttribute`.
+  // The alias is resolved eagerly here, matching Rails: `enum`'s
+  // `decorate_attributes([name])` resolves the name through `attribute_aliases`
+  // at declaration time (enum.rb:238, activemodel attribute_methods.rb:396) and
+  // bakes it into a pending modification that is never re-evaluated. So
+  // `alias_attribute` MUST precede `enum` (the order Rails' own suite uses).
+  // Declaring `enum` first keys everything off the un-aliased name, which has no
+  // column of its own; real Rails raises `Undeclared attribute type for enum` on
+  // first use (verified against vendored Rails). trails does NOT yet raise on
+  // this order — it silently registers a phantom attribute — because the raise
+  // must fire from the deferred decorator, which trails also applies eagerly at
+  // class-definition time (before the schema loads), so a naive check
+  // false-positives every column-backed enum. Converging to Rails' raise is
+  // tracked as a follow-up (see enum-before-alias-must-raise).
   const attrName =
     (this as unknown as { _attributeAliases?: Record<string, string> })._attributeAliases?.[
       attribute
@@ -693,10 +629,6 @@ export function _enum(
   // (enum.rb:251); route trails' generation through the same module so
   // `EnumMethods.defineEnumMethods` is the single generator.
   const methodsModule = this._enumMethodsModule();
-  // Record the exact (valueMethodName, value) pairs fed to the generator so a
-  // later `alias_attribute` can replay them against the backing column without
-  // recomputing prefix/suffix. See `reresolveEnumAlias`.
-  const generatedValueMethods: Array<[string, EnumValue]> = [];
   for (const [n, value] of Object.entries(mapping)) {
     const fullName = toCamel(methodName(n));
     const friendlyName = toCamel(methodName(n).replace(/[^\w\x80-\uffff]+/g, "_"));
@@ -707,10 +639,8 @@ export function _enum(
     // predicate `is{Name}`, the persisting bang `{name}Bang`, the positive
     // scope `{name}`, and the auto negative scope `not{Name}`.
     methodsModule.defineEnumMethods(attrName, fullName, value, true, true);
-    generatedValueMethods.push([fullName, value]);
     if (friendlyName !== fullName) {
       methodsModule.defineEnumMethods(attrName, friendlyName, value, true, true);
-      generatedValueMethods.push([friendlyName, value]);
     }
 
     // Original-form predicate/bang for labels with special chars (spaces,
@@ -745,17 +675,6 @@ export function _enum(
       enumMethodNames.add(`${friendlyName}Bang`);
     }
   }
-
-  // Stash the enum's backing column, EnumType, and generated value methods so a
-  // later `alias_attribute :<name>, :<column>` (the reverse of Rails' own order)
-  // can re-point storage/type/scopes at the backing column. See
-  // `reresolveEnumAlias`.
-  let classRegistry = enumInstallRegistry.get(this);
-  if (!classRegistry) {
-    classRegistry = new Map();
-    enumInstallRegistry.set(this, classRegistry);
-  }
-  classRegistry.set(attribute, { column: attrName, enumType, valueMethods: generatedValueMethods });
 
   // Mirrors Rails:
   //   if validate
