@@ -20008,13 +20008,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "add_foreign_key",
-    "call": "new_foreign_key_definition",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "add_to",
     "call": "columns",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -20171,20 +20164,6 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "new_foreign_key_definition",
     "call": "foreign_key_options",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "new_foreign_key_definition",
-    "call": "table_name_prefix",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-definitions.ts",
-    "rubyName": "new_foreign_key_definition",
-    "call": "table_name_suffix",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -20962,13 +20941,6 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "find_join_table_name",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "foreign_key_column_for",
-    "call": "strip_table_name_prefix_and_suffix",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

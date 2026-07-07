@@ -188,6 +188,50 @@ describe("ForeignKeyDefinition#defined_for?", () => {
   });
 });
 
+describe("TableDefinition#new_foreign_key_definition", () => {
+  it("defaults the name to fk_rails_<hex>, not fk_<table>_<column>", () => {
+    const fk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets");
+    expect(fk.column).toBe("rocket_id");
+    expect(fk.name).toMatch(/^fk_rails_[0-9a-f]{10}$/);
+  });
+
+  it("routes column/name defaults through the adapter's foreignKeyOptions", () => {
+    const adapter = {
+      foreignKeyOptions(fromTable: string, toTable: string, options: Record<string, unknown>) {
+        return { ...options, column: "custom_id", name: `fk_${fromTable}_${toTable}` };
+      },
+    } as any;
+    const td = new TableDefinition("astronauts", { adapter });
+    const fk = td.newForeignKeyDefinition("rockets");
+    expect(fk.column).toBe("custom_id");
+    expect(fk.name).toBe("fk_astronauts_rockets");
+  });
+
+  it("maps a composite primaryKey array to a composite column array (bare-adapter fallback)", () => {
+    // Mirrors foreign_key_options' array branch: each PK column gets its own
+    // singularized foreign-key column.
+    // primaryKey/column are string|string[] on ForeignKeyDefinition; the scalar
+    // AddForeignKeyOptions DSL type is cast here to exercise the composite path.
+    const fk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
+      primaryKey: ["tenant_id", "id"] as unknown as string,
+    });
+    expect(fk.column).toEqual(["rocket_tenant_id", "rocket_id"]);
+  });
+
+  it("applies table_name_prefix/suffix to to_table before building the def", () => {
+    const adapter = {
+      tableNamePrefix: "app_",
+      tableNameSuffix: "_v2",
+      foreignKeyOptions(_fromTable: string, toTable: string, options: Record<string, unknown>) {
+        return { ...options, column: "rocket_id", name: "fk_rails_deadbeef00", toTable };
+      },
+    } as any;
+    const td = new TableDefinition("app_astronauts_v2", { adapter });
+    const fk = td.newForeignKeyDefinition("rockets");
+    expect(fk.toTable).toBe("app_rockets_v2");
+  });
+});
+
 describe("ReferenceDefinition helpers", () => {
   it("addTo adds id column by default", () => {
     const ref = new ReferenceDefinition("user", { index: false });
