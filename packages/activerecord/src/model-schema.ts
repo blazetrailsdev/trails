@@ -1057,8 +1057,14 @@ function applyColumnsHash(
       // 301-302, model_schema.rb:622-629) — so the enum subtype carries the
       // same tz-conversion / optimistic-locking wrappers Rails passes into
       // `EnumType.new`. Stash it on the def so `enumTypeFrom` delegates to it.
+      //
+      // Skip when the enum's attribute was EXPLICITLY typed (`attribute(name,
+      // type)` before `enum`): Rails uses the declared type, which wins over
+      // the column's reflected type — overriding it here would, e.g., coerce an
+      // integer enum on a MySQL `TINYINT(1)` column through boolean and break
+      // the round-trip.
       const enums = (host as unknown as { _enums?: Map<string, unknown> })._enums;
-      if (enums?.has(name)) {
+      if (enums?.has(name) && !(existing as { enumTypeExplicit?: boolean }).enumTypeExplicit) {
         (existing as { enumReflectedSubtype?: Type }).enumReflectedSubtype = reflectedTypeForColumn(
           host,
           adapter,

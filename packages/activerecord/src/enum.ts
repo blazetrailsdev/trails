@@ -561,6 +561,18 @@ export function _enum(
     options && "default" in options ? { default: options.default } : undefined,
   );
 
+  // Record whether the user explicitly typed the enum's attribute (e.g.
+  // `attribute("state", "integer")` before `enum`). Rails resolves the enum
+  // subtype from the attribute's *declared* type — an explicit type wins over
+  // the column's reflected type — so schema reflection must NOT override an
+  // explicitly-typed enum's subtype with the column type (e.g. a TINYINT(1)
+  // that MySQL reflects as boolean). See the `enumTypeExplicit` gate in
+  // model-schema's `applyColumnsHash`.
+  const enumDef = (
+    this as unknown as { _attributeDefinitions?: Map<string, unknown> }
+  )._attributeDefinitions?.get(attrName) as { enumTypeExplicit?: boolean } | undefined;
+  if (enumDef) enumDef.enumTypeExplicit = explicitlyTyped;
+
   // Rails' `_enum` takes `scopes: true, instance_methods: true` keyword
   // defaults; `scopes: false` suppresses per-value scope generation and
   // `instance_methods: false` suppresses predicate/bang generation.

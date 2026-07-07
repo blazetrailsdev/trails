@@ -379,20 +379,25 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
   it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {
     const type = enumTypeOf(NumericEnum, "decimal_number");
     expect(type).toBeInstanceOf(EnumType);
+    // `subtype`/`subtypeType().type()` is "decimal" — the reflected column
+    // family — where mapping-shape inference (all-numbers) would have said
+    // "integer". Assert the reflected type string, not a concrete class:
+    // adapters reflect their own decimal variant (e.g. MySQL's
+    // DecimalWithoutScale), all of whose `type()` is "decimal".
     expect(type!.subtype).toBe("decimal");
-    expect(type!.subtypeType()).toBeInstanceOf(DecimalType);
+    expect(type!.subtypeType().type()).toBe("decimal");
   });
 
   it("serializes labels through the reflected decimal subtype on both read paths", () => {
     // castEnumValue (predicate/read) and TypeCaster::Map (query) must both
-    // resolve the reflected EnumType, coercing the mapped value through decimal.
-    expect(castEnumValue(NumericEnum, "decimal_number", "mid")).toEqual(
-      new DecimalType().serialize(1),
-    );
+    // resolve the reflected EnumType and serialize the mapped value through the
+    // reflected subtype — not the integer inference. Compare against the
+    // reflected subtype's own serialize so this holds across adapters (whose
+    // decimal serialize output differs).
+    const subtype = enumTypeOf(NumericEnum, "decimal_number")!.subtypeType();
+    expect(castEnumValue(NumericEnum, "decimal_number", "mid")).toEqual(subtype.serialize(1));
     const caster = new MapCaster(NumericEnum);
-    expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(
-      new DecimalType().serialize(1),
-    );
+    expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(subtype.serialize(1));
   });
 });
 
