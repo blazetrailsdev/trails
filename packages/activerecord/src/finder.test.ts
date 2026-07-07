@@ -1750,12 +1750,12 @@ describe("FinderTest", () => {
 // range fix in flight as PR #4433.
 // ==========================================================================
 describe("FinderTest", () => {
-  fixtures(["topics", "comments", "posts", "companies", "accounts"], {
-    // Rails' malformed-condition test intentionally raises StatementInvalid
-    // (unknown `dhh` column), which aborts the surrounding PG transaction and
-    // poisons transactional-fixtures teardown; run it outside the wrapper.
-    usesTransaction: ["hash condition find malformed"],
-  });
+  // The malformed-condition test intentionally raises StatementInvalid (unknown
+  // `dhh` column), which aborts the PG transaction; it still runs
+  // transactionally because the fixture teardown skips its redundant DELETEs
+  // while the pinned transaction is open, so the abort no longer poisons the
+  // rollback.
+  fixtures(["topics", "comments", "posts", "companies", "accounts"]);
   registerModel("Topic", CanonicalTopic);
   registerModel("Reply", CanonicalReply);
   registerModel("Comment", CanonicalComment);

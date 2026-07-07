@@ -191,6 +191,40 @@ export async function resolveFixtureNames(
   return map;
 }
 
+/**
+ * Whether fixture rows must be DELETEd in teardown, or whether an outer
+ * transaction will discard them for us.
+ *
+ * The skip is confined to **PostgreSQL**, the sole adapter where the DELETE is
+ * actively harmful: a test that deliberately raised `StatementInvalid` aborts
+ * the whole PG transaction (SQLSTATE 25P02), so a subsequent DELETE on that
+ * pinned connection fails with "current transaction is aborted, commands
+ * ignored…", poisoning teardown for the next test (or a vitest `retry` re-run).
+ * MySQL/MariaDB and SQLite do not abort the transaction on a failed statement,
+ * so they never hit that — and on MySQL an implicit commit (DDL auto-commits,
+ * `test_fixtures` caveat) can durably persist seeded fixtures that the rollback
+ * then cannot undo, making the DELETE the *only* cleanup. So off PG the DELETE
+ * must always run (unchanged behavior).
+ *
+ * On PG the skip fires only for rows a still-open transaction will roll back —
+ * precisely "were this test's `beforeEach` inserts seeded inside a transaction
+ * that is still open now?". That mirrors Rails' `teardown_fixtures`, where the
+ * rollback IS the teardown and no DELETE is issued. Both conditions are load-
+ * bearing:
+ *   - `seededInTransaction` alone would wrongly skip if that transaction had
+ *     since committed/closed (rows now durable) — so we also require it open.
+ *   - `openTransactions > 0` alone is unsafe on the non-transactional /
+ *     `usesTransaction`-opt-out path: there the fixtures are autocommitted
+ *     before the test body runs, so a test body that leaves its *own*
+ *     transaction/savepoint open wraps none of those committed rows — skipping
+ *     the DELETE would leak them. Gating on `seededInTransaction` confines the
+ *     skip to rows the open transaction actually owns.
+ */
+function shouldDeleteFixtureRows(adapter: DatabaseAdapter, seededInTransaction: boolean): boolean {
+  if (adapter.adapterName !== "postgres") return true;
+  return !(seededInTransaction && adapter.openTransactions > 0);
+}
+
 /** Returns true for "table/relation does not exist" errors from any adapter. */
 function isTableMissingError(e: unknown): boolean {
   const msg = e instanceof Error ? e.message : String(e);
@@ -236,6 +270,9 @@ function useTablelessFixtures(
 
   const keys = entries.map((e) => e.table);
   const store: Record<string, Record<string, unknown>> = {};
+  // Whether the most recent seed ran inside an open transaction (the fixture
+  // pin). Read in afterEach — see shouldDeleteFixtureRows.
+  let seededInTransaction = false;
 
   beforeEach(async () => {
     const adapter = getAdapter();
@@ -248,6 +285,7 @@ function useTablelessFixtures(
       tables.push(table);
     }
     const results = await insertPreparedFixtureSets(adapter, prepared);
+    seededInTransaction = adapter.openTransactions > 0;
     results.forEach((result, i) => {
       store[tables[i]] = result;
     });
@@ -255,11 +293,13 @@ function useTablelessFixtures(
 
   afterEach(async () => {
     const adapter = getAdapter();
-    for (const { table } of [...entries].reverse()) {
-      try {
-        await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
-      } catch (e) {
-        if (!isTableMissingError(e)) throw e;
+    if (shouldDeleteFixtureRows(adapter, seededInTransaction)) {
+      for (const { table } of [...entries].reverse()) {
+        try {
+          await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
+        } catch (e) {
+          if (!isTableMissingError(e)) throw e;
+        }
       }
     }
     for (const key of keys) delete store[key];
@@ -420,6 +460,9 @@ function useFixtures(
 
   // Per-test mutable state: populated in beforeEach, cleared in afterEach.
   const store: Record<string, Record<string, unknown>> = {};
+  // Whether the most recent seed ran inside an open transaction (the fixture
+  // pin). Read in afterEach — see shouldDeleteFixtureRows.
+  let seededInTransaction = false;
 
   // TODO(fixtures-adoption Spike S1): seed once per worker in a global beforeAll
   // (before the pinned transaction opens) when transactional fixtures are
@@ -456,6 +499,7 @@ function useFixtures(
       preparedKeys.push(key);
     }
     const results = await insertPreparedFixtureSets(adapter, prepared);
+    seededInTransaction = adapter.openTransactions > 0;
     results.forEach((result, i) => {
       store[preparedKeys[i]] = result;
     });
@@ -464,12 +508,14 @@ function useFixtures(
   afterEach(async () => {
     if (!fixtures) return;
     const adapter = getAdapter();
-    // Delete in reverse insertion order to respect FK constraints.
-    for (const { table } of Object.values(fixtures).reverse()) {
-      try {
-        await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
-      } catch (e) {
-        if (!isTableMissingError(e)) throw e;
+    if (shouldDeleteFixtureRows(adapter, seededInTransaction)) {
+      // Delete in reverse insertion order to respect FK constraints.
+      for (const { table } of Object.values(fixtures).reverse()) {
+        try {
+          await adapter.executeMutation(`DELETE FROM ${adapter.quoteTableName(table)}`);
+        } catch (e) {
+          if (!isTableMissingError(e)) throw e;
+        }
       }
     }
     for (const key of Object.keys(store)) {

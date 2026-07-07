@@ -42,17 +42,19 @@ function withCollectionCacheVersioning(fn: () => Promise<void>): Promise<void> {
 }
 
 describe("CollectionCacheKeyTest", () => {
-  const { topics, projects } = fixtures(
-    ["developers", "developersProjects", "projects", "topics", "comments", "posts"],
-    {
-      // This test deliberately runs `cache_key(:published_at)` against a column
-      // that doesn't exist. On Postgres the resulting StatementInvalid aborts
-      // the surrounding transaction, which would poison the shared
-      // transactional-fixtures rollback for every later test in the file. Give
-      // it its own transaction so the abort stays isolated.
-      usesTransaction: ["cache_key with unknown timestamp column"],
-    },
-  );
+  // One test deliberately runs `cache_key(:published_at)` against a column that
+  // doesn't exist; on Postgres the resulting StatementInvalid aborts the
+  // transaction. It still runs transactionally because the fixture teardown
+  // skips its redundant DELETEs while the pinned transaction is open, so the
+  // abort no longer poisons the rollback.
+  const { topics, projects } = fixtures([
+    "developers",
+    "developersProjects",
+    "projects",
+    "topics",
+    "comments",
+    "posts",
+  ]);
 
   it("collection_cache_key on model", async () => {
     const key = await Developer.collectionCacheKey();

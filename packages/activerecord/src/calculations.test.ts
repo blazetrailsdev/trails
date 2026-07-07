@@ -31,33 +31,25 @@ import { Edge } from "./test-helpers/models/edge.js";
 describe("CalculationsTest", () => {
   // fixtures :companies, :accounts, :authors, :author_addresses, :topics,
   //          :speedometers, :minivans, :books, :posts, :comments, :cpk_books
-  const { companies, topics, cpkBooks, minivans } = fixtures(
-    [
-      "companies",
-      "accounts",
-      "authors",
-      "authorAddresses",
-      "topics",
-      "speedometers",
-      "minivans",
-      "books",
-      "posts",
-      "comments",
-      "cpkBooks",
-      "cpkAuthors",
-      "oneNeedQuoting",
-    ] as const,
-    {
-      usesTransaction: [
-        // These tests intentionally trigger DB errors (invalid column/syntax) which
-        // abort PG transactions; they must run outside the transactional fixtures wrapper.
-        "count on invalid columns raises",
-        "should calculate with invalid field",
-        "group by with order by virtual count attribute",
-        "pluck with hash argument containing non existent field",
-      ],
-    },
-  );
+  const { companies, topics, cpkBooks, minivans } = fixtures([
+    "companies",
+    "accounts",
+    "authors",
+    "authorAddresses",
+    "topics",
+    "speedometers",
+    "minivans",
+    "books",
+    "posts",
+    "comments",
+    "cpkBooks",
+    "cpkAuthors",
+    "oneNeedQuoting",
+  ] as const);
+  // Several tests intentionally trigger DB errors (invalid column/syntax) that
+  // abort the PG transaction; they still run transactionally because the
+  // fixture teardown skips its redundant DELETEs while the pinned transaction is
+  // open, so the abort no longer poisons the rollback.
 
   it("should sum field", async () => {
     expect(await Account.sum("credit_limit")).toBe(318);

@@ -73,28 +73,26 @@ describe("UpdateAllTest", () => {
     comments,
     warehouseThings,
     cpkOrderAgreements,
-  } = fixtures(
-    [
-      "authors",
-      "authorAddresses",
-      "comments",
-      "developers",
-      "posts",
-      "people",
-      "pets",
-      "toys",
-      "tags",
-      "taggings",
-      "warehouseThings",
-      "cpkOrders",
-      "cpkOrderAgreements",
-    ],
-    {
-      // "update all doesnt ignore order" deliberately raises a DB error to test
-      // ORDER BY semantics; on PG this aborts the transaction, poisoning teardown.
-      usesTransaction: ["update all doesnt ignore order"],
-    },
-  );
+  } = fixtures([
+    "authors",
+    "authorAddresses",
+    "comments",
+    "developers",
+    "posts",
+    "people",
+    "pets",
+    "toys",
+    "tags",
+    "taggings",
+    "warehouseThings",
+    "cpkOrders",
+    "cpkOrderAgreements",
+  ]);
+  // "update all doesnt ignore order" deliberately raises a DB error to test
+  // ORDER BY semantics; on PG this aborts the transaction. It still runs
+  // transactionally because the fixture teardown skips its redundant DELETEs
+  // while the pinned transaction is open, so the abort no longer poisons the
+  // rollback.
 
   it("update all with scope", async () => {
     const tag = tags("general");

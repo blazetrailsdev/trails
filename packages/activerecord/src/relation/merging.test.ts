@@ -440,14 +440,7 @@ describe("RelationMergingTest", () => {
 });
 
 describe("MergingDifferentRelationsTest", () => {
-  const { posts } = fixtures(["posts", "authors", "authorAddresses", "developers", "comments"], {
-    // The same-alias CTE case deliberately triggers a StatementInvalid, which
-    // aborts the PG transaction and would poison shared transactional
-    // fixtures; run it outside the shared transaction.
-    usesTransaction: [
-      "relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed",
-    ],
-  });
+  const { posts } = fixtures(["posts", "authors", "authorAddresses", "developers", "comments"]);
 
   it("merging where relations", async () => {
     const helloByBob = await Post.where({ body: "hello" })

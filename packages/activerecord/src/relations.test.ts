@@ -57,34 +57,34 @@ describe("RelationTest", () => {
     companies,
     minivans,
     cpkOrders,
-  } = fixtures(
-    [
-      "authors",
-      "authorAddresses",
-      "topics",
-      "entrants",
-      "developers",
-      "people",
-      "companies",
-      "developersProjects",
-      "accounts",
-      "categories",
-      "categorizations",
-      "categoriesPosts",
-      "posts",
-      "comments",
-      "tags",
-      "taggings",
-      "cars",
-      "minivans",
-      "cpkOrders",
-      "cpkBooks",
-      "subscribers",
-    ],
-    {
-      usesTransaction: ["finding with subquery without select does not change the select"],
-    },
-  );
+  } = fixtures([
+    "authors",
+    "authorAddresses",
+    "topics",
+    "entrants",
+    "developers",
+    "people",
+    "companies",
+    "developersProjects",
+    "accounts",
+    "categories",
+    "categorizations",
+    "categoriesPosts",
+    "posts",
+    "comments",
+    "tags",
+    "taggings",
+    "cars",
+    "minivans",
+    "cpkOrders",
+    "cpkBooks",
+    "subscribers",
+  ]);
+  // "finding with subquery without select does not change the select"
+  // deliberately raises a DB error that aborts the PG transaction; it still runs
+  // transactionally because the fixture teardown skips its redundant DELETEs
+  // while the pinned transaction is open, so the abort no longer poisons the
+  // rollback.
 
   beforeAll(() => {
     registerModel(Post);
