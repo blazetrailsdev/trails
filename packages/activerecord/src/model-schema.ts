@@ -712,11 +712,18 @@ export function symbolColumnToString(this: SchemaHost, name: string): string | u
  * `schema_cache.clear_data_source_cache!(table_name)` step in Rails'
  * `reset_column_information` (model_schema.rb).
  *
- * Resolved WITHOUT leasing a connection — Rails keeps `reset_column_information`
- * inert (`active_connection&.`, schema_cache reached via the pool). We prefer a
- * directly-assigned adapter (`Base.adapter=` bypasses the pool), else the
- * pool-level schema cache; both skip `leaseConnection()`. Best-effort: a model
- * with no pool/table simply has nothing to clear.
+ * The cache is resolved WITHOUT leasing a connection — Rails keeps
+ * `reset_column_information` inert (`active_connection&.`, schema_cache reached
+ * via the pool). We prefer a directly-assigned adapter (`Base.adapter=` bypasses
+ * the pool), else the pool-level schema cache; both skip `leaseConnection()`.
+ * Best-effort: a model with no pool/table simply has nothing to clear.
+ *
+ * Exception: under {@link SchemaReflection.eagerLoadSchemaCache} the entry is
+ * refreshed in place (fire-and-forget {@link SchemaCache#refreshBang}) instead
+ * of cleared, so a synchronous read right after the reset stays warm — see the
+ * branch below. That path DOES lease a connection to re-introspect, matching
+ * eager warming's live-reflection contract; the default (flag-off) path remains
+ * inert and connection-free.
  */
 function clearAdapterDataSourceCache(host: SchemaHost): void {
   // The raw, sync SchemaCache — `clearDataSourceCacheBang(connection, name)`.
