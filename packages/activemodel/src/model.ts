@@ -1979,7 +1979,12 @@ export class Model {
     return this._dirty.changed;
   }
 
-  get changedAttributes(): string[] {
+  /**
+   * Map of each changed attribute's name to its old (pre-change) value.
+   *
+   * Mirrors: ActiveModel::Dirty#changed_attributes
+   */
+  get changedAttributes(): Record<string, unknown> {
     return this._dirty.changedAttributes;
   }
 
@@ -2088,7 +2093,7 @@ export class Model {
    * Mirrors: ActiveModel::Dirty#changed_attribute_names_to_save
    */
   get changedAttributeNamesToSave(): string[] {
-    return this.changedAttributes;
+    return this._dirty.changedAttributeNames;
   }
 
   /**
@@ -2109,7 +2114,7 @@ export class Model {
    */
   get attributesInDatabase(): Record<string, unknown> {
     const result: Record<string, unknown> = {};
-    for (const name of this.changedAttributes) {
+    for (const name of this._dirty.changedAttributeNames) {
       result[name] = this.attributeInDatabase(name);
     }
     return result;

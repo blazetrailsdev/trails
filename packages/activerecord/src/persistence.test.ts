@@ -1772,7 +1772,7 @@ describe("PersistenceTest", () => {
     const company = new Company({ name: "37signals" }) as any;
     const client = company.becomes(Client);
     expect(client.name).toBe("37signals");
-    expect(client.changedAttributes).toEqual(["name"]);
+    expect(client.changedAttributeNamesToSave).toEqual(["name"]);
   });
 });
 

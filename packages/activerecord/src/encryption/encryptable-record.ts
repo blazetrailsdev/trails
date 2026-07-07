@@ -518,8 +518,8 @@ export class EncryptableRecord {
       modelClass.beforeSave((record: any) => {
         const isNew =
           typeof record.isNewRecord === "function" ? record.isNewRecord() : !record.isPersisted?.();
-        const changed: string[] = Array.isArray(record.changedAttributes)
-          ? record.changedAttributes
+        const changed: string[] = Array.isArray(record.changedAttributeNamesToSave)
+          ? record.changedAttributeNamesToSave
           : [];
         if (!isNew && !changed.includes(name)) return;
         record.writeAttribute(originalName, record.readAttribute(name));
@@ -674,10 +674,10 @@ export class EncryptableRecord {
   static cantModifyEncryptedAttributesWhenFrozen(record: any): void {
     const klass = record.constructor;
     const encryptedAttrs: Set<string> = klass._encryptedAttributes ?? new Set();
-    // changedAttributes is a string[] in this codebase (from DirtyTracker).
+    // changedAttributeNamesToSave is the string[] of changed attribute names.
     // Iterate changed once and check Set membership — O(n+m) vs O(n×m).
-    const changed: string[] = Array.isArray(record.changedAttributes)
-      ? record.changedAttributes
+    const changed: string[] = Array.isArray(record.changedAttributeNamesToSave)
+      ? record.changedAttributeNamesToSave
       : [];
     for (const attr of changed) {
       if (encryptedAttrs.has(attr)) {

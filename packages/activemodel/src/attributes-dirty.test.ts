@@ -70,8 +70,8 @@ describe("AttributesDirtyTest", () => {
   it("list of changed attribute keys", () => {
     const p = new DirtyPerson({ name: "Alice", age: 25 });
     p.writeAttribute("name", "Bob");
-    expect(p.changedAttributes).toContain("name");
-    expect(p.changedAttributes).not.toContain("age");
+    expect(p.changedAttributeNamesToSave).toContain("name");
+    expect(p.changedAttributeNamesToSave).not.toContain("age");
   });
 
   it("changes to attribute values", () => {

@@ -22,7 +22,7 @@ export async function lockBang<T extends Base>(
     if (this.changed) {
       // Mirrors Rails' squished message order: the save/reload guidance first,
       // then `Changed attributes: #{changed.map(&:inspect).join(', ')}.` last.
-      const dirtyAttrs = this.changedAttributes.map((a) => `"${a}"`).join(", ");
+      const dirtyAttrs = this.changedAttributeNamesToSave.map((a) => `"${a}"`).join(", ");
       throw new Error(
         "Locking a record with unpersisted changes is not supported. Use " +
           "`save` to persist the changes, or `reload` to discard them " +
