@@ -123,10 +123,7 @@ describe("StoreTest", () => {
     expect((john as any).colorChanged()).toBe(false);
   });
 
-  // trails: Serialized#isChanged uses reference equality for HWIA, so a
-  // write→revert produces two different HWIA references that compare as changed.
-  // Rails uses Ruby's == which compares by content. Tracked for convergence.
-  it.skip("updating the store and changing it back won't mark accessor as changed", () => {
+  it("updating the store and changing it back won't mark accessor as changed", () => {
     john.color = "red";
     expect((john as any).colorWas()).toBe("black");
     john.color = "black";
