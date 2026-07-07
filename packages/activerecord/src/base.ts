@@ -29,6 +29,7 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   Model,
+  MissingAttributeError,
   Type,
   typeRegistry,
   pushPendingDecorator,
@@ -670,11 +671,45 @@ function _extractAssociationAttrs(
 }
 
 /**
- * Route a constructor-form composite primary key (`new Model({ id: [a, b] })`)
- * through the `id=` setter so each key column is populated. Rails dispatches all
- * `assign_attributes` keys through `public_send("#{k}=")`, but trails' Model
- * constructor writes directly via `writeAttribute`, which would store the whole
- * array in a single `id` column. Mirrors Rails' `Cpk::Book.new(id: [1, 2])`.
+ * Collect every `<assoc>Attributes` nested-attribute setter key registered on
+ * `ctor` and its ancestors (the same registry `_reapplyNestedAttrSetters`
+ * walks). Used to hold nested-attribute keys out of the Model constructor's
+ * setter-dispatching assignment so they fire post-super, once the association
+ * caches exist.
+ * @internal
+ */
+function _collectNestedAttributeSetterKeys(ctor: typeof Base | undefined): Set<string> {
+  const keys = new Set<string>();
+  let cls: unknown = ctor;
+  while (cls && cls !== Object) {
+    const own = Object.getOwnPropertyDescriptor(cls, "_nestedAttributeSetterKeys");
+    if (own?.value instanceof Set) {
+      for (const k of own.value as Set<string>) keys.add(k);
+    }
+    cls = Object.getPrototypeOf(cls);
+  }
+  return keys;
+}
+
+/**
+ * Route a constructor-form composite primary key through the deferred `id`
+ * handling: trails holds the `id` key out of super()'s attribute loop and
+ * re-dispatches it here, once `initInternals` has run.
+ *
+ * - `id: [a, b]` goes through the `id=` setter (`setId`, mirroring
+ *   `CompositePrimaryKey#id=`), which spreads the array across the key columns.
+ * - a scalar `id` on a model-level composite PK is written straight to the `id`
+ *   column when the table has one. trails' cpk test models (`cpk_orders`,
+ *   `cpk_books`) declare a composite PK at the model level over tables that keep
+ *   a real single `id` column, and the suite's established convention passes the
+ *   key parts as scalars (`CpkBook.create({ author_id, id: 7 })`). Rails' native
+ *   `CompositePrimaryKey#id=` would raise `TypeError` on a scalar (it wants
+ *   `id: [author_id, id]`); converging that — and the many scalar-`id` cpk
+ *   fixtures/tests that depend on it — is a distinct deviation out of scope for
+ *   this unknown-attribute story, whose acceptance criteria explicitly keep
+ *   composite-PK keys constructing (deferred), not raised. A model with no `id`
+ *   column resolves to the Null attribute → MissingAttributeError, kept lenient
+ *   here (the deferred composite-PK path is never an unknown-attribute error).
  * @internal
  */
 function _applyCompositePrimaryKey(
@@ -683,9 +718,43 @@ function _applyCompositePrimaryKey(
   attrs: Record<string, unknown>,
 ): void {
   const pk = (ctor as { primaryKey?: unknown }).primaryKey;
-  if (Array.isArray(pk) && Array.isArray((attrs as { id?: unknown }).id)) {
-    (record as unknown as { id: unknown }).id = (attrs as { id: unknown }).id;
+  if (!Array.isArray(pk) || !Object.prototype.hasOwnProperty.call(attrs, "id")) return;
+  const idVal = (attrs as { id: unknown }).id;
+  if (Array.isArray(idVal)) {
+    (record as unknown as { id: unknown }).id = idVal;
+    return;
   }
+  try {
+    (record as unknown as { _writeAttribute: (n: string, v: unknown) => void })._writeAttribute(
+      "id",
+      idVal,
+    );
+  } catch (error) {
+    if (!(error instanceof MissingAttributeError)) throw error;
+  }
+}
+
+/**
+ * Keys held out of super()'s setter-dispatching attribute loop and re-applied
+ * post-`initInternals`: a composite-PK `id` (→ `_applyCompositePrimaryKey`) and
+ * `<assoc>Attributes` nested-attribute keys (→ `_reapplyNestedAttrSetters`).
+ * Both dispatch setters that touch state (`id=` the key columns, the nested
+ * writer the association caches) which isn't wired until after `super()`.
+ * @internal
+ */
+function _withoutDeferredConstructionKeys(
+  ctor: typeof Base | undefined,
+  attrs: Record<string, unknown>,
+): Record<string, unknown> {
+  const drop = _collectNestedAttributeSetterKeys(ctor);
+  if (
+    Array.isArray((ctor as { primaryKey?: unknown } | undefined)?.primaryKey) &&
+    Object.prototype.hasOwnProperty.call(attrs, "id")
+  ) {
+    drop.add("id");
+  }
+  if (drop.size === 0) return attrs;
+  return Object.fromEntries(Object.entries(attrs).filter(([k]) => !drop.has(k)));
 }
 
 /**
@@ -3004,8 +3073,12 @@ export class Base extends Model {
       const wasSuppressed = suppressor._suppressInitializeCallback;
       suppressor._suppressInitializeCallback = true;
       const { multiparams, regular } = extractMultiparameterCallstack(attrs);
+      // Same deferral as the non-multiparameter branch: a composite-PK `id` or
+      // nested-attribute key sitting alongside multiparameter keys must not
+      // dispatch its setter inside super() before `initInternals` runs.
+      const regularForSuper = _withoutDeferredConstructionKeys(ctor, regular);
       try {
-        super(regular);
+        super(regularForSuper);
       } finally {
         // Always restore the flag even if super() throws, so later instances
         // on this class still fire after_initialize normally.
@@ -3020,6 +3093,7 @@ export class Base extends Model {
       // initialize_internals_callback and after_initialize, regardless of
       // callback suppression (found records run it via `new this()` too).
       _Core.initInternals.call(this as any);
+      _applyCompositePrimaryKey(this as unknown as Base, ctor, attrs);
       executeMultiparameterAssignment(this as any, multiparams);
       // Re-snapshot so mp attrs are part of the initial clean state.
       (this as any)._dirty.snapshot((this as any)._attributes);
@@ -3073,20 +3147,12 @@ export class Base extends Model {
           );
         }
       }
-      // A composite primary key passed as `id: [a, b]` must be routed solely
-      // through the `id=` setter (applied post-super by
-      // `_applyCompositePrimaryKey`). Drop it from `attrsForSuper` so super()'s
-      // raw `writeAttribute("id", …)` doesn't materialize a phantom `id`
-      // attribute for key columns not literally named `id` — Rails' dispatch
-      // (`public_send("id=")`) never creates one.
-      if (
-        Array.isArray((ctor2 as { primaryKey?: unknown }).primaryKey) &&
-        Array.isArray(attrs.id)
-      ) {
-        attrsForSuper = Object.fromEntries(
-          Object.entries(attrsForSuper).filter(([k]) => k !== "id"),
-        );
-      }
+      // Hold the composite-PK `id` and any `<assoc>Attributes` nested-attribute
+      // keys out of super()'s setter-dispatching loop: their setters (`id=`, the
+      // nested writer) touch state that isn't wired until after super()
+      // (`initInternals`). Re-dispatched post-super by `_applyCompositePrimaryKey`
+      // and `_reapplyNestedAttrSetters`.
+      attrsForSuper = _withoutDeferredConstructionKeys(ctor2, attrsForSuper);
       const suppressor2 = ctor2 as typeof ctor2 & { _suppressInitializeCallback?: boolean };
       const hadOwn2 = Object.prototype.hasOwnProperty.call(
         suppressor2,

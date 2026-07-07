@@ -351,6 +351,15 @@ describeIfPg("PostgreSQLAdapter", () => {
       // sentinels (the timestamp OID round-trips them as "infinity" / "-infinity").
       class Dev extends Base {
         static tableName = "ts_infinity_dev";
+        // Declare `name` so mass-assignment dispatches its setter: the sibling
+        // `load infinity and beyond` Dev above shares the `ts_infinity_dev`
+        // schema-cache slot but its table has no `name` column, so reflection
+        // alone can leave `name` out of the attribute set — and construction now
+        // raises UnknownAttributeError for an unmodeled key. `updated_at` reflects
+        // from the timestamp column (keeping its infinity-capable OID decoder).
+        static {
+          this.attribute("name", "string");
+        }
       }
       await adapter.exec(`DROP TABLE IF EXISTS ts_infinity_dev`);
       await adapter.exec(

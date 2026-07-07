@@ -22,6 +22,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType } from "@blazetrails/activemodel";
+import { CpkBook } from "./test-helpers/models/cpk.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -244,9 +245,16 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    // Should not throw when setting unknown attributes
-    const u = new User({ name: "test", unknown: "value" } as any);
-    expect(u.name).toBe("test");
+    // Mirrors Rails: constructing with a genuinely-unknown key raises
+    // UnknownAttributeError (attribute_assignment.rb:56-58), carrying the key.
+    let error: unknown;
+    try {
+      new User({ name: "test", unknown: "value" } as any);
+    } catch (e) {
+      error = e;
+    }
+    expect((error as { name?: string })?.name).toBe("UnknownAttributeError");
+    expect((error as { attribute?: string })?.attribute).toBe("unknown");
   });
 
   it("many mutations", async () => {
@@ -1258,20 +1266,13 @@ describe("BasicsTest", () => {
     expect(u.isDestroyed()).toBe(true);
   });
   it("dup for a composite primary key model", async () => {
-    class Order extends Base {
-      static {
-        this.attribute("shop_id", "integer");
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.primaryKey = ["shop_id", "id"];
-      }
-    }
-    const o = new Order({ shop_id: 1, id: 42, name: "Widget" });
-    const copy = o.dup();
-    expect(copy.readAttribute("shop_id")).toBeNull();
-    expect(copy.readAttribute("id")).toBeNull();
-    expect(copy.readAttribute("name")).toBe("Widget");
-    expect(copy.isNewRecord()).toBe(true);
+    // Mirrors Rails `basic_test.rb#test_dup_for_a_composite_primary_key_model`:
+    // a persisted composite-PK record's dup preserves regular attributes and
+    // nulls the whole primary key (`[nil, nil]`). CpkBook's PK is [author_id, id].
+    const book = await CpkBook.createBang({ id: [1, 2], title: "The first book" });
+    const newBook = book.dup();
+    expect((newBook as { title: string }).title).toBe("The first book");
+    expect((newBook as { id: unknown }).id).toEqual([null, null]);
   });
   it("dup does not copy associations", async () => {
     class User extends Base {

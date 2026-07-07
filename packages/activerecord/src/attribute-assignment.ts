@@ -17,6 +17,10 @@ import {
 
 interface AttributeAssignmentHost {
   writeAttribute(key: string, value: unknown): void;
+  // ActiveModel's `_assign_attribute` (attribute_assignment.rb:67-75): dispatch
+  // a key through its writer, or route a writer-less key to
+  // `attribute_writer_missing` (→ UnknownAttributeError). Inherited from `Model`.
+  _assignAttribute(key: string, value: unknown): void;
   constructor: unknown;
   association?: (name: string) => unknown;
 }
@@ -46,7 +50,7 @@ export function _assignAttributes(
     } else if (v !== null && typeof v === "object" && !Array.isArray(v)) {
       (nestedParameterAttributes ??= Object.create(null))[k] = v;
     } else {
-      this.writeAttribute(k, v);
+      this._assignAttribute(k, v);
     }
   }
 
@@ -67,7 +71,7 @@ export function assignNestedParameterAttributes(
   pairs: Record<string, unknown>,
 ): void {
   for (const [k, v] of Object.entries(pairs)) {
-    this.writeAttribute(k, v);
+    this._assignAttribute(k, v);
   }
 }
 
