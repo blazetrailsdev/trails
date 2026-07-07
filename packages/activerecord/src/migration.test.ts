@@ -1993,7 +1993,9 @@ describe("MigrationTest", () => {
           // (year 9999) is definitely > tomorrow.
           const dir = new URL("./test-helpers/migrations/future_timestamp", import.meta.url)
             .pathname;
-          expect(() => Migrator.fromPath(dir, Base.connection)).toThrow(/Invalid timestamp/);
+          expect(() => Migrator.fromPath(dir, Base.connection)).toThrow(
+            /Invalid timestamp 99991231235959 for migration file: future_timestamp_migration/,
+          );
         } finally {
           Migrator.validateMigrationTimestamps = savedValidate;
         }

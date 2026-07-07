@@ -2997,6 +2997,7 @@ export class Migrator {
       const parsed = helper.parseMigrationFilename(file);
       if (!parsed) continue;
       const [version, rawName, scope] = parsed;
+      helper._validateLoadedMigration(version, rawName);
       const name = camelize(rawName);
       proxies.push({
         version,
@@ -3010,7 +3011,6 @@ export class Migrator {
         },
       });
     }
-    helper._validateLoadedMigrations(proxies);
     return proxies.sort((a, b) => {
       const va = BigInt(a.version),
         vb = BigInt(b.version);
@@ -3032,6 +3032,7 @@ export class Migrator {
       const parsed = helper.parseMigrationFilename(file);
       if (!parsed) continue;
       const [version, rawName, scope] = parsed;
+      helper._validateLoadedMigration(version, rawName);
       const name = camelize(rawName);
       proxies.push({
         version,
@@ -3045,7 +3046,6 @@ export class Migrator {
         },
       });
     }
-    helper._validateLoadedMigrations(proxies);
     // Rails MigrationContext#migrations: `migrations.sort_by(&:version)` —
     // numeric (not lexicographic) so "10" sorts after "2".
     return proxies.sort((a, b) => {
@@ -3066,26 +3066,25 @@ export class Migrator {
   }
 
   /**
-   * Load-time validation, mirroring the per-file checks in Rails'
-   * `MigrationContext#migrations` (migration.rb:1303-1308): reject a
-   * non-numeric version and, when timestamp validation is enabled, a version
-   * that isn't a valid migration timestamp. Called from the file-load paths
-   * (`fromPath` / `discoverMigrations`) so the layering matches Rails, where
-   * these checks never live in `Migrator#validate`.
+   * Per-file load-time validation, mirroring the checks Rails runs inside
+   * `MigrationContext#migrations` (migration.rb:1303-1308) as each file is
+   * parsed: reject a non-numeric version and, when timestamp validation is
+   * enabled, a version that isn't a valid migration timestamp. Runs on the
+   * raw (pre-camelize) name so the error names the file like Rails, and is
+   * called from the file-load paths (`fromPath` / `discoverMigrations`) — not
+   * from `validate`, matching Rails' layering where these checks never live
+   * in `Migrator#validate`.
    *
    * @internal
    */
-  private _validateLoadedMigrations(migrations: MigrationProxy[]): void {
-    const validateTs = this.isValidateTimestamp();
-    for (const m of migrations) {
-      if (!m.version || !/^\d+$/.test(m.version)) {
-        throw new MigrationError(
-          `Invalid migration version: ${m.version}. Version must be a numeric string.`,
-        );
-      }
-      if (validateTs && !this.isValidMigrationTimestamp(m.version)) {
-        throw new InvalidMigrationTimestampError(m.version, m.name);
-      }
+  private _validateLoadedMigration(version: string, name: string): void {
+    if (!version || !/^\d+$/.test(version)) {
+      throw new MigrationError(
+        `Invalid migration version: ${version}. Version must be a numeric string.`,
+      );
+    }
+    if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
+      throw new InvalidMigrationTimestampError(version, name);
     }
   }
 
