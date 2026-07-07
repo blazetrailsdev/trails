@@ -15,13 +15,14 @@ import {
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
   underscore,
+  singularize,
   renameKey,
+  toTag,
   type RenameKeyOptions,
+  type XmlBuilder,
   htmlEscape,
   resetCallbacks as asResetCallbacks,
-  BigDecimal,
 } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   humanAttributeName as translationHumanAttributeName,
   lookupAncestors as translationLookupAncestors,
@@ -185,6 +186,18 @@ interface XmlTypeInfo {
 }
 
 const EMPTY_XML_TYPE_INFO: XmlTypeInfo = { types: {}, nested: {} };
+
+/**
+ * Whether a serialized value is a plain `{}` record (the trails analog of a
+ * Ruby Hash) rather than a class instance. Only plain records are expanded into
+ * nested XML tags; Date/Temporal/BigDecimal/TimeWithZone and any other instance
+ * serialize as a single leaf, matching XmlMini's `respond_to?(:to_xml)` gate.
+ */
+function isPlainRecord(value: unknown): value is Record<string, unknown> {
+  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
 
 /**
  * Build the cast-derived {@link XmlTypeInfo} for a record's serialized `hash`,
@@ -2368,69 +2381,77 @@ export class Model {
     // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
     // attribute on every tag; the `nil="true"` marker is a separate attribute
     // and stays. (active_support/core_ext/array/conversions.rb / xml_mini.rb)
-    const typeAttr = (t: string) => (skipTypes ? "" : ` type="${t}"`);
     let xml = "";
+    // An indentation-aware leaf sink for the shared XmlMini `toTag` funnel,
+    // which resolves the `type=` name, applies formatting, emits `nil="true"`,
+    // and calls `renameKey`. `openTag`/`closeTag` are unused: only leaves are
+    // routed through `toTag` here — nested plain-object hashes keep their own
+    // recursion below so the per-attribute cast types (`typeInfo.nested`) can be
+    // threaded, which `toTag` (one type per value) cannot carry.
+    const leafBuilder = (leafIndent: string): XmlBuilder => ({
+      tag: (name, content, attributes = {}) => {
+        const attrs = Object.entries(attributes)
+          .map(([k, v]) => ` ${k}="${this._escapeXml(v)}"`)
+          .join("");
+        xml +=
+          content == null
+            ? `${leafIndent}<${name}${attrs}/>\n`
+            : `${leafIndent}<${name}${attrs}>${this._escapeXml(content)}</${name}>\n`;
+      },
+      openTag: () => {},
+      closeTag: () => {},
+    });
+    const builder = leafBuilder(indent);
     for (const [key, value] of Object.entries(hash)) {
-      const tag = renameKey(underscore(key), renameOptions);
+      const tagKey = underscore(key);
       // The cast/column type name (when known) overrides JS-runtime inference so
       // the `type=` attribute is adapter-agnostic (e.g. a bigint `id` stays
       // `type="integer"` whether it arrives as a JS number, BigInt, or string).
       const castTypeName = typeInfo.types[key];
-      if (value === null || value === undefined) {
-        xml += `${indent}<${tag} nil="true"/>\n`;
-      } else if (
-        typeof value === "object" &&
-        !Array.isArray(value) &&
-        // boundary: exclude Date and Temporal types from the plain-object
-        // branch so they hit dedicated serialization arms below.
-        !(value instanceof Date) &&
-        !(value instanceof Temporal.Instant) &&
-        !(value instanceof Temporal.PlainDateTime) &&
-        !(value instanceof Temporal.PlainDate) &&
-        !(value instanceof Temporal.PlainTime) &&
-        !(value instanceof Temporal.ZonedDateTime) &&
-        // boundary: a decimal attribute materializes as a BigDecimal object,
-        // but Rails serializes BigDecimal#to_xml as a scalar `type="decimal"`
-        // leaf (its `to_s`), not a nested object of its digit parts.
-        !(value instanceof BigDecimal)
-      ) {
-        xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}</${tag}>\n`;
-      } else if (value instanceof BigDecimal) {
-        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "decimal")}>${this._escapeXml(value.toString())}</${tag}>\n`;
-        // boundary: legacy Date values serialize as ISO 8601 dateTime XML.
-      } else if (value instanceof Date) {
-        xml += `${indent}<${tag}${typeAttr("dateTime")}>${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
+      const emit = (type?: string) =>
+        toTag(tagKey, value, { builder, type, skipTypes, ...renameOptions });
+      if (isPlainRecord(value)) {
+        // A plain `{}` record is the trails analog of a Ruby Hash: expand it.
+        // Non-plain objects (Date, Temporal, BigDecimal, an ActiveSupport
+        // TimeWithZone, or any other class instance) fall through to `toTag`,
+        // which serializes each as a single typed leaf — never a nested hash.
+        const tag = renameKey(tagKey, renameOptions);
+        xml += `${indent}<${tag}>\n${this._hashToXml(value, indent + "  ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}</${tag}>\n`;
       } else if (Array.isArray(value)) {
-        xml += `${indent}<${tag}${typeAttr("array")}>\n`;
-        for (const item of value) {
-          if (typeof item === "object" && item !== null) {
-            xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </item>\n`;
-          } else {
-            xml += `${indent}  <item>${this._escapeXml(String(item))}</item>\n`;
+        const tag = renameKey(tagKey, renameOptions);
+        const arrayType = skipTypes ? "" : ` type="array"`;
+        if (value.length === 0) {
+          // Rails emits an empty array as the self-closing `<tag type="array"/>`.
+          xml += `${indent}<${tag}${arrayType}/>\n`;
+        } else {
+          xml += `${indent}<${tag}${arrayType}>\n`;
+          // Array children are named for the singularized (renamed) root, per
+          // Array#to_xml (`children = root.singularize`) — e.g. `<tag>` under
+          // `<tags type="array">`, not a generic `<item>`.
+          const children = singularize(tag);
+          const itemBuilder = leafBuilder(indent + "  ");
+          for (const item of value) {
+            if (isPlainRecord(item)) {
+              xml += `${indent}  <${children}>\n${this._hashToXml(item, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </${children}>\n`;
+            } else {
+              // Route every scalar element through `toTag` so it keeps Rails'
+              // inferred `type=`, `nil="true"`, and per-type formatting (a Date
+              // element stays a `dateTime` leaf, not an expanded hash).
+              toTag(children, item, { builder: itemBuilder, skipTypes, ...renameOptions });
+            }
           }
+          xml += `${indent}</${tag}>\n`;
         }
-        xml += `${indent}</${tag}>\n`;
       } else if (typeof value === "number") {
-        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "integer")}>${value}</${tag}>\n`;
-      } else if (typeof value === "boolean") {
-        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "boolean")}>${value}</${tag}>\n`;
-      } else if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
-        xml += `${indent}<${tag}${typeAttr("dateTime")}>${value.toJSON()}</${tag}>\n`;
-      } else if (value instanceof Temporal.ZonedDateTime) {
-        // ZonedDateTime.toJSON() includes the IANA bracket annotation which is
-        // not a valid XML Schema dateTime lexical form. Serialize as Instant
-        // (UTC) so the output is a standard ISO 8601 dateTime string.
-        xml += `${indent}<${tag}${typeAttr("dateTime")}>${value.toInstant().toJSON()}</${tag}>\n`;
-      } else if (value instanceof Temporal.PlainDate) {
-        xml += `${indent}<${tag}${typeAttr("date")}>${value.toString()}</${tag}>\n`;
-      } else if (value instanceof Temporal.PlainTime) {
-        xml += `${indent}<${tag}${typeAttr("time")}>${value.toString()}</${tag}>\n`;
-      } else if (castTypeName) {
-        // BigInt/string-materialized numeric columns (bigint ids on PG/MariaDB,
-        // decimals as strings) land here; the cast type restores their `type=`.
-        xml += `${indent}<${tag}${typeAttr(castTypeName)}>${this._escapeXml(String(value))}</${tag}>\n`;
+        // ActiveModel serializes every JS `number` as `integer` (it cannot see
+        // the DB scale); a float column supplies its cast type explicitly.
+        emit(castTypeName ?? "integer");
       } else {
-        xml += `${indent}<${tag}>${this._escapeXml(String(value))}</${tag}>\n`;
+        // Every remaining leaf — nil, boolean, BigDecimal, Date, the Temporal
+        // types, and strings — is typed by `toTag`'s own inference, with the
+        // cast/column type (bigint ids, string-materialized decimals) overriding
+        // it so the `type=` attribute stays adapter-agnostic.
+        emit(castTypeName);
       }
     }
     return xml;
