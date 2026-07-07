@@ -3427,7 +3427,11 @@ export class Base extends Model {
       if (saved) {
         this._transactionAction = wasNewRecord ? "create" : "update";
         (this as any)._newRecordBeforeLastCommit = wasNewRecord;
-        (this as any)._triggerUpdateCallback = !wasNewRecord;
+        // `@_trigger_update_callback` is set inside `_performUpdate` from the
+        // UPDATE's affected-row count (Rails persistence.rb:900-909), so it is
+        // NOT forced here: a real update whose WHERE matched zero rows (e.g. a
+        // separate instance deleted the row earlier in the transaction) must
+        // leave the flag false so after_update_commit doesn't fire.
       }
 
       // Rails Callbacks#create_or_update is `_run_save_callbacks { super }`,
@@ -3654,7 +3658,12 @@ export class Base extends Model {
     const changedAttrs = { ...this.changes };
 
     // With partial_writes=false Rails uses all columns and never short-circuits on clean attrs.
-    if (ctor.partialUpdates && Object.keys(changedAttrs).length === 0) return;
+    // Mirrors Rails _update_record's `if attribute_names.empty?` branch: no
+    // columns to write ⇒ affected_rows = 0 but @_trigger_update_callback = true.
+    if (ctor.partialUpdates && Object.keys(changedAttrs).length === 0) {
+      (this as any)._triggerUpdateCallback = true;
+      return;
+    }
 
     const dbValues = this._attributes.valuesForDatabase();
     // With partial_writes=false Rails includes all columns; with it on, only dirty ones.
@@ -3663,7 +3672,11 @@ export class Base extends Model {
       : ctor.attributeNames().filter((key) => ctor._attributeDefinitions.has(key));
     const declaredChanges = _attributesForUpdate.call(this, candidateNames);
 
-    if (declaredChanges.length === 0) return;
+    // Same empty-attribute_names branch as above (Rails persistence.rb:903-905).
+    if (declaredChanges.length === 0) {
+      (this as any)._triggerUpdateCallback = true;
+      return;
+    }
 
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = declaredChanges.map(
       (key) => {
@@ -3737,7 +3750,9 @@ export class Base extends Model {
     this._pendingOperation = adapter
       .execUpdate(updateSql, `${ctor.name} Update`, updateBinds)
       .then((affected) => {
-        if (ctor.lockingEnabled && affected === 0) {
+        // Mirrors Rails Locking::Optimistic#_update_row (optimistic.rb:110):
+        // `raise StaleObjectError if affected_rows != 1` — not just `=== 0`.
+        if (ctor.lockingEnabled && affected !== 1) {
           // Mirrors Rails _update_row rescue: `@attributes[locking_column] =
           // lock_attribute_was` restores the attribute snapshot so NULL-in-DB
           // records don't lose their original null valueBeforeTypeCast.
@@ -3757,6 +3772,11 @@ export class Base extends Model {
           }
           throw new StaleObjectError(this, "update");
         }
+        // Mirrors Rails _update_record: `@_trigger_update_callback = affected_rows == 1`.
+        // A stale update whose WHERE matched no row (row deleted by another
+        // instance earlier in the transaction) leaves the flag false, so
+        // after_update_commit / after_rollback(on: :update) don't fire.
+        (this as any)._triggerUpdateCallback = affected === 1;
       });
   }
 

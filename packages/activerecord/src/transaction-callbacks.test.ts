@@ -19,7 +19,9 @@ import {
   currentTransaction,
   Rollback,
   registerModel,
+  setCallback,
 } from "./index.js";
+import { skipCallbackOnProto } from "@blazetrails/activemodel";
 import { Owner } from "./test-helpers/models/owner.js";
 import { Pet } from "./test-helpers/models/pet.js";
 import { fixtures } from "./test-helpers/fixtures.js";
@@ -46,7 +48,28 @@ function defineBehaviourTopic() {
 
 // Rails `fixtures :topics, :owners, :pets`. The canonical tables come from the
 // template clone.
-fixtures(["topics", "owners", "pets"]);
+//
+// Rails marks CallbacksOnDestroyUpdateActionRaceTest and
+// CallbacksOnActionAndConditionTest with `use_transactional_tests = false`
+// because their after_commit / after_rollback assertions need real transaction
+// boundaries (the destroy/update-after-delete race and the commit-time :if
+// condition only resolve at an actual commit, not a nested fixture savepoint).
+// Opt those tests out of the shared transaction by name so they commit for real.
+fixtures(["topics", "owners", "pets"], {
+  usesTransaction: [
+    "trigger once on multiple deletion within transaction",
+    "trigger once on multiple deletions",
+    "trigger once on multiple deletions in a transaction",
+    "rollback on multiple deletions",
+    "trigger on update where row was deleted",
+    "callback on action with condition",
+    // SetCallbackTest is also `use_transactional_tests = false` in Rails
+    // (transaction_callbacks_test.rb:1038): after_commit needs a real commit
+    // boundary. It passes under the fixture savepoint on sqlite but PG's
+    // savepoint semantics differ, so opt out for parity.
+    "set callback with on",
+  ],
+});
 
 describe("TransactionCallbacksTest", () => {
   it("before commit exception should pop transaction stack", async () => {
@@ -1177,141 +1200,172 @@ describe("TransactionCallbacksTest", () => {
   }); // CallbackOrderTest
 
   describe("CallbacksOnDestroyUpdateActionRaceTest", () => {
-    it("trigger once on multiple deletion within transaction", async () => {
-      const log: string[] = [];
-      class Topic extends Base {
+    // Rails keys history off a class-var on TopicWithHistory shared by the STI
+    // subclasses; only one subclass is exercised per test, so each factory keeps
+    // its own history array. `beforeDestroyForTransaction` /
+    // `beforeSaveForTransaction` default to no-ops on the prototype and are
+    // overridden per-instance to mirror Rails' `define_singleton_method`.
+    const makeTopicWithCallbacksOnDestroy = (history: string[]) =>
+      class TopicWithCallbacksOnDestroy extends Base {
         declare title: string;
+        declare author_name: string;
+
+        beforeDestroyForTransaction(): void | Promise<void> {}
 
         static {
+          this._tableName = "topics";
           this.attribute("title", "string");
-          this.afterDestroy((record: any) => {
-            log.push("destroyed:" + record.title);
-          });
+          this.attribute("author_name", "string");
+          afterCommit(this, () => history.push("commit_on_destroy"), { on: "destroy" });
+          afterRollback(this, () => history.push("rollback_on_destroy"), { on: "destroy" });
+          this.beforeDestroy((record: any) => record.beforeDestroyForTransaction());
         }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      await transaction(Topic, async () => {
-        await t1.destroy();
-      });
-      expect(log.filter((l) => l === "destroyed:a").length).toBe(1);
+      };
+
+    const makeTopicWithCallbacksOnUpdate = (history: string[]) =>
+      class TopicWithCallbacksOnUpdate extends Base {
+        declare title: string;
+        declare author_name: string;
+
+        beforeSaveForTransaction(): void | Promise<void> {}
+
+        static {
+          this._tableName = "topics";
+          this.attribute("title", "string");
+          this.attribute("author_name", "string");
+          afterCommit(this, () => history.push("commit_on_update"), { on: "update" });
+          this.beforeSave((record: any) => record.beforeSaveForTransaction());
+        }
+      };
+
+    it("trigger once on multiple deletion within transaction", async () => {
+      const history: string[] = [];
+      const TopicWithCallbacksOnDestroy = makeTopicWithCallbacksOnDestroy(history);
+      const topic = new TopicWithCallbacksOnDestroy() as any;
+      await topic.save();
+      const topicClone = (await TopicWithCallbacksOnDestroy.find(topic.id)) as any;
+
+      topic.beforeDestroyForTransaction = async () => {
+        await topicClone.destroy();
+      };
+
+      await topic.destroy();
+
+      expect(history).toEqual(["commit_on_destroy"]);
     });
 
     it("trigger once on multiple deletions", async () => {
-      const log: string[] = [];
-      class Topic extends Base {
-        declare title: string;
+      const history: string[] = [];
+      const TopicWithCallbacksOnDestroy = makeTopicWithCallbacksOnDestroy(history);
+      const topic = new TopicWithCallbacksOnDestroy() as any;
+      await topic.save();
+      const topicClone = (await TopicWithCallbacksOnDestroy.find(topic.id)) as any;
 
-        static {
-          this.attribute("title", "string");
-          this.afterDestroy((record: any) => {
-            log.push("destroyed:" + record.title);
-          });
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      const t2 = await Topic.create({ title: "b" });
-      await t1.destroy();
-      await t2.destroy();
-      expect(log.length).toBe(2);
+      await topic.destroy();
+      await topic.destroy();
+      await topicClone.destroy();
+
+      expect(history).toEqual(["commit_on_destroy"]);
     });
 
     it("trigger once on multiple deletions in a transaction", async () => {
-      const log: string[] = [];
-      class Topic extends Base {
-        declare title: string;
+      const history: string[] = [];
+      const TopicWithCallbacksOnDestroy = makeTopicWithCallbacksOnDestroy(history);
+      const topic = new TopicWithCallbacksOnDestroy() as any;
+      await topic.save();
 
-        static {
-          this.attribute("title", "string");
-          this.afterDestroy((record: any) => {
-            log.push("destroyed:" + record.title);
-          });
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      const t2 = await Topic.create({ title: "b" });
-      await transaction(Topic, async () => {
-        await t1.destroy();
-        await t2.destroy();
+      await transaction(TopicWithCallbacksOnDestroy, async () => {
+        await topic.destroy();
+        await topic.destroy();
       });
-      expect(log.length).toBe(2);
-      expect(log).toContain("destroyed:a");
-      expect(log).toContain("destroyed:b");
+
+      expect(history).toEqual(["commit_on_destroy"]);
     });
 
     it("rollback on multiple deletions", async () => {
-      const log: string[] = [];
-      class Topic extends Base {
-        declare title: string;
+      const history: string[] = [];
+      const TopicWithCallbacksOnDestroy = makeTopicWithCallbacksOnDestroy(history);
+      const topic = new TopicWithCallbacksOnDestroy() as any;
+      await topic.save();
+      const topicClone = (await TopicWithCallbacksOnDestroy.find(topic.id)) as any;
 
-        static {
-          this.attribute("title", "string");
-          this.afterDestroy((record: any) => {
-            log.push("destroyed");
-          });
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      const t2 = await Topic.create({ title: "b" });
-      const rollbackLog: string[] = [];
-      try {
-        await transaction(Topic, async (tx) => {
-          tx.afterRollback(() => {
-            rollbackLog.push("rollback");
-          });
-          await t1.destroy();
-          await t2.destroy();
-          throw new Error("rollback");
-        });
-      } catch {}
-      expect(rollbackLog.length).toBeGreaterThan(0);
+      topic.beforeDestroyForTransaction = async () => {
+        await topicClone.updateBang({ author_name: "Test Author Clone" });
+        await topicClone.destroy();
+      };
+
+      await transaction(TopicWithCallbacksOnDestroy, async () => {
+        await topic.updateBang({ author_name: "Test Author" });
+        await topic.destroy();
+        throw new Rollback();
+      });
+
+      expect(topic.isDestroyed()).toBe(false);
+      expect(topicClone.isDestroyed()).toBe(false);
+      expect(topic.attributeChangeToBeSaved("author_name")).toEqual([null, "Test Author"]);
+      expect(topicClone.attributeChangeToBeSaved("author_name")).toEqual([
+        null,
+        "Test Author Clone",
+      ]);
+
+      expect(history).toEqual(["rollback_on_destroy"]);
     });
 
     it("trigger on update where row was deleted", async () => {
-      const log: string[] = [];
-      class Topic extends Base {
-        declare title: string;
+      const history: string[] = [];
+      const TopicWithCallbacksOnUpdate = makeTopicWithCallbacksOnUpdate(history);
+      const topic = new TopicWithCallbacksOnUpdate() as any;
+      await topic.save();
+      const topicClone = (await TopicWithCallbacksOnUpdate.find(topic.id)) as any;
 
-        static {
-          this.attribute("title", "string");
-          this.afterUpdate(function () {
-            log.push("updated");
-          });
-          this.afterDestroy(function () {
-            log.push("destroyed");
-          });
-        }
-      }
-      const t1 = await Topic.create({ title: "a" });
-      await t1.destroy();
-      expect(log).toContain("destroyed");
-      // Attempting to modify a destroyed (frozen) record should throw, not trigger afterUpdate
-      expect(() => (t1.title = "b")).toThrow();
-      expect(log).not.toContain("updated");
+      topicClone.beforeSaveForTransaction = async () => {
+        await topic.destroy();
+      };
+
+      topicClone.author_name = "Test Author";
+      await topicClone.save();
+
+      expect(history).toEqual([]);
     });
   }); // CallbacksOnDestroyUpdateActionRaceTest
 
   describe("CallbacksOnActionAndConditionTest", () => {
     it("callback on action with condition", async () => {
-      const log: string[] = [];
-      class Post extends Base {
+      class TopicWithCallbacksOnActionAndCondition extends Base {
         declare title: string;
         declare approved: boolean;
+        history: any[] = [];
+
+        // Rails' `run_callback?` pushes itself to history then returns true,
+        // proving the :if condition runs (and in which order) at commit time.
+        runCallback(): boolean {
+          this.history.push("run_callback?");
+          return true;
+        }
 
         static {
           this._tableName = "topics";
           this.attribute("title", "string");
-          this.attribute("approved", "boolean", { default: false });
-          this.beforeSave(function (record: any) {
-            if (record.approved) {
-              log.push("published_save");
-            }
+          this.attribute("approved", "boolean", { default: true });
+          afterCommit(this, (record: any) => record.history.push("create_or_update"), {
+            on: ["create", "update"],
+            if: (record: any) => record.runCallback(),
           });
         }
       }
-      await Post.create({ title: "draft", approved: false });
-      expect(log).not.toContain("published_save");
-      await Post.create({ title: "live", approved: true });
-      expect(log).toContain("published_save");
+
+      const topic = new TopicWithCallbacksOnActionAndCondition() as any;
+      await topic.save();
+      expect(topic.history).toEqual(["run_callback?", "create_or_update"]);
+
+      topic.history = [];
+      topic.approved = true;
+      await topic.save();
+      expect(topic.history).toEqual(["run_callback?", "create_or_update"]);
+
+      topic.history = [];
+      await topic.destroy();
+      expect(topic.history).toEqual([]);
     });
   }); // CallbacksOnActionAndConditionTest
 
@@ -1450,24 +1504,46 @@ describe("TransactionCallbacksTest", () => {
 
   describe("SetCallbackTest", () => {
     it("set callback with on", async () => {
-      const log: string[] = [];
-      class Post extends Base {
+      // Rails registers `after_commit :after_commit_on_update_1, on: :update`
+      // then `after_update_commit :after_commit_on_update_2` as named methods on
+      // a class-var history. Here the callbacks are function references so
+      // skipCallback / setCallback can match them by identity.
+      const history: string[] = [];
+      const afterCommitOnUpdate1 = () => history.push("after_commit_on_update_1");
+      const afterCommitOnUpdate2 = () => history.push("after_commit_on_update_2");
+      class TopicWithCallbacksOnUpdate extends Base {
         declare title: string;
 
         static {
           this._tableName = "topics";
           this.attribute("title", "string");
-          this.beforeCreate(function () {
-            log.push("before_create");
-          });
-          this.beforeSave(function () {
-            log.push("before_save");
-          });
+          afterCommit(this, afterCommitOnUpdate1, { on: "update" });
+          afterUpdateCommit(this, afterCommitOnUpdate2);
         }
       }
-      await Post.create({ title: "test" });
-      expect(log).toContain("before_create");
-      expect(log).toContain("before_save");
+      let topic = await TopicWithCallbacksOnUpdate.create({ title: "New topic" });
+      expect(history).toEqual([]);
+
+      await topic.update({ title: "Updated topic 1" });
+      const expectedHistory = ["after_commit_on_update_2", "after_commit_on_update_1"];
+      expect(history).toEqual(expectedHistory);
+
+      skipCallbackOnProto(
+        TopicWithCallbacksOnUpdate.prototype,
+        "commit",
+        "after",
+        afterCommitOnUpdate2,
+      );
+      await topic.update({ title: "Updated topic 2" });
+      expectedHistory.push("after_commit_on_update_1");
+      expect(history).toEqual(expectedHistory);
+
+      setCallback(TopicWithCallbacksOnUpdate, "commit", afterCommitOnUpdate2, { on: "update" });
+      topic = await TopicWithCallbacksOnUpdate.create({ title: "New topic" });
+      await topic.update({ title: "Updated topic 3" });
+      expectedHistory.push("after_commit_on_update_2");
+      expectedHistory.push("after_commit_on_update_1");
+      expect(history).toEqual(expectedHistory);
     });
   }); // SetCallbackTest
 }); // TransactionCallbacksTest
