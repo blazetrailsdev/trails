@@ -25,19 +25,22 @@ export function defaultSqlTimezone(): string {
 }
 
 /**
- * Format a `Temporal.Instant` for SQL as `YYYY-MM-DD HH:MM:SS[.fffffffff]`.
- * Respects `ActiveRecord.default_timezone`:
- * UTC when the setting is `"utc"`, otherwise the host system's local timezone.
- * Preserves up to nanosecond precision; trailing zero groups are trimmed.
+ * Format a `Temporal.Instant` for SQL as `YYYY-MM-DD HH:MM:SS[.ffffff]`,
+ * faithful to the abstract `quoted_date` (abstract/quoting.rb:193-197): the
+ * fractional part is a fixed 6-digit microsecond field emitted only when
+ * `usec > 0`, and precision is capped at microseconds (nanoseconds dropped).
+ * Respects `ActiveRecord.default_timezone`: UTC when the setting is `"utc"`,
+ * otherwise the host system's local timezone.
  */
 export function formatInstantForSql(value: Temporal.Instant): string {
   return formatZonedComponents(value.toZonedDateTimeISO(defaultSqlTimezone()));
 }
 
 /**
- * Format a `Temporal.PlainDateTime` for SQL as `YYYY-MM-DD HH:MM:SS[.fffffffff]`.
- * No timezone conversion — the value is naive by definition. Fractional digits
- * are trimmed to the smallest non-zero 3-digit group (ms/µs/ns).
+ * Format a `Temporal.PlainDateTime` for SQL as `YYYY-MM-DD HH:MM:SS[.ffffff]`.
+ * No timezone conversion — the value is naive by definition. Fractional part is
+ * a fixed 6-digit microsecond field when `usec > 0`, capped at microseconds
+ * (see {@link formatInstantForSql}).
  */
 export function formatPlainDateTimeForSql(value: Temporal.PlainDateTime): string {
   return formatPlainComponents(value);
@@ -63,11 +66,9 @@ export function formatPlainDateForSql(value: Temporal.PlainDate): string {
  *   ...
  *   # PG#quoted_date then suffixes " BC" for proleptic years <= 0.
  *
- * Differs from {@link formatInstantForSql} in two Rails-faithful ways: the
- * fractional part is a fixed 6-digit microsecond field (not a trimmed 3/6/9 group)
- * and is capped at microseconds — matching PG's `timestamp` resolution — so a
- * nil-precision nanosecond value never reaches the wire as 7–9 digits. The " BC"
- * suffix is what the abstract formatters omit.
+ * Shares the fixed-6 microsecond fraction ({@link microsecondFraction}) with the
+ * abstract/MySQL formatters; the only PG-specific behavior is the " BC" suffix
+ * appended for proleptic years <= 0.
  */
 function pgDateTimeLiteral(
   year: number,
@@ -81,8 +82,7 @@ function pgDateTimeLiteral(
   const isBc = year <= 0;
   const yyyy = String(isBc ? -year + 1 : year).padStart(4, "0");
   const p2 = (n: number) => String(n).padStart(2, "0");
-  let s = `${yyyy}-${p2(month)}-${p2(day)} ${p2(hour)}:${p2(min)}:${p2(sec)}`;
-  if (usec > 0) s += `.${String(usec).padStart(6, "0")}`;
+  const s = `${yyyy}-${p2(month)}-${p2(day)} ${p2(hour)}:${p2(min)}:${p2(sec)}${microsecondFraction(usec)}`;
   return isBc ? `${s} BC` : s;
 }
 
@@ -119,8 +119,9 @@ export function formatPlainDateForSqlPostgres(value: Temporal.PlainDate): string
 }
 
 /**
- * Format a `Temporal.PlainTime` for SQL as `HH:MM:SS[.fffffffff]`.
- * Fractional digits are trimmed to the smallest non-zero 3-digit group.
+ * Format a `Temporal.PlainTime` for SQL as `HH:MM:SS[.ffffff]`. Fractional part
+ * is a fixed 6-digit microsecond field when `usec > 0`, capped at microseconds
+ * (see {@link formatInstantForSql}).
  */
 export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
   return formatTimeComponents(
@@ -129,49 +130,18 @@ export function formatPlainTimeForSql(value: Temporal.PlainTime): string {
     value.second,
     value.millisecond,
     value.microsecond,
-    value.nanosecond,
   );
 }
 
 /**
- * MySQL-safe variants of the formatters. MySQL TIME/DATETIME/TIMESTAMP support
- * at most 6 fractional digits (microseconds); emitting 7–9 nanosecond digits
- * in strict SQL mode causes an error rather than silent truncation.
+ * MySQL variants. Since the abstract formatters already emit Rails' fixed-6
+ * microsecond field capped at microseconds — the same resolution MySQL
+ * TIME/DATETIME/TIMESTAMP support — the MySQL path is identical. Kept as named
+ * exports so adapter call sites document intent.
  */
-export function formatInstantForSqlMysql(value: Temporal.Instant): string {
-  const zdt = value.toZonedDateTimeISO(defaultSqlTimezone());
-  return (
-    formatDatePrefix(zdt) +
-    formatTimeComponents(zdt.hour, zdt.minute, zdt.second, zdt.millisecond, zdt.microsecond, 0, 6)
-  );
-}
-
-export function formatPlainDateTimeForSqlMysql(value: Temporal.PlainDateTime): string {
-  return (
-    formatDatePrefix(value) +
-    formatTimeComponents(
-      value.hour,
-      value.minute,
-      value.second,
-      value.millisecond,
-      value.microsecond,
-      0,
-      6,
-    )
-  );
-}
-
-export function formatPlainTimeForSqlMysql(value: Temporal.PlainTime): string {
-  return formatTimeComponents(
-    value.hour,
-    value.minute,
-    value.second,
-    value.millisecond,
-    value.microsecond,
-    0,
-    6,
-  );
-}
+export const formatInstantForSqlMysql = formatInstantForSql;
+export const formatPlainDateTimeForSqlMysql = formatPlainDateTimeForSql;
+export const formatPlainTimeForSqlMysql = formatPlainTimeForSql;
 
 function formatDatePrefix(v: { year: number; month: number; day: number }): string {
   return `${padYear(v.year)}-${String(v.month).padStart(2, "0")}-${String(v.day).padStart(2, "0")} `;
@@ -185,54 +155,33 @@ function padYear(year: number): string {
 function formatZonedComponents(zdt: Temporal.ZonedDateTime): string {
   return (
     formatDatePrefix(zdt) +
-    formatTimeComponents(
-      zdt.hour,
-      zdt.minute,
-      zdt.second,
-      zdt.millisecond,
-      zdt.microsecond,
-      zdt.nanosecond,
-    )
+    formatTimeComponents(zdt.hour, zdt.minute, zdt.second, zdt.millisecond, zdt.microsecond)
   );
 }
 
 function formatPlainComponents(pdt: Temporal.PlainDateTime): string {
-  const base = formatDatePrefix(pdt);
   return (
-    base +
-    formatTimeComponents(
-      pdt.hour,
-      pdt.minute,
-      pdt.second,
-      pdt.millisecond,
-      pdt.microsecond,
-      pdt.nanosecond,
-    )
+    formatDatePrefix(pdt) +
+    formatTimeComponents(pdt.hour, pdt.minute, pdt.second, pdt.millisecond, pdt.microsecond)
   );
 }
 
-function formatTimeComponents(
-  h: number,
-  min: number,
-  s: number,
-  ms: number,
-  us: number,
-  ns: number,
-  maxFracDigits = 9,
-): string {
+/**
+ * Build the `HH:MM:SS` base and append Rails' fixed 6-digit microsecond field
+ * when non-zero. Sub-microsecond precision (nanoseconds) is dropped, matching
+ * the abstract `quoted_date` cap and MySQL's fractional-seconds resolution.
+ */
+function formatTimeComponents(h: number, min: number, s: number, ms: number, us: number): string {
   const hh = String(h).padStart(2, "0");
   const mm = String(min).padStart(2, "0");
   const ss = String(s).padStart(2, "0");
-  const base = `${hh}:${mm}:${ss}`;
-  // Clamp sub-second components to maxFracDigits before building the string.
-  const effectiveUs = maxFracDigits >= 6 ? us : 0;
-  const effectiveNs = maxFracDigits >= 9 ? ns : 0;
-  if (ms === 0 && effectiveUs === 0 && effectiveNs === 0) return base;
-  const frac9 =
-    String(ms).padStart(3, "0") +
-    String(effectiveUs).padStart(3, "0") +
-    String(effectiveNs).padStart(3, "0");
-  const frac =
-    effectiveNs !== 0 ? frac9 : effectiveUs !== 0 ? frac9.slice(0, 6) : frac9.slice(0, 3);
-  return `${base}.${frac.slice(0, maxFracDigits)}`;
+  return `${hh}:${mm}:${ss}${microsecondFraction(ms * 1000 + us)}`;
+}
+
+/**
+ * Rails `quoted_date`'s fractional-seconds rule (abstract/quoting.rb:194-195):
+ * append `.` + `sprintf("%06d", usec)` when `usec > 0`, otherwise nothing.
+ */
+function microsecondFraction(usec: number): string {
+  return usec > 0 ? `.${String(usec).padStart(6, "0")}` : "";
 }

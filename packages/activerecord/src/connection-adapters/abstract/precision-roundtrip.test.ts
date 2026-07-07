@@ -29,9 +29,9 @@ describe("formatInstantForSql", () => {
     expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55");
   });
 
-  it("preserves millisecond precision", () => {
+  it("pads millisecond precision to a fixed 6-digit microsecond field", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.123Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123");
+    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123000");
   });
 
   it("preserves microsecond precision", () => {
@@ -39,9 +39,9 @@ describe("formatInstantForSql", () => {
     expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123456");
   });
 
-  it("preserves nanosecond precision", () => {
+  it("caps fractional seconds at microseconds (drops nanoseconds)", () => {
     const v = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
-    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123456789");
+    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.123456");
   });
 
   it("preserves the smallest possible non-zero value (1 µs)", () => {
@@ -68,9 +68,9 @@ describe("formatPlainDateTimeForSql", () => {
     expect(formatPlainDateTimeForSql(v)).toBe("2024-12-31 23:59:59.999999");
   });
 
-  it("preserves nanosecond precision", () => {
+  it("caps fractional seconds at microseconds, omitting a sub-µs-only value", () => {
     const v = Temporal.PlainDateTime.from("2024-01-01T00:00:00.000000001");
-    expect(formatPlainDateTimeForSql(v)).toBe("2024-01-01 00:00:00.000000001");
+    expect(formatPlainDateTimeForSql(v)).toBe("2024-01-01 00:00:00");
   });
 });
 
@@ -103,15 +103,13 @@ describe("formatPlainTimeForSql", () => {
     );
   });
 
-  it("preserves nanoseconds", () => {
-    expect(formatPlainTimeForSql(Temporal.PlainTime.from("00:00:00.000000001"))).toBe(
-      "00:00:00.000000001",
-    );
+  it("caps fractional seconds at microseconds, omitting a sub-µs-only value", () => {
+    expect(formatPlainTimeForSql(Temporal.PlainTime.from("00:00:00.000000001"))).toBe("00:00:00");
   });
 
-  it("omits trailing zeros beyond the precision present", () => {
-    // millisecond only — 3 fractional digits
-    expect(formatPlainTimeForSql(Temporal.PlainTime.from("12:00:00.100"))).toBe("12:00:00.100");
+  it("pads to a fixed 6-digit microsecond field", () => {
+    // millisecond only — padded out to 6 digits
+    expect(formatPlainTimeForSql(Temporal.PlainTime.from("12:00:00.100"))).toBe("12:00:00.100000");
   });
 });
 
@@ -167,6 +165,28 @@ describe("MySQL-safe formatters (clamped to 6 fractional digits)", () => {
   it("formatPlainTimeForSqlMysql preserves microseconds", () => {
     const v = Temporal.PlainTime.from("14:23:55.000001");
     expect(formatPlainTimeForSqlMysql(v)).toBe("14:23:55.000001");
+  });
+});
+
+// Rails `quoted_date` fixed-6 microsecond field (abstract/quoting.rb:194-195):
+// `.5` → `.500000`, and usec == 0 omits the fractional part entirely.
+describe("SQLite/MySQL fixed-6 microsecond field (quoted_date parity)", () => {
+  it("emits a fixed 6-digit field for a half-second (.5 → .500000)", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55.5Z");
+    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55.500000");
+    expect(formatInstantForSqlMysql(v)).toBe("2026-04-26 14:23:55.500000");
+  });
+
+  it("omits the fractional part when usec == 0", () => {
+    const v = Temporal.Instant.from("2026-04-26T14:23:55Z");
+    expect(formatInstantForSql(v)).toBe("2026-04-26 14:23:55");
+    expect(formatInstantForSqlMysql(v)).toBe("2026-04-26 14:23:55");
+  });
+
+  it("omits the fractional part for a whole-second PlainTime (.000 → omitted)", () => {
+    const v = Temporal.PlainTime.from("14:23:55.000");
+    expect(formatPlainTimeForSql(v)).toBe("14:23:55");
+    expect(formatPlainTimeForSqlMysql(v)).toBe("14:23:55");
   });
 });
 
