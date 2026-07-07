@@ -16,7 +16,9 @@ import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-at
 import {
   underscore,
   renameKey,
+  toTag,
   type RenameKeyOptions,
+  type XmlBuilder,
   htmlEscape,
   resetCallbacks as asResetCallbacks,
   BigDecimal,
@@ -2368,17 +2370,38 @@ export class Model {
     // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
     // attribute on every tag; the `nil="true"` marker is a separate attribute
     // and stays. (active_support/core_ext/array/conversions.rb / xml_mini.rb)
-    const typeAttr = (t: string) => (skipTypes ? "" : ` type="${t}"`);
     let xml = "";
+    // An indentation-aware XmlMini builder: leaf tags (nil/scalar) are routed
+    // through the shared `toTag` funnel, which resolves the `type=` name,
+    // applies formatting, and calls `renameKey` — deduplicating the per-value
+    // logic. Nested-hash and array shapes keep their own recursion here (Rails
+    // routes those through Hash#to_xml / Array#to_xml, not the scalar path).
+    const attrString = (attributes: Record<string, string>) =>
+      Object.entries(attributes)
+        .map(([k, v]) => ` ${k}="${this._escapeXml(v)}"`)
+        .join("");
+    const builder: XmlBuilder = {
+      tag: (name, content, attributes = {}) => {
+        const attrs = attrString(attributes);
+        xml +=
+          content == null
+            ? `${indent}<${name}${attrs}/>\n`
+            : `${indent}<${name}${attrs}>${this._escapeXml(content)}</${name}>\n`;
+      },
+      openTag: () => {},
+      closeTag: () => {},
+    };
     for (const [key, value] of Object.entries(hash)) {
-      const tag = renameKey(underscore(key), renameOptions);
+      const tagKey = underscore(key);
       // The cast/column type name (when known) overrides JS-runtime inference so
       // the `type=` attribute is adapter-agnostic (e.g. a bigint `id` stays
       // `type="integer"` whether it arrives as a JS number, BigInt, or string).
       const castTypeName = typeInfo.types[key];
-      if (value === null || value === undefined) {
-        xml += `${indent}<${tag} nil="true"/>\n`;
-      } else if (
+      const emit = (type?: string) =>
+        toTag(tagKey, value, { builder, type, skipTypes, ...renameOptions });
+      if (
+        value !== null &&
+        value !== undefined &&
         typeof value === "object" &&
         !Array.isArray(value) &&
         // boundary: exclude Date and Temporal types from the plain-object
@@ -2394,14 +2417,12 @@ export class Model {
         // leaf (its `to_s`), not a nested object of its digit parts.
         !(value instanceof BigDecimal)
       ) {
+        const tag = renameKey(tagKey, renameOptions);
         xml += `${indent}<${tag}>\n${this._hashToXml(value as Record<string, unknown>, indent + "  ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}</${tag}>\n`;
-      } else if (value instanceof BigDecimal) {
-        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "decimal")}>${this._escapeXml(value.toString())}</${tag}>\n`;
-        // boundary: legacy Date values serialize as ISO 8601 dateTime XML.
-      } else if (value instanceof Date) {
-        xml += `${indent}<${tag}${typeAttr("dateTime")}>${Number.isNaN(value.getTime()) ? "" : value.toISOString()}</${tag}>\n`;
       } else if (Array.isArray(value)) {
-        xml += `${indent}<${tag}${typeAttr("array")}>\n`;
+        const tag = renameKey(tagKey, renameOptions);
+        const arrayType = skipTypes ? "" : ` type="array"`;
+        xml += `${indent}<${tag}${arrayType}>\n`;
         for (const item of value) {
           if (typeof item === "object" && item !== null) {
             xml += `${indent}  <item>\n${this._hashToXml(item as Record<string, unknown>, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </item>\n`;
@@ -2410,27 +2431,28 @@ export class Model {
           }
         }
         xml += `${indent}</${tag}>\n`;
+      } else if (value === null || value === undefined) {
+        emit();
+      } else if (value instanceof BigDecimal) {
+        emit(castTypeName ?? "decimal");
+      } else if (value instanceof Date) {
+        emit("dateTime");
       } else if (typeof value === "number") {
-        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "integer")}>${value}</${tag}>\n`;
+        emit(castTypeName ?? "integer");
       } else if (typeof value === "boolean") {
-        xml += `${indent}<${tag}${typeAttr(castTypeName ?? "boolean")}>${value}</${tag}>\n`;
+        emit(castTypeName ?? "boolean");
       } else if (value instanceof Temporal.Instant || value instanceof Temporal.PlainDateTime) {
-        xml += `${indent}<${tag}${typeAttr("dateTime")}>${value.toJSON()}</${tag}>\n`;
+        emit("dateTime");
       } else if (value instanceof Temporal.ZonedDateTime) {
-        // ZonedDateTime.toJSON() includes the IANA bracket annotation which is
-        // not a valid XML Schema dateTime lexical form. Serialize as Instant
-        // (UTC) so the output is a standard ISO 8601 dateTime string.
-        xml += `${indent}<${tag}${typeAttr("dateTime")}>${value.toInstant().toJSON()}</${tag}>\n`;
+        emit("dateTime");
       } else if (value instanceof Temporal.PlainDate) {
-        xml += `${indent}<${tag}${typeAttr("date")}>${value.toString()}</${tag}>\n`;
+        emit("date");
       } else if (value instanceof Temporal.PlainTime) {
-        xml += `${indent}<${tag}${typeAttr("time")}>${value.toString()}</${tag}>\n`;
-      } else if (castTypeName) {
-        // BigInt/string-materialized numeric columns (bigint ids on PG/MariaDB,
-        // decimals as strings) land here; the cast type restores their `type=`.
-        xml += `${indent}<${tag}${typeAttr(castTypeName)}>${this._escapeXml(String(value))}</${tag}>\n`;
+        emit("time");
       } else {
-        xml += `${indent}<${tag}>${this._escapeXml(String(value))}</${tag}>\n`;
+        // BigInt/string-materialized numeric columns (bigint ids on PG/MariaDB,
+        // decimals as strings) carry a cast type; bare strings emit no `type=`.
+        emit(castTypeName);
       }
     }
     return xml;

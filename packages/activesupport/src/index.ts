@@ -165,7 +165,14 @@ export {
 
 export { Inflections, loadDefaults } from "./inflector/inflections.js";
 
-export { renameKey, type RenameKeyOptions } from "./xml-mini.js";
+export {
+  renameKey,
+  toTag,
+  XmlStringBuilder,
+  type RenameKeyOptions,
+  type ToTagOptions,
+  type XmlBuilder,
+} from "./xml-mini.js";
 
 export {
   isBlank,
