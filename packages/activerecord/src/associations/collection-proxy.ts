@@ -3620,26 +3620,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private _buildThroughScope(): any {
     const ctor = this._record.constructor as typeof Base;
     // Rails' scope IS the JOIN-based AssociationScope relation: delegate to it
-    // for the shapes it can route. Most composite-key shapes stay on the
-    // IN-subquery fallback below (they trip its ConfigurationError guards), as
-    // do other unroutable shapes (nested/polymorphic). The one composite case
-    // that DOES route to `buildThroughJoinScope` is a composite source FK on a
-    // hasMany source (see the `Array.isArray(sourceFk)` branch below): the
-    // single-column IN-subquery can't express that tuple match, and the
-    // JOIN-based scope handles the composite ON clause safely even with a
-    // composite owner PK.
+    // for every shape it can route, composite keys included. The chain-based
+    // `buildThroughJoinScope` emits the full composite ON clause, so composite
+    // owner PK, composite target PK, composite belongsTo-source FK, and
+    // composite through-model PK all build correctly here — the single-column
+    // IN-subquery fallback below can't express those tuple matches and would
+    // throw. Only shapes `_routeThroughViaAssociationScope` still declines
+    // (polymorphic-has_many sources, unsaved nested-through) fall through to
+    // that fallback, where the composite guards remain as a loud backstop.
     const refl = (ctor as any)._reflectOnAssociation?.(this._assocName);
-    const ownerPkComposite = Array.isArray((ctor as any).primaryKey);
-    const targetPkComposite = Array.isArray((this.model as any).primaryKey);
-    if (
-      refl &&
-      !ownerPkComposite &&
-      !targetPkComposite &&
-      _routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)
-    ) {
+    if (refl && _routeThroughViaAssociationScope(this._record, refl, this._assocDef.options)) {
       const joinRel = buildThroughJoinScope(this._record, this._assocName, this._assocDef.options);
       return joinRel ?? (this.model as any).all().none(); // null FK → empty, as below
     }
+    // Below is the single-column IN-subquery fallback, reached only for shapes
+    // `_routeThroughViaAssociationScope` declines (polymorphic-has_many sources,
+    // unsaved nested-through). Every composite shape it CAN route now takes the
+    // JOIN path above, so the composite ConfigurationError guards below are
+    // backstops for the residual unroutable composite shapes the single-column
+    // subquery genuinely can't express — not the common composite-key path.
     const associations: AssociationDefinition[] = (ctor as any)._associations ?? [];
     const throughAssoc = associations.find((a: any) => a.name === this._assocDef.options.through);
     if (!throughAssoc) {
