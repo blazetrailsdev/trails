@@ -5,6 +5,12 @@ import { Model } from "../index.js";
 // Mirrors ActiveModel::Serializers::JSON (json.rb). Pinning the host
 // surface here so the mixin shape (model_name + serializable_hash +
 // as_json + from_json) doesn't regress.
+//
+// Rails' `read_attribute_for_serialization` is `alias :… :send`, so a host
+// must expose a per-key reader for every attribute name (`attr_accessor`
+// parity) — the `attributes` hash only names the keys, it is not a value
+// fallback. These test models therefore define per-key getters alongside the
+// `attributes` accessor.
 describe("Serializers::JSON host", () => {
   class Person extends JSONHost {
     static {
@@ -21,6 +27,12 @@ describe("Serializers::JSON host", () => {
     }
     _name = "";
     _age = 0;
+    get name() {
+      return this._name;
+    }
+    get age() {
+      return this._age;
+    }
   }
 
   it("modelName resolves to the subclass and is memoized per-class", () => {
@@ -78,6 +90,9 @@ describe("Serializers::JSON host", () => {
         });
       }
       _x = 0;
+      get x() {
+        return this._x;
+      }
     }
     const r = new Rooted();
     r._x = 1;
@@ -110,6 +125,9 @@ describe("Serializers::JSON host", () => {
         });
       }
       _id = 0n;
+      get id() {
+        return this._id;
+      }
     }
     const b = new Big();
     b._id = 9007199254740993n;
@@ -132,6 +150,9 @@ describe("Serializers::JSON host", () => {
         });
       }
       _name = "";
+      get name() {
+        return this._name;
+      }
     }
     const c = new CustomRooted();
     c._name = "Eve";
@@ -163,6 +184,9 @@ describe("Serializers::JSON host", () => {
         });
       }
       _v = 0;
+      get v() {
+        return this._v;
+      }
     }
     const k = new Keyed().fromJson('{"payload":{"v":7},"data":{"v":1}}');
     expect(k._v).toBe(7);
@@ -183,6 +207,9 @@ describe("Serializers::JSON host", () => {
         });
       }
       _v = 0;
+      get v() {
+        return this._v;
+      }
     }
     const d = new Defaulted().fromJson('{"defaulted":{"v":99}}');
     expect(d._v).toBe(99);
