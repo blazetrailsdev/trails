@@ -810,6 +810,78 @@ describe("HasManyThroughAssociationsTest", () => {
       const found = orderTags.find((ot: any) => Number(ot.tag_id) === Number((tag as any).id));
       expect(found.attached_reason).toBe("This is our loyal customer");
     });
+
+    // TS-only: guard the JOIN routing for the remaining composite through
+    // shapes. All three used to trip a `ConfigurationError` in the
+    // single-column IN-subquery fallback (composite target FK / composite-PK
+    // target / composite through-model PK); routing through
+    // `buildThroughJoinScope` builds Rails' chain-based composite scope
+    // instead. The assertions read the generated JOIN SQL (adapter-agnostic
+    // via quoteTableName) so they hold under SQLite / PG / MariaDB.
+
+    // has_many :order_agreements, through: :order — composite belongsTo through
+    // (`order`, FK [shop_id, order_id]) anchoring a scalar source. The owner's
+    // composite key surfaces as a two-column predicate on the JOINed order row.
+    it("composite through-key has_many through routes via join scope", async () => {
+      const { CpkBookWithOrderAgreements, CpkOrderAgreement } =
+        await import("../test-helpers/models/cpk.js");
+      const order = await CpkOrder.create({ shop_id: 1 });
+      const book = await CpkBookWithOrderAgreements.create({ id: [1, 2] });
+      (book as any).order = order;
+      await book.save();
+      const agreement = await CpkOrderAgreement.create({ order_id: (order as any).idValue });
+
+      const sql = await (book as any).orderAgreements.toSql();
+      const orderAgreementsFk = quoteTableName("cpk_order_agreements.order_id");
+      const orderId = quoteTableName("cpk_orders.id");
+      const orderShopId = quoteTableName("cpk_orders.shop_id");
+      // JOIN, not IN-subquery: the ON matches the source FK to the through PK…
+      expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_orders")}`, "i"));
+      expect(sql).toMatch(new RegExp(`${orderAgreementsFk} = ${orderId}`, "i"));
+      // …and the composite owner key constrains BOTH columns of the through row.
+      expect(sql).toMatch(new RegExp(`${orderShopId} =`, "i"));
+      expect(sql).toMatch(new RegExp(`${orderId} =`, "i"));
+
+      const rows = await (book as any).orderAgreements.toArray();
+      expect(rows.map((a: any) => a.id)).toEqual([agreement.id]);
+    });
+
+    // has_many :orders, through: :order_tags — composite-PK through model
+    // (cpk_order_tags, PK [order_id, tag_id]) with a composite-PK target
+    // (cpk_orders, PK [shop_id, id]). Routes through the JOIN scope instead of
+    // the throwing IN-subquery fallback.
+    it("composite-pk target and through model has_many through routes via join scope", async () => {
+      const tag = cpkTags("cpk_tag_loyal_customer");
+      const sql = await (tag as any).orders.toSql();
+      const ordersId = quoteTableName("cpk_orders.id");
+      const orderTagsOrderId = quoteTableName("cpk_order_tags.order_id");
+      const orderTagsTagId = quoteTableName("cpk_order_tags.tag_id");
+      expect(sql).toMatch(new RegExp(`INNER JOIN ${quoteTableName("cpk_order_tags")}`, "i"));
+      expect(sql).toMatch(new RegExp(`${ordersId} = ${orderTagsOrderId}`, "i"));
+      expect(sql).toMatch(new RegExp(`${orderTagsTagId} =`, "i"));
+
+      const orders = await (tag as any).orders.toArray();
+      expect(orders.length).toBeGreaterThan(0);
+    });
+
+    // has_many :chapters, through: :book — composite source FK
+    // (cpk_chapters, FK [author_id, book_id]) yields the full composite ON
+    // clause. Owner (cpk_orders) also has a composite PK.
+    it("composite source fk has_many through routes via join scope", async () => {
+      const { CpkOrderWithSingularBookChapters } = await import("../test-helpers/models/cpk.js");
+      const order = await CpkOrderWithSingularBookChapters.create({ id: [5, 6] });
+      await (order as any).createBook({ id: [7, 8] });
+
+      const sql = await (order as any).chapters.toSql();
+      const chapAuthorId = quoteTableName("cpk_chapters.author_id");
+      const chapBookId = quoteTableName("cpk_chapters.book_id");
+      const bookAuthorId = quoteTableName("cpk_books.author_id");
+      const bookId = quoteTableName("cpk_books.id");
+      // Full composite ON clause on the source join.
+      expect(sql).toMatch(new RegExp(`${chapAuthorId} = ${bookAuthorId}`, "i"));
+      expect(sql).toMatch(new RegExp(`${chapBookId} = ${bookId}`, "i"));
+      await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
+    });
   });
 
   it("destroy all on association clears scope", async () => {
