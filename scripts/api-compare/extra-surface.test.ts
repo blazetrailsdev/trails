@@ -837,6 +837,124 @@ describe("buildReport — novel vs moved classification", () => {
     expect(f!.extras.map((e) => e.name)).toContain("unportedMethod");
   });
 
+  it("folds a ported mirror of an unported mixin method back into allowed (PORTED_UNPORTED_MIXIN_METHODS)", () => {
+    // ActiveRecord::AssociationNotFoundError `include DidYouMean::Correctable`,
+    // whose source (core_ext/name_error.rb) is unported — so walkMixin skips it
+    // and `detailedMessage` would show as a "moved" extra. We ported
+    // detailed_message inline (associations/errors.ts), so
+    // PORTED_UNPORTED_MIXIN_METHODS must fold it back into allowed while a
+    // genuinely-extra name stays flagged.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        "did-you-mean": {
+          classes: {},
+          modules: {
+            "DidYouMean::Correctable": rubyClass({
+              name: "Correctable",
+              file: "core_ext/name_error.rb",
+              instance: [method("detailed_message")],
+            }),
+          },
+        },
+        activerecord: {
+          classes: {
+            "ActiveRecord::AssociationNotFoundError": {
+              ...rubyClass({ name: "AssociationNotFoundError", file: "host.rb" }),
+              includes: ["DidYouMean::Correctable"],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        "did-you-mean": { classes: {}, modules: {} },
+        activerecord: {
+          classes: {
+            AssociationNotFoundError: {
+              name: "AssociationNotFoundError",
+              file: "host.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [method("detailedMessage"), method("genuinelyNovel")],
+              classMethods: [],
+            },
+          },
+          modules: {},
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "host.ts");
+    expect(f).toBeDefined();
+    // detailedMessage folded back in; only the genuinely-novel name remains.
+    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+  });
+
+  it("folds railtie-reexported ControllerRuntime methods on the Railtie host into allowed", () => {
+    // trailtie.ts re-exports Railties::ControllerRuntime (railtie.rb:267,
+    // on_load(:action_controller) { include … }); its source
+    // controller_runtime.rb is unported, so the ported process_action /
+    // cleanup_view_runtime / append_info_to_payload mirrors would show as moved
+    // extras without the PORTED_UNPORTED_MIXIN_METHODS["ActiveRecord::Railtie"]
+    // fold-back. Guards the exact host FQN + method names against a typo.
+    const ruby: ApiManifest = {
+      source: "ruby",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {
+            "ActiveRecord::Railtie": rubyClass({ name: "Railtie", file: "railtie.rb" }),
+          },
+          modules: {},
+        },
+      },
+    };
+    const ts: ApiManifest = {
+      source: "typescript",
+      generatedAt: "",
+      packages: {
+        activerecord: {
+          classes: {},
+          modules: {
+            Trailtie: {
+              name: "Trailtie",
+              file: "trailtie.ts",
+              includes: [],
+              extends: [],
+              instanceMethods: [],
+              classMethods: [
+                method("processAction"),
+                method("cleanupViewRuntime"),
+                method("appendInfoToPayload"),
+                method("genuinelyNovel"),
+              ],
+            },
+          },
+        },
+      },
+    };
+    const report = buildReport(ruby, ts, {
+      filterPkg: "activerecord",
+      excludeGlobs: [],
+      novelOnly: false,
+      topN: 50,
+    });
+    const f = report.packages[0].extraFiles.find((x) => x.tsFile === "trailtie.ts");
+    expect(f).toBeDefined();
+    expect(f!.extras.map((e) => e.name)).toEqual(["genuinelyNovel"]);
+  });
+
   it("resolves the unported guard against a cross-package module's OWNING package", () => {
     // A cross-package `::`-qualified include where the module's source is
     // unported only in its OWN package (i18n_railtie.rb, scoped to

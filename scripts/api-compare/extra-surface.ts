@@ -142,6 +142,36 @@ const AMBIENT_RAILTIE_MIXINS: Record<string, { includes?: string[]; methods?: st
 };
 
 /**
+ * Methods a Rails file's host class/module gains by including a mixin whose
+ * SOURCE file is on `UNPORTED_FILES` — so `collectAllowedNames`'s `walkMixin`
+ * skips the mixin (mirroring `compare.flattenIncludedMethodInfos` at
+ * compare.ts:507) and the faithful TS ports look like unexplained "moved"
+ * extras. We DID port these methods, just as standalone mirrors that don't go
+ * through the unported module, so list them here keyed by the Ruby host FQN to
+ * fold the ported names back into the host's allowed set. Applied like
+ * `AMBIENT_RAILTIE_MIXINS.methods` (raw Ruby names → `addRubyName`), but the
+ * justification is a source-unported *lexical* include rather than a railtie
+ * `on_load` injection.
+ *
+ *   - `ActiveRecord::Railtie` re-exports `Railties::ControllerRuntime`
+ *     (railtie.rb:267 — `on_load(:action_controller) { include … }`); the port
+ *     lives in `trailties/controller-runtime.ts`. Its source (vendored at
+ *     `activerecord/lib/active_record/railties/controller_runtime.rb`, matched
+ *     by the `railties/controller_runtime.rb` UNPORTED_FILES pattern) is
+ *     unported (Railties / ActionController integration not ported yet).
+ *   - The association error classes `include DidYouMean::Correctable`
+ *     (associations/errors.rb:18,47,88); `Correctable#detailed_message` is
+ *     ported inline as `detailedMessage` in `associations/errors.ts`.
+ *     Correctable's source `core_ext/name_error.rb` is unported (Ruby NameError
+ *     machinery with no JS analog). Keyed on one host class since `allowed` is
+ *     unioned per-file across every entity in errors.rb.
+ */
+const PORTED_UNPORTED_MIXIN_METHODS: Record<string, string[]> = {
+  "ActiveRecord::Railtie": ["process_action", "cleanup_view_runtime", "append_info_to_payload"],
+  "ActiveRecord::AssociationNotFoundError": ["detailed_message"],
+};
+
+/**
  * `rubyMethodToTs` for any method, plus the trails `Q`-suffix predicate form.
  * trails encodes a Ruby `?` predicate with a trailing `Q` in TS
  * (`connected_to?` → `connectedToQ`), sometimes stacked on the is-prefix form
@@ -452,6 +482,8 @@ function collectAllowedNames(
       for (const inc of ambient.includes ?? []) walkMixin(inc, fqn);
       for (const name of ambient.methods ?? []) addRubyName(name);
     }
+
+    for (const name of PORTED_UNPORTED_MIXIN_METHODS[fqn] ?? []) addRubyName(name);
   }
   return allowed;
 }
