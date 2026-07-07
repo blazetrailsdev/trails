@@ -12,26 +12,20 @@
  * `withExampleTable`: it creates the ephemeral `ex` table, runs the block, and
  * drops it in a finally.
  *
- * Tracked deviations (RFC 0023 surfaced-deviations, story
- * pg-adapter-test-port-surfaced-deviations):
- *   - test_serial_sequence / test_default_sequence_name use the ambient
- *     `accounts` fixture ("public.accounts_id_seq"). trails adapter tests have
- *     no ambient fixtures, and recreating the shared canonical `accounts` in
- *     the parallel PG lane would corrupt sibling suites, so the identical
- *     sequence-name derivation is exercised against the ephemeral `ex` table
- *     ("public.ex_id_seq"). Ratified: the sequence-name derivation under test is
- *     table-agnostic, so `ex` exercises the same code path as `accounts`;
- *     loading a private-schema `accounts` fixture here would only re-verify the
- *     fixtures machinery, not the adapter behavior. The `error.connection_pool`
- *     (NullPool / pool identity) assertions from Rails' connection-error,
- *     serial-sequence, and invalid-index tests are now ported faithfully — a
- *     standalone trails adapter carries a NullPool that connect-time and
- *     query-time errors surface via `connection_pool`.
+ * test_serial_sequence / test_default_sequence_name run against the canonical
+ * `accounts` table ("public.accounts_id_seq"), as in Rails. `ensureCanonicalTables`
+ * lays the canonical `accounts` only if absent (idempotent, no drop), so it
+ * cannot corrupt sibling suites in the shared PG lane. The `error.connection_pool`
+ * (NullPool / pool identity) assertions from Rails' connection-error,
+ * serial-sequence, and invalid-index tests are ported faithfully — a standalone
+ * trails adapter carries a NullPool that connect-time and query-time errors
+ * surface via `connection_pool`.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
+import { ensureCanonicalTables } from "../../test-helpers/canonical-schema.js";
 import * as Arel from "@blazetrails/arel";
 import {
   ConnectionFailed,
@@ -337,22 +331,20 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("serial sequence", async () => {
-      await withExampleTable(adapter, async () => {
-        expect(await adapter.serialSequence("ex", "id")).toBe("public.ex_id_seq");
-        const error = await adapter.serialSequence("zomg", "id").then(
-          () => null,
-          (e) => e,
-        );
-        expect(error).toBeInstanceOf(StatementInvalid);
-        expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
-      });
+      await ensureCanonicalTables(adapter, ["accounts"]);
+      expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
+      const error = await adapter.serialSequence("zomg", "id").then(
+        () => null,
+        (e) => e,
+      );
+      expect(error).toBeInstanceOf(StatementInvalid);
+      expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
     });
 
     it("default sequence name", async () => {
-      await withExampleTable(adapter, async () => {
-        expect(await adapter.defaultSequenceName("ex", "id")).toBe("public.ex_id_seq");
-        expect(await adapter.defaultSequenceName("ex")).toBe("public.ex_id_seq");
-      });
+      await ensureCanonicalTables(adapter, ["accounts"]);
+      expect(await adapter.defaultSequenceName("accounts", "id")).toBe("public.accounts_id_seq");
+      expect(await adapter.defaultSequenceName("accounts")).toBe("public.accounts_id_seq");
     });
 
     it("default sequence name bad table", async () => {
