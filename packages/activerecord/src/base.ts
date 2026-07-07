@@ -3750,7 +3750,9 @@ export class Base extends Model {
     this._pendingOperation = adapter
       .execUpdate(updateSql, `${ctor.name} Update`, updateBinds)
       .then((affected) => {
-        if (ctor.lockingEnabled && affected === 0) {
+        // Mirrors Rails Locking::Optimistic#_update_row (optimistic.rb:110):
+        // `raise StaleObjectError if affected_rows != 1` — not just `=== 0`.
+        if (ctor.lockingEnabled && affected !== 1) {
           // Mirrors Rails _update_row rescue: `@attributes[locking_column] =
           // lock_attribute_was` restores the attribute snapshot so NULL-in-DB
           // records don't lose their original null valueBeforeTypeCast.

@@ -63,6 +63,11 @@ fixtures(["topics", "owners", "pets"], {
     "rollback on multiple deletions",
     "trigger on update where row was deleted",
     "callback on action with condition",
+    // SetCallbackTest is also `use_transactional_tests = false` in Rails
+    // (transaction_callbacks_test.rb:1038): after_commit needs a real commit
+    // boundary. It passes under the fixture savepoint on sqlite but PG's
+    // savepoint semantics differ, so opt out for parity.
+    "set callback with on",
   ],
 });
 
