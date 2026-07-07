@@ -1166,24 +1166,24 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#fetch_type_metadata
    * (schema_statements.rb:1717) — resolve the cast type from the whole `sql_type`
-   * and source `limit`/`precision`/`scale` straight off it, carrying the full
-   * `sql_type` verbatim. trails' SQLite type map recovers these off the cast type
-   * at lookup time: limits via `register_class_with_limit`, temporal/decimal
-   * precision via `register_class_with_precision`, and the 8-byte INTEGER default
-   * lives on `SQLite3IntegerType#_limit` (private) so the public `limit` stays nil
-   * for bare integers — dumps stay bare and `c_int_1..8` keep their 1..8.
+   * and carry `type`/`limit`/`precision`/`scale` straight off it, holding the full
+   * `sql_type` verbatim. trails' SQLite type map recovers the scalar hints off the
+   * cast type at lookup time: limits via `register_class_with_limit`, temporal/
+   * decimal precision via `register_class_with_precision`, and the 8-byte INTEGER
+   * default on `SQLite3IntegerType#_limit` (private) so the public `limit` stays
+   * nil for bare integers — dumps stay bare and `c_int_1..8` keep their 1..8.
+   *
+   * `type` comes straight from `cast_type.type` (no base-name fallback). For an
+   * unmapped `sql_type` the map returns a `ValueType`; Rails' `Value#type` is nil,
+   * whereas trails' `ValueType#type()` is `"value"` — that residual gap is the
+   * ValueType-nil-fidelity follow-up, not something to paper over here.
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
     const castType = this.lookupCastType(raw);
-    // Rails carries `cast_type.type`; for sql_types the map can't resolve
-    // (castType.type() === "value") fall back to the paren-stripped base name.
-    const parenIndex = raw.indexOf("(");
-    const baseSqlType = parenIndex >= 0 ? raw.slice(0, parenIndex).trimEnd() : raw;
-    const type = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
     return new SqlTypeMetadata({
       sqlType: raw,
-      type,
+      type: castType.type(),
       limit: castType.limit ?? null,
       precision: castType.precision ?? null,
       scale: castType.scale ?? null,
