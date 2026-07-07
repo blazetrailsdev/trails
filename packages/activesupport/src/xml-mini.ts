@@ -108,7 +108,12 @@ const FORMATTING: Record<string, (value: unknown) => string> = {
 function encode64(value: unknown): string {
   const bytes =
     typeof value === "string" ? Buffer.from(value, "binary") : Buffer.from(value as Uint8Array);
-  return bytes.toString("base64").replace(/(.{60})/g, "$1\n") + "\n";
+  const b64 = bytes.toString("base64");
+  // Empty input encodes to "" (no trailing newline); otherwise chunk into
+  // 60-char lines joined by "\n" with a single trailing "\n" — matching
+  // Base64.encode64 exactly, including when the length is a multiple of 60.
+  if (b64 === "") return "";
+  return (b64.match(/.{1,60}/g) ?? []).join("\n") + "\n";
 }
 
 function formatDateTime(value: unknown): string {
