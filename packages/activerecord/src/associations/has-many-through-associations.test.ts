@@ -811,6 +811,25 @@ describe("HasManyThroughAssociationsTest", () => {
       expect(found.attached_reason).toBe("This is our loyal customer");
     });
 
+    // TS-only: guard the write (construct_join_attributes) path for a
+    // composite-PK target has_many :through. Pushing an order into a tag's
+    // `orders` builds the join row (cpk_order_tags) via the source belongs_to's
+    // association_primary_key — the converged path no longer trips a trails-only
+    // `ConfigurationError` for the composite-PK target, mirroring Rails' single
+    // `construct_join_attributes` build for every shape.
+    it("appends a composite-pk target record through a join model", async () => {
+      const order = await CpkOrder.create({ shop_id: 1, status: "open" });
+      const tag = cpkTags("cpk_tag_loyal_customer");
+      await (tag as any).orders.push(order);
+      const joinRow = await CpkOrderTag.findBy({
+        order_id: (order as any).idValue,
+        tag_id: (tag as any).id,
+      });
+      expect(joinRow).not.toBeNull();
+      const orders = await (tag as any).orders.reload();
+      expect(orders.map((o: any) => Number(o.idValue))).toContain(Number((order as any).idValue));
+    });
+
     // TS-only: guard the JOIN routing for the remaining composite through
     // shapes. All three used to trip a `ConfigurationError` in the
     // single-column IN-subquery fallback (composite target FK / composite-PK
