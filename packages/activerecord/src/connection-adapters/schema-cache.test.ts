@@ -451,6 +451,44 @@ describe("SchemaCacheTest", () => {
     expect(cache.isCached("users")).toBe(false);
   });
 
+  it("refreshBang overwrites a warm entry in place without a cold window", async () => {
+    // Backs the eager-warm re-establish after resetColumnInformation: unlike
+    // clearDataSourceCacheBang, the prior DB-sourced entry stays cached the
+    // whole time (isCached never flips false), then converges to the fresh
+    // reflection once the async refresh settles.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+    cache.setPrimaryKeys("users", "id");
+    expect(cache.isCached("users")).toBe(true);
+
+    const fakeConn = {
+      primaryKey: async () => "id",
+      dataSourceExists: async () => true,
+      columns: async () => [
+        makeColumn("id", "integer", { primaryKey: true }),
+        makeColumn("name", "varchar(255)"),
+      ],
+      indexes: async () => [{ name: "idx_users_name", columns: ["name"] }],
+    };
+    const refresh = cache.refreshBang(new FakePool(fakeConn), "users");
+    // Still warm (old shape) while the refresh is in flight.
+    expect(cache.isCached("users")).toBe(true);
+    await refresh;
+
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "name"]);
+    expect((await cache.indexes(null, "users")).length).toBe(1);
+  });
+
+  it("refreshBang clears the entry when the table no longer exists", async () => {
+    const cache = new SchemaCache();
+    cache.setColumns("gone", [makeColumn("id", "integer")]);
+    expect(cache.isCached("gone")).toBe(true);
+
+    const fakeConn = { dataSourceExists: async () => false };
+    await cache.refreshBang(new FakePool(fakeConn), "gone");
+    expect(cache.isCached("gone")).toBe(false);
+  });
+
   it("records touched tables between recordTouchedTables and takeTouchedTables", () => {
     const cache = new SchemaCache();
     // No recording window: clears are not tracked.

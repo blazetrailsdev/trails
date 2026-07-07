@@ -232,6 +232,54 @@ export class SchemaCache {
     });
   }
 
+  /**
+   * Re-introspect a single table and overwrite its cached columns / primary
+   * keys / indexes **in place**, without the intermediate delete that
+   * {@link clearDataSourceCacheBang} performs. Unlike {@link add} it bypasses
+   * the per-entry `has` guards, so it re-reads even a table that is already
+   * warm.
+   *
+   * Used to re-establish the eager warm after `resetColumnInformation`
+   * (model-schema.ts) under {@link SchemaReflection.eagerLoadSchemaCache}:
+   * keeping the prior DB-sourced entry live until the fresh reflection lands
+   * means a synchronous `Model.columnNames()` issued between the reset and the
+   * refresh settling still takes the warm, DB-sourced branch — excluding
+   * virtual `attribute()` declarations — rather than going cold. When the table
+   * no longer exists its entry is cleared.
+   *
+   * @internal trails-only — Rails has no analogue because
+   * `reset_column_information` reflects synchronously on the next `column_names`
+   * access (`schema_cache.columns`), which the async layer cannot.
+   */
+  async refreshBang(pool: unknown, tableName: string): Promise<void> {
+    if (isSchemaCacheIgnoredTable(tableName)) return;
+    await withConnection(pool, async (connection) => {
+      // Ask the connection directly rather than `this.dataSourceExists`, whose
+      // cached `true` (warmed alongside the columns we're refreshing) would
+      // never re-detect a table dropped since. When the connection can't answer,
+      // assume it still exists and refresh the columns anyway.
+      const exists =
+        typeof connection.dataSourceExists === "function"
+          ? await connection.dataSourceExists(tableName)
+          : true;
+      if (!exists) {
+        this.clearDataSourceCacheBang(connection, tableName);
+        return;
+      }
+      // Primary keys first so setColumns' reconcilePrimaryKeyFlags sees the
+      // fresh authoritative key (mirrors `add`'s ordering).
+      if (typeof connection.primaryKey === "function") {
+        this.setPrimaryKeys(tableName, (await connection.primaryKey(tableName)) ?? null);
+      }
+      if (typeof connection.columns === "function") {
+        this.setColumns(tableName, await connection.columns(tableName));
+      }
+      if (typeof connection.indexes === "function") {
+        this._indexes.set(tableName, await connection.indexes(tableName));
+      }
+    });
+  }
+
   async columns(pool: unknown, tableName: string): Promise<Column[] | undefined> {
     if (isSchemaCacheIgnoredTable(tableName)) {
       throw new StatementInvalid(`Table '${tableName}' doesn't exist`);
@@ -609,11 +657,18 @@ export class SchemaReflection {
    * on-disk cache (if any) as a base, then tops it up by introspection.
    *
    * Off by default — the boot-time introspection cost is opt-in, mirroring how
-   * Rails apps choose between a committed dump and live reflection. Note the
-   * documented async limitation: after `resetColumnInformation` clears a
-   * table's entry, the warm is NOT synchronously re-established (the adapter
-   * data-source cache cannot reload without awaiting); the model stays cold for
-   * that table until the next async schema load or a fresh connection.
+   * Rails apps choose between a committed dump and live reflection.
+   *
+   * The warm is also re-established after `resetColumnInformation`
+   * (model-schema.ts): rather than clearing the table's entry (which would go
+   * cold), the reset kicks off a fire-and-forget {@link SchemaCache#refreshBang}
+   * that re-introspects and overwrites the entry **in place**. The prior
+   * DB-sourced entry stays live until the fresh reflection lands, so a
+   * synchronous `Model.columnNames()` issued right after the reset still
+   * excludes virtual `attribute()` declarations without an intervening
+   * `await ensureSchemaLoaded()`, and a later schema change is picked up once
+   * the refresh settles. (The flag-off default still clears, matching Rails'
+   * `clear_data_source_cache!`.)
    */
   static eagerLoadSchemaCache = false;
 

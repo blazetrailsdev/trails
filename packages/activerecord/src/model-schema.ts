@@ -26,7 +26,7 @@ import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { applyPendingSerializations } from "./serialize.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
-import { FakePool } from "./connection-adapters/schema-cache.js";
+import { FakePool, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { threadedConnectionFor, connectionPool } from "./connection-handling.js";
 
 /**
@@ -724,14 +724,21 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
   // for that form here would clear a table named `null` and leave a floating
   // Promise. Both branches below resolve the raw cache, matching what the
   // adapter's own `schemaCache` getter returns (abstract-adapter.ts).
-  type Cache = { clearDataSourceCacheBang?: (connection: unknown, name: string) => void };
+  type Cache = {
+    clearDataSourceCacheBang?: (connection: unknown, name: string) => void;
+    refreshBang?: (pool: unknown, name: string) => Promise<void>;
+  };
   let cache: Cache | null | undefined;
   let table: string | undefined;
+  // The pool (or directly-assigned adapter) to introspect through when
+  // re-establishing the eager warm; unused on the flag-off clear path.
+  let connectionSource: unknown;
   try {
     table = (host as unknown as { tableName?: string }).tableName;
     const direct = (host as unknown as { _adapter?: { schemaCache?: Cache } })._adapter;
     if (direct?.schemaCache) {
       cache = direct.schemaCache;
+      connectionSource = direct;
     } else {
       // Pooled path: read the pool config's raw SchemaCache directly (the slot
       // the adapter getter shares), NOT `schemaCache()` whose fallback is the
@@ -743,11 +750,32 @@ function clearAdapterDataSourceCache(host: SchemaHost): void {
         }
       ).connectionPool?.();
       cache = pool?.poolConfig?.schemaCache;
+      connectionSource = pool;
     }
   } catch {
     return;
   }
-  if (table && typeof cache?.clearDataSourceCacheBang === "function") {
+  if (!table) return;
+  // Under eager warming, re-establish the warm in place instead of clearing:
+  // a synchronous columnNames() right after the reset then still takes the
+  // warm, DB-sourced branch (excluding virtual attribute() declarations)
+  // rather than going cold, and the refresh overwrites the entry once the
+  // async reflection lands so a later schema change is still picked up.
+  // Fire-and-forget for the same reason as the boot warm — reset_column_
+  // information is sync and cannot block on introspection. On a reflection
+  // failure, fall back to a plain clear so the next async load re-reflects
+  // rather than serving a now-untrustworthy entry forever.
+  if (
+    SchemaReflection.eagerLoadSchemaCache &&
+    connectionSource &&
+    typeof cache?.refreshBang === "function"
+  ) {
+    void cache.refreshBang(connectionSource, table).catch(() => {
+      cache?.clearDataSourceCacheBang?.(null, table);
+    });
+    return;
+  }
+  if (typeof cache?.clearDataSourceCacheBang === "function") {
     cache.clearDataSourceCacheBang(null, table);
   }
 }
