@@ -955,6 +955,34 @@ function getColumnsHash(host: SchemaHost): Record<string, unknown> {
 }
 
 /**
+ * Rails' `ActiveRecord::Attributes#type_for_column`: the adapter's cast type
+ * for a column, run through `ModelSchema`'s immutable-string conversion
+ * (model_schema.rb:622-629) and then `hook_attribute_type` (attributes.rb:
+ * 301-302), which layers tz-conversion / optimistic-locking wrappers. Shared by
+ * the non-enum schema-def path and the enum-subtype stash so both seed the same
+ * reflected type. Falls back to the `value` type when the adapter yields none.
+ */
+function reflectedTypeForColumn(
+  host: { immutableStringsByDefault?: boolean; hookAttributeType?: (n: string, t: Type) => Type },
+  adapter: { lookupCastTypeFromColumn?: (c: unknown) => unknown },
+  name: string,
+  column: unknown,
+): Type {
+  const castType =
+    typeof adapter.lookupCastTypeFromColumn === "function"
+      ? adapter.lookupCastTypeFromColumn(column)
+      : null;
+  let type = (castType as Type | null) ?? typeRegistry.lookup("value");
+  // Only mutable StringType responds to toImmutableString, mirroring Ruby's
+  // `type.respond_to?(:to_immutable_string)` guard.
+  if (host.immutableStringsByDefault) {
+    const toImmutable = (type as { toImmutableString?: () => Type }).toImmutableString;
+    if (typeof toImmutable === "function") type = toImmutable.call(type);
+  }
+  return host.hookAttributeType?.(name, type) ?? type;
+}
+
+/**
  * Sync worker: apply a columns hash (already fetched from the schema
  * cache) to `_attributeDefinitions`. Shared by sync `loadSchema` and
  * async `loadSchemaFromAdapter`.
@@ -1018,25 +1046,36 @@ function applyColumnsHash(
       // reflection. The schema column's default is NOT merged onto the def;
       // `_defaultAttributes` seeds it via from_database directly from the cached
       // column (Rails' column-seed-then-replay), then replays the user override.
+      //
+      // Enums are the exception that still needs the reflected column type:
+      // Rails resolves the enum subtype from the column's real `Type::Value`
+      // inside `decorate_attributes` (enum.rb:239-246). Our column-seed-then-
+      // replay seeds the override itself, so the reflected type would never
+      // reach the enum decorator otherwise. Compute it here (the adapter is in
+      // hand) via the SAME `type_for_column` pipeline the non-enum path uses —
+      // immutable-string conversion + `hook_attribute_type` (attributes.rb:
+      // 301-302, model_schema.rb:622-629) — so the enum subtype carries the
+      // same tz-conversion / optimistic-locking wrappers Rails passes into
+      // `EnumType.new`. Stash it on the def so `enumTypeFrom` delegates to it.
+      //
+      // Skip when the enum's attribute was EXPLICITLY typed (`attribute(name,
+      // type)` before `enum`): Rails uses the declared type, which wins over
+      // the column's reflected type — overriding it here would, e.g., coerce an
+      // integer enum on a MySQL `TINYINT(1)` column through boolean and break
+      // the round-trip.
+      const enums = (host as unknown as { _enums?: Map<string, unknown> })._enums;
+      if (enums?.has(name) && !(existing as { enumTypeExplicit?: boolean }).enumTypeExplicit) {
+        (existing as { enumReflectedSubtype?: Type }).enumReflectedSubtype = reflectedTypeForColumn(
+          host,
+          adapter,
+          name,
+          column,
+        );
+      }
       continue;
     }
 
-    const castType =
-      typeof adapter.lookupCastTypeFromColumn === "function"
-        ? adapter.lookupCastTypeFromColumn(column)
-        : null;
-    let type = (castType as Type | null) ?? typeRegistry.lookup("value");
-
-    // Rails type_for_column: convert string types to their immutable variant
-    // when `immutable_strings_by_default` is set (model_schema.rb:623-626).
-    // Only mutable StringType responds to toImmutableString, mirroring
-    // Ruby's `type.respond_to?(:to_immutable_string)` guard.
-    if ((host as { immutableStringsByDefault?: boolean }).immutableStringsByDefault) {
-      const toImmutable = (type as { toImmutableString?: () => Type }).toImmutableString;
-      if (typeof toImmutable === "function") type = toImmutable.call(type);
-    }
-
-    type = host.hookAttributeType?.(name, type) ?? type;
+    let type = reflectedTypeForColumn(host, adapter, name, column);
 
     // Preserve encryption wrappers across schema reflection. Both
     // EncryptedAttributeType variants implement `WrappedType`; any

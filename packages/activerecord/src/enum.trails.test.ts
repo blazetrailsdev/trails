@@ -4,15 +4,22 @@
  * `assertValidEnumDefinitionValues`, `assertValidEnumOptions`,
  * `detectNegativeEnumConditionsBang`, and the `setEnumWarn` warning hook).
  */
-import { describe, it, expect, afterEach, vi } from "vitest";
+import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
+  castEnumValue,
   detectNegativeEnumConditionsBang,
+  enumTypeOf,
+  EnumType,
   setEnumWarn,
 } from "./enum.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
+import { Map as MapCaster } from "./type-caster/map.js";
+import { fixtures } from "./test-helpers/fixtures.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { Book } from "./test-helpers/models/book.js";
 
 describe("Enum name conflict detection", () => {
   // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
@@ -299,5 +306,143 @@ describe("Enum private validators", () => {
       detectNegativeEnumConditionsBang(["notDraft", "published"]);
       expect(spy).not.toHaveBeenCalled();
     });
+  });
+});
+
+// Rails resolves the enum subtype lazily inside `decorate_attributes` from the
+// column's real `Type::Value` (enum.rb:239-246), NOT from the mapping's value
+// shapes. When a column type differs from what the mapping implies — here an
+// integer-valued enum on a `decimal`-typed attribute — the EnumType must
+// delegate to the reflected column type, not the integer that eager
+// mapping-shape inference would have guessed. No canonical model exercises
+// this (all canonical enum columns match their mapping shapes), so this is a
+// trails-only regression guard for the reflected-type resolution.
+describe("Enum subtype resolved from the reflected column type", () => {
+  class Book extends Base {
+    static _tableName = "books";
+    static {
+      this.attribute("status", "decimal");
+      this.enum("status", { proposed: 0, written: 1, published: 2 });
+    }
+  }
+
+  it("delegates the enum subtype to the reflected decimal type, not the mapping shape", () => {
+    const type = Book.typeForAttribute("status");
+    expect(type).toBeInstanceOf(EnumType);
+    // Eager mapping-shape inference (all-numbers) would have picked "integer";
+    // resolving from the reflected column type yields the real "decimal".
+    expect((type as EnumType).subtype).toBe("decimal");
+    expect((type as EnumType).subtypeType()).toBeInstanceOf(DecimalType);
+  });
+
+  it("serializes an enum label through the reflected decimal subtype", () => {
+    // castEnumValue serializes the label to its stored value via the single
+    // registered EnumType, coercing through the decimal subtype exactly as the
+    // reflected DecimalType would.
+    expect(castEnumValue(Book, "status", "written")).toEqual(new DecimalType().serialize(1));
+  });
+
+  it("serializes through the reflected subtype on the query type-caster path too", () => {
+    // The predicate builder's TypeCaster::Map serialize path must resolve the
+    // same reflected EnumType (not the pre-reflection one), so where(status:)
+    // round-trips the label through the decimal subtype.
+    const caster = new MapCaster(Book);
+    expect(caster.typeCastForDatabase("status", "written")).toEqual(new DecimalType().serialize(1));
+  });
+});
+
+// The harder case the explicit-`attribute(...)` block above does NOT cover: an
+// enum whose subtype comes purely from SCHEMA REFLECTION. `numeric_data`'s
+// `decimal_number` is a real `decimal` column, so an integer-valued enum on it
+// must delegate to the reflected `DecimalType`, even though (a) mapping-shape
+// inference would guess `integer` and (b) reflection skips the userProvided
+// enum def, leaving `_attributeDefinitions` carrying the pre-reflection integer
+// EnumType — so the reflected subtype only lives in the replayed AttributeSet.
+describe("Enum subtype resolved from a schema-reflected column type", () => {
+  fixtures(["books"]);
+
+  class NumericEnum extends Base {
+    static _tableName = "numeric_data";
+    static {
+      this.enum("decimal_number", { low: 0, mid: 1, high: 2 });
+    }
+  }
+
+  // A default-only `attribute(name, { default })` (no explicit type) must still
+  // resolve the subtype from the reflected column — Rails pushes only a
+  // PendingDefault, so the column type governs. A prior version marked any
+  // user-provided def as "explicitly typed" and skipped reflection here.
+  class DefaultOnlyNumericEnum extends Base {
+    static _tableName = "numeric_data";
+    static {
+      this.attribute("decimal_number", { default: 0 });
+      this.enum("decimal_number", { low: 0, mid: 1, high: 2 });
+    }
+  }
+
+  // Deliberately do NOT await `NumericEnum.loadSchema()` here: `enumTypeOf`
+  // must reflect synchronously from the warm schema cache on its own (the same
+  // sync path `Base.typeForAttribute` uses). Awaiting the async loader first
+  // would mask a regression where the helper fire-and-forgets reflection.
+  beforeAll(async () => {
+    await rebuildCanonicalTables(Base.connection, ["numeric_data"]);
+  });
+
+  it("delegates the enum subtype to the reflected decimal column, not the integer mapping shape", () => {
+    const type = enumTypeOf(NumericEnum, "decimal_number");
+    expect(type).toBeInstanceOf(EnumType);
+    // `subtype`/`subtypeType().type()` is "decimal" — the reflected column
+    // family — where mapping-shape inference (all-numbers) would have said
+    // "integer". Assert the reflected type string, not a concrete class:
+    // adapters reflect their own decimal variant (e.g. MySQL's
+    // DecimalWithoutScale), all of whose `type()` is "decimal".
+    expect(type!.subtype).toBe("decimal");
+    expect(type!.subtypeType().type()).toBe("decimal");
+  });
+
+  it("serializes labels through the reflected decimal subtype on both read paths", () => {
+    // castEnumValue (predicate/read) and TypeCaster::Map (query) must both
+    // resolve the reflected EnumType and serialize the mapped value through the
+    // reflected subtype — not the integer inference. Compare against the
+    // reflected subtype's own serialize so this holds across adapters (whose
+    // decimal serialize output differs).
+    const subtype = enumTypeOf(NumericEnum, "decimal_number")!.subtypeType();
+    expect(castEnumValue(NumericEnum, "decimal_number", "mid")).toEqual(subtype.serialize(1));
+    const caster = new MapCaster(NumericEnum);
+    expect(caster.typeCastForDatabase("decimal_number", "mid")).toEqual(subtype.serialize(1));
+  });
+
+  it("resolves the reflected subtype for a default-only attribute (no explicit type)", () => {
+    const type = enumTypeOf(DefaultOnlyNumericEnum, "decimal_number");
+    expect(type).toBeInstanceOf(EnumType);
+    // A default-only attribute is NOT "explicitly typed", so reflection still
+    // supplies the column subtype ("decimal") rather than the integer the
+    // mapping shape implies.
+    expect(type!.subtype).toBe("decimal");
+    expect(type!.subtypeType().type()).toBe("decimal");
+  });
+});
+
+// The `enumTypeOf` serialize path must preserve `Base.typeForAttribute`'s
+// `assertEnumTypeDeclared` guard: a typeless enum (no backing column, no
+// explicit `attribute` type) raises rather than silently serializing through
+// the mapping-shape fallback. Rails raises from the enum `decorate_attributes`
+// block when the subtype is `ActiveModel::Type.default_value` (enum.rb:240-245).
+describe("Enum with an undeclared type raises on the serialize path", () => {
+  // Reflect `books` so `typeless_genre` resolves to a NullColumn (no synthesize
+  // fallback), the condition under which the guard fires.
+  fixtures(["books"]);
+
+  class TypelessBook extends Book {
+    static {
+      this.enum("typeless_genre", { adventure: 0, comic: 1 });
+    }
+  }
+
+  it("castEnumValue raises for an enum with no column and no explicit type", async () => {
+    await TypelessBook.loadSchema();
+    expect(() => castEnumValue(TypelessBook, "typeless_genre", "comic")).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in/,
+    );
   });
 });

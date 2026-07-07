@@ -9,6 +9,9 @@ import {
 } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
 import { isDangerousClassMethod } from "./scoping/named.js";
+// The synchronous schema reflector (warm-cache path), NOT the async
+// `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
+import { loadSchema as reflectSchemaSync } from "./model-schema.js";
 
 /** Value a label can map to — matches Rails' hash-value support for enums. */
 type EnumValue = number | string | boolean | null;
@@ -52,35 +55,58 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
 }
 
 /**
+ * Resolve the enum's storage subtype from the reflected attribute type — the
+ * single source of truth, mirroring Rails' `decorate_attributes` block
+ * (`subtype = subtype.subtype if EnumType === subtype; EnumType.new(name,
+ * enum_values, subtype, ...)`, enum.rb:239-246). The `reflected` type is
+ * whatever the attribute currently resolves to when the pending decorator
+ * replays: after the schema is loaded that is the column's real `Type::Value`,
+ * so the EnumType always delegates cast/serialize/deserialize to the actual
+ * column type.
+ *
+ * The reflected column type is the authoritative source. trails' column-seed-
+ * then-replay seeds the enum override itself (not the raw column type, unlike
+ * Rails), so the `reflected` argument the decorator receives at replay time is
+ * the pre-reflection EnumType, not the column's `Type::Value`. Schema
+ * reflection therefore stashes the real column cast type on the attribute def
+ * as `enumReflectedSubtype` (model-schema.ts, where the adapter is in hand);
+ * prefer it when present.
+ *
+ * Two fallbacks mirror the surrounding replay machinery rather than Rails
+ * directly: an already-decorated EnumType is unwrapped to its own subtype (a
+ * re-replay), and — because trails' decorator also runs eagerly at
+ * class-definition time, before the schema is reflected — a still-default
+ * `value` type falls back to inferring the subtype from the mapping's value
+ * shapes so pre-reflection casts are not identity no-ops.
+ */
+function enumTypeFrom(
+  klass: typeof Base,
+  attribute: string,
+  name: string,
+  mapping: Record<string, EnumValue>,
+  reflected: Type,
+  raiseOnInvalidValues: boolean,
+): EnumType {
+  const defs = (klass as unknown as { _attributeDefinitions?: Map<string, unknown> })
+    ._attributeDefinitions;
+  const stashed = (defs?.get(attribute) as { enumReflectedSubtype?: Type } | undefined)
+    ?.enumReflectedSubtype;
+  const source = stashed ?? reflected;
+  let subtype: ValueType<unknown>;
+  if (source instanceof EnumType) {
+    subtype = source.subtypeType();
+  } else {
+    const rv = source as ValueType<unknown>;
+    subtype = rv.type() === "value" ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
+  }
+  return new EnumType(name, new Map(Object.entries(mapping)), subtype, raiseOnInvalidValues);
+}
+
+/**
  * Enum definition — maps symbolic names to integer values.
  *
  * Mirrors: ActiveRecord::Enum
  */
-
-/**
- * EnumType cache keyed on the `_enums` mapping object. Each enum stores one
- * stable mapping Record in `_enums`, so keying on its identity lets the
- * read/serialize helpers reuse a single EnumType instead of reallocating one
- * per call.
- */
-const enumTypeCache = new WeakMap<object, EnumType>();
-
-/**
- * Build (and cache) an EnumType for the deserialize/serialize helpers below
- * from the canonical `_enums` mapping. The subtype only governs the
- * integer/string coercion fallback, so infer it from the mapping's value
- * types — uniform numbers mean an integer-backed column, anything else a
- * string-backed one.
- */
-export function enumTypeFor(name: string, mapping: Record<string, EnumValue>): EnumType {
-  const cached = enumTypeCache.get(mapping);
-  if (cached) return cached;
-  const entries = Object.entries(mapping);
-  const subtype = inferSubtype(entries.map(([, v]) => v));
-  const enumType = new EnumType(name, new Map(entries), subtype);
-  enumTypeCache.set(mapping, enumType);
-  return enumType;
-}
 
 /**
  * Register an EnumType in the attribute set and install the label-returning
@@ -97,7 +123,9 @@ export function enumTypeFor(name: string, mapping: Record<string, EnumValue>): E
 export function installEnumAttribute(
   klass: typeof Base,
   attribute: string,
-  enumType: EnumType,
+  name: string,
+  mapping: Record<string, EnumValue>,
+  raiseOnInvalidValues: boolean,
   attributeOptions?: { default?: unknown },
 ): void {
   // Rails' _enum uses `attribute(name)` (bare) + `decorate_attributes`, layering
@@ -120,7 +148,13 @@ export function installEnumAttribute(
   } else {
     klass.attribute(attribute);
   }
-  klass.decorateAttributes([attribute], (_name: string, _subtype: Type) => enumType);
+  // Rails resolves the subtype lazily inside the decorate block from the
+  // reflected column type (enum.rb:239-246); the decorator re-runs on every
+  // _defaultAttributes replay, so once the schema is loaded `reflected` is the
+  // column's real Type::Value and the EnumType delegates to it.
+  klass.decorateAttributes([attribute], (_name: string, reflected: Type) =>
+    enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues),
+  );
 
   // Define the getter after attribute() so the EnumType is already in
   // _attributeDefinitions / the pending-type queue when we overwrite whatever
@@ -178,12 +212,11 @@ export class EnumType extends ValueType<string> {
   private _reverseMapping: ReadonlyMap<EnumValue, string>;
   private _raiseOnInvalidValues: boolean;
   private _subtypeType: ValueType<unknown>;
-  readonly subtype: string;
 
   constructor(
     name: string,
     mapping: ReadonlyMap<string, EnumValue>,
-    subtype: string,
+    subtype: ValueType<unknown>,
     raiseOnInvalidValues = true,
   ) {
     super();
@@ -198,14 +231,18 @@ export class EnumType extends ValueType<string> {
     }
     this._reverseMapping = reverse;
     this._raiseOnInvalidValues = raiseOnInvalidValues;
-    this.subtype = subtype;
-    this._subtypeType = subtypeInstance(subtype);
+    // Rails passes the column's real `Type::Value` instance into `EnumType.new`
+    // and stores it as `subtype`; cast/serialize/deserialize delegate to it.
+    this._subtypeType = subtype;
   }
 
-  // Rails' EnumType does `delegate :type, to: :subtype` — callers that
-  // ask what an enum column's storage type is want the underlying
-  // column type (e.g. "integer"), not the enum's attribute name. Our
-  // subtype is already the type string, so return it directly.
+  // Rails' EnumType does `delegate :type, to: :subtype` — callers that ask what
+  // an enum column's storage type is want the underlying column type (e.g.
+  // "integer"), so delegate to the subtype's own `type()`.
+  get subtype(): string {
+    return this._subtypeType.type();
+  }
+
   override type(): string {
     return this.subtype;
   }
@@ -490,8 +527,22 @@ export function _enum(
   // explicitly typed via `attribute(name, type)` is queued for a deferred check
   // (`_enumsPendingTypeCheck`) that `typeForAttribute` runs post-loadSchema and
   // clears once a backing column is confirmed. See `assertEnumTypeDeclared`.
+  // "Explicitly typed" means the user declared a concrete attribute *type*
+  // (`attribute(name, "integer")`), NOT merely a default (`attribute(name,
+  // { default })`) or nothing. Rails pushes a `PendingType` only when a type is
+  // present (attribute_registration.rb:12-18); a default-only / type-less
+  // attribute keeps the fallback `value` type until the column reflects, so its
+  // subtype must still come from the column (enum decorates the column type,
+  // enum.rb:238-248). Requiring a user-provided def AND a concrete (non-`value`)
+  // type distinguishes the two: a default-only attribute's type is still the
+  // `value` default at `enum` time, so it is treated as column-reflected.
   const existingDef = (this as any)._attributeDefinitions?.get(attrName);
-  const explicitlyTyped = existingDef?.source === "user" || existingDef?.userProvided === true;
+  const existingTypeName =
+    typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
+  const explicitlyTyped =
+    (existingDef?.source === "user" || existingDef?.userProvided === true) &&
+    existingTypeName != null &&
+    existingTypeName !== "value";
   const pendingHost = this as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
     if (!Object.prototype.hasOwnProperty.call(this, "_enumsPendingTypeCheck")) {
@@ -504,41 +555,37 @@ export function _enum(
     pendingHost._enumsPendingTypeCheck.delete(attrName);
   }
 
-  // Read subtype from _attributeDefinitions directly — never call typeForAttribute()
-  // here, because typeForAttribute() triggers loadSchema(), which sets _schemaLoaded
-  // prematurely and blocks the real DB schema reflection from running later.
-  // Resolve it now from user-declared defs (e.g. `attribute("status", "string")`)
-  // and fall back to "integer" otherwise.
-  let subtype: string;
-  try {
-    const t: string = existingDef?.type?.type?.() ?? "value";
-    // No user-declared attribute type yet (schema not reflected): infer the
-    // storage subtype from the mapping's value shapes (booleans → boolean,
-    // strings → string, numbers → integer).
-    subtype =
-      t === "value"
-        ? inferSubtype(Object.values(mapping))
-        : /integer/i.test(t) || t === "smallint"
-          ? "integer"
-          : t;
-  } catch {
-    subtype = "integer";
-  }
-
-  // Register EnumType so typeForAttribute() returns it for predicate-builder
+  // Register the EnumType so typeForAttribute() returns it for predicate-builder
   // serialization — e.g. where({status: "draft"}) serializes "draft" → 0 — and
   // install the label-returning accessor via the shared installEnumAttribute.
+  // The subtype is NOT resolved here: installEnumAttribute wires a
+  // `decorateAttributes` decorator that builds the EnumType lazily from the
+  // reflected column type on each replay (Rails' `decorate_attributes` model),
+  // so we never eagerly guess it from the mapping shape.
   // Mirrors Rails `EnumType.new(..., raise_on_invalid_values: !validate)`: with
   // `validate:` set, an invalid assignment is caught by the inclusion validator
   // rather than raising on write, so the type must not raise.
   const validate = options?.validate ?? false;
-  const enumType = new EnumType(name, new Map(Object.entries(mapping)), subtype, !validate);
   installEnumAttribute(
     this,
     attrName,
-    enumType,
+    name,
+    mapping,
+    !validate,
     options && "default" in options ? { default: options.default } : undefined,
   );
+
+  // Record whether the user explicitly typed the enum's attribute (e.g.
+  // `attribute("state", "integer")` before `enum`). Rails resolves the enum
+  // subtype from the attribute's *declared* type — an explicit type wins over
+  // the column's reflected type — so schema reflection must NOT override an
+  // explicitly-typed enum's subtype with the column type (e.g. a TINYINT(1)
+  // that MySQL reflects as boolean). See the `enumTypeExplicit` gate in
+  // model-schema's `applyColumnsHash`.
+  const enumDef = (
+    this as unknown as { _attributeDefinitions?: Map<string, unknown> }
+  )._attributeDefinitions?.get(attrName) as { enumTypeExplicit?: boolean } | undefined;
+  if (enumDef) enumDef.enumTypeExplicit = explicitlyTyped;
 
   // Rails' `_enum` takes `scopes: true, instance_methods: true` keyword
   // defaults; `scopes: false` suppresses per-value scope generation and
@@ -876,6 +923,42 @@ export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
 }
 
 /**
+ * Fetch the single registered EnumType for an enum attribute — the one source
+ * of truth built lazily from the reflected column type via the
+ * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
+ * (`_defaultAttributes`), NOT `_attributeDefinitions`: reflection skips a
+ * userProvided enum def, so its `type` stays the pre-reflection (mapping-shape-
+ * inferred) EnumType, whereas the replayed decorator rebuilds the EnumType from
+ * the reflected column subtype. Returns null when the attribute isn't an enum
+ * on this class.
+ *
+ * @internal
+ */
+export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | null {
+  const host = klass as unknown as {
+    _enums?: Map<string, unknown>;
+    _attributeAliases?: Record<string, string>;
+    _defaultAttributes(): { getAttribute(n: string): { type: Type } };
+  };
+  const resolved = host._attributeAliases?.[attribute] ?? attribute;
+  if (!host._enums?.has(resolved)) return null;
+  // Reflect synchronously from the warm schema cache before reading the
+  // attribute set — the SAME path `Base.typeForAttribute` uses (base.ts). The
+  // public `Base.loadSchema()` is async and would fire-and-forget, letting a
+  // caller read the pre-reflection (mapping-inferred) EnumType; this sync
+  // reflection stashes `enumReflectedSubtype` and rebuilds `_defaultAttributes`
+  // before we read it, so the reflected subtype is already in place.
+  reflectSchemaSync.call(klass);
+  // Mirror `Base.typeForAttribute`'s guard: a typeless enum (no backing column,
+  // no explicit `attribute` type) must raise rather than silently serialize
+  // through the pre-reflection fallback (Rails raises from the enum
+  // `decorate_attributes` block, enum.rb:240-245).
+  assertEnumTypeDeclared(klass, resolved);
+  const type = host._defaultAttributes().getAttribute(resolved).type;
+  return type instanceof EnumType ? type : null;
+}
+
+/**
  * Get the human-readable enum value for an attribute.
  * Delegates to EnumType.deserialize for the mapping lookup.
  */
@@ -890,7 +973,7 @@ export function readEnumValue(record: Base, attribute: string): string | null {
   const stored = record.readAttribute(attribute);
   if (typeof stored === "string" && Object.prototype.hasOwnProperty.call(mapping, stored))
     return stored;
-  return enumTypeFor(attribute, mapping).deserialize(stored);
+  return enumTypeOf(ctor, attribute)?.deserialize(stored) ?? null;
 }
 
 /**
@@ -902,10 +985,7 @@ export function castEnumValue(
   attribute: string,
   value: unknown,
 ): number | string | boolean | null {
-  const mapping = modelClass._enums?.get(attribute);
-  if (!mapping) return null;
-
-  return enumTypeFor(attribute, mapping).serialize(value);
+  return enumTypeOf(modelClass, attribute)?.serialize(value) ?? null;
 }
 
 /**
