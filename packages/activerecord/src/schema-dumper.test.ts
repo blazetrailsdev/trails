@@ -194,9 +194,12 @@ describe("SchemaDumperTest", () => {
     // Rails sources the decimal precision default from native_database_types
     // (nil on SQLite/PostgreSQL), so precision-less `t.decimal`/`t.numeric`
     // columns dump bare there. MySQL/MariaDB physically materialize a bare
-    // `decimal` as `decimal(10,0)` (SQL-standard default), so it reflects and
-    // dumps with `precision: 10, scale: 0` — matching Rails on MySQL.
-    const decimalTail = adapterType === "mysql" ? ", { precision: 10, scale: 0 })" : ")";
+    // `decimal` as `decimal(10,0)` (SQL-standard default), so it reflects a
+    // precision of 10. The scale is 0 but does not dump: `decimal(N,0)` maps to
+    // `Type::DecimalWithoutScale`, whose `scale` is nil (not 0), so the dumper's
+    // `column.scale.inspect if column.scale` guard skips it — matching Rails on
+    // MySQL, which likewise dumps `precision: 10` with no scale.
+    const decimalTail = adapterType === "mysql" ? ", { precision: 10 })" : ")";
     expect(output).toContain(`t.decimal("numeric_number"${decimalTail}`);
     expect(output).toContain(`t.decimal("decimal_number"${decimalTail}`);
   });
