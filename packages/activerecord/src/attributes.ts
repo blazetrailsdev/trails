@@ -19,6 +19,7 @@ import {
 import { isStiSubclass, getStiBase } from "./inheritance.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup } from "./type.js";
+import { cachedColumnsHash } from "./model-schema.js";
 
 type AnyClass = any;
 
@@ -31,12 +32,6 @@ interface AttributeDefinition {
   limit?: number | null;
   /** Declared via `attribute(name, type, { virtual: true })` — not DB-backed. */
   virtual?: boolean;
-  /**
-   * A user-declared type override (e.g. an enum) whose `defaultValue` came from
-   * the schema column, not a user-supplied default. Seeds via from_database in
-   * `_defaultAttributes` so the default is deserialized rather than user-cast.
-   */
-  defaultFromSchema?: boolean;
   /**
    * For `source:"schema"` defs, the `tableName` the columns were reflected
    * against. A non-STI subclass that overrides `_tableName` and declares an
@@ -138,14 +133,16 @@ export function defineAttribute(
  *
  * Mirrors: ActiveRecord::Attributes::ClassMethods#_default_attributes
  *
- * Seeds from `_attributeDefinitions` then replays user-declared `attribute()`
- * calls from the pending-modification queue. Entries with an explicit default
- * use `Attribute.fromDatabase` (schema) or `withUserDefault` (user-declared).
- * Entries without a default use `Attribute.fromDatabase(null, type)` for all
- * attributes — mirroring Rails' `columns_hash.transform_values { from_database }`.
- * Using `fromDatabase` (rather than `withCastValue`) means the type's
- * `deserialize(null)` is called, which is required for `LockingType` to return
- * 0 instead of null for new records that have no lock column default.
+ * Rails' column-seed-then-replay: seeds every real DB column via
+ * `Attribute.fromDatabase(name, column.default, type)` (so the default flows
+ * through `deserialize`), then replays the pending-modification queue —
+ * user-declared `attribute()` PendingType/PendingDefault entries and
+ * `decorate_attributes` PendingDecorators (e.g. enums) — on top. A user
+ * type-override on a real column (an enum) therefore keeps the FromDatabase
+ * attribute and its deserialized default. User-declared attributes that are NOT
+ * DB columns seed from `_attributeDefinitions`: with a default via
+ * `withUserDefault` (cast), without one via `fromDatabase(null, type)` — the
+ * latter required for `LockingType`, whose `deserialize(null)` returns 0.
  */
 export function _defaultAttributes(this: AnyClass): AttributeSet {
   // Reflect the (always-warm, RFC 0031) schema cache into `_attributeDefinitions`
@@ -183,33 +180,33 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     // cascades here when the superclass gains new attribute declarations.
     registerWithSuperclass(cacheHost);
 
-    // Phase 1: seed from _attributeDefinitions (all entries — schema-reflected
-    // columns and direct defineAttribute() calls).
-    // For entries with a default: schema columns use fromDatabase, user-declared
-    // columns use withCastValue + withUserDefault (preserving user semantics).
-    // For entries without a default: all entries use fromDatabase(null, type),
-    // mirroring Rails' columns_hash.transform_values { Attribute.from_database(...) }.
-    // The fromDatabase path matters for LockingType: deserialize(null) → 0.
+    // Phase 1: seed schema columns via `Attribute.fromDatabase`, mirroring Rails'
+    // `columns_hash.transform_values { Attribute.from_database(col.name, col.default, type) }`.
+    // A real DB column — even one carrying a user type-override (e.g. an enum) —
+    // seeds from_database with the column's raw default so the default flows
+    // through `deserialize`, not `cast`; the user override is layered back on in
+    // phase 2 (a bare `attribute(name)` PendingType keeps the FromDatabase
+    // wrapper, `decorate_attributes` swaps the type). User-declared attributes
+    // that are NOT DB columns seed from `_attributeDefinitions`: with a default
+    // via withUserDefault (cast), without one via fromDatabase(null) — the latter
+    // matters for LockingType, where deserialize(null) → 0.
+    const columns = cachedColumnsHash(cacheHost);
     const defs: Map<string, AttributeDefinition> = cacheHost._attributeDefinitions;
     const attrMap = new Map<string, Attribute>();
     for (const [name, def] of defs) {
-      const schemaColumn =
-        (def.source ?? (def.userProvided === false ? "schema" : "user")) === "schema" ||
-        // A user-declared type override (e.g. enum) whose default originated
-        // from the schema column: seed via from_database so the default is
-        // deserialized, not user-cast. Mirrors Rails' build_from_user.
-        def.defaultFromSchema === true;
-      if (def.defaultValue != null) {
-        if (schemaColumn) {
-          attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue, def.type));
-        } else {
-          const base = Attribute.withCastValue(name, null, def.type);
-          attrMap.set(name, base.withUserDefault(def.defaultValue));
-        }
+      const source = def.source ?? (def.userProvided === false ? "schema" : "user");
+      const column = columns[name];
+      if (source === "schema") {
+        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue ?? null, def.type));
+      } else if (column !== undefined) {
+        // User type-override on a real DB column (e.g. enum): the cached column
+        // carries the authoritative raw default; seed via from_database so it
+        // deserializes through the (overridden) type.
+        attrMap.set(name, Attribute.fromDatabase(name, column.default ?? null, def.type));
+      } else if (def.defaultValue != null) {
+        const base = Attribute.withCastValue(name, null, def.type);
+        attrMap.set(name, base.withUserDefault(def.defaultValue));
       } else {
-        // Seed via fromDatabase(null, type), mirroring Rails'
-        // columns_hash.transform_values { Attribute.from_database(col.name, col.default, type) }.
-        // This matters for LockingType: deserialize(null) → 0, not null.
         attrMap.set(name, Attribute.fromDatabase(name, null, def.type));
       }
     }

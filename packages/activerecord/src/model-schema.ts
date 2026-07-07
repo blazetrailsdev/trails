@@ -26,7 +26,7 @@ import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 import { FakePool } from "./connection-adapters/schema-cache.js";
-import { threadedConnectionFor } from "./connection-handling.js";
+import { threadedConnectionFor, connectionPool } from "./connection-handling.js";
 
 /**
  * Adapter for a schema-reflection read: prefer the connection threaded by the
@@ -313,6 +313,44 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
 }
 
 type DatabaseAdapterLike = { schemaCache?: unknown };
+
+/**
+ * Connection-safe read of the cached column hash for `klass`'s table.
+ *
+ * Used by `_defaultAttributes` to seed schema columns via `Attribute.fromDatabase`
+ * (Rails' `columns_hash.transform_values { Attribute.from_database(...) }`) without
+ * ever touching `.connection` — which under the default `permanentConnectionCheckout`
+ * would permanently lease a connection on every record construction. Reads the warm
+ * schema cache off an already-available connection only: the threaded (in-query)
+ * connection, else a connection the pool has already leased. Returns `{}` when
+ * neither is available (a bare `new Model()` with no active connection); the caller
+ * then seeds that column from its attribute definition instead. Any real DB column
+ * whose default matters here has already pinned a connection via the
+ * `!_schemaLoaded` reflection in `_defaultAttributes`, so `{}` is only reached for
+ * columns that carry no client-side default anyway.
+ */
+export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
+  const target = isStiSubclass(klass) ? getStiBase(klass) : klass;
+  const cachedFrom = (conn: { schemaCache?: unknown } | null | undefined) => {
+    const cache = conn?.schemaCache as
+      | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
+      | undefined;
+    return cache?.getCachedColumnsHash?.(target.tableName);
+  };
+  // Read the warm schema cache off an already-available connection — the
+  // threaded (in-query) one, else a connection the pool has already leased.
+  // Both are connection-free reads (no `.connection`), so this is safe on the
+  // hot `new Model()` path and never forces a permanent checkout.
+  try {
+    const hash =
+      cachedFrom(threadedConnectionFor(target)) ??
+      cachedFrom(connectionPool.call(target).activeConnection as { schemaCache?: unknown } | null);
+    if (hash) return hash;
+  } catch {
+    /* fall through */
+  }
+  return {};
+}
 
 /**
  * Return content columns (excluding PK, FKs, and timestamps).
@@ -941,22 +979,10 @@ function applyColumnsHash(
     }
     const existing = host._attributeDefinitions.get(name);
     if (existing && (existing.userProvided ?? true)) {
-      // A user-declared type override (e.g. an enum) whose default is meant to
-      // come from the schema column: refresh the column default onto the def so
-      // `_defaultAttributes` can seed it via from_database. The user-declared
-      // type is preserved; only the schema-sourced default is (re)injected.
-      // Mirrors Rails, where the column default lives on the column and enum's
-      // `build_from_user` preserves it.
-      if ((existing as { defaultFromSchema?: boolean }).defaultFromSchema) {
-        const colDefault = (column as { default?: unknown }).default ?? null;
-        const colDefaultFn =
-          (column as { defaultFunction?: string | null }).defaultFunction ?? null;
-        host._attributeDefinitions.set(name, {
-          ...existing,
-          defaultValue: colDefault,
-          ...(colDefaultFn != null ? { defaultFunction: colDefaultFn } : {}),
-        });
-      }
+      // A user-declared type override (e.g. an enum) preserves its type across
+      // reflection. The schema column's default is NOT merged onto the def;
+      // `_defaultAttributes` seeds it via from_database directly from the cached
+      // column (Rails' column-seed-then-replay), then replays the user override.
       continue;
     }
 
