@@ -2090,6 +2090,11 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
  * Lay the full canonical AR test schema onto a freshly-created (empty) database.
  * The template DB is built once at boot, so — unlike `defineSchema` — this issues
  * no drops, no signature-cache bookkeeping, and no schema-cache warming.
+ *
+ * @internal Plumbing for the boot/template setup paths only. Do NOT call this
+ * from a `*.test.ts` file — wire the canonical schema + fixtures through the
+ * `fixtures({ ... })` helper, which is the sanctioned public test surface. The
+ * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces this.
  */
 export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<void> {
   const { ss, typeMap } = await prepareSchema(adapter);
@@ -2145,6 +2150,12 @@ export async function rebuildCanonicalTables(
  * would clobber data other suites rely on: existing tables are left untouched
  * and only genuinely-missing ones are created. Throws on an unknown name for the
  * same reason {@link rebuildCanonicalTables} does.
+ *
+ * @internal Low-level plumbing for shared internal setup helpers (e.g.
+ * `encryption/test-helpers.ts`). Do NOT call this from a `*.test.ts` file — wire
+ * the canonical schema + fixtures through the `fixtures({ ... })` helper, which
+ * is the sanctioned public test surface. The
+ * `blazetrails/no-internal-canonical-loaders` ESLint rule enforces this.
  */
 export async function ensureCanonicalTables(
   adapter: DatabaseAdapter,

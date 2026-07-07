@@ -22,6 +22,7 @@ import testFixtureParity from "./eslint/test-fixture-parity.mjs";
 import requireTableTeardown from "./eslint/require-table-teardown.mjs";
 import noRawSql from "./eslint/no-raw-sql.mjs";
 import noStandaloneAssociations from "./eslint/no-standalone-associations.mjs";
+import noInternalCanonicalLoaders from "./eslint/no-internal-canonical-loaders.mjs";
 import noExplicitAnyDisable from "./eslint/no-explicit-any-disable.mjs";
 import { readFileSync } from "node:fs";
 
@@ -156,6 +157,7 @@ export default defineConfig(
           "require-table-teardown": requireTableTeardown,
           "no-raw-sql": noRawSql,
           "no-standalone-associations": noStandaloneAssociations,
+          "no-internal-canonical-loaders": noInternalCanonicalLoaders,
           "no-explicit-any-disable": noExplicitAnyDisable,
           // Off by default — opt in per project (see eslint/manifest-complete.mjs).
           "manifest-complete": manifestComplete,
@@ -410,6 +412,19 @@ export default defineConfig(
     files: ["packages/*/src/**/*.ts"],
     rules: {
       "blazetrails/no-standalone-associations": "error",
+    },
+  },
+
+  // ── no-internal-canonical-loaders: a *.test.ts must not import the internal
+  //    canonical-schema loaders (ensureCanonicalTables, loadCanonicalSchema)
+  //    directly — wire the canonical schema + fixtures through `fixtures({ ... })`.
+  //    rebuildCanonicalTables is intentionally allowed (documented shared shield).
+  //    Only canonical-schema.test.ts may import them, to test them directly
+  //    (allowlisted in the rule). See eslint/no-internal-canonical-loaders.mjs. ──
+  {
+    files: ["packages/activerecord/src/**/*.test.ts"],
+    rules: {
+      "blazetrails/no-internal-canonical-loaders": "error",
     },
   },
 
