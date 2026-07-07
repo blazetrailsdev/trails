@@ -3,13 +3,6 @@ import { IntegerType } from "./integer.js";
 export class BigIntegerType extends IntegerType {
   readonly name: string = "big_integer";
 
-  // Mirrors Rails: `BigInteger < Integer` inherits `Integer#type`, hardcoded
-  // `:integer`. Our `name` ("big_integer") is the type-registry key, not the
-  // reflected column type — `column.type` for a bigint is `:integer`.
-  override type(): string {
-    return "integer";
-  }
-
   // Mirrors Rails big_integer.rb:29 — serialize_cast_value returns value as-is,
   // bypassing Integer's ensureInRange. BigIntegerType is unconditionally unlimited.
   override serializeCastValue(value: number | null): number | null {
@@ -22,12 +15,31 @@ export class BigIntegerType extends IntegerType {
     return Number.POSITIVE_INFINITY;
   }
 
-  /** @internal Rails-private helper. */
+  // Mirrors Rails: `BigInteger < Integer` inherits `Integer#type`, hardcoded
+  // `:integer`. Our `name` ("big_integer") is the type-registry key, not the
+  // reflected column type — `column.type` for a bigint is `:integer`.
+  override type(): string {
+    return "integer";
+  }
+
+  /**
+   * @internal Rails-private helper.
+   *
+   * Ruby has a single unbounded `Integer`, so Rails represents every id the
+   * same way regardless of magnitude. Trails is `number`-backed, so we keep a
+   * safe-range integer (`[MIN_SAFE_INTEGER, MAX_SAFE_INTEGER]`) as a plain JS
+   * `number` and only carry a `bigint` (under a `number` cast) for genuine
+   * bignums beyond float64's exact-integer range. This matches
+   * `IntegerType#castValue` and gives pg/MariaDB the same "safe-range integer
+   * is a number" contract better-sqlite3/mysql2 already honor, so a default
+   * `bigint` PK, `pluck`, collection `ids`, and an `integer` FK holding the
+   * same value all compare `===`.
+   */
   protected override castValue(value: unknown): number | null {
-    if (typeof value === "bigint") return value as unknown as number;
+    if (typeof value === "bigint") return this.narrowBigInt(value);
     if (typeof value === "number") {
       if (isNaN(value) || !isFinite(value)) return null;
-      return BigInt(Math.trunc(value)) as unknown as number;
+      return this.narrowBigInt(BigInt(Math.trunc(value)));
     }
     if (typeof value === "string") {
       const trimmed = value.trim();
@@ -38,7 +50,7 @@ export class BigIntegerType extends IntegerType {
       // BigInt() rejects a leading "+"; strip it first.
       const lead = trimmed.match(/^([+-]?\d+)/)?.[1];
       if (!lead) return null;
-      return BigInt(lead.startsWith("+") ? lead.slice(1) : lead) as unknown as number;
+      return this.narrowBigInt(BigInt(lead.startsWith("+") ? lead.slice(1) : lead));
     }
     return super.castValue(value);
   }

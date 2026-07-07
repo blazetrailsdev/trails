@@ -473,14 +473,14 @@ describe("SerializationTest", () => {
       const b = new Blog({ name: "b" });
       setAssociationAccessors(b, {
         posts: [
-          new Post({ id: "1000000000000", title: "p1" }),
-          new Post({ id: "2000000000000", title: "p2" }),
+          new Post({ id: "10000000000000000000", title: "p1" }),
+          new Post({ id: "20000000000000000000", title: "p2" }),
         ],
       });
       const json = b.asJson({ include: "posts" });
       expect(Array.isArray(json.posts)).toBe(true);
-      // Each post's BigInt id is coerced to a string.
-      expect((json.posts as Array<{ id: string }>)[0].id).toBe("1000000000000");
+      // Each post's above-safe-range BigInt id is coerced to a string.
+      expect((json.posts as Array<{ id: string }>)[0].id).toBe("10000000000000000000");
       expect(() => JSON.stringify(json)).not.toThrow();
     });
 
@@ -517,7 +517,7 @@ describe("SerializationTest", () => {
       const r = new Row({ id: "42", name: "row-1" });
       expect(JSON.stringify(r)).toBe(r.toJson());
       const parsed = JSON.parse(JSON.stringify(r));
-      expect(parsed).toEqual({ id: "42", name: "row-1" });
+      expect(parsed).toEqual({ id: 42, name: "row-1" });
     });
 
     it("JSON.stringify(model) with large bigint id above Number.MAX_SAFE_INTEGER", () => {
