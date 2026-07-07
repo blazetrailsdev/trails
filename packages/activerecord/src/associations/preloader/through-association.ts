@@ -411,6 +411,28 @@ export class ThroughAssociation extends Association {
         // intermediate rows. Source/target predicates stay at the source-preloader
         // stage (see `_getSourcePreloaders`); adding a source join here would only
         // risk fanning out through rows.
+        //
+        // But a reflection scope carrying a RAW string / Arel-node join in its own
+        // `_joinValues` bucket (`.joins("INNER JOIN …")`) is NOT gated on collection
+        // in Rails' through_scope: `joins!(source_reflection.name => values[:joins])`
+        // runs whenever the reflection where_clause is non-empty
+        // (through_association.rb:132-134). `JoinDependency.walk_tree` symbolizes the
+        // raw string into a bogus association name and `find_reflection` raises
+        // `ActiveRecord::ConfigurationError` (join_dependency.rb:224-226) — real Rails
+        // raises on a has_many-through preload here too, not just has_one. Mirror the
+        // has_one branch below: nest the scope's raw `_joinValues` under the source
+        // reflection name so the through-query build raises the SAME ConfigurationError
+        // our join builder throws for `{source => [<raw string>]}`, rather than
+        // silently deferring the raw join to the source-preloader stage (a lenient
+        // deviation Rails itself rejects). Symbol-association joins live in
+        // `_namedInnerJoins` and are carried without error at the source stage.
+        const sourceRefl = this._sourceReflection;
+        const reflScopeVals = this._reflectionScope;
+        const nestedRawJoinValues: any[] = reflScopeVals?._joinValues ?? [];
+        const whereNonEmpty = throughPredicates.length > 0 || sourcePredicates.length > 0;
+        if (sourceRefl && whereNonEmpty && nestedRawJoinValues.length > 0) {
+          scope = scope.joins({ [sourceRefl.name]: [...nestedRawJoinValues] });
+        }
         if (throughPredicates.length > 0) {
           scope._whereClause = new WhereClause([
             ...scope._whereClause.predicates,
