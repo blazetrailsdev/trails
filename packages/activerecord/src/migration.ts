@@ -3010,6 +3010,7 @@ export class Migrator {
         },
       });
     }
+    helper._validateLoadedMigrations(proxies);
     return proxies.sort((a, b) => {
       const va = BigInt(a.version),
         vb = BigInt(b.version);
@@ -3044,6 +3045,7 @@ export class Migrator {
         },
       });
     }
+    helper._validateLoadedMigrations(proxies);
     // Rails MigrationContext#migrations: `migrations.sort_by(&:version)` —
     // numeric (not lexicographic) so "10" sorts after "2".
     return proxies.sort((a, b) => {
@@ -3063,10 +3065,32 @@ export class Migrator {
     });
   }
 
+  /**
+   * Load-time validation, mirroring the per-file checks in Rails'
+   * `MigrationContext#migrations` (migration.rb:1303-1308): reject a
+   * non-numeric version and, when timestamp validation is enabled, a version
+   * that isn't a valid migration timestamp. Called from the file-load paths
+   * (`fromPath` / `discoverMigrations`) so the layering matches Rails, where
+   * these checks never live in `Migrator#validate`.
+   *
+   * @internal
+   */
+  private _validateLoadedMigrations(migrations: MigrationProxy[]): void {
+    const validateTs = this.isValidateTimestamp();
+    for (const m of migrations) {
+      if (!m.version || !/^\d+$/.test(m.version)) {
+        throw new MigrationError(
+          `Invalid migration version: ${m.version}. Version must be a numeric string.`,
+        );
+      }
+      if (validateTs && !this.isValidMigrationTimestamp(m.version)) {
+        throw new InvalidMigrationTimestampError(m.version, m.name);
+      }
+    }
+  }
+
   /** @internal */
   private validate(migrations: MigrationProxy[]): void {
-    const validateTs = this.isValidateTimestamp();
-
     // Rails' Migrator#validate checks duplicate names before touching
     // versions, and tolerates a nil version. Mirror that ordering so a list of
     // same-name, version-less migrations raises DuplicateMigrationNameError
@@ -3083,17 +3107,6 @@ export class Migrator {
     for (const m of migrations) {
       if (nameCounts.get(m.name)! > 1) {
         throw new DuplicateMigrationNameError(m.name);
-      }
-    }
-
-    for (const m of migrations) {
-      if (!m.version || !/^\d+$/.test(m.version)) {
-        throw new MigrationError(
-          `Invalid migration version: ${m.version}. Version must be a numeric string.`,
-        );
-      }
-      if (validateTs && !this.isValidMigrationTimestamp(m.version)) {
-        throw new InvalidMigrationTimestampError(m.version, m.name);
       }
     }
 

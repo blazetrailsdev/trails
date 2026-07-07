@@ -1983,23 +1983,17 @@ describe("MigrationTest", () => {
         expect(new LongV().version).toBe("123456789012345");
       });
 
-      it("migration raises if timestamp is future date", async () => {
+      it("migration raises if timestamp is future date", () => {
         const savedValidate = Migrator.validateMigrationTimestamps;
         try {
           Migrator.validateMigrationTimestamps = true;
-          // A timestamp far in the future (year 9999) is definitely > tomorrow
-          const ts = "99991231235959";
-          class FutureM extends Migration {
-            static version = ts;
-            async change() {}
-          }
-          const futureAdapter = Base.connection;
-          expect(
-            () =>
-              new Migrator(futureAdapter, [
-                { name: "test_migration", version: ts, migration: () => new FutureM() },
-              ]),
-          ).toThrow(/Invalid timestamp/);
+          // Rails validates the timestamp at migration *load* time
+          // (MigrationContext#migrations), so exercise the fromPath loader
+          // rather than the Migrator constructor. The fixture's version
+          // (year 9999) is definitely > tomorrow.
+          const dir = new URL("./test-helpers/migrations/future_timestamp", import.meta.url)
+            .pathname;
+          expect(() => Migrator.fromPath(dir, Base.connection)).toThrow(/Invalid timestamp/);
         } finally {
           Migrator.validateMigrationTimestamps = savedValidate;
         }
