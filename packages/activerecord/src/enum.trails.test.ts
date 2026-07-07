@@ -113,6 +113,27 @@ describe("Enum name conflict detection", () => {
     }).toThrow(/enum named "column"/);
   });
 
+  // Rails' `dangerous_class_method?` (attribute_methods.rb:201-213) checks
+  // `Base.respond_to?` — the framework class, a FIXED reference point, never the
+  // receiving subclass. So a bespoke static on the model whose name collides
+  // with the enum's pluralized accessor must NOT raise (Base doesn't know about
+  // it; the enum accessor simply overwrites it). Regression guard for the
+  // class-method branch checking `Base`, not `this`.
+  it("does not treat a bespoke subclass static as a class-method conflict", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static statuses() {
+          return "bespoke";
+        }
+        static {
+          this.enum("status", { proposed: 0, written: 1 });
+        }
+      }
+      new Klass();
+    }).not.toThrow();
+  });
+
   // Rails guards `name=` too (`detect_enum_conflict!(name, "#{name}=")`), so an
   // enum named after a framework writer conflicts on the setter.
   it("raises for an enum name whose reader is a framework method", () => {
