@@ -120,33 +120,42 @@ describe("EnumTest", () => {
     expect((await Book.whereNot({ status: written }).first())?.id).toBe(book.id);
   });
 
-  // Surfaced gap: every assertion uses `Book.statuses[...].to_s` (a numeric
-  // string like "2"), and `where({ status: "2" })` doesn't serialize the
-  // numeric string through EnumType in the predicate builder (it matches
-  // `IS NULL` instead). Plus the `cover` tail. Pending under
-  // 0023-surfaced-deviations/enum-canonical-book-gaps.
-  it.skip("find via where with values.to_s", () => {});
+  it("find via where with values.to_s", async () => {
+    book = books("awdr");
+    const published = String((Book as any).statuses.published);
+    const written = String((Book as any).statuses.written);
+
+    expect((await Book.where({ status: published }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: written }).first())?.id).not.toBe(book.id);
+    expect((await Book.where({ status: [published, published] }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: [written, written] }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: published }).first())?.id).not.toBe(book.id);
+    expect((await Book.whereNot({ status: written }).first())?.id).toBe(book.id);
+    expect((await Book.where({ cover: (Book as any).covers.soft }).first())?.id).toBe(book.id);
+  });
 
   // Ruby symbols map to trails' label strings.
   it("find via where with symbols", async () => {
     book = books("awdr");
     expect((await Book.where({ status: "published" }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: "written" }).first())?.id).not.toBe(book.id);
+    expect((await Book.where({ status: ["published", "published"] }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: ["written", "written"] }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
-    // Pending: array-of-label `where({ status: ["published", ...] })` (the
-    // predicate builder doesn't map enum labels per array element),
-    // `last_read: forgotten`, `status: prohibited` (nil), and `cover` matches.
+    // Pending: `last_read: forgotten`, `status: prohibited` (nil), and `cover`
+    // matches.
   });
 
   it("find via where with strings", async () => {
     book = books("awdr");
     expect((await Book.where({ status: "published" }).first())?.id).toBe(book.id);
     expect((await Book.where({ status: "written" }).first())?.id).not.toBe(book.id);
+    expect((await Book.where({ status: ["published", "published"] }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: ["written", "written"] }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
-    // Pending: array-of-label `where`, `last_read: "forgotten"`, and
-    // `status: "prohibited"` (nil).
+    // Pending: `last_read: "forgotten"` and `status: "prohibited"` (nil).
   });
 
   // Rails uses 64-bit out-of-range labels and beginless/endless ranges.
