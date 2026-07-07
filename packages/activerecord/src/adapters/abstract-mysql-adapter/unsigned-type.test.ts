@@ -34,7 +34,9 @@ describeIfMysql("Mysql2Adapter", () => {
     // Declare the auto-increment PK so the post-INSERT write-back
     // (`_performInsert` → `_writeAttribute("id", insertedId)`) targets a real
     // column under strict `writeFromUser`, without the internal-write bridge.
-    UnsignedType.attribute("id", "integer");
+    // MySQL's default `primary_key` type is `BIGINT AUTO_INCREMENT`
+    // (schema-creation.ts), so declare `bigint` to match the physical column.
+    UnsignedType.attribute("id", "bigint");
     UnsignedType.adapter = adapter;
     return UnsignedType;
   }
