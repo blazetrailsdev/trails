@@ -20,6 +20,7 @@ import {
   DeleteRestrictionError,
   RecordInvalid,
   RecordNotSaved,
+  ReadOnlyRecord,
 } from "../index.js";
 import { Associations } from "../associations.js";
 import {
@@ -76,7 +77,7 @@ function registerCompanyModels(): void {
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
 describe("HasOneAssociationsTest", () => {
-  const { companies, accounts } = fixtures([
+  const { companies, accounts, pirates } = fixtures([
     "companies",
     "accounts",
     "developers",
@@ -214,17 +215,17 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("nullify on polymorphic association", () => {
-    // BLOCKED: polymorphic dependent: :nullify on Department/Chef/DrinkDesigner
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): polymorphic dependent: :nullify on Department/Chef/DrinkDesigner
     // (employable) — polymorphic has_one feature gap.
   });
 
   it.skip("nullification on destroyed association", () => {
-    // BLOCKED: Developer.create triggers a before_create that builds an
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Developer.create triggers a before_create that builds an
     // `auditLogs` association whose `AuditLog` model is not ported/registered.
   });
 
   it.skip("nullification on cpk association", () => {
-    // BLOCKED: Cpk::Book / Cpk::OrderWithNullifiedBook composite-PK has_one — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Cpk::Book / Cpk::OrderWithNullifiedBook composite-PK has_one — gap.
   });
 
   it("natural assignment to nil after destroy", async () => {
@@ -332,7 +333,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("restrict with error with locale", () => {
-    // BLOCKED: requires I18n backend translation lookup.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): requires I18n backend translation lookup.
   });
 
   it("successful build association", async () => {
@@ -378,8 +379,18 @@ describe("HasOneAssociationsTest", () => {
     expect(() => (firm as any).buildCompany({ type: "Account" })).toThrow(SubclassNotFound);
   });
 
-  it.skip("build and create should not happen within scope", () => {
-    // BLOCKED: pirate.build_foo_bulb scope_after_initialize — scope/unscope gap.
+  it("build and create should not happen within scope", async () => {
+    const pirate = pirates("blackbeard") as any;
+    const scope = pirate.association("fooBulb").scope().whereValuesHash();
+
+    let bulb = pirate.buildFooBulb();
+    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+
+    bulb = await pirate.createFooBulb();
+    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
+
+    bulb = await pirate.createFooBulbBang();
+    expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
   });
 
   it("create association", async () => {
@@ -405,7 +416,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("clearing an association clears the associations inverse", () => {
-    // BLOCKED: `post.update({ author: null })` does not nullify the belongs_to
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): `post.update({ author: null })` does not nullify the belongs_to
     // foreign key — belongs_to association assignment via update is a gap.
   });
 
@@ -428,7 +439,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("create with inexistent foreign key failing", () => {
-    // BLOCKED: building an Account through `account_with_inexistent_foreign_key`
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): building an Account through `account_with_inexistent_foreign_key`
     // does not raise UnknownAttributeError for the bad foreign key column.
   });
 
@@ -449,7 +460,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("reload association with query cache", () => {
-    // BLOCKED: requires connection query cache (enable_query_cache!).
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): requires connection query cache (enable_query_cache!).
   });
 
   it("reset association", async () => {
@@ -510,12 +521,17 @@ describe("HasOneAssociationsTest", () => {
     await firm.destroy();
   });
 
-  it.skip("finding with interpolated condition", () => {
-    // BLOCKED: clients_with_interpolated_conditions uses runtime-interpolated scope.
+  it("finding with interpolated condition", async () => {
+    const firm = (await Firm.first()) as any;
+    const superior = await firm.clients.create({ name: "SuperiorCo" });
+    superior.rating = 10;
+    await superior.save();
+    const found = await firm.clientsWithInterpolatedConditions.first();
+    expect(found.rating).toBe(10);
   });
 
   it.skip("assignment before child saved", () => {
-    // BLOCKED: trails defers has_one writer persistence to the owner's save,
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): trails defers has_one writer persistence to the owner's save,
     // so `firm.account = Account.new(...)` does not immediately persist the
     // child (Rails persists on assignment to a saved owner).
   });
@@ -526,8 +542,11 @@ describe("HasOneAssociationsTest", () => {
     await expect((jp as any).save()).resolves.toBeTruthy();
   });
 
-  it.skip("cant save readonly association", () => {
-    // BLOCKED: readonly scope + ReadOnlyRecord enforcement on has_one — gap.
+  it("cant save readonly association", async () => {
+    const firm = companies("first_firm") as any;
+    const readonlyAccount = await readHasOne(firm, "readonlyAccount");
+    await expect(readonlyAccount.saveBang()).rejects.toThrow(ReadOnlyRecord);
+    expect((await readHasOne(firm, "readonlyAccount")).isReadonly()).toBe(true);
   });
 
   it.skip("has one proxy should not respond to private methods", () => {
@@ -566,25 +585,25 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("creation failure replaces existing without dependent option", () => {
-    // BLOCKED: pirate.create_ship validation-failure replacement — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): pirate.create_ship validation-failure replacement — gap.
   });
 
   it.skip("creation failure replaces existing with dependent option", () => {
-    // BLOCKED: becomes(DestructivePirate) + dependent replacement — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): becomes(DestructivePirate) + dependent replacement — gap.
   });
 
   it.skip("creation failure due to new record should raise error", () => {
-    // BLOCKED: the RecordNotSaved is raised correctly, but the failed has_one
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): the RecordNotSaved is raised correctly, but the failed has_one
     // assignment leaves the invalid Ship cached as the target instead of
     // resetting `pirate.ship` to nil — post-failure target reset is a gap.
   });
 
   it.skip("replacement failure due to existing record should raise error", () => {
-    // BLOCKED: replacement-failure error path on existing record — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): replacement-failure error path on existing record — gap.
   });
 
   it.skip("replacement failure due to new record should raise error", () => {
-    // BLOCKED: replacement-failure error path on new record — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): replacement-failure error path on new record — gap.
   });
 
   it("association keys bypass attribute protection", async () => {
@@ -618,20 +637,34 @@ describe("HasOneAssociationsTest", () => {
     expect(ship.pirate_id).toBe(Number(pirate.id));
   });
 
-  it.skip("build with block", () => {
-    // BLOCKED: canonical Bulb color= callback gap (see association keys bypass).
+  it("build with block", async () => {
+    const car = (await Car.create({ name: "honda" })) as any;
+    const bulb = car.buildBulb(undefined, (b: any) => {
+      b.color = "Red";
+    });
+    expect(bulb.color).toBe("RED!");
   });
 
-  it.skip("create with block", () => {
-    // BLOCKED: canonical Bulb color= callback gap (see association keys bypass).
+  it("create with block", async () => {
+    const car = (await Car.create({ name: "honda" })) as any;
+    const bulb = await car.createBulb(undefined, (b: any) => {
+      b.color = "Red";
+    });
+    expect(bulb.color).toBe("RED!");
   });
 
-  it.skip("create bang with block", () => {
-    // BLOCKED: canonical Bulb color= callback gap (see association keys bypass).
+  it("create bang with block", async () => {
+    const car = (await Car.create({ name: "honda" })) as any;
+    const bulb = await car.createBulbBang(undefined, (b: any) => {
+      b.color = "Red";
+    });
+    expect(bulb.color).toBe("RED!");
   });
 
-  it.skip("association attributes are available to after initialize", () => {
-    // BLOCKED: canonical Bulb attributes_after_initialize gap.
+  it("association attributes are available to after initialize", async () => {
+    const car = (await Car.create({ name: "honda" })) as any;
+    const bulb = await car.createBulb();
+    expect(bulb.attributesAfterInitialize["car_id"]).toBe(Number(car.id));
   });
 
   it("has one transaction", async () => {
@@ -697,11 +730,11 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("has one autosave with primary key manually set", () => {
-    // BLOCKED: manual-PK autosave on Author/Post — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): manual-PK autosave on Author/Post — gap.
   });
 
   it.skip("has one loading for new record", () => {
-    // BLOCKED: a new (unsaved) Author with a manually-set id does not load its
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): a new (unsaved) Author with a manually-set id does not load its
     // has_one post — has_one read on a new record short-circuits to null.
   });
 
@@ -713,7 +746,7 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("with polymorphic has one with custom columns name", () => {
-    // BLOCKED: Image polymorphic has_one with custom column names — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Image polymorphic has_one with custom column names — gap.
   });
 
   it("dangerous association name raises ArgumentError", () => {
@@ -726,35 +759,35 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("has one with touch option on create", () => {
-    // BLOCKED: Club/Membership touch via nested attributes — query-count gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Club/Membership touch via nested attributes — query-count gap.
   });
 
   it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
-    // BLOCKED: polymorphic touch + transaction commit — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): polymorphic touch + transaction commit — gap.
   });
 
   it.skip("polymorphic has one with touch option on update will touch record by fetching from database if needed", () => {
-    // BLOCKED: polymorphic touch on update — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): polymorphic touch on update — gap.
   });
 
   it.skip("has one with touch option on update", () => {
-    // BLOCKED: Club/Membership touch — query-count gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Club/Membership touch — query-count gap.
   });
 
   it.skip("has one with touch option on touch", () => {
-    // BLOCKED: touch propagation chain — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): touch propagation chain — gap.
   });
 
   it.skip("has one with touch option on destroy", () => {
-    // BLOCKED: Club/Membership touch on destroy — query-count gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Club/Membership touch on destroy — query-count gap.
   });
 
   it.skip("has one with touch option on empty update", () => {
-    // BLOCKED: no-op save detection — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): no-op save detection — gap.
   });
 
   it.skip("has one with touch option on nonpersisted built associations doesnt update parent", () => {
-    // BLOCKED: SpecialCar/SpecialBulb touch on unpersisted built association —
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): SpecialCar/SpecialBulb touch on unpersisted built association —
     // query-count gap.
   });
 
@@ -777,11 +810,11 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("association enum works properly", () => {
-    // BLOCKED: SpecialBook enum + has_one join — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): SpecialBook enum + has_one join — gap.
   });
 
   it.skip("association enum works properly with nested join", () => {
-    // BLOCKED: SpecialBook enum + nested join — gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): SpecialBook enum + nested join — gap.
   });
 
   // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
@@ -874,11 +907,11 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("composite primary key malformed association class", () => {
-    // BLOCKED: Cpk::BrokenOrder CompositePrimaryKeyMismatchError — Cpk gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Cpk::BrokenOrder CompositePrimaryKeyMismatchError — Cpk gap.
   });
 
   it.skip("composite primary key malformed association owner class", () => {
-    // BLOCKED: Cpk::BrokenOrderWithNonCpkBooks mismatch error — Cpk gap.
+    // BLOCKED (tracked: d2-has-one-remaining-gaps): Cpk::BrokenOrderWithNonCpkBooks mismatch error — Cpk gap.
   });
 });
 

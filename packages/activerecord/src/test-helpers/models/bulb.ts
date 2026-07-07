@@ -14,9 +14,12 @@ export class Bulb extends Base {
   declare ID: number;
   declare name: string;
 
-  scopeAfterInitialize: any;
-  attributesAfterInitialize: any;
-  countAfterCreate: number | undefined;
+  // `declare` (not a plain field) so no constructor initializer runs after
+  // super() — a value emitter would reset these to `undefined` right after the
+  // after_initialize callbacks in Base's constructor populate them.
+  declare scopeAfterInitialize: any;
+  declare attributesAfterInitialize: any;
+  declare countAfterCreate: number | undefined;
 
   static {
     this.defaultScope((q: any) => q.where({ name: "defaulty" }));

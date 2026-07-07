@@ -579,8 +579,15 @@ export class Association {
   protected buildRecord(attributes?: Record<string, unknown>): Base | null {
     const Klass = this.klass;
     if (!Klass) return null;
-    const record = new (Klass as any)(attributes ?? {});
-    this.initializeAttributes(record, attributes);
+    // Rails' `build_record` passes `initialize_attributes` as the block to
+    // `reflection.build_association(attributes)`; `Core#initialize` yields that
+    // block (core.rb:479) BEFORE `_run_initialize_callbacks`. So both the
+    // scope_for_create attrs (e.g. the association FK) AND the inverse instance
+    // wired by `initialize_attributes` (association.rb:224) are visible to
+    // `after_initialize` hooks. Thread the same block through trails' `new`.
+    const record = new (Klass as any)(attributes ?? {}, (r: Base) => {
+      this.initializeAttributes(r, attributes);
+    });
     return record;
   }
 

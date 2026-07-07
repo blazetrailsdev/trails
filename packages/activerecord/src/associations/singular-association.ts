@@ -27,9 +27,13 @@ export class SingularAssociation extends Association {
     this.replace(record);
   }
 
-  build(attributes?: Record<string, unknown>): Base | null {
+  build(attributes?: Record<string, unknown>, block?: (record: Base) => void): Base | null {
     const record = this.buildRecord(attributes);
     if (record) {
+      // Rails yields the freshly built record before it's set as the new
+      // target (`build_record(attributes, &block)`), so a passed block can
+      // mutate persisted attributes (e.g. `build_bulb { |b| b.color = ... }`).
+      if (block) block(record);
       this.setNewRecord(record);
     }
     return record;
