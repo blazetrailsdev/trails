@@ -34,7 +34,7 @@ export function attributesBeforeTypeCast(record: BeforeTypeCastRecord): Record<s
 interface DatabaseRecord {
   _attributes: {
     valuesForDatabase?(): Record<string, unknown>;
-    getAttribute?(name: string): { valueForDatabase?(): unknown } | undefined;
+    getAttribute?(name: string): { valueForDatabase?: unknown } | undefined;
     keys?(): Iterable<string>;
   };
   readAttribute(name: string): unknown;
@@ -47,7 +47,9 @@ interface DatabaseRecord {
 export function readAttributeForDatabase(record: DatabaseRecord, attrName: string): unknown {
   const name = record.constructor._attributeAliases?.[attrName] ?? attrName;
   const attr = record._attributes.getAttribute?.(name);
-  if (attr?.valueForDatabase) return attr.valueForDatabase();
+  // `valueForDatabase` is a getter (Attribute), so read it as a property — the
+  // enum column serializes its label to the stored integer here (e.g. 2).
+  if (attr && "valueForDatabase" in attr) return attr.valueForDatabase;
   // Fallback: use valuesForDatabase bulk method
   if (record._attributes.valuesForDatabase) {
     return record._attributes.valuesForDatabase()[name];
