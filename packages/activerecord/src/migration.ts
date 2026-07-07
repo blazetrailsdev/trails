@@ -2995,8 +2995,9 @@ export class Migrator {
     const proxies: MigrationProxy[] = [];
     for (const file of helper.migrationFiles(dirs)) {
       const parsed = helper.parseMigrationFilename(file);
-      if (!parsed) continue;
+      if (!parsed) throw new IllegalMigrationNameError(file);
       const [version, rawName, scope] = parsed;
+      helper._validateLoadedMigration(version, rawName);
       const name = camelize(rawName);
       proxies.push({
         version,
@@ -3029,8 +3030,9 @@ export class Migrator {
     const proxies: MigrationProxy[] = [];
     for (const file of helper.migrationFiles([dir])) {
       const parsed = helper.parseMigrationFilename(file);
-      if (!parsed) continue;
+      if (!parsed) throw new IllegalMigrationNameError(file);
       const [version, rawName, scope] = parsed;
+      helper._validateLoadedMigration(version, rawName);
       const name = camelize(rawName);
       proxies.push({
         version,
@@ -3063,10 +3065,27 @@ export class Migrator {
     });
   }
 
+  /**
+   * Per-file load-time timestamp validation, mirroring the check Rails runs
+   * inside `MigrationContext#migrations` (migration.rb:1305-1307) as each file
+   * is parsed: when timestamp validation is enabled, reject a version that
+   * isn't a valid migration timestamp. The illegal-name check for an
+   * unparseable filename lives at the parse site (Rails migration.rb:1304).
+   * Runs on the raw (pre-camelize) name so the error names the file like
+   * Rails, and is called from the file-load paths (`fromPath` /
+   * `discoverMigrations`) — not from `validate`, matching Rails' layering
+   * where these checks never live in `Migrator#validate`.
+   *
+   * @internal
+   */
+  private _validateLoadedMigration(version: string, name: string): void {
+    if (this.isValidateTimestamp() && !this.isValidMigrationTimestamp(version)) {
+      throw new InvalidMigrationTimestampError(version, name);
+    }
+  }
+
   /** @internal */
   private validate(migrations: MigrationProxy[]): void {
-    const validateTs = this.isValidateTimestamp();
-
     // Rails' Migrator#validate checks duplicate names before touching
     // versions, and tolerates a nil version. Mirror that ordering so a list of
     // same-name, version-less migrations raises DuplicateMigrationNameError
@@ -3083,17 +3102,6 @@ export class Migrator {
     for (const m of migrations) {
       if (nameCounts.get(m.name)! > 1) {
         throw new DuplicateMigrationNameError(m.name);
-      }
-    }
-
-    for (const m of migrations) {
-      if (!m.version || !/^\d+$/.test(m.version)) {
-        throw new MigrationError(
-          `Invalid migration version: ${m.version}. Version must be a numeric string.`,
-        );
-      }
-      if (validateTs && !this.isValidMigrationTimestamp(m.version)) {
-        throw new InvalidMigrationTimestampError(m.version, m.name);
       }
     }
 
