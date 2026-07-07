@@ -1182,13 +1182,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         newClient = await PostgreSQLAdapter.newClient(this._pgClientOptions!);
       } catch (error) {
         // Mirrors Rails' `PostgreSQLAdapter#connect`: `rescue
-        // ConnectionNotEstablished => ex; raise ex.set_pool(@pool)`. Attach the
-        // originating pool (a NullPool for a standalone adapter) so
-        // `error.connection_pool` is set on a connect-time failure.
+        // ConnectionNotEstablished => ex; raise ex.set_pool(@pool)`. Rails
+        // rescues ONLY ConnectionNotEstablished (which includes
+        // DatabaseConnectionError). A NoDatabaseError from new_client is a
+        // StatementInvalid, which Rails' connect does not rescue — it
+        // propagates with connection_pool == nil — so it must not be stamped.
         if (error instanceof ConnectionNotEstablished) {
           error.setPool(this.pool);
-        } else if (error instanceof AdapterError) {
-          error.setConnectionPool(this.pool);
         }
         throw error;
       }
