@@ -135,7 +135,12 @@ export class Serialized extends ValueType {
   // not a change. JS `!==` is reference equality and would flag them as
   // changed, marking `Topic.new(content: nil)` dirty. Restore Ruby's value
   // semantics for the value-comparable defaults (Array/Hash), matching the
-  // same distinction `isValueComparable` draws for `default_value?`.
+  // same distinction `isValueComparable`/`canonicalKey` already draw for
+  // `default_value?`. Sharing that scope is deliberate: a coder whose `load`
+  // returns a non-Array/Hash value with its own value-based `==` (e.g.
+  // Date/Time) still falls through to reference equality — a narrow edge no
+  // serialized coder here hits — and `canonicalKey`'s key-order sensitivity
+  // is inherited from the default-detection path, not newly introduced.
   override isChanged(
     oldValue: unknown,
     newValue: unknown,
