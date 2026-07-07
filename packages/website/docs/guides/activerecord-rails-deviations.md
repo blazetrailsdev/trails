@@ -344,6 +344,45 @@ one collection-callback semantic that trails' async-everywhere model cannot
 reproduce, and it is ratified as such rather than tracked for a convergence
 that the design forecloses.
 
+### `before_validation` ordering vs. the validators inside `save` (tracked-pending-convergence)
+
+Rails layers `save` as `Transactions#save { with_transaction_returning_status {
+Validations#save { perform_validations; Persistence#save { create_or_update } } }
+}` (`transactions.rb:360`, `validations.rb:47`), so the **entire** validation
+pass — the `before_validation` callbacks _and_ the validators (`valid?`) — runs
+_inside_ the save transaction, with `before_validation` firing _before_ the
+validators. A `before_validation` that `throw :abort`s therefore halts the save
+_before any validator runs_, and a record that _also_ has a failing validator
+reports **no** errors.
+
+trails' validation chain is strictly synchronous — `validations.ts#isValid`
+returns a `boolean`, never a `Promise` (the same constraint behind §1 and the
+deferred `_asyncValidations` uniqueness path). A `before_validation` that needs
+async DB work (Rails runs it inside the save transaction —
+`transactions_test.rb:714`) cannot `await` from inside that sync chain, so it
+defers its thunk into a per-instance `_beforeValidationSideEffects` queue that
+`save` drains _inside_ the transaction (`persistence.ts`) — but _after_
+`performValidations` has already run the validators. The order inverts:
+
+- **Rails**: aborting `before_validation` → save halted, `errors.any? == false`.
+- **trails**: validators run first → `errors.any? == true`, then the deferred
+  abort halts the save.
+
+**Observable only** when a record has BOTH a failing validator AND an aborting
+async `before_validation`; the four cancellation tests in `transactions_test.rb`
+don't hit it (their validations pass), so persistence/rollback parity holds
+across the ported suite. Guarded by two tests in `transactions.trails.test.ts`:
+a skipped test asserting the Rails order and a companion regression-lock
+asserting the current trails order.
+
+**This is NOT a wontfix.** Full convergence — moving `performValidations` inside
+`withTransactionReturningStatus` so `before_validation` fires before the
+validators, all inside the transaction — is gated on the strict-sync validation
+decision being revisited (it ripples through every synchronous `isValid` /
+`valid?` caller and interacts with the deferred async-validation drain). Tracked
+under RFC 0057-transaction-fidelity, story
+`save-runs-validations-inside-transaction`.
+
 ## 12. `Base.update(:all, ...)` sentinel is `":all"`
 
 Rails' `Model.update(id = :all, attributes)` uses Ruby's `:all` symbol

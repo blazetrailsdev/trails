@@ -871,7 +871,8 @@ export async function save<T extends SaveRecord>(
       // The four cancellation tests don't hit this (validations pass); the
       // governing constraint is the strict-sync validation chain — see the
       // Topic wiring and `validations.ts#isValid`. Tracked for convergence:
-      // RFC 0023 story `save-runs-validations-inside-transaction`.
+      // RFC 0057-transaction-fidelity story
+      // `save-runs-validations-inside-transaction`.
       const sideEffects = self._beforeValidationSideEffects as Array<() => unknown>;
       for (const thunk of sideEffects) {
         try {

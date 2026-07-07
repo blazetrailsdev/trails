@@ -9,7 +9,8 @@
  * mirrors transactions_test.rb) so the convention file tracks Rails 1:1.
  */
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
-import { Base, transaction } from "./index.js";
+import { throwAbort } from "@blazetrails/activesupport";
+import { Base, transaction, registerModel } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
@@ -71,6 +72,36 @@ afterEach(async () => {
   }
 });
 
+// Minimal view of the record the before_validation-ordering tests drive: the
+// deferred cancelling hook, the save path, and the errors collection they read.
+interface AbortingTopicRecord {
+  beforeValidationForTransaction: () => Promise<void>;
+  save(): Promise<boolean | undefined>;
+  isNewRecord(): boolean;
+  errors: { size: number; include(attr: string): boolean };
+}
+
+// A CanonicalTopic subclass with a validator that always fails plus an aborting
+// async `before_validation` — the record shape that surfaces the ordering
+// deviation. Built fresh per test so the anonymous subclass registration and
+// schema reflection stay isolated.
+async function buildAbortingTopic(): Promise<AbortingTopicRecord> {
+  class AbortingTopic extends CanonicalTopic {
+    static {
+      this.validate((r: { errors: { add(a: string, b: string): void } }) =>
+        r.errors.add("title", "invalid"),
+      );
+    }
+  }
+  registerModel(AbortingTopic as unknown as Parameters<typeof registerModel>[0]);
+  await (AbortingTopic as unknown as { ensureSchemaLoaded(): Promise<void> }).ensureSchemaLoaded();
+  const record = AbortingTopic.new() as unknown as AbortingTopicRecord;
+  record.beforeValidationForTransaction = async () => {
+    throwAbort();
+  };
+  return record;
+}
+
 describe("TransactionTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
@@ -119,6 +150,49 @@ describe("TransactionTest", () => {
     });
 
     expect(log).toEqual(["committed"]);
+  });
+
+  // Tracked-pending-convergence under RFC 0057-transaction-fidelity, story
+  // `save-runs-validations-inside-transaction`.
+  //
+  // Rails layers save as `Transactions#save { with_transaction_returning_status
+  // { Validations#save { perform_validations; Persistence#save } } }`
+  // (transactions.rb:360, validations.rb:47), so the ENTIRE validation pass —
+  // `before_validation` callbacks THEN the validators (`valid?`) — runs inside
+  // the save transaction, `before_validation` FIRST. A `before_validation` that
+  // `throw :abort`s therefore halts the save before any validator runs, so a
+  // record that ALSO has a failing validator reports no errors.
+  //
+  // trails' validation chain is strictly synchronous (`validations.ts#isValid`
+  // returns a boolean, never a Promise), so a `before_validation` needing async
+  // DB work can't abort from inside the chain — the canonical Topic defers its
+  // thunk into `_beforeValidationSideEffects`, which `save` drains INSIDE the
+  // transaction but AFTER `performValidations` has already run the validators
+  // (persistence.ts). The order inverts: trails reports `errors.any` where Rails
+  // reports none. Converging requires splitting the sync `valid?` pass so the
+  // async `before_validation` can await before the validators — the same
+  // sync-only-chain constraint behind `async-validations-honor-validation-context`
+  // and the deferred `_asyncValidations` path. Skipped until that architecture
+  // decision is revisited; the companion test below locks the current behaviour.
+  it.skip("aborting async before_validation halts before validators (Rails order)", async () => {
+    const record = await buildAbortingTopic();
+    // Save halts (abort) and the record stays unsaved — same as trails today.
+    expect(await record.save()).toBeFalsy();
+    expect(record.isNewRecord()).toBe(true);
+    // Rails-only delta: the abort fires *before* `valid?`, so the failing
+    // validator never runs and no error is recorded.
+    expect(record.errors.size).toBe(0);
+  });
+
+  // Regression lock for the deviation documented above: today the sync validators
+  // run BEFORE the deferred async `before_validation` abort, so the failing
+  // `title` validator DOES register its error even though the same abort halts
+  // the save. Remove / fold into the test above once the sync-chain split lands.
+  it("aborting async before_validation still records validator error (trails order)", async () => {
+    const record = await buildAbortingTopic();
+    expect(await record.save()).toBeFalsy();
+    expect(record.isNewRecord()).toBe(true);
+    expect(record.errors.include("title")).toBe(true);
   });
 
   describe("after_failure_actions on PreparedStatementCacheExpired", () => {
