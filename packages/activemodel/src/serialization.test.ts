@@ -811,6 +811,53 @@ describe("toXml()", () => {
     expect(xml).toContain('<rating type="float">4.5</rating>');
   });
 
+  it("derives the type attribute for a nested collection include from the associated model's cast type", () => {
+    // The same adapter-dependent deviation as the top-level case, one level
+    // down: PG/MariaDB materialize a nested bigint `id` as a JS BigInt/string,
+    // so `type="integer"` must come from the associated model's cast type, not
+    // `typeof value`. `serializableHash` flattens the association into a plain
+    // object that no longer carries its class, so toXml re-derives it.
+    class Comment extends Model {
+      static {
+        this.attribute("id", "big_integer");
+        this.attribute("body", "string");
+      }
+    }
+    class Post extends Model {
+      comments: Comment[] = [];
+      static {
+        this.attribute("id", "big_integer");
+      }
+    }
+    const comment = new Comment({ body: "Nice" });
+    comment.writeAttribute("id", "99");
+    const p = new Post({});
+    p.comments = [comment];
+    const xml = p.toXml({ include: "comments" });
+    expect(xml).toContain('<id type="integer">99</id>');
+  });
+
+  it("derives the type attribute for a nested singular include from the associated model's cast type", () => {
+    class Author extends Model {
+      static {
+        this.attribute("id", "big_integer");
+        this.attribute("name", "string");
+      }
+    }
+    class Post extends Model {
+      author: Author | null = null;
+      static {
+        this.attribute("id", "big_integer");
+      }
+    }
+    const author = new Author({ name: "Alice" });
+    author.writeAttribute("id", "7");
+    const p = new Post({});
+    p.author = author;
+    const xml = p.toXml({ include: "author" });
+    expect(xml).toContain('<id type="integer">7</id>');
+  });
+
   it("supports custom root element", () => {
     class User extends Model {
       static {
