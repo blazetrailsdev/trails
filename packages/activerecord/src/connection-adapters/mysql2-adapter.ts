@@ -117,14 +117,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors: Mysql2Adapter#initialize_type_map (mysql2_adapter.rb:40-49).
    *
    * `super` registers the shared MySQL types. On top of that the concrete
-   * mysql2 adapter binds char/varchar/enum/set to a `StringType` whose boolean
-   * coercions are `"1"`/`"0"` rather than the ActiveModel default `"t"`/`"f"`,
-   * so a boolean assigned to a string column round-trips as 1/0 — this mirrors
-   * the `Type.register(:string, adapter: :mysql2)` block. char/varchar thread
-   * `extract_limit(sql_type)` onto the type (`register_type(%r(char)i)`), so
-   * `type_for_attribute(col).limit` reflects the column limit; enum/set register
-   * the limitless string. These are NOT in AbstractMysqlAdapter because they
-   * bind mysql2-specific behavior to a concrete client.
+   * mysql2 adapter resolves char/varchar/enum/set through
+   * `Type.lookup(:string, adapter: :mysql2)`, which returns the adapter-scoped
+   * `StringType` whose boolean coercions are `"1"`/`"0"` rather than the
+   * ActiveModel default `"t"`/`"f"` (see the module-level `Type.register` calls
+   * below), so a boolean assigned to a string column round-trips as 1/0.
+   * char/varchar thread `extract_limit(sql_type)` through the `limit:` kwarg
+   * (`register_type(%r(char)i)`), so `type_for_attribute(col).limit` reflects
+   * the column limit; enum/set look up the limitless string. These are NOT in
+   * AbstractMysqlAdapter because they bind mysql2-specific behavior to a
+   * concrete client.
+   *
+   * @internal
    */
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
