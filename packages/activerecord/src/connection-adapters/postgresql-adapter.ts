@@ -2079,8 +2079,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
-  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
-  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  // materializeTransactions is handled here (before the loop) instead of inside
+  // withRawConnection, so transaction-control SQL keeps its exact pre-existing
+  // materialize semantics. Rails' with_raw_connection `ensure
+  // dirty_current_transaction if materialize_transactions` (abstract_adapter.rb:1046)
+  // is relocated to this method's own finally so a savepoint statement
+  // (materialize:true, savepoints.rb:11-20) still dirties the current — parent, for a
+  // popped RELEASE/ROLLBACK TO SAVEPOINT frame — transaction on every exit.
   override async internalExecute(
     sql: string,
     name: string = "SQL",
@@ -2091,86 +2096,91 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     }: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] } = {},
   ): Promise<unknown> {
     sql = preprocessQuery.call(this as any, sql);
-    if (materializeTransactions) await this.materializeTransactions();
-    // Thread binds through so a bound INSERT ... RETURNING reaches the driver,
-    // matching Rails internal_execute(sql, name, binds). Transaction-control
-    // callers pass none, keeping their byte-identical no-bind path (no rewrite).
-    const hasBinds = binds.length > 0;
-    const bindArray = hasBinds ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
-    const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
-    // A bound query here is the exec_insert RETURNING read-back; mirror
-    // _instrumentedQueryOnClient by resetting the notice buffer up front and
-    // flushing after, so PG WARNING/NOTICE handling (db_warnings_action) is not
-    // dropped or misattributed to the next query. Transaction-control SQL passes
-    // no binds and keeps its byte-identical path (no reset/flush/rewrite).
-    if (hasBinds) this._noticeReceiverSqlWarnings = [];
-    const payload: Record<string, unknown> = {
-      sql: runSql,
-      name,
-      binds,
-      type_casted_binds: bindArray,
-      connection: this,
-      row_count: 0,
-    };
-    const queryPromise = Notifications.instrumentAsync("sql.active_record", payload, () =>
-      // materializeTransactions is handled above (not delegated to
-      // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
-      // SAVEPOINT — keeps its exact pre-existing materialize semantics and the
-      // loop's `finally dirtyCurrentTransaction()` does not fire on txn-control
-      // SQL. The leaf still gains the retry/verify/reconnect loop.
-      this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
-        const client = conn as unknown as pg.Client;
-        try {
-          const result = await this._runQuery(client, runSql, bindArray, { rowMode: "array" });
-          const count = result.rowCount ?? result.rows.length;
-          payload.row_count = count;
-          return result;
-        } catch (e: any) {
-          // A bound query is the exec_insert RETURNING read-back: translate with
-          // sql + binds here (mirroring _instrumentedQueryOnClient) so a
-          // constraint violation surfaces as RecordNotUnique/InvalidForeignKey
-          // carrying statement context. withRawConnection re-catches this AR
-          // error and passes it through unchanged; its own translate would
-          // otherwise re-wrap with null sql / empty binds. Transaction-control
-          // SQL (no binds) keeps the raw rethrow, matching pre-PR behavior.
-          const translated = hasBinds ? this._translateException(e, runSql, bindArray) : e;
-          payload.exception = translated;
-          payload.exception_object = translated;
-          throw translated;
-        }
-      }),
-    );
-    if (!hasBinds) return queryPromise;
-    const result = await queryPromise;
-    this._flushWarnings(runSql);
-    return result;
+    try {
+      if (materializeTransactions) await this.materializeTransactions();
+      // Thread binds through so a bound INSERT ... RETURNING reaches the driver,
+      // matching Rails internal_execute(sql, name, binds). Transaction-control
+      // callers pass none, keeping their byte-identical no-bind path (no rewrite).
+      const hasBinds = binds.length > 0;
+      const bindArray = hasBinds ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
+      const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
+      // A bound query here is the exec_insert RETURNING read-back; mirror
+      // _instrumentedQueryOnClient by resetting the notice buffer up front and
+      // flushing after, so PG WARNING/NOTICE handling (db_warnings_action) is not
+      // dropped or misattributed to the next query. Transaction-control SQL passes
+      // no binds and keeps its byte-identical path (no reset/flush/rewrite).
+      if (hasBinds) this._noticeReceiverSqlWarnings = [];
+      const payload: Record<string, unknown> = {
+        sql: runSql,
+        name,
+        binds,
+        type_casted_binds: bindArray,
+        connection: this,
+        row_count: 0,
+      };
+      const result = await Notifications.instrumentAsync("sql.active_record", payload, () =>
+        // materializeTransactions is handled above (not delegated to
+        // withRawConnection) so transaction-control SQL — COMMIT/ROLLBACK/
+        // SAVEPOINT — keeps its exact pre-existing materialize semantics. The
+        // loop's own `finally dirtyCurrentTransaction()` does not fire (false is
+        // passed); this method's finally handles it instead. The leaf still gains
+        // the retry/verify/reconnect loop.
+        this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
+          const client = conn as unknown as pg.Client;
+          try {
+            const runResult = await this._runQuery(client, runSql, bindArray, { rowMode: "array" });
+            const count = runResult.rowCount ?? runResult.rows.length;
+            payload.row_count = count;
+            return runResult;
+          } catch (e: any) {
+            // A bound query is the exec_insert RETURNING read-back: translate with
+            // sql + binds here (mirroring _instrumentedQueryOnClient) so a
+            // constraint violation surfaces as RecordNotUnique/InvalidForeignKey
+            // carrying statement context. withRawConnection re-catches this AR
+            // error and passes it through unchanged; its own translate would
+            // otherwise re-wrap with null sql / empty binds. Transaction-control
+            // SQL (no binds) keeps the raw rethrow, matching pre-PR behavior.
+            const translated = hasBinds ? this._translateException(e, runSql, bindArray) : e;
+            payload.exception = translated;
+            payload.exception_object = translated;
+            throw translated;
+          }
+        }),
+      );
+      if (hasBinds) this._flushWarnings(runSql);
+      return result;
+    } finally {
+      // Rails' with_raw_connection `ensure dirty_current_transaction if
+      // materialize_transactions` (abstract_adapter.rb:1046), relocated here
+      // because the materialize pass runs outside withRawConnection (above).
+      // Fires on every exit path, so a retryable savepoint failure mid-flight
+      // leaves the parent frame dirty → isRestorable() refuses to restore it.
+      if (materializeTransactions) this.dirtyCurrentTransaction();
+    }
   }
 
   /**
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    // materializeTransactions defaults to true, matching Rails savepoints.rb:11-20.
+    // internalExecute's finally then dirties the current transaction (Rails'
+    // with_raw_connection ensure) — see internalExecute above.
+    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   /**

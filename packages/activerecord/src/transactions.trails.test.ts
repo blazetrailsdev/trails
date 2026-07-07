@@ -232,6 +232,50 @@ describe("TransactionTest", () => {
   });
 });
 
+describe("savepoint statements dirty the current transaction (trails ensure relocation)", () => {
+  // trails-specific: mysql2/PG/sqlite internalExecute run materializeTransactions
+  // OUTSIDE withRawConnection, so Rails' `ensure dirty_current_transaction if
+  // materialize_transactions` (abstract_adapter.rb:1046) is relocated to
+  // internalExecute's own finally. A savepoint statement (materialize:true, per
+  // savepoints.rb:11-20) therefore dirties the current transaction — the PARENT
+  // frame for a RELEASE/ROLLBACK TO SAVEPOINT whose committing frame was already
+  // popped — so isRestorable() refuses to restore a parent whose child savepoint
+  // op may have partially executed after a reconnect. Exercised here on sqlite
+  // (which shares the internalExecute finally); the mysql2/PG paths are the same.
+  it("createSavepoint dirties the current (parent) transaction frame", async () => {
+    const { adapter } = makeSQLiteTopic();
+    const tm = adapter.transactionManager;
+    await tm.withinNewTransaction({}, async () => {
+      // BEGIN is emitted with materializeTransactions:false, so the frame is
+      // materialized but clean.
+      await tm.materializeTransactions();
+      expect(tm.isRestorable()).toBe(true);
+      await adapter.createSavepoint("sp1");
+      expect(tm.isRestorable()).toBe(false);
+    });
+  });
+
+  it("a savepoint statement failing mid-flight still dirties the parent (ensure fires on the error path)", async () => {
+    const { adapter } = makeSQLiteTopic();
+    const tm = adapter.transactionManager;
+    await tm.withinNewTransaction({}, async () => {
+      await tm.materializeTransactions();
+      expect(tm.isRestorable()).toBe(true);
+      // Simulate a reconnect/connection-loss mid savepoint op: the raw driver
+      // rejects, the statement throws — and internalExecute's finally must still
+      // dirty the parent, mirroring Rails' `ensure` firing on the raise path.
+      const driver = (adapter as unknown as { driver: { exec: (s: string) => Promise<unknown> } })
+        .driver;
+      const spy = vi
+        .spyOn(driver, "exec")
+        .mockRejectedValueOnce(new Error("server closed the connection unexpectedly"));
+      await expect(adapter.rollbackToSavepoint("sp_x")).rejects.toThrow();
+      spy.mockRestore();
+      expect(tm.isRestorable()).toBe(false);
+    });
+  });
+});
+
 describe("rememberTransactionRecordState / restoreTransactionRecordState (Story K)", () => {
   it("rememberTransactionRecordState populates _startTransactionState with level and attributes", async () => {
     const { rememberTransactionRecordState } = await import("./transactions.js");

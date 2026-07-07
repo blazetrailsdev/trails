@@ -1107,8 +1107,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
-  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
-  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  // materializeTransactions is handled here (before the loop) instead of inside
+  // withRawConnection, and the loop is passed false, so transaction-control SQL
+  // keeps its exact pre-existing materialize semantics. The Rails ensure —
+  // with_raw_connection's `dirty_current_transaction if materialize_transactions`
+  // (abstract_adapter.rb:1046) — is relocated to this method's own finally so it
+  // still fires when the param is true (savepoint statements, savepoints.rb:11-20).
   // Returns the raw {rows, fields, affectedRows} so internalExecQuery's `castResult`
   // (and execUpdate/execDelete's affectedRows) can build a Result — the Rails-faithful
   // query_value/update path. Transaction-control callers ignore the return.
@@ -1122,125 +1126,115 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     }: { materializeTransactions?: boolean; allowRetry?: boolean; binds?: unknown[] } = {},
   ): Promise<Mysql2RawResult> {
     sql = this.preprocessQuery(sql);
-    if (materializeTransactions) {
-      this._syncDatabaseTimezone();
-      await this.materializeTransactions();
-    }
-    const driverSql = this.mysqlQuote(sql);
-    // Thread binds through so a bound INSERT ... RETURNING (MariaDB) reaches the
-    // driver, matching Rails internal_execute(sql, name, binds). Transaction-
-    // control callers pass none, keeping their byte-identical no-bind path.
-    const driverBinds = binds.length > 0 ? this.mysqlBinds(binds) : [];
-    const txPublicInt = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql: driverSql,
-      name,
-      binds: driverBinds,
-      type_casted_binds: typeCastedBinds(driverBinds),
-      connection: this,
-      row_count: 0,
-      transaction: txPublicInt.isOpen() ? txPublicInt : null,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      try {
-        // materializeTransactions is run BEFORE the loop (above) and we pass
-        // `false` into withRawConnection — the same materialize-outside-the-loop
-        // split PostgreSQLAdapter#internalExecute uses (postgresql-adapter.ts),
-        // which this story converges mysql2 onto. The leaf still gains the
-        // retry/verify/reconnect loop, so callers thread allowRetry in a single
-        // call (matching Rails abstract_mysql_adapter.rb:227-239).
-        //
-        // Divergence note: because the flag is `false` here, the loop's
-        // `finally dirtyCurrentTransaction()` (abstract-adapter.ts) never fires
-        // for this leaf. In Rails, COMMIT/ROLLBACK pass materialize_transactions:
-        // true (abstract_mysql_adapter.rb:242-248) so with_raw_connection's
-        // `ensure dirty_current_transaction if materialize_transactions`
-        // (abstract_adapter.rb:1046) fires on commit/rollback. trails does not,
-        // but this is pre-existing and shared with PG, NOT introduced here:
-        // pre-this-PR mysql2 internalExecute used the direct getConn path with no
-        // withRawConnection, so it never dirtied here either.
-        //
-        // The suppressed dirty has no observable effect on the COMMIT/ROLLBACK
-        // path: real COMMIT/ROLLBACK SQL is only ever issued by the bottom-of-
-        // stack RealTransaction (SavepointTransaction#commit/rollback issue
-        // RELEASE/ROLLBACK TO SAVEPOINT instead — transaction.ts:832,898), and
-        // TransactionManager#_commitTransactionInner pops the committing frame
-        // BEFORE calling transaction.commit() → commitDbTransaction()
-        // (transaction.ts:1108-1117). So by the time this COMMIT runs the stack
-        // is empty, currentTransaction is NULL_TRANSACTION, and
-        // dirtyCurrentTransaction() is a no-op — there is no parent frame to
-        // dirty. (Nested RELEASE/ROLLBACK TO SAVEPOINT, where a real parent frame
-        // does remain, go through createSavepoint/releaseSavepoint/
-        // rollbackToSavepoint below, whose materializeTransactions:false is
-        // likewise pre-existing and unchanged by this PR — Rails passes true
-        // there per savepoints.rb:11-20, a separate long-standing trails/PG
-        // deviation, not this story's scope.)
-        //
-        // Error translation + invalidateTransaction live in the withRawConnection
-        // loop and the outer catch below — mirroring execute()/executeMutation()
-        // — so the block stays a bare leaf and does not double-translate or
-        // double-invalidate.
-        return await this.withRawConnection(
-          { materializeTransactions: false, allowRetry },
-          async (rawConn) => {
-            // Route the read path through the shared array-mode performQuery seam
-            // (rowsAsArray + single CALL/multi-result unwrap), mirroring Rails'
-            // internal_execute → raw_execute → cast_result. Array-mode rows keep
-            // duplicate column names that the old hash-keyed conn.query collapsed.
-            const conn = rawConn as unknown as mysql.Connection;
-            const prepare = this._shouldPrepare(binds);
-            if (prepare) this._trackPrepared(conn, driverSql);
-            const rawResult = await mysql2PerformQuery.call(
-              this as any,
-              conn,
-              driverSql,
-              binds,
-              driverBinds,
-              { prepare },
-            );
-            payload.row_count = rawResult.affectedRows;
-            return rawResult;
-          },
-        );
-      } catch (e: any) {
-        // The loop already translated for its retry classification; guard
-        // against re-translating an ActiveRecordError (see execute()).
-        const translated =
-          e instanceof ActiveRecordError
-            ? e
-            : await this._translateAndEnrich(e, driverSql, driverBinds);
-        payload.exception = translated;
-        payload.exception_object = translated;
-        throw translated;
+    try {
+      if (materializeTransactions) {
+        this._syncDatabaseTimezone();
+        await this.materializeTransactions();
       }
-    });
+      const driverSql = this.mysqlQuote(sql);
+      // Thread binds through so a bound INSERT ... RETURNING (MariaDB) reaches the
+      // driver, matching Rails internal_execute(sql, name, binds). Transaction-
+      // control callers pass none, keeping their byte-identical no-bind path.
+      const driverBinds = binds.length > 0 ? this.mysqlBinds(binds) : [];
+      const txPublicInt = this.currentTransaction().userTransaction;
+      const payload: Record<string, unknown> = {
+        sql: driverSql,
+        name,
+        binds: driverBinds,
+        type_casted_binds: typeCastedBinds(driverBinds),
+        connection: this,
+        row_count: 0,
+        transaction: txPublicInt.isOpen() ? txPublicInt : null,
+      };
+      return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+        try {
+          // materializeTransactions is run BEFORE the loop (above) and we pass
+          // `false` into withRawConnection — the same materialize-outside-the-loop
+          // split PostgreSQLAdapter#internalExecute uses (postgresql-adapter.ts).
+          // The leaf still gains the retry/verify/reconnect loop, so callers thread
+          // allowRetry in a single call (matching Rails abstract_mysql_adapter.rb:227-239).
+          //
+          // Because the split moved materialize out of withRawConnection, the
+          // loop's `finally dirtyCurrentTransaction()` (abstract-adapter.ts) never
+          // fires for this leaf. Rails' equivalent `ensure dirty_current_transaction
+          // if materialize_transactions` (abstract_adapter.rb:1046) is relocated to
+          // this method's own finally so a savepoint statement (materialize:true,
+          // savepoints.rb:11-20) still dirties the current — parent, for a popped
+          // RELEASE/ROLLBACK TO SAVEPOINT frame — transaction on every exit. COMMIT/
+          // ROLLBACK pass materialize:false and so do not dirty (nor would it matter:
+          // _commitTransactionInner pops the committing frame first, transaction.ts:
+          // 1108-1117, leaving currentTransaction the NULL_TRANSACTION no-op).
+          //
+          // Error translation + invalidateTransaction live in the withRawConnection
+          // loop and the outer catch below — mirroring execute()/executeMutation()
+          // — so the block stays a bare leaf and does not double-translate or
+          // double-invalidate.
+          return await this.withRawConnection(
+            { materializeTransactions: false, allowRetry },
+            async (rawConn) => {
+              // Route the read path through the shared array-mode performQuery seam
+              // (rowsAsArray + single CALL/multi-result unwrap), mirroring Rails'
+              // internal_execute → raw_execute → cast_result. Array-mode rows keep
+              // duplicate column names that the old hash-keyed conn.query collapsed.
+              const conn = rawConn as unknown as mysql.Connection;
+              const prepare = this._shouldPrepare(binds);
+              if (prepare) this._trackPrepared(conn, driverSql);
+              const rawResult = await mysql2PerformQuery.call(
+                this as any,
+                conn,
+                driverSql,
+                binds,
+                driverBinds,
+                { prepare },
+              );
+              payload.row_count = rawResult.affectedRows;
+              return rawResult;
+            },
+          );
+        } catch (e: any) {
+          // The loop already translated for its retry classification; guard
+          // against re-translating an ActiveRecordError (see execute()).
+          const translated =
+            e instanceof ActiveRecordError
+              ? e
+              : await this._translateAndEnrich(e, driverSql, driverBinds);
+          payload.exception = translated;
+          payload.exception_object = translated;
+          throw translated;
+        }
+      });
+    } finally {
+      // Rails' with_raw_connection `ensure dirty_current_transaction if
+      // materialize_transactions` (abstract_adapter.rb:1046), relocated here
+      // because the materialize pass runs outside withRawConnection (above).
+      // Fires on every exit path, so a retryable savepoint failure mid-flight
+      // leaves the parent frame dirty → isRestorable() refuses to restore it.
+      if (materializeTransactions) this.dirtyCurrentTransaction();
+    }
   }
 
   /**
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`SAVEPOINT \`${name}\``, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    // materializeTransactions defaults to true, matching Rails savepoints.rb:11-20.
+    // internalExecute's finally then dirties the current transaction (Rails'
+    // with_raw_connection ensure) — see internalExecute above.
+    await this.internalExecute(`SAVEPOINT \`${name}\``, "TRANSACTION");
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`RELEASE SAVEPOINT \`${name}\``, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    await this.internalExecute(`RELEASE SAVEPOINT \`${name}\``, "TRANSACTION");
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`ROLLBACK TO SAVEPOINT \`${name}\``, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT \`${name}\``, "TRANSACTION");
   }
 
   /**

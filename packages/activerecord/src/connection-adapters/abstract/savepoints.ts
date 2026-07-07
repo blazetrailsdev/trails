@@ -58,9 +58,12 @@ export function currentSavepointName(this: CurrentSavepointNameHost): string | n
  */
 export async function createSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName();
-  await this.internalExecute(createSavepointSql(spName), "TRANSACTION", {
-    materializeTransactions: false,
-  });
+  // materializeTransactions defaults to true, matching Rails savepoints.rb:11-20
+  // (internal_execute's default). The re-entrant materialize pass is a no-op —
+  // createSavepoint runs inside materializeBang, where the
+  // `_materializingTransactions` guard is already set — and internalExecute's
+  // finally then dirties the current frame (Rails' with_raw_connection ensure).
+  await this.internalExecute(createSavepointSql(spName), "TRANSACTION");
 }
 
 /**
@@ -70,9 +73,12 @@ export async function createSavepoint(this: SavepointHost, name?: string): Promi
  */
 export async function execRollbackToSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName();
-  await this.internalExecute(execRollbackToSavepointSql(spName), "TRANSACTION", {
-    materializeTransactions: false,
-  });
+  // materializeTransactions:true (default) per Rails savepoints.rb. The
+  // committing/rolling-back savepoint frame is already popped, so
+  // internalExecute's finally dirties the real PARENT frame — Rails
+  // with_raw_connection's `ensure dirty_current_transaction` — making the
+  // parent non-restorable if this savepoint op hit a reconnect mid-flight.
+  await this.internalExecute(execRollbackToSavepointSql(spName), "TRANSACTION");
 }
 
 /**
@@ -82,9 +88,10 @@ export async function execRollbackToSavepoint(this: SavepointHost, name?: string
  */
 export async function releaseSavepoint(this: SavepointHost, name?: string): Promise<void> {
   const spName = name ?? this.currentSavepointName();
-  await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION", {
-    materializeTransactions: false,
-  });
+  // materializeTransactions:true (default) per Rails savepoints.rb. See
+  // execRollbackToSavepoint — the popped-frame → parent-dirty semantics apply
+  // identically to RELEASE SAVEPOINT.
+  await this.internalExecute(releaseSavepointSql(spName), "TRANSACTION");
 }
 
 /**

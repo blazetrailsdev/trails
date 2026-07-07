@@ -720,8 +720,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   // Mirrors: ActiveRecord::ConnectionAdapters::DatabaseStatements#internal_execute
-  // Overrides the abstract mixin default so TRANSACTION SQL (materializeTransactions=false)
-  // skips materializeTransactions() — calling it would trigger re-entrant SAVEPOINT emission.
+  // materializeTransactions defaults to true; transaction-control SQL passes false
+  // to keep its byte-identical no-materialize path. Rails' with_raw_connection
+  // `ensure dirty_current_transaction if materialize_transactions`
+  // (abstract_adapter.rb:1046) is relocated to this method's finally so a savepoint
+  // statement (materialize:true, savepoints.rb:11-20) dirties the current — parent,
+  // for a popped RELEASE/ROLLBACK TO SAVEPOINT frame — transaction on every exit.
   override async internalExecute(
     sql: string,
     name: string = "SQL",
@@ -729,26 +733,30 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   ): Promise<unknown> {
     sql = this.preprocessQuery(sql);
     await this.ensureConnected();
-    if (materializeTransactions) await this.materializeTransactions();
-    const payload: Record<string, unknown> = {
-      sql,
-      name,
-      binds: [],
-      type_casted_binds: [],
-      connection: this,
-      row_count: 0,
-    };
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      try {
-        await this.driver.exec(sql);
-        return 0;
-      } catch (e: any) {
-        const translated = this._translateException(e, sql, []);
-        payload.exception = translated;
-        payload.exception_object = translated;
-        throw translated;
-      }
-    });
+    try {
+      if (materializeTransactions) await this.materializeTransactions();
+      const payload: Record<string, unknown> = {
+        sql,
+        name,
+        binds: [],
+        type_casted_binds: [],
+        connection: this,
+        row_count: 0,
+      };
+      return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
+        try {
+          await this.driver.exec(sql);
+          return 0;
+        } catch (e: any) {
+          const translated = this._translateException(e, sql, []);
+          payload.exception = translated;
+          payload.exception_object = translated;
+          throw translated;
+        }
+      });
+    } finally {
+      if (materializeTransactions) this.dirtyCurrentTransaction();
+    }
   }
 
   /**
@@ -887,27 +895,24 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Create a savepoint (nested transaction).
    */
   async createSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    // materializeTransactions defaults to true, matching Rails savepoints.rb:11-20.
+    // internalExecute's finally then dirties the current transaction (Rails'
+    // with_raw_connection ensure) — see internalExecute above.
+    await this.internalExecute(`SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   /**
    * Release a savepoint.
    */
   async releaseSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    await this.internalExecute(`RELEASE SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   /**
    * Rollback to a savepoint.
    */
   async rollbackToSavepoint(name: string): Promise<void> {
-    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION", {
-      materializeTransactions: false,
-    });
+    await this.internalExecute(`ROLLBACK TO SAVEPOINT "${name}"`, "TRANSACTION");
   }
 
   /**
