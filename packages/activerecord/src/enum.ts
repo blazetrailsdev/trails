@@ -598,49 +598,63 @@ export function _enum(
       valueMethodNames.push(friendlyName);
     }
 
-    if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
-    if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
-    if (definedNames.has(fullName))
-      raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    definedNames.add(predicateName);
-    definedNames.add(bangName);
-    definedNames.add(fullName);
-
-    // Instance value methods (predicate/bang) only conflict with *dangerous*
-    // Active Record instance methods — a plain user override (`def published!;
-    // super; end`) is allowed and simply wins over the generated method, so we
-    // must not raise merely because the name exists on the prototype.
-    // Mirrors enum.rb's `dangerous_attribute_method?` gate; the value/`not*`
-    // scope names are class methods, so they only conflict with a *dangerous*
-    // class method (`dangerous_class_method?` — RESTRICTED_CLASS_METHODS plus
-    // methods `Base` itself defines), never a scope inherited from a parent
-    // enum or a user static on the model/an ancestor.
-    if (dangerousMethods.has(predicateName))
-      raiseConflictError.call(this, attribute, predicateName);
-    if (enumMethodNames.has(predicateName))
-      raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
-    if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
-    if (enumMethodNames.has(bangName))
-      raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
-    if (isDangerousClassMethod(fullName))
-      raiseConflictError.call(this, attribute, fullName, { type: "class" });
-    if (isDangerousClassMethod(notScopeName))
-      raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    // Rails runs `detect_enum_conflict!` for the `?`/`!` methods *only* inside
+    // `if instance_methods` and for the value/`not_` scopes *only* inside
+    // `if scopes` (enum.rb:302-321). Gate each family the same way so an enum
+    // opting out of a surface also opts out of its conflict checks — e.g.
+    // `instance_methods: false` must not raise on a predicate-name collision it
+    // will never generate.
+    if (instanceMethodsEnabled) {
+      if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
+      if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+      definedNames.add(predicateName);
+      definedNames.add(bangName);
+      // Instance value methods (predicate/bang) only conflict with *dangerous*
+      // Active Record instance methods — a plain user override (`def published!;
+      // super; end`) is allowed and simply wins over the generated method, so we
+      // must not raise merely because the name exists on the prototype.
+      // Mirrors enum.rb's `dangerous_attribute_method?` gate.
+      if (dangerousMethods.has(predicateName))
+        raiseConflictError.call(this, attribute, predicateName);
+      if (enumMethodNames.has(predicateName))
+        raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
+      if (dangerousMethods.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+      if (enumMethodNames.has(bangName))
+        raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
+    }
+    if (scopesEnabled) {
+      if (definedNames.has(fullName))
+        raiseConflictError.call(this, attribute, fullName, { type: "class" });
+      definedNames.add(fullName);
+      // The value/`not*` scope names are class methods, so they only conflict
+      // with a *dangerous* class method (`dangerous_class_method?` —
+      // RESTRICTED_CLASS_METHODS plus methods `Base` itself defines), never a
+      // scope inherited from a parent enum or a user static on the model/an
+      // ancestor.
+      if (isDangerousClassMethod(fullName))
+        raiseConflictError.call(this, attribute, fullName, { type: "class" });
+      if (isDangerousClassMethod(notScopeName))
+        raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+    }
     if (friendlyName !== fullName) {
       const fp = `is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
       const friendlyBang = `${friendlyName}Bang`;
-      if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
-      if (enumMethodNames.has(fp))
-        raiseConflictError.call(this, attribute, fp, { source: "another enum" });
-      if (dangerousMethods.has(friendlyBang))
-        raiseConflictError.call(this, attribute, friendlyBang);
-      if (enumMethodNames.has(friendlyBang))
-        raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
-      if (isDangerousClassMethod(friendlyName))
-        raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
-      const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
-      if (isDangerousClassMethod(notFriendlyName))
-        raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+      if (instanceMethodsEnabled) {
+        if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
+        if (enumMethodNames.has(fp))
+          raiseConflictError.call(this, attribute, fp, { source: "another enum" });
+        if (dangerousMethods.has(friendlyBang))
+          raiseConflictError.call(this, attribute, friendlyBang);
+        if (enumMethodNames.has(friendlyBang))
+          raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
+      }
+      if (scopesEnabled) {
+        if (isDangerousClassMethod(friendlyName))
+          raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
+        const notFriendlyName = `not${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`;
+        if (isDangerousClassMethod(notFriendlyName))
+          raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+      }
     }
   }
 
@@ -648,7 +662,7 @@ export function _enum(
   // negative scope (`not*`) would clash with a positively-named element, and
   // skips the check entirely when scopes are disabled.
   // Mirrors: `detect_negative_enum_conditions!(value_method_names) if scopes`.
-  if (options?.scopes !== false) {
+  if (scopesEnabled) {
     detectNegativeEnumConditionsBang(valueMethodNames);
   }
 
@@ -706,12 +720,16 @@ export function _enum(
     // Record the generated instance-method names so a later enum on this class
     // (or a subclass) that would generate the same predicate/bang raises
     // "already defined by another enum" — mirroring membership in Rails'
-    // `_enum_methods_module`.
-    enumMethodNames.add(`is${fullName.charAt(0).toUpperCase()}${fullName.slice(1)}`);
-    enumMethodNames.add(`${fullName}Bang`);
-    if (friendlyName !== fullName) {
-      enumMethodNames.add(`is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`);
-      enumMethodNames.add(`${friendlyName}Bang`);
+    // `_enum_methods_module`. Only record when the predicate/bang were actually
+    // defined (`instance_methods: false` defines neither, so a later enum reusing
+    // the name must not conflict).
+    if (instanceMethodsEnabled) {
+      enumMethodNames.add(`is${fullName.charAt(0).toUpperCase()}${fullName.slice(1)}`);
+      enumMethodNames.add(`${fullName}Bang`);
+      if (friendlyName !== fullName) {
+        enumMethodNames.add(`is${friendlyName.charAt(0).toUpperCase()}${friendlyName.slice(1)}`);
+        enumMethodNames.add(`${friendlyName}Bang`);
+      }
     }
   }
 
