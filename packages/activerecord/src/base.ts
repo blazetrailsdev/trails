@@ -3043,7 +3043,7 @@ export class Base extends Model {
     this._associationCacheStore.clear();
   }
 
-  constructor(attrs: Record<string, unknown> = {}) {
+  constructor(attrs: Record<string, unknown> = {}, initBlock?: (record: Base) => void) {
     (new.target as typeof Base | undefined)?._requireConcreteClass();
     // Forbid/unwrap strong-params before anything inspects the attribute bag.
     // Mirrors the Rails construction path: ActiveModel::API#initialize skips
@@ -3074,7 +3074,7 @@ export class Base extends Model {
     ) {
       const stiTarget = subclassFromAttributesForNew(new.target, attrs);
       if (stiTarget && stiTarget !== new.target) {
-        return new stiTarget(attrs);
+        return new stiTarget(attrs, initBlock);
       }
     }
     // Split out constructor-form association values (e.g. `new Owner({items:
@@ -3146,6 +3146,10 @@ export class Base extends Model {
           assocPending = null;
         }
         _reinstateConstructorDirtiness(this as any, ctor as any);
+        // Rails yields the constructor block (Core#initialize, core.rb:479)
+        // before after_initialize — used by association `build_record` to run
+        // `initialize_attributes` (scope FK + set_inverse_instance) first.
+        initBlock?.(this as unknown as Base);
         cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
       }
     } else {
@@ -3238,6 +3242,10 @@ export class Base extends Model {
           assocPending = null;
         }
         _reinstateConstructorDirtiness(this as any, ctor2 as any);
+        // Rails yields the constructor block (Core#initialize, core.rb:479)
+        // before after_initialize — used by association `build_record` to run
+        // `initialize_attributes` (scope FK + set_inverse_instance) first.
+        initBlock?.(this as unknown as Base);
         cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }
     }

@@ -579,16 +579,15 @@ export class Association {
   protected buildRecord(attributes?: Record<string, unknown>): Base | null {
     const Klass = this.klass;
     if (!Klass) return null;
-    // Rails' `build_association(attributes) { |r| initialize_attributes(r, attributes) }`
-    // applies scope_for_create INSIDE `new`, before `after_initialize` runs — so
-    // the association FK (e.g. `car_id`) is visible to after_initialize hooks.
-    // Merge the scope attrs into the constructor call to reproduce that ordering;
-    // `initializeAttributes` below then re-applies them (idempotent) and wires the
-    // inverse instance.
-    const scopeAttrs = computeScopeForCreateAttributes(this, attributes);
-    const initialAttrs = scopeAttrs ? { ...attributes, ...scopeAttrs } : (attributes ?? {});
-    const record = new (Klass as any)(initialAttrs);
-    this.initializeAttributes(record, attributes);
+    // Rails' `build_record` passes `initialize_attributes` as the block to
+    // `reflection.build_association(attributes)`; `Core#initialize` yields that
+    // block (core.rb:479) BEFORE `_run_initialize_callbacks`. So both the
+    // scope_for_create attrs (e.g. the association FK) AND the inverse instance
+    // wired by `initialize_attributes` (association.rb:224) are visible to
+    // `after_initialize` hooks. Thread the same block through trails' `new`.
+    const record = new (Klass as any)(attributes ?? {}, (r: Base) => {
+      this.initializeAttributes(r, attributes);
+    });
     return record;
   }
 
@@ -869,14 +868,24 @@ export class Association {
 }
 
 /**
- * The `skip_assign = [foreign_key, foreign_type]` set from Rails'
- * `initialize_attributes` — scope values for these columns win even when the
- * caller already assigned them, so a scoped association's FK / polymorphic
- * type gets re-anchored from the scope.
+ * Apply scope_for_create attrs to `record`, mirroring Rails'
+ * `initialize_attributes` (association.rb:217). Caller-supplied attrs
+ * normally win — except for `skip_assign = [foreign_key, foreign_type]`,
+ * where the scope value is allowed through even when already assigned
+ * (Rails relies on this so a scoped association's FK / polymorphic type
+ * gets re-anchored from the scope). Note: `foreign_type` is the
+ * polymorphic-belongs-to type column, NOT the STI inheritance column.
  *
  * @internal
  */
-function scopeSkipAssignSet(assoc: Association): Set<string> {
+export function applyScopeForCreate(
+  assoc: Association,
+  record: Base,
+  exceptFromScopeAttributes?: Record<string, unknown>,
+): void {
+  const scope = assoc.scopeForCreate();
+  if (!scope || Object.keys(scope).length === 0) return;
+
   // `assoc.reflection` is the lightweight AssociationDefinition (its `type`
   // is the macro name — "belongsTo" / etc. — not the polymorphic foreign
   // type column). Resolve the rich Reflection via `_reflectOnAssociation`
@@ -904,48 +913,6 @@ function scopeSkipAssignSet(assoc: Association): Set<string> {
     skipAssign.add(String(fk));
   }
   if (foreignType) skipAssign.add(String(foreignType));
-  return skipAssign;
-}
-
-/**
- * Compute the scope_for_create attrs to seed into a freshly-built record's
- * constructor, so Rails' `build_association(attributes) { initialize_attributes }`
- * ordering holds: the association FK is present before `after_initialize` runs.
- * Returns `null` when there's nothing to merge.
- *
- * @internal
- */
-export function computeScopeForCreateAttributes(
-  assoc: Association,
-  userAttributes?: Record<string, unknown>,
-): Record<string, unknown> | null {
-  const scope = assoc.scopeForCreate();
-  if (!scope || Object.keys(scope).length === 0) return null;
-  const skipAssign = scopeSkipAssignSet(assoc);
-  const assigned = new Set<string>(userAttributes ? Object.keys(userAttributes) : []);
-  return filterScopeForCreate(scope, assigned, skipAssign);
-}
-
-/**
- * Apply scope_for_create attrs to `record`, mirroring Rails'
- * `initialize_attributes` (association.rb:217). Caller-supplied attrs
- * normally win — except for `skip_assign = [foreign_key, foreign_type]`,
- * where the scope value is allowed through even when already assigned
- * (Rails relies on this so a scoped association's FK / polymorphic type
- * gets re-anchored from the scope). Note: `foreign_type` is the
- * polymorphic-belongs-to type column, NOT the STI inheritance column.
- *
- * @internal
- */
-export function applyScopeForCreate(
-  assoc: Association,
-  record: Base,
-  exceptFromScopeAttributes?: Record<string, unknown>,
-): void {
-  const scope = assoc.scopeForCreate();
-  if (!scope || Object.keys(scope).length === 0) return;
-
-  const skipAssign = scopeSkipAssignSet(assoc);
 
   const assigned = new Set<string>(((record as any).changedAttributeNamesToSave ?? []) as string[]);
   if (exceptFromScopeAttributes) {
