@@ -489,6 +489,45 @@ describe("SchemaCacheTest", () => {
     expect(cache.isCached("gone")).toBe(false);
   });
 
+  it("refreshBang lets the latest-initiated refresh win regardless of resolution order", async () => {
+    // Two overlapping refreshes (e.g. a quick double reset): the second one is
+    // initiated later, so its result must win even if the first's DB round-trip
+    // resolves last — otherwise a stale reflection would clobber the newer one
+    // and leave the cache warm-but-stale with no further trigger to correct it.
+    const cache = new SchemaCache();
+    cache.setColumns("users", [makeColumn("id", "integer")]);
+
+    // First (older) refresh: slow columns() that resolves after the second.
+    let releaseSlow: () => void;
+    const slow = new Promise<void>((r) => (releaseSlow = r));
+    const slowConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => {
+        await slow;
+        return [makeColumn("id", "integer"), makeColumn("stale", "varchar(255)")];
+      },
+      indexes: async () => [],
+    };
+    // Second (newer) refresh: resolves immediately with the winning shape.
+    const fastConn = {
+      dataSourceExists: async () => true,
+      primaryKey: async () => "id",
+      columns: async () => [makeColumn("id", "integer"), makeColumn("fresh", "varchar(255)")],
+      indexes: async () => [],
+    };
+
+    const older = cache.refreshBang(new FakePool(slowConn), "users");
+    const newer = cache.refreshBang(new FakePool(fastConn), "users");
+    await newer;
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+
+    // Now let the older, stale refresh finish — it must no-op, not overwrite.
+    releaseSlow!();
+    await older;
+    expect(Object.keys(cache.getCachedColumnsHash("users")!)).toEqual(["id", "fresh"]);
+  });
+
   it("records touched tables between recordTouchedTables and takeTouchedTables", () => {
     const cache = new SchemaCache();
     // No recording window: clears are not tracked.
