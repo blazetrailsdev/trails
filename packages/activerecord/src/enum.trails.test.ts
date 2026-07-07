@@ -8,10 +8,12 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
+  castEnumValue,
   detectNegativeEnumConditionsBang,
+  EnumType,
   setEnumWarn,
 } from "./enum.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, DecimalType } from "@blazetrails/activemodel";
 import { Base } from "./index.js";
 
 describe("Enum name conflict detection", () => {
@@ -299,5 +301,39 @@ describe("Enum private validators", () => {
       detectNegativeEnumConditionsBang(["notDraft", "published"]);
       expect(spy).not.toHaveBeenCalled();
     });
+  });
+});
+
+// Rails resolves the enum subtype lazily inside `decorate_attributes` from the
+// column's real `Type::Value` (enum.rb:239-246), NOT from the mapping's value
+// shapes. When a column type differs from what the mapping implies — here an
+// integer-valued enum on a `decimal`-typed attribute — the EnumType must
+// delegate to the reflected column type, not the integer that eager
+// mapping-shape inference would have guessed. No canonical model exercises
+// this (all canonical enum columns match their mapping shapes), so this is a
+// trails-only regression guard for the reflected-type resolution.
+describe("Enum subtype resolved from the reflected column type", () => {
+  class Book extends Base {
+    static _tableName = "books";
+    static {
+      this.attribute("status", "decimal");
+      this.enum("status", { proposed: 0, written: 1, published: 2 });
+    }
+  }
+
+  it("delegates the enum subtype to the reflected decimal type, not the mapping shape", () => {
+    const type = Book.typeForAttribute("status");
+    expect(type).toBeInstanceOf(EnumType);
+    // Eager mapping-shape inference (all-numbers) would have picked "integer";
+    // resolving from the reflected column type yields the real "decimal".
+    expect((type as EnumType).subtype).toBe("decimal");
+    expect((type as EnumType).subtypeType()).toBeInstanceOf(DecimalType);
+  });
+
+  it("serializes an enum label through the reflected decimal subtype", () => {
+    // castEnumValue serializes the label to its stored value via the single
+    // registered EnumType, coercing through the decimal subtype exactly as the
+    // reflected DecimalType would.
+    expect(castEnumValue(Book, "status", "written")).toEqual(new DecimalType().serialize(1));
   });
 });

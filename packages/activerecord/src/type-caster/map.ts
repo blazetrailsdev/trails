@@ -1,5 +1,4 @@
 import { Type, ValueType } from "@blazetrails/activemodel";
-import { enumTypeFor } from "../enum.js";
 
 /**
  * Casts attribute values for database operations using the model's
@@ -15,22 +14,12 @@ export class Map {
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
-    // Rails splits type casting across two casters: `model.type_caster`
-    // (TypeCaster::Map → `klass.type_for_attribute`, EnumType-aware, used by
-    // `in_order_of`) and the predicate builder's `TypeCaster::Connection`
-    // (raw schema column type, enum-unaware). We share one Map class across
-    // both because our `arelTable` predicate builder relies on Map to serialize
-    // e.g. EncryptedAttributeType. Enums aren't decorated onto
-    // `_attributeDefinitions` (our enum stores the raw subtype in memory and
-    // presents labels via accessors), so to reproduce Rails' Map/Connection
-    // behavioral split we resolve EnumType only on the serialize path here —
-    // mapping keys → integers for the database form, mirroring
-    // `type_caster.type_cast_for_database`. The `typeForAttribute` cast path
-    // (used by the predicate builder) stays the raw subtype, so
-    // `whereValuesHash` / `scopeForCreate` round-trip the raw value our
-    // accessors expect.
-    const enumMapping = this._klass._enums?.get(attrName);
-    if (enumMapping) return enumTypeFor(attrName, enumMapping).serialize(value);
+    // Rails' `model.type_caster` (TypeCaster::Map → `klass.type_for_attribute`)
+    // is EnumType-aware: an enum attribute resolves to its registered EnumType,
+    // whose `serialize` maps the label → the stored database value. Enums are
+    // decorated onto `_attributeDefinitions` via `decorateAttributes`, so
+    // `typeForAttribute` already returns that EnumType — no separate enum path
+    // is needed here.
     const type = this.typeForAttribute(attrName);
     return type.serialize(value);
   }
