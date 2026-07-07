@@ -202,6 +202,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * (Mysql2Adapter) may still override for performance.
    */
   async columns(tableName: string): Promise<Column[]> {
+    // Warm the server-version/`isMariadb()` flag before reflecting. It's cold on
+    // a freshly leased connection until getFullVersion() runs, and callers gate
+    // engine-specific behavior on `isMariadb()` after reflecting a table's
+    // columns (e.g. version-conditional test skips). The retired information_schema
+    // columns() path warmed it unconditionally for the same reason (PR #4197);
+    // preserve that now that SHOW FULL FIELDS is the sole path. Memoized, so this
+    // is a no-op after the first call.
+    await this.getDatabaseVersion();
     const fields = await this.columnDefinitions(tableName);
     // newColumnFromField's broader function-default detection calls SHOW CREATE TABLE via the
     // sync createTableInfoFn callback. Pre-fetch once iff any field default falls through the
@@ -1807,8 +1815,19 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // `Mysql2Adapter#initialize_type_map` (mysql2_adapter.rb:40-49), not in
     // `AbstractMysqlAdapter#initialize_type_map` (abstract_mysql_adapter.rb:711,
     // which has no such registration). See Mysql2Adapter.initializeTypeMap.
-    m.registerType(/^binary/i, undefined, () => new BinaryType());
-    m.registerType(/^varbinary/i, undefined, () => new BinaryType());
+    // Rails relies on super's `register_class_with_limit(m, /binary/i, Binary)`
+    // (abstract_mysql_adapter.rb has no binary override), so binary/varbinary
+    // carry the declared length as their limit — e.g. varbinary(255) → 255.
+    m.registerType(
+      /^binary/i,
+      undefined,
+      (sqlType) => new BinaryType({ limit: this.extractLimit(sqlType) }),
+    );
+    m.registerType(
+      /^varbinary/i,
+      undefined,
+      (sqlType) => new BinaryType({ limit: this.extractLimit(sqlType) }),
+    );
     m.registerType(/^date$/i, new DateType());
     m.registerType(
       /^time\b/i,
@@ -1835,15 +1854,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     m.registerType(/numeric/i, undefined, registerDecimal);
     m.registerType("json", new JsonType());
 
-    // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions)
-    m.registerType(/tinytext/i, undefined, () => new TextType());
-    m.registerType(/tinyblob/i, undefined, () => new BinaryType());
-    m.registerType(/text/i, undefined, () => new TextType());
-    m.registerType(/blob/i, undefined, () => new BinaryType());
-    m.registerType(/mediumtext/i, undefined, () => new TextType());
-    m.registerType(/mediumblob/i, undefined, () => new BinaryType());
-    m.registerType(/longtext/i, undefined, () => new TextType());
-    m.registerType(/longblob/i, undefined, () => new BinaryType());
+    // MySQL-specific overrides (mirrors MySQL's initialize_type_map additions).
+    // Rails registers each lob variant with a fixed byte-size limit (2**8-1 …
+    // 2**32-1) rather than extracting it from the sql_type, so column
+    // introspection and the schema dumper's :size mapping see the right limit.
+    m.registerType(/tinytext/i, undefined, () => new TextType({ limit: 2 ** 8 - 1 }));
+    m.registerType(/tinyblob/i, undefined, () => new BinaryType({ limit: 2 ** 8 - 1 }));
+    m.registerType(/text/i, undefined, () => new TextType({ limit: 2 ** 16 - 1 }));
+    m.registerType(/blob/i, undefined, () => new BinaryType({ limit: 2 ** 16 - 1 }));
+    m.registerType(/mediumtext/i, undefined, () => new TextType({ limit: 2 ** 24 - 1 }));
+    m.registerType(/mediumblob/i, undefined, () => new BinaryType({ limit: 2 ** 24 - 1 }));
+    m.registerType(/longtext/i, undefined, () => new TextType({ limit: 2 ** 32 - 1 }));
+    m.registerType(/longblob/i, undefined, () => new BinaryType({ limit: 2 ** 32 - 1 }));
     m.registerType(/^float/i, undefined, () => new FloatType({ limit: 24 }));
     m.registerType(/^double/i, undefined, () => new FloatType({ limit: 53 }));
     this.registerIntegerType(m, /^bigint/i, { limit: 8 });
