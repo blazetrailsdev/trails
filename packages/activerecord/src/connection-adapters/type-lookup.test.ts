@@ -94,8 +94,13 @@ describe.skipIf(adapterType === "postgres")("TypeLookupTest", () => {
   });
 
   it("bigint limit", () => {
+    // Mirrors Rails test_bigint_limit (type_lookup_test.rb:84): it asserts the
+    // PRIVATE `_limit` (`.send(:_limit)`), not the public `limit`. SQLite3Integer
+    // overrides `_limit` to default to 8 (the 8-byte INTEGER storage class) while
+    // leaving the public `limit` reader nil.
     const castType = adapter.lookupCastType("bigint") as IntegerType;
-    expect(castType.limit).toBe(8);
+    const limit = (castType as unknown as { _limit(): number })._limit();
+    expect(limit).toBe(8);
   });
 
   it("decimal without scale", () => {
