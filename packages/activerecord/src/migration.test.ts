@@ -385,19 +385,19 @@ describe("MigrationTest", () => {
     expect(byName("my_house_population").precision).toBe(2);
 
     try {
-      // Mirrors models/big_number.rb: my_house_population is :integer. Rails
-      // also reads the scale-0 `world_population` column back as an exact
-      // Integer; in trails a scale-0/unscaled decimal read without an explicit
-      // attribute override comes back as a lossy JS number (e.g. 2**62 rounds to
-      // 4611686018427388000), so — exactly as models/numeric_data.rb does for
-      // the same column — declare it :big_integer to get the exact round-trip.
-      // value_of_e (DECIMAL, no precision/scale) is left to the raw column type;
-      // its per-adapter cast (PG exact / SQLite float / others Integer) diverges
-      // in trails (see below) and is asserted only for non-nil here.
+      // Mirrors the inline BigNumber model in migration_test.rb: value_of_e is
+      // declared :integer only on adapters other than PG/SQLite (i.e. MySQL);
+      // my_house_population is always :integer. world_population carries NO
+      // override — Rails reads the scale-0 decimal column back as an exact
+      // Integer, and trails matches now that DecimalWithoutScale inherits
+      // BigIntegerType's arbitrary-precision cast (2**62 round-trips without
+      // JS-number precision loss).
+      const adapterName = adapter.adapterName;
+      const isPgOrSqlite = adapterName === "postgres" || adapterName === "sqlite";
       class BigNumber extends Base {
         static _tableName = "big_numbers";
         static {
-          this.attribute("world_population", "big_integer");
+          if (!isPgOrSqlite) this.attribute("value_of_e", "integer");
           this.attribute("my_house_population", "integer");
           this.adapter = adapter;
         }
@@ -423,6 +423,8 @@ describe("MigrationTest", () => {
       expect((b as any).value_of_e).not.toBeNull();
 
       // world_population round-trips exactly (no precision loss) as Rails' 2**62.
+      // 2**62 exceeds float64's exact-integer range, so DecimalWithoutScale
+      // carries it as a bigint (Rails' unbounded Integer).
       expect(typeof (b as any).world_population).toBe("bigint");
       expect((b as any).world_population).toBe(2n ** 62n);
       expect((b as any).my_house_population).toBe(3);
@@ -433,12 +435,24 @@ describe("MigrationTest", () => {
       expect((b as any).big_bank_balance).toBeInstanceOf(BigDecimal);
       expect(((b as any).big_bank_balance as BigDecimal).toString("F")).toBe("1000234000567.95");
 
-      // Rails additionally asserts value_of_e's exact per-adapter type/value (PG:
-      // BigDecimal 2.71828…; SQLite: BigDecimal float; others: Integer 2). trails'
-      // read of an unscaled decimal column diverges (SQLite returns the truncated
-      // JS number 2, not a float BigDecimal), so the detailed per-adapter value
-      // assertion is omitted pending the decimal-read fidelity story
-      // (0023-surfaced-deviations/unscaled-decimal-read-fidelity).
+      // value_of_e is DECIMAL with precision/scale left out; by the SQL standard
+      // it should truncate to an Integer, but adapters diverge (see Rails'
+      // per-adapter branch):
+      const valueOfE = (b as any).value_of_e;
+      if (adapterName === "postgres") {
+        // PG promotes bare `decimal` to full compile-time precision/scale.
+        expect(valueOfE).toBeInstanceOf(BigDecimal);
+        expect((valueOfE as BigDecimal).toString("F")).toBe("2.7182818284590452353602875");
+      } else if (adapterName === "sqlite") {
+        // SQLite3 stores a float, read back as a BigDecimal within 1e-14.
+        expect(valueOfE).toBeInstanceOf(BigDecimal);
+        expect(
+          Math.abs(Number((valueOfE as BigDecimal).toString("F")) - 2.71828182845905),
+        ).toBeLessThan(0.00000000000001);
+      } else {
+        // SQL standard: an Integer (2), via the :integer attribute override.
+        expect(valueOfE).toBe(2);
+      }
     } finally {
       await ctx.dropTable("big_numbers", { ifExists: true });
     }

@@ -10,18 +10,12 @@ import { BigIntegerType } from "@blazetrails/activemodel";
 export class DecimalWithoutScale extends BigIntegerType {
   override readonly name: string = "decimal";
 
-  // BigIntegerType.castValue returns bigint; DecimalWithoutScale must return
-  // plain number (Ruby to_i semantics) because NUMERIC-without-scale columns
-  // are consumed as numbers by the rest of the stack.
-  protected override castValue(value: unknown): number | null {
-    if (typeof value === "number") {
-      if (isNaN(value) || !isFinite(value)) return null;
-      return Math.trunc(value);
-    }
-    if (typeof value === "bigint") return Number(value);
-    const parsed = parseInt(String(value), 10);
-    return isNaN(parsed) ? null : parsed;
-  }
+  // Rails: `DecimalWithoutScale < BigInteger`, so an unscaled/scale-0 decimal
+  // reads back as an unbounded Ruby Integer. Inherit BigIntegerType.castValue
+  // unchanged — it keeps safe-range values as JS `number` and only carries a
+  // `bigint` for genuine bignums beyond float64's exact-integer range (e.g.
+  // 2**62), so no JS-number precision loss. An earlier override truncated to a
+  // lossy plain `number`; that divergence is what this type must not have.
 
   override type(): string {
     return "decimal";
