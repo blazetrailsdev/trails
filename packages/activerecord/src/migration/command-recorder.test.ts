@@ -504,6 +504,16 @@ describe("CommandRecorder", () => {
         { cmd: "removeColumn", args: ["fruits", "seq", "serial", {}] },
       ]);
     });
+
+    it("records the snake_case type for PG bitVarying (multi-word shorthand)", async () => {
+      const recorder = new CommandRecorder({ columnMethodNames: () => ["bitVarying"] });
+      await recorder.changeTable("fruits", async (t) => {
+        await (t as any).bitVarying("mask");
+      });
+      expect(recorder.commands).toEqual([
+        { cmd: "addColumn", args: ["fruits", "mask", "bit_varying", {}] },
+      ]);
+    });
   });
 
   describe("change_table surfaces adapter ColumnMethods shorthands (MySQL unsigned/blob)", () => {
@@ -511,11 +521,10 @@ describe("CommandRecorder", () => {
     // `t.mediumtext`, `t.longblob`, ... inside change_table — shorthands the
     // adapter advertises via columnMethodNames() beyond NATIVE_DATABASE_TYPES.
     //
-    // NOTE: the generic proxy records the camelCase method name as the column
-    // type (`unsignedInteger`), whereas Rails records the snake symbol
-    // (`:unsigned_integer`). That recorder-side normalization is tracked
-    // separately in story recorder-camelcase-column-type-normalization
-    // (RFC 0023); the assertions below document current behavior.
+    // The proxy normalizes the camelCase method name back to the snake symbol
+    // Rails' `define_column_methods` records (`unsignedInteger` ->
+    // `unsigned_integer`); single-token shorthands (mediumtext, longblob) are
+    // unchanged.
     const mysqlLike = {
       columnMethodNames: () => ["unsignedInteger", "mediumtext", "longblob"],
     };
@@ -528,7 +537,7 @@ describe("CommandRecorder", () => {
         await (t as any).longblob("payload");
       });
       expect(recorder.commands).toEqual([
-        { cmd: "addColumn", args: ["fruits", "qty", "unsignedInteger", {}] },
+        { cmd: "addColumn", args: ["fruits", "qty", "unsigned_integer", {}] },
         { cmd: "addColumn", args: ["fruits", "notes", "mediumtext", {}] },
         { cmd: "addColumn", args: ["fruits", "payload", "longblob", {}] },
       ]);
@@ -544,7 +553,7 @@ describe("CommandRecorder", () => {
       });
       expect(recorder.commands).toEqual([
         { cmd: "removeColumn", args: ["fruits", "notes", "mediumtext", {}] },
-        { cmd: "removeColumn", args: ["fruits", "qty", "unsignedInteger", {}] },
+        { cmd: "removeColumn", args: ["fruits", "qty", "unsigned_integer", {}] },
       ]);
     });
   });

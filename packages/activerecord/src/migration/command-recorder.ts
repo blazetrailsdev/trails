@@ -5,6 +5,7 @@
  */
 
 import { ArgumentError } from "@blazetrails/activemodel";
+import { underscore } from "@blazetrails/activesupport";
 import { IrreversibleMigration } from "../migration.js";
 import {
   findJoinTableName as _findJoinTableName,
@@ -868,7 +869,14 @@ export function withAdapterColumnMethods<T extends object>(
           if (names.length === 0) {
             throw new ArgumentError(`Missing column name(s) for ${prop}`);
           }
-          const results = names.map((name) => col.column(name, prop, options));
+          // Rails' `define_column_methods` generates `def type(...);
+          // column(name, :type, ...)` where `:type` is the snake_case native
+          // type name. trails uses camelCase JS method names, so normalize
+          // multi-word shorthands (`unsignedInteger` -> `unsigned_integer`,
+          // `bitVarying` -> `bit_varying`) back to the snake symbol Rails would
+          // record. Single-token shorthands (serial, jsonb, ...) are unchanged.
+          const type = underscore(prop);
+          const results = names.map((name) => col.column(name, type, options));
           // Table#column is async (non-recording path); RecorderTableProxy#column
           // is sync. Return a Promise when any call is thenable so callers can
           // await, mirroring Rails' synchronous per-name iteration.
