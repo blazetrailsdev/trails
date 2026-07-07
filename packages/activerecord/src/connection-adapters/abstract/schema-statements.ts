@@ -859,9 +859,13 @@ export class SchemaStatements {
       column: opts.column,
       name: opts.name,
     });
-    await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(fromTable)} DROP CONSTRAINT ${this._qi(fk.name)}`,
-    );
+    // Rails: at = create_alter_table from_table; at.drop_foreign_key fk.name;
+    //        execute schema_creation.accept(at)
+    // Route through AlterTable so adapters emit dialect-specific DROP syntax
+    // (MySQL/MariaDB `DROP FOREIGN KEY`) rather than a hardcoded `DROP CONSTRAINT`.
+    const at = this.createAlterTable(fromTable);
+    at.dropForeignKey(fk.name);
+    await this.adapter.executeMutation(this.schemaCreation.accept(at));
   }
 
   async addCheckConstraint(
@@ -927,9 +931,13 @@ export class SchemaStatements {
         `Table '${tableName}' has no check constraint for ${expression ?? JSON.stringify(opts)}`,
       );
     }
-    await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(tableName)} DROP CONSTRAINT ${this._qi(chk.name)}`,
-    );
+    // Rails: at = create_alter_table table_name; at.drop_check_constraint chk.name;
+    //        execute schema_creation.accept(at)
+    // Route through AlterTable so adapters emit dialect-specific DROP syntax
+    // (MySQL `DROP CHECK`) rather than a hardcoded `DROP CONSTRAINT`.
+    const at = this.createAlterTable(tableName);
+    at.dropCheckConstraint(chk.name);
+    await this.adapter.executeMutation(this.schemaCreation.accept(at));
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
