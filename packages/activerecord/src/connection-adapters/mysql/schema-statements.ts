@@ -360,6 +360,18 @@ export function addOptionsForIndexColumns(
   return quotedColumns;
 }
 
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::MySQL::SchemaStatements#table_alias_length
+ *
+ * MySQL caps table aliases at 256 (https://dev.mysql.com/doc/refman/en/identifiers.html),
+ * not max_identifier_length (64). Overrides the DatabaseLimits default.
+ *
+ * @internal
+ */
+export function tableAliasLength(): number {
+  return 256;
+}
+
 /** @internal */
 export function dataSourceSql(
   this: QuotedScopeHost,
