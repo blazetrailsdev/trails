@@ -68,6 +68,18 @@ registerModel(Comment);
   scope: (rel: any) => rel.where("posts.title = 'Welcome to the weblog'"),
 });
 
+// A MIXED predicate referencing both the through table (`posts`) and the source
+// table (`comments`) in one node. The two-step through query joins neither the
+// source nor anything else, so this predicate is NOT through-table-only and must
+// stay whole on the source scope — not be split off / copied onto the through
+// query where `comments` is unjoined.
+(Author as any).hasMany("commentsWithMixedCondition", {
+  className: "Comment",
+  through: "posts",
+  source: "comments",
+  scope: (rel: any) => rel.where("posts.title = 'Welcome to the weblog' OR comments.body = 'x'"),
+});
+
 describe("Preloader::ThroughAssociation#through_scope", () => {
   const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"]);
 
@@ -121,6 +133,16 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     // Raw through-table predicate rides the through query (Rails' full
     // where_clause assignment), not the source query where `posts` is unjoined.
     expect(scope.toSql()).toContain("posts.title");
+  });
+
+  it("does not copy a mixed through+source predicate onto the through query", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithMixedCondition");
+    const scope = (loader as any)._buildThroughScope();
+    // The predicate references both `posts` (through) and `comments` (source) in
+    // one node. The through query can't resolve `comments`, so the whole node
+    // stays on the source scope — nothing from it is copied here.
+    expect(scope.toSql()).not.toContain("posts.title");
   });
 
   it("cascades strict loading from the preload scope onto the through query", async () => {

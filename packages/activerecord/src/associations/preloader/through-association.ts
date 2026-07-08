@@ -214,9 +214,12 @@ export class ThroughAssociation extends Association {
       } else {
         const throughTable = this._throughTableName();
         const wc = this._reflectionScope._whereClause;
+        // Keep every predicate except the ones the through query fully resolves
+        // (through-table-only). A predicate mixing the through table with another
+        // table stays here — it is not through-only, so it is not copied there.
         const sourcePredicates =
           throughTable != null && wc != null
-            ? wc.predicates.filter((p: any) => !predicateReferencesTable(p, throughTable))
+            ? wc.predicates.filter((p: any) => !predicateIsThroughOnly(p, throughTable))
             : (wc?.predicates ?? []);
         sourceScope._whereClause = new WhereClause(sourcePredicates);
       }
@@ -620,17 +623,18 @@ export class ThroughAssociation extends Association {
         // trails' preloader collects raw rows. So the source / sub-chain
         // predicates, order, and scope includes ride the recursive
         // source-preloader stage (see `_getSourcePreloaders`) instead. Only a
-        // THROUGH-table predicate the reflection scope carries (e.g.
-        // `miscPostFirstBlueTags_2`'s `posts.title IN (…)`, whose through
-        // reflection is `posts`) must still constrain which intermediate rows
-        // this through query selects — the recursion can't apply it because it
-        // filters the through table, not the source. So copy just the predicates
-        // that reference the through table (hash/Arel or raw SQL — Rails assigns
-        // the full where_clause here, so a raw through-table condition must be
-        // honored too).
+        // predicate the reflection scope carries that references the through
+        // table AND no other table (e.g. `miscPostFirstBlueTags_2`'s
+        // `posts.title IN (…)`, whose through reflection is `posts`) is copied
+        // here to constrain which intermediate rows this through query selects —
+        // it is fully resolvable against the through table this query already
+        // selects. A predicate mixing the through table with another table (e.g.
+        // `posts.title = ? OR categorizations.author_id = ?`) is NOT copied: the
+        // through query never joins the other table, so it stays whole on the
+        // source scope (hash/Arel or raw SQL both classified precisely).
         const throughTable = throughKlass.tableName;
         const throughPreds = whereClause.predicates.filter((p: any) =>
-          predicateReferencesTable(p, throughTable),
+          predicateIsThroughOnly(p, throughTable),
         );
         if (throughPreds.length > 0) {
           scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...throughPreds]);
@@ -763,6 +767,69 @@ function rawSqlReferencesTable(node: any, tableName: string): boolean {
 function stripSqlStringLiterals(sql: string): string {
   // eslint-disable-next-line blazetrails/no-raw-sql
   return sql.replace(/'(?:[^'\\]|''|\\.)*'/g, (lit) => " ".repeat(lit.length));
+}
+
+/**
+ * True when `node` qualifies a column with some table OTHER than `tableName`.
+ * Used together with `predicateReferencesTable` to decide whether a single
+ * predicate can ride the two-step's through query: only a predicate that
+ * references the through table AND no other table is fully resolvable there
+ * (the two-step through query joins nothing beyond the through table). A mixed
+ * predicate — e.g. `posts.title = ? OR categorizations.author_id = ?` — is not,
+ * so it must NOT be routed to the through query (nor stripped from the source
+ * scope). Mirrors the precise Arel walk plus raw-SQL qualifier scan.
+ * @internal
+ */
+function predicateReferencesOtherTable(node: any, tableName: string): boolean {
+  let other = false;
+  node.fetchAttribute?.((attr: any) => {
+    if (attr instanceof Nodes.Attribute && relationName(attr.relation.name) !== tableName) {
+      other = true;
+      return false;
+    }
+    return true;
+  });
+  if (other) return true;
+  if (node instanceof Nodes.Not) {
+    return predicateReferencesOtherTable((node as any).expr, tableName);
+  }
+  return rawSqlReferencesOtherTable(node, tableName);
+}
+
+/**
+ * True when a raw-SQL predicate node's text qualifies a column with any table
+ * other than `tableName`. Mirrors `rawSqlReferencesTable`'s node unwrapping and
+ * literal blanking, then extracts every `<word>.` qualifier.
+ * @internal
+ */
+function rawSqlReferencesOtherTable(node: any, tableName: string): boolean {
+  if (node instanceof Nodes.Grouping) {
+    return rawSqlReferencesOtherTable((node as any).expr, tableName);
+  }
+  let sql: string | undefined;
+  if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
+  else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
+  if (typeof sql !== "string") return false;
+  sql = stripSqlStringLiterals(sql);
+  const qualifierRe = /(^|[^\w.])(\w+)\s*\./g;
+  let match: RegExpExecArray | null;
+  while ((match = qualifierRe.exec(sql)) !== null) {
+    if (match[2] !== tableName) return true;
+  }
+  return false;
+}
+
+/**
+ * True when `node` references the through table `tableName` and NO other table,
+ * so the two-step's through query (which joins nothing beyond the through table)
+ * can fully resolve it. Predicates that reference only source/other tables, or
+ * mix the through table with another, are left on the source scope instead.
+ * @internal
+ */
+function predicateIsThroughOnly(node: any, tableName: string): boolean {
+  return (
+    predicateReferencesTable(node, tableName) && !predicateReferencesOtherTable(node, tableName)
+  );
 }
 
 /** @internal */
