@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
+import { performMerge } from "./relation/spawn-methods.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
@@ -69,6 +70,88 @@ describe("RelationTest", () => {
     expect(sql).toContain("LIMIT");
     expect(sql.toLowerCase()).toContain("order by");
     expect(CanonPost.all().merge({ readonly: true } as any).isReadonly).toBe(true);
+  });
+
+  // No like-named Rails test: guards trails' merge/merge! structure, which
+  // mirrors Rails' `merge` = `spawn.merge!` (spawn_methods.rb). `merge` clones
+  // first so the receiver is untouched; `merge!` runs the one Merger#merge
+  // algorithm in place, returning the same object. Both must land the same
+  // conditions — a regression that re-splits the two paths is caught here.
+  it("merge is non-destructive while mergeBang mutates in place through one path", () => {
+    const base = CanonPost.all().where({ title: "a" });
+    const baseSqlBefore = base.toSql();
+
+    const merged = base.merge(CanonPost.where({ type: "SpecialPost" }));
+    // merge() left the receiver untouched (spawn cloned first)...
+    expect(base.toSql()).toBe(baseSqlBefore);
+    // ...and produced the combined conditions on a fresh relation.
+    expect(merged.toSql()).toContain("title");
+    expect(merged.toSql()).toContain("type");
+
+    // mergeBang() mutates the receiver in place and returns it (same object),
+    // landing the identical conditions merge() produced on its clone.
+    const target = CanonPost.all().where({ title: "a" });
+    const returned = (target as any).mergeBang(CanonPost.where({ type: "SpecialPost" }));
+    expect(returned).toBe(target);
+    expect(target.toSql()).toBe(merged.toSql());
+  });
+
+  // No like-named Rails test: guards the merge/merge! Array dispatch
+  // (spawn_methods.rb:33-51). `merge` special-cases an Array as `records & other`
+  // (the receiver's records intersected by AR equality — async in trails, so a
+  // Promise of the intersection); `merge!` never treats an Array as a Hash and
+  // raises. A JS Array is `typeof "object"`, so this guards against it wrongly
+  // routing into HashMerger.
+  it("merge with an array returns the records intersection while mergeBang rejects it", async () => {
+    const a = await CanonPost.createBang({ title: "ary-a", body: "b" });
+    await CanonPost.createBang({ title: "ary-b", body: "b" });
+
+    const intersection = await (CanonPost.where({ title: ["ary-a", "ary-b"] }) as any).merge([a]);
+    expect(intersection.map((p: any) => Number(p.id))).toEqual([Number(a.id)]);
+
+    // Rails `records & other` is Array#& — set-style, so a receiver that loads
+    // `a` twice (e.g. a join that duplicates the row) still yields it once. Drive
+    // performMerge with a stub receiver whose records include the duplicate.
+    const dupReceiver = { toArray: async () => [a, a] };
+    const deduped = await (performMerge as (this: unknown, o: unknown) => Promise<any[]>).call(
+      dupReceiver,
+      [a],
+    );
+    expect(deduped.map((p: any) => Number(p.id))).toEqual([Number(a.id)]);
+
+    expect(() => (CanonPost.all() as any).mergeBang([a])).toThrow(/not an ActiveRecord::Relation/);
+  });
+
+  // No like-named Rails test: guards Rails' `|=` union for the preload/includes/
+  // eager_load merge folds (merger.rb / query_methods.rb) — a repeated spec across
+  // a merge must dedup structurally, not accumulate duplicate specs the preloader
+  // then double-loads.
+  it("merge unions preload/includes/eager_load specs without duplicating", () => {
+    const preloadMerged = CanonPost.preload("comments").merge(CanonPost.preload("comments"));
+    expect((preloadMerged as any)._preloadAssociations).toEqual(["comments"]);
+
+    const includesMerged = CanonPost.includes("comments").merge(CanonPost.includes("comments"));
+    expect((includesMerged as any)._includesAssociations).toEqual(["comments"]);
+
+    const eagerMerged = CanonPost.eagerLoad("comments").merge(CanonPost.eagerLoad("comments"));
+    expect((eagerMerged as any)._eagerLoadAssociations).toEqual(["comments"]);
+  });
+
+  // No like-named Rails test: guards the documented proc-merge path
+  // (`Post.where(...).merge(-> { ... })`, spawn_methods.rb). Through the single
+  // path `merge` = `spawn.merge!` and `merge!` runs the block via
+  // `instance_exec(&other)` — trails routes a function argument to
+  // `other.call(this)` on the spawned clone, so the receiver stays untouched and
+  // the block's returned relation carries the added condition.
+  it("merge evaluates a proc against the spawned relation", () => {
+    const base = CanonPost.all().where({ title: "a" });
+    const baseSqlBefore = base.toSql();
+    const merged = (base as any).merge(function (this: any) {
+      return this.where({ type: "SpecialPost" });
+    });
+    expect(base.toSql()).toBe(baseSqlBefore);
+    expect(merged.toSql()).toContain("title");
+    expect(merged.toSql()).toContain("type");
   });
 
   it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {

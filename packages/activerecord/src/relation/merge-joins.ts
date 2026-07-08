@@ -3,13 +3,12 @@ import { Nodes } from "@blazetrails/arel";
 import type { AssociationSpec } from "./query-methods.js";
 import { constructJoinDependency, structuralUnionEq } from "./query-methods.js";
 
-// Shared join-folding passes used by BOTH Merger (merge()) and mergeBang
-// (merge!()) so the two paths cannot drift — a future edit to the dedup/branching
-// logic lands in one place and applies to both. See PR #4660 which converged the
-// logic but left it hand-duplicated between Merger#mergeJoins/#mergeOuterJoins
-// and mergeBang's inline block. Merger keeps thin mergeJoins/mergeOuterJoins
-// wrappers (so api:compare still maps merger.rb's merge_joins/merge_outer_joins);
-// mergeBang calls both helpers directly.
+// Join-folding passes for the single merge path (Merger#merge). Both `merge` and
+// `merge!` now funnel through Merger — `merge` is `spawn.merge!` and `merge!`
+// runs Merger#merge in place (spawn-methods.ts) — so there is one caller. Kept as
+// dedicated functions here (rather than inlined) so the dedup/branching logic
+// stays isolated and reviewable; Merger keeps thin mergeJoins/mergeOuterJoins
+// wrappers so api:compare still maps merger.rb's merge_joins/merge_outer_joins.
 
 // Minimal structural view of the join-related fields these helpers touch on a
 // Relation. Kept local (rather than `any`) so the shared module stays off the

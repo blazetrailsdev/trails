@@ -6,7 +6,6 @@
 
 import { Merger, HashMerger } from "./merger.js";
 import { argumentError } from "./query-methods.js";
-import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
@@ -29,115 +28,69 @@ export function performSpawn<T extends SpawnRelation<T>>(this: T): T {
  * Mirrors: ActiveRecord::SpawnMethods#merge
  */
 export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T {
-  // Mirrors SpawnMethods#merge!: a Hash routes through HashMerger, a
-  // Relation through Merger, and a proc/lambda is instance-exec'd against
-  // the spawned relation. A bare Relation is detected by its `_whereClause`.
-  // Rails `merge` (spawn_methods.rb:33-41) raises `invalid argument: #{inspect}.`
-  // for a *falsey* argument (`nil`/`false`) before ever dispatching to `merge!`.
-  // Ruby falsiness is only nil/false (not 0/"" /NaN).
+  // Mirrors Rails SpawnMethods#merge (spawn_methods.rb:33-41): an Array returns
+  // `records & other`; a *falsey* argument raises (Ruby falsiness is only
+  // nil/false); otherwise `spawn.merge!(other)`. The single merge algorithm lives
+  // in merge! (mergeBang → Merger#merge); `merge` is just the non-destructive
+  // wrapper that clones first via `spawn`, so the two entry points share one code
+  // path and cannot drift.
+  if (Array.isArray(other)) {
+    // Rails intersects the receiver's loaded `records` with the array by AR
+    // equality (==/eql? — class + id). trails loads records asynchronously, so
+    // this resolves to a Promise of the intersection rather than a sync array.
+    return recordsIntersection(this, other) as unknown as T;
+  }
   if (other === null || other === undefined || other === false) {
     throw argumentError(`invalid argument: ${other === false ? "false" : "nil"}.`);
   }
-  if (typeof other === "function") {
-    // Mirrors merge!'s `instance_exec(&other)` (spawn_methods.rb:48-49): the
-    // block runs with the spawned relation as receiver (`this`), receives no
-    // positional args (an arity>=1 proc's first param is `undefined`, as Ruby
-    // passes `nil`), and its return value is used verbatim — Rails does NOT
-    // `|| self`.
-    return (other as (this: T) => T).call(this._clone());
+  return (this as any).spawn().mergeBang(other) as T;
+}
+
+async function recordsIntersection(rel: any, other: readonly unknown[]): Promise<unknown[]> {
+  const records: any[] = await rel.toArray();
+  // Rails `records & other` is `Array#&` — a set-style intersection that also
+  // *dedups* by AR equality (==/eql?/hash: class + id), so a joined relation that
+  // loads the same record twice still yields it once. filter() alone would keep
+  // those duplicates, so track seen records and skip a repeat.
+  const eq = (a: any, o: unknown): boolean =>
+    typeof a?.isEqual === "function" ? a.isEqual(o) : a === o;
+  const result: unknown[] = [];
+  for (const r of records) {
+    if (!other.some((o) => eq(r, o))) continue;
+    if (result.some((seen) => eq(r, seen))) continue;
+    result.push(r);
   }
-  if (typeof other === "object" && "_whereClause" in other) {
-    return new Merger(this, other).merge() as T;
-  }
-  if (typeof other === "object") {
-    return new HashMerger(this, other).merge() as T;
-  }
-  // Rails `merge!`'s final `else` for a truthy non-Hash/Relation/proc argument
-  // (spawn_methods.rb:43-51): `raise ArgumentError, "#{other.inspect} is not an
-  // ActiveRecord::Relation"`.
-  throw argumentError(`${String(other)} is not an ActiveRecord::Relation`);
+  return result;
 }
 
 /**
- * In-place merge — mutates this relation directly.
+ * In-place merge — mutates this relation directly and returns it.
  *
- * Mirrors: ActiveRecord::SpawnMethods#merge!
+ * Mirrors: ActiveRecord::SpawnMethods#merge!. A Relation routes through Merger
+ * (which mutates `this` in place), a Hash through HashMerger, a proc/lambda is
+ * instance-exec'd against `this`, and anything else raises. This is the one
+ * merge algorithm; `merge` (performMerge) reaches it via `spawn.merge!`.
  */
 export function mergeBang(this: any, other: any): any {
+  // A bare Relation is detected by its `_whereClause`.
   if (other && typeof other === "object" && "_whereClause" in other) {
-    // Mirror Merger#merge field-by-field so merge() and merge!() stay aligned.
-    if (!other._whereClause.isEmpty())
-      this._whereClause = this._whereClause.merge(other._whereClause);
-    // mergeSelectValues: null vs [] is meaningful ([] = explicit clear)
-    if (other._selectColumns != null) this._selectColumns = [...other._selectColumns];
-    // mergeMultiValues
-    if (other._orderClauses?.length > 0) this._orderClauses = [...other._orderClauses];
-    if (other._groupColumns?.length > 0) this._groupColumns.push(...other._groupColumns);
-    if (other._annotations?.length > 0) this._annotations.push(...other._annotations);
-    if (other._referencesValues) {
-      for (const ref of other._referencesValues) {
-        if (!this._referencesValues.includes(ref)) this._referencesValues.push(ref);
-      }
-    }
-    if (other._manualReferences) {
-      for (const ref of other._manualReferences) {
-        if (!this._manualReferences.includes(ref)) this._manualReferences.push(ref);
-      }
-    }
-    // mergeSingleValues
-    if (other._limitValue != null) this._limitValue = other._limitValue;
-    if (other._offsetValue != null) this._offsetValue = other._offsetValue;
-    if (other._isDistinct) this._isDistinct = true;
-    if (other._lockValue) this._lockValue = other._lockValue;
-    if (other._isReadonly) this._isReadonly = true;
-    if (other._skipQueryCache) this._skipQueryCache = true;
-    if (other._isStrictLoading !== undefined) this._isStrictLoading = other._isStrictLoading;
-    // mergeClauses
-    if (other._havingClause && !other._havingClause.isEmpty())
-      this._havingClause = this._havingClause.merge(other._havingClause);
-    if (
-      (!this._fromClause || this._fromClause.isEmpty?.()) &&
-      other._fromClause &&
-      !other._fromClause.isEmpty?.() &&
-      // Rails replace_from_clause? also requires same base_class (see Merger).
-      this._modelClass?.baseClass === other._modelClass?.baseClass
-    ) {
-      this._fromClause = other._fromClause;
-    }
-    // mergePreloads
-    if (other._preloadAssociations?.length > 0)
-      this._preloadAssociations = [
-        ...(this._preloadAssociations ?? []),
-        ...other._preloadAssociations,
-      ];
-    if (other._includesAssociations?.length > 0)
-      this._includesAssociations = [
-        ...(this._includesAssociations ?? []),
-        ...other._includesAssociations,
-      ];
-    if (other._eagerLoadAssociations?.length > 0)
-      this._eagerLoadAssociations = [
-        ...(this._eagerLoadAssociations ?? []),
-        ...other._eagerLoadAssociations,
-      ];
-    // mergeJoins / mergeOuterJoins — shared with Merger (merger.ts) via the
-    // foldMerge* helpers so merge() and merge!() fold joins identically and can't
-    // drift.
-    foldMergeJoins(this, other);
-    foldMergeOuterJoins(this, other);
-    // mergeCtes — append the other relation's common table expressions
-    if (other._ctes?.length > 0) this._ctes = [...this._ctes, ...other._ctes];
-    // sticky none
-    if (other._isNone) this._isNone = true;
-  } else if (typeof other === "object" && other !== null) {
-    const merged = new HashMerger(this, other).merge();
-    if (merged && merged._whereClause) {
-      this._whereClause = merged._whereClause;
-    }
-  } else if (typeof other === "function") {
-    other.call(this);
+    return new Merger(this, other).merge();
   }
-  return this;
+  // Rails merge! (spawn_methods.rb:43-51) hash-merges only a *Hash*. A JS Array is
+  // `typeof "object"`, so exclude it explicitly — an Array is not a Hash and, not
+  // being a Relation or proc either, falls through to the ArgumentError below.
+  // (Rails handles arrays earlier in `merge`; they never reach merge!.)
+  if (other && typeof other === "object" && !Array.isArray(other)) {
+    return new HashMerger(this, other).merge();
+  }
+  if (typeof other === "function") {
+    // Rails `instance_exec(&other)` (spawn_methods.rb:48-49): the block runs with
+    // this relation as receiver and its return value is used verbatim.
+    return other.call(this);
+  }
+  // Rails merge!'s final `else` (spawn_methods.rb:43-51): a non-Hash/Relation/proc
+  // argument raises `ArgumentError, "#{other.inspect} is not an ActiveRecord::Relation"`.
+  throw argumentError(`${String(other)} is not an ActiveRecord::Relation`);
 }
 
 export const SpawnMethods = {

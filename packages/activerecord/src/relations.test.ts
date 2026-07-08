@@ -899,10 +899,50 @@ describe("RelationTest", () => {
     expect(await query.size()).toBe(1);
   });
 
-  it.skip("preloading with associations and merges", async () => {
-    // BLOCKED: relations — Rails asserts result_comment.post.readers is already loaded
-    // (no extra queries) after Comment.joins(:post).merge(Post.preload(:readers)...).
-    // Cross-model preload propagation through merge is not yet implemented in Trails.
+  it("preloading with associations and merges", async () => {
+    const post = await Post.createBang({ title: "Uhuu", body: "body" });
+    const reader = await Reader.createBang({ post_id: post.id, person_id: 1 });
+    const comment = await Comment.createBang({ post_id: post.id, body: "body" });
+
+    const postRel = Post.preload("readers").joins("readers").where({ title: "Uhuu" });
+    let resultComment = (await Comment.joins("post").merge(postRel))[0];
+    expect(Number(resultComment.id)).toBe(Number(comment.id));
+
+    let postAssoc = (resultComment as any).association("post");
+    expect(postAssoc.isLoaded()).toBe(true);
+    expect(Number(postAssoc.target.id)).toBe(Number(post.id));
+    const readersAssoc = postAssoc.target.association("readers");
+    expect(readersAssoc.isLoaded()).toBe(true);
+    expect(readersAssoc.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
+
+    const postRel2 = Post.includes("readers").where({ title: "Uhuu" });
+    resultComment = (await Comment.joins("post").merge(postRel2).first())!;
+    expect(Number(resultComment.id)).toBe(Number(comment.id));
+
+    postAssoc = (resultComment as any).association("post");
+    expect(postAssoc.isLoaded()).toBe(true);
+    expect(Number(postAssoc.target.id)).toBe(Number(post.id));
+    const readersAssoc2 = postAssoc.target.association("readers");
+    expect(readersAssoc2.isLoaded()).toBe(true);
+    expect(readersAssoc2.target.map((r: any) => Number(r.id))).toEqual([Number(reader.id)]);
+
+    // Rails merges :eager_load as a NORMAL_VALUE (merger.rb) — a straight union
+    // via eager_load!, never gated on model equality nor nested under a
+    // reflection, so it crosses the model boundary untouched.
+    const merged = Comment.joins("post").merge(Post.eagerLoad("readers")) as any;
+    expect(merged._eagerLoadAssociations).toContain("readers");
+
+    // merge! (in-place) shares Merger#merge in Rails; trails routes both through
+    // the same foldMerge* helpers, so the cross-model reflection-nesting applies
+    // identically — the bang path must nest `{ post: [:readers] }`, not ask
+    // Comment to preload `:readers` directly.
+    const bang = Comment.joins("post") as any;
+    bang.mergeBang(Post.preload("readers").where({ title: "Uhuu" }));
+    expect(bang._preloadAssociations).toEqual([{ post: ["readers"] }]);
+    const bangComment = (await bang.toArray())[0];
+    const bangPost = bangComment.association("post");
+    expect(bangPost.isLoaded()).toBe(true);
+    expect(bangPost.target.association("readers").isLoaded()).toBe(true);
   });
 
   it("preloading with associations default scopes and merges", async () => {
