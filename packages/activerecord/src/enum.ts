@@ -8,7 +8,7 @@ import {
   typeRegistry,
 } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
-import { isDangerousClassMethod } from "./scoping/named.js";
+import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 // The synchronous schema reflector (warm-cache path), NOT the async
 // `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
 import { loadSchema as reflectSchemaSync } from "./model-schema.js";
@@ -694,10 +694,12 @@ export function _enum(
       // RESTRICTED_CLASS_METHODS plus methods `Base` itself defines), never a
       // scope inherited from a parent enum or a user static on the model/an
       // ancestor.
-      if (isDangerousClassMethod(fullName))
-        raiseConflictError.call(this, attribute, fullName, { type: "class" });
-      if (isDangerousClassMethod(notScopeName))
-        raiseConflictError.call(this, attribute, notScopeName, { type: "class" });
+      // Route through the class-method conflict detector so the value scope and
+      // its auto `not*` scope consult all three Rails sub-branches (dangerous
+      // class method, Relation instance method, and the `id` special-case), each
+      // raising with the correct type/source rather than the generic scope error.
+      detectEnumConflictBang.call(this, attribute, fullName, true);
+      detectEnumConflictBang.call(this, attribute, notScopeName, true);
     }
     if (friendlyName !== fullName) {
       const {
@@ -715,10 +717,8 @@ export function _enum(
           raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
       }
       if (scopesEnabled) {
-        if (isDangerousClassMethod(friendlyName))
-          raiseConflictError.call(this, attribute, friendlyName, { type: "class" });
-        if (isDangerousClassMethod(notFriendlyName))
-          raiseConflictError.call(this, attribute, notFriendlyName, { type: "class" });
+        detectEnumConflictBang.call(this, attribute, friendlyName, true);
+        detectEnumConflictBang.call(this, attribute, notFriendlyName, true);
       }
     }
   }
@@ -877,6 +877,22 @@ export function detectEnumConflictBang(
     // reserved names like `columns` (defined on `Base`) still raise.
     if (isDangerousClassMethod(methodName)) {
       raiseConflictError.call(this, enumName, methodName, { type: "class" });
+    }
+    // Sub-branch 2 (enum.rb:377-378): a class method that `Relation` defines as
+    // an instance method — e.g. `records`, `to_ary`, `scope_for_create` — is a
+    // conflict because the generated scope shadows it. Rails reports
+    // `source: Relation.name` ("ActiveRecord::Relation").
+    if (isRelationInstanceMethod(methodName)) {
+      raiseConflictError.call(this, enumName, methodName, {
+        type: "class",
+        source: "ActiveRecord::Relation",
+      });
+    }
+    // Sub-branch 3 (enum.rb:379-380): a scope literally named `id` conflicts
+    // with AR querying. Rails raises the *instance*-type message here (default
+    // type/source), matching `method_name.to_sym == :id`.
+    if (methodName === "id") {
+      raiseConflictError.call(this, enumName, methodName);
     }
     return;
   }

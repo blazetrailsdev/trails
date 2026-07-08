@@ -48,7 +48,7 @@ export function isDangerousClassMethod(name: string): boolean {
  * Mirrors `method_defined_within?(name, Relation)`: true when `Relation`
  * defines an instance method with this name that is not inherited from `Object`.
  */
-function isRelationInstanceMethod(name: string): boolean {
+export function isRelationInstanceMethod(name: string): boolean {
   let proto: any = Relation.prototype;
   while (proto && proto !== Object.prototype) {
     if (Object.prototype.hasOwnProperty.call(proto, name)) return true;
