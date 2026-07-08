@@ -11,7 +11,7 @@
 import { describe, it, expect } from "vitest";
 import { MigrationContext, Migrator } from "./index.js";
 import type { MigrationProxy } from "./migration.js";
-import { Migration } from "./migration.js";
+import { Migration, IllegalMigrationNameError } from "./migration.js";
 import { Base } from "./base.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { newRawTestAdapter } from "./test-adapter.js";
@@ -209,5 +209,16 @@ describe("MigrationTest", () => {
     );
     await sqliteCtx.addIndex("users", "email", { using: "hash" });
     expect(sqliteCtx.indexes("users").find((i) => i.columns.includes("email"))?.using).toBe("hash");
+  });
+
+  // Rails' IllegalMigrationNameError message carries an explanatory suffix
+  // (migration.rb: "…\n\t(only lower case letters, numbers, and '_' allowed).")
+  // and a distinct no-name variant. No Rails test asserts the message text, so
+  // this fidelity check lives in the trails-only sibling.
+  it("IllegalMigrationNameError message matches Rails", () => {
+    expect(new IllegalMigrationNameError("bad name!").message).toBe(
+      "Illegal name for migration file: bad name!\n\t(only lower case letters, numbers, and '_' allowed).",
+    );
+    expect(new IllegalMigrationNameError().message).toBe("Illegal name for migration.");
   });
 });
