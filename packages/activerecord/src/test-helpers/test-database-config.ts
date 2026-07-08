@@ -26,6 +26,7 @@
  */
 
 import { getEnv } from "@blazetrails/activesupport";
+import { ArgumentError } from "@blazetrails/activemodel";
 import { Base } from "../base.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
@@ -128,14 +129,14 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
   // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
   // (connection.rb:35-37). A live-backend `ARCONN` whose connection details are
   // absent would silently fall back to SQLite — folding in PR #4768's guard, we
-  // raise instead of resolving the wrong backend.
+  // raise instead of resolving the wrong backend. The `arunit_adapter` proxy is
+  // the fallback lane (`sqlite3`); the message mirrors Rails' wording verbatim
+  // (single-quoted interpolations included) — only the trigger (missing env var
+  // vs. a genuine post-connect adapter mismatch) is necessarily trails-specific.
   if (envConfig === null) {
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new Error(
+    throw new ArgumentError(
       `The connection name did not match the adapter name. Connection name is ` +
-        `"${connectionName}" (adapter "${connection.adapter}"), but its connection ` +
-        `details (PG_TEST_URL / MYSQL_TEST_URL) are not set, so the run would ` +
-        `silently fall back to SQLite.`,
+        `'${connectionName}' and the adapter name is '${DEFAULT_CONNECTION}'.`,
     );
   }
 
