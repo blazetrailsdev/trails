@@ -50,6 +50,22 @@ type JoinWhere = {
 type HasManyHost = {
   hasMany: (name: string, options: Record<string, unknown>) => void;
 };
+type HasOneHost = {
+  hasOne: (name: string, options: Record<string, unknown>) => void;
+};
+
+// Nested through (through reflection `club` is itself a has_one-through, so
+// `_reflectionScope` is the flattened chain scope) whose has_ONE target's own
+// scope reaches `categorizations` via a RAW string join. Exercises the "join"
+// branch's own-scope raw-join routing for a has_one nested through.
+(Member as unknown as HasOneHost).hasOne("rawCategoryOfClub", {
+  through: "club",
+  source: "category",
+  scope: (rel: JoinWhere) =>
+    rel
+      .joins("INNER JOIN categorizations ON categorizations.category_id = categories.id")
+      .where("categorizations.author_id = 1"),
+});
 
 // Nested through (source `members` on Club is itself a has_many-through) whose
 // OUTER scope reaches `categories` via a RAW string join. The raw join belongs
@@ -109,6 +125,12 @@ describe("Preloader::ThroughAssociation#through_scope nested raw-join attributio
   it("raises when the outer reflection's OWN scope carries a raw join", () => {
     const groucho = members("groucho");
     const loader = throughLoader([groucho], "rawMembersOfClub");
+    expect(() => buildSql(loader)).toThrow(ConfigurationError);
+  });
+
+  it("raises for a has_one nested through whose own scope carries a raw join", () => {
+    const groucho = members("groucho");
+    const loader = throughLoader([groucho], "rawCategoryOfClub");
     expect(() => buildSql(loader)).toThrow(ConfigurationError);
   });
 
