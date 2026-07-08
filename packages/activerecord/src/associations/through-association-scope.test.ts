@@ -1,18 +1,17 @@
 /**
  * Preloader::ThroughAssociation#through_scope fidelity.
  *
- * Pins the parts of Rails' `through_scope`
- * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb)
- * that our preloader can honour without the single-query JOIN strategy:
+ * Pins Rails' `through_scope`
+ * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb):
  *
  *   - `annotate(...)` on the through reflection's own scope is carried onto
- *     the through (intermediate) query rather than being silently dropped.
+ *     the through (intermediate) query.
  *   - a strict-loading preload scope cascades to the through query.
- *
- * The `where_clause`/`includes`/`joins` JOIN branch of `through_scope` is a
- * single-query strategy; our preloader applies target-table conditions at the
- * source-preloader stage instead, so that branch is exercised by the
- * join-based eager-loading tests, not here.
+ *   - the `elsif !reflection_scope.where_clause.empty?` branch copies the FULL
+ *     reflection-scope `where_clause` onto the through query and JOINs the
+ *     source reflection, so every referenced column resolves in ONE query. A
+ *     source-table condition is therefore carried onto the through query (with
+ *     the source JOIN) rather than being deferred to the source-preloader stage.
  */
 import { describe, it, expect } from "vitest";
 import { registerModel } from "../index.js";
@@ -36,49 +35,49 @@ registerModel(Comment);
   scope: (rel: any) => rel.annotate("preload-through"),
 });
 
-// A raw-SQL source-table condition whose text embeds the THROUGH table name
-// (`posts.`) inside a string literal. The through table is `posts`; a naive
-// text scan for a `posts.` qualifier would relocate this source predicate onto
-// the through query (a false positive), so this pins that string literals are
-// stripped before the qualifier scan.
-(Author as any).hasMany("commentsWithLiteralThroughRef", {
+// A source-table (`comments.`) condition on a has_many-through (collection
+// source). The single-query JOIN can't cover a collection source (it fans the
+// through rows out), so trails keeps the two-step: the source condition is
+// applied at the source-preloader stage, NOT copied onto the through query.
+(Author as any).hasMany("commentsWithSourceCondition", {
   className: "Comment",
   through: "posts",
   source: "comments",
-  scope: (rel: any) => rel.where("comments.body = 'mention posts.title here'"),
+  scope: (rel: any) => rel.where("comments.body = 'first comment'"),
 });
 
-// Same false-positive class but with a BACKSLASH-escaped quote inside the
-// literal (`\'`) — MySQL/MariaDB's default escaping. A regex that only knows
-// `''` escaping would terminate the literal early at the backslash-escaped
-// quote and leave `posts.` exposed to the scan.
-(Author as any).hasMany("commentsWithBackslashLiteralThroughRef", {
+// A through-table (`posts.title`) condition expressed as a hash so its Arel
+// attribute is precisely detected. For a collection-source two-step, the
+// through-table predicate is copied onto the through query to constrain which
+// intermediate rows are selected.
+(Author as any).hasMany("commentsWithThroughCondition", {
   className: "Comment",
   through: "posts",
   source: "comments",
-  scope: (rel: any) => rel.where("comments.body = 'don\\'t touch posts.title here'"),
+  scope: (rel: any) => rel.where({ posts: { title: "Welcome to the weblog" } }),
 });
 
-// A literal ending in an escaped backslash (`'a\\'`, i.e. the string value `a\`)
-// immediately followed by a GENUINE through-table qualifier in the same raw-SQL
-// string. The `\\.` escape-pairing must consume `\\` as one unit and let the
-// quote close, so `posts.title` after it is still seen and relocated — pins that
-// the escaped-backslash-then-close-quote case is NOT over-swallowed.
-(Author as any).hasMany("commentsWithEscapedBackslashThenQualifier", {
+// Same, but the through-table condition is RAW SQL. Rails' `through_scope`
+// assigns the full `reflection_scope.where_clause` before the source join, so a
+// raw through-table predicate must be copied onto the through query too (not
+// left on the source query, where `posts` is not joined — an invalid predicate).
+(Author as any).hasMany("commentsWithRawThroughCondition", {
   className: "Comment",
   through: "posts",
   source: "comments",
-  scope: (rel: any) => rel.where("comments.body = 'a\\\\' AND posts.title = 'x'"),
+  scope: (rel: any) => rel.where("posts.title = 'Welcome to the weblog'"),
 });
 
-// Positive control: a GENUINE through-table (`posts.`) qualifier — unquoted, a
-// real column reference — must still be relocated onto the through query. Pins
-// that stripping string literals does not break the true-positive path.
-(Author as any).hasMany("commentsWithRealThroughRef", {
+// A MIXED predicate referencing both the through table (`posts`) and the source
+// table (`comments`) in one node. The two-step through query joins neither the
+// source nor anything else, so this predicate is NOT through-table-only and must
+// stay whole on the source scope — not be split off / copied onto the through
+// query where `comments` is unjoined.
+(Author as any).hasMany("commentsWithMixedCondition", {
   className: "Comment",
   through: "posts",
   source: "comments",
-  scope: (rel: any) => rel.where("posts.title = 'welcome'"),
+  scope: (rel: any) => rel.where("posts.title = 'Welcome to the weblog' OR comments.body = 'x'"),
 });
 
 describe("Preloader::ThroughAssociation#through_scope", () => {
@@ -107,54 +106,43 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     expect(comments.length).toBeGreaterThan(0);
   });
 
-  it("does not relocate a source predicate whose string literal embeds the through table name", () => {
+  it("keeps a source-table condition on a collection source at the source stage, not the through query", () => {
     const david = authors("david");
-    const loader = throughLoader([david], "commentsWithLiteralThroughRef");
-    const partition = (loader as any)._partitionReflectionWhere();
-    // The `posts.` token lives inside a string literal, so the predicate is a
-    // source-table condition and must stay on the source preloader.
-    expect(partition.throughPredicates).toHaveLength(0);
-    expect(partition.sourcePredicates).toHaveLength(1);
-
-    // And the through query must not carry the source predicate.
+    const loader = throughLoader([david], "commentsWithSourceCondition");
+    // Collection source (has_many comments): the two-step keeps the through
+    // query free of the source condition (it would fan the through rows out).
     const scope = (loader as any)._buildThroughScope();
-    expect(scope.toSql()).not.toContain("mention posts.title here");
+    const sql = scope.toSql();
+    expect(sql).not.toContain("first comment");
+    expect(sql).not.toMatch(/JOIN/);
   });
 
-  it("does not relocate when a backslash-escaped-quote literal embeds the through table name", () => {
+  it("copies a through-table condition onto the through query for a collection source", () => {
     const david = authors("david");
-    const loader = throughLoader([david], "commentsWithBackslashLiteralThroughRef");
-    const partition = (loader as any)._partitionReflectionWhere();
-    expect(partition.throughPredicates).toHaveLength(0);
-    expect(partition.sourcePredicates).toHaveLength(1);
-
+    const loader = throughLoader([david], "commentsWithThroughCondition");
     const scope = (loader as any)._buildThroughScope();
+    const sql = scope.toSql();
+    // The through-table predicate constrains the intermediate (posts) rows.
+    expect(sql).toContain("Welcome to the weblog");
+  });
+
+  it("copies a raw-SQL through-table condition onto the through query for a collection source", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithRawThroughCondition");
+    const scope = (loader as any)._buildThroughScope();
+    // Raw through-table predicate rides the through query (Rails' full
+    // where_clause assignment), not the source query where `posts` is unjoined.
+    expect(scope.toSql()).toContain("posts.title");
+  });
+
+  it("does not copy a mixed through+source predicate onto the through query", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithMixedCondition");
+    const scope = (loader as any)._buildThroughScope();
+    // The predicate references both `posts` (through) and `comments` (source) in
+    // one node. The through query can't resolve `comments`, so the whole node
+    // stays on the source scope — nothing from it is copied here.
     expect(scope.toSql()).not.toContain("posts.title");
-  });
-
-  it("still sees a genuine qualifier after an escaped-backslash literal", () => {
-    const david = authors("david");
-    const loader = throughLoader([david], "commentsWithEscapedBackslashThenQualifier");
-    const partition = (loader as any)._partitionReflectionWhere();
-    // The `'a\\'` literal closes correctly, so the trailing `posts.title` is a
-    // real through-table qualifier and the predicate relocates.
-    expect(partition.throughPredicates).toHaveLength(1);
-    expect(partition.sourcePredicates).toHaveLength(0);
-
-    const scope = (loader as any)._buildThroughScope();
-    expect(scope.toSql()).toContain("posts.title");
-  });
-
-  it("relocates a genuine through-table qualifier onto the through query", () => {
-    const david = authors("david");
-    const loader = throughLoader([david], "commentsWithRealThroughRef");
-    const partition = (loader as any)._partitionReflectionWhere();
-    // `posts.title` is a real column reference on the through table.
-    expect(partition.throughPredicates).toHaveLength(1);
-    expect(partition.sourcePredicates).toHaveLength(0);
-
-    const scope = (loader as any)._buildThroughScope();
-    expect(scope.toSql()).toContain("posts.title");
   });
 
   it("cascades strict loading from the preload scope onto the through query", async () => {

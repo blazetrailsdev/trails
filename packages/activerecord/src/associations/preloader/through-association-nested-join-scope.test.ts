@@ -46,6 +46,9 @@ type NestedRel = {
 type HasOneHost = {
   hasOne: (name: string, options: Record<string, unknown>) => void;
 };
+type HasManyHost = {
+  hasMany: (name: string, options: Record<string, unknown>) => void;
+};
 
 // A has_one-through mirroring `general_club` (Member → current_membership →
 // club) but whose scope reaches `categorizations` — two levels deep from the
@@ -57,6 +60,49 @@ type HasOneHost = {
   source: "club",
   scope: (rel: NestedRel) =>
     rel.leftJoins({ category: "categorizations" }).where({ categorizations: { author_id: 1 } }),
+});
+
+// Same shape but reaching the deeper table via `.includes` instead of
+// `.leftJoins`. Rails' through_scope nests the scope's `values[:includes]` under
+// the source reflection (`includes!(source => includes)`), so `.includes` and
+// `.leftJoins` both realize the deeper join on the through query. Pins that a
+// has_one-through honors an explicit `.includes` in its scope.
+(Member as unknown as HasOneHost).hasOne("davidIncludedCategorizedClub", {
+  through: "currentMembership",
+  source: "club",
+  scope: (rel: NestedRel) =>
+    (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
+      .includes({ category: "categorizations" })
+      .where({ categorizations: { author_id: 1 } }),
+});
+
+// A has_MANY-through whose scope carries a `.includes` reaching a belongs_to
+// association (`category` on Club) plus a predicate on it. A belongs_to join is
+// 1:1, so it does NOT fan the through rows out and IS nested onto the through
+// query even for a collection target — the predicate must resolve there, not
+// leak onto the source query where `categories` is unjoined.
+(Member as unknown as HasManyHost).hasMany("generalClubs", {
+  through: "favoriteMemberships",
+  source: "club",
+  scope: (rel: NestedRel) =>
+    (rel as unknown as { includes: (s: string) => NestedRel })
+      .includes("category")
+      .where({ categories: { name: "General" } }),
+});
+
+// A has_MANY-through whose scope includes a FAN-OUT path (`categorizations`, a
+// has_many two levels deep) AND predicates on it. Joining it onto the through
+// query would multiply the middle records, so the whole preload falls back to
+// the two-step: the `categorizations` join + predicate ride the source stage,
+// and neither the join nor the predicate is left on the through query (which
+// would be an unjoined-table predicate).
+(Member as unknown as HasManyHost).hasMany("categorizedClubs", {
+  through: "favoriteMemberships",
+  source: "club",
+  scope: (rel: NestedRel) =>
+    (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
+      .includes({ category: "categorizations" })
+      .where({ categorizations: { author_id: 1 } }),
 });
 
 describe("Preloader::ThroughAssociation#through_scope multi-level nested join carry", () => {
@@ -85,10 +131,10 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
   it("nests the two-level scope join under the source reflection on the through query", () => {
     const groucho = members("groucho");
     const sql = throughScopeSql([groucho], "davidCategorizedClub");
-    // The deeper `categorizations` join is realized on the through query and,
-    // because `_resolveNestedTableNames` now resolves it two levels deep, the
-    // predicate qualifying it rides the through query's WHERE too (without the
-    // recursive resolution it would be deferred to the source-preloader stage).
+    // The deeper `categorizations` join is realized on the through query by
+    // nesting the scope's `.leftJoins({ category: "categorizations" })` under the
+    // source reflection, and the copied full where_clause qualifies it, so the
+    // predicate rides the through query's WHERE too.
     // Quote identifiers via the active adapter (Rails' `quote_table_name`
     // pattern) so the assertions run on SQLite/PG (`"x"`) and MariaDB (`` `x` ``).
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
@@ -96,6 +142,41 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     expect(sql).toMatch(
       new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
     );
+  });
+
+  it("nests an explicit scope includes under the source reflection on the through query", () => {
+    const groucho = members("groucho");
+    const sql = throughScopeSql([groucho], "davidIncludedCategorizedClub");
+    // Rails nests `values[:includes]` under the source reflection, joining the
+    // deeper tables so the copied `categorizations.author_id` predicate resolves
+    // on the through query (rather than being left on the source query where the
+    // table is not joined).
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
+    expect(sql).toMatch(
+      new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
+    );
+  });
+
+  it("nests a belongs_to scope includes onto the through query for a has_many-through", () => {
+    const groucho = members("groucho");
+    const sql = throughScopeSql([groucho], "generalClubs");
+    // `category` (belongs_to on Club) is a 1:1 join, so even for this collection
+    // target it is nested onto the through query and the `categories.name`
+    // predicate resolves there — not left on the source query where `categories`
+    // is unjoined (an invalid predicate).
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
+  });
+
+  it("routes a has_many-through with a fan-out include+predicate to the two-step", () => {
+    const groucho = members("groucho");
+    const sql = throughScopeSql([groucho], "categorizedClubs");
+    // `categorizations` is a to-many join that would fan the middle records out,
+    // so the whole preload takes the two-step: the through query joins neither
+    // `categorizations` nor carries its predicate (both ride the source stage) —
+    // crucially the predicate is NOT orphaned onto an unjoined table here.
+    expect(sql).not.toContain("categorizations");
   });
 
   type AssocHost = {
