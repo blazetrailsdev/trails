@@ -31,7 +31,6 @@ import {
   Model,
   MissingAttributeError,
   Type,
-  typeRegistry,
   pushPendingDecorator,
   type AttributeOptions,
   type TransactionalCallbackConditions,
@@ -1222,12 +1221,16 @@ export class Base extends Model {
     // Rails raises inside enum's `decorate_attributes` block for an enum backed
     // by neither a DB column nor an explicit `attribute` type.
     _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, resolved);
-    // Resolve through the decorated default attribute set (`attribute_types`),
-    // mirroring Rails `type_for_attribute` (attribute_registration.rb:43-50).
-    // The set replays every pending decorator (serialize/normalizes/encrypts)
-    // onto the reflected column type, so query-side decorations are honored
-    // without a per-feature post-reflection replay onto `_attributeDefinitions`.
-    return this.attributeTypes()[resolved] ?? typeRegistry.lookup("value");
+    // Resolve through the decorated default attribute set — Rails'
+    // `attribute_types[name]` is `_default_attributes.cast_types[name]` with a
+    // `Type.default_value` hash default (attribute_registration.rb:43-50). The set
+    // replays every pending decorator (serialize/normalizes/encrypts) onto the
+    // reflected column type, so query-side decorations are honored without a
+    // per-feature post-reflection replay onto `_attributeDefinitions`. Read the
+    // single attribute (O(1), and `getAttribute` returns a `value`-typed Null for
+    // an unknown name) rather than `attributeTypes()`, which rebuilds the whole
+    // cast-types record + Proxy on every call — this is a hot per-bind path.
+    return this._defaultAttributes().getAttribute(resolved).type;
   }
 
   /**

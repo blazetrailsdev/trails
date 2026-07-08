@@ -39,20 +39,16 @@ export class Map {
   private _baseTypeForAttribute(name: string): Type {
     const klass = this._klass;
 
-    // Resolve through the decorated default attribute set (`attribute_types`),
-    // mirroring Rails `type_for_attribute` (attribute_registration.rb:43-50): it
-    // replays every pending decorator (serialize/normalizes/encrypts) onto the
-    // reflected column type, so query-side decorations are honored without a
-    // per-feature post-reflection replay onto `_attributeDefinitions`.
+    // Resolve through the decorated default attribute set — Rails'
+    // `attribute_types[name]` (attribute_registration.rb:43-50) — so pending
+    // decorators (serialize/normalizes/encrypts) are honored on the query side
+    // without a per-feature post-reflection replay onto `_attributeDefinitions`.
+    // Read the single attribute (O(1), `getAttribute` returns a `value`-typed Null
+    // for an unknown name) rather than the whole `attributeTypes()` record + Proxy
+    // — this runs once per predicate-builder bind.
     const resolved = klass._attributeAliases?.[name] ?? name;
-    const attributeTypes =
-      typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
-    if (attributeTypes) {
-      const type =
-        attributeTypes instanceof globalThis.Map
-          ? attributeTypes.get(resolved)
-          : attributeTypes[resolved];
-      if (type) return type as Type;
+    if (typeof klass._defaultAttributes === "function") {
+      return klass._defaultAttributes().getAttribute(resolved).type as Type;
     }
 
     return new ValueType();
