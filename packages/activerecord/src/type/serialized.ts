@@ -34,6 +34,22 @@ function isValueComparable(value: unknown): boolean {
  *
  * @internal
  */
+/**
+ * Whether a value exposes an explicit `equals(other)` method — our convention
+ * for a Ruby object that overrides `==`. Used to dispatch change detection to
+ * the value's own equality (e.g. ActiveSupport::TimeWithZone, which compares by
+ * UTC instant across Date/Time-like operands) rather than a primitive fallback.
+ *
+ * @internal
+ */
+function hasEquals(value: unknown): value is { equals(other: unknown): boolean } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { equals?: unknown }).equals === "function"
+  );
+}
+
 function hasValueEquality(value: unknown): boolean {
   if (value === null || typeof value !== "object") return false;
   const primitive = (value as { valueOf(): unknown }).valueOf();
@@ -180,12 +196,19 @@ export class Serialized extends ValueType {
         return true;
       }
     }
-    // A coder whose `load` returns a value-== object (e.g. Date/Time) mirrors
-    // Ruby's `old_value != new_value` dispatching to that object's own `==`. A
-    // Ruby value type's `==` (e.g. `Date#==`) only compares against its own
-    // kind, so require the operands share a constructor before value-comparing
-    // by `valueOf()` — two unrelated classes that happen to yield the same
-    // primitive are not equal, matching Ruby.
+    // A coder whose `load` returns a value-== object mirrors Ruby's
+    // `old_value != new_value` dispatching to that object's own `==`. When the
+    // value defines an explicit `equals` (our convention for Ruby `==`, e.g.
+    // ActiveSupport::TimeWithZone whose `<=>`/`==` compares by UTC instant
+    // across Date/Time-like kinds), dispatch to it so cross-class time-like
+    // equality is honored.
+    if (hasEquals(oldValue)) return !oldValue.equals(newValue);
+    if (hasEquals(newValue)) return !newValue.equals(oldValue);
+    // Otherwise a value object without an explicit `==` but with a primitive
+    // `valueOf` (e.g. Date) compares by that primitive. A Ruby value type's
+    // `==` only compares against its own kind, so require a shared constructor:
+    // two unrelated classes that happen to yield the same primitive are not
+    // equal, matching Ruby.
     if (
       hasValueEquality(oldValue) &&
       hasValueEquality(newValue) &&

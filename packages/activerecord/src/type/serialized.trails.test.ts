@@ -41,6 +41,19 @@ describe("Serialized#isChanged", () => {
     expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-09"))).toBe(true);
   });
 
+  it("dispatches to an explicit equals method, honoring cross-class value equality", () => {
+    // Mirrors ActiveSupport::TimeWithZone#== comparing by UTC instant across
+    // Date/Time-like kinds via its own equality method.
+    class Instant {
+      constructor(readonly ms: number) {}
+      equals(other: unknown) {
+        return other instanceof Date ? this.ms === other.getTime() : false;
+      }
+    }
+    expect(type.isChanged(new Instant(100), new Date(100))).toBe(false);
+    expect(type.isChanged(new Instant(100), new Date(200))).toBe(true);
+  });
+
   it("does not equate unrelated classes that yield the same valueOf primitive", () => {
     class Cents {
       valueOf() {
