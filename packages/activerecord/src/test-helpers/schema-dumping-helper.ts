@@ -1,5 +1,12 @@
 import { SchemaDumper } from "../schema-dumper.js";
 import type { SchemaSource } from "../schema-dumper.js";
+// Load the adapter-layer dumper so `SchemaDumper.create` resolves the
+// ConnectionAdapters subclass (the single `column_spec` emitter) for the plain
+// `SchemaSource`s this helper dumps — mirroring Rails, whose dump factory is the
+// adapter-layer `ConnectionAdapters::SchemaDumper.create`. `SchemaDumper` above
+// stays the base class so its `ignoreTables` static is the one this helper
+// saves/restores. The import registers the subclass as a side effect.
+import "../connection-adapters/abstract/schema-dumper.js";
 
 /**
  * Test-only schema-dump helpers. Mirrors Rails'

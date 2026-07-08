@@ -99,7 +99,7 @@ describe("SchemaDumper schemaDefault with adapter type deserialize", () => {
 
 // Story 3.3-U1: columnSpec must emit directly-emittable TypeScript-DSL text
 // (not Ruby schema.rb syntax) so a later story (3.3-U3) can route emitTable
-// through it via formatColspecRaw. These pin the prerequisite.
+// through it via formatColspec. These pin the prerequisite.
 describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
   const dumper = SchemaDumper.create(emptySource) as any;
 
@@ -111,7 +111,7 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
     expect(dumper.schemaExpression({ defaultFunction: "now()" })).toBe('() => "now()"');
   });
 
-  it("columnSpec output round-trips through formatColspecRaw as valid TS-DSL", () => {
+  it("columnSpec output round-trips through formatColspec as valid TS-DSL", () => {
     const [type, spec] = dumper.columnSpec({
       type: "datetime",
       precision: null,
@@ -121,7 +121,7 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
       defaultFunction: "now()",
     });
     expect(type).toBe("datetime");
-    const text = dumper.formatColspecRaw(spec);
+    const text = dumper.formatColspec(spec);
     expect(text).toContain("precision: null");
     expect(text).toContain("null: false");
     expect(text).toContain('default: () => "now()"');

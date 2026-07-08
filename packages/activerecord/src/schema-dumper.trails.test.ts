@@ -1,6 +1,6 @@
 // Trails-only SchemaDumper cases with no 1:1 in Rails'
 // schema_dumper_test.rb. These unit-test trails-invented exported helpers
-// (formatColspecRaw / indexParts), the adapter-introspection dump path
+// (formatColspec / indexParts), the adapter-introspection dump path
 // (SchemaDumperAdapterTest), async header ordering, and DSL-helper
 // round-trips. Kept out of the Rails-mirrored schema-dumper.test.ts so
 // test:compare maps cleanly.
@@ -18,7 +18,10 @@ describe("SchemaDumper trails-only cases", () => {
       tables: () => ["gen_defaults"],
       columns: () => [
         { name: "id", type: "integer", primaryKey: true },
-        { name: "token", type: "string", defaultFunction: "gen_random_uuid()" },
+        // A function default reflects as `default: null` + `defaultFunction`
+        // (the literal default is null; the expression rides defaultFunction),
+        // which schemaDefault routes through schemaExpression to the arrow form.
+        { name: "token", type: "string", default: null, defaultFunction: "gen_random_uuid()" },
       ],
       indexes: () => [],
     };
@@ -283,7 +286,10 @@ describe("SchemaDumperAdapterTest", () => {
   }, 60000);
 
   it("emitTable forwards comment from fetchTableOptions into createTable options", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    // Subclasses the ConnectionAdapters dumper directly — that's where emitTable
+    // (the single column_spec dispatch) lives; the bare base delegates to it.
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: () => ["users"],
       columns: () => [{ name: "id", type: "integer", primaryKey: true }],
@@ -301,7 +307,8 @@ describe("SchemaDumperAdapterTest", () => {
   });
 
   it("emitTable emits charset and collation from adapterTableOpts before force", async () => {
-    const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
+    const { SchemaDumper: TopLevelDumper } =
+      await import("./connection-adapters/abstract/schema-dumper.js");
     const source = {
       tables: () => ["t"],
       columns: () => [{ name: "id", type: "integer", primaryKey: true }],
@@ -386,7 +393,7 @@ describe("SchemaDumper async header ordering", () => {
   });
 });
 
-describe("formatColspecRaw", () => {
+describe("formatColspec", () => {
   const dumper = SchemaDumper.create({
     tables: () => [],
     columns: () => [],
@@ -395,7 +402,7 @@ describe("formatColspecRaw", () => {
 
   it("emits values verbatim (Rails format_colspec), not re-quoted", () => {
     expect(
-      dumper.formatColspecRaw({
+      dumper.formatColspec({
         null: "false",
         limit: "255",
         precision: "null",
@@ -407,7 +414,7 @@ describe("formatColspecRaw", () => {
 
   it("recurses into nested objects (primary-key `id: { type:, … }` spec)", () => {
     expect(
-      dumper.formatColspecRaw({ id: { type: '"uuid"', default: "null" }, force: '"cascade"' }),
+      dumper.formatColspec({ id: { type: '"uuid"', default: "null" }, force: '"cascade"' }),
     ).toBe('id: { type: "uuid", default: null }, force: "cascade"');
   });
 });
