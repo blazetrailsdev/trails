@@ -434,7 +434,7 @@ export class Before {
             `Use the default terminator (halt via throwAbort()) or make all before callbacks synchronous.`,
         );
       }
-      if (halt) env.halted = true;
+      if (halt) this.halt(env);
       return env;
     }
 
@@ -444,7 +444,7 @@ export class Before {
       cbResult = resultLambda();
     } catch (e) {
       if (!isAbortSignal(e)) throw e;
-      env.halted = true;
+      this.halt(env);
       return env;
     }
     if (!isThenable(cbResult)) return env;
@@ -459,10 +459,23 @@ export class Before {
       () => env,
       (e) => {
         if (!isAbortSignal(e)) throw e;
-        env.halted = true;
+        this.halt(env);
         return env;
       },
     );
+  }
+
+  /**
+   * Mark the chain halted and fire Rails' `halted_callback_hook(filter, name)`
+   * on the target (a private no-op the including class may override to log or
+   * instrument which callback halted). Mirrors `Before#call`'s
+   * `target.send :halted_callback_hook, filter, name`.
+   */
+  private halt(env: FilterEnvironment): void {
+    env.halted = true;
+    const hook = (env.target as { haltedCallbackHook?: (filter: unknown, name: string) => void })
+      .haltedCallbackHook;
+    if (typeof hook === "function") hook.call(env.target, this.filter, this.name);
   }
 
   apply(seq: CallbackSequence): CallbackSequence {
@@ -965,6 +978,18 @@ export class CallbackChain {
     return this.chain.length === 0;
   }
 
+  /**
+   * Fire Rails' `halted_callback_hook(filter, name)` on the target for the
+   * before callback that halted the chain. Mirrors `Filters::Before#call`;
+   * kept here because the bespoke around-chain engine (`_invoke`) does not
+   * compile through `Before#call`. See `Before#halt` for the compiled path.
+   */
+  private _notifyHalt(target: object, entry: Callback): void {
+    const hook = (target as { haltedCallbackHook?: (filter: unknown, name: string) => void })
+      .haltedCallbackHook;
+    if (typeof hook === "function") hook.call(target, entry.filter, entry.name);
+  }
+
   _invoke(
     target: object,
     block?: () => unknown,
@@ -1011,6 +1036,7 @@ export class CallbackChain {
 
       if (aborted) {
         halted = true;
+        this._notifyHalt(target, entry);
         break;
       }
 
@@ -1052,6 +1078,7 @@ export class CallbackChain {
             // Rails scopes `catch(:abort)` to the default terminator). An async
             // before rejecting with the sentinel halts; real errors propagate.
             if (!isAbortSignal(e) || terminatorFn === false) throw e;
+            this._notifyHalt(target, entry);
             return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
           }
           for (const rem of remaining) {
@@ -1073,16 +1100,20 @@ export class CallbackChain {
               }
             } catch (e) {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
+              this._notifyHalt(target, rem);
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
             }
             try {
               if (isThenable(remVal)) await remVal;
             } catch (e) {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
+              this._notifyHalt(target, rem);
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
             }
-            if (remSyncHalt)
+            if (remSyncHalt) {
+              this._notifyHalt(target, rem);
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
+            }
           }
           return this._runAroundAndAfter(
             arounds,
@@ -1102,6 +1133,7 @@ export class CallbackChain {
         // `aborted`), matching Rails 5+ default_terminator. A `false` return no
         // longer halts. A custom terminator owns its own halt decision.
         halted = true;
+        this._notifyHalt(target, entry);
         break;
       }
     }
@@ -1673,6 +1705,11 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
     ): boolean | Promise<boolean> {
       return runCallbacks(this, name, block, opts);
     }
+
+    // A hook invoked every time a before callback is halted. Overridable in
+    // implementors (Rails: ActiveSupport::Callbacks#halted_callback_hook) to
+    // provide better debugging/logging. Default is a no-op.
+    haltedCallbackHook(_filter: unknown, _name: string): void {}
   }
 
   return WithCallbacks;
