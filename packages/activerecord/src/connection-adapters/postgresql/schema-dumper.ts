@@ -32,7 +32,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
       if (column.isEnum) spec["enum_type"] = JSON.stringify(column.sqlType);
       // Rails dumps the symbol `type: :bigserial`; the TS DSL takes a string
       // ColumnType, so emit `type: "bigserial"` (consumed verbatim by
-      // formatColspecRaw on the U3 columnSpec path).
+      // formatColspec on the U3 columnSpec path).
       return { type: JSON.stringify(this.schemaType(column)), ...spec };
     }
 

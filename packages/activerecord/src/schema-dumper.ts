@@ -978,12 +978,12 @@ export class SchemaDumper {
    * stray `undefined`/`null` value would render literally.
    * @internal
    */
-  formatColspecRaw(colspec: Record<string, unknown>): string {
+  formatColspec(colspec: Record<string, unknown>): string {
     return Object.entries(colspec)
       .map(([k, v]) => {
         const value =
           v && typeof v === "object" && !Array.isArray(v)
-            ? `{ ${this.formatColspecRaw(v as Record<string, unknown>)} }`
+            ? `{ ${this.formatColspec(v as Record<string, unknown>)} }`
             : String(v);
         return `${k}: ${value}`;
       })

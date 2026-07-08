@@ -96,14 +96,14 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
     const spec: Record<string, unknown> = {};
     if (!this.isDefaultPrimaryKey(column)) {
-      // Pre-format the id value as a TS-DSL string literal for formatColspecRaw.
+      // Pre-format the id value as a TS-DSL string literal for formatColspec.
       spec["id"] = JSON.stringify(this.schemaType(column));
     }
     const colOpts = this.prepareColumnOptions(column);
     delete colOpts["null"];
     Object.assign(spec, colOpts);
     if (this.isExplicitPrimaryKeyDefault(column)) {
-      // "null" (not Ruby "nil") — emitted verbatim by formatColspecRaw as `default: null`.
+      // "null" (not Ruby "nil") — emitted verbatim by formatColspec as `default: null`.
       spec["default"] ??= "null";
     }
     return spec;
@@ -181,7 +181,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   protected schemaPrecision(column: Column): string | undefined {
     if (column.type === "datetime") {
       // TS-DSL literal `null` (Rails dumps the Ruby `nil`); the value is emitted
-      // verbatim by formatColspecRaw, so it must already read as valid TS.
+      // verbatim by formatColspec, so it must already read as valid TS.
       if (column.precision == null) return "null";
       if (column.precision === BaseSchemaDumper.DEFAULT_DATETIME_PRECISION) return undefined;
       return String(column.precision);
@@ -228,7 +228,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaExpression(column: Column): string | undefined {
     // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
-    // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
+    // by formatColspec and consumed by the DSL as `default: () => "fn()"`.
     if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
     return undefined;
   }
@@ -265,7 +265,7 @@ export class SchemaDumper extends BaseSchemaDumper {
     const singlePkName = !hasCompositePk && pkColumn ? pkColumn.name : undefined;
     const stripped = this.removePrefixAndSuffix(tableName);
 
-    // All values in tableOpts are pre-formatted TS-DSL text for formatColspecRaw.
+    // All values in tableOpts are pre-formatted TS-DSL text for formatColspec.
     const tableOpts: Record<string, unknown> = {};
     if (hasCompositePk) {
       // Rails (Array case) emits only `primary_key: [...]`; the TS DSL also needs
@@ -303,14 +303,14 @@ export class SchemaDumper extends BaseSchemaDumper {
     tableOpts["force"] = '"cascade"';
 
     lines.push(
-      `  await ctx.createTable(${JSON.stringify(stripped)}, { ${this.formatColspecRaw(tableOpts)} }, (t) => {`,
+      `  await ctx.createTable(${JSON.stringify(stripped)}, { ${this.formatColspec(tableOpts)} }, (t) => {`,
     );
 
     for (const col of columns) {
       if (col.name === singlePkName) continue;
 
       const [dslType, spec] = this.columnSpec(col);
-      const optStr = Object.keys(spec).length > 0 ? `, { ${this.formatColspecRaw(spec)} }` : "";
+      const optStr = Object.keys(spec).length > 0 ? `, { ${this.formatColspec(spec)} }` : "";
       const typeName = String(dslType);
 
       if (this._isDslHelper(typeName)) {

@@ -1,6 +1,6 @@
 // Trails-only SchemaDumper cases with no 1:1 in Rails'
 // schema_dumper_test.rb. These unit-test trails-invented exported helpers
-// (formatColspecRaw / indexParts), the adapter-introspection dump path
+// (formatColspec / indexParts), the adapter-introspection dump path
 // (SchemaDumperAdapterTest), async header ordering, and DSL-helper
 // round-trips. Kept out of the Rails-mirrored schema-dumper.test.ts so
 // test:compare maps cleanly.
@@ -397,7 +397,7 @@ describe("SchemaDumper async header ordering", () => {
   });
 });
 
-describe("formatColspecRaw", () => {
+describe("formatColspec", () => {
   const dumper = SchemaDumper.create({
     tables: () => [],
     columns: () => [],
@@ -406,7 +406,7 @@ describe("formatColspecRaw", () => {
 
   it("emits values verbatim (Rails format_colspec), not re-quoted", () => {
     expect(
-      dumper.formatColspecRaw({
+      dumper.formatColspec({
         null: "false",
         limit: "255",
         precision: "null",
@@ -418,7 +418,7 @@ describe("formatColspecRaw", () => {
 
   it("recurses into nested objects (primary-key `id: { type:, … }` spec)", () => {
     expect(
-      dumper.formatColspecRaw({ id: { type: '"uuid"', default: "null" }, force: '"cascade"' }),
+      dumper.formatColspec({ id: { type: '"uuid"', default: "null" }, force: '"cascade"' }),
     ).toBe('id: { type: "uuid", default: null }, force: "cascade"');
   });
 });
