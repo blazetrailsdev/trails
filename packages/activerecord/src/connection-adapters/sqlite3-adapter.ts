@@ -5,7 +5,7 @@ import type {
   SqliteOpenConfig,
   SqliteStatement,
 } from "../sqlite-adapter.js";
-import { Nodes, Visitors } from "@blazetrails/arel";
+import { Visitors } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./abstract-adapter.js";
 import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
@@ -178,44 +178,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   get schemaCreation(): SQLite3SchemaCreation {
     return (this._sqlite3SchemaCreation ??= new SQLite3SchemaCreation("sqlite", this));
-  }
-
-  /**
-   * Mirrors: AbstractAdapter#case_insensitive_comparison
-   * (abstract_adapter.rb:814) — look up the column and only wrap both sides in
-   * `LOWER()` when `can_perform_case_insensitive_comparison_for?` is true,
-   * otherwise fall back to plain equality.
-   *
-   * Rails' SQLite3Adapter inherits the abstract `can_perform...? => true`, so on
-   * MRI a `LOWER(int_col) = LOWER(?)` comparison still matches: the sqlite3 gem
-   * binds a Ruby Integer as SQLITE_INTEGER, and `LOWER(1)` yields the text `'1'`
-   * on both sides. Our better-sqlite3 driver binds a JS number as SQLITE_FLOAT,
-   * so `LOWER(?)` yields `'1.0'` and never matches `LOWER(int_col)` = `'1'` —
-   * silently missing integer scope/attribute collisions
-   * (uniqueness_validation_test.rb `test_validate_case_insensitive_uniqueness`,
-   * `:parent_id`). Restricting the `LOWER()` form to text columns converges the
-   * behavior with Rails without touching the driver's numeric binding.
-   * @internal
-   */
-  override async caseInsensitiveComparison(
-    attribute: Nodes.Attribute,
-    value: unknown,
-  ): Promise<Nodes.Node> {
-    const column = await this.columnForAttribute(attribute);
-    if (column && this.canPerformCaseInsensitiveComparisonFor(column)) {
-      return attribute.lower().eq((attribute.relation as any).lower(value));
-    }
-    return attribute.eq(value);
-  }
-
-  /**
-   * Only text columns can be meaningfully lowercased; non-text columns (integer,
-   * float, date, …) fall back to plain equality. See caseInsensitiveComparison
-   * for why this diverges structurally from Rails' unconditional `true`.
-   * @internal
-   */
-  override canPerformCaseInsensitiveComparisonFor(column: { type?: string | null }): boolean {
-    return column.type === "string" || column.type === "text";
   }
 
   /** @internal */

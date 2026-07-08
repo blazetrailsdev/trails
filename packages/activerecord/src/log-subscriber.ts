@@ -26,11 +26,28 @@ function byteLength(value: unknown): number {
 }
 
 /**
- * JSON.stringify that handles bigint values (converts to string)
- * so logging never throws on valid bind values.
+ * JSON.stringify that handles bigint values so logging never throws on valid
+ * bind values. Integer binds now type-cast to BigInt (SQLite binds them as
+ * SQLITE_INTEGER), and Rails renders a bound Integer bare — `[["id", 10]]` —
+ * so we emit the exact decimal digits unquoted rather than JSON's quoted
+ * `"10"` (Rails renders binds via `binds.inspect`, log_subscriber.rb:65-78).
+ *
+ * We wrap each bigint's digits in a marker, then strip the marker plus its
+ * surrounding quotes. The marker is plain ASCII (JSON never escapes it, so it
+ * appears identically in the output) and is extended until it is provably
+ * absent from a probe serialization of the same data — so the unwrap only ever
+ * matches our own sentinels and can never corrupt a string bind that resembles
+ * the marker. (A fixed sentinel is reproducible by user data; this one is not.)
  */
 function safeJsonStringify(value: unknown): string {
-  return JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+  const probe = JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+  let marker = "@bigint@";
+  while (probe.includes(marker)) marker += "@";
+  const wrapped = JSON.stringify(value, (_key, v) =>
+    typeof v === "bigint" ? `${marker}${v.toString()}${marker}` : v,
+  );
+  const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return wrapped.replace(new RegExp(`"${escaped}(-?\\d+)${escaped}"`, "g"), "$1");
 }
 
 let _baseResolver: (() => any) | null = null;

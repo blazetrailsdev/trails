@@ -168,8 +168,34 @@ export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: 
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === null || value === undefined) return null;
-  if (typeof value === "boolean") return value ? unquotedTrue() : unquotedFalse();
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  // Rails routes booleans through `type_cast` to `unquoted_true` /
+  // `unquoted_false`, which SQLite defines as the Ruby Integers `1` / `0`
+  // (sqlite3/quoting.rb) — so they bind as SQLITE_INTEGER just like any other
+  // integer. Return BigInt so better-sqlite3 binds INTEGER rather than FLOAT;
+  // otherwise `LOWER(?)` on a boolean bind would serialize `1.0` / `0.0` and a
+  // `case_sensitive: false` uniqueness check on a boolean column would miss
+  // collisions (the same divergence the integer branch below fixes).
+  if (typeof value === "boolean") return BigInt(value ? unquotedTrue() : unquotedFalse());
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    // better-sqlite3 binds every JS number as SQLITE_FLOAT (there is no
+    // integer/float distinction in JS), so an integer-valued number like `1`
+    // binds as `real` and `LOWER(?)` yields `'1.0'`. MRI's sqlite3 gem binds a
+    // Ruby Integer as SQLITE_INTEGER, so `LOWER(1)` yields `'1'`. Handing the
+    // driver a BigInt makes it bind SQLITE_INTEGER, converging the text-forcing
+    // (e.g. `LOWER(col) = LOWER(?)`) path with Rails. Non-integer numbers keep
+    // binding as float.
+    //
+    // Fidelity boundary: MRI keys the INTEGER/FLOAT choice off the Ruby object
+    // class (Integer vs Float) set by the type-cast layer, whereas here both
+    // arrive as an indistinguishable JS number, so we key off the value. A
+    // whole-valued Float (e.g. a `2.0` from a float/decimal column) therefore
+    // binds as INTEGER rather than FLOAT — observable only through a
+    // text-forcing function (`LOWER(2.0)` → `'2'` not `'2.0'`), which is not a
+    // path AR generates for numeric columns; numeric comparisons coerce and are
+    // unaffected.
+    return Number.isInteger(value) ? BigInt(value) : value;
+  }
   if (typeof value === "string" || typeof value === "bigint") return value;
   // Rails SQLite3::Quoting#_type_cast: `when BigDecimal then value.to_f` — a
   // float, NOT the abstract adapter's `value.to_s("F")` string. (quote() still
