@@ -448,4 +448,36 @@ describe("SchemaStatements mixed into AbstractAdapter", () => {
     expect(cols).toEqual(["author_id", "editor_id"]);
     await adapter.dropTable("articles", "authors");
   });
+
+  it("addForeignKey with ifNotExists is a no-op when a composite FK already exists", async () => {
+    // The composite `column: [...]` must match the existing FK by value, not by
+    // array identity. foreignKeys() reports composite columns as arrays (Rails
+    // parity), and the ifNotExists guard routes through foreignKeyExists ->
+    // isDefinedFor for an element-wise compare.
+    adapter = new BetterSQLite3Adapter(":memory:");
+    await adapter.createTable("rockets", { primaryKey: ["tenant_id", "id"] }, (t) => {
+      t.integer("tenant_id");
+      t.integer("id");
+    });
+    await adapter.createTable("astronauts", (t) => {
+      t.integer("rocket_id");
+      t.integer("rocket_tenant_id");
+    });
+    await adapter.addForeignKey("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+    });
+    expect((await adapter.foreignKeys("astronauts"))[0].column).toEqual([
+      "rocket_tenant_id",
+      "rocket_id",
+    ]);
+    const before = (await adapter.foreignKeys("astronauts")).length;
+    await adapter.addForeignKey("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+      ifNotExists: true,
+    });
+    expect((await adapter.foreignKeys("astronauts")).length).toBe(before);
+    await adapter.dropTable("astronauts", "rockets");
+  });
 });

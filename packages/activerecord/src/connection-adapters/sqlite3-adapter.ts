@@ -1762,13 +1762,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       const toTable = first.table as string;
       const onDelete = this._extractFkAction(first.on_delete as string);
       const onUpdate = this._extractFkAction(first.on_update as string);
-      const column =
-        group.length === 1 ? (first.from as string) : group.map((r) => r.from as string).join(",");
-      const primaryKey =
-        group.length === 1 ? (first.to as string) : group.map((r) => r.to as string).join(",");
-      const nameKey = column.replace(/,/g, "_");
-      const name = namesByColumn.get(column) ?? `fk_${bare}_${nameKey}`;
-      const deferrable = deferrableByKey.get(`${toTable},${column},${primaryKey}`);
+      // Rails returns composite column/primary_key as arrays and a bare string
+      // for single-column FKs (sqlite3_adapter.rb#foreign_keys). The name and
+      // deferrable maps are still keyed on the comma-joined column list.
+      const fromCols = group.map((r) => r.from as string);
+      const toCols = group.map((r) => r.to as string);
+      const column = fromCols.length === 1 ? fromCols[0] : fromCols;
+      const primaryKey = toCols.length === 1 ? toCols[0] : toCols;
+      const columnKey = fromCols.join(",");
+      const primaryKeyKey = toCols.join(",");
+      const nameKey = columnKey.replace(/,/g, "_");
+      const name = namesByColumn.get(columnKey) ?? `fk_${bare}_${nameKey}`;
+      const deferrable = deferrableByKey.get(`${toTable},${columnKey},${primaryKeyKey}`);
       results.push(
         // Rails' SQLite foreign_keys options hash carries on_delete/on_update/
         // deferrable/column/primary_key but no :name (we synthesize one for the
@@ -2155,13 +2160,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     options: AddForeignKeyOptions = {},
   ): Promise<void> {
     if (options.ifNotExists === true) {
-      const fks = await this.foreignKeys(fromTable);
-      if (
-        fks.some(
-          (fk) =>
-            fk.toTable === toTable && (options.column == null || fk.column === options.column),
-        )
-      ) {
+      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
+      // compares `column` element-wise, so composite (array) columns match by
+      // value rather than by array identity (a bare `===` is always false for
+      // distinct array instances). Mirrors the abstract addForeignKey guard.
+      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
         return;
       }
     }
