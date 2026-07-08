@@ -88,9 +88,11 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     // because `_resolveNestedTableNames` now resolves it two levels deep, the
     // predicate qualifying it rides the through query's WHERE too (without the
     // recursive resolution it would be deferred to the source-preloader stage).
-    expect(sql).toMatch(/JOIN "categories"/);
-    expect(sql).toMatch(/JOIN "categorizations"/);
-    expect(sql).toMatch(/WHERE.*"categorizations"\."author_id"/);
+    // Identifier quoting is adapter-specific (`"x"` on SQLite/PG, `` `x` `` on
+    // MariaDB), so match the bare table/column names.
+    expect(sql).toMatch(/JOIN .categories./);
+    expect(sql).toMatch(/JOIN .categorizations./);
+    expect(sql).toMatch(/WHERE.*categorizations.\..author_id/);
   });
 
   type AssocHost = {
