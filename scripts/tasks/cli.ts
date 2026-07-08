@@ -1039,10 +1039,18 @@ export function commitAndPush(opts: {
       // commit whose tree equals its parent — the mutation's file is silently
       // gone, but the message still lands on main. Verify the commit actually
       // carries changes before pushing; if not, drop it and retry the mutation.
-      const committed = git(["diff-tree", "--no-commit-id", "--name-only", "-r", "HEAD"], {
-        silent: true,
-        cwd,
-      });
+      // `--root` keeps a parentless first commit (fresh repo) from reading as
+      // empty; a probe failure fails OPEN (push as before) — the guard must
+      // never be more dangerous than the race it guards against.
+      let committed = "unverified";
+      try {
+        committed = git(["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", "HEAD"], {
+          silent: true,
+          cwd,
+        });
+      } catch {
+        /* probe failed — assume the commit is fine and let the push proceed */
+      }
       if (committed === "") {
         git(["reset", "--hard", "origin/main"], { silent: true, cwd });
         if (attempt === 1) {

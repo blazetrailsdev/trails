@@ -1035,7 +1035,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : sub;
       seen.push(label);
       // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
+      // commit is never empty in these flows, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
@@ -1128,6 +1128,32 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen.filter((l) => l === "reset").length).toBe(2);
   });
 
+  it("fails open when the diff-tree probe itself errors: the push still runs", () => {
+    const { seen, exit } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      // Includes --root so a parentless first commit can't read as empty.
+      if (label === "diff-tree") {
+        expect(args).toContain("--root");
+        throw new Error("fatal: bad revision");
+      }
+      return "" as never;
+    });
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => {},
+      raceMessage: "should not be reached",
+      raceExitCode: 3,
+    });
+    // The guard must never block a push it cannot evaluate.
+    expect(exit).not.toHaveBeenCalled();
+    expect(seen.filter((l) => l === "push").length).toBe(1);
+    expect(seen).not.toContain("reset");
+  });
+
   // The tasks repo's .husky/post-commit hook background-pushes main after
   // every commit, racing commitAndPush's own explicit push (and capable of
   // shipping an empty clobbered commit before the guard above can reset it).
@@ -1165,8 +1191,6 @@ describe("commitAndPush (git mutation flow)", () => {
       if (label === "symbolic-ref") return "main" as never;
       if (label === "add") addArg = args?.[3] ?? "";
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
@@ -1266,8 +1290,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       if (label === "clean") worktree.delete(args[args.length - 1]);
       return "" as never;
@@ -1335,8 +1357,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       if (label === "push" && push++ === 0) {
         throw pushError("! [rejected]        main -> main (non-fast-forward)");
@@ -1386,8 +1406,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       if (label === "push") throw pushError("! [rejected] non-fast-forward");
       return "" as never;
@@ -1422,8 +1440,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       if (label === "push") {
         // The background post-commit push already won the race and put our
@@ -1461,8 +1477,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       if (label === "push") {
         throw pushError("fatal: Authentication failed for 'https://...'");
@@ -1533,8 +1547,6 @@ describe("commitAndPush (git mutation flow)", () => {
         return "" as never;
       }
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
@@ -1573,8 +1585,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "rfc-some-feature" as never;
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
@@ -1613,8 +1623,6 @@ describe("commitAndPush (git mutation flow)", () => {
       // git() helper surfaces that as a throw, which the guard must swallow.
       if (label === "symbolic-ref") throw new Error("fatal: ref HEAD is not a symbolic ref");
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
@@ -1644,8 +1652,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "rev-list") return "2" as never; // HEAD is 2 commits ahead
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
@@ -1677,8 +1683,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "fetch") throw new Error("fatal: unable to access origin");
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
@@ -1705,8 +1709,6 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       if (label === "status") return " M rfcs/0001/stories/foo.md" as never;
       return "" as never;
@@ -1742,8 +1744,6 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       // index.md changed both staged (`M  ...`) and unstaged (` M ...`).
       if (label === "status") return "M  index.md\n M index.md" as never;
@@ -1772,8 +1772,6 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       if (label === "pull") {
         const e = new Error("Command failed") as Error & { stderr?: string };
@@ -1813,8 +1811,6 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "rev-list") return "0" as never; // HEAD even with origin/main
       seen.push(label);
-      // The empty-commit guard diff-trees HEAD after every commit; a real
-      // commit is never empty here, so report a file.
       if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
