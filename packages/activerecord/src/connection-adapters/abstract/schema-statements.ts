@@ -613,13 +613,38 @@ export class SchemaStatements {
     return rows.length > 0;
   }
 
-  async columnExists(tableName: string, columnName: string): Promise<boolean> {
+  async columnExists(
+    tableName: string,
+    columnName: string,
+    type?: string | null,
+    options: {
+      limit?: unknown;
+      precision?: unknown;
+      scale?: unknown;
+      default?: unknown;
+      null?: unknown;
+      collation?: unknown;
+      comment?: unknown;
+    } = {},
+  ): Promise<boolean> {
     // Rails' column_exists? loads the table's columns and matches the name in
-    // Ruby (schema_statements.rb), never interpolating the column name into SQL —
-    // so an arbitrary value (quotes/operators) simply matches nothing. The
-    // schema.table qualification is honored by columns() below.
+    // Ruby (schema_statements.rb:132-141), never interpolating the column name
+    // into SQL — so an arbitrary value (quotes/operators) simply matches
+    // nothing. The schema.table qualification is honored by columns() below.
+    // An optional `type` plus any of the `columnOptionsKeys`
+    // (limit/precision/scale/default/null/collation/comment) narrow the match,
+    // each ANDed like Rails' `checks.all?`.
     const cols = await this.columns(tableName);
-    return cols.some((c) => c.name === columnName);
+    const optionKeys = this.columnOptionsKeys() as Array<keyof typeof options>;
+    return cols.some((c) => {
+      if (c.name !== columnName) return false;
+      if (type != null && (c as { type?: unknown }).type !== type) return false;
+      for (const key of optionKeys) {
+        if (key in options && (c as unknown as Record<string, unknown>)[key] !== options[key])
+          return false;
+      }
+      return true;
+    });
   }
 
   async changeColumnDefault(

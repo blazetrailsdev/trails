@@ -116,6 +116,21 @@ describe("MigrationTest", () => {
     expect(ddlColumns[0]).toBe("lower(email)");
   });
 
+  it("columnExists forwards type and columnOptionsKeys to the adapter", async () => {
+    // Regression: MigrationContext#columnExists is the live adapter-backed
+    // introspection path, so it must expose Rails' full
+    // `column_exists?(table, column, type = nil, **options)` surface and forward
+    // `type` + the columnOptionsKeys (schema_statements.rb:132-141) rather than
+    // matching on name alone. Ride the canonical `people` table
+    // (`first_name` string, null: false — schema.rb:933).
+    const ctx = new MigrationContext(Base.connection);
+    expect(await ctx.columnExists("people", "first_name")).toBe(true);
+    expect(await ctx.columnExists("people", "first_name", "string")).toBe(true);
+    expect(await ctx.columnExists("people", "first_name", "integer")).toBe(false);
+    expect(await ctx.columnExists("people", "first_name", "string", { null: false })).toBe(true);
+    expect(await ctx.columnExists("people", "first_name", "string", { null: true })).toBe(false);
+  });
+
   it("dropTable delegates to the adapter drop_table, forwarding options", async () => {
     // Regression: MigrationContext#dropTable routes through `this.connection`
     // (the adapter's own drop_table) rather than a bare SchemaStatements

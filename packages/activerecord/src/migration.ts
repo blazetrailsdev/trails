@@ -75,6 +75,21 @@ function _extractNewCommentValue(
 
 // Registry for AR config injected by Base — breaks the migration ↔ base import cycle.
 /** @internal */
+/**
+ * The `columnOptionsKeys` (limit/precision/scale/default/null/collation/comment)
+ * that Rails' `column_exists?(table, column, type = nil, **options)` matches
+ * against, in addition to the name and optional `type`.
+ */
+export interface ColumnExistsOptions {
+  limit?: unknown;
+  precision?: unknown;
+  scale?: unknown;
+  default?: unknown;
+  null?: unknown;
+  collation?: unknown;
+  comment?: unknown;
+}
+
 export interface MigrationArConfig {
   tableNamePrefix: string;
   tableNameSuffix: string;
@@ -564,8 +579,13 @@ export abstract class Migration {
     return this.schema.tableExists(this._pt(tableName));
   }
 
-  async columnExists(tableName: string, columnName: string): Promise<boolean> {
-    return this.schema.columnExists(this._pt(tableName), columnName);
+  async columnExists(
+    tableName: string,
+    columnName: string,
+    type?: string | null,
+    options?: ColumnExistsOptions,
+  ): Promise<boolean> {
+    return this.schema.columnExists(this._pt(tableName), columnName, type, options);
   }
 
   async changeColumnDefault(
@@ -1659,9 +1679,11 @@ export class MigrationContext {
         ifExists: true,
       });
     }
-    if (options?.ifNotExists && (await this.tableExists(name))) {
-      return;
-    }
+    // Rails' create_table does not short-circuit in Ruby when the table exists:
+    // it threads `if_not_exists` into the definition so schema_creation emits
+    // `CREATE TABLE IF NOT EXISTS` (a no-op at the DB when present) and still
+    // iterates `td.indexes` with `if_not_exists: td.if_not_exists`
+    // (schema_statements.rb#create_table).
     const tdOpts = {
       id: options?.as != null ? false : options?.id,
       primaryKey: options?.primaryKey,
@@ -1671,6 +1693,7 @@ export class MigrationContext {
       charset: options?.charset,
       collation: options?.collation,
       as: options?.as,
+      ifNotExists: options?.ifNotExists,
     };
     const td =
       this.connection.createTableDefinition?.(name, tdOpts) ??
@@ -1733,7 +1756,10 @@ export class MigrationContext {
         using: idx.using,
         nullsNotDistinct: idx.nullsNotDistinct,
         include: idx.include,
-        ifNotExists: idx.ifNotExists,
+        // Rails forces the table-level `if_not_exists` onto each block index
+        // (`add_index(..., if_not_exists: td.if_not_exists)`), so an existing
+        // table's indexes are re-added idempotently rather than raising.
+        ifNotExists: options?.ifNotExists ?? idx.ifNotExists,
         comment: idx.comment,
       });
     }
@@ -1939,8 +1965,16 @@ export class MigrationContext {
     return this.connection.tableExists(name);
   }
 
-  async columnExists(table: string, column: string): Promise<boolean> {
-    return this.connection.columnExists(table, column);
+  async columnExists(
+    table: string,
+    column: string,
+    // Rails' `column_exists?(table, column, type = nil, **options)` narrows the
+    // match by column `type` and the `columnOptionsKeys`
+    // (limit/precision/scale/default/null/collation/comment) when given.
+    type?: string | null,
+    options?: ColumnExistsOptions,
+  ): Promise<boolean> {
+    return this.connection.columnExists(table, column, type, options);
   }
 
   async indexExists(
