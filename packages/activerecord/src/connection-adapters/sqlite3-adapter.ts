@@ -1164,54 +1164,29 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * `newColumnFromField` (the Rails `new_column_from_field` flow) so `columns()`
    * and the schema-statements column path share one type-reflection routine.
    *
-   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#fetch_type_metadata.
-   * Rails carries the full `sql_type` string and lets `lookup_cast_type`'s regex
-   * registrations parse precision/limit. trails' SQLite type map extracts both the
-   * limit (`register_class_with_limit`) and temporal/decimal precision
-   * (`register_class_with_precision`) at lookup time, so we keep the full `sql_type`
-   * in `sqlType` and read the scalar hints off the cast type.
+   * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#fetch_type_metadata
+   * (schema_statements.rb:1717) — resolve the cast type from the whole `sql_type`
+   * and carry `type`/`limit`/`precision`/`scale` straight off it, holding the full
+   * `sql_type` verbatim. trails' SQLite type map recovers the scalar hints off the
+   * cast type at lookup time: limits via `register_class_with_limit`, temporal/
+   * decimal precision via `register_class_with_precision`, and the 8-byte INTEGER
+   * default on `SQLite3IntegerType#_limit` (private) so the public `limit` stays
+   * nil for bare integers — dumps stay bare and `c_int_1..8` keep their 1..8.
+   *
+   * `type` comes straight from `cast_type.type` (no base-name fallback). For an
+   * unmapped `sql_type` the map returns a `ValueType`; Rails' `Value#type` is nil,
+   * whereas trails' `ValueType#type()` is `"value"` — that residual gap is the
+   * ValueType-nil-fidelity follow-up, not something to paper over here.
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";
-    // Single-arg `(N)` only — limit. Multi-arg types (`decimal(10,2)`)
-    // deliberately don't match: `baseSqlType` keeps the parens and resolves via
-    // `lookupCastType`'s `/decimal|numeric/i` regex registration (→ type
-    // "decimal"). So the DSL type still resolves; only the scalar limit
-    // hints are scoped to single-arg forms.
-    const paramMatch = /\((\d+)\)/.exec(raw);
-    let precision: number | null = null;
-    let limit = paramMatch ? parseInt(paramMatch[1], 10) : null;
-    let scale: number | null = null;
-    const baseSqlType = paramMatch ? raw.slice(0, raw.indexOf("(")).trimEnd() : raw;
-    // Rails' fetch_type_metadata resolves the cast type from the whole sql_type;
-    // do the same so regex registrations parse precision/scale off the full string.
     const castType = this.lookupCastType(raw);
-    const dslTypeName = castType.type() !== "value" ? castType.type() : baseSqlType.toLowerCase();
-    // Temporal (precision, via register_class_with_precision) and decimal
-    // (precision/scale) types carry their `(N[,M])` parameter on the cast type at
-    // lookup time — the single-arg `paramMatch` limit above mis-reads it (e.g.
-    // `DECIMAL(55)` as limit 55, dropping the parens from `baseSqlType`). For these,
-    // read the parameter off the cast type and hold the full sql_type in `sqlType`,
-    // matching Rails' fetch_type_metadata which carries the whole string.
-    if (
-      dslTypeName === "datetime" ||
-      dslTypeName === "time" ||
-      dslTypeName === "date" ||
-      dslTypeName === "decimal"
-    ) {
-      precision = castType.precision ?? null;
-      scale = castType.scale ?? null;
-      limit = null;
-    }
-    // Carry the full `sql_type` (with `(N)`) so limit-bearing type-map factories
-    // (`char`/`binary`/`text`/`int`/`float`) recover the limit via `extractLimit`
-    // at lookup time — Rails' `register_class_with_limit` mechanism.
     return new SqlTypeMetadata({
       sqlType: raw,
-      type: dslTypeName,
-      limit,
-      precision,
-      scale,
+      type: castType.type(),
+      limit: castType.limit ?? null,
+      precision: castType.precision ?? null,
+      scale: castType.scale ?? null,
     });
   }
 
@@ -3035,7 +3010,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /** @internal */
   static override initializeTypeMap(m: TypeMap): void {
-    const sqlite3Int = (limit?: number) => new IntegerType({ limit: limit ?? 8 });
+    const sqlite3Int = (limit?: number) => new SQLite3IntegerType({ limit });
     m.registerType("string", new StringType());
     m.registerType("text", new TextType());
     m.registerType("integer", sqlite3Int());
@@ -3077,14 +3052,32 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // `sql_type` supplies none, and `blob`/`clob` are aliases to
     // `binary`/`text` (abstract_adapter.rb:899-900).
     m.registerType(/int/i, undefined, (k) => sqlite3Int(this.extractLimit(k)));
-    // Explicit "bigint" registered after /int/i so it takes priority on exact matches.
-    m.registerType("bigint", sqlite3Int(8));
+    // Explicit "bigint" registered after /int/i so it takes priority on exact
+    // matches. Like `/int/i`, it carries no explicit limit — the 8-byte default
+    // lives on `SQLite3IntegerType#_limit`, so the public `limit` stays nil and
+    // reflected `bigint` columns dump bare (Rails resolves "bigint" via the same
+    // `%r(int)i` → `SQLite3Integer` registration with a nil `limit`).
+    m.registerType("bigint", sqlite3Int());
     this.registerClassWithLimit(m, /char/i, StringType);
     this.registerClassWithLimit(m, /text/i, TextType);
     this.registerClassWithLimit(m, /binary/i, BinaryType);
     m.aliasType(/clob/i, "text");
     m.aliasType(/blob/i, "binary");
     this.registerClassWithLimit(m, /real|floa|doub/i, FloatType);
+  }
+}
+
+/**
+ * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter::SQLite3Integer
+ * (sqlite3_adapter.rb:486). The INTEGER storage class holds up to an 8-byte
+ * value, so range checks default to an 8-byte limit when the column's sql_type
+ * supplies none. Rails overrides only the private `_limit` (leaving the public
+ * `limit` reader nil), so `fetch_type_metadata` reflects a nil `limit` and
+ * schema dumps stay bare for unlimited integers — mirror that split here.
+ */
+export class SQLite3IntegerType extends IntegerType {
+  protected override _limit(): number {
+    return this.limit ?? 8;
   }
 }
 

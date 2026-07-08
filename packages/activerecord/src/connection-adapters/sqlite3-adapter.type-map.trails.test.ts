@@ -52,8 +52,15 @@ describe("SQLite3Adapter type-map limit threading", () => {
   });
 
   it("defaults SQLite integers to an 8-byte limit when the sql_type carries none", () => {
-    expect(castType("integer").limit).toBe(8);
-    expect(castType("bigint").limit).toBe(8);
+    // Rails' SQLite3Integer overrides only the private `_limit` (→ 8), leaving
+    // the public `limit` reader nil so `fetch_type_metadata` reflects a bare
+    // `limit` and dumps stay bare. The 8-byte default still governs range: a
+    // value beyond a 4-byte int's max (2^31) but within 8 bytes is accepted.
+    for (const sqlType of ["integer", "bigint"] as const) {
+      const type = castType(sqlType);
+      expect(type.limit).toBeUndefined();
+      expect(() => type.serialize(2 ** 40)).not.toThrow();
+    }
   });
 
   it("resolves temporal types from the paren-stripped base and threads precision", () => {
