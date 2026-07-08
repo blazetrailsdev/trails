@@ -202,6 +202,48 @@ describe("MigrationTest", () => {
     expect(idx?.name).toBe("index_users_on_lower_email");
   });
 
+  it("dropTable delegates to the adapter drop_table, forwarding options", async () => {
+    // Regression: MigrationContext#dropTable routes through `this.connection`
+    // (the adapter's own drop_table) rather than a bare SchemaStatements
+    // instance, so the dialect overrides that emit `temporary:`/`force:
+    // "cascade"` (e.g. MySQL's `DROP TEMPORARY TABLE ... CASCADE`) are reached.
+    // The options object is forwarded verbatim; the in-memory bookkeeping is
+    // still pruned per table name.
+    const calls: unknown[][] = [];
+    const stub = {
+      dropTable: async (...args: unknown[]) => {
+        calls.push(args);
+      },
+    };
+    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    await ctx.dropTable("widgets");
+    await ctx.dropTable("a", "b", { ifExists: true, force: "cascade", temporary: true });
+    expect(calls).toEqual([
+      ["widgets"],
+      ["a", "b", { ifExists: true, force: "cascade", temporary: true }],
+    ]);
+  });
+
+  it("renameTable delegates to the adapter rename_table, applying prefix/suffix", async () => {
+    // Regression: MigrationContext#renameTable routes through `this.connection`
+    // (the adapter's own rename_table) so the dialect side effects — MySQL's
+    // `RENAME TABLE` + rename_table_indexes, PostgreSQL's PK sequence/index
+    // rename — are preserved, not the abstract `ALTER TABLE ... RENAME` fallback.
+    // MigrationContext still applies the tableNamePrefix/suffix the adapters do
+    // not.
+    const calls: [string, string][] = [];
+    const stub = {
+      renameTable: async (from: string, to: string) => {
+        calls.push([from, to]);
+      },
+    };
+    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    ctx.tableNamePrefix = "pre_";
+    ctx.tableNameSuffix = "_suf";
+    await ctx.renameTable("old", "new");
+    expect(calls).toEqual([["pre_old_suf", "pre_new_suf"]]);
+  });
+
   it("addIndex bookkeeping stores using per default_index_type?", async () => {
     // Regression: MigrationContext#addIndex records `using` into `_indexes` for
     // the schema dump. Rails stores `using` unconditionally (add_index_options);
