@@ -3965,7 +3965,7 @@ export class Base extends Model {
         const adapter = ConnectionHandling.threadedConnectionFor(ctor) ?? ctor.connection;
         const [deleteSql, deleteBinds] = adapter.toSqlAndBinds(dm);
         const affected = await adapter.execDelete(deleteSql, `${ctor.name} Destroy`, deleteBinds);
-        if (ctor.lockingEnabled && affected === 0) {
+        if (ctor.lockingEnabled && affected !== 1) {
           throw new StaleObjectError(this, "destroy");
         }
         didDelete = affected > 0;
