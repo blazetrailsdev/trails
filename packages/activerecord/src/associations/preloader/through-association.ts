@@ -571,6 +571,10 @@ export class ThroughAssociation extends Association {
         // `ActiveRecord::ConfigurationError` — real Rails raises on preload here,
         // it does not silently carry the raw join. Nesting it under the source
         // reflection name makes trails' join builder raise the same error.
+        // Read from the FLATTENED `reflection_scope` (`join_scopes.inject(&:merge!)`,
+        // preloader/association.rb:290): Rails nests the whole flattened
+        // `values[:joins]` — sub-chain raw joins included — so a raw join
+        // declared on a deeper link in a nested chain raises here too.
         const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
 
         // Rails `includes!(source_reflection.name => values[:includes])` (bare
@@ -638,6 +642,23 @@ export class ThroughAssociation extends Association {
         );
         if (throughPreds.length > 0) {
           scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...throughPreds]);
+        }
+
+        // A raw string / Arel-node join anywhere in the FLATTENED chain scope
+        // (`.joins("INNER JOIN …")`, held in `_joinValues`) raises
+        // `ConfigurationError` in Rails regardless of the collection/nested
+        // strategy — `through_scope` passes the whole flattened `values[:joins]`
+        // to `joins!(source_reflection.name => joins)` (rb:132-134) and
+        // `JoinDependency` rejects the bogus association name. This branch is
+        // already gated on the flattened `where_clause` being non-empty (the
+        // same `elsif !reflection_scope.where_clause.empty?` gate, rb:117), so
+        // matching Rails means raising here too — a raw join declared only on a
+        // deeper sub-chain link is NOT deferred to its own recursive stage
+        // (verified against a live Rails nested-through repro). Nest it under the
+        // source reflection name so trails' join builder raises identically.
+        const rawJoinValues: any[] = reflScope?._joinValues ?? [];
+        if (rawJoinValues.length > 0) {
+          scope = scope.joins({ [sourceRefl.name]: [...rawJoinValues] });
         }
       }
     }
