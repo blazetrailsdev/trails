@@ -631,4 +631,33 @@ export default defineConfig(
       "@typescript-eslint/no-unnecessary-type-assertion": "error",
     },
   },
+
+  // ── no-misused-promises: boolean-position guard (RFC 0063 async-validation) ──
+  // Before `isValid()`/`validate()` flip to returning `Promise<boolean>`, lint
+  // must catch a forgotten `await`: `if (record.isValid())` on an un-awaited
+  // Promise is always truthy and fails silently. `checksConditionals` (default
+  // on) makes a Promise used in a boolean position — condition, `!`, `&&`, `||`,
+  // ternary — a hard error, which is exactly the flip's footgun. Scoped to the
+  // two packages the flip touches (src + tests). The rule needs type info — the
+  // projectService block above supplies it.
+  //
+  // The other two sub-checks are turned OFF, each for cause:
+  //  - checksVoidReturn: 12 pre-existing sites pass an async callback / override
+  //    an adapter method typed to return void. Those are legitimate patterns
+  //    unrelated to the validation flip, and fixing them means runtime changes
+  //    this story forbids. Follow-up: lint-guard-misused-promises-void-return.
+  //  - checksSpreads: 1 pre-existing site (collection-proxy.test.ts) spreads a
+  //    Promise into an object. Same follow-up burden; off for now.
+  // A `no-floating-promises` companion (177 dropped-Promise sites, ~170 in
+  // tests) is deferred to its own burndown story — enabling it would require
+  // the runtime `await`/`void` edits this story forbids.
+  {
+    files: ["packages/activemodel/src/**/*.ts", "packages/activerecord/src/**/*.ts"],
+    rules: {
+      "@typescript-eslint/no-misused-promises": [
+        "error",
+        { checksConditionals: true, checksVoidReturn: false, checksSpreads: false },
+      ],
+    },
+  },
 );
