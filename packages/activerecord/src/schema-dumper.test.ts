@@ -536,7 +536,12 @@ describe("SchemaDumperTest", () => {
     });
     const output = await SchemaDumper.dumpTableSchema(Base.connection, "users");
     expect(output).toContain("idx_users_full_name");
-    expect(output).toContain("lower(first_name");
+    // Real introspection returns the backend's stored expression form — sqlite
+    // keeps `lower(first_name || ' ' || last_name)` verbatim, PostgreSQL
+    // normalizes it to `lower((((first_name)::text || ' '::text) || …))`. Assert
+    // the lowercased expression over both columns rather than a byte-exact form,
+    // and that the embedded space literal is still escaped in the dumped string.
+    expect(output).toMatch(/lower\(.*first_name.*last_name.*\).*idx_users_full_name/s);
   });
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql binary fields",
