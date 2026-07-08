@@ -1689,6 +1689,19 @@ export class ThroughReflection extends AbstractReflection {
     return [...sourceScopes, ...super.joinScopes(table, predicateBuilder, klass, record)];
   }
 
+  /**
+   * This through reflection's OWN join scope — the `super.join_scopes` term of
+   * `join_scopes` above, EXCLUDING the source sub-chain's scopes. `join_scopes`
+   * flattens the whole chain (`source_reflection.join_scopes + super`); the
+   * preloader needs the outer reflection's own scope alone to attribute a raw
+   * `.joins(...)` to the reflection that declares it, rather than to a deeper
+   * sub-chain reflection re-derived at its own recursive stage. Not a new Rails
+   * method — it is the `super` term made addressable.
+   */
+  ownJoinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+    return super.joinScopes(table, predicateBuilder, klass, record);
+  }
+
   collectJoinChain(): AbstractReflection[] {
     return this.collectJoinReflections([this]);
   }

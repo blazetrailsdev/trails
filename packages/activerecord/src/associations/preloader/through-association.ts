@@ -571,7 +571,10 @@ export class ThroughAssociation extends Association {
         // `ActiveRecord::ConfigurationError` — real Rails raises on preload here,
         // it does not silently carry the raw join. Nesting it under the source
         // reflection name makes trails' join builder raise the same error.
-        const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
+        // Read from the OUTER reflection's OWN scope, not the flattened chain
+        // scope: a nested-through sub-chain's raw join belongs to a deeper
+        // reflection and must NOT raise here (see `_ownReflectionScope`).
+        const nestedRawJoinValues: any[] = this._ownReflectionScope()?._joinValues ?? [];
 
         // Rails `includes!(source_reflection.name => values[:includes])` (bare
         // when the scope has no `.includes`) + `references!(...)` promotes to a
@@ -639,12 +642,59 @@ export class ThroughAssociation extends Association {
         if (throughPreds.length > 0) {
           scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...throughPreds]);
         }
+
+        // A raw string / Arel-node join the OUTER reflection's OWN scope carries
+        // (`.joins("INNER JOIN …")`) raises `ConfigurationError` in Rails
+        // regardless of collection/nested strategy — `through_scope` passes the
+        // whole `joins_values` to `joins!(source_reflection.name => joins)` and
+        // `JoinDependency` rejects the bogus association name. Nest it under the
+        // source reflection name so trails' join builder raises identically.
+        // Sourced from `_ownReflectionScope` (not the flattened chain scope), so
+        // a nested sub-chain's raw join is left to raise at its own recursive
+        // stage — not misattributed to this outer build.
+        const ownRawJoinValues: any[] = this._ownReflectionScope()?._joinValues ?? [];
+        if (ownRawJoinValues.length > 0) {
+          scope = scope.joins({ [sourceRefl.name]: [...ownRawJoinValues] });
+        }
       }
     }
 
     // cascade_strict_loading: a strict-loading preload scope propagates to the
     // through query so intermediate records inherit the constraint (rb:145).
     return this._cascadeStrictLoading(scope);
+  }
+
+  /**
+   * The OUTER reflection's own reflection scope — the merge of its own
+   * `join_scopes` (excluding the source sub-chain), where `_reflectionScope` is
+   * the FLATTENED chain scope (source sub-chain + own, merged by branch.ts).
+   * Used to attribute a raw `_joinValues` join to the reflection that declares
+   * it: for a nested through, a raw join carried only by the sub-chain must NOT
+   * raise at the outer through-scope build (it is deferred to the sub-chain's
+   * own recursive preload stage), while the outer reflection's own raw join
+   * still raises. Returns null when the outer reflection has no own scope, and
+   * falls back to the flattened `_reflectionScope` for a non-through reflection
+   * (a plain has_many/has_one-through's own scope IS the flattened scope, so the
+   * "join" branch is unchanged). Mirrors `super.join_scopes` in
+   * ThroughReflection#join_scopes.
+   * @internal
+   */
+  private _ownReflectionScope(): any {
+    const refl: any = this.reflection;
+    if (typeof refl.ownJoinScopes !== "function") return this._reflectionScope;
+    let klass: typeof Base;
+    try {
+      klass = this.klass;
+    } catch {
+      return this._reflectionScope;
+    }
+    const scopes = refl.ownJoinScopes(
+      (klass as any).arelTable,
+      (klass as any).predicateBuilder,
+      klass,
+    );
+    if (!scopes || scopes.length === 0) return null;
+    return scopes.reduce((acc: any, s: any) => acc.merge(s));
   }
 
   /** @internal */
