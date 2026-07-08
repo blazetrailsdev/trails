@@ -207,13 +207,15 @@ function keyToString(key: unknown): string {
 }
 
 /**
- * The final tag name for a key: {@link renameKey} applied to the stringified
- * key, optionally underscored first (ActiveModel's camelCase keys) so
- * `dasherize` has `_`/space separators to rewrite.
+ * The stringified key, underscored first when `underscoreKeys` is set
+ * (ActiveModel's camelCase keys) so a later `dasherize` has `_`/space
+ * separators to rewrite. The result is still passed through {@link renameKey}
+ * at each call site (kept a direct call there to mirror Rails' `to_tag`/
+ * `Hash#to_xml`/`Array#to_xml`, which each call `rename_key`).
  */
-function renameTag(key: unknown, options: ToTagOptions): string {
+function tagKey(key: unknown, options: ToTagOptions): string {
   const name = keyToString(key);
-  return renameKey(options.underscoreKeys ? underscore(name) : name, options);
+  return options.underscoreKeys ? underscore(name) : name;
 }
 
 /**
@@ -267,7 +269,7 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
   let typeName = explicitType ?? inferTypeName(value);
   if (typeName === "datetime") typeName = "dateTime";
 
-  const renamed = renameTag(key, options);
+  const renamed = renameKey(tagKey(key, options), options);
   const attributes: Record<string, string> = {};
   if (!(options.skipTypes || typeName == null)) attributes.type = typeName;
   if (value == null) attributes.nil = "true";
@@ -290,7 +292,7 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
  * at this level and not forwarded to the element tags.
  */
 function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void {
-  const root = renameTag(key, options);
+  const root = renameKey(tagKey(key, options), options);
   const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
   // Rails special-cases an empty array to `builder.tag!(root, attributes)` with
   // no block — the self-closing `<root type="array"/>` form.
@@ -314,7 +316,7 @@ function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void
  * `to_tag`, which renames the entry key.
  */
 function emitHash(key: unknown, hash: Record<string, unknown>, options: ToTagOptions): void {
-  const root = renameTag(key, options);
+  const root = renameKey(tagKey(key, options), options);
   const info = options.typeInfo;
   options.builder.openTag(root, {});
   for (const [k, v] of Object.entries(hash)) {
