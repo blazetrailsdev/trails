@@ -3288,8 +3288,7 @@ describe("syncWorktreeToOrigin (pre-read sync)", () => {
     }
     // No status probe, no fetch, and above all no reset --hard: the checkout
     // belongs to the lock holder until it finishes.
-    expect(seen).not.toContain("reset");
-    expect(seen).not.toContain("fetch");
+    expect(seen).toEqual([]);
     expect(err).toHaveBeenCalled();
     expect(String(err.mock.calls[0][0])).toMatch(/lock is busy/);
   });

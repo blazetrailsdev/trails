@@ -456,23 +456,25 @@ function syncFromOrigin(): void {
 // dying.
 export function syncWorktreeToOrigin(cwd?: string, lockWaitMs = 20_000): void {
   const lock = acquireTasksLock(cwd, { waitMs: lockWaitMs, onTimeout: "give-up" });
+  // A "busy" give-up means a live mutation is mid-flight in this checkout —
+  // touching it at all (even the status probe) belongs to the lock holder,
+  // and resetting is exactly the clobber the lock prevents. Skip entirely and
+  // serve the stale index. (A `null` lock — no resolvable git dir — falls
+  // through instead: the status probe below throws and returns silently,
+  // preserving the quiet non-repo behavior.)
+  if (lock === "busy") {
+    console.error(
+      `warning: tasks-CLI lock is busy; skipping the pre-read sync to origin/main. ` +
+        `The index may be stale.`,
+    );
+    return;
+  }
   try {
     let porcelain: string;
     try {
       porcelain = git(["status", "--porcelain"], { silent: true, cwd });
     } catch {
       return; // not a git repo / git unavailable — leave the checkout untouched
-    }
-    // A null lock after "give-up" means a live mutation is mid-flight in this
-    // checkout — resetting now is exactly the clobber this lock prevents. (The
-    // other null case, no resolvable git dir, can't reach here: the status
-    // probe above throws first.) Serve the stale index.
-    if (lock == null) {
-      console.error(
-        `warning: tasks-CLI lock is busy; skipping the pre-read sync to origin/main. ` +
-          `The index may be stale.`,
-      );
-      return;
     }
     const dirty = dirtyWorktreeLines(porcelain);
     if (dirty.length > 0) {
@@ -739,13 +741,15 @@ function installLockSignalHandlers(): void {
 // lock can never be released, so making a human/agent `rm` it was only busywork
 // (and a racy one: concurrent rm+retry can delete a freshly-taken live lock).
 // Only the wait timeout against a *live* holder still fails loudly — unless
-// the caller opts into `onTimeout: "give-up"`, which returns null instead so a
-// best-effort caller (the pre-read sync) can skip its critical section rather
-// than kill a read command with LOCK_TIMEOUT_EXIT.
+// the caller opts into `onTimeout: "give-up"`, which returns the distinct
+// sentinel "busy" so a best-effort caller (the pre-read sync) can skip its
+// critical section rather than kill a read command with LOCK_TIMEOUT_EXIT.
+// "busy" is deliberately not null: null means "nothing to lock against"
+// (proceed unlocked), while "busy" means a live holder owns the checkout.
 export function acquireTasksLock(
   cwd: string | undefined,
   opts: { waitMs?: number; pollMs?: number; onTimeout?: "exit" | "give-up" } = {},
-): LockHandle | null {
+): LockHandle | null | "busy" {
   const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
   let lockPath: string;
@@ -792,7 +796,7 @@ export function acquireTasksLock(
         continue;
       }
       if (waited >= waitMs) {
-        if (opts.onTimeout === "give-up") return null;
+        if (opts.onTimeout === "give-up") return "busy";
         console.error(
           `error: timed out after ${Math.round(waitMs / 1000)}s waiting for the tasks-CLI ` +
             `lock at ${lockPath}. Another mutation is holding it; retry shortly.`,
@@ -809,8 +813,8 @@ export function acquireTasksLock(
 // so the signal handlers don't try to re-release a handle we've let go. The
 // read-then-unlink is race-free because no waiter removes/recreates a lock it
 // didn't create (acquire only `wx`s onto a free path, or reclaims a dead one).
-export function releaseTasksLock(lock: LockHandle | null): void {
-  if (!lock) return;
+export function releaseTasksLock(lock: LockHandle | null | "busy"): void {
+  if (!lock || lock === "busy") return;
   activeLocks.delete(lock);
   try {
     if (readFileSync(lock.path, "utf8").trim() === lock.token) unlinkSync(lock.path);
