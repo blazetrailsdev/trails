@@ -95,6 +95,22 @@ describe("RelationTest", () => {
     expect(target.toSql()).toBe(merged.toSql());
   });
 
+  // No like-named Rails test: guards the merge/merge! Array dispatch
+  // (spawn_methods.rb:33-51). `merge` special-cases an Array as `records & other`
+  // (the receiver's records intersected by AR equality — async in trails, so a
+  // Promise of the intersection); `merge!` never treats an Array as a Hash and
+  // raises. A JS Array is `typeof "object"`, so this guards against it wrongly
+  // routing into HashMerger.
+  it("merge with an array returns the records intersection while mergeBang rejects it", async () => {
+    const a = await CanonPost.createBang({ title: "ary-a", body: "b" });
+    await CanonPost.createBang({ title: "ary-b", body: "b" });
+
+    const intersection = await (CanonPost.where({ title: ["ary-a", "ary-b"] }) as any).merge([a]);
+    expect(intersection.map((p: any) => Number(p.id))).toEqual([Number(a.id)]);
+
+    expect(() => (CanonPost.all() as any).mergeBang([a])).toThrow(/not an ActiveRecord::Relation/);
+  });
+
   // No like-named Rails test: guards Rails' `|=` union for the preload/includes/
   // eager_load merge folds (merger.rb / query_methods.rb) — a repeated spec across
   // a merge must dedup structurally, not accumulate duplicate specs the preloader
