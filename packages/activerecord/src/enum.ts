@@ -152,9 +152,21 @@ export function installEnumAttribute(
   // reflected column type (enum.rb:239-246); the decorator re-runs on every
   // _defaultAttributes replay, so once the schema is loaded `reflected` is the
   // column's real Type::Value and the EnumType delegates to it.
-  klass.decorateAttributes([attribute], (_name: string, reflected: Type) =>
-    enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues),
-  );
+  klass.decorateAttributes([attribute], (_name: string, reflected: Type) => {
+    // Rails raises inside the `decorate_attributes` block when an enum's name
+    // resolves through `attribute_aliases` to no declared type. trails resolves
+    // an `alias_attribute` target eagerly in `_enum` (attrName above): if the
+    // alias existed when `enum` ran, `attribute` is already the real column and
+    // this decorator seeds the backing column type. But when `enum` is declared
+    // BEFORE `alias_attribute` on the same name, the alias didn't exist yet, so
+    // `attribute` is the un-aliased name with no column of its own — a phantom
+    // that Rails rejects. The eager (class-definition-time) application of this
+    // decorator runs before `alias_attribute`, so the alias is absent and the
+    // guard is a no-op; only the deferred replay (first use, after both macros)
+    // sees the alias and raises — matching Rails' lazy timing.
+    assertEnumAliasDeclaredBefore(klass, attribute);
+    return enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues);
+  });
 
   // Define the getter after attribute() so the EnumType is already in
   // _attributeDefinitions / the pending-type queue when we overwrite whatever
@@ -502,12 +514,10 @@ export function _enum(
   // `alias_attribute` MUST precede `enum` (the order Rails' own suite uses).
   // Declaring `enum` first keys everything off the un-aliased name, which has no
   // column of its own; real Rails raises `Undeclared attribute type for enum` on
-  // first use (verified against vendored Rails). trails does NOT yet raise on
-  // this order — it silently registers a phantom attribute — because the raise
-  // must fire from the deferred decorator, which trails also applies eagerly at
-  // class-definition time (before the schema loads), so a naive check
-  // false-positives every column-backed enum. Converging to Rails' raise is
-  // tracked as a follow-up (see enum-before-alias-must-raise).
+  // first use (verified against vendored Rails). trails converges via
+  // `assertEnumAliasDeclaredBefore`, run from the enum decorator's deferred
+  // replay (not its eager class-definition-time application, which runs before
+  // `alias_attribute` and so never sees the alias) — matching Rails' lazy timing.
   const attrName =
     (this as unknown as { _attributeAliases?: Record<string, string> })._attributeAliases?.[
       attribute
@@ -935,11 +945,41 @@ export function assertEnumTypeDeclared(klass: typeof Base, name: string): void {
     host._enumsPendingTypeCheck!.delete(name);
     return;
   }
-  throw new Error(
+  throw undeclaredEnumTypeError(klass, name);
+}
+
+/** The Rails "Undeclared attribute type for enum" RuntimeError message. */
+function undeclaredEnumTypeError(klass: typeof Base, name: string): Error {
+  return new Error(
     `Undeclared attribute type for enum '${name}' in ${klass.name}. Enums must be` +
       " backed by a database column or declared with an explicit type" +
       " via `attribute`.",
   );
+}
+
+/**
+ * Raise when an enum was declared before the `alias_attribute` that would give
+ * its name a backing column — the anti-Rails order. Detected by the enum name
+ * being both a pending type-check target (no column/explicit type of its own at
+ * `enum` time) AND, now, a registered attribute alias: the alias was added after
+ * `enum`, so the enum keys a phantom attribute Rails rejects. Called from the
+ * enum decorator's deferred replay so the raise fires on first use, mirroring
+ * Rails raising inside its `decorate_attributes` block (enum.rb:240-245).
+ *
+ * @internal
+ */
+export function assertEnumAliasDeclaredBefore(klass: typeof Base, name: string): void {
+  const host = klass as unknown as {
+    _enumsPendingTypeCheck?: Set<string>;
+    _attributeAliases?: Record<string, string>;
+  };
+  if (!host._enumsPendingTypeCheck?.has(name)) return;
+  if (
+    !host._attributeAliases ||
+    !Object.prototype.hasOwnProperty.call(host._attributeAliases, name)
+  )
+    return;
+  throw undeclaredEnumTypeError(klass, name);
 }
 
 /**

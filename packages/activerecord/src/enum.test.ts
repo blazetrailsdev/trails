@@ -632,6 +632,25 @@ describe("EnumTest", () => {
     expect(record.aliased_status).toBe("proposed");
   });
 
+  // Real Rails raises "Undeclared attribute type for enum" when `enum` is
+  // declared BEFORE `alias_attribute` on the same name: the enum keys a phantom
+  // attribute with no backing column. The raise fires lazily, on first use.
+  // (No dedicated Rails test — Rails treats it as the undeclared-type case.)
+  it("enum declared before alias_attribute raises on first use", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("aliased_status", ["proposed", "written", "published"] as any);
+        this.aliasAttribute("aliased_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    await expect((Klass as any).create({ status: "written" })).rejects.toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+  });
+
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
     expect((book as any).isAuthorVisibilityInvisible()).toBe(false);
