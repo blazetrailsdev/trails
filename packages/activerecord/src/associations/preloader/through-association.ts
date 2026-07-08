@@ -206,11 +206,10 @@ export class ThroughAssociation extends Association {
     //     recursive preload stage, and carrying the flattened chain scope's
     //     joins/select here would duplicate the middle records.
     let sourceScope = null;
-    const sourceIsThrough = (sourceRefl as any)?.isThroughReflection?.() ?? false;
-    const sourceIsCollection = (sourceRefl as any)?.isCollection?.() ?? false;
-    if (!sourceIsThrough && this._reflectionScope != null) {
+    const strategy = this._throughScopeStrategy();
+    if (strategy !== "nested" && this._reflectionScope != null) {
       sourceScope = this._reflectionScope._clone();
-      if (!sourceIsCollection) {
+      if (strategy === "join") {
         sourceScope._whereClause = new WhereClause([]);
       } else {
         const throughTable = this._throughTableName();
@@ -387,6 +386,75 @@ export class ThroughAssociation extends Association {
   }
 
   /**
+   * How this preload realizes Rails' `through_scope` where-copy branch, given
+   * what trails' row-collecting preloader can do without Rails' PK-deduping
+   * eager JoinDependency:
+   *
+   *   - `"join"` — the source is a to-one, non-through association, so JOINing it
+   *     onto the through query can't fan the through rows out (a to-one join
+   *     adds no rows). This is Rails' single-query strategy: copy the full
+   *     where_clause and join the source. Nested scope joins/includes are
+   *     carried too, but a fan-out-prone one (reaching a to-many association) is
+   *     dropped for a collection target — see `_includeSpecFansOut`.
+   *   - `"twoStep"` — a collection source would be duplicated by the source join,
+   *     so keep the two-step: copy only the reflection scope's through-table
+   *     predicates here; source-table predicates, order, and scope includes ride
+   *     the recursive source stage.
+   *   - `"nested"` — the source is itself a through; its sub-chain re-derives its
+   *     own scope at its own recursive stage. Same through-query handling as
+   *     `"twoStep"`, but the source stage carries nothing.
+   * @internal
+   */
+  private _throughScopeStrategy(): "join" | "twoStep" | "nested" {
+    const sourceRefl = this._sourceReflection;
+    if (!sourceRefl) return "twoStep";
+    if ((sourceRefl as any).isThroughReflection?.()) return "nested";
+    const sourceIsCollection = (sourceRefl as any).isCollection?.() ?? false;
+    return sourceIsCollection ? "twoStep" : "join";
+  }
+
+  /**
+   * True when the include/join spec reaches an association that can multiply the
+   * through rows when JOINed. Only a `belongs_to` join is truly 1:1 (a foreign
+   * key referencing a unique primary key); a `has_one`/`has_many` join can return
+   * several rows when the row has multiple children — `has_one` is a Rails-level
+   * "keep the first", not a SQL uniqueness — so both are treated as fan-out.
+   * Rails tolerates the fan-out via its PK-deduping eager JoinDependency; trails'
+   * row-collecting preloader can't, so for a collection target a fan-out-prone
+   * nested include is dropped. Walks nested hash/array specs, resolving each key
+   * against the current klass; an unresolvable (e.g. polymorphic) association is
+   * treated as fan-out (conservative). A has_one target tolerates fan-out anyway
+   * since it keeps only the first row, so this gate is applied only for a
+   * collection target.
+   * @internal
+   */
+  private _includeSpecFansOut(klass: typeof Base, spec: any): boolean {
+    if (spec == null) return false;
+    if (Array.isArray(spec)) return spec.some((s) => this._includeSpecFansOut(klass, s));
+    const step = (name: string, child: any): boolean => {
+      let r: any;
+      try {
+        r = (klass as any)._reflectOnAssociation?.(name);
+      } catch {
+        return true;
+      }
+      if (!r) return true;
+      if (!(r.isBelongsTo?.() ?? false)) return true;
+      if (child == null) return false;
+      let nextKlass: typeof Base | undefined;
+      try {
+        nextKlass = r.klass;
+      } catch {
+        return true;
+      }
+      return nextKlass ? this._includeSpecFansOut(nextKlass, child) : true;
+    };
+    if (typeof spec === "string") return step(spec, null);
+    if (typeof spec === "object") return Object.keys(spec).some((key) => step(key, spec[key]));
+    return false;
+  }
+
+  /**
    * Build the through (intermediate) query's scope, mirroring Rails'
    * `Preloader::ThroughAssociation#through_scope`
    * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb:104-146).
@@ -444,21 +512,8 @@ export class ThroughAssociation extends Association {
       // where_clause onto the through query and JOIN the source reflection so
       // every referenced column resolves in this single query.
       const sourceRefl = this._sourceReflection;
-      // The single-query JOIN is only safe when the source reflection is a
-      // to-ONE, non-through association. A collection source (has_many) or a
-      // nested through source joined onto the through query fans the
-      // intermediate rows out across the source/sub-chain join tables,
-      // duplicating the middle records — Rails avoids that because its through
-      // query is an eager-load whose JoinDependency instantiates distinct
-      // parents by primary key, but trails' preloader collects raw rows. For
-      // those cases trails recurses per reflection stage (Rails'
-      // `source_preloaders`): the source/sub-chain predicates and order are
-      // applied at the source-preloader stage (see `_getSourcePreloaders`), and
-      // only the reflection scope's THROUGH-table predicates are copied here to
-      // constrain which intermediate rows this through query selects.
-      const sourceIsThrough = (sourceRefl as any)?.isThroughReflection?.() ?? false;
-      const sourceIsCollection = (sourceRefl as any)?.isCollection?.() ?? false;
-      if (sourceRefl && !sourceIsThrough && !sourceIsCollection) {
+      const strategy = this._throughScopeStrategy();
+      if (sourceRefl && strategy === "join") {
         scope._whereClause = new WhereClause([
           ...scope._whereClause.predicates,
           ...whereClause.predicates,
@@ -484,22 +539,29 @@ export class ThroughAssociation extends Association {
         // (`_includesAssociations`) the same way — nested under the source
         // reflection — so a has_one-through scope like
         // `includes(:category).where(categories: { … })` joins `categories` on
-        // this through query and the predicate resolves.
+        // this through query and the predicate resolves. `.left_joins(source =>
+        // nested)` (`_leftOuterJoinsValues`) is carried likewise.
         //
-        // BUT only when THIS reflection is to-one (has_one). Rails realizes the
-        // eager join as a JoinDependency that instantiates the through parent
-        // deduplicated by primary key, so a to-many nested include (e.g. the
-        // canonical `tag` source's own `includes(:tagging)`, where a tag has many
-        // taggings) doesn't inflate its result. trails' preloader collects raw
-        // rows instead: for a to-many nested include on a collection (has_many)
-        // through it would fan the middle records out and duplicate them, so
-        // there we fall back to the bare source join (the source condition still
-        // rides the copied where_clause). `.left_joins(source => nested)`
-        // (`_leftOuterJoinsValues`) is carried likewise.
+        // The one carve-out: for a COLLECTION target, a nested include that
+        // reaches a to-many association (e.g. the canonical `tag` source's own
+        // `includes(:tagging)`) is dropped, because trails can't PK-dedup the
+        // resulting fan-out the way Rails' eager JoinDependency does. A to-one
+        // nested include is kept for every target. `_joinValues` raw joins are
+        // never gated — Rails raises on them regardless of collection (see the
+        // raw-join tests), and nesting them makes trails raise the same error.
+        let sourceKlass: typeof Base | undefined;
+        try {
+          sourceKlass = (sourceRefl as any).klass;
+        } catch {
+          sourceKlass = undefined;
+        }
         const targetIsCollection = (this.reflection as any).isCollection?.() ?? false;
-        const nestedIncludes: any[] = targetIsCollection
-          ? []
-          : (reflScope?._includesAssociations ?? []);
+        const rawIncludes: any[] = reflScope?._includesAssociations ?? [];
+        const includeKlass = sourceKlass;
+        const nestedIncludes: any[] =
+          targetIsCollection && includeKlass != null
+            ? rawIncludes.filter((spec) => !this._includeSpecFansOut(includeKlass, spec))
+            : rawIncludes;
         const nestedOuter = [...nestedLeftOuter, ...nestedIncludes];
         if (nestedOuter.length > 0) {
           scope = scope.leftOuterJoins({ [sourceName]: nestedOuter });
@@ -527,17 +589,23 @@ export class ThroughAssociation extends Association {
           scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
         }
       } else if (sourceRefl) {
-        // Collection or nested source: the single-query JOIN cannot cover it
-        // (fan-out), so the source / sub-chain predicates ride the recursive
-        // source-preloader stages instead. But a THROUGH-table predicate the
-        // reflection scope carries (e.g. `miscPostFirstBlueTags_2`'s
-        // `posts.title IN (…)`, whose through reflection is `posts`) must still
-        // constrain which intermediate rows this through query selects — the
-        // recursion can't apply it because it filters the through table, not the
-        // source. So copy just the predicates that reference the through table
-        // (hash/Arel or raw SQL — Rails assigns the full where_clause here, so a
-        // raw through-table condition must be honored too). Source / sub-chain
-        // predicates stay for the recursion.
+        // Collection source/target ("twoStep") or nested through source
+        // ("nested"): JOINing the source (or a to-many nested include such as
+        // the canonical `tag` source's own `includes(:tagging)`) onto the
+        // through query would fan the middle records out and duplicate them —
+        // Rails avoids that because its through query is an eager-load whose
+        // JoinDependency instantiates distinct parents by primary key, but
+        // trails' preloader collects raw rows. So the source / sub-chain
+        // predicates, order, and scope includes ride the recursive
+        // source-preloader stage (see `_getSourcePreloaders`) instead. Only a
+        // THROUGH-table predicate the reflection scope carries (e.g.
+        // `miscPostFirstBlueTags_2`'s `posts.title IN (…)`, whose through
+        // reflection is `posts`) must still constrain which intermediate rows
+        // this through query selects — the recursion can't apply it because it
+        // filters the through table, not the source. So copy just the predicates
+        // that reference the through table (hash/Arel or raw SQL — Rails assigns
+        // the full where_clause here, so a raw through-table condition must be
+        // honored too).
         const throughTable = throughKlass.tableName;
         const throughPreds = whereClause.predicates.filter((p: any) =>
           predicateReferencesTable(p, throughTable),

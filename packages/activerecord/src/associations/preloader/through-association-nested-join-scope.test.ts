@@ -46,6 +46,9 @@ type NestedRel = {
 type HasOneHost = {
   hasOne: (name: string, options: Record<string, unknown>) => void;
 };
+type HasManyHost = {
+  hasMany: (name: string, options: Record<string, unknown>) => void;
+};
 
 // A has_one-through mirroring `general_club` (Member → current_membership →
 // club) but whose scope reaches `categorizations` — two levels deep from the
@@ -71,6 +74,20 @@ type HasOneHost = {
     (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
       .includes({ category: "categorizations" })
       .where({ categorizations: { author_id: 1 } }),
+});
+
+// A has_MANY-through whose scope carries a `.includes` reaching a belongs_to
+// association (`category` on Club) plus a predicate on it. A belongs_to join is
+// 1:1, so it does NOT fan the through rows out and IS nested onto the through
+// query even for a collection target — the predicate must resolve there, not
+// leak onto the source query where `categories` is unjoined.
+(Member as unknown as HasManyHost).hasMany("generalClubs", {
+  through: "favoriteMemberships",
+  source: "club",
+  scope: (rel: NestedRel) =>
+    (rel as unknown as { includes: (s: string) => NestedRel })
+      .includes("category")
+      .where({ categories: { name: "General" } }),
 });
 
 describe("Preloader::ThroughAssociation#through_scope multi-level nested join carry", () => {
@@ -124,6 +141,17 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     expect(sql).toMatch(
       new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
     );
+  });
+
+  it("nests a belongs_to scope includes onto the through query for a has_many-through", () => {
+    const groucho = members("groucho");
+    const sql = throughScopeSql([groucho], "generalClubs");
+    // `category` (belongs_to on Club) is a 1:1 join, so even for this collection
+    // target it is nested onto the through query and the `categories.name`
+    // predicate resolves there — not left on the source query where `categories`
+    // is unjoined (an invalid predicate).
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
   });
 
   type AssocHost = {
