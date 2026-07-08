@@ -637,43 +637,62 @@ export class ThroughAssociation extends Association {
    * set with the tables the reflection scope joins via its own
    * `.joins`/`.leftJoins`/`.includes`, so a predicate qualifying one of them can
    * ride the through query (Rails' nested through_scope carry-over,
-   * through_association.rb:120-142). Resolution is single-level against the source
-   * klass — deeper hash nesting collects the first-level key only, which covers
-   * the canonical scopes; an unresolvable (e.g. polymorphic) association is
-   * skipped, leaving its predicate at the source-preloader stage.
+   * through_association.rb:120-142). Resolution walks nested hash/array specs
+   * recursively: each level's key resolves against the current klass, and its
+   * value recurses against that association's klass, so a two-or-more-levels-deep
+   * table (e.g. `.joins({ category: :subcategory })` reaching `subcategories`)
+   * enters the resolvable set. Rails nests the whole spec under the source
+   * reflection name, realizing the deeper join on the through query. An
+   * unresolvable (e.g. polymorphic) association is skipped, leaving its predicate
+   * at the source-preloader stage.
    * @internal
    */
   private _resolveNestedTableNames(sourceRefl: AssociationLikeReflection, specs: any[]): string[] {
-    let klass: typeof Base;
+    let sourceKlass: typeof Base;
     try {
-      klass = sourceRefl.klass;
+      sourceKlass = sourceRefl.klass;
     } catch {
       return [];
     }
-    const names: string[] = [];
-    const collect = (spec: any): void => {
+    const tables: string[] = [];
+    const walk = (klass: typeof Base, spec: any): void => {
       if (spec == null) return;
       if (typeof spec === "string") {
-        names.push(spec);
+        this._collectNestedTable(klass, spec, tables);
       } else if (Array.isArray(spec)) {
-        for (const s of spec) collect(s);
+        for (const s of spec) walk(klass, s);
       } else if (typeof spec === "object") {
-        for (const key of Object.keys(spec)) names.push(key);
+        for (const key of Object.keys(spec)) {
+          const nextKlass = this._collectNestedTable(klass, key, tables);
+          if (nextKlass) walk(nextKlass, spec[key]);
+        }
       }
     };
-    for (const spec of specs) collect(spec);
-
-    const tables: string[] = [];
-    for (const name of names) {
-      try {
-        const r = (klass as any)._reflectOnAssociation?.(name);
-        const t = r?.klass?.tableName;
-        if (typeof t === "string") tables.push(t);
-      } catch {
-        /* polymorphic / unresolved association — leave predicate at source stage */
-      }
-    }
+    for (const spec of specs) walk(sourceKlass, spec);
     return tables;
+  }
+
+  /**
+   * Resolve `name` as an association on `klass`, push its table into `tables`,
+   * and return its klass so the caller can recurse into a deeper spec. Returns
+   * null for an unresolvable (e.g. polymorphic) association.
+   * @internal
+   */
+  private _collectNestedTable(
+    klass: typeof Base,
+    name: string,
+    tables: string[],
+  ): typeof Base | null {
+    try {
+      const r = (klass as any)._reflectOnAssociation?.(name);
+      const nextKlass = r?.klass;
+      const t = nextKlass?.tableName;
+      if (typeof t === "string") tables.push(t);
+      return (nextKlass as typeof Base) ?? null;
+    } catch {
+      /* polymorphic / unresolved association — leave predicate at source stage */
+      return null;
+    }
   }
 
   /**
