@@ -297,12 +297,12 @@ export class SchemaCreation {
    * Rails delegates `quoted_columns_for_index` to `@conn`
    * (abstract/schema_creation.rb:18), whose single source of truth is
    * `SchemaStatements#quoted_columns_for_index` → `add_options_for_index_columns`
-   * (sort order in the base, opclass folded in by the PG override). When the
-   * real adapter is threaded as the host it exposes that method, so route
-   * through it. Fall back to inline identifier quoting + sort-order/opclass
-   * decoration on the host-less unit-test path (only the SchemaQuoter shim is
-   * wired). Sub-part index lengths (`col(N)`) are MySQL-only and are never
-   * applied here — MySQL uses its own SchemaCreation `quotedColumns` override.
+   * (sort order in the base, opclass folded in by the PG override, sub-part
+   * length by MySQL). When the real adapter is threaded as the host it exposes
+   * that method, so route through it — this is the sole decoration path for
+   * every concrete adapter. Fall back to bare identifier quoting on the
+   * host-less unit-test path (only the SchemaQuoter shim is wired), mirroring
+   * the parallel `quotedIncludeColumns` delegation.
    * @internal
    */
   protected quotedColumnsForIndex(
@@ -319,18 +319,7 @@ export class SchemaCreation {
     if (typeof host.quotedColumnsForIndex === "function") {
       return host.quotedColumnsForIndex(columnNames, options);
     }
-    return columnNames
-      .map((c) => {
-        let col = this.adapter.quoteIdentifier(c);
-        if (this.supportsIndexSortOrder()) {
-          const order = typeof options.order === "string" ? options.order : options.order?.[c];
-          if (order) col += ` ${order.toUpperCase()}`;
-        }
-        const opc = typeof options.opclass === "string" ? options.opclass : options.opclass?.[c];
-        if (this.adapterName === "postgres" && opc) col += ` ${opc}`;
-        return col;
-      })
-      .join(", ");
+    return columnNames.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {

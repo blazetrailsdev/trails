@@ -84,6 +84,53 @@ describe("SchemaCreation#quotedColumnsForIndex sub-part length gating", () => {
   }
 });
 
+describe("SchemaCreation#quotedColumns delegates to the connection", () => {
+  // Rails' abstract SchemaCreation delegates :quoted_columns_for_index to @conn
+  // (schema_creation.rb:18). When a real adapter is threaded as the host, the
+  // visitor must route column quoting through it rather than re-deriving the
+  // order/opclass decoration inline — that's the single source of truth
+  // (SchemaStatements#quoted_columns_for_index -> add_options_for_index_columns).
+  const host = {
+    quoteIdentifier: (c: string) => `"${c}"`,
+    quoteTableName: (t: string) => `"${t}"`,
+    quoteDefaultExpression: (v: unknown) => String(v),
+    quotedColumnsForIndex(cols: string[], options: any) {
+      // Stand-in for the connection's decoration, incl. PG opclass folding.
+      // Mirrors options_for_index_columns: a String opclass applies to every
+      // column, a Record keys per-column (IndexDefinition#conciseOptions
+      // collapses a uniform Record to a String).
+      const opc = (c: string) =>
+        typeof options.opclass === "string" ? options.opclass : options.opclass?.[c];
+      return cols.map((c) => `"${c}" ${opc(c) ?? "DEFAULT_OPS"}`).join(", ");
+    },
+  };
+
+  it("routes an array column set through host.quotedColumnsForIndex", () => {
+    const idx = new IndexDefinition("posts", "index_posts_on_title", false, ["title"], {
+      opclasses: { title: "text_pattern_ops" },
+    });
+    const sql = (new SchemaCreation("postgres", host as any) as any).visitCreateIndexDefinition(
+      new CreateIndexDefinition(idx, false),
+    );
+    expect(sql).toContain('("title" text_pattern_ops)');
+  });
+
+  it("emits a String column set verbatim without delegating", () => {
+    const idx = new IndexDefinition(
+      "posts",
+      "index_posts_on_expr",
+      false,
+      "lower(title)" as any,
+      {},
+    );
+    const sql = (new SchemaCreation("postgres", host as any) as any).visitCreateIndexDefinition(
+      new CreateIndexDefinition(idx, false),
+    );
+    expect(sql).toContain("(lower(title))");
+    expect(sql).not.toContain("DEFAULT_OPS");
+  });
+});
+
 describe("SchemaCreation#typeToSql decimal precision/scale", () => {
   it("raises when a decimal scale is given without a precision", () => {
     expect(() => new SchemaCreation("sqlite").typeToSql("decimal", { scale: 2 })).toThrow(
