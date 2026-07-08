@@ -1,8 +1,24 @@
 /**
- * Builds the test-environment `DatabaseConfigurations` from the standard
- * env-var signals (`PG_TEST_URL` / `MYSQL_TEST_URL` / sqlite fallback) and
- * wires it into `DatabaseTasks`, routing schema load through the real
- * Rails-mirrored path (`loadSchema` / `reconstructFromSchema`).
+ * Builds the test-environment `DatabaseConfigurations` from a Rails-faithful
+ * named-connections map (the `config.yml`-analogue) selected purely by
+ * `ARCONN`, and wires it into `DatabaseTasks`, routing schema load through the
+ * real Rails-mirrored path (`loadSchema` / `reconstructFromSchema`).
+ *
+ * Mirrors `vendor/rails/activerecord/test/support/connection.rb`:
+ *   - `connection_name = ENV["ARCONN"] || config["default_connection"]`
+ *     (`connection.rb:10`),
+ *   - `config.fetch("connections").fetch(connection_name) { ... exit 1 }`
+ *     (`connection.rb:14-19`) — a hard failure when `ARCONN` names an
+ *     unconfigured connection,
+ *   - `unless connection_name.include?(arunit_adapter) raise ArgumentError`
+ *     (`connection.rb:35-37`) — a loud raise when `ARCONN` and the resolved
+ *     adapter diverge. PR #4768's `*_TEST_URL`-presence guard folds into this:
+ *     a live-backend `ARCONN` whose connection details are absent resolves to
+ *     SQLite, whose adapter (`sqlite3`) is not a substring of the connection
+ *     name (`postgresql` / `mysql2`), so the mismatch check raises.
+ *
+ * As in `config.example.yml`, `ENV` only feeds connection *sub-settings*
+ * (host/port/socket/credentials); it never selects the backend.
  *
  * Phase 1 of RFC 0002 — new file, no consumer changes.
  * Phase 2 of RFC 0002 — adds `establishFromTestConfig` for setupHandlerSuite.
@@ -28,50 +44,83 @@ export interface TestDatabaseConfig {
 }
 
 /**
- * Guard against a silent SQLite fallback when `ARCONN` selects a live backend.
- *
- * `ARCONN` only drives which tests vitest includes (`vitest.config.ts`); the
- * backend is chosen here from `PG_TEST_URL` / `MYSQL_TEST_URL`. When `ARCONN`
- * is `postgresql`/`mysql2` but the matching `*_TEST_URL` is absent, the SELECTs
- * would run against SQLite while the run pretends to be the PG/MySQL job — a
- * false green that hides adapter-specific divergences. Fail loudly instead.
+ * The named connections available to the test harness, mirroring the
+ * `connections:` hash of `vendor/rails/activerecord/test/config.example.yml`.
+ * `ARCONN` selects one of these keys; `DEFAULT_CONNECTION` is Rails'
+ * `config["default_connection"]` fallback.
  */
-function assertTestUrlPresentForArconn(pgUrl?: string, mysqlUrl?: string): void {
-  const arconn = getEnv("ARCONN");
-  if (arconn === "postgresql" && !pgUrl) {
-    // Test-helper invariant with no Rails error counterpart — a bare Error is intentional.
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new Error(
-      "ARCONN=postgresql but PG_TEST_URL is not set: the test backend would " +
-        "silently fall back to SQLite, running against the wrong database. " +
-        "Set PG_TEST_URL to a live PostgreSQL, or unset ARCONN to run on SQLite.",
-    );
-  }
-  if (arconn === "mysql2" && !mysqlUrl) {
-    // Test-helper invariant with no Rails error counterpart — a bare Error is intentional.
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new Error(
-      "ARCONN=mysql2 but MYSQL_TEST_URL is not set: the test backend would " +
-        "silently fall back to SQLite, running against the wrong database. " +
-        "Set MYSQL_TEST_URL to a live MySQL, or unset ARCONN to run on SQLite.",
-    );
-  }
+type ConnectionName = "sqlite3" | "sqlite3_mem" | "postgresql" | "mysql2";
+
+const DEFAULT_CONNECTION: ConnectionName = "sqlite3";
+
+/**
+ * Each named connection builds its primary "test" env config from
+ * Rails-mirrored sub-setting env vars (never a URL that also *selects* the
+ * backend). The live-backend builders return a SQLite fallback when their
+ * connection details are absent; the adapter-mismatch check downstream turns
+ * that into Rails' `ArgumentError`.
+ */
+const CONNECTIONS: Record<ConnectionName, () => HashConfig | UrlConfig> = {
+  sqlite3: () => new HashConfig("test", "primary", sqliteHash()),
+  sqlite3_mem: () =>
+    new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:", pool: 1 }),
+  postgresql: () => {
+    const pgUrl = getEnv("PG_TEST_URL");
+    if (pgUrl) return new UrlConfig("test", "primary", pgUrl);
+    return new HashConfig("test", "primary", sqliteHash());
+  },
+  mysql2: () => {
+    const mysqlUrl = getEnv("MYSQL_TEST_URL");
+    if (mysqlUrl) return new UrlConfig("test", "primary", mysqlUrl);
+    return new HashConfig("test", "primary", sqliteHash());
+  },
+};
+
+/** Map a resolved `envConfig.adapter` to the public {@link TestAdapterName}. */
+function adapterName(config: HashConfig | UrlConfig): TestAdapterName {
+  const adapter = config.adapter ?? "";
+  if (adapter.includes("postgres")) return "postgres";
+  if (adapter.includes("mysql")) return "mysql";
+  return "sqlite";
 }
 
+/**
+ * Resolve the named connection selected by `ARCONN` into an adapter + config.
+ *
+ * Mirrors `ARTest.connection_name` / `test_configuration_hashes` / the
+ * adapter-name guard in `connection.rb`.
+ */
 function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfig } {
-  const pgUrl = getEnv("PG_TEST_URL");
-  const mysqlUrl = getEnv("MYSQL_TEST_URL");
-  assertTestUrlPresentForArconn(pgUrl, mysqlUrl);
-  if (pgUrl) {
-    return { adapter: "postgres", envConfig: new UrlConfig("test", "primary", pgUrl) };
+  const connectionName = (getEnv("ARCONN") || DEFAULT_CONNECTION) as ConnectionName;
+  const builder = CONNECTIONS[connectionName];
+  if (!builder) {
+    // Rails prints "Connection ... not found" and `exit 1`; we have no
+    // `process.exit`, so the loud failure is a throw with the same message.
+    // Test-helper invariant with no Rails error counterpart — a bare Error is intentional.
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(
+      `Connection "${connectionName}" not found. Available connections: ` +
+        `${Object.keys(CONNECTIONS).join(", ")}`,
+    );
   }
-  if (mysqlUrl) {
-    return { adapter: "mysql", envConfig: new UrlConfig("test", "primary", mysqlUrl) };
+
+  const envConfig = builder();
+  const arunitAdapter = envConfig.adapter ?? "";
+  // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
+  // (connection.rb:35-37). A live-backend `ARCONN` whose connection details are
+  // absent resolves to SQLite here, whose adapter is not a substring of the
+  // connection name, so this fires — folding in PR #4768's silent-fallback guard.
+  if (!connectionName.includes(arunitAdapter)) {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(
+      `The connection name did not match the adapter name. Connection name is ` +
+        `"${connectionName}" and the adapter name is "${arunitAdapter}". ` +
+        `The ${connectionName} backend's connection details (e.g. PG_TEST_URL / ` +
+        `MYSQL_TEST_URL) are not set, so the run would silently fall back to SQLite.`,
+    );
   }
-  return {
-    adapter: "sqlite",
-    envConfig: new HashConfig("test", "primary", sqliteHash()),
-  };
+
+  return { adapter: adapterName(envConfig), envConfig };
 }
 
 /**
@@ -124,7 +173,7 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
 }
 
 /**
- * Re-establish `Base`'s connection handler from the env-var config if not
+ * Re-establish `Base`'s connection handler from the resolved test config if not
  * already connected. Called by `setupHandlerSuite` so handler-path test files
  * get a live pool without knowing which adapter the worker is using.
  * Idempotent — a no-op when already connected.
@@ -136,16 +185,10 @@ export async function buildTestDatabaseConfig(): Promise<TestDatabaseConfig> {
  */
 export async function establishFromTestConfig(): Promise<void> {
   if (Base.isConnectedQ()) return;
-  const pgUrl = getEnv("PG_TEST_URL");
-  const mysqlUrl = getEnv("MYSQL_TEST_URL");
-  assertTestUrlPresentForArconn(pgUrl, mysqlUrl);
-  if (pgUrl) {
-    await Base.establishConnection(pgUrl);
+  const { envConfig } = resolve();
+  if (envConfig instanceof UrlConfig) {
+    await Base.establishConnection(envConfig.url);
     return;
   }
-  if (mysqlUrl) {
-    await Base.establishConnection(mysqlUrl);
-    return;
-  }
-  await Base.establishConnection(sqliteHash());
+  await Base.establishConnection(envConfig.configurationHash);
 }
