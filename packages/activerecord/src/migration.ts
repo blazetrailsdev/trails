@@ -1881,8 +1881,10 @@ export class MigrationContext {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
     if (options?.force) {
+      // Rails' create_table force path drops with `if_exists: true`.
       await this.dropTable(name, {
         force: options.force === "cascade" ? "cascade" : undefined,
+        ifExists: true,
       }).catch(() => {});
     }
     if (options?.ifNotExists && this.tableExists(name)) {
@@ -2030,27 +2032,17 @@ export class MigrationContext {
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
   ): Promise<void> {
-    // Mirrors Rails MySQL drop_table: emit `DROP TEMPORARY TABLE` when `temporary: true`.
-    // `IF EXISTS` is included by default (matches the abstract drop_table contract); pass
-    // `ifExists: false` to omit it. `force: "cascade"` adds `CASCADE` on Postgres.
+    // Delegate the DDL to the adapter's SchemaStatements — the single
+    // Rails-faithful source. The dialect overrides honor `temporary:`
+    // (MySQL `DROP TEMPORARY TABLE`) and `force: "cascade"`; `IF EXISTS` is
+    // emitted only when `ifExists: true` is passed, matching Rails' drop_table
+    // (which does not default it). We keep the in-memory bookkeeping in sync
+    // for the bespoke introspection that columns()/indexes()/tables() read.
     const last = args[args.length - 1];
     const hasOptions = last !== null && typeof last === "object";
-    const options = (hasOptions ? last : {}) as {
-      ifExists?: boolean;
-      force?: "cascade";
-      temporary?: boolean;
-    };
     const names = (hasOptions ? args.slice(0, -1) : args) as string[];
-    const temporary =
-      options.temporary === true && this._adapterName === "mysql" ? " TEMPORARY" : "";
-    const ifExists = options.ifExists === false ? "" : " IF EXISTS";
-    const cascade =
-      options.force === "cascade" && this._adapterName === "postgres" ? " CASCADE" : "";
+    await this.schema.dropTable(...(args as Parameters<SchemaStatements["dropTable"]>));
     for (const name of names) {
-      const quoted = this.connection.quoteTableName(name);
-      await this.connection.executeMutation(
-        `DROP${temporary} TABLE${ifExists} ${quoted}${cascade}`,
-      );
       this._tables.delete(name);
       this._columns.delete(name);
       this._columnMeta.delete(name);
@@ -2344,7 +2336,11 @@ export class MigrationContext {
   async renameTable(from: string, to: string): Promise<void> {
     const fullFrom = `${this.tableNamePrefix}${from}${this.tableNameSuffix}`;
     const fullTo = `${this.tableNamePrefix}${to}${this.tableNameSuffix}`;
-    await this.connection.executeMutation(`ALTER TABLE "${fullFrom}" RENAME TO "${fullTo}"`);
+    // Delegate the ALTER TABLE ... RENAME to SchemaStatements (adapter-correct
+    // identifier quoting); MigrationContext keeps the prefix/suffix application
+    // that SchemaStatements#renameTable does not perform, plus the in-memory
+    // bookkeeping the bespoke introspection reads.
+    await this.schema.renameTable(fullFrom, fullTo);
     this._tables.delete(fullFrom);
     this._tables.add(fullTo);
     const cols = this._columns.get(fullFrom);
