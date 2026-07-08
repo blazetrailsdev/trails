@@ -158,8 +158,12 @@ export class UnknownMigrationVersionError extends MigrationError {
 }
 
 export class IllegalMigrationNameError extends MigrationError {
-  constructor(name: string) {
-    super(`Illegal name for migration file: ${name}.`);
+  constructor(name?: string) {
+    super(
+      name != null
+        ? `Illegal name for migration file: ${name}\n\t(only lower case letters, numbers, and '_' allowed).`
+        : "Illegal name for migration.",
+    );
     this.name = "IllegalMigrationNameError";
   }
 }

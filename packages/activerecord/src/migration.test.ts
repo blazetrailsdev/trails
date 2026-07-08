@@ -9,7 +9,7 @@ import { BigDecimal } from "@blazetrails/activesupport";
 import { Base, MigrationContext, Migrator, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
-import { ConcurrentMigrationError } from "./migration.js";
+import { ConcurrentMigrationError, IllegalMigrationNameError } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -2040,6 +2040,13 @@ describe("MigrationTest", () => {
           async change() {}
         }
         expect(new NoTs().version).toBe("99999999999999");
+      });
+
+      it("illegal migration name error carries allowed characters suffix", () => {
+        expect(new IllegalMigrationNameError("bad name!").message).toBe(
+          "Illegal name for migration file: bad name!\n\t(only lower case letters, numbers, and '_' allowed).",
+        );
+        expect(new IllegalMigrationNameError().message).toBe("Illegal name for migration.");
       });
 
       it("copied migrations at timestamp boundary are valid", () => {
