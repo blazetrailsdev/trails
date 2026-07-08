@@ -3,7 +3,6 @@ import { assertValidKeys } from "@blazetrails/activesupport";
 
 import { arelColumns } from "./query-methods.js";
 import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
-import { foldMergeEagerLoad, foldMergePreloads } from "./merge-preloads.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -31,7 +30,6 @@ export class Merger {
     this.mergeSingleValues(rel);
     this.mergeClauses(rel);
     this.mergeCtes(rel);
-    this.mergeEagerLoad(rel);
     this.mergePreloads(rel);
     this.mergeJoins(rel);
     this.mergeOuterJoins(rel);
@@ -76,16 +74,25 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
-  // Thin wrappers over the shared folders (merge-preloads.ts) so merge() and
-  // merge!() (spawn-methods mergeBang) fold preload/includes/eager_load through
-  // the same code and cannot drift, while api:compare still maps merger.rb's
-  // merge_preloads to this file.
-  private mergeEagerLoad(rel: any): void {
-    foldMergeEagerLoad(rel, this.other);
-  }
-
   private mergePreloads(rel: any): void {
-    foldMergePreloads(rel, this.other);
+    if (this.other._preloadAssociations && this.other._preloadAssociations.length > 0) {
+      rel._preloadAssociations = [
+        ...(rel._preloadAssociations ?? []),
+        ...this.other._preloadAssociations,
+      ];
+    }
+    if (this.other._includesAssociations && this.other._includesAssociations.length > 0) {
+      rel._includesAssociations = [
+        ...(rel._includesAssociations ?? []),
+        ...this.other._includesAssociations,
+      ];
+    }
+    if (this.other._eagerLoadAssociations && this.other._eagerLoadAssociations.length > 0) {
+      rel._eagerLoadAssociations = [
+        ...(rel._eagerLoadAssociations ?? []),
+        ...this.other._eagerLoadAssociations,
+      ];
+    }
   }
 
   // Thin wrappers over the shared folders (merge-joins.ts) so merge() and
