@@ -210,10 +210,8 @@ describe("TableDefinition#new_foreign_key_definition", () => {
   it("maps a composite primaryKey array to a composite column array (bare-adapter fallback)", () => {
     // Mirrors foreign_key_options' array branch: each PK column gets its own
     // singularized foreign-key column.
-    // primaryKey/column are string|string[] on ForeignKeyDefinition; the scalar
-    // AddForeignKeyOptions DSL type is cast here to exercise the composite path.
     const fk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
-      primaryKey: ["tenant_id", "id"] as unknown as string,
+      primaryKey: ["tenant_id", "id"],
     });
     expect(fk.column).toEqual(["rocket_tenant_id", "rocket_id"]);
   });
