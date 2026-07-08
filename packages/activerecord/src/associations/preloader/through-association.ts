@@ -477,18 +477,32 @@ export class ThroughAssociation extends Association {
         // reflection name makes trails' join builder raise the same error.
         const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
 
-        // Rails `includes!(source_reflection.name)` + `references!(...)` promotes
-        // to a LEFT OUTER JOIN of the source reflection. `values[:includes]`
-        // (the reflection SCOPE's explicit `.includes`) is empty for the through
-        // scopes we support — trails' `_includesAssociations` bucket is polluted
-        // with derived inverse associations (e.g. the source's own inverse
-        // `tagging`), which would fan the through query out — so we do NOT carry
-        // it; the bare source join matches Rails' `includes!(source)`. A scope's
-        // explicit `.left_joins(source => nested)` lives in
-        // `_leftOuterJoinsValues` and IS nested so a deeper table its predicate
-        // qualifies is joined too (rb:120-138).
-        if (nestedLeftOuter.length > 0) {
-          scope = scope.leftOuterJoins({ [sourceName]: nestedLeftOuter });
+        // Rails `includes!(source_reflection.name => values[:includes])` (bare
+        // when the scope has no `.includes`) + `references!(...)` promotes to a
+        // LEFT OUTER JOIN of the source reflection and its nested includes
+        // (rb:120-124). trails carries the scope's explicit `.includes`
+        // (`_includesAssociations`) the same way — nested under the source
+        // reflection — so a has_one-through scope like
+        // `includes(:category).where(categories: { … })` joins `categories` on
+        // this through query and the predicate resolves.
+        //
+        // BUT only when THIS reflection is to-one (has_one). Rails realizes the
+        // eager join as a JoinDependency that instantiates the through parent
+        // deduplicated by primary key, so a to-many nested include (e.g. the
+        // canonical `tag` source's own `includes(:tagging)`, where a tag has many
+        // taggings) doesn't inflate its result. trails' preloader collects raw
+        // rows instead: for a to-many nested include on a collection (has_many)
+        // through it would fan the middle records out and duplicate them, so
+        // there we fall back to the bare source join (the source condition still
+        // rides the copied where_clause). `.left_joins(source => nested)`
+        // (`_leftOuterJoinsValues`) is carried likewise.
+        const targetIsCollection = (this.reflection as any).isCollection?.() ?? false;
+        const nestedIncludes: any[] = targetIsCollection
+          ? []
+          : (reflScope?._includesAssociations ?? []);
+        const nestedOuter = [...nestedLeftOuter, ...nestedIncludes];
+        if (nestedOuter.length > 0) {
+          scope = scope.leftOuterJoins({ [sourceName]: nestedOuter });
         } else {
           scope = scope.leftOuterJoins(sourceName);
         }
@@ -520,9 +534,10 @@ export class ThroughAssociation extends Association {
         // `posts.title IN (…)`, whose through reflection is `posts`) must still
         // constrain which intermediate rows this through query selects — the
         // recursion can't apply it because it filters the through table, not the
-        // source. So copy just the predicates that reference the through table,
-        // detected precisely from their Arel attributes (no raw-SQL text scan).
-        // Source / sub-chain predicates stay for the recursion.
+        // source. So copy just the predicates that reference the through table
+        // (hash/Arel or raw SQL — Rails assigns the full where_clause here, so a
+        // raw through-table condition must be honored too). Source / sub-chain
+        // predicates stay for the recursion.
         const throughTable = throughKlass.tableName;
         const throughPreds = whereClause.predicates.filter((p: any) =>
           predicateReferencesTable(p, throughTable),
@@ -592,12 +607,15 @@ export class ThroughAssociation extends Association {
 }
 
 /**
- * True when any Arel attribute in `node` references `tableName`. Used only for a
- * NESTED through source (where the single-query JOIN can't be used) to copy the
- * reflection scope's through-table predicates onto the through query. This is a
- * precise Arel-attribute walk — NOT the raw-SQL text scan removed with this
- * convergence — so a raw-string predicate carries no attributes and is left for
- * the recursive source stage.
+ * True when `node` references `tableName`. Used for a collection (has_many) or
+ * nested (through) source — the cases the single-query JOIN can't cover without
+ * fanning the through rows out — to route the reflection scope's through-table
+ * predicates onto the through query (and keep them off the source query, which
+ * never joins the through table). Rails' `through_scope` assigns the FULL
+ * `reflection_scope.where_clause` before adding the source join
+ * (through_association.rb:117-130), so a raw-SQL through-table predicate must be
+ * honored too, not just a hash/Arel one — hence the raw-SQL qualifier scan
+ * alongside the precise Arel walk.
  * @internal
  */
 function predicateReferencesTable(node: any, tableName: string): boolean {
@@ -612,7 +630,49 @@ function predicateReferencesTable(node: any, tableName: string): boolean {
   if (!found && node instanceof Nodes.Not) {
     return predicateReferencesTable((node as any).expr, tableName);
   }
+  // Raw-SQL predicates (e.g. `where("posts.title = ?", "x")`) carry no Arel
+  // Attribute nodes, so `fetchAttribute` never visits them. Scan the raw SQL
+  // text for a `<table>.` qualifier so a string condition on the through table
+  // is routed like a hash/Arel one.
+  if (!found && rawSqlReferencesTable(node, tableName)) {
+    found = true;
+  }
   return found;
+}
+
+/**
+ * True when a raw-SQL predicate node's text qualifies a column with `tableName.`.
+ * Handles SqlLiteral / BoundSqlLiteral and a single Grouping wrapper. String
+ * literals are blanked first (see `stripSqlStringLiterals`) so a `<table>.`
+ * qualifier inside quoted text — e.g. `where("body = 'see posts.title'")` — is
+ * not a false positive. Hash/Arel predicates take the precise `fetchAttribute`
+ * path above and never reach here.
+ * @internal
+ */
+function rawSqlReferencesTable(node: any, tableName: string): boolean {
+  if (node instanceof Nodes.Grouping) {
+    return rawSqlReferencesTable((node as any).expr, tableName);
+  }
+  let sql: string | undefined;
+  if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
+  else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
+  if (typeof sql !== "string") return false;
+  sql = stripSqlStringLiterals(sql);
+  const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`(^|[^\\w.])${escaped}\\.`).test(sql);
+}
+
+/**
+ * Blank single-quoted SQL string literals (preserving length) so the read-only
+ * `<table>.` qualifier scan in `rawSqlReferencesTable` does not match a table
+ * name embedded in literal text. Consumes both SQL-standard doubled quotes
+ * (`''`) and backslash-escaped quotes (`\'`, MySQL/MariaDB default). The result
+ * is never executed as SQL.
+ * @internal
+ */
+function stripSqlStringLiterals(sql: string): string {
+  // eslint-disable-next-line blazetrails/no-raw-sql
+  return sql.replace(/'(?:[^'\\]|''|\\.)*'/g, (lit) => " ".repeat(lit.length));
 }
 
 /** @internal */

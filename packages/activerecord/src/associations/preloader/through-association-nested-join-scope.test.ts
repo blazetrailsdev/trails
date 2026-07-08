@@ -59,6 +59,20 @@ type HasOneHost = {
     rel.leftJoins({ category: "categorizations" }).where({ categorizations: { author_id: 1 } }),
 });
 
+// Same shape but reaching the deeper table via `.includes` instead of
+// `.leftJoins`. Rails' through_scope nests the scope's `values[:includes]` under
+// the source reflection (`includes!(source => includes)`), so `.includes` and
+// `.leftJoins` both realize the deeper join on the through query. Pins that a
+// has_one-through honors an explicit `.includes` in its scope.
+(Member as unknown as HasOneHost).hasOne("davidIncludedCategorizedClub", {
+  through: "currentMembership",
+  source: "club",
+  scope: (rel: NestedRel) =>
+    (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
+      .includes({ category: "categorizations" })
+      .where({ categorizations: { author_id: 1 } }),
+});
+
 describe("Preloader::ThroughAssociation#through_scope multi-level nested join carry", () => {
   const { members, clubs } = fixtures([
     "memberTypes",
@@ -85,12 +99,26 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
   it("nests the two-level scope join under the source reflection on the through query", () => {
     const groucho = members("groucho");
     const sql = throughScopeSql([groucho], "davidCategorizedClub");
-    // The deeper `categorizations` join is realized on the through query and,
-    // because `_resolveNestedTableNames` now resolves it two levels deep, the
-    // predicate qualifying it rides the through query's WHERE too (without the
-    // recursive resolution it would be deferred to the source-preloader stage).
+    // The deeper `categorizations` join is realized on the through query by
+    // nesting the scope's `.leftJoins({ category: "categorizations" })` under the
+    // source reflection, and the copied full where_clause qualifies it, so the
+    // predicate rides the through query's WHERE too.
     // Quote identifiers via the active adapter (Rails' `quote_table_name`
     // pattern) so the assertions run on SQLite/PG (`"x"`) and MariaDB (`` `x` ``).
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
+    expect(sql).toMatch(
+      new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
+    );
+  });
+
+  it("nests an explicit scope includes under the source reflection on the through query", () => {
+    const groucho = members("groucho");
+    const sql = throughScopeSql([groucho], "davidIncludedCategorizedClub");
+    // Rails nests `values[:includes]` under the source reflection, joining the
+    // deeper tables so the copied `categorizations.author_id` predicate resolves
+    // on the through query (rather than being left on the source query where the
+    // table is not joined).
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
     expect(sql).toMatch(

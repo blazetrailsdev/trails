@@ -57,6 +57,17 @@ registerModel(Comment);
   scope: (rel: any) => rel.where({ posts: { title: "Welcome to the weblog" } }),
 });
 
+// Same, but the through-table condition is RAW SQL. Rails' `through_scope`
+// assigns the full `reflection_scope.where_clause` before the source join, so a
+// raw through-table predicate must be copied onto the through query too (not
+// left on the source query, where `posts` is not joined — an invalid predicate).
+(Author as any).hasMany("commentsWithRawThroughCondition", {
+  className: "Comment",
+  through: "posts",
+  source: "comments",
+  scope: (rel: any) => rel.where("posts.title = 'Welcome to the weblog'"),
+});
+
 describe("Preloader::ThroughAssociation#through_scope", () => {
   const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"]);
 
@@ -101,6 +112,15 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     const sql = scope.toSql();
     // The through-table predicate constrains the intermediate (posts) rows.
     expect(sql).toContain("Welcome to the weblog");
+  });
+
+  it("copies a raw-SQL through-table condition onto the through query for a collection source", () => {
+    const david = authors("david");
+    const loader = throughLoader([david], "commentsWithRawThroughCondition");
+    const scope = (loader as any)._buildThroughScope();
+    // Raw through-table predicate rides the through query (Rails' full
+    // where_clause assignment), not the source query where `posts` is unjoined.
+    expect(scope.toSql()).toContain("posts.title");
   });
 
   it("cascades strict loading from the preload scope onto the through query", async () => {
