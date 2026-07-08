@@ -4,7 +4,8 @@
  * `assertValidEnumDefinitionValues`, `assertValidEnumOptions`,
  * `detectNegativeEnumConditionsBang`, and the `setEnumWarn` warning hook).
  */
-import { describe, it, expect, afterEach, beforeAll, vi } from "vitest";
+import { describe, it, expect, afterEach, afterAll, beforeAll, vi } from "vitest";
+import { Inflections, camelize } from "@blazetrails/activesupport";
 import {
   assertValidEnumDefinitionValues,
   assertValidEnumOptions,
@@ -444,5 +445,87 @@ describe("Enum with an undeclared type raises on the serialize path", () => {
     expect(() => castEnumValue(TypelessBook, "typeless_genre", "comic")).toThrow(
       /Undeclared attribute type for enum 'typeless_genre' in/,
     );
+  });
+});
+
+// trails derives enum method names (camelCase `isApiKey`, `apiKeyBang`,
+// `apiKey`, `notApiKey`) from snake_case labels; Rails' surface is snake_case
+// (`api_key?`), so acronym-capitalization consistency is a trails-only concern.
+// The predicate/scope names must be derived identically by the pre-generation
+// conflict-detection pass and the generator. The two paths only diverge when an
+// acronym is registered: `camelize("api_key", true)` then expands the leading
+// segment to the acronym (`APIKey` → `isAPIKey`), while the `cap()` path the
+// generator uses lowercases it (`apiKey` → `isApiKey`). Register `API` so the
+// label genuinely exercises that split; without a registered acronym both paths
+// already agree and the test would guard nothing.
+describe("Enum acronym method name consistency", () => {
+  let restoreInflections: () => void;
+
+  beforeAll(() => {
+    const inflect = Inflections.instance("en");
+    const savedAcronyms = new Map(inflect.acronyms);
+    const savedAcronymRegex = inflect.acronymRegex;
+    const savedAcronymsCamelizeRegex = inflect.acronymsCamelizeRegex;
+    const savedAcronymsUnderscoreRegex = inflect.acronymsUnderscoreRegex;
+    // Register acronyms so the labels' leading segments diverge between the two
+    // derivations: `camelize(x, true)` expands the segment to its acronym while
+    // the `cap()` path the generator uses lowercases it. `API` → `api_key`
+    // yields `APIKey` vs. `ApiKey`; `VALID` → `valid` yields `VALID` vs. `Valid`.
+    inflect.acronym("API");
+    inflect.acronym("VALID");
+    const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
+    expect(camelize("api_key", true)).toBe("APIKey");
+    expect(cap(camelize("api_key", false))).toBe("ApiKey");
+    expect(camelize("valid", true)).toBe("VALID");
+    expect(cap(camelize("valid", false))).toBe("Valid");
+    restoreInflections = () => {
+      inflect.acronyms = savedAcronyms;
+      inflect.acronymRegex = savedAcronymRegex;
+      inflect.acronymsCamelizeRegex = savedAcronymsCamelizeRegex;
+      inflect.acronymsUnderscoreRegex = savedAcronymsUnderscoreRegex;
+    };
+  });
+
+  afterAll(() => {
+    restoreInflections();
+  });
+
+  it("records the same predicate name the generator defines for acronym labels", () => {
+    class AcroBook extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { api_key: 0, plain: 1 });
+      }
+    }
+    // With `API` registered the two derivations diverge (`isAPIKey` vs.
+    // `isApiKey`). Generation defines the predicate via the `cap()` path
+    // (`isApiKey`), never the `camelize(_, true)` acronym form (`isAPIKey`); the
+    // name conflict detection records in `_enumMethodsModuleNames` must be the
+    // very same name it defines, so cross-enum "already defined" detection sees
+    // the real method.
+    const proto = AcroBook.prototype as unknown as Record<string, unknown>;
+    expect(typeof proto.isApiKey).toBe("function");
+    expect(proto.isAPIKey).toBeUndefined();
+    const recorded = (AcroBook as unknown as { _enumMethodsModuleNames: Set<string> })
+      ._enumMethodsModuleNames;
+    expect(recorded.has("isApiKey")).toBe(true);
+    expect(recorded.has("isAPIKey")).toBe(false);
+  });
+
+  it("detects a conflict on the name it actually generates for an acronym label", () => {
+    // The generator defines the predicate `isValid` for the `valid` label
+    // (`cap()` path). `isValid` is a dangerous Active Record method, so the
+    // conflict pass must raise. Before the fix the pass derived the predicate as
+    // `camelize("valid", true)` = `isVALID`, which is NOT a dangerous method, so
+    // it silently let generation clobber `Model#isValid`. Sharing one helper
+    // makes the checked name equal the generated name, restoring the raise.
+    expect(() => {
+      class ValidEnum extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", { valid: 0, plain: 1 });
+        }
+      }
+    }).toThrow(/generate a instance method "isValid", which is already defined/);
   });
 });
