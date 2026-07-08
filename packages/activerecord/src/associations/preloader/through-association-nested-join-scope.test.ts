@@ -28,6 +28,7 @@ import { Club } from "../../test-helpers/models/club.js";
 import { Membership, CurrentMembership } from "../../test-helpers/models/membership.js";
 import { Category } from "../../test-helpers/models/category.js";
 import { Categorization } from "../../test-helpers/models/categorization.js";
+import { quoteTableName, escapeRegExp } from "../../test-helpers/quote-regex.js";
 
 registerModel(Member);
 registerModel(Club);
@@ -88,11 +89,13 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     // because `_resolveNestedTableNames` now resolves it two levels deep, the
     // predicate qualifying it rides the through query's WHERE too (without the
     // recursive resolution it would be deferred to the source-preloader stage).
-    // Identifier quoting is adapter-specific (`"x"` on SQLite/PG, `` `x` `` on
-    // MariaDB), so match the bare table/column names.
-    expect(sql).toMatch(/JOIN .categories./);
-    expect(sql).toMatch(/JOIN .categorizations./);
-    expect(sql).toMatch(/WHERE.*categorizations.\..author_id/);
+    // Quote identifiers via the active adapter (Rails' `quote_table_name`
+    // pattern) so the assertions run on SQLite/PG (`"x"`) and MariaDB (`` `x` ``).
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
+    expect(sql).toMatch(
+      new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
+    );
   });
 
   type AssocHost = {
