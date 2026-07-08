@@ -311,15 +311,20 @@ export class SchemaDumper extends BaseSchemaDumper {
 
       const [dslType, spec] = this.columnSpec(col);
       const optStr = Object.keys(spec).length > 0 ? `, { ${this.formatColspec(spec)} }` : "";
-      const typeName = String(dslType);
+      // A nil DSL type means an unmapped column (Value cast type, e.g. a PG
+      // composite): it has no cast-type name, so fall through to the raw sqlType.
+      const typeName = dslType == null ? "" : String(dslType);
 
       if (this._isDslHelper(typeName)) {
         lines.push(`    t.${typeName}(${JSON.stringify(col.name)}${optStr});`);
       } else if ((col as any).isEnum && typeName === "enum") {
         lines.push(`    t.enum(${JSON.stringify(col.name)}${optStr});`);
       } else {
-        // Generic fallback: pass arbitrary SQL type verbatim via t.column.
-        const colType = typeName === "enum" ? ((col as any).sqlType ?? typeName) : typeName;
+        // Generic fallback: pass arbitrary SQL type verbatim via t.column. An
+        // unmapped (nil-type) or enum column dumps the raw sqlType, mirroring
+        // Rails' `t.column name, sql_type` for a column whose type is nil.
+        const colType =
+          typeName === "" || typeName === "enum" ? ((col as any).sqlType ?? typeName) : typeName;
         lines.push(
           `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(colType)}${optStr});`,
         );
