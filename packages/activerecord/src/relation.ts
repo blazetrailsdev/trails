@@ -603,11 +603,11 @@ export class Relation<T extends Base> {
   /**
    * Filter for records WHERE the association IS present.
    *
-   * Mirrors: ActiveRecord::QueryMethods::WhereChain#associated — emits an
-   * INNER JOIN on the association then WHERE assoc_pk IS NOT NULL.
-   * Skips if an identical (table+ON) join already exists, regardless of join
-   * type; throws if a different join to the same table is present (aliasing
-   * not supported).
+   * Mirrors: ActiveRecord::QueryMethods::WhereChain#associated
+   * (query_methods.rb:88-92) — `@scope.joins!(association)` (unless the
+   * association is already joined) then `self.not(pk => nil)`. Building the
+   * join through JoinDependency means through / HABTM / composite-key shapes
+   * work for free; `skipJoinFor` carries WhereChain's already-joined guard.
    */
   whereAssociated(assocNames: string[], skipJoinFor?: ReadonlySet<string>): Relation<T> {
     let rel: Relation<T> = this;
