@@ -95,6 +95,21 @@ describe("RelationTest", () => {
     expect(target.toSql()).toBe(merged.toSql());
   });
 
+  // No like-named Rails test: guards Rails' `|=` union for the preload/includes/
+  // eager_load merge folds (merger.rb / query_methods.rb) — a repeated spec across
+  // a merge must dedup structurally, not accumulate duplicate specs the preloader
+  // then double-loads.
+  it("merge unions preload/includes/eager_load specs without duplicating", () => {
+    const preloadMerged = CanonPost.preload("comments").merge(CanonPost.preload("comments"));
+    expect((preloadMerged as any)._preloadAssociations).toEqual(["comments"]);
+
+    const includesMerged = CanonPost.includes("comments").merge(CanonPost.includes("comments"));
+    expect((includesMerged as any)._includesAssociations).toEqual(["comments"]);
+
+    const eagerMerged = CanonPost.eagerLoad("comments").merge(CanonPost.eagerLoad("comments"));
+    expect((eagerMerged as any)._eagerLoadAssociations).toEqual(["comments"]);
+  });
+
   // No like-named Rails test: guards the documented proc-merge path
   // (`Post.where(...).merge(-> { ... })`, spawn_methods.rb). Through the single
   // path `merge` = `spawn.merge!` and `merge!` runs the block via
