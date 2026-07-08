@@ -3173,7 +3173,13 @@ export function association<T extends Base = Base>(
         "`association()` call.",
     );
   }
-  const proxy = new _CollectionProxyCtor(record, assocName, assocDef) as CollectionProxy<T> & {
+  // Route through the CollectionProxy per-model subclass carrier (its `_create`
+  // factory) so generated relation methods resolve as real methods on the proxy.
+  const proxy = (
+    _CollectionProxyCtor as unknown as {
+      _create: (r: Base, n: string, d: AssociationDefinition) => CollectionProxy<T>;
+    }
+  )._create(record, assocName, assocDef) as CollectionProxy<T> & {
     _hydrateFromPreload: (records: T[]) => void;
   };
 

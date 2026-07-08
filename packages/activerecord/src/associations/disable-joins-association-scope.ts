@@ -5,6 +5,7 @@ import {
   type ValueTransformation,
 } from "./association-scope.js";
 import { DisableJoinsAssociationRelation } from "../disable-joins-association-relation.js";
+import { disableJoinsAssociationRelationClassFor } from "../relation/delegation.js";
 import type { Relation } from "../relation.js";
 import type { ExceptKey } from "../relation/query-methods.js";
 import type { Base } from "../base.js";
@@ -328,10 +329,11 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       // Branch over key arity so we hit DJAR's correlated overloads.
       // At this point `joinIds` is already shape-matched to `keyCols`
       // by the single-vs-composite branches in `_addConstraintsDj`.
+      const Ctor = disableJoinsAssociationRelationClassFor(klass);
       const split =
         keyCols.length === 1
-          ? new DisableJoinsAssociationRelation<Base>(klass, keyCols[0], joinIds as unknown[])
-          : new DisableJoinsAssociationRelation<Base>(klass, keyCols, joinIds as unknown[][]);
+          ? new Ctor(klass, keyCols[0], joinIds as unknown[])
+          : new Ctor(klass, keyCols, joinIds as unknown[][]);
       const sourceWhere = (scope as { _whereClause?: { predicates?: unknown[] } })._whereClause;
       const splitWhere = (split as unknown as { _whereClause?: { predicates: unknown[] } })
         ._whereClause;

@@ -3,7 +3,11 @@ import { Relation } from "../relation.js";
 import { concatRecordsLoop } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
-import { wrapWithScopeProxy } from "../relation/delegation.js";
+import {
+  wrapWithScopeProxy,
+  associationRelationClassFor,
+  collectionProxyClassFor,
+} from "../relation/delegation.js";
 import { _registerRelationFamily } from "../relation/uncacheable-methods-slot.js";
 
 // Late-bound AssociationRelation constructor to break circular imports
@@ -452,14 +456,46 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._targetLoaded = true;
   }
 
-  constructor(record: Base, assocName: string, assocDef: AssociationDefinition) {
+  /**
+   * @internal Resolve the target model an association's proxy scopes to —
+   * preferring the rich reflection's namespace-aware klass, else `className`.
+   * Shared by the constructor and {@link _create} so the per-model carrier is
+   * chosen from the exact same model the constructed instance reports as
+   * `.model`.
+   */
+  static _targetModelFor(
+    record: Base,
+    assocName: string,
+    assocDef: AssociationDefinition,
+  ): typeof Base {
     const className = assocDef.options.className ?? camelize(singularize(assocName));
-    // Prefer the rich reflection's klass so namespace-relative resolution applies.
     const ownerCtor = record.constructor as typeof Base & {
       _reflectOnAssociation?: (n: string) => { klass?: typeof Base } | null;
     };
     const richKlass = ownerCtor._reflectOnAssociation?.(assocName)?.klass;
-    const targetModel = richKlass ?? resolveModel(className);
+    return richKlass ?? resolveModel(className);
+  }
+
+  /**
+   * @internal Construct a CollectionProxy from the target model's per-model
+   * subclass carrier (`collectionProxyClassFor`), so generated relation methods
+   * resolve as real methods on it (Rails' `delegate.include
+   * generated_relation_methods`). The carrier subclass inherits this
+   * constructor unchanged.
+   */
+  static _create<T extends Base = Base>(
+    record: Base,
+    assocName: string,
+    assocDef: AssociationDefinition,
+  ): CollectionProxy<T> {
+    const targetModel = this._targetModelFor(record, assocName, assocDef);
+    const Ctor = collectionProxyClassFor(targetModel);
+    return new Ctor(record, assocName, assocDef) as CollectionProxy<T>;
+  }
+
+  constructor(record: Base, assocName: string, assocDef: AssociationDefinition) {
+    // Prefer the rich reflection's klass so namespace-relative resolution applies.
+    const targetModel = CollectionProxy._targetModelFor(record, assocName, assocDef);
     super(targetModel, targetModel.arelTable);
     this._record = record;
     this._assocName = assocName;
@@ -3588,7 +3624,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           "deep-importing './associations/collection-proxy.js'.",
       );
     }
-    const ar = new _AssociationRelationCtor(rel.model, this);
+    const Ctor = associationRelationClassFor(rel.model as typeof Base);
+    const ar = new Ctor(rel.model, this);
     ar._copyStateFrom(rel);
     // Re-apply the association's `extend:` modules — mirrors Rails
     // `CollectionAssociation#scope`, which extends the freshly built scope
@@ -4206,7 +4243,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           "association-relation.ts must be loaded first",
       );
     }
-    return new _AssociationRelationCtor(this.model, this) as Relation<T>;
+    const Ctor = associationRelationClassFor(this.model);
+    return new Ctor(this.model, this) as Relation<T>;
   }
 }
 

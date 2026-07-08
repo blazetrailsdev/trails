@@ -6,6 +6,7 @@ import type { Association } from "./associations/association.js";
 import { setAssociationRelationFactory } from "./associations/_scope-slots.js";
 import { _cacheSingularTarget } from "./associations.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
+import { associationRelationClassFor } from "./relation/delegation.js";
 import { rebaseNewOwnerSeed } from "./associations/new-owner-seed-rebase.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 
@@ -52,7 +53,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * through the association.
    */
   protected _newRelation(): Relation<T> {
-    return new AssociationRelation<T>(this.model, this._association);
+    const Ctor = associationRelationClassFor(this.model);
+    return new Ctor(this.model, this._association);
   }
 
   /**
@@ -333,6 +335,7 @@ _registerRelationFamily(
   "associationRelation",
   AssociationRelation as unknown as new (...a: never[]) => unknown,
 );
-setAssociationRelationFactory(
-  (klass, assoc) => new AssociationRelation(klass as typeof Base, assoc as Association),
-);
+setAssociationRelationFactory((klass, assoc) => {
+  const Ctor = associationRelationClassFor(klass as typeof Base);
+  return new Ctor(klass as typeof Base, assoc as Association);
+});
