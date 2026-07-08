@@ -22,9 +22,6 @@ export class ThroughAssociation extends Association {
   private _throughRecordsByOwner: Map<Base, Base[]> | undefined;
   private _throughPreloadedRecords: Base[] | undefined;
   private _preloadIndex: Map<Base, number> | undefined;
-  private _reflectionWherePartition:
-    | { throughPredicates: Nodes.Node[]; sourcePredicates: Nodes.Node[]; sourceScope: any }
-    | undefined;
 
   constructor(
     klass: typeof Base,
@@ -181,23 +178,50 @@ export class ThroughAssociation extends Association {
       return [];
     }
 
-    // Apply this reflection's OWN scope to source record loading so
-    // instance-dependent scopes filter the final target (e.g. only comments
-    // mentioning the owner). Merge the user-supplied preload scope on top so
-    // it is not silently dropped when the reflection scope is set. Predicates
-    // that reference the THROUGH table are stripped here and applied to the
-    // through query instead (see _buildThroughScope / _partitionReflectionWhere).
+    // Mirror Rails' `source_preloaders`, which spawns a fresh Preloader on
+    // `source_reflection.name` passing this preloader's built `scope`
+    // (through_association.rb:71). The reflection scope's WHERE predicates are
+    // already applied by `_buildThroughScope` — copied onto the through query
+    // with the source JOIN so every referenced column resolves there — so we do
+    // NOT re-apply them at the source stage (they would reference the through /
+    // intermediate table that this source query never joins, e.g.
+    // `no such column: memberships.favorite`). For a nested source (source is
+    // itself a through), the sub-chain's own predicates are re-derived at its
+    // own recursive preload stage, not carried here. What the source query DOES
+    // need from the reflection scope is its non-where structure — `order`,
+    // `select`, `distinct` — so `orderedPostComments`' `order(id: :desc)` still
+    // orders the source (comments) query.
     //
-    // Rails structures nested-through preloading recursively per reflection:
-    // `source_preloaders` spawns a fresh Preloader on `source_reflection.name`,
-    // so a nested-through source re-derives its own sub-chain's scope at its own
-    // stage. We mirror that by routing only the outer reflection's own scope
-    // (via `_partitionReflectionWhere`, which draws from `_ownReflectionScope`)
-    // — never the flattened chain scope. Without this the sub-chain's own
-    // predicates (e.g. `first_blue_tags_2`'s `taggings.comment = 'first'`) would
-    // leak down to the innermost target query (`SELECT tags.* … taggings.comment`)
-    // where the intermediate table is not in the FROM clause.
-    let sourceScope = this._partitionReflectionWhere().sourceScope;
+    //   - Single-query JOIN case (to-one, non-through source): the through query
+    //     copied the FULL where_clause and joined the source, so the source
+    //     query re-applies NO predicates — empty its where_clause (keeping order
+    //     / select). This also avoids re-applying a through-table condition (e.g.
+    //     `favoriteClub`'s `memberships.favorite`) that the source query can't
+    //     resolve.
+    //   - Collection two-step case: the through query only carried through-table
+    //     predicates, so the source query keeps the reflection scope's remaining
+    //     (source-table) predicates — e.g. `goodRatings`' `ratings.value > 5`.
+    //   - Nested source (source is itself a through): carry nothing; the
+    //     sub-chain re-derives its own scope (including order) at its own
+    //     recursive preload stage, and carrying the flattened chain scope's
+    //     joins/select here would duplicate the middle records.
+    let sourceScope = null;
+    const sourceIsThrough = (sourceRefl as any)?.isThroughReflection?.() ?? false;
+    const sourceIsCollection = (sourceRefl as any)?.isCollection?.() ?? false;
+    if (!sourceIsThrough && this._reflectionScope != null) {
+      sourceScope = this._reflectionScope._clone();
+      if (!sourceIsCollection) {
+        sourceScope._whereClause = new WhereClause([]);
+      } else {
+        const throughTable = this._throughTableName();
+        const wc = this._reflectionScope._whereClause;
+        const sourcePredicates =
+          throughTable != null && wc != null
+            ? wc.predicates.filter((p: any) => !predicateReferencesTable(p, throughTable))
+            : (wc?.predicates ?? []);
+        sourceScope._whereClause = new WhereClause(sourcePredicates);
+      }
+    }
     if (sourceScope != null && this._preloadScope != null) {
       sourceScope = sourceScope.merge(this._preloadScope);
     } else if (sourceScope == null) {
@@ -362,6 +386,18 @@ export class ThroughAssociation extends Association {
     return this._preloadIndex;
   }
 
+  /**
+   * Build the through (intermediate) query's scope, mirroring Rails'
+   * `Preloader::ThroughAssociation#through_scope`
+   * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb:104-146).
+   *
+   * The whole reflection-scope `where_clause` is copied onto the through query
+   * and the source reflection is JOINed (Rails `includes!`/`references!`, a LEFT
+   * OUTER JOIN), so every column — through-table, source-table, or a
+   * scope-joined nested table — resolves in ONE query. No per-predicate table
+   * attribution is needed: the JOIN makes the source columns available on the
+   * through query directly.
+   */
   private _buildThroughScope(): any {
     const throughRefl = this._throughReflection;
     if (!throughRefl) return undefined;
@@ -376,369 +412,122 @@ export class ThroughAssociation extends Association {
     let scope = (throughKlass as any).unscoped?.() ?? (throughKlass as any)._allForPreload();
     const options = (this.reflection as any).options ?? {};
 
+    // Rails returns the bare unscoped relation before annotate/where/join when
+    // the association opts out of joins (through_association.rb:108).
     if (options.disableJoins) return scope;
 
-    // Carry the through reflection's own scope `annotate(...)` comments onto the
-    // through query. Mirrors Rails' through_scope, which reads
-    // `reflection_scope.values[:annotate]` before applying source_type
-    // (preloader/through_association.rb). Without this, custom SQL annotations
-    // on the intermediate association are silently dropped.
     const reflScope = this._reflectionScope;
+
+    // values[:annotate] → scope.annotate!(*annotations) (through_association.rb:111-113)
     const annotations: string[] = reflScope?._annotations ?? [];
     if (annotations.length > 0) {
       scope = scope.annotate(...annotations);
     }
 
-    // source_type: filter through records by polymorphic type column
+    const whereClause = reflScope?._whereClause;
     if (options.sourceType) {
+      // scope.where!(reflection.foreign_type => source_type) (rb:115-116)
       const foreignType = (this.reflection as any).foreignType;
       if (foreignType) {
         scope = scope.where({ [foreignType]: options.sourceType });
       }
-    } else {
-      // Rails' `elsif !reflection_scope.where_clause.empty?` branch copies the
-      // reflection scope's WHERE onto the through query and joins/includes the
-      // source reflection so source-table columns resolve there too
-      // (through_association.rb:117-129). We approximate that per-predicate.
-      const { throughPredicates, sourcePredicates } = this._partitionReflectionWhere();
-      const throughTable = this._throughTableName();
-      const sourceTable = this._sourceTableName();
-      const isCollection = (this.reflection as any).isCollection?.() ?? false;
-
-      if (isCollection) {
-        // has_many through: it collects every matching target at the source stage,
-        // so the through query only needs the through-table predicates to select
-        // intermediate rows. Source/target predicates stay at the source-preloader
-        // stage (see `_getSourcePreloaders`); adding a source join here would only
-        // risk fanning out through rows.
-        //
-        // But a reflection scope carrying a RAW string / Arel-node join in its own
-        // `_joinValues` bucket (`.joins("INNER JOIN …")`) is NOT gated on collection
-        // in Rails' through_scope: `joins!(source_reflection.name => values[:joins])`
-        // runs whenever the reflection where_clause is non-empty
-        // (through_association.rb:132-134). `JoinDependency.walk_tree` symbolizes the
-        // raw string into a bogus association name and `find_reflection` raises
-        // `ActiveRecord::ConfigurationError` (join_dependency.rb:224-226) — real Rails
-        // raises on a has_many-through preload here too, not just has_one. Mirror the
-        // has_one branch below: nest the scope's raw `_joinValues` under the source
-        // reflection name so the through-query build raises the SAME ConfigurationError
-        // our join builder throws for `{source => [<raw string>]}`, rather than
-        // silently deferring the raw join to the source-preloader stage (a lenient
-        // deviation Rails itself rejects). Symbol-association joins live in
-        // `_namedInnerJoins` and are carried without error at the source stage.
-        const sourceRefl = this._sourceReflection;
-        const reflScopeVals = this._reflectionScope;
-        const nestedRawJoinValues: any[] = reflScopeVals?._joinValues ?? [];
-        const whereNonEmpty = throughPredicates.length > 0 || sourcePredicates.length > 0;
-        if (sourceRefl && whereNonEmpty && nestedRawJoinValues.length > 0) {
-          scope = scope.joins({ [sourceRefl.name]: [...nestedRawJoinValues] });
-        }
-        if (throughPredicates.length > 0) {
-          scope._whereClause = new WhereClause([
-            ...scope._whereClause.predicates,
-            ...throughPredicates,
-          ]);
-        }
-      } else {
-        // has_one through: the through preloader materializes only the FIRST
-        // through record per owner (Preloader::Association#load_records keeps one
-        // row for a non-collection). A source-table condition deferred to the
-        // source-preloader stage can then filter out that lone record's target,
-        // nilling the has_one even though a different through record's target
-        // would match — and which row is "first" depends on unstable PG/MariaDB
-        // ordering. So we copy every reflection-scope predicate the through query
-        // can resolve and add the source join when any of them needs it, so the
-        // condition constrains which through row wins (Rails' through_scope).
-        //
-        // "Can resolve" = references no table beyond the through/source pair OR
-        // a deeper table the reflection scope itself reaches via its own
-        // `.joins`/`.leftJoins`/`.includes`. Rails' through_scope nests those
-        // structural values under the source reflection name so the deeper table
-        // is joined onto the through query too (through_association.rb:120-142);
-        // we carry them the same way and widen the resolvable-table set with the
-        // tables they join, so a predicate qualifying such a nested table
-        // (e.g. `general`'s `categories.name`) constrains which through row wins
-        // instead of being deferred to the source-preloader stage. A predicate
-        // reaching a table NOT joined by the scope still stays at the source
-        // stage (pushing it here would produce `no such column: <nested>.<col>`).
-        // This also admits source-qualified and unqualified predicates, and
-        // mixed through/source predicates (e.g.
-        // `memberships.favorite = ? OR clubs.name = ?`), which land in the
-        // throughPredicates bucket but still need the source join.
-        const sourceRefl = this._sourceReflection;
-        const reflScopeVals = this._reflectionScope;
-        const nestedIncludes: any[] = reflScopeVals?._includesAssociations ?? [];
-        const nestedJoins: any[] = reflScopeVals?._namedInnerJoins ?? [];
-        const nestedLeftOuter: any[] = reflScopeVals?._leftOuterJoinsValues ?? [];
+    } else if (reflScope != null && whereClause != null && !whereClause.isEmpty()) {
+      // elsif !reflection_scope.where_clause.empty? (rb:117-143): copy the FULL
+      // where_clause onto the through query and JOIN the source reflection so
+      // every referenced column resolves in this single query.
+      const sourceRefl = this._sourceReflection;
+      // The single-query JOIN is only safe when the source reflection is a
+      // to-ONE, non-through association. A collection source (has_many) or a
+      // nested through source joined onto the through query fans the
+      // intermediate rows out across the source/sub-chain join tables,
+      // duplicating the middle records — Rails avoids that because its through
+      // query is an eager-load whose JoinDependency instantiates distinct
+      // parents by primary key, but trails' preloader collects raw rows. For
+      // those cases trails recurses per reflection stage (Rails'
+      // `source_preloaders`): the source/sub-chain predicates and order are
+      // applied at the source-preloader stage (see `_getSourcePreloaders`), and
+      // only the reflection scope's THROUGH-table predicates are copied here to
+      // constrain which intermediate rows this through query selects.
+      const sourceIsThrough = (sourceRefl as any)?.isThroughReflection?.() ?? false;
+      const sourceIsCollection = (sourceRefl as any)?.isCollection?.() ?? false;
+      if (sourceRefl && !sourceIsThrough && !sourceIsCollection) {
+        scope._whereClause = new WhereClause([
+          ...scope._whereClause.predicates,
+          ...whereClause.predicates,
+        ]);
+        const sourceName = sourceRefl.name;
+        const nestedJoins: any[] = reflScope?._namedInnerJoins ?? [];
+        const nestedLeftOuter: any[] = reflScope?._leftOuterJoinsValues ?? [];
         // Raw string / Arel-node joins the reflection scope carries in its own
-        // `_joinValues` bucket (`.joins("INNER JOIN …")` or `.joins(<Arel join>)`).
-        // Rails passes the scope's FULL `joins_values` — symbols AND raw
-        // strings / Arel nodes — to `joins!(source_reflection.name => joins)`
-        // (through_association.rb:132-134). See the nesting below for why a raw
-        // value there is not a silent carry but an error, matching Rails.
-        const nestedRawJoinValues: any[] = reflScopeVals?._joinValues ?? [];
-        const nestedTables = sourceRefl
-          ? this._resolveNestedTableNames(sourceRefl, [
-              ...nestedIncludes,
-              ...nestedJoins,
-              ...nestedLeftOuter,
-            ])
-          : [];
-        const allowed = [throughTable, sourceTable, ...nestedTables].filter(
-          (t): t is string => t != null,
-        );
-        // Rails' through_scope runs `joins!(source_reflection.name => values[:joins])`
-        // whenever the reflection where_clause is non-empty
-        // (through_association.rb:132-134). `values[:joins]` is the scope's FULL
-        // joins array — raw SQL strings and Arel join nodes included, not just
-        // symbol associations. `JoinDependency.walk_tree` symbolizes a raw string
-        // hash-value into a bogus association name and `find_reflection` raises
-        // `ActiveRecord::ConfigurationError` (confirmed against a live Rails
-        // console: a has_one-through whose scope uses `.joins("INNER JOIN …")`
-        // raises on preload). We mirror that verbatim: nest the scope's raw
-        // `_joinValues` under the source reflection name so the through-query
-        // build raises the SAME ConfigurationError our join builder already
-        // throws for `{source => [<raw string>]}` — rather than silently carrying
-        // an SQL join Rails itself rejects (which would be a new deviation, not a
-        // fidelity fix). Symbol-association joins live in `_namedInnerJoins` and
-        // are nested below without error — that is the only `joins` case Rails
-        // actually supports in this branch.
-        const whereNonEmpty = throughPredicates.length > 0 || sourcePredicates.length > 0;
-        if (sourceRefl && whereNonEmpty && nestedRawJoinValues.length > 0) {
-          scope = scope.joins({ [sourceRefl.name]: [...nestedRawJoinValues] });
+        // `_joinValues` bucket (`.joins("INNER JOIN …")` or `.joins(<Arel node>)`).
+        // Rails passes the scope's FULL `joins_values` — symbols AND raw strings
+        // / Arel nodes — to `joins!(source_reflection.name => joins)`
+        // (rb:132-134). `JoinDependency.walk_tree` symbolizes a raw string into a
+        // bogus association name and `find_reflection` raises
+        // `ActiveRecord::ConfigurationError` — real Rails raises on preload here,
+        // it does not silently carry the raw join. Nesting it under the source
+        // reflection name makes trails' join builder raise the same error.
+        const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
+
+        // Rails `includes!(source_reflection.name)` + `references!(...)` promotes
+        // to a LEFT OUTER JOIN of the source reflection. `values[:includes]`
+        // (the reflection SCOPE's explicit `.includes`) is empty for the through
+        // scopes we support — trails' `_includesAssociations` bucket is polluted
+        // with derived inverse associations (e.g. the source's own inverse
+        // `tagging`), which would fan the through query out — so we do NOT carry
+        // it; the bare source join matches Rails' `includes!(source)`. A scope's
+        // explicit `.left_joins(source => nested)` lives in
+        // `_leftOuterJoinsValues` and IS nested so a deeper table its predicate
+        // qualifies is joined too (rb:120-138).
+        if (nestedLeftOuter.length > 0) {
+          scope = scope.leftOuterJoins({ [sourceName]: nestedLeftOuter });
+        } else {
+          scope = scope.leftOuterJoins(sourceName);
         }
-        const copyable = [...throughPredicates, ...sourcePredicates].filter(
-          (pred) => !predicateReferencesForeignTable(pred, allowed),
+
+        // joins!(source_reflection.name => joins): symbol-association joins are
+        // carried as an inner join; raw string / Arel joins raise as above.
+        if (nestedRawJoinValues.length > 0) {
+          scope = scope.joins({ [sourceName]: [...nestedRawJoinValues] });
+        }
+        if (nestedJoins.length > 0) {
+          scope = scope.joins({ [sourceName]: nestedJoins });
+        }
+
+        // Rails carries `order` only when `scope.eager_loading?` (rb:140). In
+        // this branch Rails always `includes!(source)` + `references!(...)`, so
+        // `eager_loading?` is true whenever the branch runs — our source join
+        // above is the analogue, so carry the order unconditionally here.
+        const orderClauses: any[] = reflScope?._orderClauses ?? [];
+        const rawOrderClauses: string[] = reflScope?._rawOrderClauses ?? [];
+        if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
+          scope._orderClauses = [...scope._orderClauses, ...orderClauses];
+          scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
+        }
+      } else if (sourceRefl) {
+        // Collection or nested source: the single-query JOIN cannot cover it
+        // (fan-out), so the source / sub-chain predicates ride the recursive
+        // source-preloader stages instead. But a THROUGH-table predicate the
+        // reflection scope carries (e.g. `miscPostFirstBlueTags_2`'s
+        // `posts.title IN (…)`, whose through reflection is `posts`) must still
+        // constrain which intermediate rows this through query selects — the
+        // recursion can't apply it because it filters the through table, not the
+        // source. So copy just the predicates that reference the through table,
+        // detected precisely from their Arel attributes (no raw-SQL text scan).
+        // Source / sub-chain predicates stay for the recursion.
+        const throughTable = throughKlass.tableName;
+        const throughPreds = whereClause.predicates.filter((p: any) =>
+          predicateReferencesTable(p, throughTable),
         );
-        if (copyable.length > 0) {
-          // Rails' branch unconditionally includes!/references! the source
-          // reflection whenever it copies the where_clause — the join is not
-          // gated on any predicate referencing the source table. Add it whenever
-          // we copy predicates so an UNQUALIFIED source condition (e.g.
-          // `where("name = ?")`) resolves against the joined source rather than
-          // binding to the through table. leftOuterJoins (not an inner join)
-          // mirrors Rails' LEFT OUTER JOIN: it never drops a through row for a
-          // null source, so a mixed OR predicate can still select a through row
-          // via its through-table arm while the WHERE filters the source arm.
-          if (sourceRefl) {
-            const sourceName = sourceRefl.name;
-            // Nest the scope's own joins/includes under the source reflection so
-            // the deeper tables their predicates qualify are joined onto the
-            // through query (Rails joins!/left_outer_joins!/includes!
-            // source_reflection.name => …). The nested left-outer form already
-            // joins the source, so only add the bare source join otherwise.
-            const nestedOuter = [...nestedLeftOuter, ...nestedIncludes];
-            if (nestedOuter.length > 0) {
-              scope = scope.leftOuterJoins({ [sourceName]: nestedOuter });
-            } else {
-              scope = scope.leftOuterJoins(sourceName);
-            }
-            // Rails nests the scope's symbol-association `joins_values` under the
-            // source reflection (through_association.rb:132-134); `_namedInnerJoins`
-            // holds exactly those. Raw string / Arel-node joins are handled above
-            // (they raise, matching Rails).
-            if (nestedJoins.length > 0) {
-              scope = scope.joins({ [sourceName]: nestedJoins });
-            }
-            // Rails also `references!(source_reflection.table_name)` so its
-            // `includes!(source)` promotes to a LEFT JOIN. We join the source
-            // explicitly above, so that step is already realized and no separate
-            // references pass is needed.
-            //
-            // Rails carries the scope's `order` only when `scope.eager_loading?`
-            // (through_association.rb:140). In that branch Rails ALWAYS
-            // `includes!(source)` and `references!(source.table_name)`, so
-            // `includes_values.any? && references_eager_loaded_tables?`
-            // (relation.rb:1238-1242) holds and `eager_loading?` is true
-            // whenever this where-copy branch runs — it does NOT depend on the
-            // reflection scope carrying its own nested `includes`. Our equivalent
-            // of that unconditional source include/reference is the source join
-            // added just above, so carry the order whenever we reach here (the
-            // enclosing `copyable.length > 0` guard is the analogue of the branch
-            // running), matching Rails for a `.leftJoins(:x).where(…).order(…)`
-            // scope that has no top-level `.includes`.
-            const orderClauses: any[] = reflScopeVals?._orderClauses ?? [];
-            const rawOrderClauses: string[] = reflScopeVals?._rawOrderClauses ?? [];
-            if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
-              scope._orderClauses = [...scope._orderClauses, ...orderClauses];
-              scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
-            }
-          }
-          scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...copyable]);
+        if (throughPreds.length > 0) {
+          scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...throughPreds]);
         }
       }
     }
 
     // cascade_strict_loading: a strict-loading preload scope propagates to the
-    // through query so intermediate records inherit the constraint
-    // (preloader/through_association.rb:145, Association#cascade_strict_loading).
+    // through query so intermediate records inherit the constraint (rb:145).
     return this._cascadeStrictLoading(scope);
-  }
-
-  /**
-   * Split this reflection's OWN scope's WHERE predicates by referenced table:
-   * those that reference the through table go onto the through query, the rest
-   * (source / target table, unqualified) stay on the source preloader. Mirrors
-   * the intent of Rails' `through_scope` `reflection_scope.where_clause` copy
-   * (preloader/through_association.rb:117) without the single-query JOIN.
-   *
-   * Draws from `_ownReflectionScope`, not the flattened chain scope: a
-   * nested-through source re-derives its own sub-chain's scope at its own
-   * recursive preload stage (Rails' `source_preloaders`), so this reflection
-   * only routes what it itself declares.
-   * @internal
-   */
-  private _partitionReflectionWhere(): {
-    throughPredicates: Nodes.Node[];
-    sourcePredicates: Nodes.Node[];
-    sourceScope: any;
-  } {
-    if (this._reflectionWherePartition !== undefined) return this._reflectionWherePartition;
-
-    const reflScope = this._ownReflectionScope();
-    let result: {
-      throughPredicates: Nodes.Node[];
-      sourcePredicates: Nodes.Node[];
-      sourceScope: any;
-    } = {
-      throughPredicates: [],
-      sourcePredicates: [],
-      sourceScope: reflScope,
-    };
-
-    const wc = reflScope?._whereClause;
-    const throughTable = this._throughTableName();
-    if (reflScope != null && wc != null && !wc.isEmpty()) {
-      const throughPredicates: Nodes.Node[] = [];
-      const sourcePredicates: Nodes.Node[] = [];
-      for (const pred of wc.predicates) {
-        if (throughTable != null && predicateReferencesTable(pred, throughTable))
-          throughPredicates.push(pred);
-        else sourcePredicates.push(pred);
-      }
-      // Only re-scope the source preloader when a through predicate is peeled off
-      // — otherwise leave the full reflection scope so the source stage keeps
-      // applying every (source-table) condition exactly as before.
-      let sourceScope = reflScope;
-      if (throughPredicates.length > 0) {
-        sourceScope = reflScope._clone();
-        sourceScope._whereClause = new WhereClause(sourcePredicates);
-      }
-      result = { throughPredicates, sourcePredicates, sourceScope };
-    }
-
-    this._reflectionWherePartition = result;
-    return result;
-  }
-
-  /**
-   * Resolve the table names an `AssociationSpec` list reaches from the source
-   * reflection's klass. Used to widen the has_one-through query's resolvable-table
-   * set with the tables the reflection scope joins via its own
-   * `.joins`/`.leftJoins`/`.includes`, so a predicate qualifying one of them can
-   * ride the through query (Rails' nested through_scope carry-over,
-   * through_association.rb:120-142). Resolution walks nested hash/array specs
-   * recursively: each level's key resolves against the current klass, and its
-   * value recurses against that association's klass, so a two-or-more-levels-deep
-   * table (e.g. `.joins({ category: :subcategory })` reaching `subcategories`)
-   * enters the resolvable set. Rails nests the whole spec under the source
-   * reflection name, realizing the deeper join on the through query. An
-   * unresolvable (e.g. polymorphic) association is skipped, leaving its predicate
-   * at the source-preloader stage.
-   * @internal
-   */
-  private _resolveNestedTableNames(sourceRefl: AssociationLikeReflection, specs: any[]): string[] {
-    let sourceKlass: typeof Base;
-    try {
-      sourceKlass = sourceRefl.klass;
-    } catch {
-      return [];
-    }
-    const tables: string[] = [];
-    const walk = (klass: typeof Base, spec: any): void => {
-      if (spec == null) return;
-      if (typeof spec === "string") {
-        this._collectNestedTable(klass, spec, tables);
-      } else if (Array.isArray(spec)) {
-        for (const s of spec) walk(klass, s);
-      } else if (typeof spec === "object") {
-        for (const key of Object.keys(spec)) {
-          const nextKlass = this._collectNestedTable(klass, key, tables);
-          if (nextKlass) walk(nextKlass, spec[key]);
-        }
-      }
-    };
-    for (const spec of specs) walk(sourceKlass, spec);
-    return tables;
-  }
-
-  /**
-   * Resolve `name` as an association on `klass`, push its table into `tables`,
-   * and return its klass so the caller can recurse into a deeper spec. Returns
-   * null for an unresolvable (e.g. polymorphic) association.
-   * @internal
-   */
-  private _collectNestedTable(
-    klass: typeof Base,
-    name: string,
-    tables: string[],
-  ): typeof Base | null {
-    try {
-      const r = (klass as any)._reflectOnAssociation?.(name);
-      const nextKlass = r?.klass;
-      const t = nextKlass?.tableName;
-      if (typeof t === "string") tables.push(t);
-      return (nextKlass as typeof Base) ?? null;
-    } catch {
-      /* polymorphic / unresolved association — leave predicate at source stage */
-      return null;
-    }
-  }
-
-  /**
-   * This reflection's OWN scope, excluding the source reflection's contribution.
-   *
-   * Branch passes `_reflectionScope` as the whole chain's flattened
-   * `join_scopes` (source_reflection.join_scopes + this reflection's own),
-   * merged. For a nested-through source that flattening carries the source
-   * sub-chain's own predicates (e.g. `first_blue_tags_2`'s
-   * `taggings.comment = 'first'`), which the recursive source preloader
-   * re-derives at its own stage — so this reflection must not also route them.
-   * We recompute the split by length: `join_scopes` returns
-   * `[...source_reflection.join_scopes, ...own]`, so the own scopes are the tail
-   * past the source reflection's own `join_scopes`. When the source is not a
-   * nested through, the tail is the entire scope, so `_reflectionScope` is
-   * returned unchanged (preserving instance-dependent scopes exactly).
-   * @internal
-   */
-  private _ownReflectionScope(): any {
-    const reflScope = this._reflectionScope ?? null;
-    if (reflScope == null) return null;
-
-    const sourceRefl = this._sourceReflection;
-    if (!sourceRefl || !(sourceRefl as any).isThroughReflection?.()) return reflScope;
-
-    let table: any;
-    let predicateBuilder: any;
-    try {
-      table = (this.klass as any).arelTable;
-      predicateBuilder = (this.klass as any).predicateBuilder;
-    } catch {
-      return reflScope;
-    }
-
-    let full: any[];
-    let sourceScopes: any[];
-    try {
-      full = (this.reflection as any).joinScopes?.(table, predicateBuilder, this.klass) ?? [];
-      sourceScopes = (sourceRefl as any).joinScopes?.(table, predicateBuilder, this.klass) ?? [];
-    } catch {
-      return reflScope;
-    }
-
-    const ownScopes = full.slice(sourceScopes.length);
-    if (ownScopes.length === 0) return null;
-    return ownScopes.reduce((acc: any, s: any) => acc.merge(s));
   }
 
   /** @internal */
@@ -747,17 +536,6 @@ export class ThroughAssociation extends Association {
     if (!throughRefl) return null;
     try {
       return (throughRefl.klass as any)?.tableName ?? null;
-    } catch {
-      return null;
-    }
-  }
-
-  /** @internal */
-  private _sourceTableName(): string | null {
-    const sourceRefl = this._sourceReflection;
-    if (!sourceRefl) return null;
-    try {
-      return (sourceRefl.klass as any)?.tableName ?? null;
     } catch {
       return null;
     }
@@ -806,8 +584,12 @@ export class ThroughAssociation extends Association {
 }
 
 /**
- * True when any attribute in `node` references `tableName`. Used to route a
- * reflection-scope predicate to either the through query or the source query.
+ * True when any Arel attribute in `node` references `tableName`. Used only for a
+ * NESTED through source (where the single-query JOIN can't be used) to copy the
+ * reflection scope's through-table predicates onto the through query. This is a
+ * precise Arel-attribute walk — NOT the raw-SQL text scan removed with this
+ * convergence — so a raw-string predicate carries no attributes and is left for
+ * the recursive source stage.
  * @internal
  */
 function predicateReferencesTable(node: any, tableName: string): boolean {
@@ -822,124 +604,7 @@ function predicateReferencesTable(node: any, tableName: string): boolean {
   if (!found && node instanceof Nodes.Not) {
     return predicateReferencesTable((node as any).expr, tableName);
   }
-  // Raw-SQL predicates (e.g. `where("memberships.favorite = ?", true)`) carry no
-  // Arel Attribute nodes, so `fetchAttribute` never visits them. Inspect the raw
-  // SQL text for a `<table>.` reference so a string condition on the through
-  // table is relocated to the through query just like a hash/Arel condition.
-  if (!found && rawSqlReferencesTable(node, tableName)) {
-    found = true;
-  }
   return found;
-}
-
-/**
- * True when a raw-SQL predicate node's text qualifies a column with `tableName.`.
- * Handles SqlLiteral / BoundSqlLiteral and a single Grouping wrapper.
- *
- * Not a SQL parse but a qualifier scan: string literals are stripped first (see
- * `stripSqlStringLiterals`) so a `<table>.` qualifier appearing inside a quoted
- * literal — e.g. `where("note = 'see memberships.x'")` — is NOT a false positive
- * and does not relocate a source-table predicate onto the through query.
- * Arel/hash predicates take the precise `fetchAttribute` path above and never
- * reach here.
- * @internal
- */
-function rawSqlReferencesTable(node: any, tableName: string): boolean {
-  if (node instanceof Nodes.Grouping) {
-    return rawSqlReferencesTable((node as any).expr, tableName);
-  }
-  let sql: string | undefined;
-  if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
-  else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
-  if (typeof sql !== "string") return false;
-  sql = stripSqlStringLiterals(sql);
-  const escaped = tableName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  return new RegExp(`(^|[^\\w.])${escaped}\\.`).test(sql);
-}
-
-/**
- * Blank out single-quoted SQL string literals (keeping length via spaces) so a
- * `<table>.` qualifier scan does not match a table name embedded in literal
- * text. Both escape forms inside a literal are consumed: SQL-standard doubled
- * single-quotes (`''`) and a backslash-escaped quote (`\'`), the latter being
- * MySQL/MariaDB's default (`NO_BACKSLASH_ESCAPES` off) — so a literal like
- * `'don\'t touch memberships.x'` is fully blanked rather than terminating early
- * at the escaped quote. The `\\.` alternative pairs each backslash with its
- * following char, so an escaped backslash (`\\`) is consumed as one unit and a
- * real close-quote right after it (`'a\\'`) still closes the literal — a
- * subsequent genuine qualifier (`... 'a\\' AND posts.x ...`) stays exposed to
- * the scan and is NOT swallowed. `?` placeholders in a BoundSqlLiteral are
- * outside any literal and unaffected.
- *
- * Only single-quoted literals are tokenized; double-quoted identifiers are not
- * tracked. That leaves one narrow gap: two double-quoted identifiers each
- * containing a stray apostrophe (e.g. `"note's"`) can have their apostrophes
- * paired as a bogus literal, blanking a genuine qualifier between them. This
- * needs apostrophe-bearing quoted identifiers — pathological for canonical
- * table/column names — so it is left as an accepted limitation rather than
- * carrying a full SQL tokenizer here.
- * @internal
- */
-function stripSqlStringLiterals(sql: string): string {
-  // Not query construction — this blanks literals purely so the read-only
-  // qualifier scan below does not match a table name inside quoted text. The
-  // result is never executed as SQL.
-  // eslint-disable-next-line blazetrails/no-raw-sql
-  return sql.replace(/'(?:[^'\\]|''|\\.)*'/g, (lit) => " ".repeat(lit.length));
-}
-
-/**
- * True when `node` qualifies a column with some table NOT in `allowedTables`.
- * Used to decide whether a reflection-scope predicate can ride the has_one-through
- * query, which selects the through table and joins the immediate source: a
- * predicate qualifying only those (or unqualified) is safe (return false), but one
- * reaching a further nested table the through query never joins is not (true).
- *
- * Uses the same Arel `fetchAttribute` walk as `predicateReferencesTable` for
- * precise hash/Arel conditions, and the same raw-SQL qualifier scan as
- * `rawSqlReferencesTable` — string literals are stripped first, then every
- * `<word>.` qualifier is extracted and any not in `allowedTables` is flagged. A
- * `<table>.` qualifier inside a quoted literal is not a false positive; hash
- * predicates take the exact Arel path.
- * @internal
- */
-function predicateReferencesForeignTable(node: any, allowedTables: string[]): boolean {
-  const allowed = new Set(allowedTables);
-  let foreign = false;
-  node.fetchAttribute?.((attr: any) => {
-    if (attr instanceof Nodes.Attribute && !allowed.has(relationName(attr.relation.name))) {
-      foreign = true;
-      return false;
-    }
-    return true;
-  });
-  if (foreign) return true;
-  if (node instanceof Nodes.Not) {
-    return predicateReferencesForeignTable((node as any).expr, allowedTables);
-  }
-  return rawSqlReferencesForeignTable(node, allowed);
-}
-
-/**
- * True when a raw-SQL predicate node's text qualifies a column with any table
- * not in `allowed`. Mirrors `rawSqlReferencesTable`'s node unwrapping.
- * @internal
- */
-function rawSqlReferencesForeignTable(node: any, allowed: Set<string>): boolean {
-  if (node instanceof Nodes.Grouping) {
-    return rawSqlReferencesForeignTable((node as any).expr, allowed);
-  }
-  let sql: string | undefined;
-  if (node instanceof Nodes.BoundSqlLiteral) sql = (node as any).sqlWithPlaceholders;
-  else if (node instanceof Nodes.SqlLiteral) sql = (node as any).value;
-  if (typeof sql !== "string") return false;
-  sql = stripSqlStringLiterals(sql);
-  const qualifierRe = /(^|[^\w.])(\w+)\s*\./g;
-  let match: RegExpExecArray | null;
-  while ((match = qualifierRe.exec(sql)) !== null) {
-    if (!allowed.has(match[2])) return true;
-  }
-  return false;
 }
 
 /** @internal */
