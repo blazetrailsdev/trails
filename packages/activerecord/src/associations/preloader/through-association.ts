@@ -662,23 +662,19 @@ export class ThroughAssociation extends Association {
 
         // references!(source.table_name) (rb:127-130): unless the scope already
         // carries explicit references, reference the source table so `includes`
-        // promotes to the eager JOIN. `.klass` can throw for an unresolvable /
-        // polymorphic source reflection (same guard as `_scopeHasFanOutJoin` /
-        // `_includeSpecFansOut`); if it does, skip the reference and let the
-        // `includes` degrade to a plain preload.
+        // promotes to the eager JOIN. Rails reads `source_reflection.table_name`
+        // unguarded here and raises for an unresolvable / polymorphic source
+        // (you can't get a static klass off a polymorphic belongs_to without an
+        // instance) — so this is intentionally NOT wrapped: it must fail loudly
+        // the way Rails does rather than silently degrade to an unreferenced
+        // `includes` (a differently-shaped query). The sibling `.klass` guards in
+        // `_scopeHasFanOutJoin` / `_includeSpecFansOut` are internal routing
+        // heuristics with no Rails counterpart; this branch is a direct port.
         const refs: string[] = reflScope?._referencesValues ?? [];
-        let sourceTableName: string | undefined;
-        if (refs.length === 0) {
-          try {
-            sourceTableName = (sourceRefl as any).klass?.tableName;
-          } catch {
-            sourceTableName = undefined;
-          }
-        }
         if (refs.length > 0) {
           scope = scope.references(...refs);
-        } else if (sourceTableName != null) {
-          scope = scope.references(sourceTableName);
+        } else {
+          scope = scope.references(sourceRefl.klass.tableName);
         }
 
         // joins!(source => joins) / left_outer_joins!(source => …) (rb:132-137).
