@@ -44,45 +44,65 @@ export interface TestDatabaseConfig {
 }
 
 /**
+ * A named connection in the `connections:` hash of
+ * `vendor/rails/activerecord/test/config.example.yml`: its `arunit` adapter
+ * name plus a builder for the primary "test" env config.
+ *
+ * `build()` returns `null` when the backend's connection details are absent
+ * (the live-backend analogue of a `config.yml` entry with no reachable server);
+ * `resolve()` turns that into Rails' loud adapter-mismatch failure rather than
+ * silently falling back to SQLite.
+ */
+interface NamedConnection {
+  /** The `arunit` adapter name Rails checks against (`connection.rb:35`). */
+  adapter: string;
+  /** The public {@link TestAdapterName} lane this connection drives. */
+  lane: TestAdapterName;
+  build(): HashConfig | UrlConfig | null;
+}
+
+/**
  * The named connections available to the test harness, mirroring the
- * `connections:` hash of `vendor/rails/activerecord/test/config.example.yml`.
- * `ARCONN` selects one of these keys; `DEFAULT_CONNECTION` is Rails'
- * `config["default_connection"]` fallback.
+ * `connections:` hash of `config.example.yml`. `ARCONN` selects one of these
+ * keys; `DEFAULT_CONNECTION` is Rails' `config["default_connection"]` fallback.
+ *
+ * Connection details for the live backends still come from `PG_TEST_URL` /
+ * `MYSQL_TEST_URL` in this foundation PR; migrating those onto Rails' discrete
+ * sub-setting env vars is tracked as a follow-up story.
  */
 type ConnectionName = "sqlite3" | "sqlite3_mem" | "postgresql" | "mysql2";
 
 const DEFAULT_CONNECTION: ConnectionName = "sqlite3";
 
-/**
- * Each named connection builds its primary "test" env config from
- * Rails-mirrored sub-setting env vars (never a URL that also *selects* the
- * backend). The live-backend builders return a SQLite fallback when their
- * connection details are absent; the adapter-mismatch check downstream turns
- * that into Rails' `ArgumentError`.
- */
-const CONNECTIONS: Record<ConnectionName, () => HashConfig | UrlConfig> = {
-  sqlite3: () => new HashConfig("test", "primary", sqliteHash()),
-  sqlite3_mem: () =>
-    new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:", pool: 1 }),
-  postgresql: () => {
-    const pgUrl = getEnv("PG_TEST_URL");
-    if (pgUrl) return new UrlConfig("test", "primary", pgUrl);
-    return new HashConfig("test", "primary", sqliteHash());
+const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
+  sqlite3: {
+    adapter: "sqlite3",
+    lane: "sqlite",
+    build: () => new HashConfig("test", "primary", sqliteHash()),
   },
-  mysql2: () => {
-    const mysqlUrl = getEnv("MYSQL_TEST_URL");
-    if (mysqlUrl) return new UrlConfig("test", "primary", mysqlUrl);
-    return new HashConfig("test", "primary", sqliteHash());
+  sqlite3_mem: {
+    adapter: "sqlite3",
+    lane: "sqlite",
+    build: () =>
+      new HashConfig("test", "primary", { adapter: "sqlite3", database: ":memory:", pool: 1 }),
+  },
+  postgresql: {
+    adapter: "postgresql",
+    lane: "postgres",
+    build: () => {
+      const pgUrl = getEnv("PG_TEST_URL");
+      return pgUrl ? new UrlConfig("test", "primary", pgUrl) : null;
+    },
+  },
+  mysql2: {
+    adapter: "mysql2",
+    lane: "mysql",
+    build: () => {
+      const mysqlUrl = getEnv("MYSQL_TEST_URL");
+      return mysqlUrl ? new UrlConfig("test", "primary", mysqlUrl) : null;
+    },
   },
 };
-
-/** Map a resolved `envConfig.adapter` to the public {@link TestAdapterName}. */
-function adapterName(config: HashConfig | UrlConfig): TestAdapterName {
-  const adapter = config.adapter ?? "";
-  if (adapter.includes("postgres")) return "postgres";
-  if (adapter.includes("mysql")) return "mysql";
-  return "sqlite";
-}
 
 /**
  * Resolve the named connection selected by `ARCONN` into an adapter + config.
@@ -92,8 +112,8 @@ function adapterName(config: HashConfig | UrlConfig): TestAdapterName {
  */
 function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfig } {
   const connectionName = (getEnv("ARCONN") || DEFAULT_CONNECTION) as ConnectionName;
-  const builder = CONNECTIONS[connectionName];
-  if (!builder) {
+  const connection = CONNECTIONS[connectionName];
+  if (!connection) {
     // Rails prints "Connection ... not found" and `exit 1`; we have no
     // `process.exit`, so the loud failure is a throw with the same message.
     // Test-helper invariant with no Rails error counterpart — a bare Error is intentional.
@@ -104,23 +124,22 @@ function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfi
     );
   }
 
-  const envConfig = builder();
-  const arunitAdapter = envConfig.adapter ?? "";
+  const envConfig = connection.build();
   // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
   // (connection.rb:35-37). A live-backend `ARCONN` whose connection details are
-  // absent resolves to SQLite here, whose adapter is not a substring of the
-  // connection name, so this fires — folding in PR #4768's silent-fallback guard.
-  if (!connectionName.includes(arunitAdapter)) {
+  // absent would silently fall back to SQLite — folding in PR #4768's guard, we
+  // raise instead of resolving the wrong backend.
+  if (envConfig === null) {
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(
       `The connection name did not match the adapter name. Connection name is ` +
-        `"${connectionName}" and the adapter name is "${arunitAdapter}". ` +
-        `The ${connectionName} backend's connection details (e.g. PG_TEST_URL / ` +
-        `MYSQL_TEST_URL) are not set, so the run would silently fall back to SQLite.`,
+        `"${connectionName}" (adapter "${connection.adapter}"), but its connection ` +
+        `details (PG_TEST_URL / MYSQL_TEST_URL) are not set, so the run would ` +
+        `silently fall back to SQLite.`,
     );
   }
 
-  return { adapter: adapterName(envConfig), envConfig };
+  return { adapter: connection.lane, envConfig };
 }
 
 /**
