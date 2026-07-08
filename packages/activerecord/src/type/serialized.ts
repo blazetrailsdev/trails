@@ -24,6 +24,23 @@ function isValueComparable(value: unknown): boolean {
 }
 
 /**
+ * Whether a non-collection object carries value-based equality, mirroring a
+ * Ruby object whose `==` compares by value rather than identity (e.g.
+ * `Date`/`Time`). The JS analog is an object whose `valueOf()` returns a
+ * primitive other than the object itself: `Date.prototype.valueOf` yields a
+ * number, whereas the default `Object.prototype.valueOf` returns `this` (so a
+ * plain custom `object_class` instance falls through to reference equality,
+ * matching Ruby's default `Object#==`).
+ *
+ * @internal
+ */
+function hasValueEquality(value: unknown): boolean {
+  if (value === null || typeof value !== "object") return false;
+  const primitive = (value as { valueOf(): unknown }).valueOf();
+  return primitive !== value && (primitive === null || typeof primitive !== "object");
+}
+
+/**
  * Structural JSON key used to compare a value against the coder's default.
  * Unwraps objects that expose `toHash()` (the HashWithIndifferentAccess
  * interface) so their contents — not their Map-backed internal shape — drive
@@ -147,10 +164,9 @@ export class Serialized extends ValueType {
   // same distinction `isValueComparable`/`canonicalKey` already draw for
   // `default_value?`. Sharing that scope is deliberate: a coder whose `load`
   // returns a non-Array/Hash value with its own value-based `==` (e.g.
-  // Date/Time) still falls through to reference equality — a narrow edge no
-  // serialized coder here hits. `canonicalKey` sorts object keys, so two
-  // content-equal hashes built in a different insertion order compare equal,
-  // matching Ruby's order-insensitive `Hash#==`.
+  // Date/Time) is compared through `hasValueEquality` below. `canonicalKey`
+  // sorts object keys, so two content-equal hashes built in a different
+  // insertion order compare equal, matching Ruby's order-insensitive `Hash#==`.
   override isChanged(
     oldValue: unknown,
     newValue: unknown,
@@ -163,6 +179,14 @@ export class Serialized extends ValueType {
       } catch {
         return true;
       }
+    }
+    // A coder whose `load` returns a value-== object (e.g. Date/Time) mirrors
+    // Ruby's `old_value != new_value` dispatching to that object's own `==`.
+    if (hasValueEquality(oldValue) && hasValueEquality(newValue)) {
+      return !Object.is(
+        (oldValue as { valueOf(): unknown }).valueOf(),
+        (newValue as { valueOf(): unknown }).valueOf(),
+      );
     }
     return true;
   }

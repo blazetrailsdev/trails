@@ -35,4 +35,17 @@ describe("Serialized#isChanged", () => {
     const newValue = new HashWithIndifferentAccess({ b: 2, a: 1 });
     expect(type.isChanged(oldValue, newValue)).toBe(false);
   });
+
+  it("treats two value-equal Dates as unchanged, matching Ruby Date#==", () => {
+    expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-08"))).toBe(false);
+    expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-09"))).toBe(true);
+  });
+
+  it("falls back to reference equality for identity-== object_class instances", () => {
+    class Custom {}
+    const oldValue = new Custom();
+    const newValue = new Custom();
+    expect(type.isChanged(oldValue, newValue)).toBe(true);
+    expect(type.isChanged(oldValue, oldValue)).toBe(false);
+  });
 });
