@@ -46,11 +46,13 @@ export class ThroughAssociation extends Association {
     // When every owner already carries this association loaded — e.g. an outer
     // through query eager-loaded this source sub-chain via `includes!`/
     // `references!`, so the middle records arrive with their source association
-    // populated — return those targets directly. Skipping the through/source
-    // fetch below is what collapses the deeper stages into the single eager
-    // through query (Rails' `data_available?` short-circuit); the per-owner
-    // `isLoaded` check inside the loop only avoids re-associating, not the
-    // fetch, so it must be hoisted here.
+    // populated — return those targets directly. This is the hoisted
+    // loop-invariant of Rails' `records_by_owner`
+    // (preloader/through_association.rb:11-15): if every owner is loaded, every
+    // iteration takes the early `next`, so `through_records_by_owner` /
+    // `source_records_by_owner` are never forced and no fetch happens. The
+    // per-owner `isLoaded` check inside our loop only avoids re-associating, not
+    // the unconditional fetch above it, so the guard must be hoisted here.
     if (this.owners.length > 0 && this.owners.every((owner) => this.isLoaded(owner))) {
       for (const owner of this.owners) {
         result.set(owner, this.targetFor(owner));
@@ -660,12 +662,23 @@ export class ThroughAssociation extends Association {
 
         // references!(source.table_name) (rb:127-130): unless the scope already
         // carries explicit references, reference the source table so `includes`
-        // promotes to the eager JOIN.
+        // promotes to the eager JOIN. `.klass` can throw for an unresolvable /
+        // polymorphic source reflection (same guard as `_scopeHasFanOutJoin` /
+        // `_includeSpecFansOut`); if it does, skip the reference and let the
+        // `includes` degrade to a plain preload.
         const refs: string[] = reflScope?._referencesValues ?? [];
+        let sourceTableName: string | undefined;
+        if (refs.length === 0) {
+          try {
+            sourceTableName = (sourceRefl as any).klass?.tableName;
+          } catch {
+            sourceTableName = undefined;
+          }
+        }
         if (refs.length > 0) {
           scope = scope.references(...refs);
-        } else {
-          scope = scope.references(sourceRefl.klass.tableName);
+        } else if (sourceTableName != null) {
+          scope = scope.references(sourceTableName);
         }
 
         // joins!(source => joins) / left_outer_joins!(source => …) (rb:132-137).

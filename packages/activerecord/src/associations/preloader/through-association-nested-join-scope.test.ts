@@ -171,7 +171,7 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
   });
 
-  it("routes a has_many-through with a fan-out include+predicate to the two-step", () => {
+  it("nests a has_many-through fan-out include+predicate onto the through query via eager-load", () => {
     const groucho = members("groucho");
     const sql = throughScopeSql([groucho], "categorizedClubs");
     // Rails nests the scope's `values[:includes]` under the source reflection
