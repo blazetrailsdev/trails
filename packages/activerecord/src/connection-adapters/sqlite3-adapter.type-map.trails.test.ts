@@ -78,4 +78,15 @@ describe("SQLite3Adapter type-map limit threading", () => {
     expect(dec.precision).toBe(10);
     expect(dec.scale).toBe(2);
   });
+
+  it("reflects an unmapped sql_type as a nil cast type with the round-trippable sql name", () => {
+    // The type map returns a ValueType for an unmapped sql_type, whose `type()`
+    // — like Rails' Value#type — is nil. fetchTypeMetadata carries that nil
+    // through; SqlTypeMetadata then falls `type` back to the sql name so
+    // reflection stays informative and round-trippable.
+    const meta = adapter.fetchTypeMetadata("mystery_type");
+    expect(castType("mystery_type").type()).toBeUndefined();
+    expect(meta.sqlType).toBe("mystery_type");
+    expect(meta.type).toBe("mystery_type");
+  });
 });
