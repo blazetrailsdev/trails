@@ -649,6 +649,10 @@ describe("EnumTest", () => {
     await expect((Klass as any).create({ status: "written" })).rejects.toThrow(
       /Undeclared attribute type for enum 'aliased_status' in Klass/,
     );
+    // Also raises via type_for_attribute (Rails materializes attribute_types).
+    expect(() => (Klass as any).typeForAttribute("aliased_status")).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
   });
 
   it("query state by predicate with prefix", () => {

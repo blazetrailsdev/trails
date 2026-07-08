@@ -1206,6 +1206,12 @@ export class Base extends Model {
    */
   static override typeForAttribute(name: string): Type {
     (ModelSchema.loadSchema as any).call(this);
+    // An `enum` declared before its `alias_attribute` keys a phantom attribute
+    // Rails rejects. Check the *un-resolved* name (the phantom): resolving the
+    // alias first would look past it to the backing column. Mirrors Rails
+    // materializing `attribute_types`, which replays the phantom decorate and
+    // raises (enum.rb:240-245).
+    _EnumModule.assertEnumAliasDeclaredBefore(this as unknown as typeof Base, name);
     // Rails resolves attribute aliases first
     // (`attr_name = attribute_aliases[attr_name] || attr_name`).
     const resolved = (this as any)._attributeAliases?.[name] ?? name;
