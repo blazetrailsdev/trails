@@ -197,8 +197,7 @@ describe("TokenForTest", () => {
   });
 
   it("finds record with a composite primary key", async () => {
-    // Rails: Cpk::Book.create!(id: [1, 3], shop_id: 2) — composite PK is
-    // [author_id, id]; assign the components our mass-assignment understands.
+    // Rails: Cpk::Book.create!(id: [1, 3], shop_id: 2) — composite PK [author_id, id].
     const book = await CpkBook.create({ id: [1, 3], shop_id: 2 });
     const token = (book as any).generateTokenFor("test");
 

@@ -7241,8 +7241,7 @@ describe("HasManyAssociationsTest", () => {
     const orderId = (order as any).idValue;
     const mk = (authorId: number, id: number) =>
       CpkBook.create({
-        author_id: authorId,
-        id,
+        id: [authorId, id],
         shop_id: shopId,
         order_id: orderId,
         title: `b${authorId}-${id}`,
