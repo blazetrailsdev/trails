@@ -4000,8 +4000,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     fromTable: string,
     toTable: string,
     options: {
-      column?: string;
-      primaryKey?: string;
+      column?: string | string[];
+      primaryKey?: string | string[];
       name?: string;
       onDelete?: ReferentialAction;
       onUpdate?: ReferentialAction;
