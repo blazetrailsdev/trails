@@ -11,7 +11,6 @@
 import { NotImplementedError } from "../../errors.js";
 import { joinTableName as _joinTableName } from "../../migration/join-table.js";
 import { ArgumentError } from "@blazetrails/activemodel";
-import { tableNameLength, indexNameLength } from "./database-limits.js";
 import type { AbstractAdapter as DatabaseAdapter, AdapterName } from "../abstract-adapter.js";
 import {
   TableDefinition,
@@ -2546,7 +2545,9 @@ export class SchemaStatements {
 
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, _internal = false): void {
-    const limit = indexNameLength();
+    // Resolve through the adapter (which carries the DatabaseLimits mixin) so an
+    // adapter overriding indexNameLength/maxIdentifierLength propagates here.
+    const limit = (this.adapter as unknown as { indexNameLength(): number }).indexNameLength();
     if (newName.length > limit) {
       throw new ArgumentError(
         `Index name '${newName}' on table '${tableName}' is too long; the limit is ${limit} characters`,
@@ -2556,7 +2557,7 @@ export class SchemaStatements {
 
   /** @internal */
   validateTableLengthBang(tableName: string): void {
-    const limit = tableNameLength();
+    const limit = (this.adapter as unknown as { tableNameLength(): number }).tableNameLength();
     if (tableName.length > limit) {
       throw new ArgumentError(
         `Table name '${tableName}' is too long; the limit is ${limit} characters`,

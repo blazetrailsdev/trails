@@ -328,6 +328,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
   }
 
+  // Rails' MySQL SchemaStatements#table_alias_length returns a hardcoded 256
+  // (mysql/schema_statements.rb:135, per
+  // https://dev.mysql.com/doc/refman/en/identifiers.html), NOT
+  // max_identifier_length (64). Override the DatabaseLimits mixin default.
+  tableAliasLength(): number {
+    return 256;
+  }
+
   /**
    * Quote a value using MySQL-family escape rules (`\0 \n \r \Z \\ ''`
    * via MYSQL_ESCAPE_MAP, booleans as `1/0`, Dates as

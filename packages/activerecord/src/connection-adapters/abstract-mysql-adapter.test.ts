@@ -777,3 +777,17 @@ describe("AbstractMysqlAdapter#changeColumnComment (#1568)", () => {
     expect(calls).toEqual([["users", "name", "", { comment: null }]]);
   });
 });
+
+describe("AbstractMysqlAdapter#tableAliasLength", () => {
+  it("table alias length", async () => {
+    // Rails' MySQL SchemaStatements#table_alias_length returns 256
+    // (mysql/schema_statements.rb:135), not max_identifier_length (64).
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
+      typeof AbstractMysqlAdapter
+    >;
+    expect(adapter.tableAliasLength()).toBe(256);
+    const long = "a".repeat(300);
+    expect(adapter.tableAliasFor(long)).toBe("a".repeat(256));
+  });
+});

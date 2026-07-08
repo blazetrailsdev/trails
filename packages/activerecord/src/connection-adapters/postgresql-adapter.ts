@@ -2406,6 +2406,24 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return this._maxIdentifierLength;
   }
 
+  // trails' `maxIdentifierLength` is async (it queries `SHOW
+  // max_identifier_length`), so the DatabaseLimits mixin's receiver-dispatch
+  // (`this.maxIdentifierLength()`) would hand these callers a Promise instead
+  // of a number. The alias-length consumers (relation join-alias tracking) are
+  // synchronous, so resolve the cached limit synchronously — the real value
+  // once `maxIdentifierLength` has been queried, else the abstract default 64.
+  tableAliasLength(): number {
+    return this._maxIdentifierLength ?? 64;
+  }
+
+  tableNameLength(): number {
+    return this._maxIdentifierLength ?? 64;
+  }
+
+  indexNameLength(): number {
+    return this._maxIdentifierLength ?? 64;
+  }
+
   // Mirrors: PostgreSQLAdapter#session_auth= (postgresql_adapter.rb:625)
   // Returns a Promise so callers can await the SET SESSION AUTHORIZATION round-trip.
   async sessionAuth(user: string): Promise<void> {

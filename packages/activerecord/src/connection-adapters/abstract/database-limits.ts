@@ -4,20 +4,29 @@
  * Mirrors: ActiveRecord::ConnectionAdapters::DatabaseLimits
  */
 
+/** Host for the DatabaseLimits mixin — the concrete adapter `this` resolves to. */
+export interface DatabaseLimitsHost {
+  maxIdentifierLength(): number;
+}
+
 export function maxIdentifierLength(): number {
   return 64;
 }
 
-export function tableNameLength(): number {
-  return maxIdentifierLength();
+// Rails' DatabaseLimits derives these from `max_identifier_length` on the
+// receiver (database_limits.rb:11-23), so an adapter overriding
+// `max_identifier_length` propagates through. Dispatch via `this` — not the
+// module-level `maxIdentifierLength` — to preserve that.
+export function tableNameLength(this: DatabaseLimitsHost): number {
+  return this.maxIdentifierLength();
 }
 
-export function tableAliasLength(): number {
-  return maxIdentifierLength();
+export function tableAliasLength(this: DatabaseLimitsHost): number {
+  return this.maxIdentifierLength();
 }
 
-export function indexNameLength(): number {
-  return maxIdentifierLength();
+export function indexNameLength(this: DatabaseLimitsHost): number {
+  return this.maxIdentifierLength();
 }
 
 /** @internal */

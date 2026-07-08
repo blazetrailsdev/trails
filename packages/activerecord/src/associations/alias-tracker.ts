@@ -4,10 +4,12 @@
  * Mirrors: ActiveRecord::Associations::AliasTracker
  */
 import { Table, Nodes } from "@blazetrails/arel";
-import { tableAliasLength as getTableAliasLength } from "../connection-adapters/abstract/database-limits.js";
+import { maxIdentifierLength } from "../connection-adapters/abstract/database-limits.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 
-const DEFAULT_TABLE_ALIAS_LENGTH = getTableAliasLength();
+// DatabaseLimits' table_alias_length defaults to max_identifier_length; use the
+// abstract default directly (the free tableAliasLength now dispatches via `this`).
+const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
 export class AliasTracker {
   readonly aliases: Map<string, number>;
