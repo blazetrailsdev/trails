@@ -2197,7 +2197,11 @@ export class SchemaStatements {
   /** @internal */
   addOptionsForIndexColumns(
     quotedColumns: Map<string, string>,
-    options: { order?: string | Record<string, string> } = {},
+    options: {
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    } = {},
   ): Map<string, string> {
     const adapter = this.adapter as any;
     if (typeof adapter.supportsIndexSortOrder === "function" && adapter.supportsIndexSortOrder()) {

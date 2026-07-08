@@ -266,6 +266,21 @@ export interface AbstractAdapter {
     columnName: string | string[],
     options?: Record<string, unknown>,
   ): Promise<[IndexDefinition, string | undefined, boolean]>;
+  /** @internal */
+  quotedColumnsForIndex(columnNames: string[], options?: Record<string, unknown>): string;
+  /** @internal */
+  optionsForIndexColumns(
+    options: string | Record<string, string> | undefined,
+  ): (col: string) => string | undefined;
+  /** @internal */
+  addOptionsForIndexColumns(
+    quotedColumns: Map<string, string>,
+    options?: {
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    },
+  ): Map<string, string>;
   removeIndex(
     tableName: string,
     columnOrOptions?:
