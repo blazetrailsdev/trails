@@ -10,8 +10,10 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
-import { StringType } from "@blazetrails/activemodel";
+import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
 import { TypeMap } from "../type/type-map.js";
+import * as Type from "../type.js";
+import { UnsignedInteger } from "../type/unsigned-integer.js";
 import {
   AbstractAdapter,
   Version,
@@ -115,29 +117,27 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors: Mysql2Adapter#initialize_type_map (mysql2_adapter.rb:40-49).
    *
    * `super` registers the shared MySQL types. On top of that the concrete
-   * mysql2 adapter binds char/varchar/enum/set to a `StringType` whose boolean
-   * coercions are `"1"`/`"0"` rather than the ActiveModel default `"t"`/`"f"`,
-   * so a boolean assigned to a string column round-trips as 1/0 — this mirrors
-   * the `Type.register(:string, adapter: :mysql2)` block. char/varchar thread
-   * `extract_limit(sql_type)` onto the type (`register_type(%r(char)i)`), so
-   * `type_for_attribute(col).limit` reflects the column limit; enum/set register
-   * the limitless string. These are NOT in AbstractMysqlAdapter because they
-   * bind mysql2-specific behavior to a concrete client.
+   * mysql2 adapter resolves char/varchar/enum/set through
+   * `Type.lookup(:string, adapter: :mysql2)`, which returns the adapter-scoped
+   * `StringType` whose boolean coercions are `"1"`/`"0"` rather than the
+   * ActiveModel default `"t"`/`"f"` (see the module-level `Type.register` calls
+   * below), so a boolean assigned to a string column round-trips as 1/0.
+   * char/varchar thread `extract_limit(sql_type)` through the `limit:` kwarg
+   * (`register_type(%r(char)i)`), so `type_for_attribute(col).limit` reflects
+   * the column limit; enum/set look up the limitless string. These are NOT in
+   * AbstractMysqlAdapter because they bind mysql2-specific behavior to a
+   * concrete client.
+   *
+   * @internal
    */
   static override initializeTypeMap(m: TypeMap): void {
     super.initializeTypeMap(m);
-    m.registerType(
-      /char/i,
-      undefined,
-      (sqlType) =>
-        new StringType({ trueString: "1", falseString: "0", limit: this.extractLimit(sqlType) }),
-    );
-    m.registerType(
-      /^enum/i,
-      undefined,
-      () => new StringType({ trueString: "1", falseString: "0" }),
-    );
-    m.registerType(/^set/i, undefined, () => new StringType({ trueString: "1", falseString: "0" }));
+    m.registerType(/char/i, undefined, (sqlType) => {
+      const limit = this.extractLimit(sqlType);
+      return Type.lookup("string", { adapter: "mysql2", limit });
+    });
+    m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql2" }));
+    m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
   }
 
   // Cached liveness state — true until a failure is observed (ping fail,
@@ -2142,3 +2142,24 @@ dirtiesQueryCache(Mysql2Adapter, "executeMutation");
 // so dirty `execInsert` too; the single-column path delegates to
 // `executeMutation` via `super`, where the double-clear is a harmless no-op.
 dirtiesQueryCache(Mysql2Adapter, "execInsert");
+
+// Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
+// mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`
+// (not the ActiveModel default `"t"`/`"f"`) so a boolean assigned to a string
+// column round-trips as 1/0; `initializeTypeMap` resolves char/varchar/enum/set
+// through `Type.lookup(:string, adapter: :mysql2)`.
+Type.register("immutable_string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+  return new ImmutableStringType({
+    trueString: "1",
+    falseString: "0",
+    ...((args as Record<string, unknown>) ?? {}),
+  });
+});
+Type.register("string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+  return new StringType({
+    trueString: "1",
+    falseString: "0",
+    ...((args as Record<string, unknown>) ?? {}),
+  });
+});
+Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
