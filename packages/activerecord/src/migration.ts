@@ -1942,8 +1942,13 @@ export class MigrationContext {
 
   async indexExists(
     table: string,
-    column: string | string[],
-    options?: { unique?: boolean; name?: string },
+    // `column` may be null for a named expression index (Rails' `defined_for?`
+    // matches on name alone when columns are blank).
+    column: string | string[] | null | undefined,
+    // Forward the adapter's full option surface — `valid:` distinguishes a
+    // failed CONCURRENTLY index (PostgreSQL), mirroring Rails `index_exists?`'s
+    // `**options` → `IndexDefinition#defined_for?`.
+    options?: { unique?: boolean; name?: string; valid?: boolean },
   ): Promise<boolean> {
     return this.connection.indexExists(table, column, options);
   }
