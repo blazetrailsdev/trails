@@ -153,27 +153,30 @@ export function installEnumAttribute(
   // reflected column type (enum.rb:239-246); the decorator re-runs on every
   // _defaultAttributes replay, so once the schema is loaded `reflected` is the
   // column's real Type::Value and the EnumType delegates to it.
-  klass.decorateAttributes([attribute], (_name: string, reflected: Type) => {
+  klass.decorateAttributes([attribute], (_name: string, reflected: Type, host?: unknown) => {
     // Rails raises inside the `decorate_attributes` block when the decorated
     // subtype is `ActiveModel::Type.default_value` — an enum name with no backing
-    // column and no explicit type (enum.rb:240-245). Rails only ever runs this
-    // block on `_default_attributes` materialization, but trails ALSO applies
-    // decorators eagerly to `_attributeDefinitions` at declaration time (a
-    // back-compat convenience), when every enum's subtype is still the bare
-    // default — so gate the raise on `isDecoratorReplay()` to fire solely on the
-    // deferred replay, matching Rails' timing and avoiding a false positive on
-    // column-backed enums at class-definition time (including a subclass of an
-    // already-schema-loaded model). `assertEnumTypeDeclared` keys off the real
-    // column, so an `enum` declared before its `alias_attribute` (a phantom
-    // un-aliased name with no column) raises while a column-backed enum does not.
+    // column and no explicit type (enum.rb:240-245). trails can't mirror that via
+    // the `reflected` subtype: its alias-aware column-seeding hands the aliased
+    // phantom the *target* column's type at replay (so `reflected.type()` is e.g.
+    // "integer", not "value"). Instead check the real column via
+    // `assertEnumTypeDeclared` (an alias-unaware `columnForAttribute` lookup).
     //
-    // Skip abstract classes: `klass` is the *declaring* class, and an enum
-    // declared on an abstract parent (e.g. `Cat`, no table) has no columns of its
-    // own — `columnForAttribute` would throw `TableNotSpecified`. Rails resolves
-    // such an enum against the concrete subclass's columns at that subclass's
-    // materialization, so the abstract parent must defer rather than raise.
-    if (isDecoratorReplay() && !klass.abstractClass) {
-      assertEnumTypeDeclared(klass, attribute);
+    // Resolve the check against the *materializing* class (`host`), not the
+    // declaring `klass`: Rails replays a superclass's pending decorator into the
+    // subclass's attribute set (attribute_registration.rb:81-87), so a concrete
+    // subclass of an abstract parent (e.g. `Lion` < abstract `Cat`) checks its own
+    // columns — while an abstract parent that declares an enum defers until a
+    // concrete subclass materializes rather than throwing `TableNotSpecified` on
+    // its own tableless schema.
+    //
+    // Two trails-specific gates: `isDecoratorReplay()` skips the eager
+    // class-definition-time application (a back-compat convenience Rails lacks,
+    // when the subtype is still the bare default), and `!target.abstractClass`
+    // skips the rare direct materialization of an abstract class itself.
+    const target = (host as typeof Base | undefined) ?? klass;
+    if (isDecoratorReplay() && !target.abstractClass) {
+      assertEnumTypeDeclared(target, attribute);
     }
     return enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues);
   });

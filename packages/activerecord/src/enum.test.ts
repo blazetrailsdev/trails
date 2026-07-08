@@ -666,7 +666,7 @@ describe("EnumTest", () => {
   // default (no column), and a real column reflects its own subtype at replay
   // regardless of a later alias. Guards against a coarse "pending ∩ alias-key"
   // heuristic false-positiving a legitimate column-backed enum.
-  it("column-backed enum whose name is later aliased does not raise", async () => {
+  it("column-backed enum whose name is later aliased does not raise", () => {
     class Klass extends Base {
       static _tableName = "books";
       static {
@@ -676,9 +676,34 @@ describe("EnumTest", () => {
     }
     registerModel(Klass);
 
+    // Materialize (typeForAttribute + a fresh instance's predicate) without
+    // persisting — aliasing the enum name onto another real column would list it
+    // twice in an INSERT, which is orthogonal to the raise being tested.
     expect(() => (Klass as any).typeForAttribute("nullable_status")).not.toThrow();
-    const record: any = await (Klass as any).create({});
-    expect(() => record.isSingle()).not.toThrow();
+    expect(() => new (Klass as any)().isSingle()).not.toThrow();
+  });
+
+  // An enum declared on an abstract parent with no column of its own must defer
+  // to its concrete subclass's columns (Rails replays the superclass decorator
+  // into the subclass attribute set). A concrete subclass that DOES back the enum
+  // (Lion has lions.gender via Cat) stays green; one that does NOT raises against
+  // its own columns — not silently install, and not throw TableNotSpecified on the
+  // abstract parent's tableless schema.
+  it("enum on abstract parent resolves against concrete subclass columns", () => {
+    class AbstractParent extends Base {
+      static {
+        this._abstractClass = true;
+        this.enum("typeless_genre", ["adventure", "comic"] as any);
+      }
+    }
+    class Concrete extends AbstractParent {
+      static _tableName = "books"; // books has no `typeless_genre` column
+    }
+    registerModel(Concrete);
+
+    expect(() => (Concrete as any).typeForAttribute("typeless_genre")).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
+    );
   });
 
   it("query state by predicate with prefix", () => {

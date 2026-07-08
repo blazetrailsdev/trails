@@ -21,7 +21,7 @@ export interface AttributeRegistrationClassMethods {
     options?: AttributeOptions,
   ): void;
   _defaultAttributes(): AttributeSet;
-  decorateAttributes(names: string[] | null, decorator: (name: string, type: Type) => Type): void;
+  decorateAttributes(names: string[] | null, decorator: AttributeDecorator): void;
   attributeTypes(): Record<string, Type>;
   typeForAttribute(name: string): Type;
 }
@@ -44,10 +44,21 @@ export interface AttributeHostInternals {
 // Mirrors: ActiveModel::AttributeRegistration::ClassMethods private structs
 // ---------------------------------------------------------------------------
 
+/**
+ * A decorator receives the attribute name and its current type, and optionally
+ * the *materializing* class (`host`) — the class whose AttributeSet is being
+ * built. Rails' `decorate_attributes` block resolves against that class's
+ * attributes, so a superclass's decorator replayed into a subclass sees the
+ * subclass's columns. trails threads `host` through so a decorator (e.g. enum's
+ * "Undeclared attribute type" check) can key off the materializing subclass
+ * rather than the class the decorator was declared on.
+ */
+export type AttributeDecorator = (name: string, type: Type, host?: unknown) => Type;
+
 /** @internal Rails-private helper. */
 export interface PendingModification {
   /** @internal */
-  applyTo(attributeSet: AttributeSet): void;
+  applyTo(attributeSet: AttributeSet, host?: unknown): void;
 }
 
 /** @internal Rails-private helper. */
@@ -101,18 +112,18 @@ export function isDecoratorReplay(): boolean {
 export class PendingDecorator implements PendingModification {
   constructor(
     readonly names: string[] | null,
-    readonly decorator: (name: string, type: Type) => Type,
+    readonly decorator: AttributeDecorator,
   ) {}
 
   /** @internal */
-  applyTo(attributeSet: AttributeSet): void {
+  applyTo(attributeSet: AttributeSet, host?: unknown): void {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
       _decoratorReplayDepth++;
       let newType: Type;
       try {
-        newType = this.decorator(name, existing.type);
+        newType = this.decorator(name, existing.type, host);
       } finally {
         _decoratorReplayDepth--;
       }
@@ -155,7 +166,7 @@ type HostAsClass = new (...args: unknown[]) => unknown;
 export function decorateAttributes(
   this: AttributeHostInternals,
   names: string[] | null,
-  decorator: (name: string, type: Type) => Type,
+  decorator: AttributeDecorator,
 ): void {
   // Push to pending queue so _defaultAttributes replays in declaration order.
   pushPendingDecorator(this, names, decorator);
@@ -171,7 +182,7 @@ export function decorateAttributes(
   for (const name of targetNames) {
     const def = defs.get(name);
     if (def) {
-      const newType = decorator(name, def.type);
+      const newType = decorator(name, def.type, this);
       if (newType) defs.set(name, { ...def, type: newType });
     }
   }
@@ -261,7 +272,7 @@ export function applyPendingAttributeModifications(
   attributeSet: AttributeSet,
 ): void {
   for (const mod of collectPendingModifications(cls)) {
-    mod.applyTo(attributeSet);
+    mod.applyTo(attributeSet, cls);
   }
 }
 
@@ -407,7 +418,7 @@ export function pushPendingDefault(
 export function pushPendingDecorator(
   cls: AttributeHostInternals,
   names: string[] | null,
-  decorator: (name: string, type: Type) => Type,
+  decorator: AttributeDecorator,
 ): void {
   pendingAttributeModifications.call(cls).push(new PendingDecorator(names, decorator));
 }
