@@ -1137,9 +1137,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * `type` comes straight from `cast_type.type` (no base-name fallback). For an
    * unmapped `sql_type` the map returns a `ValueType`, whose `type()` — like
-   * Rails' `Value#type` — is nil (`undefined`); `SqlTypeMetadata` then falls the
-   * absent `type` back to the round-trippable `sqlType` name (the #1332 fallback,
-   * now living in one place) so reflection stays informative.
+   * Rails' `Value#type` — is nil (`undefined`), so `type` reflects nil while the
+   * verbatim `sqlType` is retained for the raw declaration.
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";

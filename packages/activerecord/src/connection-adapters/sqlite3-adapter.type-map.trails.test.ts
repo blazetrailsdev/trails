@@ -82,8 +82,7 @@ describe("SQLite3Adapter type-map limit threading", () => {
   it("reflects an unmapped sql_type as a nil cast type keeping the sql name", () => {
     // The type map returns a ValueType for an unmapped sql_type, whose `type()`
     // — like Rails' Value#type — is nil. fetchTypeMetadata carries that nil
-    // through to `type`; `sqlType` still holds the raw name so the schema dumper
-    // can round-trip the column via `t.column name, sqlType`.
+    // through to `type` while `sqlType` still holds the raw name.
     const meta = adapter.fetchTypeMetadata("mystery_type");
     expect(castType("mystery_type").type()).toBeUndefined();
     expect(meta.sqlType).toBe("mystery_type");

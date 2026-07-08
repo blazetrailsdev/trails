@@ -26,8 +26,8 @@ export class SqlTypeMetadata implements Deduplicable {
     this.sqlType = options.sqlType ?? options.type ?? "";
     // Rails' SqlTypeMetadata#type is just `@type` — nil for an unmapped
     // sql_type (Value#type is nil). Keep it nil-faithful rather than falling
-    // back to the sql_type name; the schema dumper substitutes `sqlType` when
-    // emitting an unknown column, so reflection still round-trips.
+    // back to the sql_type name, so `Column#type` mirrors Rails' `delegate
+    // :type, allow_nil: true`.
     this.type = options.type ?? undefined;
     this.limit = options.limit ?? null;
     this.precision = options.precision ?? null;
