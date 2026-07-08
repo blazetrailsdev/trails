@@ -434,7 +434,7 @@ export class Before {
             `Use the default terminator (halt via throwAbort()) or make all before callbacks synchronous.`,
         );
       }
-      if (halt) env.halted = true;
+      if (halt) this.halt(env);
       return env;
     }
 
@@ -444,7 +444,7 @@ export class Before {
       cbResult = resultLambda();
     } catch (e) {
       if (!isAbortSignal(e)) throw e;
-      env.halted = true;
+      this.halt(env);
       return env;
     }
     if (!isThenable(cbResult)) return env;
@@ -459,10 +459,23 @@ export class Before {
       () => env,
       (e) => {
         if (!isAbortSignal(e)) throw e;
-        env.halted = true;
+        this.halt(env);
         return env;
       },
     );
+  }
+
+  /**
+   * Mark the chain halted and fire Rails' `halted_callback_hook(filter, name)`
+   * on the target (a private no-op the including class may override to log or
+   * instrument which callback halted). Mirrors `Before#call`'s
+   * `target.send :halted_callback_hook, filter, name`.
+   */
+  private halt(env: FilterEnvironment): void {
+    env.halted = true;
+    const hook = (env.target as { haltedCallbackHook?: (filter: unknown, name: string) => void })
+      .haltedCallbackHook;
+    if (typeof hook === "function") hook.call(env.target, this.filter, this.name);
   }
 
   apply(seq: CallbackSequence): CallbackSequence {
@@ -1659,6 +1672,11 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
     ): boolean | Promise<boolean> {
       return runCallbacks(this, name, block, opts);
     }
+
+    // A hook invoked every time a before callback is halted. Overridable in
+    // implementors (Rails: ActiveSupport::Callbacks#halted_callback_hook) to
+    // provide better debugging/logging. Default is a no-op.
+    haltedCallbackHook(_filter: unknown, _name: string): void {}
   }
 
   return WithCallbacks;

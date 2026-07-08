@@ -1448,11 +1448,21 @@ describe("CallbackTerminatorTest", () => {
     expect(target.log).not.toContain("body");
   });
   it("termination invokes hook", () => {
-    const target = { log: [] as string[], halted: false };
+    const second = () => "halt";
+    const target = {
+      log: [] as string[],
+      halted: undefined as unknown,
+      callbackName: undefined as unknown,
+      haltedCallbackHook(filter: unknown, name: string) {
+        this.halted = filter;
+        this.callbackName = name;
+      },
+    };
     defineCallbacks(target, "save", { terminator: haltTerminator });
-    setCallback(target, "save", "before", () => "halt");
+    setCallback(target, "save", "before", second);
     runCallbacks(target, "save");
-    expect(target.halted).toBe(false); // hook not invoked automatically
+    expect(target.halted).toBe(second);
+    expect(target.callbackName).toBe("save");
   });
   it("block never called if terminated", () => {
     const target = { ran: false };
@@ -1476,14 +1486,22 @@ describe("CallbackDefaultTerminatorTest", () => {
     expect(target.ran).toBe(false);
   });
   it("default termination invokes hook", () => {
-    const target = { count: 0 };
-    defineCallbacks(target, "save");
-    setCallback(target, "save", "before", (t: any) => {
+    const second = (t: any) => {
       t.count++;
       throwAbort();
-    });
+    };
+    const target = {
+      count: 0,
+      halted: undefined as unknown,
+      haltedCallbackHook(filter: unknown, _name: string) {
+        this.halted = filter;
+      },
+    };
+    defineCallbacks(target, "save");
+    setCallback(target, "save", "before", second);
     runCallbacks(target, "save");
     expect(target.count).toBe(1);
+    expect(target.halted).toBe(second);
   });
   it("block never called if abort is thrown", () => {
     const target = { ran: false };
