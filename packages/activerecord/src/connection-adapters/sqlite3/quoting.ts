@@ -189,7 +189,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
     // MRI keys the INTEGER/FLOAT choice off the Ruby object class (Integer vs
     // Float) set by the type-cast layer, whereas both arrive here as an
     // indistinguishable JS number. `_driverBind` recovers the distinction from
-    // the bind's cast type and sets `bindsAsFloat` for Float/Decimal columns, so
+    // the bind's cast type and sets `bindsAsFloat` for Float columns, so
     // a whole-valued float (e.g. `2.0`) stays a JS number and better-sqlite3
     // binds it as SQLITE_FLOAT (`typeof(?) => 'real'`, `LOWER(?) => '2.0'`) —
     // matching MRI's Float → SQLITE_FLOAT dispatch. Absent type info (a bare

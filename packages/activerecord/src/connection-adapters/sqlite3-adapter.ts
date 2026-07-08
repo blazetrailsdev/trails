@@ -142,15 +142,16 @@ export class SQLiteDateTimeType extends ARDateTimeType {
 // case) pass straight through.
 function _driverBind(this: QuotingDispatchHost, value: unknown): unknown {
   // `valueForDatabase` is a getter on Attribute/QueryAttribute, so reading it
-  // yields the unwrapped DB value directly. The attribute also carries its
-  // cast `type`; thread whether it is a Float/Decimal so typeCast can mirror
-  // MRI's class-based INTEGER/FLOAT dispatch (Ruby Float → SQLITE_FLOAT) rather
-  // than keying purely off the JS value — a whole-valued float like `2.0` must
-  // still bind as `real`, not INTEGER.
+  // yields the unwrapped DB value directly. The attribute also carries its cast
+  // `type`; thread whether it is a Float so typeCast can mirror MRI's
+  // class-based INTEGER/FLOAT dispatch (Ruby Float → SQLITE_FLOAT) rather than
+  // keying purely off the JS value — a whole-valued float like `2.0` must still
+  // bind as `real`, not INTEGER. (Decimal binds reach typeCast as BigDecimal
+  // and take its dedicated float branch, so they need no flag here.)
   let bindsAsFloat = false;
   if (value && typeof value === "object" && "valueForDatabase" in value) {
     const attr = value as { valueForDatabase: unknown; type?: unknown };
-    bindsAsFloat = attr.type instanceof FloatType || attr.type instanceof DecimalType;
+    bindsAsFloat = attr.type instanceof FloatType;
     value = attr.valueForDatabase;
   }
   // `.call(this)` so date/time dispatch lands on the adapter's quotedDate /
