@@ -324,13 +324,26 @@ export class AttributeSet {
    * SELECT projects only a subset of columns: unselected columns are absent
    * from the materialized set, so `has`/`keys` no longer report them.
    *
+   * `overrideTypes` threads the per-query `additional_types` (Rails' second
+   * `build_from_database` arg): a narrowed column becomes
+   * `Attribute.uninitialized(name, additional_types.fetch(name, types[name]))`
+   * (builder.rb:76-87), so an override supplied for a column absent from the
+   * projected row wins over the declared schema type — matching Rails' resolved
+   * `type` in the `elsif types.key?(name)` / `else Attribute.uninitialized`
+   * branch. Absent that, the declared type is preserved.
+   *
    * @internal Rails-private helper.
    */
-  narrowTo(names: Iterable<string>): void {
+  narrowTo(
+    names: Iterable<string>,
+    overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  ): void {
     this.assertNotFrozen();
     const keep = names instanceof Set ? names : new Set(names);
     for (const [name, attr] of this.attributes) {
-      if (!keep.has(name)) this.attributes.set(name, Attribute.uninitialized(name, attr.type));
+      if (keep.has(name)) continue;
+      const type = (overrideTypes?.[name] as import("./type/value.js").Type) ?? attr.type;
+      this.attributes.set(name, Attribute.uninitialized(name, type));
     }
   }
 

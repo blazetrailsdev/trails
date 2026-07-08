@@ -2937,7 +2937,16 @@ export class Base extends Model {
     // those keys, so hasAttribute() must reflect what was loaded rather than
     // the full schema. Mirrors Rails' attributes_builder narrowing (see
     // narrowToProjectedColumns). Shared with the STI path in inheritance.ts.
-    narrowToProjectedColumns(this as unknown as typeof Base, record as unknown as Base, row);
+    // `overrideTypes` is threaded so a schema column absent from the row adopts
+    // the per-query override type when narrowed to uninitialized (builder.rb's
+    // `else Attribute.uninitialized(name, type)` branch, where `type` resolves
+    // via `additional_types.fetch(name, types[name])`).
+    narrowToProjectedColumns(
+      this as unknown as typeof Base,
+      record as unknown as Base,
+      row,
+      overrideTypes,
+    );
     record._newRecord = false;
     (record as any)._dirty.snapshot(record._attributes);
     record.changesApplied();

@@ -10,6 +10,8 @@ import { describe, it, expect } from "vitest";
 import { Base, UnknownPrimaryKey } from "./index.js";
 import { quoteSqlValue } from "./base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Type } from "@blazetrails/activemodel";
+import { fixtures } from "./test-helpers/fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("quoteSqlValue", () => {
@@ -203,6 +205,69 @@ describe("UnknownPrimaryKeyTest", () => {
       "Unknown primary key for table dummies in model Dummy.\nNo PK configured.",
     );
     expect(err.model).toBe(Dummy);
+  });
+});
+
+describe("instantiate override types for absent keys (trails)", () => {
+  fixtures([]);
+
+  class Typecast extends Type {
+    readonly name = "typecast";
+    cast() {
+      return "t.lo";
+    }
+  }
+
+  interface AttrProbe {
+    _attributes: {
+      getAttribute(name: string): { isInitialized(): boolean; type: unknown };
+      has(name: string): boolean;
+      keys(): string[];
+    };
+  }
+  const seedAttrs = async (): Promise<Record<string, unknown>> => {
+    class Topic extends Base {}
+    const seed = await Topic.create({ title: "The First Topic" } as Partial<Topic>);
+    const attrs = {
+      ...(seed as unknown as AttrProbe & { attributes: Record<string, unknown> }).attributes,
+    };
+    delete attrs.id;
+    return attrs;
+  };
+
+  // builder.rb's `elsif types.key?(name)` / `else Attribute.uninitialized(name,
+  // type)` branch: a schema column absent from the values hash with no default
+  // (every non-PK column, since attributes_builder passes
+  // `_default_attributes.except(column_names - [primary_key])`) is materialized
+  // uninitialized, and `type = additional_types.fetch(name, types[name])`, so a
+  // per-query override wins over the declared schema type.
+  it("materializes an override type for a schema column absent from the projected row", async () => {
+    class Topic extends Base {}
+    const attrs = await seedAttrs();
+    delete attrs.author_name;
+
+    const topic = Topic.instantiate(attrs, {
+      author_name: new Typecast(),
+    }) as unknown as AttrProbe;
+    const attr = topic._attributes.getAttribute("author_name");
+    expect(attr.isInitialized()).toBe(false);
+    expect(attr.type).toBeInstanceOf(Typecast);
+  });
+
+  // builder.rb only materializes `values.each_key` and `types.each_key`;
+  // `additional_types` is consulted only for names already sourced from values
+  // or schema `types`. An override-only key that is neither in the row nor a
+  // schema column is therefore never materialized (its `default_attribute`
+  // falls to the `else Attribute.null` branch) — it must not appear in the set.
+  it("does not materialize an override-only key absent from the row and schema", async () => {
+    class Topic extends Base {}
+    const attrs = await seedAttrs();
+
+    const topic = Topic.instantiate(attrs, {
+      computed_col: new Typecast(),
+    }) as unknown as AttrProbe;
+    expect(topic._attributes.has("computed_col")).toBe(false);
+    expect(topic._attributes.keys()).not.toContain("computed_col");
   });
 });
 
