@@ -1266,8 +1266,9 @@ describe("MigrationTest", () => {
     expect(rows).toHaveLength(1);
     expect(ctx.columnExists("table_from_query_testings", "person_id")).toBe(true);
 
-    // _introspectColumns / _normalizeIntrospectedType should populate
-    // _columnMeta with a Rails-canonical type (not the raw catalog string).
+    // The CTAS column derivation reads back through the adapter's own
+    // `columns()` (Rails `new_column_from_field`), so the persisted type is the
+    // Rails-canonical name (not the raw catalog string).
     const cols = ctx.columns("table_from_query_testings");
     const pid = cols.find((c) => c.name === "person_id");
     expect(pid?.type).toBe("integer");
