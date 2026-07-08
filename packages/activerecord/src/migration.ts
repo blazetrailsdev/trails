@@ -2032,16 +2032,18 @@ export class MigrationContext {
       | [string, ...string[]]
       | [string, ...string[], { ifExists?: boolean; force?: "cascade"; temporary?: boolean }]
   ): Promise<void> {
-    // Delegate the DDL to the adapter's SchemaStatements — the single
-    // Rails-faithful source. The dialect overrides honor `temporary:`
-    // (MySQL `DROP TEMPORARY TABLE`) and `force: "cascade"`; `IF EXISTS` is
-    // emitted only when `ifExists: true` is passed, matching Rails' drop_table
-    // (which does not default it). We keep the in-memory bookkeeping in sync
-    // for the bespoke introspection that columns()/indexes()/tables() read.
+    // Delegate to the adapter's own drop_table — the Rails-faithful path.
+    // The dialect overrides honor `temporary:` and `force: "cascade"` (MySQL
+    // emits `DROP TEMPORARY TABLE ... CASCADE`; PostgreSQL appends CASCADE);
+    // `IF EXISTS` is emitted only when `ifExists: true` is passed, matching
+    // Rails' drop_table (which does not default it). Routing through
+    // `this.connection` (not a bare SchemaStatements instance) is what reaches
+    // those adapter overrides. We keep the in-memory bookkeeping in sync for
+    // the bespoke introspection that columns()/indexes()/tables() read.
     const last = args[args.length - 1];
     const hasOptions = last !== null && typeof last === "object";
     const names = (hasOptions ? args.slice(0, -1) : args) as string[];
-    await this.schema.dropTable(...(args as Parameters<SchemaStatements["dropTable"]>));
+    await (this.connection.dropTable as (...a: typeof args) => Promise<void>)(...args);
     for (const name of names) {
       this._tables.delete(name);
       this._columns.delete(name);
@@ -2336,11 +2338,15 @@ export class MigrationContext {
   async renameTable(from: string, to: string): Promise<void> {
     const fullFrom = `${this.tableNamePrefix}${from}${this.tableNameSuffix}`;
     const fullTo = `${this.tableNamePrefix}${to}${this.tableNameSuffix}`;
-    // Delegate the ALTER TABLE ... RENAME to SchemaStatements (adapter-correct
-    // identifier quoting); MigrationContext keeps the prefix/suffix application
-    // that SchemaStatements#renameTable does not perform, plus the in-memory
+    // Delegate to the adapter's own rename_table — the Rails-faithful path.
+    // MySQL uses `RENAME TABLE ...` plus `rename_table_indexes`; PostgreSQL
+    // renames the PK sequence/index after `ALTER TABLE`; SQLite emits
+    // `ALTER TABLE ... RENAME TO`. Routing through `this.connection` (not a
+    // bare SchemaStatements instance, whose abstract fallback misses those
+    // side effects) is what reaches those overrides. MigrationContext keeps the
+    // prefix/suffix application the adapters do not perform, plus the in-memory
     // bookkeeping the bespoke introspection reads.
-    await this.schema.renameTable(fullFrom, fullTo);
+    await this.connection.renameTable(fullFrom, fullTo);
     this._tables.delete(fullFrom);
     this._tables.add(fullTo);
     const cols = this._columns.get(fullFrom);
