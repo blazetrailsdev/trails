@@ -16,6 +16,7 @@ import {
   AddColumnDefinition,
   AlterTable,
   CreateIndexDefinition,
+  IndexDefinition,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
   TableDefinition,
@@ -283,18 +284,7 @@ export class SchemaCreation {
       `${this.adapter.quoteIdentifier(index.name)} ON ${this.adapter.quoteTableName(index.table)}`,
     );
     if (this.supportsIndexUsing() && index.using) parts.push(`USING ${index.using}`);
-    // Rails `quoted_columns`: a String column set is an expression, emitted
-    // verbatim (e.g. "remind_at, place_id", "(data->'foo')"); otherwise each
-    // column is quoted with its length/order/opclass decoration.
-    const columns =
-      typeof index.columns === "string"
-        ? index.columns
-        : this.quotedColumnsForIndex(index.columns, {
-            lengths: index.lengths,
-            orders: index.orders,
-            opclasses: index.opclasses,
-          });
-    parts.push(`(${columns})`);
+    parts.push(`(${this.quotedColumns(index)})`);
     if (this.supportsIndexInclude() && index.include && index.include.length > 0) {
       parts.push(`INCLUDE (${this.quotedIncludeColumns(index.include)})`);
     }
@@ -304,34 +294,32 @@ export class SchemaCreation {
   }
 
   /**
-   * Mirrors Rails' abstract `quoted_columns_for_index`: quote each column name
-   * and append its order/opclass decoration. Sub-part index lengths (`col(N)`)
-   * are MySQL-only and are NOT applied here — Rails decorates them exclusively
-   * in `AbstractMysqlAdapter#add_index_length`, and the MySQL SchemaCreation's
-   * `quotedColumns` override carries that in trails. Applying `length` on
-   * PostgreSQL/SQLite emits invalid DDL (`("name"(10))`).
+   * Rails delegates `quoted_columns_for_index` to `@conn`
+   * (abstract/schema_creation.rb:18), whose single source of truth is
+   * `SchemaStatements#quoted_columns_for_index` → `add_options_for_index_columns`
+   * (sort order in the base, opclass folded in by the PG override, sub-part
+   * length by MySQL). When the real adapter is threaded as the host it exposes
+   * that method, so route through it — this is the sole decoration path for
+   * every concrete adapter. Fall back to bare identifier quoting on the
+   * host-less unit-test path (only the SchemaQuoter shim is wired), mirroring
+   * the parallel `quotedIncludeColumns` delegation.
+   * @internal
    */
   protected quotedColumnsForIndex(
     columnNames: string[],
     options: {
-      lengths: number | Record<string, number>;
-      orders: string | Record<string, string>;
-      opclasses: string | Record<string, string>;
+      length?: number | Record<string, number>;
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
     },
   ): string {
-    return columnNames
-      .map((c) => {
-        let col = this.adapter.quoteIdentifier(c);
-        if (this.supportsIndexSortOrder()) {
-          const order = typeof options.orders === "string" ? options.orders : options.orders[c];
-          if (order) col += ` ${order.toUpperCase()}`;
-        }
-        const opc =
-          typeof options.opclasses === "string" ? options.opclasses : options.opclasses[c];
-        if (this.adapterName === "postgres" && opc) col += ` ${opc}`;
-        return col;
-      })
-      .join(", ");
+    const host = this.adapter as SchemaQuoter & {
+      quotedColumnsForIndex?(cols: string[], options: Record<string, unknown>): string;
+    };
+    if (typeof host.quotedColumnsForIndex === "function") {
+      return host.quotedColumnsForIndex(columnNames, options);
+    }
+    return columnNames.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
   }
 
   protected visitForeignKeyDefinition(o: ForeignKeyDefinition): string {
@@ -564,10 +552,16 @@ export class SchemaCreation {
     return `ADD ${this.visitCheckConstraintDefinition(o)}`;
   }
 
-  /** @internal */
-  protected quotedColumns(o: { columns: string | string[] }): string {
-    if (typeof o.columns === "string") return o.columns;
-    return o.columns.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
+  /**
+   * Rails' `quoted_columns` (abstract/schema_creation.rb:133): a String column
+   * set is an expression emitted verbatim (e.g. "remind_at, place_id",
+   * "(data->'foo')"); otherwise delegate to `quoted_columns_for_index`.
+   * @internal
+   */
+  protected quotedColumns(o: IndexDefinition): string {
+    return typeof o.columns === "string"
+      ? o.columns
+      : this.quotedColumnsForIndex(o.columns, o.columnOptions());
   }
 
   /** @internal */

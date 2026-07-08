@@ -4611,26 +4611,40 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     return () => this.changeColumnNull(tableName, columnName, nullable, defaultValue);
   }
 
-  /** @internal */
+  /**
+   * Mirrors PostgreSQL::SchemaStatements#add_index_opclass
+   * (postgresql/schema_statements.rb:1066): appends each column's operator class
+   * to its quoted form.
+   * @internal
+   */
   addIndexOpclass(
-    quotedColumns: Record<string, string>,
-    options: Record<string, unknown> = {},
-  ): void {
-    const opclasses = options.opclass as Record<string, string> | undefined;
-    if (!opclasses) return;
-    for (const [name] of Object.entries(quotedColumns)) {
-      const opclass = opclasses[name];
-      if (opclass) quotedColumns[name] += ` ${opclass}`;
+    quotedColumns: Map<string, string>,
+    options: { opclass?: string | Record<string, string> } = {},
+  ): Map<string, string> {
+    const opclasses = this.optionsForIndexColumns(options.opclass);
+    for (const [name] of quotedColumns) {
+      const opclass = opclasses(name);
+      if (opclass) quotedColumns.set(name, `${quotedColumns.get(name)} ${opclass}`);
     }
+    return quotedColumns;
   }
 
-  /** @internal */
+  /**
+   * Mirrors PostgreSQL::SchemaStatements#add_options_for_index_columns
+   * (postgresql/schema_statements.rb:1073): folds in opclass, then falls through
+   * to the base (sort order) via `super`.
+   * @internal
+   */
   addOptionsForIndexColumns(
-    quotedColumns: Record<string, string>,
-    options: Record<string, unknown> = {},
-  ): Record<string, string> {
-    this.addIndexOpclass(quotedColumns, options);
-    return quotedColumns;
+    quotedColumns: Map<string, string>,
+    options: {
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    } = {},
+  ): Map<string, string> {
+    quotedColumns = this.addIndexOpclass(quotedColumns, options);
+    return super.addOptionsForIndexColumns(quotedColumns, options);
   }
 
   async exclusionConstraints(tableName: string): Promise<ExclusionConstraintDefinition[]> {

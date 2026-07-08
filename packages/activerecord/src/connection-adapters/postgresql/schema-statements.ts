@@ -340,12 +340,19 @@ export interface SchemaStatements {
     defaultValue?: unknown,
   ): unknown;
   /** @internal */
-  addIndexOpclass(quotedColumns: Record<string, string>, options?: Record<string, unknown>): void;
+  addIndexOpclass(
+    quotedColumns: Map<string, string>,
+    options?: { opclass?: string | Record<string, string> },
+  ): Map<string, string>;
   /** @internal */
   addOptionsForIndexColumns(
-    quotedColumns: Record<string, string>,
-    options?: Record<string, unknown>,
-  ): Record<string, string>;
+    quotedColumns: Map<string, string>,
+    options?: {
+      order?: string | Record<string, string>;
+      opclass?: string | Record<string, string>;
+      length?: number | Record<string, number>;
+    },
+  ): Map<string, string>;
   /** @internal */
   exclusionConstraintName(tableName: string, options?: Record<string, unknown>): string;
   /** @internal */
