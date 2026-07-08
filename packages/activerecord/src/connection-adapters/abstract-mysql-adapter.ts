@@ -83,6 +83,7 @@ import {
   isRowFormatDynamicByDefault,
   newColumnFromField,
   quotedScope,
+  tableAliasLength as mysqlTableAliasLength,
 } from "./mysql/schema-statements.js";
 import type { Column as MysqlColumn } from "./mysql/column.js";
 import { TypeMap } from "../type/type-map.js";
@@ -328,12 +329,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return (this._mysqlSchemaCreation ??= new MysqlSchemaCreation(this));
   }
 
-  // Rails' MySQL SchemaStatements#table_alias_length returns a hardcoded 256
-  // (mysql/schema_statements.rb:135, per
-  // https://dev.mysql.com/doc/refman/en/identifiers.html), NOT
-  // max_identifier_length (64). Override the DatabaseLimits mixin default.
+  // Rails maps MySQL::SchemaStatements#table_alias_length (256, not the
+  // DatabaseLimits default of 64). Thin wrapper delegating to the
+  // Rails-layout implementation in mysql/schema-statements.
   tableAliasLength(): number {
-    return 256;
+    return mysqlTableAliasLength();
   }
 
   /**
