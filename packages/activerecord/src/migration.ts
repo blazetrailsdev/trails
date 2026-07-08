@@ -1595,9 +1595,16 @@ export class MigrationContext {
       string,
       {
         type: string;
+        // Raw adapter SQL type (`"bigint"`, `"varchar(255)"` …). The dumpers key
+        // `bigint?`/`schemaType`/`schemaLimit` off `Column#sql_type`, so it must
+        // survive the CTAS copy — a reflected `bigint` whose cast type is
+        // `integer` still dumps as `t.bigint` only via this string.
+        sqlType?: string | null;
         primaryKey?: boolean;
         null?: boolean;
         default?: unknown;
+        collation?: string | null;
+        comment?: string | null;
         limit?: number | null;
         precision?: number | null;
         scale?: number | null;
@@ -1765,9 +1772,12 @@ export class MigrationContext {
       string,
       {
         type: string;
+        sqlType?: string | null;
         primaryKey?: boolean;
         null?: boolean;
         default?: unknown;
+        collation?: string | null;
+        comment?: string | null;
         limit?: number | null;
         precision?: number | null;
         scale?: number | null;
@@ -1814,6 +1824,13 @@ export class MigrationContext {
         cols.add(col.name);
         meta.set(col.name, {
           type: col.type ?? "string",
+          // Carry the raw `sql_type` so the dumper's `bigint?`/`schemaType`
+          // detection keys off the same string Rails does (`Column#sql_type`).
+          sqlType: col.sqlType,
+          null: col.null ?? undefined,
+          default: col.default,
+          collation: col.collation,
+          comment: col.comment,
           ...(col.limit != null ? { limit: col.limit } : {}),
           ...(col.precision != null ? { precision: col.precision } : {}),
           ...(col.scale != null ? { scale: col.scale } : {}),
@@ -2234,9 +2251,12 @@ export class MigrationContext {
   columns(tableName: string): Array<{
     name: string;
     type: string;
+    sqlType?: string | null;
     primaryKey?: boolean;
     null?: boolean;
     default?: unknown;
+    collation?: string | null;
+    comment?: string | null;
     limit?: number | null;
     precision?: number | null;
     scale?: number | null;
