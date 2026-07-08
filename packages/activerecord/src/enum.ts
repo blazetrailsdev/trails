@@ -166,7 +166,13 @@ export function installEnumAttribute(
     // already-schema-loaded model). `assertEnumTypeDeclared` keys off the real
     // column, so an `enum` declared before its `alias_attribute` (a phantom
     // un-aliased name with no column) raises while a column-backed enum does not.
-    if (isDecoratorReplay()) {
+    //
+    // Skip abstract classes: `klass` is the *declaring* class, and an enum
+    // declared on an abstract parent (e.g. `Cat`, no table) has no columns of its
+    // own — `columnForAttribute` would throw `TableNotSpecified`. Rails resolves
+    // such an enum against the concrete subclass's columns at that subclass's
+    // materialization, so the abstract parent must defer rather than raise.
+    if (isDecoratorReplay() && !klass.abstractClass) {
       assertEnumTypeDeclared(klass, attribute);
     }
     return enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues);
