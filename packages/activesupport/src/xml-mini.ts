@@ -325,6 +325,13 @@ function emitHash(key: unknown, hash: Record<string, unknown>, options: ToTagOpt
   options.builder.closeTag(root);
 }
 
+/** Render `attrs` as ` k="v"` pairs with escaped values, in insertion order. */
+function attributeString(attributes: Record<string, string>): string {
+  return Object.entries(attributes)
+    .map(([k, v]) => ` ${k}="${htmlEscape(v).toString()}"`)
+    .join("");
+}
+
 /**
  * Compact XML sink mirroring `Builder::XmlMarkup`'s default (no indentation),
  * escaping text content and attribute values. Used as the `to_tag` builder in
@@ -333,14 +340,8 @@ function emitHash(key: unknown, hash: Record<string, unknown>, options: ToTagOpt
 export class XmlStringBuilder implements XmlBuilder {
   private buffer = "";
 
-  private attributeString(attributes: Record<string, string>): string {
-    return Object.entries(attributes)
-      .map(([k, v]) => ` ${k}="${htmlEscape(v).toString()}"`)
-      .join("");
-  }
-
   tag(name: string, content?: string | null, attributes: Record<string, string> = {}): void {
-    const attrs = this.attributeString(attributes);
+    const attrs = attributeString(attributes);
     if (content == null) {
       this.buffer += `<${name}${attrs}/>`;
     } else {
@@ -349,7 +350,7 @@ export class XmlStringBuilder implements XmlBuilder {
   }
 
   openTag(name: string, attributes: Record<string, string> = {}): void {
-    this.buffer += `<${name}${this.attributeString(attributes)}>`;
+    this.buffer += `<${name}${attributeString(attributes)}>`;
   }
 
   closeTag(name: string): void {
@@ -379,14 +380,8 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
     return this.baseIndent + "  ".repeat(this.depth);
   }
 
-  private attributeString(attributes: Record<string, string>): string {
-    return Object.entries(attributes)
-      .map(([k, v]) => ` ${k}="${htmlEscape(v).toString()}"`)
-      .join("");
-  }
-
   tag(name: string, content?: string | null, attributes: Record<string, string> = {}): void {
-    const attrs = this.attributeString(attributes);
+    const attrs = attributeString(attributes);
     this.buffer +=
       content == null
         ? `${this.indent()}<${name}${attrs}/>\n`
@@ -394,7 +389,7 @@ export class IndentedXmlStringBuilder implements XmlBuilder {
   }
 
   openTag(name: string, attributes: Record<string, string> = {}): void {
-    this.buffer += `${this.indent()}<${name}${this.attributeString(attributes)}>\n`;
+    this.buffer += `${this.indent()}<${name}${attributeString(attributes)}>\n`;
     this.depth += 1;
   }
 
