@@ -1116,7 +1116,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // no full-string match is found.
     const lower = sqlType.toLowerCase().trim();
     const full = this._nativeTypeMap.fetch(lower);
-    if (full.type() !== "value") return full;
+    if (full.type() != null) return full;
     const normalized = lower.replace(/\(.*\)/, "").trim();
     return this._nativeTypeMap.lookup(normalized);
   }
@@ -1136,9 +1136,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * nil for bare integers — dumps stay bare and `c_int_1..8` keep their 1..8.
    *
    * `type` comes straight from `cast_type.type` (no base-name fallback). For an
-   * unmapped `sql_type` the map returns a `ValueType`; Rails' `Value#type` is nil,
-   * whereas trails' `ValueType#type()` is `"value"` — that residual gap is the
-   * ValueType-nil-fidelity follow-up, not something to paper over here.
+   * unmapped `sql_type` the map returns a `ValueType`, whose `type()` — like
+   * Rails' `Value#type` — is nil (`undefined`); `SqlTypeMetadata` then falls the
+   * absent `type` back to the round-trippable `sqlType` name (the #1332 fallback,
+   * now living in one place) so reflection stays informative.
    */
   fetchTypeMetadata(sqlType: string): SqlTypeMetadata {
     const raw = sqlType || "";

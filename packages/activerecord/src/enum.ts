@@ -90,7 +90,7 @@ function enumTypeFrom(
     subtype = reflected.subtypeType();
   } else {
     const rv = reflected as ValueType<unknown>;
-    subtype = rv.type() === "value" ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
+    subtype = rv.type() == null ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
   }
   return new EnumType(name, new Map(Object.entries(mapping)), subtype, raiseOnInvalidValues);
 }
@@ -256,11 +256,11 @@ export class EnumType extends ValueType<string> {
   // Rails' EnumType does `delegate :type, to: :subtype` — callers that ask what
   // an enum column's storage type is want the underlying column type (e.g.
   // "integer"), so delegate to the subtype's own `type()`.
-  get subtype(): string {
+  get subtype(): string | undefined {
     return this._subtypeType.type();
   }
 
-  override type(): string {
+  override type(): string | undefined {
     return this.subtype;
   }
 
@@ -569,16 +569,16 @@ export function _enum(
   // present (attribute_registration.rb:12-18); a default-only / type-less
   // attribute keeps the fallback `value` type until the column reflects, so its
   // subtype must still come from the column (enum decorates the column type,
-  // enum.rb:238-248). Requiring a user-provided def AND a concrete (non-`value`)
-  // type distinguishes the two: a default-only attribute's type is still the
-  // `value` default at `enum` time, so it is treated as column-reflected.
+  // enum.rb:238-248). Requiring a user-provided def AND a concrete type
+  // distinguishes the two: the `value` default's `type()` is nil (like Rails'
+  // `Value#type`), so a default-only attribute reads as `existingTypeName ==
+  // null` and is treated as column-reflected.
   const existingDef = (this as any)._attributeDefinitions?.get(attrName);
   const existingTypeName =
     typeof existingDef?.type?.type === "function" ? existingDef.type.type() : undefined;
   const explicitlyTyped =
     (existingDef?.source === "user" || existingDef?.userProvided === true) &&
-    existingTypeName != null &&
-    existingTypeName !== "value";
+    existingTypeName != null;
   const pendingHost = this as unknown as { _enumsPendingTypeCheck?: Set<string> };
   if (!explicitlyTyped) {
     if (!Object.prototype.hasOwnProperty.call(this, "_enumsPendingTypeCheck")) {
