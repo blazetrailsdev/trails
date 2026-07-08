@@ -4639,7 +4639,9 @@ export class Base extends Model {
       return `${name}(Table doesn't exist)`;
     }
     const attrList = Object.entries(this.attributeTypes())
-      .map(([attr, type]) => `${attr}: ${type.type()}`)
+      // Rails interpolates `type.type` (core.rb:383); a nil type renders as the
+      // empty string, so mirror Ruby's nil-to-"" rather than JS's "undefined".
+      .map(([attr, type]) => `${attr}: ${type.type() ?? ""}`)
       .join(", ");
     return `${name}(${attrList})`;
   }
