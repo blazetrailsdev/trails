@@ -30,19 +30,24 @@ function byteLength(value: unknown): number {
  * bind values. Integer binds now type-cast to BigInt (SQLite binds them as
  * SQLITE_INTEGER), and Rails renders a bound Integer bare — `[["id", 10]]` —
  * so we emit the exact decimal digits unquoted rather than JSON's quoted
- * `"10"`. The replacer wraps each bigint's digits in a NUL-delimited sentinel,
- * then a final pass strips the surrounding quotes and sentinel. A real string
- * bind containing NUL is escaped by JSON.stringify (as \u0000), so the
- * sentinel can never collide with user data.
+ * `"10"` (Rails renders binds via `binds.inspect`, log_subscriber.rb:65-78).
+ *
+ * We wrap each bigint's digits in a marker, then strip the marker plus its
+ * surrounding quotes. The marker is plain ASCII (JSON never escapes it, so it
+ * appears identically in the output) and is extended until it is provably
+ * absent from a probe serialization of the same data — so the unwrap only ever
+ * matches our own sentinels and can never corrupt a string bind that resembles
+ * the marker. (A fixed sentinel is reproducible by user data; this one is not.)
  */
-const BIGINT_SENTINEL = String.fromCharCode(0);
 function safeJsonStringify(value: unknown): string {
-  const s = JSON.stringify(value, (_key, v) =>
-    typeof v === "bigint" ? `${BIGINT_SENTINEL}${v.toString()}${BIGINT_SENTINEL}` : v,
+  const probe = JSON.stringify(value, (_key, v) => (typeof v === "bigint" ? v.toString() : v));
+  let marker = "@bigint@";
+  while (probe.includes(marker)) marker += "@";
+  const wrapped = JSON.stringify(value, (_key, v) =>
+    typeof v === "bigint" ? `${marker}${v.toString()}${marker}` : v,
   );
-  // JSON.stringify escapes the NUL sentinel to the literal \u0000 sequence in
-  // the output, so unwrap that escaped form (not a raw NUL) back to bare digits.
-  return s.replace(/"\\u0000(-?\d+)\\u0000"/g, "$1");
+  const escaped = marker.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return wrapped.replace(new RegExp(`"${escaped}(-?\\d+)${escaped}"`, "g"), "$1");
 }
 
 let _baseResolver: (() => any) | null = null;
