@@ -11,6 +11,10 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "./sqlite/better-sqlite3.js";
+// Side-effect: register the `Base.encrypts` hooks up front (Rails wires
+// encryption at boot). Ensures the declaration path is ready before any model's
+// `encrypts` runs.
+import "./encryption.js";
 import { beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { DelegateCache } from "./relation/delegation.js";
@@ -18,6 +22,12 @@ import { loadDefaults } from "./trailtie.js";
 import { setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
 import { resetTestAdapterState } from "./test-adapter.js";
 import { shouldSkipGlobalReset } from "./test-helpers/skip-global-reset.js";
+import { Configurable as EncryptionConfigurable } from "./encryption/configurable.js";
+import {
+  TEST_PRIMARY_KEY,
+  TEST_DETERMINISTIC_KEY,
+  TEST_KEY_DERIVATION_SALT,
+} from "./encryption/test-keys.js";
 
 // The test app runs with the Rails 7.0+ defaults (`config.load_defaults 7.0`),
 // which sets `config.active_record.partial_inserts = false` (partial_updates
@@ -39,6 +49,18 @@ Base.automaticallyInvertPluralAssociations = true;
 // raise-on-assign-to-readonly globally; the framework default (active_record.rb:343)
 // is false, flipped to true by load_defaults 7.1 (configuration.rb:286).
 setRaiseOnAssignToAttrReadonly(true);
+
+// Mirror Rails activerecord/test/cases/helper.rb:98-102 — configure encryption
+// once, suite-wide, BEFORE any model class loads, so a model's `encrypts`
+// declaration always builds its scheme against real key material (Rails boots
+// encryption config before models). Individual encryption tests snapshot and
+// re-`configureEncryption()` on top of this baseline; the values match so
+// fixtures encrypted at load round-trip regardless of which suite reads them.
+EncryptionConfigurable.configure({
+  primaryKey: TEST_PRIMARY_KEY,
+  deterministicKey: TEST_DETERMINISTIC_KEY,
+  keyDerivationSalt: TEST_KEY_DERIVATION_SALT,
+});
 
 // Wipe shared test-adapter state before every test so each test starts
 // from a clean slate.
