@@ -519,9 +519,11 @@ export function _enum(
   // Declaring `enum` first keys everything off the un-aliased name, which has no
   // column of its own; real Rails raises `Undeclared attribute type for enum` on
   // first use (verified against vendored Rails). trails converges via
-  // `assertEnumAliasDeclaredBefore`, run from the enum decorator's deferred
-  // replay (not its eager class-definition-time application, which runs before
-  // `alias_attribute` and so never sees the alias) — matching Rails' lazy timing.
+  // `assertEnumTypeDeclared` on the un-aliased name — mirroring Rails' `subtype
+  // == ActiveModel::Type.default_value` branch (enum.rb:240-245) — run from the
+  // enum decorator's deferred replay (gated by `isDecoratorReplay()`, so it never
+  // fires on trails' eager class-definition-time decorator application), matching
+  // Rails' lazy timing.
   const attrName =
     (this as unknown as { _attributeAliases?: Record<string, string> })._attributeAliases?.[
       attribute
