@@ -136,6 +136,24 @@ describe("Callbacks", () => {
 
       expect(target.log).toEqual(["before", "around-pre", "block", "around-post", "after"]);
     });
+
+    it("after registered after an around runs inside it", () => {
+      // Rails compiles an after registered later onto the inner (final) sequence,
+      // so it runs right after the block — before the around's post — rather than
+      // outside the around. Mirrors CallbackChain#compile's reverse fold.
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "around", (t: any, next: () => void) => {
+        t.log.push("around-pre");
+        next();
+        t.log.push("around-post");
+      });
+      setCallback(target, "save", "after", (t: any) => t.log.push("after"));
+
+      runCallbacks(target, "save", () => target.log.push("block"));
+
+      expect(target.log).toEqual(["around-pre", "block", "after", "around-post"]);
+    });
   });
 
   describe("halting", () => {
