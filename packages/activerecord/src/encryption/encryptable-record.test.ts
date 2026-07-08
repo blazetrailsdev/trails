@@ -32,6 +32,7 @@ import { itIfSupports } from "../test-helpers/supports.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { EncryptableRecord } from "./encryptable-record.js";
 import {
+  EncryptedBook,
   EncryptedBookNormalizedFirst,
   EncryptedBookNormalizedSecond,
 } from "../test-helpers/models/book-encrypted.js";
@@ -490,9 +491,13 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("support encrypted attributes defined on columns with default values", async () => {
-    const Book = makeEncryptedBook(await freshAdapter());
-    new Book();
-    const book = await Book.create({});
+    // Rides the canonical reflection-based `EncryptedBook` (name via schema
+    // reflection, non-null default `<untitled>`), mirroring Rails'
+    // `EncryptedBook.create!`. The reflected column default is threaded into the
+    // EncryptedAttributeType and round-trips through the plaintext-default guard
+    // on first read — no `Failed to deserialize encrypted message`.
+    await freshAdapter();
+    const book = await EncryptedBook.create({});
     await assertEncryptedAttribute(book, "name", "<untitled>");
   });
 
