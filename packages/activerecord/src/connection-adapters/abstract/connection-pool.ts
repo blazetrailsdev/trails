@@ -440,6 +440,17 @@ export class ConnectionPool implements ReapablePool {
           if (typeof prop === "symbol" || ADAPTER_PROXY_PROBE_KEYS.has(prop)) {
             return undefined;
           }
+          // Only dispatch names a real connection exposes as a method. When a
+          // connection already exists (it does whenever a translated error was
+          // raised — a query was mid-flight), an unrecognised probe key not in
+          // the deny set still resolves to a non-callable instead of a
+          // dispatcher that would blow up on `conn[prop] is not a function`.
+          // With no connection yet, fabricate optimistically so first-use
+          // dispatch (schemaMigration etc.) still works.
+          const sample = pool.activeConnection ?? pool.connections[0];
+          if (sample && typeof (sample as any)[prop] !== "function") {
+            return undefined;
+          }
           return (...args: unknown[]) => {
             return pool.withConnection((conn) => (conn as any)[prop](...args));
           };

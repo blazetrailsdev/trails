@@ -636,3 +636,16 @@ it("adapter proxy still dispatches genuine adapter methods to the connection", a
   const quoted = await proxy.quoteTableName("people");
   expect(quoted).toContain("people");
 });
+
+it("adapter proxy does not fabricate a method for an unknown probe key once a connection exists", async () => {
+  const pool = makePool();
+  // Materialise a connection (as when a query is mid-flight and an error is
+  // translated). An arbitrary probe key not in the deny set must now resolve to
+  // a non-callable, since the live connection has no such method.
+  await pool.checkout();
+  const proxy = (
+    pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }
+  )._getAdapterProxy();
+  expect(proxy.someMatcherProbeKey).toBeUndefined();
+  await pool.disconnect();
+});
