@@ -52,6 +52,7 @@ describe("buildTestDatabaseConfig", () => {
   });
 
   it("picks mysql when MYSQL_TEST_URL is set and PG_TEST_URL is absent", async () => {
+    vi.stubEnv("ARCONN", "mysql2");
     vi.stubEnv("PG_TEST_URL", "");
     vi.stubEnv("MYSQL_TEST_URL", "mysql2://localhost/trails_test");
     const { adapter } = await buildTestDatabaseConfig();
