@@ -332,17 +332,43 @@ export class SchemaDumper {
 
   /**
    * The `ConnectionAdapters::SchemaDumper` subclass, registered by that module
-   * at load. Rails has a single dumper: the base `SchemaDumper#table` always
-   * drives column specs through the adapter's mixed-in
-   * `column_spec`/`prepare_column_options` (which live on the adapter subclass).
-   * TS can't mix a module into a class, so instead constructing the bare base
-   * for a non-adapter source (`create`/`dump` with a plain `SchemaSource`)
-   * transparently yields the adapter subclass — the sole `emitTable` /
-   * `columnSpec` dispatch. Dialect subclasses set `this` to themselves and are
+   * at load. Rails has a single dumper: `SchemaDumper#table` drives columns
+   * through the unqualified `column_spec` (schema_dumper.rb:199), a private
+   * method defined only on the adapter subclass (abstract/schema_dumper.rb:13),
+   * so Rails always instantiates that subclass via `connection.create_schema_dumper`
+   * — a bare `ActiveRecord::SchemaDumper` would `NameError` on `column_spec`. TS
+   * can't mix a module into a class, so the emitter lives on the subclass and the
+   * base factory (`create`/`dump`/`dumpTableSchema`) redirects to it for
+   * non-adapter sources. Dialect subclasses set `this` to themselves and are
    * never redirected.
    * @internal
    */
   static connectionAdaptersDumper?: typeof SchemaDumper;
+
+  /** @internal */
+  private static _connectionAdaptersDumperLoad?: Promise<typeof SchemaDumper>;
+
+  /**
+   * Load the `ConnectionAdapters::SchemaDumper` subclass and return it once it
+   * has registered itself as {@link connectionAdaptersDumper}. The import is
+   * dynamic (cached) rather than static because the subclass `extends` this
+   * class: a static back-edge would evaluate its `extends` clause before this
+   * class is defined (a temporal dead zone) — the same static cycle this file
+   * already breaks for `schema-introspection`. Async entrypoints await this
+   * before constructing so the redirect never falls back to the bare base.
+   * @internal
+   */
+  protected static async loadConnectionAdaptersDumper(): Promise<typeof SchemaDumper> {
+    if (SchemaDumper.connectionAdaptersDumper) return SchemaDumper.connectionAdaptersDumper;
+    SchemaDumper._connectionAdaptersDumperLoad ??=
+      import("./connection-adapters/abstract/schema-dumper.js").then(() => {
+        if (!SchemaDumper.connectionAdaptersDumper) {
+          throw new Error("ConnectionAdapters::SchemaDumper did not register on load");
+        }
+        return SchemaDumper.connectionAdaptersDumper;
+      });
+    return SchemaDumper._connectionAdaptersDumperLoad;
+  }
 
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
@@ -417,11 +443,20 @@ export class SchemaDumper {
     // `emitTable`/`columnSpec` dispatch (which lives there, mirroring Rails'
     // adapter-mixed-in column_spec) serves every source. Dialect subclasses
     // pass `this !== SchemaDumper` and construct themselves unchanged.
-    const Ctor =
-      this === SchemaDumper && SchemaDumper.connectionAdaptersDumper
-        ? SchemaDumper.connectionAdaptersDumper
-        : this;
-    return new Ctor(source, options) as InstanceType<T>;
+    if (this !== SchemaDumper) return new this(source, options) as InstanceType<T>;
+    const Sub = SchemaDumper.connectionAdaptersDumper;
+    if (!Sub) {
+      // Synchronous construction can't load the subclass (see
+      // loadConnectionAdaptersDumper); the async `dump`/`dumpTableSchema` paths
+      // await it before reaching here. Like Rails, a bare base has no
+      // `column_spec` — go through an adapter's `createSchemaDumper()` or await
+      // `loadConnectionAdaptersDumper()` first.
+      throw new Error(
+        "SchemaDumper.create needs the ConnectionAdapters dumper; use SchemaDumper.dump()/" +
+          "dumpTableSchema() (which load it) or an adapter's createSchemaDumper().",
+      );
+    }
+    return new Sub(source, options) as InstanceType<T>;
   }
 
   /**
@@ -455,14 +490,42 @@ export class SchemaDumper {
       // redirect) — never the bare base.
       const createDialectDumper = (sourceOrAdapter as { createSchemaDumper?: unknown })
         .createSchemaDumper;
-      const dumper =
+      const dialectDumper =
         typeof createDialectDumper === "function"
-          ? ((createDialectDumper.call(sourceOrAdapter, source, dumperOptions) ??
-              this.create(source, dumperOptions)) as SchemaDumper)
-          : this.create(source, dumperOptions);
-      return dumper.dump() as Promise<string>;
+          ? (createDialectDumper.call(sourceOrAdapter, source, dumperOptions) as
+              | SchemaDumper
+              | undefined
+              | null)
+          : undefined;
+      if (dialectDumper) return dialectDumper.dump() as Promise<string>;
+      // Adapter without a dialect dumper hook — fall back to the base factory,
+      // awaiting the ConnectionAdapters subclass load so `create` never hits the
+      // bare base.
+      return this._createEnsuringEmitter(source, dumperOptions).then((d) => d.dump());
     }
-    return this.create(sourceOrAdapter, options).dump();
+    // Non-adapter source (in-memory MigrationContext / mock). The public
+    // `SchemaDumper` IS the subclass, so `create` resolves synchronously; only a
+    // direct import of the bare base needs the awaited load.
+    if (this !== SchemaDumper || SchemaDumper.connectionAdaptersDumper) {
+      return this.create(sourceOrAdapter, options).dump();
+    }
+    return this._createEnsuringEmitter(sourceOrAdapter, options).then((d) => d.dump());
+  }
+
+  /**
+   * Construct a dumper for `source`, first awaiting the ConnectionAdapters
+   * subclass load when called on the bare base so the `create` redirect has the
+   * emitter registered. Used by the async dump entrypoints.
+   * @internal
+   */
+  private static async _createEnsuringEmitter(
+    source: SchemaSource,
+    options: Record<string, unknown>,
+  ): Promise<SchemaDumper> {
+    if (this === SchemaDumper && !SchemaDumper.connectionAdaptersDumper) {
+      await SchemaDumper.loadConnectionAdaptersDumper();
+    }
+    return this.create(source, options);
   }
 
   static dumpTableSchema(adapter: DatabaseAdapter, tableName: string): Promise<string>;
@@ -480,7 +543,7 @@ export class SchemaDumper {
     if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
       dumper = (source as any).createSchemaDumper(wrappedSource, {}) as SchemaDumper;
     } else {
-      dumper = this.create(wrappedSource);
+      dumper = await this._createEnsuringEmitter(wrappedSource, {});
     }
     const lines: string[] = [];
     await dumper.schemas(lines);
@@ -1022,16 +1085,3 @@ function isDatabaseAdapter(v: unknown): v is DatabaseAdapter {
     typeof obj.adapterName === "string"
   );
 }
-
-// Load the `ConnectionAdapters::SchemaDumper` subclass so it registers itself
-// as `connectionAdaptersDumper` (see that field) even when a consumer imports
-// only this base module — the redirect in `create` then always has the single
-// `emitTable`/`columnSpec` emitter available, mirroring Rails' adapter dumper
-// factory which unconditionally returns `ConnectionAdapters::SchemaDumper`
-// (connection_adapters/abstract/schema_dumper.rb:8-10). The import must be
-// dynamic, not static: the subclass `extends` this class, so a static back-edge
-// would evaluate its `extends` clause before this class is defined (a temporal
-// dead zone) — the same static cycle this file already breaks for
-// `schema-introspection`. Placed after the class declaration, so by the time
-// the subclass module evaluates, this base class is fully defined.
-void import("./connection-adapters/abstract/schema-dumper.js");
