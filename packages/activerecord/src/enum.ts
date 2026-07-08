@@ -1000,6 +1000,13 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
     _attributeAliases?: Record<string, string>;
     _defaultAttributes(): { getAttribute(n: string): { type: Type } };
   };
+  // Guard the *un-resolved* name before resolving the alias: an `enum` declared
+  // before its `alias_attribute` keys a phantom `_enums` entry under the
+  // un-aliased name, so resolving first would look past it to the backing column
+  // and silently return null. Mirrors Rails' type casting always routing through
+  // `type_for_attribute(name)`, whose `decorate_attributes` block raises
+  // (type_caster/map.rb:10-16, enum.rb:240-245).
+  assertEnumAliasDeclaredBefore(klass, attribute);
   const resolved = host._attributeAliases?.[attribute] ?? attribute;
   if (!host._enums?.has(resolved)) return null;
   // Reflect synchronously from the warm schema cache before reading the

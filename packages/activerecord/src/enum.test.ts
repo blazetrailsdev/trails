@@ -653,6 +653,12 @@ describe("EnumTest", () => {
     expect(() => (Klass as any).typeForAttribute("aliased_status")).toThrow(
       /Undeclared attribute type for enum 'aliased_status' in Klass/,
     );
+    // And via the enum helper path (predicate → castEnumValue → enumTypeOf),
+    // which keys off the un-aliased enum name: Rails routes type casting through
+    // type_for_attribute, whose decorate block raises.
+    expect(() => new (Klass as any)().isProposed()).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
   });
 
   it("query state by predicate with prefix", () => {
