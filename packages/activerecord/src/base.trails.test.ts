@@ -10,6 +10,8 @@ import { describe, it, expect } from "vitest";
 import { Base, UnknownPrimaryKey } from "./index.js";
 import { quoteSqlValue } from "./base.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Type } from "@blazetrails/activemodel";
+import { fixtures } from "./test-helpers/fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 
 describe("quoteSqlValue", () => {
@@ -203,6 +205,62 @@ describe("UnknownPrimaryKeyTest", () => {
       "Unknown primary key for table dummies in model Dummy.\nNo PK configured.",
     );
     expect(err.model).toBe(Dummy);
+  });
+});
+
+describe("instantiate override types for absent no-default keys (trails)", () => {
+  fixtures([]);
+
+  class Typecast extends Type {
+    readonly name = "typecast";
+    cast() {
+      return "t.lo";
+    }
+  }
+
+  interface AttrProbe {
+    _attributes: { getAttribute(name: string): { isInitialized(): boolean; type: unknown } };
+  }
+  const seedAttrs = async (): Promise<Record<string, unknown>> => {
+    class Topic extends Base {}
+    const seed = await Topic.create({ title: "The First Topic" } as Partial<Topic>);
+    const attrs = {
+      ...(seed as unknown as AttrProbe & { attributes: Record<string, unknown> }).attributes,
+    };
+    delete attrs.id;
+    return attrs;
+  };
+
+  // Rails' LazyAttributeHash materializes every `types`/`additional_types` key,
+  // not just those present in the values hash: an override key absent from the
+  // attributes with no schema default becomes Attribute.uninitialized carrying
+  // the override type (builder.rb:170-177). trails previously applied overrides
+  // only while iterating keys present in the row, dropping this edge.
+  it("materializes an override type for an absent key lacking a schema default", async () => {
+    class Topic extends Base {}
+    const attrs = await seedAttrs();
+
+    const topic = Topic.instantiate(attrs, {
+      computed_col: new Typecast(),
+    }) as unknown as AttrProbe;
+    const attr = topic._attributes.getAttribute("computed_col");
+    // Materialized as uninitialized carrying the override type (no schema
+    // default existed for this purely-computed key).
+    expect(attr.isInitialized()).toBe(false);
+    expect(attr.type).toBeInstanceOf(Typecast);
+  });
+
+  it("keeps the schema type for a real column omitted from attrs", async () => {
+    class Topic extends Base {}
+    const attrs = await seedAttrs();
+    delete attrs.author_name;
+
+    const topic = Topic.instantiate(attrs, {
+      author_name: new Typecast(),
+    }) as unknown as AttrProbe;
+    // The absent real column falls to the attr.dup branch: schema type kept,
+    // override NOT applied, so the custom cast type never reaches the set.
+    expect(topic._attributes.getAttribute("author_name").type).not.toBeInstanceOf(Typecast);
   });
 });
 

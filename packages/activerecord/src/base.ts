@@ -2933,6 +2933,15 @@ export class Base extends Model {
         record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
       }
     }
+    // Rails' LazyAttributeHash also materializes override keys absent from the
+    // values hash: one with no schema default becomes Attribute.uninitialized
+    // carrying the override type (builder.rb:170-177). Schema columns keep their
+    // declared type (the attr.dup branch), handled inside overrideUninitialized.
+    if (overrideTypes) {
+      for (const [key, type] of Object.entries(overrideTypes)) {
+        if (!(key in row)) record._attributes.overrideUninitialized(key, type);
+      }
+    }
     // A SELECT that projects only a subset of columns yields a row with just
     // those keys, so hasAttribute() must reflect what was loaded rather than
     // the full schema. Mirrors Rails' attributes_builder narrowing (see

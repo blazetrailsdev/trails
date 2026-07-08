@@ -647,6 +647,13 @@ function directInstantiate(
       record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
     }
   }
+  // Materialize override keys absent from the row with no schema default as
+  // Attribute.uninitialized (mirrors Base._instantiate / LazyAttributeHash).
+  if (overrideTypes) {
+    for (const [key, type] of Object.entries(overrideTypes)) {
+      if (!(key in row)) record._attributes.overrideUninitialized(key, type);
+    }
+  }
   narrowToProjectedColumns(klass, record, row);
   record._newRecord = false;
   (record as any)._dirty.snapshot(record._attributes);

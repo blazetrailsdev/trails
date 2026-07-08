@@ -162,6 +162,26 @@ export class AttributeSet {
     );
   }
 
+  /**
+   * Materialize an override type for a key absent from the values hash and
+   * lacking a schema default, as an uninitialized attribute — mirroring
+   * `LazyAttributeHash#[]`'s final branch (builder.rb:170-177): when a name is
+   * in `additional_types`/`types` but not in the values hash, Rails returns
+   * `attr.dup` if a `default_attributes[name]` exists (schema type kept, the
+   * override is NOT applied) and otherwise `Attribute.uninitialized(name,
+   * type)` with the resolved override type. A schema-declared column is already
+   * materialized in the set (warm schema cache), so its presence here is the
+   * `attr.dup` branch — we leave it untouched.
+   */
+  overrideUninitialized(name: string, type: { deserialize(value: unknown): unknown }): void {
+    this.assertNotFrozen();
+    if (this.attributes.has(name)) return;
+    this.attributes.set(
+      name,
+      Attribute.uninitialized(name, type as import("./type/value.js").Type),
+    );
+  }
+
   writeFromUser(name: string, value: unknown): unknown {
     this.assertNotFrozen();
     // Rails one-liner (attribute_set.rb:58-61):
