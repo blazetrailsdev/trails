@@ -321,45 +321,119 @@ export function includeRelationMethods(carrier: object, methods: GeneratedRelati
 }
 
 /**
- * Per-model prototype carrier for the Relation delegate class. Rails builds a
- * per-model delegate subclass and `include`s the model's
- * `GeneratedRelationMethods` module into it (`relation_class_for`,
- * delegation.rb:32-45,144). trails' analogue is a lazily-created per-model
- * `Relation` subclass whose prototype carries the generated methods: relations
- * built for `modelClass` (via `Base._buildDefaultRelation` &c.) are constructed
- * from this subclass, so a generated delegator resolves as a real method by
- * ordinary prototype lookup — no side-table consulted in the `Proxy` `get` trap.
+ * Constructor of any relation-family delegate class. Varargs because the four
+ * carriers differ in shape (`Relation(model, table?)`,
+ * `AssociationRelation(model, association)`,
+ * `DisableJoinsAssociationRelation(model, key, ids, walker?)`,
+ * `CollectionProxy(record, name, def)`) — the per-model subclass inherits the
+ * base constructor unchanged, so construction is signature-agnostic here.
+ */
+type FamilyCtor = new (...args: any[]) => any;
+
+/**
+ * Build (once, memoized in `cache`) a per-model subclass of a relation-family
+ * delegate class and `include` the model's `GeneratedRelationMethods` module
+ * into its prototype. Rails builds a per-model delegate subclass and `include`s
+ * the model's generated module into it (`relation_class_for`,
+ * delegation.rb:32-45,144); Rails then `include`s that **same** module into
+ * *every* delegate subclass (`DelegateCache#include_relation_methods`,
+ * delegation.rb:57-60), so `AssociationRelation` / `CollectionProxy` /
+ * `DisableJoinsAssociationRelation` all carry the generated methods too.
+ *
+ * trails' analogue: a lazily-created per-model subclass whose prototype carries
+ * the generated methods. Instances built for `modelClass` from this subclass
+ * resolve a generated delegator as a real method by ordinary prototype lookup —
+ * no side-table consulted in either `Proxy` `get` trap. Every carrier for a
+ * given model shares the one `generatedRelationMethods(modelClass)` module, so a
+ * `generate` (from either proxy's miss path) propagates to all of them.
  *
  * The carrier is the subclass **prototype**, set once at subclass creation, so
- * no per-instance `Object.setPrototypeOf` runs on the relation construction hot
- * path (the V8 megamorphic-deopt the parent story flagged).
- *
- * Mirrors: ActiveRecord::Delegation::ClassMethods#relation_class_for
+ * no per-instance `Object.setPrototypeOf` runs on the construction hot path (the
+ * V8 megamorphic-deopt the parent story flagged).
  */
-const _relationClassByModel = new WeakMap<typeof Base, RelationCtor>();
-
-export function relationClassFor(modelClass: typeof Base): RelationCtor {
-  let subclass = _relationClassByModel.get(modelClass);
+function perModelCarrier(
+  cache: WeakMap<typeof Base, FamilyCtor>,
+  modelClass: typeof Base,
+  base: FamilyCtor | undefined,
+): FamilyCtor {
+  let subclass = cache.get(modelClass);
   if (!subclass) {
-    // The `relation` family slot is always registered (relation.ts, at module
-    // init) before any relation is constructed, so this cast is safe at runtime.
-    const baseRelation = _relationFamilySlot.relation as unknown as new (
-      ...args: never[]
-    ) => object;
-    subclass = class extends baseRelation {} as RelationCtor;
+    // The family slot is always registered at its class module's init, before
+    // any instance is constructed for that class, so `base` is set here.
+    const baseCtor = base as unknown as new (...args: never[]) => object;
+    subclass = class extends baseCtor {} as FamilyCtor;
     // A class expression assigned to a `let` infers `.name` from the variable
-    // (`"subclass"`), which would leak through `Relation#inspect`'s
+    // (`"subclass"`), which would leak through `#inspect`'s
     // `this.constructor.name`. Rails' `ClassSpecificRelation::ClassMethods#name`
     // (delegation.rb:111-115) returns `superclass.name` so a per-model delegate
-    // still reports the base relation class name — mirror that here.
+    // still reports the base class name — mirror that here.
     Object.defineProperty(subclass, "name", {
-      value: (baseRelation as { name: string }).name,
+      value: (baseCtor as { name: string }).name,
       configurable: true,
     });
-    _relationClassByModel.set(modelClass, subclass);
+    cache.set(modelClass, subclass);
     includeRelationMethods(subclass.prototype, generatedRelationMethods(modelClass));
   }
   return subclass;
+}
+
+/**
+ * Per-model prototype carrier for the `Relation` delegate class. Relations
+ * built for `modelClass` (via `Base._buildDefaultRelation` &c.) are constructed
+ * from this subclass.
+ *
+ * Mirrors: ActiveRecord::Delegation::ClassMethods#relation_class_for
+ */
+const _relationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
+
+export function relationClassFor(modelClass: typeof Base): RelationCtor {
+  return perModelCarrier(
+    _relationClassByModel,
+    modelClass,
+    _relationFamilySlot.relation,
+  ) as RelationCtor;
+}
+
+/**
+ * Per-model prototype carrier for the `AssociationRelation` delegate class.
+ * `blog.posts.where(...)` and other association-relation construction sites are
+ * built from this subclass so generated methods resolve as real methods on them.
+ */
+const _associationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
+
+export function associationRelationClassFor(modelClass: typeof Base): FamilyCtor {
+  return perModelCarrier(
+    _associationRelationClassByModel,
+    modelClass,
+    _relationFamilySlot.associationRelation,
+  );
+}
+
+/**
+ * Per-model prototype carrier for the `DisableJoinsAssociationRelation` delegate
+ * class.
+ */
+const _disableJoinsAssociationRelationClassByModel = new WeakMap<typeof Base, FamilyCtor>();
+
+export function disableJoinsAssociationRelationClassFor(modelClass: typeof Base): FamilyCtor {
+  return perModelCarrier(
+    _disableJoinsAssociationRelationClassByModel,
+    modelClass,
+    _relationFamilySlot.disableJoinsAssociationRelation,
+  );
+}
+
+/**
+ * Per-model prototype carrier for the `CollectionProxy` delegate class.
+ */
+const _collectionProxyClassByModel = new WeakMap<typeof Base, FamilyCtor>();
+
+export function collectionProxyClassFor(modelClass: typeof Base): FamilyCtor {
+  return perModelCarrier(
+    _collectionProxyClassByModel,
+    modelClass,
+    _relationFamilySlot.collectionProxy,
+  );
 }
 
 /**
@@ -567,11 +641,12 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
 
       // Generated relation methods (Rails' GeneratedRelationMethods) now resolve
       // as real methods via the top-of-trap `Reflect.get` above: they live on
-      // the per-model `Relation` subclass prototype (`relationClassFor`), which
-      // is this `target`'s prototype, so no explicit side-table branch is needed
-      // here. The `uncacheableMethods` gate below is therefore load-bearing — a
-      // subclass-only method (e.g. CollectionProxy#target) is never generated,
-      // so a generated copy can never shadow it.
+      // the per-model subclass prototype (`relationClassFor` /
+      // `associationRelationClassFor` / `disableJoinsAssociationRelationClassFor`),
+      // which is this `target`'s prototype, so no explicit side-table branch is
+      // needed here. The `uncacheableMethods` gate below is therefore
+      // load-bearing — a subclass-only method (e.g. CollectionProxy#target) is
+      // never generated, so a generated copy can never shadow it.
       if (modelClass._scopes.has(prop)) {
         return (...args: any[]) => {
           const scopeFn = modelClass._scopes.get(prop)!;

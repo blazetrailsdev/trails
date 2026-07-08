@@ -1,6 +1,7 @@
 import { Relation } from "./relation.js";
 import { argumentError } from "./relation/query-methods.js";
 import { _registerRelationFamily } from "./relation/uncacheable-methods-slot.js";
+import { disableJoinsAssociationRelationClassFor } from "./relation/delegation.js";
 import { normalizeAssociationKey } from "./associations/key-normalization.js";
 import type { Base } from "./base.js";
 
@@ -289,7 +290,8 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     klass: typeof Base,
     chainWalker: () => Promise<{ relation: Relation<T> }>,
   ): DisableJoinsAssociationRelation<T> {
-    return new DisableJoinsAssociationRelation<T>(klass, "", [], chainWalker);
+    const Ctor = disableJoinsAssociationRelationClassFor(klass);
+    return new Ctor(klass, "", [], chainWalker);
   }
 
   /**
@@ -468,19 +470,10 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     // the public `chainWalker?` slot — same runtime position, same
     // module.
     const trusted = payload as unknown as () => Promise<{ relation: Relation<T> }>;
+    const Ctor = disableJoinsAssociationRelationClassFor(this.model);
     const clone = this._composite
-      ? new DisableJoinsAssociationRelation<T>(
-          this.model,
-          this.key as string[],
-          this._storedIds as unknown[][],
-          trusted,
-        )
-      : new DisableJoinsAssociationRelation<T>(
-          this.model,
-          this.key as string,
-          this._storedIds as unknown[],
-          trusted,
-        );
+      ? new Ctor(this.model, this.key as string[], this._storedIds as unknown[][], trusted)
+      : new Ctor(this.model, this.key as string, this._storedIds as unknown[], trusted);
     return clone as unknown as Relation<T>;
   }
 
