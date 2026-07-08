@@ -683,16 +683,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
     await client.query("SET intervalstyle = iso_8601");
     await client.query(`SET client_min_messages TO ${this.quoteLiteral(this._minMessages)}`);
-    // Eagerly cache max_identifier_length so the synchronous DatabaseLimits
-    // mixin (tableAliasLength/tableNameLength/indexNameLength) resolves the real
-    // server value via receiver-dispatch. Rails memoizes it lazily but reads it
-    // synchronously (query_value, postgresql_adapter.rb:620-622); trails' queries
-    // are async, so we populate the memo here on the raw client — like the SETs
-    // above — rather than expose an async maxIdentifierLength.
-    if (this._maxIdentifierLength == null) {
-      const result = await client.query("SHOW max_identifier_length");
-      this._maxIdentifierLength = parseInt(result.rows[0]?.max_identifier_length ?? "63", 10);
-    }
     for (const [key, val] of Object.entries(this._sessionVariables)) {
       if (val === null) continue;
       if (val === "default") {
@@ -2406,13 +2396,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: PostgreSQLAdapter#max_identifier_length (postgresql_adapter.rb:620)
-  // Synchronous like Rails: the memo is populated eagerly on connect
-  // (_maybeConfigureConnection), so the inherited DatabaseLimits mixin's
-  // receiver-dispatch (`this.maxIdentifierLength()`) resolves the real server
-  // value (normally 63). Falls back to PostgreSQL's default (NAMEDATALEN-1 = 63)
-  // before the memo is warmed.
+  // Synchronous like Rails: the memo is warmed eagerly on connect
+  // (_warmMaxIdentifierLength, driven by connectBang), so the inherited
+  // DatabaseLimits mixin's receiver-dispatch (`this.maxIdentifierLength()`)
+  // resolves the real server value (normally 63) for its synchronous callers
+  // (relation join-alias tracking). Falls back to PostgreSQL's compile-time
+  // default (NAMEDATALEN-1 = 63) before the memo is warmed.
   maxIdentifierLength(): number {
     return this._maxIdentifierLength ?? 63;
+  }
+
+  // Populate the max_identifier_length memo via a logged SCHEMA query, matching
+  // Rails' `query_value("SHOW max_identifier_length", "SCHEMA")`
+  // (postgresql_adapter.rb:620-622). trails can't run that query synchronously,
+  // so connectBang warms it once per adapter after the connection is live —
+  // the memo persists across reconnects, so the null guard makes this a no-op
+  // on every subsequent (re)connect.
+  private async _warmMaxIdentifierLength(): Promise<void> {
+    if (this._maxIdentifierLength != null) return;
+    const rows = (await this.schemaQuery("SHOW max_identifier_length")) as Array<{
+      max_identifier_length: string;
+    }>;
+    this._maxIdentifierLength = parseInt(rows[0]?.max_identifier_length ?? "63", 10);
   }
 
   // Mirrors: PostgreSQLAdapter#session_auth= (postgresql_adapter.rb:625)
@@ -2626,6 +2631,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   override async connectBang(): Promise<void> {
     await this.connect();
+    // The connection is now live and out of the configure barrier, so the
+    // logged schemaQuery is safe here (re-entering withRawConnection finds a
+    // non-null _connection and skips the connectBang pre-loop). Warms the
+    // synchronous maxIdentifierLength memo for relation join-alias tracking.
+    await this._warmMaxIdentifierLength();
   }
 
   /**
