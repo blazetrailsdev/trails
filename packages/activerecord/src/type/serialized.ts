@@ -52,7 +52,12 @@ function hasEquals(value: unknown): value is { equals(other: unknown): boolean }
 
 function hasValueEquality(value: unknown): boolean {
   if (value === null || typeof value !== "object") return false;
-  const primitive = (value as { valueOf(): unknown }).valueOf();
+  // A null-prototype object (which isValueComparable treats as hash-like) does
+  // not inherit Object.prototype.valueOf, so guard the lookup rather than
+  // throwing when such a value reaches this fallback.
+  const valueOf = (value as { valueOf?: unknown }).valueOf;
+  if (typeof valueOf !== "function") return false;
+  const primitive = valueOf.call(value);
   return primitive !== value && (primitive === null || typeof primitive !== "object");
 }
 

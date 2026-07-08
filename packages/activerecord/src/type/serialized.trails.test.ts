@@ -65,6 +65,11 @@ describe("Serialized#isChanged", () => {
     expect(type.isChanged(cents, sameMillis)).toBe(true);
   });
 
+  it("reports changed (not throws) for a null-prototype hash vs a Date", () => {
+    const nullProto = Object.assign(Object.create(null), { a: 1 });
+    expect(type.isChanged(nullProto, new Date(100))).toBe(true);
+  });
+
   it("falls back to reference equality for identity-== object_class instances", () => {
     class Custom {}
     const oldValue = new Custom();
