@@ -926,6 +926,41 @@ describe("toXml()", () => {
     expect(xml).toContain('<id type="integer">7</id>');
   });
 
+  it("indents a nested include two spaces deeper than its wrapper", () => {
+    // The nested-hash branch routes through XmlMini.toTag's depth-aware builder,
+    // so a singular include is wrapped in its own tag and each attribute sits
+    // two spaces deeper — the same pretty-printed layout the inline recursion
+    // produced before this path was consolidated onto the shared funnel.
+    class Author extends Model {
+      static {
+        this.attribute("id", "big_integer");
+        this.attribute("name", "string");
+      }
+    }
+    class Post extends Model {
+      author: Author | null = null;
+      static {
+        this.attribute("id", "big_integer");
+      }
+    }
+    const author = new Author({ name: "Alice" });
+    author.writeAttribute("id", "7");
+    const p = new Post({});
+    p.writeAttribute("id", "1");
+    p.author = author;
+    expect(p.toXml({ include: "author" })).toBe(
+      [
+        "<post>",
+        '  <id type="integer">1</id>',
+        "  <author>",
+        '    <id type="integer">7</id>',
+        "    <name>Alice</name>",
+        "  </author>",
+        "</post>",
+      ].join("\n"),
+    );
+  });
+
   it("serializes a decimal attribute as a scalar type=decimal, not a nested object", () => {
     // A decimal attribute materializes as a BigDecimal object carrying
     // sign/intDigits/fracDigits. Rails serializes BigDecimal#to_xml as a

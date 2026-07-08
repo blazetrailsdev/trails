@@ -14,13 +14,11 @@ import {
 } from "./validations.js";
 import { sanitizeForbiddenAttributes as forbiddenSanitize } from "./forbidden-attributes-protection.js";
 import {
-  underscore,
-  singularize,
   renameKey,
   toTag,
+  IndentedXmlStringBuilder,
   type RenameKeyOptions,
-  type XmlBuilder,
-  htmlEscape,
+  type XmlTypeInfo,
   resetCallbacks as asResetCallbacks,
 } from "@blazetrails/activesupport";
 import {
@@ -172,32 +170,14 @@ const XML_MINI_TYPE_NAMES: Record<string, string> = {
 };
 
 /**
- * A cast-derived type map for one serialized hash level, mirroring the
- * column-type table Rails builds per-record in its XML serializer. `types`
- * maps each scalar attribute key to its `XmlMini` `type=` name; `nested`
- * carries the same info for each `include`d association keyed by association
- * name, so a nested numeric column keeps an adapter-stable `type=` attribute
- * even though `serializableHash` flattens the association into a plain object
- * that no longer carries its model class.
+ * The empty {@link XmlTypeInfo} used when a level has no cast types (a bare
+ * hash with no association metadata). `types` maps each scalar attribute key to
+ * its `XmlMini` `type=` name and `nested` carries the same table for each
+ * `include`d association, mirroring the per-record column-type table Rails
+ * builds in its XML serializer — needed because `serializableHash` flattens
+ * associations into plain objects that no longer name their model class.
  */
-interface XmlTypeInfo {
-  types: Record<string, string>;
-  nested: Record<string, XmlTypeInfo>;
-}
-
 const EMPTY_XML_TYPE_INFO: XmlTypeInfo = { types: {}, nested: {} };
-
-/**
- * Whether a serialized value is a plain `{}` record (the trails analog of a
- * Ruby Hash) rather than a class instance. Only plain records are expanded into
- * nested XML tags; Date/Temporal/BigDecimal/TimeWithZone and any other instance
- * serialize as a single leaf, matching XmlMini's `respond_to?(:to_xml)` gate.
- */
-function isPlainRecord(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const proto = Object.getPrototypeOf(value);
-  return proto === Object.prototype || proto === null;
-}
 
 /**
  * Build the cast-derived {@link XmlTypeInfo} for a record's serialized `hash`,
@@ -2390,84 +2370,33 @@ export class Model {
     // `skip_types: true` (XmlMini) suppresses the inferred `type="..."`
     // attribute on every tag; the `nil="true"` marker is a separate attribute
     // and stays. (active_support/core_ext/array/conversions.rb / xml_mini.rb)
-    let xml = "";
-    // An indentation-aware leaf sink for the shared XmlMini `toTag` funnel,
-    // which resolves the `type=` name, applies formatting, emits `nil="true"`,
-    // and calls `renameKey`. `openTag`/`closeTag` are unused: only leaves are
-    // routed through `toTag` here — nested plain-object hashes keep their own
-    // recursion below so the per-attribute cast types (`typeInfo.nested`) can be
-    // threaded, which `toTag` (one type per value) cannot carry.
-    const leafBuilder = (leafIndent: string): XmlBuilder => ({
-      tag: (name, content, attributes = {}) => {
-        const attrs = Object.entries(attributes)
-          .map(([k, v]) => ` ${k}="${this._escapeXml(v)}"`)
-          .join("");
-        xml +=
-          content == null
-            ? `${leafIndent}<${name}${attrs}/>\n`
-            : `${leafIndent}<${name}${attrs}>${this._escapeXml(content)}</${name}>\n`;
-      },
-      openTag: () => {},
-      closeTag: () => {},
-    });
-    const builder = leafBuilder(indent);
+    //
+    // Every value — leaf, nested hash, or array — routes through the shared
+    // XmlMini `toTag` funnel, so `renameKey`/`type=`/`nil=` have a single call
+    // site. `toTag`'s `emitHash`/`emitArray` recurse into the depth-aware
+    // builder for the pretty-printed layout, and the per-level cast types ride
+    // along in `typeInfo` (bigint ids / string-materialized decimals keep an
+    // adapter-agnostic `type=`). Keys are camelCase, so `underscoreKeys` lets
+    // `renameKey` see `_`/space separators to dasherize.
+    const builder = new IndentedXmlStringBuilder(indent);
     for (const [key, value] of Object.entries(hash)) {
-      const tagKey = underscore(key);
       // The cast/column type name (when known) overrides JS-runtime inference so
-      // the `type=` attribute is adapter-agnostic (e.g. a bigint `id` stays
-      // `type="integer"` whether it arrives as a JS number, BigInt, or string).
-      const castTypeName = typeInfo.types[key];
-      const emit = (type?: string) =>
-        toTag(tagKey, value, { builder, type, skipTypes, ...renameOptions });
-      if (isPlainRecord(value)) {
-        // A plain `{}` record is the trails analog of a Ruby Hash: expand it.
-        // Non-plain objects (Date, Temporal, BigDecimal, an ActiveSupport
-        // TimeWithZone, or any other class instance) fall through to `toTag`,
-        // which serializes each as a single typed leaf — never a nested hash.
-        const tag = renameKey(tagKey, renameOptions);
-        xml += `${indent}<${tag}>\n${this._hashToXml(value, indent + "  ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}</${tag}>\n`;
-      } else if (Array.isArray(value)) {
-        const tag = renameKey(tagKey, renameOptions);
-        const arrayType = skipTypes ? "" : ` type="array"`;
-        if (value.length === 0) {
-          // Rails emits an empty array as the self-closing `<tag type="array"/>`.
-          xml += `${indent}<${tag}${arrayType}/>\n`;
-        } else {
-          xml += `${indent}<${tag}${arrayType}>\n`;
-          // Array children are named for the singularized (renamed) root, per
-          // Array#to_xml (`children = root.singularize`) — e.g. `<tag>` under
-          // `<tags type="array">`, not a generic `<item>`.
-          const children = singularize(tag);
-          const itemBuilder = leafBuilder(indent + "  ");
-          for (const item of value) {
-            if (isPlainRecord(item)) {
-              xml += `${indent}  <${children}>\n${this._hashToXml(item, indent + "    ", skipTypes, typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO, renameOptions)}${indent}  </${children}>\n`;
-            } else {
-              // Route every scalar element through `toTag` so it keeps Rails'
-              // inferred `type=`, `nil="true"`, and per-type formatting (a Date
-              // element stays a `dateTime` leaf, not an expanded hash).
-              toTag(children, item, { builder: itemBuilder, skipTypes, ...renameOptions });
-            }
-          }
-          xml += `${indent}</${tag}>\n`;
-        }
-      } else if (typeof value === "number") {
-        // ActiveModel serializes every JS `number` as `integer` (it cannot see
-        // the DB scale); a float column supplies its cast type explicitly.
-        emit(castTypeName ?? "integer");
-      } else {
-        // Every remaining leaf — nil, boolean, BigDecimal, Date, the Temporal
-        // types, and strings — is typed by `toTag`'s own inference, with the
-        // cast/column type (bigint ids, string-materialized decimals) overriding
-        // it so the `type=` attribute stays adapter-agnostic.
-        emit(castTypeName);
-      }
+      // the `type=` attribute is adapter-agnostic. A leaf JS `number` with no
+      // cast type defaults to `integer` — ActiveModel cannot see the DB scale,
+      // and a float/decimal column supplies its own type. (Containers are
+      // objects, so this default never fires for them.)
+      let type = typeInfo.types[key];
+      if (type == null && typeof value === "number") type = "integer";
+      toTag(key, value, {
+        builder,
+        type,
+        skipTypes,
+        typeInfo: typeInfo.nested[key] ?? EMPTY_XML_TYPE_INFO,
+        underscoreKeys: true,
+        ...renameOptions,
+      });
     }
-    return xml;
-  }
-
-  private _escapeXml(str: string): string {
-    return htmlEscape(str).toString();
+    return builder.target();
   }
 
   /**
