@@ -372,6 +372,20 @@ function perModelCarrier(
       configurable: true,
     });
     cache.set(modelClass, subclass);
+    // Only the model's OWN generated module is included — deliberately NOT the
+    // Rails `include_relation_methods` superclass recursion
+    // (`superclass.include_relation_methods(delegate) unless base_class?`,
+    // delegation.rb:57-60). Rails can safely inherit an ancestor's generated
+    // module because its generated body is model-agnostic — `def m(...); scoping
+    // { model.m(...) }; end` reads `self.model` dynamically (delegation.rb:76-88).
+    // trails' delegator instead CAPTURES a specific `modelClass` + bound class
+    // method and scopes/guards that captured model (`classMethodDelegator`), so
+    // installing a parent model's delegator onto an STI child carrier would
+    // dispatch to the parent model — wrong scope and wrong STI type-condition.
+    // The child instead re-derives a correctly-bound delegator onto its own
+    // module via the `Proxy` miss path (keyed by the relation's real
+    // `_modelClass`), yielding identical observable behavior to Rails at the cost
+    // of one extra miss-path pass per (subclass, method).
     includeRelationMethods(subclass.prototype, generatedRelationMethods(modelClass));
   }
   return subclass;
