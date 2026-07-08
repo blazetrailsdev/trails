@@ -581,6 +581,7 @@ export function narrowToProjectedColumns(
   klass: typeof Base,
   record: Base,
   row: Record<string, unknown>,
+  overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
 ): void {
   const pk = (klass as any).primaryKey as string | string[] | undefined;
   const pkSet = new Set(Array.isArray(pk) ? pk : pk != null ? [pk] : []);
@@ -591,14 +592,17 @@ export function narrowToProjectedColumns(
   if (narrowable.length === 0) return;
   const attrs = (record as any)._attributes as {
     keys(): Iterable<string>;
-    narrowTo(names: Iterable<string>): void;
+    narrowTo(
+      names: Iterable<string>,
+      overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+    ): void;
   };
   const keep = new Set(rowKeys);
   const drop = new Set(narrowable);
   for (const name of attrs.keys()) {
     if (!drop.has(name)) keep.add(name);
   }
-  attrs.narrowTo(keep);
+  attrs.narrowTo(keep, overrideTypes);
 }
 
 /**
@@ -647,14 +651,7 @@ function directInstantiate(
       record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
     }
   }
-  // Materialize override keys absent from the row with no schema default as
-  // Attribute.uninitialized (mirrors Base._instantiate / LazyAttributeHash).
-  if (overrideTypes) {
-    for (const [key, type] of Object.entries(overrideTypes)) {
-      if (!(key in row)) record._attributes.overrideUninitialized(key, type);
-    }
-  }
-  narrowToProjectedColumns(klass, record, row);
+  narrowToProjectedColumns(klass, record, row, overrideTypes);
   record._newRecord = false;
   (record as any)._dirty.snapshot(record._attributes);
   record.changesApplied();

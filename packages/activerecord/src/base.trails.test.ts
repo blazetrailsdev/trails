@@ -208,7 +208,7 @@ describe("UnknownPrimaryKeyTest", () => {
   });
 });
 
-describe("instantiate override types for absent no-default keys (trails)", () => {
+describe("instantiate override types for absent keys (trails)", () => {
   fixtures([]);
 
   class Typecast extends Type {
@@ -219,7 +219,11 @@ describe("instantiate override types for absent no-default keys (trails)", () =>
   }
 
   interface AttrProbe {
-    _attributes: { getAttribute(name: string): { isInitialized(): boolean; type: unknown } };
+    _attributes: {
+      getAttribute(name: string): { isInitialized(): boolean; type: unknown };
+      has(name: string): boolean;
+      keys(): string[];
+    };
   }
   const seedAttrs = async (): Promise<Record<string, unknown>> => {
     class Topic extends Base {}
@@ -231,26 +235,13 @@ describe("instantiate override types for absent no-default keys (trails)", () =>
     return attrs;
   };
 
-  // Rails' LazyAttributeHash materializes every `types`/`additional_types` key,
-  // not just those present in the values hash: an override key absent from the
-  // attributes with no schema default becomes Attribute.uninitialized carrying
-  // the override type (builder.rb:170-177). trails previously applied overrides
-  // only while iterating keys present in the row, dropping this edge.
-  it("materializes an override type for an absent key lacking a schema default", async () => {
-    class Topic extends Base {}
-    const attrs = await seedAttrs();
-
-    const topic = Topic.instantiate(attrs, {
-      computed_col: new Typecast(),
-    }) as unknown as AttrProbe;
-    const attr = topic._attributes.getAttribute("computed_col");
-    // Materialized as uninitialized carrying the override type (no schema
-    // default existed for this purely-computed key).
-    expect(attr.isInitialized()).toBe(false);
-    expect(attr.type).toBeInstanceOf(Typecast);
-  });
-
-  it("keeps the schema type for a real column omitted from attrs", async () => {
+  // builder.rb's `elsif types.key?(name)` / `else Attribute.uninitialized(name,
+  // type)` branch: a schema column absent from the values hash with no default
+  // (every non-PK column, since attributes_builder passes
+  // `_default_attributes.except(column_names - [primary_key])`) is materialized
+  // uninitialized, and `type = additional_types.fetch(name, types[name])`, so a
+  // per-query override wins over the declared schema type.
+  it("materializes an override type for a schema column absent from the projected row", async () => {
     class Topic extends Base {}
     const attrs = await seedAttrs();
     delete attrs.author_name;
@@ -258,9 +249,25 @@ describe("instantiate override types for absent no-default keys (trails)", () =>
     const topic = Topic.instantiate(attrs, {
       author_name: new Typecast(),
     }) as unknown as AttrProbe;
-    // The absent real column falls to the attr.dup branch: schema type kept,
-    // override NOT applied, so the custom cast type never reaches the set.
-    expect(topic._attributes.getAttribute("author_name").type).not.toBeInstanceOf(Typecast);
+    const attr = topic._attributes.getAttribute("author_name");
+    expect(attr.isInitialized()).toBe(false);
+    expect(attr.type).toBeInstanceOf(Typecast);
+  });
+
+  // builder.rb only materializes `values.each_key` and `types.each_key`;
+  // `additional_types` is consulted only for names already sourced from values
+  // or schema `types`. An override-only key that is neither in the row nor a
+  // schema column is therefore never materialized (its `default_attribute`
+  // falls to the `else Attribute.null` branch) — it must not appear in the set.
+  it("does not materialize an override-only key absent from the row and schema", async () => {
+    class Topic extends Base {}
+    const attrs = await seedAttrs();
+
+    const topic = Topic.instantiate(attrs, {
+      computed_col: new Typecast(),
+    }) as unknown as AttrProbe;
+    expect(topic._attributes.has("computed_col")).toBe(false);
+    expect(topic._attributes.keys()).not.toContain("computed_col");
   });
 });
 
