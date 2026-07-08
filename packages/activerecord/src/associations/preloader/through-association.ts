@@ -393,13 +393,16 @@ export class ThroughAssociation extends Association {
    *   - `"join"` — the source is a to-one, non-through association, so JOINing it
    *     onto the through query can't fan the through rows out (a to-one join
    *     adds no rows). This is Rails' single-query strategy: copy the full
-   *     where_clause and join the source. Nested scope joins/includes are
-   *     carried too, but a fan-out-prone one (reaching a to-many association) is
-   *     dropped for a collection target — see `_includeSpecFansOut`.
-   *   - `"twoStep"` — a collection source would be duplicated by the source join,
-   *     so keep the two-step: copy only the reflection scope's through-table
-   *     predicates here; source-table predicates, order, and scope includes ride
-   *     the recursive source stage.
+   *     where_clause and join the source, carrying every nested scope
+   *     join/include unconditionally.
+   *   - `"twoStep"` — the source is a collection, OR a collection target's scope
+   *     carries a fan-out-prone nested join/include (one reaching a to-many
+   *     association) whose table a copied predicate may reference. Either would
+   *     duplicate the middle records if joined onto the through query, so keep
+   *     the two-step: copy only the reflection scope's through-table predicates
+   *     here; source-table predicates, order, and the scope's includes/joins ride
+   *     the recursive source stage (a per-record-keyed query, so the join filters
+   *     without fanning the through rows out).
    *   - `"nested"` — the source is itself a through; its sub-chain re-derives its
    *     own scope at its own recursive stage. Same through-query handling as
    *     `"twoStep"`, but the source stage carries nothing.
@@ -409,8 +412,43 @@ export class ThroughAssociation extends Association {
     const sourceRefl = this._sourceReflection;
     if (!sourceRefl) return "twoStep";
     if ((sourceRefl as any).isThroughReflection?.()) return "nested";
-    const sourceIsCollection = (sourceRefl as any).isCollection?.() ?? false;
-    return sourceIsCollection ? "twoStep" : "join";
+    if ((sourceRefl as any).isCollection?.() ?? false) return "twoStep";
+    // A has_one target keeps only the first row, so it tolerates a fanning nested
+    // join; a collection target does not — and dropping just the include would
+    // orphan any predicate on that table (copied with the full where_clause) onto
+    // an unjoined table, so route the whole preload to the two-step instead.
+    const targetIsCollection = (this.reflection as any).isCollection?.() ?? false;
+    if (targetIsCollection && this._scopeHasFanOutJoin(sourceRefl)) return "twoStep";
+    return "join";
+  }
+
+  /**
+   * True when the reflection scope carries a nested join/include
+   * (`.includes` / `.left_joins` / `.joins(<symbol>)`) that reaches a to-many
+   * association from the source klass — i.e. one the single-query JOIN can't nest
+   * onto the through query without fanning the middle records out. Raw-SQL /
+   * Arel-node joins (`_joinValues`) are excluded here: Rails raises on those
+   * regardless, which the two-step would not reproduce, so they must stay on the
+   * `"join"` path (see the raw-join tests).
+   * @internal
+   */
+  private _scopeHasFanOutJoin(sourceRefl: AssociationLikeReflection): boolean {
+    const reflScope = this._reflectionScope;
+    if (reflScope == null) return false;
+    const specs: any[] = [
+      ...(reflScope._includesAssociations ?? []),
+      ...(reflScope._leftOuterJoinsValues ?? []),
+      ...(reflScope._namedInnerJoins ?? []),
+    ];
+    if (specs.length === 0) return false;
+    let sourceKlass: typeof Base | undefined;
+    try {
+      sourceKlass = (sourceRefl as any).klass;
+    } catch {
+      return false;
+    }
+    if (sourceKlass == null) return false;
+    return specs.some((spec) => this._includeSpecFansOut(sourceKlass, spec));
   }
 
   /**
@@ -540,28 +578,12 @@ export class ThroughAssociation extends Association {
         // reflection — so a has_one-through scope like
         // `includes(:category).where(categories: { … })` joins `categories` on
         // this through query and the predicate resolves. `.left_joins(source =>
-        // nested)` (`_leftOuterJoinsValues`) is carried likewise.
-        //
-        // The one carve-out: for a COLLECTION target, a nested include that
-        // reaches a to-many association (e.g. the canonical `tag` source's own
-        // `includes(:tagging)`) is dropped, because trails can't PK-dedup the
-        // resulting fan-out the way Rails' eager JoinDependency does. A to-one
-        // nested include is kept for every target. `_joinValues` raw joins are
-        // never gated — Rails raises on them regardless of collection (see the
-        // raw-join tests), and nesting them makes trails raise the same error.
-        let sourceKlass: typeof Base | undefined;
-        try {
-          sourceKlass = (sourceRefl as any).klass;
-        } catch {
-          sourceKlass = undefined;
-        }
-        const targetIsCollection = (this.reflection as any).isCollection?.() ?? false;
-        const rawIncludes: any[] = reflScope?._includesAssociations ?? [];
-        const includeKlass = sourceKlass;
-        const nestedIncludes: any[] =
-          targetIsCollection && includeKlass != null
-            ? rawIncludes.filter((spec) => !this._includeSpecFansOut(includeKlass, spec))
-            : rawIncludes;
+        // nested)` (`_leftOuterJoinsValues`) is carried likewise. Carried
+        // unconditionally here: `_throughScopeStrategy` already diverted the only
+        // unsafe case (a collection target whose scope reaches a to-many nested
+        // table) to the two-step, so nothing copied here references an unjoined
+        // table.
+        const nestedIncludes: any[] = reflScope?._includesAssociations ?? [];
         const nestedOuter = [...nestedLeftOuter, ...nestedIncludes];
         if (nestedOuter.length > 0) {
           scope = scope.leftOuterJoins({ [sourceName]: nestedOuter });

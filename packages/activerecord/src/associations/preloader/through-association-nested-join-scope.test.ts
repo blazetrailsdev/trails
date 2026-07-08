@@ -90,6 +90,21 @@ type HasManyHost = {
       .where({ categories: { name: "General" } }),
 });
 
+// A has_MANY-through whose scope includes a FAN-OUT path (`categorizations`, a
+// has_many two levels deep) AND predicates on it. Joining it onto the through
+// query would multiply the middle records, so the whole preload falls back to
+// the two-step: the `categorizations` join + predicate ride the source stage,
+// and neither the join nor the predicate is left on the through query (which
+// would be an unjoined-table predicate).
+(Member as unknown as HasManyHost).hasMany("categorizedClubs", {
+  through: "favoriteMemberships",
+  source: "club",
+  scope: (rel: NestedRel) =>
+    (rel as unknown as { includes: (s: Record<string, unknown>) => NestedRel })
+      .includes({ category: "categorizations" })
+      .where({ categorizations: { author_id: 1 } }),
+});
+
 describe("Preloader::ThroughAssociation#through_scope multi-level nested join carry", () => {
   const { members, clubs } = fixtures([
     "memberTypes",
@@ -152,6 +167,16 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     // is unjoined (an invalid predicate).
     expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categories"))}`));
     expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
+  });
+
+  it("routes a has_many-through with a fan-out include+predicate to the two-step", () => {
+    const groucho = members("groucho");
+    const sql = throughScopeSql([groucho], "categorizedClubs");
+    // `categorizations` is a to-many join that would fan the middle records out,
+    // so the whole preload takes the two-step: the through query joins neither
+    // `categorizations` nor carries its predicate (both ride the source stage) —
+    // crucially the predicate is NOT orphaned onto an unjoined table here.
+    expect(sql).not.toContain("categorizations");
   });
 
   type AssocHost = {
