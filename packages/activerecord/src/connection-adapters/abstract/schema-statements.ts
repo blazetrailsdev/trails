@@ -33,6 +33,7 @@ import {
   type ForeignKeyLookupOptions,
 } from "./schema-definitions.js";
 import { SchemaCreation } from "./schema-creation.js";
+import { maxIdentifierLength } from "./database-limits.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { Column } from "../column.js";
 import { SqlTypeMetadata } from "../sql-type-metadata.js";
@@ -2546,8 +2547,10 @@ export class SchemaStatements {
   /** @internal */
   validateIndexLengthBang(tableName: string, newName: string, _internal = false): void {
     // Resolve through the adapter (which carries the DatabaseLimits mixin) so an
-    // adapter overriding indexNameLength/maxIdentifierLength propagates here.
-    const limit = (this.adapter as unknown as { indexNameLength(): number }).indexNameLength();
+    // adapter overriding indexNameLength/maxIdentifierLength propagates here,
+    // falling back to the DatabaseLimits base default for a bare adapter.
+    const adapter = this.adapter as unknown as { indexNameLength?(): number };
+    const limit = adapter.indexNameLength ? adapter.indexNameLength() : maxIdentifierLength();
     if (newName.length > limit) {
       throw new ArgumentError(
         `Index name '${newName}' on table '${tableName}' is too long; the limit is ${limit} characters`,
@@ -2557,7 +2560,8 @@ export class SchemaStatements {
 
   /** @internal */
   validateTableLengthBang(tableName: string): void {
-    const limit = (this.adapter as unknown as { tableNameLength(): number }).tableNameLength();
+    const adapter = this.adapter as unknown as { tableNameLength?(): number };
+    const limit = adapter.tableNameLength ? adapter.tableNameLength() : maxIdentifierLength();
     if (tableName.length > limit) {
       throw new ArgumentError(
         `Table name '${tableName}' is too long; the limit is ${limit} characters`,
