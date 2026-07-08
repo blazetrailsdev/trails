@@ -689,15 +689,13 @@ export function _enum(
       if (definedNames.has(fullName))
         raiseConflictError.call(this, attribute, fullName, { type: "class" });
       definedNames.add(fullName);
-      // The value/`not*` scope names are class methods, so they only conflict
-      // with a *dangerous* class method (`dangerous_class_method?` —
-      // RESTRICTED_CLASS_METHODS plus methods `Base` itself defines), never a
-      // scope inherited from a parent enum or a user static on the model/an
-      // ancestor.
-      // Route through the class-method conflict detector so the value scope and
-      // its auto `not*` scope consult all three Rails sub-branches (dangerous
-      // class method, Relation instance method, and the `id` special-case), each
-      // raising with the correct type/source rather than the generic scope error.
+      // The value/`not*` scope names are class methods, so route them through
+      // the class-method conflict detector, which consults all three Rails
+      // sub-branches (a *dangerous* class method — RESTRICTED_CLASS_METHODS plus
+      // methods `Base` itself defines; a Relation instance method; and the `id`
+      // special-case), each raising with the correct type/source rather than the
+      // generic scope error. A scope inherited from a parent enum or a plain
+      // user static on the model/an ancestor is NOT a conflict.
       detectEnumConflictBang.call(this, attribute, fullName, true);
       detectEnumConflictBang.call(this, attribute, notScopeName, true);
     }
