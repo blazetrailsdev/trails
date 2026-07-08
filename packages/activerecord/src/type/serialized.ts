@@ -29,14 +29,38 @@ function isValueComparable(value: unknown): boolean {
  * interface) so their contents — not their Map-backed internal shape — drive
  * the comparison.
  *
+ * Object keys are emitted in sorted order so that two content-equal hashes
+ * built with keys in a different insertion order canonicalize identically —
+ * matching Ruby's order-insensitive `Hash#==` (the semantics `Type::Value#==`
+ * relies on for change detection). `JSON.stringify` iterates keys in insertion
+ * order, so the normalization has to happen before stringifying rather than in
+ * a replacer.
+ *
  * @internal
  */
 function canonicalKey(value: unknown): string {
-  return JSON.stringify(value, (_k, v) =>
-    v && typeof v === "object" && typeof (v as { toHash?: unknown }).toHash === "function"
-      ? (v as { toHash(): unknown }).toHash()
-      : v,
-  );
+  return JSON.stringify(normalize(value));
+}
+
+/**
+ * Recursively unwraps `toHash()`-bearing objects and sorts plain-object keys so
+ * the resulting structure has a canonical, insertion-order-independent shape.
+ *
+ * @internal
+ */
+function normalize(value: unknown): unknown {
+  if (value === null || typeof value !== "object") return value;
+  if (typeof (value as { toHash?: unknown }).toHash === "function") {
+    return normalize((value as { toHash(): unknown }).toHash());
+  }
+  if (Array.isArray(value)) return value.map(normalize);
+  const proto = Object.getPrototypeOf(value);
+  if (proto !== Object.prototype && proto !== null) return value;
+  const sorted: Record<string, unknown> = {};
+  for (const key of Object.keys(value as Record<string, unknown>).sort()) {
+    sorted[key] = normalize((value as Record<string, unknown>)[key]);
+  }
+  return sorted;
 }
 
 export interface Coder {
@@ -139,8 +163,9 @@ export class Serialized extends ValueType {
   // `default_value?`. Sharing that scope is deliberate: a coder whose `load`
   // returns a non-Array/Hash value with its own value-based `==` (e.g.
   // Date/Time) still falls through to reference equality — a narrow edge no
-  // serialized coder here hits — and `canonicalKey`'s key-order sensitivity
-  // is inherited from the default-detection path, not newly introduced.
+  // serialized coder here hits. `canonicalKey` sorts object keys, so two
+  // content-equal hashes built in a different insertion order compare equal,
+  // matching Ruby's order-insensitive `Hash#==`.
   override isChanged(
     oldValue: unknown,
     newValue: unknown,
