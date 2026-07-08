@@ -450,8 +450,9 @@ export class SchemaDumper {
       // createSchemaDumper() (MySQL/PG/SQLite) so dialect overrides like
       // MySQL's schemaPrecision (datetime precision 0 → `precision: nil`)
       // apply. Mirrors Rails' `connection.create_schema_dumper`, which mixes
-      // the adapter's SchemaDumper module into the dumper. Falls back to the
-      // base class for adapters without the hook.
+      // the adapter's SchemaDumper module into the dumper. Without the hook,
+      // `create` still resolves to the ConnectionAdapters subclass (see its
+      // redirect) — never the bare base.
       const createDialectDumper = (sourceOrAdapter as { createSchemaDumper?: unknown })
         .createSchemaDumper;
       const dumper =
@@ -472,8 +473,9 @@ export class SchemaDumper {
   ): Promise<string> {
     const wrappedSource = isDatabaseAdapter(source) ? new AdapterSchemaSource(source) : source;
     // Instantiate the adapter-specific subclass when the adapter exposes
-    // createSchemaDumper() (PostgreSQLAdapter and Mysql2Adapter). Falls back to
-    // the base class when unavailable, which is what the old code always did.
+    // createSchemaDumper() (PostgreSQLAdapter and Mysql2Adapter). Otherwise
+    // `create` resolves to the ConnectionAdapters subclass via its redirect —
+    // the single emitTable/columnSpec dispatch, never the bare base.
     let dumper: SchemaDumper;
     if (isDatabaseAdapter(source) && typeof (source as any).createSchemaDumper === "function") {
       dumper = (source as any).createSchemaDumper(wrappedSource, {}) as SchemaDumper;

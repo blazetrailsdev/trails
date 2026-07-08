@@ -240,13 +240,13 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /**
-   * Epic 3.3-U3: adapter-backed emitTable routed through columnSpec so
-   * per-dialect `prepareColumnOptions` overrides (schemaType, schemaLimit,
-   * schemaPrecision, schemaDefault, etc.) take effect on live dumps.
-   *
-   * The base-class `emitTable` (inline colspec) continues to serve the
-   * in-memory MigrationContext path unchanged. This override is called only
-   * when the instance is an adapter-specific SchemaDumper subclass.
+   * The single `emitTable`, routed through `columnSpec` so per-dialect
+   * `prepareColumnOptions` overrides (schemaType, schemaLimit, schemaPrecision,
+   * schemaDefault, etc.) take effect. Mirrors the column-emission half of Rails'
+   * `SchemaDumper#table`, whose `@connection.column_spec` is the adapter's
+   * mixed-in method. Every dump reaches it — the bare base redirects
+   * construction here (see `SchemaDumper.connectionAdaptersDumper`), including
+   * the in-memory MigrationContext and mock-source paths.
    * @internal
    */
   protected override emitTable(
