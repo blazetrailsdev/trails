@@ -501,9 +501,52 @@ describe("EnumTest", () => {
       );
     });
   });
-  it.skip("reserved enum values", () => {});
-  it.skip("reserved enum values for relation", () => {});
-  it.skip("can use id as a value with a prefix or suffix", () => {});
+  it("reserved enum values", () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written", "published"] as any);
+      }
+    }
+
+    // Each value generates a method conflicting with an AR method: `new` → a
+    // scope clashing with the class method, `valid`/`save` → `valid?`/`save!`,
+    // `proposed` → an existing enum value, and `id` → AR querying.
+    const conflicts = ["new", "valid", "save", "proposed", "id"];
+    conflicts.forEach((value, i) => {
+      expect(() => (Klass as any).enum(`status_${i}`, [value])).toThrow(
+        /You tried to define an enum named .* on the model/,
+      );
+    });
+  });
+  it("reserved enum values for relation", () => {
+    // A value whose scope name matches a Relation instance method conflicts
+    // with the message reporting `source: ActiveRecord::Relation`. Rails samples
+    // `[:records, :to_ary, :scope_for_create]`; trails' Relation has no `to_ary`
+    // (Ruby's array-coercion hook has no TS equivalent), so `scoping` — another
+    // Relation instance method — stands in for it.
+    const relationMethodSamples = ["records", "scoping", "scope_for_create"];
+    relationMethodSamples.forEach((value) => {
+      expect(() => {
+        class Klass extends Base {
+          static _tableName = "books";
+        }
+        (Klass as any).enum("category", ["other", value]);
+      }).toThrow(/You tried to define an enum named .* on the model/);
+    });
+  });
+  it("can use id as a value with a prefix or suffix", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status_1", ["id"] as any, { prefix: true });
+          this.enum("status_2", ["id"] as any, { suffix: true });
+        }
+      }
+      void Klass;
+    }).not.toThrow();
+  });
   it("overriding enum method should not raise", () => {
     expect(() => {
       class Klass extends Base {
