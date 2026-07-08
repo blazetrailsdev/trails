@@ -8,6 +8,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { StringType } from "@blazetrails/activemodel";
+import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { Serialized, type Coder } from "./serialized.js";
 
 const jsonCoder: Coder = {
@@ -26,6 +27,12 @@ describe("Serialized#isChanged", () => {
   it("normalizes nested object key order", () => {
     const oldValue = { outer: { x: 1, y: 2 }, list: [{ p: 1, q: 2 }] };
     const newValue = { list: [{ q: 2, p: 1 }], outer: { y: 2, x: 1 } };
+    expect(type.isChanged(oldValue, newValue)).toBe(false);
+  });
+
+  it("normalizes key order through HashWithIndifferentAccess toHash unwrap", () => {
+    const oldValue = new HashWithIndifferentAccess({ a: 1, b: 2 });
+    const newValue = new HashWithIndifferentAccess({ b: 2, a: 1 });
     expect(type.isChanged(oldValue, newValue)).toBe(false);
   });
 });
