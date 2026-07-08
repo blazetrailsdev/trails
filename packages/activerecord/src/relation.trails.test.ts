@@ -95,6 +95,23 @@ describe("RelationTest", () => {
     expect(target.toSql()).toBe(merged.toSql());
   });
 
+  // No like-named Rails test: guards the documented proc-merge path
+  // (`Post.where(...).merge(-> { ... })`, spawn_methods.rb). Through the single
+  // path `merge` = `spawn.merge!` and `merge!` runs the block via
+  // `instance_exec(&other)` — trails routes a function argument to
+  // `other.call(this)` on the spawned clone, so the receiver stays untouched and
+  // the block's returned relation carries the added condition.
+  it("merge evaluates a proc against the spawned relation", () => {
+    const base = CanonPost.all().where({ title: "a" });
+    const baseSqlBefore = base.toSql();
+    const merged = (base as any).merge(function (this: any) {
+      return this.where({ type: "SpecialPost" });
+    });
+    expect(base.toSql()).toBe(baseSqlBefore);
+    expect(merged.toSql()).toContain("title");
+    expect(merged.toSql()).toContain("type");
+  });
+
   it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {
     class Post extends Base {
       static _tableName = "posts";
