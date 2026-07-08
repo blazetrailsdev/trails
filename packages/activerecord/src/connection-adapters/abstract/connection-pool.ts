@@ -70,6 +70,43 @@ export class NullConfig {
 const NULL_CONFIG = new NullConfig();
 
 /**
+ * Property keys a serializer, test matcher, or framework may probe on an
+ * arbitrary object while walking it (vitest error serialization, `await`,
+ * `JSON.stringify`, asymmetric matchers, React element checks, DOM sniffing).
+ *
+ * The adapter proxy (`_getAdapterProxy`) is reachable from any translated
+ * error via its `connectionPool`; if the `get` trap fabricated a callable for
+ * these keys, the probe would dispatch to a raw connection that has no such
+ * method (`conn[prop] is not a function`). The trap returns `undefined` for
+ * every key here — and for all symbol keys — so probes see a non-callable.
+ * Add new probe keys here rather than sprinkling checks in the trap.
+ */
+const ADAPTER_PROXY_PROBE_KEYS = new Set<string>([
+  // Promise / thenable duck-typing
+  "then",
+  "catch",
+  "finally",
+  // JSON / serializer hooks
+  "toJSON",
+  "toString",
+  "valueOf",
+  "inspect",
+  // vitest / jest asymmetric matchers and mock sniffing
+  "asymmetricMatch",
+  "$$typeof",
+  "_isMockFunction",
+  "getMockName",
+  // React / DOM element checks
+  "nodeType",
+  "nodeName",
+  "tagName",
+  // Object plumbing a walker may touch
+  "constructor",
+  "prototype",
+  "hasOwnProperty",
+]);
+
+/**
  * Mirrors: ActiveRecord::ConnectionAdapters::NullPool
  */
 export class NullPool implements AbstractPool {
@@ -393,13 +430,14 @@ export class ConnectionPool implements ReapablePool {
               (pool.activeConnection ?? pool.connections[0])?.adapterName ??
               adapterNameFromConfig(pool.dbConfig.adapter)
             );
-          // Don't fabricate a method for serialization/promise probes. When this
-          // proxy is reachable from an error's `connectionPool` (Rails stamps
-          // the pool onto every translated error), a serializer or `await`
-          // walks keys like `then`/`toJSON`/`Symbol.*`; returning a callable
-          // there would run `conn.then()` etc. against a raw connection that has
-          // no such method (`conn[prop] is not a function`).
-          if (typeof prop === "symbol" || prop === "then" || prop === "toJSON") {
+          // Don't fabricate a method for serialization/matcher/framework probes.
+          // When this proxy is reachable from an error's `connectionPool` (Rails
+          // stamps the pool onto every translated error), a serializer, `await`,
+          // or an asymmetric matcher walks keys like `then`/`toJSON`/`Symbol.*`/
+          // `asymmetricMatch`; returning a callable there would run `conn.then()`
+          // etc. against a raw connection that has no such method
+          // (`conn[prop] is not a function`). See ADAPTER_PROXY_PROBE_KEYS.
+          if (typeof prop === "symbol" || ADAPTER_PROXY_PROBE_KEYS.has(prop)) {
             return undefined;
           }
           return (...args: unknown[]) => {

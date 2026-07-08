@@ -590,3 +590,49 @@ it("inspect does not show secrets", async () => {
   expect(pool2.inspect()).toMatch(/shard="shard_one"/);
   expect(pool2.inspect()).toMatch(/role="reading"/);
 });
+
+it("adapter proxy does not fabricate methods for serialization/matcher probe keys", async () => {
+  const pool = makePool();
+  const proxy = (
+    pool as unknown as { _getAdapterProxy(): Record<PropertyKey, unknown> }
+  )._getAdapterProxy();
+
+  // Keys a serializer / asymmetric matcher / framework walker may probe. None
+  // may resolve to a callable that would dispatch to a raw connection.
+  for (const key of [
+    "then",
+    "toJSON",
+    "asymmetricMatch",
+    "$$typeof",
+    "nodeType",
+    "constructor",
+    "hasOwnProperty",
+  ]) {
+    expect(typeof proxy[key]).not.toBe("function");
+    expect(proxy[key]).toBeUndefined();
+  }
+  expect(proxy[Symbol.iterator]).toBeUndefined();
+
+  // The pool is stamped onto every translated error, so a serializer or matcher
+  // reaches this proxy. Walking it (JSON.stringify invokes `toJSON`; an
+  // asymmetric matcher invokes `asymmetricMatch`) must not throw
+  // `conn[prop] is not a function`.
+  expect(() => JSON.stringify(proxy)).not.toThrow();
+  expect(proxy).not.toEqual(expect.objectContaining({ id: 1 }));
+});
+
+it("adapter proxy still dispatches genuine adapter methods to the connection", async () => {
+  const pool = makePool();
+  const proxy = (
+    pool as unknown as {
+      _getAdapterProxy(): { adapterName: string; quoteTableName(name: string): Promise<string> };
+    }
+  )._getAdapterProxy();
+
+  // adapterName is served directly off the proxy (no checkout).
+  expect(typeof proxy.adapterName).toBe("string");
+
+  // A real adapter method fabricates a callable and dispatches through the pool.
+  const quoted = await proxy.quoteTableName("people");
+  expect(quoted).toContain("people");
+});
