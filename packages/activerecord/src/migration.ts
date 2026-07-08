@@ -1584,7 +1584,8 @@ export class MigrationContext {
   // synchronous and served from these in-memory maps. Collapsing them onto the
   // adapter's async introspection requires making those readers async, which
   // ripples into the synchronous `SchemaDumper.dump(ctx)` protocol and its
-  // exact-output dump assertions — deferred to its own coordinated PR rather
+  // exact-output dump assertions — deferred to the RFC 0051 follow-up story
+  // `collapse-migrationcontext-introspection-onto-adapter-remaining` rather
   // than silently retained here.
   private _tables = new Set<string>();
   private _columns = new Map<string, Set<string>>();
