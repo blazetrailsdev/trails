@@ -21,7 +21,7 @@
 import { registerEncryptionHooks } from "./encryption-hooks.js";
 import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
-import { Encryptor as CoreEncryptor, type EncryptorLike } from "./encryption/encryptor.js";
+import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
 import { EncryptableRecord } from "./encryption/encryptable-record.js";
@@ -126,52 +126,6 @@ class LegacyEncryptorShim implements EncryptorLike {
   }
 }
 
-/** True when any encryption key material is configured on the global config. */
-function hasConfiguredKeyMaterial(): boolean {
-  const { primaryKey, deterministicKey, keyDerivationSalt } = Configurable.config;
-  return (
-    primaryKey !== undefined || deterministicKey !== undefined || keyDerivationSalt !== undefined
-  );
-}
-
-/**
- * The fallback encryptor for a bare `encrypts` (no scheme options, no explicit
- * encryptor) whose class-init ran before `Configurable.configure` set any keys.
- *
- * `buildScheme` cannot decide real-vs-legacy at declaration time in that case:
- * the model's static block declares `encrypts` at import, but the test/app
- * configures keys later, so an eager `AR_ENC:` legacy shim would be baked in
- * permanently and never encrypt for real (the reflected `encrypts("name")`
- * columns on `EncryptedBook*` hit exactly this). Defer the choice to each
- * operation: use the real key-based `Encryptor` once keys are configured, and
- * fall back to the legacy base64 placeholder only while none are — preserving
- * the never-configured tests that rely on `AR_ENC:`.
- */
-class LazyDefaultEncryptor implements EncryptorLike {
-  private readonly real = new CoreEncryptor();
-  private readonly legacy = new LegacyEncryptorShim(defaultEncryptor);
-
-  private active(): EncryptorLike {
-    return hasConfiguredKeyMaterial() ? this.real : this.legacy;
-  }
-
-  encrypt(clearText: string, options?: Record<string, unknown>): string {
-    return this.active().encrypt(clearText, options);
-  }
-
-  decrypt(encryptedText: string, options?: Record<string, unknown>): string {
-    return this.active().decrypt(encryptedText, options);
-  }
-
-  isEncrypted(text: string): boolean {
-    return this.active().isEncrypted(text);
-  }
-
-  isBinary(): boolean {
-    return this.active().isBinary();
-  }
-}
-
 /**
  * The options bag `Base.encrypts` accepts. Mirrors Rails' kwargs:
  * full `SchemeOptions` (key, keyProvider, deterministic, downcase,
@@ -186,34 +140,27 @@ export interface EncryptsOptions extends Omit<SchemeOptions, "encryptor"> {
 function buildScheme(options: EncryptsOptions): Scheme {
   const { encryptor, previousSchemes: localPrevious = [], ...schemeOptions } = options;
 
-  const hasSchemeOptions =
-    schemeOptions.key !== undefined ||
-    schemeOptions.keyProvider !== undefined ||
-    schemeOptions.deterministic !== undefined ||
-    schemeOptions.downcase !== undefined ||
-    schemeOptions.ignoreCase !== undefined ||
-    localPrevious.length > 0 ||
-    schemeOptions.compress !== undefined ||
-    schemeOptions.compressor !== undefined ||
-    schemeOptions.supportUnencryptedData !== undefined;
-
-  // Switch to the real Scheme whenever any encryption key material is configured.
-  // If config is incomplete (e.g. only keyDerivationSalt set, no primaryKey),
-  // Scheme._defaultKeyProvider() returns undefined and Encryptor raises
-  // "No encryption key provided" at serialize/deserialize time — still more
-  // informative than silently storing AR_ENC:base64 data.
+  // A legacy `{ encrypt, decrypt }` pair is adapted via the shim as a scheme
+  // encryptor. Otherwise build a real `Scheme` with NO encryptor context
+  // property — mirroring Rails' `Scheme.new(..., **context_properties)` where a
+  // bare `encrypts` contributes no `:encryptor` property. Two consequences that
+  // an eager encryptor shim would break:
   //
-  // When neither scheme options nor keys are configured *at declaration time*,
-  // the key material may still arrive before first use (a model whose static
-  // block `encrypts` runs at import, configured later by the test/app). Bake in
-  // a LazyDefaultEncryptor rather than an eager legacy shim so that path
-  // encrypts for real once keys land, while never-configured callers keep the
-  // `AR_ENC:` placeholder.
+  //   1. The scheme resolves its key provider and encryptor lazily at
+  //      serialize/deserialize time, so a model whose static block runs
+  //      `encrypts` at import (before `Configurable.configure`) still encrypts
+  //      for real once keys land — no placeholder is baked in at declaration.
+  //   2. `Scheme#with_context` just yields (no `:encryptor` override), so
+  //      `EncryptedAttributeType#encryptor` reads the *current* context
+  //      encryptor — letting `withoutEncryption` (NullEncryptor) and
+  //      `protectingEncryptedData` (EncryptingOnlyEncryptor) take effect.
+  //
+  // When keys are never configured, the real Encryptor raises "No encryption
+  // key provided" at first use — matching Rails, and more informative than
+  // silently storing `AR_ENC:base64` data.
   const coreOpts: SchemeOptions = encryptor
     ? { ...schemeOptions, encryptor: new LegacyEncryptorShim(encryptor) }
-    : hasSchemeOptions || hasConfiguredKeyMaterial()
-      ? schemeOptions
-      : { encryptor: new LazyDefaultEncryptor() };
+    : schemeOptions;
 
   // Only pass locally-declared previous schemes — global ones are resolved lazily
   // in EncryptedAttributeType at serialize/deserialize time.
@@ -232,8 +179,8 @@ interface PendingEncryption {
  *
  * Routes each attribute through the shared `EncryptableRecord.encryptAttribute`
  * (single declaration path, mirroring Rails' single `encrypts`), passing a
- * scheme built by `buildScheme` so the legacy `{ encrypt, decrypt }` shim and
- * defaultEncryptor fallback are preserved on the primary path.
+ * scheme built by `buildScheme` so the legacy `{ encrypt, decrypt }` shim is
+ * preserved on the primary path.
  *
  * The actual type wrapping is deferred (Rails' `decorate_attributes` /
  * PendingDecorator) — `encryptAttribute` records pending encryptions that

@@ -42,10 +42,10 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     // writes outside the per-test BEGIN/ROLLBACK savepoint that the
     // transactional `fixtures([])` wiring relies on. The sibling handler-suite
     // encryption test (uniqueness-validations.test.ts) hand-rolls models for
-    // the same reason. They are also defined after configureEncryption so
-    // encrypts() builds the scheme against the configured key material
-    // (otherwise buildScheme falls back to the legacy AR_ENC placeholder
-    // encryptor).
+    // the same reason. They are defined after configureEncryption for clarity;
+    // the scheme now resolves its key provider lazily at serialize time, so the
+    // ordering is no longer load-bearing (a bare `encrypts` declared before
+    // configure still encrypts for real once keys land).
     EncryptedPost = class EncryptedPost extends Base {
       static {
         this._tableName = "posts";
