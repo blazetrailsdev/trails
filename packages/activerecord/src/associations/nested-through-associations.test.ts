@@ -706,14 +706,13 @@ describe("NestedThroughAssociationsTest", () => {
 
   it("nested has many through with conditions on source associations preload", async () => {
     const blue = tags("blue");
-    // Rails asserts 2 queries around `.third` (one author + a preload whose
-    // through query eager-loads the source sub-chain). We load every author via
-    // `.order` (no LIMIT/OFFSET) and, structuring each nested-through reflection
-    // recursively per Rails' `source_preloaders`, fire one query per chain
-    // stage — authors + posts + taggings + tags = 4. Pinning the count guards
-    // the per-reflection scope routing against regressing into an extra fetch.
+    // Matches Rails' `assert_queries_count(2)`: one author query plus one
+    // through query whose eager-load (`includes!(source)` + `references!`) JOINs
+    // the source sub-chain, so the middle records carry the source association
+    // already loaded and the recursive source-preloader stage issues no further
+    // query — authors + posts(⋈ taggings ⋈ tags) = 2.
     let author!: Author;
-    await assertQueriesCount(4, false, async () => {
+    await assertQueriesCount(2, false, async () => {
       [, , author] = await Author.includes("miscPostFirstBlueTags_2").order("authors.id");
     });
     await assertNoQueries(false, async () => {
