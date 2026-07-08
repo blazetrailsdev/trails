@@ -181,8 +181,16 @@ export class Serialized extends ValueType {
       }
     }
     // A coder whose `load` returns a value-== object (e.g. Date/Time) mirrors
-    // Ruby's `old_value != new_value` dispatching to that object's own `==`.
-    if (hasValueEquality(oldValue) && hasValueEquality(newValue)) {
+    // Ruby's `old_value != new_value` dispatching to that object's own `==`. A
+    // Ruby value type's `==` (e.g. `Date#==`) only compares against its own
+    // kind, so require the operands share a constructor before value-comparing
+    // by `valueOf()` — two unrelated classes that happen to yield the same
+    // primitive are not equal, matching Ruby.
+    if (
+      hasValueEquality(oldValue) &&
+      hasValueEquality(newValue) &&
+      (oldValue as object).constructor === (newValue as object).constructor
+    ) {
       return !Object.is(
         (oldValue as { valueOf(): unknown }).valueOf(),
         (newValue as { valueOf(): unknown }).valueOf(),

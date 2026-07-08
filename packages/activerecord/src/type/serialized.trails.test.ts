@@ -41,6 +41,17 @@ describe("Serialized#isChanged", () => {
     expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-09"))).toBe(true);
   });
 
+  it("does not equate unrelated classes that yield the same valueOf primitive", () => {
+    class Cents {
+      valueOf() {
+        return 100;
+      }
+    }
+    const cents = new Cents();
+    const sameMillis = new Date(100);
+    expect(type.isChanged(cents, sameMillis)).toBe(true);
+  });
+
   it("falls back to reference equality for identity-== object_class instances", () => {
     class Custom {}
     const oldValue = new Custom();
