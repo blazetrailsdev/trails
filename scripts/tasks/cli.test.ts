@@ -1034,6 +1034,9 @@ describe("commitAndPush (git mutation flow)", () => {
       // Use the first non-flag token after `-C <dir>` to label the call.
       const label = args && args.length >= 3 ? args[2] : sub;
       seen.push(label);
+      // The empty-commit guard diff-trees HEAD after every commit; a real
+      // commit is never empty in these flows, so report a file.
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     return { exit, seen, lockDir };
@@ -1062,8 +1065,114 @@ describe("commitAndPush (git mutation flow)", () => {
       "pull",
       "add",
       "commit",
+      "diff-tree",
       "push",
     ]);
+  });
+
+  // Regression: a concurrent `reset --hard` in the shared canonical checkout
+  // (a pre-read sync from a process predating the sync lock) could empty the
+  // index inside `git commit`'s pre-commit-hook window, producing a commit
+  // whose tree equals its parent — which then got PUSHED, landing the message
+  // on main with zero files (RFC 0063's stories, 2026-07-07). commitAndPush
+  // must diff-tree the fresh commit and never push an empty one.
+  it("drops an empty commit and retries the mutation instead of pushing it", () => {
+    const { seen, exit } = setup();
+    let diffTreeCalls = 0;
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      // First commit comes out empty (clobbered); the retry commits for real.
+      if (label === "diff-tree") return (diffTreeCalls++ === 0 ? "" : "story.md") as never;
+      return "" as never;
+    });
+    let mutatorCalls = 0;
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => mutatorCalls++,
+      raceMessage: "should not be reached",
+      raceExitCode: 3,
+    });
+    expect(exit).not.toHaveBeenCalled();
+    expect(mutatorCalls).toBe(2);
+    // The empty commit was reset away, never pushed; only the retry pushed.
+    expect(seen.filter((l) => l === "push").length).toBe(1);
+    expect(seen.filter((l) => l === "reset").length).toBe(1);
+    const firstPush = seen.indexOf("push");
+    const resetIdx = seen.indexOf("reset");
+    expect(resetIdx).toBeLessThan(firstPush);
+  });
+
+  it("exits with raceExitCode when the commit comes out empty twice, pushing nothing", () => {
+    const { seen, exit } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      // Every commit comes out empty — deterministic clobber.
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/file.md",
+        mutator: () => {},
+        raceMessage: "lost race",
+        raceExitCode: 4,
+      }),
+    ).toThrow(/exit 4/);
+    expect(exit).toHaveBeenCalledWith(4);
+    expect(seen).not.toContain("push");
+    expect(seen.filter((l) => l === "reset").length).toBe(2);
+  });
+
+  it("fails open when the diff-tree probe itself errors: the push still runs", () => {
+    const { seen, exit } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      // Includes --root so a parentless first commit can't read as empty.
+      if (label === "diff-tree") {
+        expect(args).toContain("--root");
+        throw new Error("fatal: bad revision");
+      }
+      return "" as never;
+    });
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => {},
+      raceMessage: "should not be reached",
+      raceExitCode: 3,
+    });
+    // The guard must never block a push it cannot evaluate.
+    expect(exit).not.toHaveBeenCalled();
+    expect(seen.filter((l) => l === "push").length).toBe(1);
+    expect(seen).not.toContain("reset");
+  });
+
+  // The tasks repo's .husky/post-commit hook background-pushes main after
+  // every commit, racing commitAndPush's own explicit push (and capable of
+  // shipping an empty clobbered commit before the guard above can reset it).
+  // The CLI must commit with RFCS_NO_AUTOPUSH=1 so the hook stands down.
+  it("commits with RFCS_NO_AUTOPUSH=1 so the post-commit hook does not race the push", () => {
+    setup();
+    commitAndPush({
+      message: "test",
+      fileToStage: "/some/file.md",
+      mutator: () => {},
+      raceMessage: "should not be reached",
+      raceExitCode: 3,
+    });
+    const commitCall = execFileSyncMock.mock.calls.find((c) =>
+      (c[1] as string[]).includes("commit"),
+    ) as unknown[] | undefined;
+    expect(commitCall).toBeDefined();
+    const opts = commitCall![2] as { env?: Record<string, string> } | undefined;
+    expect(opts?.env?.RFCS_NO_AUTOPUSH).toBe("1");
   });
 
   // End-to-end race repro through the mutation seam: a `new`-style mutator
@@ -1082,6 +1191,7 @@ describe("commitAndPush (git mutation flow)", () => {
       if (label === "symbolic-ref") return "main" as never;
       if (label === "add") addArg = args?.[3] ?? "";
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     commitAndPush({
@@ -1118,6 +1228,7 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     expect(() =>
@@ -1179,6 +1290,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       if (label === "clean") worktree.delete(args[args.length - 1]);
       return "" as never;
     });
@@ -1214,6 +1326,7 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     // The thrown Error propagates out of commitAndPush intact (the top-level
@@ -1244,6 +1357,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       if (label === "push" && push++ === 0) {
         throw pushError("! [rejected]        main -> main (non-fast-forward)");
       }
@@ -1272,6 +1386,7 @@ describe("commitAndPush (git mutation flow)", () => {
       "pull",
       "add",
       "commit",
+      "diff-tree",
       "push",
       "rev-parse",
       "fetch",
@@ -1280,6 +1395,7 @@ describe("commitAndPush (git mutation flow)", () => {
       "pull",
       "add",
       "commit",
+      "diff-tree",
       "push",
     ]);
   });
@@ -1290,6 +1406,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       if (label === "push") throw pushError("! [rejected] non-fast-forward");
       return "" as never;
     });
@@ -1323,6 +1440,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       if (label === "push") {
         // The background post-commit push already won the race and put our
         // commit on origin/main; git rejects this one with stale-info info.
@@ -1359,6 +1477,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       if (label === "push") {
         throw pushError("fatal: Authentication failed for 'https://...'");
       }
@@ -1389,6 +1508,7 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       if (args && args[2] === "symbolic-ref") return "main" as never;
       fullArgs.push(args ?? []);
+      if (args && args.includes("diff-tree")) return "story.md" as never;
       return "" as never;
     });
     commitAndPush({
@@ -1427,6 +1547,7 @@ describe("commitAndPush (git mutation flow)", () => {
         return "" as never;
       }
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     let mutatorCalls = 0;
@@ -1441,7 +1562,16 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(restored).toEqual([]);
     // ...and the mutation proceeded normally (after the HEAD:main guard probe).
     expect(mutatorCalls).toBe(1);
-    expect(seen).toEqual(["fetch", "rev-list", "status", "pull", "add", "commit", "push"]);
+    expect(seen).toEqual([
+      "fetch",
+      "rev-list",
+      "status",
+      "pull",
+      "add",
+      "commit",
+      "diff-tree",
+      "push",
+    ]);
   });
 
   // A bare-branch refspec (e.g. `pushRefspec: "main"`) pushes the LOCAL branch
@@ -1455,6 +1585,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "rfc-some-feature" as never;
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     let mutatorCalls = 0;
@@ -1492,6 +1623,7 @@ describe("commitAndPush (git mutation flow)", () => {
       // git() helper surfaces that as a throw, which the guard must swallow.
       if (label === "symbolic-ref") throw new Error("fatal: ref HEAD is not a symbolic ref");
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     expect(() =>
@@ -1520,6 +1652,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "rev-list") return "2" as never; // HEAD is 2 commits ahead
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     let mutatorCalls = 0;
@@ -1550,6 +1683,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "fetch") throw new Error("fatal: unable to access origin");
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     let mutatorCalls = 0;
@@ -1562,7 +1696,7 @@ describe("commitAndPush (git mutation flow)", () => {
     });
     // fetch threw inside the guard's try → guard skipped; mutation proceeds.
     expect(mutatorCalls).toBe(1);
-    expect(seen).toEqual(["checkout", "status", "pull", "add", "commit", "push"]);
+    expect(seen).toEqual(["checkout", "status", "pull", "add", "commit", "diff-tree", "push"]);
   });
 
   // A hand edit left in a story file (e.g. the user edited frontmatter then ran
@@ -1575,6 +1709,7 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       if (label === "status") return " M rfcs/0001/stories/foo.md" as never;
       return "" as never;
     });
@@ -1609,6 +1744,7 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       // index.md changed both staged (`M  ...`) and unstaged (` M ...`).
       if (label === "status") return "M  index.md\n M index.md" as never;
       return "" as never;
@@ -1636,6 +1772,7 @@ describe("commitAndPush (git mutation flow)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       if (label === "pull") {
         const e = new Error("Command failed") as Error & { stderr?: string };
         e.stderr = "CONFLICT (content): Merge conflict in rfcs/0001/stories/foo.md";
@@ -1674,6 +1811,7 @@ describe("commitAndPush (git mutation flow)", () => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "rev-list") return "0" as never; // HEAD even with origin/main
       seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     let mutatorCalls = 0;
@@ -1687,7 +1825,16 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(mutatorCalls).toBe(1);
     // rev-list is consumed by the guard (not pushed to seen); fetch precedes the
     // restore checkouts and the mutation loop runs in full.
-    expect(seen).toEqual(["fetch", "checkout", "status", "pull", "add", "commit", "push"]);
+    expect(seen).toEqual([
+      "fetch",
+      "checkout",
+      "status",
+      "pull",
+      "add",
+      "commit",
+      "diff-tree",
+      "push",
+    ]);
   });
 
   // The refine path passes an explicit `pushRefspec: "HEAD:main"` and a `cwd`
@@ -1732,6 +1879,7 @@ describe("commitAndPush (git mutation flow)", () => {
     const fullArgs: string[][] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       fullArgs.push(args ?? []);
+      if (args && args.includes("diff-tree")) return "story.md" as never;
       return "" as never;
     });
     commitAndPush({
@@ -1752,6 +1900,7 @@ describe("commitAndPush (git mutation flow)", () => {
     const fullArgs: string[][] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       fullArgs.push(args ?? []);
+      if (args && args.includes("diff-tree")) return "story.md" as never;
       return "" as never;
     });
     commitAndPush({
@@ -2057,6 +2206,7 @@ describe("newStory status default", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     return dir;
@@ -2371,6 +2521,7 @@ describe("newStory cluster validation", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
@@ -2423,6 +2574,7 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     const dir = makeRepo();
@@ -2487,6 +2639,7 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     const dir = makeRepo();
@@ -2503,6 +2656,7 @@ describe("newStory --status / --body-file (one-call authoring)", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     const dir = makeRepo();
@@ -2769,6 +2923,7 @@ describe("newRfc", () => {
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       if (label === "symbolic-ref") return "main" as never;
+      if (label === "diff-tree") return "story.md" as never;
       return "" as never;
     });
     const dir = mkdtempSync(join(tmpdir(), "tasks-test-"));
@@ -3079,13 +3234,19 @@ describe("dirtyWorktreeLines", () => {
 });
 
 describe("syncWorktreeToOrigin (pre-read sync)", () => {
-  function setup() {
+  // The sync now takes the tasks-CLI lock around its fetch + reset --hard so
+  // it can't clobber a concurrent mutation in the shared canonical checkout.
+  // Point the lock at a throwaway dir so gitCommonDir (mocked git) is never
+  // consulted and no lock file lands in the repo.
+  afterEach(() => __setLockDirForTest(null));
+  function setup(statusOut = "") {
+    __setLockDirForTest(mkdtempSync(join(tmpdir(), "trails-sync-lock-")));
     vi.spyOn(console, "error").mockImplementation(() => {});
     const seen: string[] = [];
     execFileSyncMock.mockImplementation((_file, args) => {
       const label = args && args.length >= 3 ? args[2] : "";
       seen.push(label);
-      if (label === "status") return "" as never; // clean by default
+      if (label === "status") return statusOut as never;
       return "" as never;
     });
     return { seen };
@@ -3099,14 +3260,8 @@ describe("syncWorktreeToOrigin (pre-read sync)", () => {
   });
 
   it("skips reset --hard (no silent data loss) when the worktree has tracked edits", () => {
-    const seen: string[] = [];
+    const { seen } = setup(" M rfcs/0024/stories/x.md");
     const err = vi.spyOn(console, "error").mockImplementation(() => {});
-    execFileSyncMock.mockImplementation((_file, args) => {
-      const label = args && args.length >= 3 ? args[2] : "";
-      seen.push(label);
-      if (label === "status") return " M rfcs/0024/stories/x.md" as never;
-      return "" as never;
-    });
     syncWorktreeToOrigin();
     // The status probe ran, but the destructive reset --hard never did.
     expect(seen).toEqual(["status"]);
@@ -3116,15 +3271,35 @@ describe("syncWorktreeToOrigin (pre-read sync)", () => {
   });
 
   it("still syncs when only untracked files are present", () => {
-    const seen: string[] = [];
-    vi.spyOn(console, "error").mockImplementation(() => {});
-    execFileSyncMock.mockImplementation((_file, args) => {
-      const label = args && args.length >= 3 ? args[2] : "";
-      seen.push(label);
-      if (label === "status") return "?? rfcs/0024/stories/new.md" as never;
-      return "" as never;
-    });
+    const { seen } = setup("?? rfcs/0024/stories/new.md");
     syncWorktreeToOrigin();
     expect(seen).toEqual(["status", "fetch", "reset"]);
+  });
+
+  it("skips the sync entirely when the tasks-CLI lock is held by a live mutation", () => {
+    const { seen } = setup();
+    // Simulate a mutation mid-flight: hold the lock with this (live) process.
+    const held = acquireTasksLock(undefined);
+    const err = vi.spyOn(console, "error").mockImplementation(() => {});
+    try {
+      syncWorktreeToOrigin(undefined, 300);
+    } finally {
+      releaseTasksLock(held);
+    }
+    // No status probe, no fetch, and above all no reset --hard: the checkout
+    // belongs to the lock holder until it finishes.
+    expect(seen).toEqual([]);
+    expect(err).toHaveBeenCalled();
+    expect(String(err.mock.calls[0][0])).toMatch(/lock is busy/);
+  });
+
+  it("releases the lock after syncing so the next mutation can take it", () => {
+    const { seen } = setup();
+    syncWorktreeToOrigin();
+    expect(seen).toEqual(["status", "fetch", "reset"]);
+    // Lock must be free again: a fresh acquire succeeds without contention.
+    const lock = acquireTasksLock(undefined, { waitMs: 300, onTimeout: "give-up" });
+    expect(lock).not.toBeNull();
+    releaseTasksLock(lock);
   });
 });

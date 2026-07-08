@@ -332,10 +332,14 @@ function inGitTasks(): void {
 // `cwd` defaults to TASKS_DIR (the canonical checkout the status mutations
 // operate on). `refine` overrides it with an agent's worktree, which lives in
 // the same repo but on a feature branch.
-function git(args: string[], opts: { silent?: boolean; cwd?: string } = {}): string {
+function git(
+  args: string[],
+  opts: { silent?: boolean; cwd?: string; env?: NodeJS.ProcessEnv } = {},
+): string {
   return execFileSync("git", ["-C", opts.cwd ?? TASKS_DIR, ...args], {
     encoding: "utf8",
     stdio: opts.silent ? ["ignore", "pipe", "pipe"] : ["inherit", "pipe", "inherit"],
+    ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
   }).trim();
 }
 
@@ -437,7 +441,34 @@ function syncFromOrigin(): void {
 // it. When the worktree carries such edits we skip the sync entirely, warn
 // loudly, and serve the possibly-stale index — never destroy unsaved work.
 // Untracked new files survive `reset --hard`, so they don't block the sync.
-export function syncWorktreeToOrigin(cwd?: string): void {
+//
+// LOCKED against mutations: the per-worktree `tasks/` symlinks all resolve to
+// the ONE shared canonical checkout, so this `reset --hard` used to run
+// concurrently with another agent's commitAndPush mutation in the same
+// working tree. A reset landing between that mutation's file write and its
+// commit deletes the staged-new story file (index AND disk → "nothing to
+// commit" crash); landing inside the pre-commit hook's window it empties the
+// index, and git finalizes an EMPTY commit that then gets pushed — the
+// message lands on main with zero files. Take the same tasks-CLI lock the
+// mutators hold; the dirty check must also sit inside the lock, or a mutation
+// could stage its file right after we probed. Reads are best-effort, so on
+// lock timeout we skip the sync and serve the possibly-stale index instead of
+// dying.
+export function syncWorktreeToOrigin(cwd?: string, lockWaitMs = 20_000): void {
+  const lock = acquireTasksLock(cwd, { waitMs: lockWaitMs, onTimeout: "give-up" });
+  // A "busy" give-up means a live mutation is mid-flight in this checkout —
+  // touching it at all (even the status probe) belongs to the lock holder,
+  // and resetting is exactly the clobber the lock prevents. Skip entirely and
+  // serve the stale index. (A `null` lock — no resolvable git dir — falls
+  // through instead: the status probe below throws and returns silently,
+  // preserving the quiet non-repo behavior.)
+  if (lock === "busy") {
+    console.error(
+      `warning: tasks-CLI lock is busy; skipping the pre-read sync to origin/main. ` +
+        `The index may be stale.`,
+    );
+    return;
+  }
   try {
     let porcelain: string;
     try {
@@ -462,6 +493,8 @@ export function syncWorktreeToOrigin(cwd?: string): void {
     git(["reset", "--hard", "--quiet", "origin/main"], { silent: true, cwd });
   } catch {
     /* best-effort — stale data is better than a broken CLI */
+  } finally {
+    releaseTasksLock(lock);
   }
 }
 
@@ -707,11 +740,16 @@ function installLockSignalHandlers(): void {
 // poll. A holder whose process is gone (ESRCH) is reclaimed automatically — its
 // lock can never be released, so making a human/agent `rm` it was only busywork
 // (and a racy one: concurrent rm+retry can delete a freshly-taken live lock).
-// Only the wait timeout against a *live* holder still fails loudly.
+// Only the wait timeout against a *live* holder still fails loudly — unless
+// the caller opts into `onTimeout: "give-up"`, which returns the distinct
+// sentinel "busy" so a best-effort caller (the pre-read sync) can skip its
+// critical section rather than kill a read command with LOCK_TIMEOUT_EXIT.
+// "busy" is deliberately not null: null means "nothing to lock against"
+// (proceed unlocked), while "busy" means a live holder owns the checkout.
 export function acquireTasksLock(
   cwd: string | undefined,
-  opts: { waitMs?: number; pollMs?: number } = {},
-): LockHandle | null {
+  opts: { waitMs?: number; pollMs?: number; onTimeout?: "exit" | "give-up" } = {},
+): LockHandle | null | "busy" {
   const waitMs = opts.waitMs ?? LOCK_WAIT_MS;
   const pollMs = opts.pollMs ?? LOCK_POLL_MS;
   let lockPath: string;
@@ -758,6 +796,7 @@ export function acquireTasksLock(
         continue;
       }
       if (waited >= waitMs) {
+        if (opts.onTimeout === "give-up") return "busy";
         console.error(
           `error: timed out after ${Math.round(waitMs / 1000)}s waiting for the tasks-CLI ` +
             `lock at ${lockPath}. Another mutation is holding it; retry shortly.`,
@@ -774,8 +813,8 @@ export function acquireTasksLock(
 // so the signal handlers don't try to re-release a handle we've let go. The
 // read-then-unlink is race-free because no waiter removes/recreates a lock it
 // didn't create (acquire only `wx`s onto a free path, or reclaims a dead one).
-export function releaseTasksLock(lock: LockHandle | null): void {
-  if (!lock) return;
+export function releaseTasksLock(lock: LockHandle | null | "busy"): void {
+  if (!lock || lock === "busy") return;
   activeLocks.delete(lock);
   try {
     if (readFileSync(lock.path, "utf8").trim() === lock.token) unlinkSync(lock.path);
@@ -971,7 +1010,12 @@ export function commitAndPush(opts: {
         // mutation's own path may have moved, so stage everything.
         const reconciled = reconcileDuplicateRfcDirs(cwd);
         git(["add", reconciled ? "-A" : opts.fileToStage], { cwd });
-        git(["commit", "-q", "-m", opts.message], { cwd });
+        // RFCS_NO_AUTOPUSH: the tasks repo's .husky/post-commit hook otherwise
+        // background-pushes `main` after this commit, racing the explicit push
+        // below (and, before the pre-read sync took the lock, occasionally
+        // pushing a clobbered EMPTY commit before we could reset it away). The
+        // CLI owns its own push; silence the hook's.
+        git(["commit", "-q", "-m", opts.message], { cwd, env: { RFCS_NO_AUTOPUSH: "1" } });
       } catch (e) {
         // Atomic rollback: a throw between the file write and the commit (a
         // prettier crash in formatFiles, a failed `git add`/`commit`, etc.)
@@ -991,6 +1035,37 @@ export function commitAndPush(opts: {
           break;
         }
         throw e;
+      }
+      // Never push an empty commit. A concurrent `reset --hard` in this shared
+      // checkout (a pre-read sync from a process predating the lock there, or
+      // any out-of-band reset) that lands inside `git commit`'s pre-commit-hook
+      // window empties the index after the emptiness check, so git finalizes a
+      // commit whose tree equals its parent — the mutation's file is silently
+      // gone, but the message still lands on main. Verify the commit actually
+      // carries changes before pushing; if not, drop it and retry the mutation.
+      // `--root` keeps a parentless first commit (fresh repo) from reading as
+      // empty; a probe failure fails OPEN (push as before) — the guard must
+      // never be more dangerous than the race it guards against.
+      let committed = "unverified";
+      try {
+        committed = git(["diff-tree", "--no-commit-id", "--name-only", "-r", "--root", "HEAD"], {
+          silent: true,
+          cwd,
+        });
+      } catch {
+        /* probe failed — assume the commit is fine and let the push proceed */
+      }
+      if (committed === "") {
+        git(["reset", "--hard", "origin/main"], { silent: true, cwd });
+        if (attempt === 1) {
+          console.error(
+            `error: commit came out empty twice (mutation clobbered by a concurrent reset?); ` +
+              `nothing was pushed. ${opts.raceMessage}`,
+          );
+          releaseTasksLock(lock);
+          process.exit(opts.raceExitCode);
+        }
+        continue;
       }
       try {
         git(["push", "--quiet", "origin", pushRefspec], { silent: true, cwd });
