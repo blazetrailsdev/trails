@@ -1609,6 +1609,7 @@ export class MigrationContext {
         precision?: number | null;
         scale?: number | null;
         array?: boolean;
+        isEnum?: boolean;
         datetimePhysicalType?: string;
       }
     >
@@ -1782,6 +1783,7 @@ export class MigrationContext {
         precision?: number | null;
         scale?: number | null;
         array?: boolean;
+        isEnum?: boolean;
         datetimePhysicalType?: string;
       }
     >();
@@ -1835,6 +1837,9 @@ export class MigrationContext {
           ...(col.precision != null ? { precision: col.precision } : {}),
           ...(col.scale != null ? { scale: col.scale } : {}),
           ...((col as { array?: boolean }).array ? { array: true } : {}),
+          // PG `Column#enum?` (cast type "enum") survives CTAS but isn't a base
+          // Column field; the dumper emits `enum_type:` only when this is set.
+          ...(col.type === "enum" ? { isEnum: true } : {}),
         });
       }
     }
@@ -2261,6 +2266,7 @@ export class MigrationContext {
     precision?: number | null;
     scale?: number | null;
     array?: boolean;
+    isEnum?: boolean;
     datetimePhysicalType?: string;
   }> {
     const meta = this._columnMeta.get(tableName);
