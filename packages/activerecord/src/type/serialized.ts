@@ -201,9 +201,9 @@ export class Serialized extends ValueType {
     // value defines an explicit `equals` (our convention for Ruby `==`, e.g.
     // ActiveSupport::TimeWithZone whose `<=>`/`==` compares by UTC instant
     // across Date/Time-like kinds), dispatch to it so cross-class time-like
-    // equality is honored.
+    // equality is honored. Rails' `old_value != new_value` calls the *left*
+    // operand's `==`, so dispatch on `oldValue` only — never `newValue`.
     if (hasEquals(oldValue)) return !oldValue.equals(newValue);
-    if (hasEquals(newValue)) return !newValue.equals(oldValue);
     // Otherwise a value object without an explicit `==` but with a primitive
     // `valueOf` (e.g. Date) compares by that primitive. A Ruby value type's
     // `==` only compares against its own kind, so require a shared constructor:
