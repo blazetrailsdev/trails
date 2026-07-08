@@ -1120,7 +1120,7 @@ export class ToSql extends Visitor {
     if (this.unboundableSign(node.right) !== 0) {
       return collector.append("1=0");
     }
-    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
+    if (this.rightIsNull(node.right)) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NULL");
       return collector;
@@ -1135,7 +1135,7 @@ export class ToSql extends Visitor {
     node: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
+    if (this.rightIsNull(node.right)) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NULL");
       return collector;
@@ -1147,7 +1147,7 @@ export class ToSql extends Visitor {
     node: Nodes.IsDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
+    if (this.rightIsNull(node.right)) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NOT NULL");
       return collector;
@@ -1159,7 +1159,7 @@ export class ToSql extends Visitor {
     if (this.unboundableSign(node.right) !== 0) {
       return collector.append("1=1");
     }
-    if (node.right instanceof Nodes.Quoted && node.right.value === null) {
+    if (this.rightIsNull(node.right)) {
       this.visitNodeOrValue(node.left, collector);
       collector.append(" IS NOT NULL");
       return collector;
@@ -2109,5 +2109,21 @@ export class ToSql extends Visitor {
       if ("value" in v) return this.unboundableSign(v.value);
     }
     return 0;
+  }
+
+  /**
+   * Mirrors Rails' `right.nil?` guard in the equality visitors: a nil right
+   * emits `IS NULL` rather than `= ?`. Beyond an explicit `Quoted(null)`, a
+   * bind attribute answers `nil?` true when it *serializes* to nil (a
+   * null-mapped or unknown enum label, or a normalizer that blanks the value),
+   * so honour a duck-typed `isNil()` on the right node too.
+   */
+  protected rightIsNull(right: unknown): boolean {
+    if (right instanceof Nodes.Quoted && right.value === null) return true;
+    // A bound scalar arrives wrapped in a BindParam; peer at the wrapped
+    // attribute so an enum/normalized bind that serializes to nil is caught.
+    const node = right instanceof Nodes.BindParam ? right.value : right;
+    const maybe = node as { isNil?: () => boolean };
+    return typeof maybe?.isNil === "function" && maybe.isNil();
   }
 }
