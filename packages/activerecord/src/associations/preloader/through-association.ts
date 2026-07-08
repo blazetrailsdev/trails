@@ -391,12 +391,20 @@ export class ThroughAssociation extends Association {
    * `Preloader::ThroughAssociation#through_scope`
    * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb:104-146).
    *
-   * The whole reflection-scope `where_clause` is copied onto the through query
-   * and the source reflection is JOINed (Rails `includes!`/`references!`, a LEFT
+   * For a to-one, non-through source this is Rails' single-query strategy: the
+   * whole reflection-scope `where_clause` is copied onto the through query and
+   * the source reflection is JOINed (Rails `includes!`/`references!`, a LEFT
    * OUTER JOIN), so every column — through-table, source-table, or a
-   * scope-joined nested table — resolves in ONE query. No per-predicate table
-   * attribution is needed: the JOIN makes the source columns available on the
-   * through query directly.
+   * scope-joined nested table — resolves in ONE query with no per-predicate
+   * table attribution.
+   *
+   * A collection (has_many) source or a nested (through) source can't be JOINed
+   * without fanning the through rows out (trails collects raw rows; Rails' eager
+   * JoinDependency dedups by PK), so those keep the two-step: only the
+   * reflection scope's through-table predicates are copied here (to constrain
+   * the intermediate rows), and the source / sub-chain predicates and order ride
+   * the recursive source-preloader stage (see `_getSourcePreloaders`).
+   * `disable_joins` and polymorphic `source_type` keep their own paths.
    */
   private _buildThroughScope(): any {
     const throughRefl = this._throughReflection;
