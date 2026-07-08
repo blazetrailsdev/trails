@@ -887,6 +887,12 @@ export class CallbackChain {
   /** True when a custom (non-default) terminator was supplied at define time. */
   private readonly _hasCustomTerminator: boolean;
   private chain: Callback[];
+  // Memoized compiled sequence (Rails' @all_callbacks). Reset to undefined on
+  // every chain mutation (append/prepend/insert/delete/remove/clear), matching
+  // Rails' @all_callbacks = nil reset points. No mutex: Rails guards the rebuild
+  // with @mutex.synchronize for thread safety, but JS is single-threaded so
+  // runCallbacks never re-enters compile() concurrently — the lock is moot.
+  private _allCallbacks: CallbackSequence | undefined;
 
   constructor(name: string, config: DefineCallbacksOptions = {}) {
     this._hasCustomTerminator = typeof config.terminator === "function";
@@ -911,31 +917,38 @@ export class CallbackChain {
   }
 
   insert(idx: number, cb: Callback): void {
+    this._allCallbacks = undefined;
     this.chain.splice(idx, 0, cb);
   }
 
   delete(cb: Callback): void {
+    this._allCallbacks = undefined;
     const i = this.chain.indexOf(cb);
     if (i !== -1) this.chain.splice(i, 1);
   }
 
   append(callback: Callback): void {
+    this._allCallbacks = undefined;
     this.chain.push(callback);
   }
 
   prepend(callback: Callback): void {
+    this._allCallbacks = undefined;
     this.chain.unshift(callback);
   }
 
   remove(kind: CallbackKind, filter?: AnyCallback | string | symbol | CallbackObject): void {
+    this._allCallbacks = undefined;
     this.chain = this.chain.filter((cb) => !cb.matches(kind, filter));
   }
 
   clear(): void {
+    this._allCallbacks = undefined;
     this.chain = [];
   }
 
   compile(): CallbackSequence {
+    if (this._allCallbacks) return this._allCallbacks;
     // Mirrors Rails CallbackChain#compile: fold the chain in reverse, applying
     // each callback's compiled filter onto the sequence. before/after mutate the
     // (single) final sequence's lists; around wraps it in a new nested sequence.
@@ -944,6 +957,7 @@ export class CallbackChain {
       seq = this.chain[i].compiled.apply(seq);
     }
     seq._callbackChain = this;
+    this._allCallbacks = seq;
     return seq;
   }
 
