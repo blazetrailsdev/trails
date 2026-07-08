@@ -1459,6 +1459,13 @@ export function tableName(this: SchemaHost, value?: string): string {
       // the next query rebuilds against the new table.
       (this as { _predicateBuilder?: unknown })._predicateBuilder = null;
       (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
+      // Rails reset_column_information also reloads the schema so the new
+      // table's columns are re-reflected. A subclass created with a different
+      // table_name (e.g. `Class.new(Minimalistic) { self.table_name = "aircraft" }`)
+      // inherits the parent's `_schemaLoaded = true` through the prototype
+      // chain and would otherwise never reflect its own table. Shadow the
+      // inherited flag with an own `false` so the next load re-reflects.
+      (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
     }
   }
   return resolveTableName.call(this as any);

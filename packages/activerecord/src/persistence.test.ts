@@ -2194,7 +2194,9 @@ describe("PersistenceTest", () => {
 
   it("persist inherited class with different table name", async () => {
     class MinimalisticAircraft extends Minimalistic {
-      static _tableName = "aircraft";
+      static {
+        this.tableName = "aircraft";
+      }
     }
     registerModel(MinimalisticAircraft);
 
