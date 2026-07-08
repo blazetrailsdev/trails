@@ -540,8 +540,9 @@ describe("SchemaDumperTest", () => {
     // keeps `lower(first_name || ' ' || last_name)` verbatim, PostgreSQL
     // normalizes it to `lower((((first_name)::text || ' '::text) || …))`. Assert
     // the lowercased expression over both columns rather than a byte-exact form,
-    // and that the embedded space literal is still escaped in the dumped string.
-    expect(output).toMatch(/lower\(.*first_name.*last_name.*\).*idx_users_full_name/s);
+    // but still require the quoted `' '` space literal between them so the
+    // escaping is verified (mirrors Rails schema_dumper_test.rb:318).
+    expect(output).toMatch(/lower\(.*first_name.*' '.*last_name.*\).*idx_users_full_name/s);
   });
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql binary fields",
