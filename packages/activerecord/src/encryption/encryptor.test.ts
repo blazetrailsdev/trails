@@ -4,7 +4,8 @@ import { Encryptor } from "./encryptor.js";
 import { Configurable } from "./configurable.js";
 import { Contexts } from "./contexts.js";
 import { clearDefaultKeyProviderCache } from "./default-key-provider-cache.js";
-import { DecryptionError, ForbiddenClass } from "./errors.js";
+import { DecryptionError, ForbiddenClass, Encryption as EncryptionError } from "./errors.js";
+import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { MessageSerializer } from "./message-serializer.js";
 import { Message } from "./message.js";
 import { defaultCompressor } from "./config.js";
@@ -43,7 +44,14 @@ describe("ActiveRecord::Encryption::EncryptorTest", () => {
 
   it("if an encryption error happens when encrypting an encrypted text it should raise", () => {
     const enc = new Encryptor();
-    expect(() => enc.encrypt("hello", {})).toThrow();
+    // Mirrors Rails: stub a key provider whose encryptionKey raises an
+    // Encryption error, and assert encrypt surfaces it (rather than relying on
+    // missing key material — encryption is configured suite-wide now).
+    const keyProvider = new DerivedSecretKeyProvider("some key");
+    vi.spyOn(keyProvider, "encryptionKey").mockImplementation(() => {
+      throw new EncryptionError("boom");
+    });
+    expect(() => enc.encrypt("Some text to encrypt", { keyProvider })).toThrow(EncryptionError);
   });
 
   it("content is compressed", () => {

@@ -66,12 +66,9 @@ export { withEncryptionContext, withoutEncryption, DecryptionError, EncryptionEr
 
 // ─── Test key material ────────────────────────────────────────────────────────
 
-// Primary key is used as a PBKDF2 password — any string works.
-export const TEST_PRIMARY_KEY = "test-primary-key-for-encryption-suite";
-// Deterministic key is used as raw AES key material (base64-encoded 32 bytes).
-// "test-deterministic-key-32bytes!!" = exactly 32 bytes, base64-encoded.
-export const TEST_DETERMINISTIC_KEY = "dGVzdC1kZXRlcm1pbmlzdGljLWtleS0zMmJ5dGVzISE=";
-export const TEST_KEY_DERIVATION_SALT = "test-key-derivation-salt-for-encryption";
+// Single source of truth shared with the suite-wide bootstrap (test-setup-ar.ts).
+export { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
+import { TEST_PRIMARY_KEY, TEST_DETERMINISTIC_KEY, TEST_KEY_DERIVATION_SALT } from "./test-keys.js";
 
 // ─── Config snapshot/restore ─────────────────────────────────────────────────
 
@@ -548,68 +545,6 @@ export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
       this.attribute("name", "date");
       this.adapter = adapter;
       this.encrypts("name");
-    }
-  } as any;
-}
-
-// Mirrors Ruby's `value.to_s.downcase` on an ASCII-8BIT string: only ASCII
-// A–Z bytes are lowercased; bytes > 0x7F are preserved bit-for-bit (Ruby's
-// downcase on a binary string does not perform Unicode case folding).
-// For our `logo: binary` attribute the cast type yields a Uint8Array,
-// so we lowercase bytes directly and return a Uint8Array to preserve the
-// binary cast type through normalization (which writes back via
-// writeCastValue after casting).
-function _downcaseLikeRails(v: unknown): unknown {
-  if (v == null) return v;
-  if (v instanceof Uint8Array) {
-    const out = new Uint8Array(v.length);
-    for (let i = 0; i < v.length; i++) {
-      const b = v[i];
-      out[i] = b >= 0x41 && b <= 0x5a ? b + 0x20 : b;
-    }
-    return out;
-  }
-  return String(v).toLowerCase();
-}
-
-/**
- * EncryptedBookNormalizedFirst: declares normalizes before encrypts on both
- * `name` and `logo`. Mirrors Rails' EncryptedBookNormalizedFirst — exercises
- * normalize-then-encrypt order.
- */
-export function makeEncryptedBookNormalizedFirst(adapter: DatabaseAdapter) {
-  return class EncryptedBookNormalizedFirst extends Base {
-    static {
-      this._tableName = "encrypted_books";
-      this.attribute("id", "integer");
-      this.attribute("name", "string", { default: "<untitled>" });
-      this.attribute("logo", "binary");
-      this.adapter = adapter;
-      this.normalizes("name", _downcaseLikeRails);
-      this.encrypts("name");
-      this.normalizes("logo", _downcaseLikeRails);
-      this.encrypts("logo");
-    }
-  } as any;
-}
-
-/**
- * EncryptedBookNormalizedSecond: declares encrypts before normalizes on both
- * `name` and `logo`. Mirrors Rails' EncryptedBookNormalizedSecond — exercises
- * encrypt-then-normalize order.
- */
-export function makeEncryptedBookNormalizedSecond(adapter: DatabaseAdapter) {
-  return class EncryptedBookNormalizedSecond extends Base {
-    static {
-      this._tableName = "encrypted_books";
-      this.attribute("id", "integer");
-      this.attribute("name", "string", { default: "<untitled>" });
-      this.attribute("logo", "binary");
-      this.adapter = adapter;
-      this.encrypts("name");
-      this.normalizes("name", _downcaseLikeRails);
-      this.encrypts("logo");
-      this.normalizes("logo", _downcaseLikeRails);
     }
   } as any;
 }

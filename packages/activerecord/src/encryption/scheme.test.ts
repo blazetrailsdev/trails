@@ -89,8 +89,25 @@ describe("ActiveRecord::Encryption::SchemeTest", () => {
   });
 
   it("keyProvider returns undefined when no key/keyProvider/deterministic configured", () => {
-    const scheme = new Scheme();
-    expect(scheme.keyProvider).toBeUndefined();
+    // The suite-wide bootstrap (test-setup-ar.ts, mirroring Rails helper.rb)
+    // configures a global primary key, so clear it locally to exercise the
+    // truly-unconfigured resolution path.
+    const c = Configurable.config;
+    const saved = {
+      primaryKey: c.primaryKey,
+      deterministicKey: c.deterministicKey,
+      keyDerivationSalt: c.keyDerivationSalt,
+    };
+    c.primaryKey = undefined;
+    c.deterministicKey = undefined;
+    c.keyDerivationSalt = undefined;
+    try {
+      expect(new Scheme().keyProvider).toBeUndefined();
+    } finally {
+      c.primaryKey = saved.primaryKey;
+      c.deterministicKey = saved.deterministicKey;
+      c.keyDerivationSalt = saved.keyDerivationSalt;
+    }
   });
 
   it("should create a encryptor well when compressor is given", () => {
