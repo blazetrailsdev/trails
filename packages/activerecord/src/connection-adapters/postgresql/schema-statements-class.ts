@@ -1194,13 +1194,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         const toTable = unquoteIdentifier(row.to_table as string);
         const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
         const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
-        let column: string;
-        let primaryKey: string;
+        // Rails returns composite column/primary_key as arrays and a bare
+        // string for single-column FKs (postgresql/schema_statements.rb#foreign_keys).
+        let column: string | string[];
+        let primaryKey: string | string[];
         if (conkey.length > 1) {
-          const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
-          const pks = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
-          column = cols.join(",");
-          primaryKey = pks.join(",");
+          column = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
+          primaryKey = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
         } else {
           column = unquoteIdentifier(row.column as string);
           primaryKey = row.primary_key as string;
@@ -1224,8 +1224,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     fromTable: string,
     toTable: string,
     options: {
-      column?: string;
-      primaryKey?: string;
+      column?: string | string[];
+      primaryKey?: string | string[];
       name?: string;
       onDelete?: ReferentialAction;
       onUpdate?: ReferentialAction;
@@ -1242,13 +1242,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // We replicate the abstract body inline here, so replicate the guard too.
     if (!this.isUseForeignKeys()) return;
     if (options.ifNotExists === true) {
-      const fks = await this.foreignKeys(fromTable);
-      if (
-        fks.some(
-          (fk) =>
-            fk.toTable === toTable && (options.column == null || fk.column === options.column),
-        )
-      ) {
+      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
+      // compares `column` element-wise, so composite (array) columns match by
+      // value rather than by array identity (a bare `===` is always false for
+      // distinct array instances). Mirrors the abstract addForeignKey guard.
+      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
         return;
       }
     }
