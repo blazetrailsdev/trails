@@ -11,6 +11,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
+import { performMerge } from "./relation/spawn-methods.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
@@ -107,6 +108,16 @@ describe("RelationTest", () => {
 
     const intersection = await (CanonPost.where({ title: ["ary-a", "ary-b"] }) as any).merge([a]);
     expect(intersection.map((p: any) => Number(p.id))).toEqual([Number(a.id)]);
+
+    // Rails `records & other` is Array#& — set-style, so a receiver that loads
+    // `a` twice (e.g. a join that duplicates the row) still yields it once. Drive
+    // performMerge with a stub receiver whose records include the duplicate.
+    const dupReceiver = { toArray: async () => [a, a] };
+    const deduped = await (performMerge as (this: unknown, o: unknown) => Promise<any[]>).call(
+      dupReceiver,
+      [a],
+    );
+    expect(deduped.map((p: any) => Number(p.id))).toEqual([Number(a.id)]);
 
     expect(() => (CanonPost.all() as any).mergeBang([a])).toThrow(/not an ActiveRecord::Relation/);
   });

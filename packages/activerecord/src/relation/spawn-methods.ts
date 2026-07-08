@@ -48,9 +48,19 @@ export function performMerge<T extends SpawnRelation<T>>(this: T, other: any): T
 
 async function recordsIntersection(rel: any, other: readonly unknown[]): Promise<unknown[]> {
   const records: any[] = await rel.toArray();
-  return records.filter((r) =>
-    other.some((o) => (typeof r?.isEqual === "function" ? r.isEqual(o) : r === o)),
-  );
+  // Rails `records & other` is `Array#&` — a set-style intersection that also
+  // *dedups* by AR equality (==/eql?/hash: class + id), so a joined relation that
+  // loads the same record twice still yields it once. filter() alone would keep
+  // those duplicates, so track seen records and skip a repeat.
+  const eq = (a: any, o: unknown): boolean =>
+    typeof a?.isEqual === "function" ? a.isEqual(o) : a === o;
+  const result: unknown[] = [];
+  for (const r of records) {
+    if (!other.some((o) => eq(r, o))) continue;
+    if (result.some((seen) => eq(r, seen))) continue;
+    result.push(r);
+  }
+  return result;
 }
 
 /**
