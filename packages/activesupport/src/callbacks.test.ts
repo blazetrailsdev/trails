@@ -554,6 +554,25 @@ describe("Callbacks", () => {
     });
   });
 
+  describe("around callback result", () => {
+    it("save around", () => {
+      // AroundCallbackResultTest#test_save_around — an around callback can capture
+      // the event return value via `@result = yield` (Rails invoke_sequence breaks
+      // with env.value, so next() returns the block result).
+      const target = { result: null as unknown };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "after", () => "tweedle_1");
+      setCallback(target, "save", "around", (t: any, next: any) => {
+        t.result = next();
+      });
+      setCallback(target, "save", "after", () => "tweedle_2");
+
+      runCallbacks(target, "save", () => "running");
+
+      expect(target.result).toBe("running");
+    });
+  });
+
   describe("save conditional person", () => {
     it("save conditional person", () => {
       // ConditionalCallbackTest#test_save_conditional_person
@@ -1877,6 +1896,18 @@ describe("Callbacks — async propagation", () => {
     expect(r).toBeInstanceOf(Promise);
     await r;
     expect(t.log).toEqual(["ao", "block", "ac", "after"]);
+  });
+
+  it("awaited next() resolves to the async block result", async () => {
+    // Rails invoke_sequence breaks with env.value, so `await next()` sees the
+    // block's return even when the block is async.
+    const t = { result: null as unknown };
+    defineCallbacks(t, "save");
+    setCallback(t, "save", "around", async (x: any, next: any) => {
+      x.result = await next();
+    });
+    await runCallbacks(t, "save", async () => "running");
+    expect(t.result).toBe("running");
   });
 
   it("strict:sync throws on async callback", () => {

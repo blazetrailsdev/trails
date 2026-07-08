@@ -794,8 +794,8 @@ export class CallbackSequence {
    * chooses the shape, and each of Ruby's `instance_exec` / `Proc#call` /
    * `send`-with-block forms maps onto the JS call below.
    */
-  invokeAround(env: FilterEnvironment, next: () => void | Promise<void>): unknown {
-    const expanded = this.expandCallTemplate(env, next as () => unknown);
+  invokeAround(env: FilterEnvironment, next: () => unknown): unknown {
+    const expanded = this.expandCallTemplate(env, next);
     const method = expanded[2];
     if (method === "instanceExec") {
       // [target, fn, "instanceExec", ...arguments] — instance_exec(*arguments, &fn):
@@ -948,15 +948,20 @@ export class CallbackSequence {
     const runAround = (current: CallbackSequence): void | Promise<void> => {
       let pendingProceed: Promise<void> | undefined;
       let proceedObserved = false;
-      const next = (): void | Promise<void> => {
+      const next = (): unknown => {
         const r = runSeq(current.nested!);
-        if (!isThenable(r)) return r;
+        // Rails' invoke_sequence Proc breaks with `env.value`, so `yield` (next())
+        // returns the event value — the block's return. Surface it here so an
+        // around can do `const v = next()` / `await next()` (callbacks.rb#128,136).
+        if (!isThenable(r)) return env.value;
         pendingProceed = Promise.resolve(r);
         // Return a thenable wrapper so we can detect whether the around actually
         // awaited/chained on next() (real observation) versus firing it and
         // forgetting. `await` and `.then(_, r)` both wire an onRejected; bare
-        // `next();`, `.then(onFulfilled)`, and `.finally()` do not.
-        const observed = pendingProceed;
+        // `next();`, `.then(onFulfilled)`, and `.finally()` do not. It resolves to
+        // env.value so an awaited next() yields the block result.
+        const observed = pendingProceed.then(() => env.value);
+        observed.catch(() => {}); // guard the derived promise; real path is pendingProceed
         return {
           then(onFulfilled?: any, onRejected?: any) {
             if (typeof onRejected === "function") {
