@@ -39,34 +39,20 @@ export class Map {
   private _baseTypeForAttribute(name: string): Type {
     const klass = this._klass;
 
-    // Prefer O(1) lookup via _attributeDefinitions (avoids building full attributeTypes object)
-    const attributeDefinitions = klass._attributeDefinitions;
-    if (attributeDefinitions) {
-      const definition =
-        attributeDefinitions instanceof globalThis.Map
-          ? attributeDefinitions.get(name)
-          : attributeDefinitions?.[name];
-      if (definition) {
-        const type =
-          typeof definition === "object" && definition !== null && "type" in definition
-            ? definition.type
-            : definition;
-        if (type) return type as Type;
-      }
-    }
-
-    // Fallback to attributeTypes (builds full object, O(n))
+    // Resolve through the decorated default attribute set (`attribute_types`),
+    // mirroring Rails `type_for_attribute` (attribute_registration.rb:43-50): it
+    // replays every pending decorator (serialize/normalizes/encrypts) onto the
+    // reflected column type, so query-side decorations are honored without a
+    // per-feature post-reflection replay onto `_attributeDefinitions`.
+    const resolved = klass._attributeAliases?.[name] ?? name;
     const attributeTypes =
       typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
     if (attributeTypes) {
       const type =
-        attributeTypes instanceof globalThis.Map ? attributeTypes.get(name) : attributeTypes[name];
+        attributeTypes instanceof globalThis.Map
+          ? attributeTypes.get(resolved)
+          : attributeTypes[resolved];
       if (type) return type as Type;
-    }
-
-    // Instance-level lookup fallback
-    if (typeof klass.typeForAttribute === "function") {
-      return klass.typeForAttribute(name);
     }
 
     return new ValueType();
