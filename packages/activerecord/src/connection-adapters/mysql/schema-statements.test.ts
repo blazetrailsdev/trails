@@ -12,6 +12,7 @@ import {
   addOptionsForIndexColumns,
   dataSourceSql,
   quotedScope,
+  tableAliasLength,
   extractSchemaQualifiedName,
   typeWithSizeToSql,
   limitToSize,
@@ -632,5 +633,12 @@ describe("parseMysqlName", () => {
     expect(() => parseMysqlName("``")).toThrow(/Invalid MySQL identifier/);
     expect(() => parseMysqlName("``.widgets")).toThrow(/Invalid MySQL identifier/);
     expect(() => parseMysqlName("`db`.``")).toThrow(/Invalid MySQL identifier/);
+  });
+});
+
+describe("MySQL::SchemaStatements#tableAliasLength", () => {
+  it("table alias length", () => {
+    // mysql/schema_statements.rb:135 — 256, not max_identifier_length (64).
+    expect(tableAliasLength()).toBe(256);
   });
 });
