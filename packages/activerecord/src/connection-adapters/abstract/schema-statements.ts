@@ -1547,13 +1547,16 @@ export class SchemaStatements {
     return null;
   }
 
-  tableAliasFor(tableName: string): string {
+  // Rails: `table_alias_length` lives only in DatabaseLimits; SchemaStatements
+  // merely uses it (schema_statements.rb:28-29). Resolve it via the mixin host
+  // rather than defining a duplicate that would silently diverge from
+  // DatabaseLimits if an adapter overrode maxIdentifierLength.
+  tableAliasFor(
+    this: SchemaStatements & { tableAliasLength(): number },
+    tableName: string,
+  ): string {
     const maxLen = this.tableAliasLength();
     return tableName.slice(0, maxLen).replace(/\./g, "_");
-  }
-
-  protected tableAliasLength(): number {
-    return 64;
   }
 
   async dataSources(): Promise<string[]> {

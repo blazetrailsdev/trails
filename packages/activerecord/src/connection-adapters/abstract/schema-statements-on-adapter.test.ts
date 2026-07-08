@@ -89,6 +89,18 @@ class SqliteCapturingAdapter extends AbstractAdapter {
 }
 
 describe("SchemaStatements mixed into AbstractAdapter", () => {
+  it("tableAliasFor resolves tableAliasLength via the DatabaseLimits mixin", () => {
+    // SchemaStatements no longer defines tableAliasLength (Rails keeps it only
+    // in DatabaseLimits); the mixed-in adapter still resolves it to 64.
+    const stub = new StubAdapter();
+    expect(stub.tableAliasLength()).toBe(64);
+    expect(stub.tableAliasFor("a.very.long.schema.qualified.table.name")).toBe(
+      "a_very_long_schema_qualified_table_name",
+    );
+    const long = "x".repeat(80);
+    expect(stub.tableAliasFor(long)).toBe("x".repeat(64));
+  });
+
   it("columns() sqlite arm quotes the table name so an embedded quote does not break the PRAGMA", async () => {
     const sqlite = new SqliteCapturingAdapter();
     await sqlite.columns("things");
