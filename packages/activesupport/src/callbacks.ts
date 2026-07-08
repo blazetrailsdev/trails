@@ -964,6 +964,18 @@ export class CallbackChain {
     return this.chain.length === 0;
   }
 
+  /**
+   * Fire Rails' `halted_callback_hook(filter, name)` on the target for the
+   * before callback that halted the chain. Mirrors `Filters::Before#call`;
+   * kept here because the bespoke around-chain engine (`_invoke`) does not
+   * compile through `Before#call`. See `Before#halt` for the compiled path.
+   */
+  private _notifyHalt(target: object, entry: Callback): void {
+    const hook = (target as { haltedCallbackHook?: (filter: unknown, name: string) => void })
+      .haltedCallbackHook;
+    if (typeof hook === "function") hook.call(target, entry.filter, entry.name);
+  }
+
   _invoke(
     target: object,
     block?: () => unknown,
@@ -1010,6 +1022,7 @@ export class CallbackChain {
 
       if (aborted) {
         halted = true;
+        this._notifyHalt(target, entry);
         break;
       }
 
@@ -1051,6 +1064,7 @@ export class CallbackChain {
             // Rails scopes `catch(:abort)` to the default terminator). An async
             // before rejecting with the sentinel halts; real errors propagate.
             if (!isAbortSignal(e) || terminatorFn === false) throw e;
+            this._notifyHalt(target, entry);
             return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
           }
           for (const rem of remaining) {
@@ -1072,16 +1086,20 @@ export class CallbackChain {
               }
             } catch (e) {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
+              this._notifyHalt(target, rem);
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
             }
             try {
               if (isThenable(remVal)) await remVal;
             } catch (e) {
               if (!isAbortSignal(e) || terminatorFn === false) throw e;
+              this._notifyHalt(target, rem);
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
             }
-            if (remSyncHalt)
+            if (remSyncHalt) {
+              this._notifyHalt(target, rem);
               return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
+            }
           }
           return this._runAroundAndAfter(
             arounds,
@@ -1101,6 +1119,7 @@ export class CallbackChain {
         // `aborted`), matching Rails 5+ default_terminator. A `false` return no
         // longer halts. A custom terminator owns its own halt decision.
         halted = true;
+        this._notifyHalt(target, entry);
         break;
       }
     }
