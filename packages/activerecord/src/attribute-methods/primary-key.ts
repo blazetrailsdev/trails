@@ -127,12 +127,17 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
   const ctor = this.constructor as any;
   const pk = ctor.primaryKey as string | string[] | null;
   if (Array.isArray(pk)) {
-    if (!Array.isArray(value)) {
+    // Rails: `raise TypeError unless value.is_a?(Enumerable)` then
+    // `@primary_key.zip(value)`. Mirror Ruby's Enumerable with the codebase's
+    // Array-or-Set analogue (see sanitization.ts `isEnumerable`) — deliberately
+    // not arbitrary iterables, so a String is a scalar that raises like Ruby.
+    if (!Array.isArray(value) && !(value instanceof Set)) {
       throw new TypeError(
         `Expected value matching [${pk.map((col) => JSON.stringify(col)).join(", ")}], got ${inspectValue(value)}.`,
       );
     }
-    pk.forEach((col, i) => this._writeAttribute(col, (value as unknown[])[i]));
+    const values = Array.isArray(value) ? value : [...value];
+    pk.forEach((col, i) => this._writeAttribute(col, values[i]));
   } else if (pk == null) {
     // Key-less model: Rails does NOT install the PrimaryKey `id=` override
     // without a primary key (`instance_method_already_implemented?` gates the

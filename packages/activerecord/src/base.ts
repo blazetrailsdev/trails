@@ -768,9 +768,9 @@ function _collectNestedAttributeSetterKeys(ctor: typeof Base | undefined): Set<s
  * re-dispatches it here, once `initInternals` has run.
  *
  * `id: [a, b]` goes through the `id=` setter (`setId`, mirroring
- * `CompositePrimaryKey#id=`), which spreads the array across the key columns. A
- * scalar `id` on a model-level composite PK raises `TypeError` there, matching
- * Rails (which wants `id: [author_id, id]`, not a bare scalar).
+ * `CompositePrimaryKey#id=`), which zips the Enumerable (array/set) across the
+ * key columns. A scalar `id` on a model-level composite PK raises `TypeError`
+ * there, matching Rails (which wants `id: [author_id, id]`, not a bare scalar).
  * @internal
  */
 function _applyCompositePrimaryKey(
