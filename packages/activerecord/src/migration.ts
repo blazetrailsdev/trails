@@ -51,7 +51,6 @@ export {
 } from "./migration/compatibility.js";
 
 import { ActiveRecordError } from "./errors.js";
-import { pgRealTypeUnlessAliased } from "./connection-adapters/postgresql/pg-datetime-config.js";
 
 // Mirrors Rails AbstractAdapter#extract_new_comment_value (alias of extract_new_default_value).
 // For {from,to} hashes, returns `to` (which may be null to clear a comment).
@@ -105,16 +104,6 @@ function _crc32(str: string): number {
     }
   }
   return (crc ^ 0xffffffff) >>> 0;
-}
-
-// `IndexDefinition` concise-ifies per-column option maps (order/length) but
-// keeps an empty `{}` when the option is absent; the `_indexes` bookkeeping and
-// the schema dump expect `undefined` there, so collapse the empty map.
-function _emptyOptionToUndefined<T>(value: T): T | undefined {
-  if (value != null && typeof value === "object" && Object.keys(value).length === 0) {
-    return undefined;
-  }
-  return value;
 }
 
 // Migration error classes. Rails defines these in migration.rb, so
@@ -1577,66 +1566,17 @@ export abstract class Migration {
 
 /**
  * MigrationContext — wraps an adapter with schema-aware migration methods
- * and synchronous schema inspection, for use in tests and programmatic migrations.
+ * and async schema inspection, for use in tests and programmatic migrations.
+ *
+ * The `columns()`/`indexes()`/`tables()`/`columnExists()`/`tableExists()`/
+ * `indexExists()` readers delegate to the connection's real
+ * `SchemaStatements` introspection (Rails' `new_column_from_field` et al.)
+ * rather than any in-memory declared-schema bookkeeping, so a
+ * MigrationContext reflects the live database exactly as the adapter does.
  *
  * Mirrors: ActiveRecord::MigrationContext
  */
 export class MigrationContext {
-  // TRACKED DIVERGENCE (RFC 0051 follow-up): the CTAS column derivation now
-  // reads back through the adapter's real `SchemaStatements#columns`, but the
-  // `columns()`/`indexes()`/`tables()`/`columnExists()` read API is still
-  // synchronous and served from these in-memory maps. Collapsing them onto the
-  // adapter's async introspection requires making those readers async, which
-  // ripples into the synchronous `SchemaDumper.dump(ctx)` protocol and its
-  // exact-output dump assertions — deferred to the RFC 0051 follow-up story
-  // `collapse-migrationcontext-introspection-onto-adapter-remaining` rather
-  // than silently retained here.
-  private _tables = new Set<string>();
-  private _columns = new Map<string, Set<string>>();
-  private _columnMeta = new Map<
-    string,
-    Map<
-      string,
-      {
-        type: string;
-        // Raw adapter SQL type (`"bigint"`, `"varchar(255)"` …). The dumpers key
-        // `bigint?`/`schemaType`/`schemaLimit` off `Column#sql_type`, so it must
-        // survive the CTAS copy — a reflected `bigint` whose cast type is
-        // `integer` still dumps as `t.bigint` only via this string.
-        sqlType?: string | null;
-        primaryKey?: boolean;
-        null?: boolean;
-        default?: unknown;
-        collation?: string | null;
-        comment?: string | null;
-        limit?: number | null;
-        precision?: number | null;
-        scale?: number | null;
-        array?: boolean;
-        isEnum?: boolean;
-        datetimePhysicalType?: string;
-      }
-    >
-  >();
-  private _indexes = new Map<
-    string,
-    {
-      // A String for an expression index (kept verbatim), a column-name array
-      // otherwise — mirrors the adapter's `IndexDefinition#columns`.
-      columns: string | string[];
-      unique: boolean;
-      name?: string;
-      where?: string;
-      // Concise per-column sort order: a scalar when uniform, a Record otherwise.
-      orders?: string | Record<string, string>;
-      using?: string;
-      type?: string;
-      lengths?: number | Record<string, number>;
-      nullsNotDistinct?: boolean;
-      include?: string[];
-      comment?: string;
-    }[]
-  >();
   private _tableNamePrefix: string | null = null;
   private _tableNameSuffix: string | null = null;
 
@@ -1719,7 +1659,7 @@ export class MigrationContext {
         ifExists: true,
       });
     }
-    if (options?.ifNotExists && this.tableExists(name)) {
+    if (options?.ifNotExists && (await this.tableExists(name))) {
       return;
     }
     const tdOpts = {
@@ -1761,13 +1701,10 @@ export class MigrationContext {
         await adapterWithComments.changeTableComment(name, options.comment);
       }
     }
-    this._tables.add(name);
-    const cols = new Set<string>();
-    // CTAS ignores td.columns — actual columns come from the SELECT (introspected below).
+    // For adapters that apply column comments as a separate statement (not
+    // inline in CREATE TABLE), emit them now — this is real DDL. CTAS ignores
+    // td.columns (its columns come from the SELECT), so there are none to comment.
     const tdCols = options?.as != null ? [] : td.columns;
-    for (const col of tdCols) {
-      cols.add(col.name);
-    }
     if (this.connection.supportsComments?.() && !this.connection.supportsCommentsInCreate?.()) {
       for (const col of tdCols) {
         const cc = (col.options as { comment?: unknown }).comment;
@@ -1776,92 +1713,10 @@ export class MigrationContext {
       }
     }
 
-    // Store column metadata
-    const meta = new Map<
-      string,
-      {
-        type: string;
-        sqlType?: string | null;
-        primaryKey?: boolean;
-        null?: boolean;
-        default?: unknown;
-        collation?: string | null;
-        comment?: string | null;
-        limit?: number | null;
-        precision?: number | null;
-        scale?: number | null;
-        array?: boolean;
-        isEnum?: boolean;
-        datetimePhysicalType?: string;
-      }
-    >();
-    const compositePk =
-      Array.isArray(options?.primaryKey) && options.primaryKey.length > 0
-        ? new Set(options.primaryKey)
-        : null;
-    if (
-      options?.id !== false &&
-      !compositePk &&
-      options?.primaryKey !== false &&
-      options?.as == null
-    ) {
-      const idType = typeof options?.id === "string" ? options.id : "integer";
-      const idName = typeof options?.primaryKey === "string" ? options.primaryKey : "id";
-      meta.set(idName, { type: idType, primaryKey: true });
-    }
-    for (const col of tdCols) {
-      if (meta.has(col.name)) continue;
-      meta.set(col.name, {
-        type: col.type,
-        primaryKey: col.options.primaryKey || compositePk?.has(col.name) || undefined,
-        null: col.options.null,
-        default: col.options.default,
-        limit: col.options.limit,
-        precision: col.options.precision,
-        scale: col.options.scale,
-        array: (col.options as { array?: boolean }).array,
-        datetimePhysicalType: (col as { datetimePhysicalType?: string }).datetimePhysicalType,
-      });
-    }
-    if (options?.as != null) {
-      // CTAS columns derive from the SELECT rather than `td.columns`, so read
-      // them back through the adapter's own `columns()` — the single
-      // Rails-faithful introspection path (`new_column_from_field` →
-      // `fetch_type_metadata`, so the catalog type is normalized through the
-      // adapter's type map) — instead of a bespoke catalog query + type
-      // normalizer.
-      for (const col of await this.connection.columns(name)) {
-        cols.add(col.name);
-        meta.set(col.name, {
-          type: col.type ?? "string",
-          // Carry the raw `sql_type` so the dumper's `bigint?`/`schemaType`
-          // detection keys off the same string Rails does (`Column#sql_type`).
-          sqlType: col.sqlType,
-          null: col.null ?? undefined,
-          default: col.default,
-          collation: col.collation,
-          comment: col.comment,
-          ...(col.limit != null ? { limit: col.limit } : {}),
-          ...(col.precision != null ? { precision: col.precision } : {}),
-          ...(col.scale != null ? { scale: col.scale } : {}),
-          ...((col as { array?: boolean }).array ? { array: true } : {}),
-          // PG `Column#enum?` (cast type "enum") survives CTAS but isn't a base
-          // Column field; the dumper emits `enum_type:` only when this is set.
-          ...(col.type === "enum" ? { isEnum: true } : {}),
-        });
-      }
-    }
-    this._columns.set(name, cols);
-    this._columnMeta.set(name, meta);
-
-    // Create indexes from table definition — skip for adapters that emit them inline in CREATE TABLE
+    // Create indexes from table definition — skip for adapters that emit them
+    // inline in CREATE TABLE.
     const adapterWithIndexInCreate = this.connection as { supportsIndexesInCreate?: () => boolean };
     if (adapterWithIndexInCreate.supportsIndexesInCreate?.()) {
-      for (const idx of td.indexes) {
-        const indexName = idx.name ?? `index_${name}_on_${idx.columns.join("_and_")}`;
-        if (!this._indexes.has(name)) this._indexes.set(name, []);
-        this._indexes.get(name)!.push({ ...idx, name: indexName, orders: {} });
-      }
       return;
     }
     for (const idx of td.indexes) {
@@ -1895,18 +1750,8 @@ export class MigrationContext {
     // `IF EXISTS` is emitted only when `ifExists: true` is passed, matching
     // Rails' drop_table (which does not default it). Routing through
     // `this.connection` (not a bare SchemaStatements instance) is what reaches
-    // those adapter overrides. We keep the in-memory bookkeeping in sync for
-    // the bespoke introspection that columns()/indexes()/tables() read.
-    const last = args[args.length - 1];
-    const hasOptions = last !== null && typeof last === "object";
-    const names = (hasOptions ? args.slice(0, -1) : args) as string[];
+    // those adapter overrides.
     await (this.connection.dropTable as (...a: typeof args) => Promise<void>)(...args);
-    for (const name of names) {
-      this._tables.delete(name);
-      this._columns.delete(name);
-      this._columnMeta.delete(name);
-      this._indexes.delete(name);
-    }
   }
 
   async enableExtension(name: string, options?: Record<string, unknown>): Promise<void> {
@@ -1929,7 +1774,6 @@ export class MigrationContext {
   async createVirtualTable(name: string, moduleName: string, args: string[]): Promise<void> {
     if (typeof (this.connection as any).createVirtualTable === "function") {
       await (this.connection as any).createVirtualTable(name, moduleName, args);
-      this._tables.add(name);
     }
     // Non-SQLite adapters: no-op; virtual tables are SQLite-specific.
   }
@@ -1941,10 +1785,7 @@ export class MigrationContext {
     _options?: ColumnOptions & { ifNotExists?: boolean },
   ): Promise<void> {
     const ifNotExists = _options?.ifNotExists ?? false;
-    if (this._columns.has(table) && this._columns.get(table)!.has(column)) {
-      if (!ifNotExists) {
-        throw new Error(`Column "${column}" already exists in table "${table}"`);
-      }
+    if (ifNotExists && (await this.columnExists(table, column))) {
       return;
     }
     // Delegate DDL/type generation to the adapter's SchemaStatements — the
@@ -1953,18 +1794,6 @@ export class MigrationContext {
     // separate COMMENT ON COLUMN; MySQL inlines it in the visitor), so we do not
     // re-apply it here.
     await this.schema.addColumn(table, column, type, _options ?? {});
-    if (!this._columns.has(table)) this._columns.set(table, new Set());
-    this._columns.get(table)!.add(column);
-    if (!this._columnMeta.has(table)) this._columnMeta.set(table, new Map());
-    this._columnMeta.get(table)!.set(column, {
-      type,
-      null: _options?.null,
-      default: _options?.default,
-      limit: _options?.limit,
-      precision: _options?.precision,
-      scale: _options?.scale,
-      array: (_options as { array?: boolean } | undefined)?.array,
-    });
   }
 
   async removeColumn(
@@ -1981,32 +1810,17 @@ export class MigrationContext {
       const allCols = [columnOrColumns, optionsOrColumn, ...rest];
       for (const col of allCols) {
         await this.schema.removeColumn(table, col);
-        this._columns.get(table)?.delete(col);
-        this._columnMeta.get(table)?.delete(col);
       }
       return;
     }
-    if (optionsOrColumn?.ifExists && !this.columnExists(table, columnOrColumns)) {
+    if (optionsOrColumn?.ifExists && !(await this.columnExists(table, columnOrColumns))) {
       return;
     }
     await this.schema.removeColumn(table, columnOrColumns);
-    this._columns.get(table)?.delete(columnOrColumns);
-    this._columnMeta.get(table)?.delete(columnOrColumns);
   }
 
   async renameColumn(table: string, from: string, to: string): Promise<void> {
     await this.schema.renameColumn(table, from, to);
-    const cols = this._columns.get(table);
-    if (cols) {
-      cols.delete(from);
-      cols.add(to);
-    }
-    const meta = this._columnMeta.get(table);
-    if (meta && meta.has(from)) {
-      const entry = meta.get(from)!;
-      meta.delete(from);
-      meta.set(to, entry);
-    }
   }
 
   async changeColumn(
@@ -2021,24 +1835,6 @@ export class MigrationContext {
     // separate COMMENT ON COLUMN; MySQL inlines it via changeColumnForAlter), so
     // we do not re-apply it here.
     await this.schema.changeColumn(table, column, type, _options ?? {});
-    const meta = this._columnMeta.get(table);
-    if (meta && meta.has(column)) {
-      const entry = meta.get(column)!;
-      meta.set(column, {
-        ...entry,
-        type,
-        null: _options?.null !== undefined ? _options.null : entry.null,
-        default: _options?.default !== undefined ? _options.default : entry.default,
-        limit: _options?.limit !== undefined ? _options.limit : entry.limit,
-        precision:
-          _options?.precision !== undefined
-            ? _options.precision
-            : type === "datetime" || type === "timestamp"
-              ? 6
-              : entry.precision,
-        scale: _options?.scale !== undefined ? _options.scale : entry.scale,
-      });
-    }
   }
 
   async changeTableComment(name: string, comment: string | null): Promise<void> {
@@ -2047,23 +1843,6 @@ export class MigrationContext {
 
   async changeColumnComment(table: string, col: string, comment: string | null): Promise<void> {
     await (this.connection as any).changeColumnComment(table, col, comment);
-  }
-
-  /**
-   * Split a possibly schema-qualified name into `[schema, bareName]` via the
-   * adapter's quote-aware parser (Rails `extract_schema_qualified_name`), so a
-   * quoted dotted identifier isn't mis-split. Only PostgreSQL carries
-   * schema-qualified DDL names; other adapters treat the whole string as bare.
-   */
-  private _splitSchemaQualified(name: string): [string | null, string] {
-    const conn = this.connection as {
-      adapterName: string;
-      extractSchemaQualifiedName?: (s: string) => [string | null, string];
-    };
-    if (conn.adapterName === "postgres" && typeof conn.extractSchemaQualifiedName === "function") {
-      return conn.extractSchemaQualifiedName(name);
-    }
-    return [null, name];
   }
 
   async addIndex(
@@ -2083,16 +1862,12 @@ export class MigrationContext {
       comment?: string;
     },
   ): Promise<void> {
-    const an = this._adapterName;
-    // Warm the cached database version before issuing the index DDL or reading
-    // the capability predicates below. Several `supports*` predicates read
-    // `databaseVersion` synchronously: MySQL's `supportsIndexSortOrder` (the
-    // `DESC`/`ASC` suffix, MariaDB reconstruct parity #4397) yields false when
-    // unset, while PostgreSQL's `supportsIndexInclude` (≥ 11) and
-    // `supportsNullsNotDistinct` (≥ 15) *throw* when unset. MigrationContext#
-    // addIndex runs on the shared-worker schema-reconstruct path on a
-    // freshly-leased connection whose version is still cold, so warm it here for
-    // every adapter before the gating below reads those predicates.
+    // Warm the cached database version before issuing the index DDL. PostgreSQL's
+    // `supportsIndexInclude` (≥ 11) and `supportsNullsNotDistinct` (≥ 15) *throw*
+    // when the version is unset, and the adapter's addIndex reads them to emit
+    // `INCLUDE`/`NULLS NOT DISTINCT`. MigrationContext#addIndex runs on the
+    // shared-worker schema-reconstruct path on a freshly-leased connection whose
+    // version is still cold, so warm it here for every adapter.
     await this.connection.getDatabaseVersion?.();
     // Rails' `Migration` delegates the DDL — and the default index-name
     // derivation (index_name → generate_index_name, incl. the identifier-length
@@ -2101,65 +1876,6 @@ export class MigrationContext {
     // Rails-faithful copy and long table+column combos get the `idx_on_...<hash>`
     // form the direct `connection.add_index` path already produces.
     await this.connection.addIndex(table, columns, options ?? {});
-    // Source the in-memory `_indexes` bookkeeping the schema dump reads from the
-    // same `IndexDefinition` the adapter resolved for the DDL, rather than
-    // re-deriving the index name and re-gating the persisted metadata per
-    // adapter here. `addIndexOptions` (Rails' `add_index_options`) is the
-    // adapter's single copy of "what was built": it resolves the columns
-    // (an expression column stays a verbatim String), the index name
-    // (schema-strip + expression reduction + hash fallback), and the concise
-    // per-column option maps exactly as the executed `addIndex` did.
-    const [idx] = await this.connection.addIndexOptions(table, columns, options ?? {});
-    // The DDL visitor only emits each option where the backend supports it, so
-    // gate the stored metadata on the same adapter capabilities to match what
-    // was actually persisted: partial `WHERE` (dropped on MySQL), sort order
-    // (version-gated on MySQL/MariaDB — the #4397 reconstruct parity, warmed
-    // above via `getDatabaseVersion`), and `NULLS NOT DISTINCT` / covering
-    // `INCLUDE` (Postgres). The `typeof` guards keep this resilient to the
-    // minimal stub adapters some tests pass. `using` follows the dumper's own
-    // gate — `!default_index_type?(index)` (schema_dumper.rb#indexes) — which is
-    // nil-only on the abstract adapter (so a non-default `using` on sqlite still
-    // round-trips) and nil-or-`btree` on Postgres/MySQL. Rails stores `using`
-    // unconditionally (`add_index_options`); only the dump is gated, so mirror
-    // that predicate here rather than an adapter-name check.
-    const supportsPartialIndex =
-      typeof this.connection.supportsPartialIndex === "function"
-        ? this.connection.supportsPartialIndex()
-        : true;
-    const supportsSortOrder =
-      typeof this.connection.supportsIndexSortOrder === "function"
-        ? this.connection.supportsIndexSortOrder()
-        : true;
-    const supportsNullsNotDistinct =
-      typeof this.connection.supportsNullsNotDistinct === "function"
-        ? this.connection.supportsNullsNotDistinct()
-        : false;
-    const supportsIndexInclude =
-      typeof this.connection.supportsIndexInclude === "function"
-        ? this.connection.supportsIndexInclude()
-        : false;
-    const usingStored =
-      idx.using != null &&
-      !(typeof this.connection.defaultIndexType === "function"
-        ? this.connection.defaultIndexType(idx.using)
-        : idx.using == null)
-        ? idx.using
-        : undefined;
-    const comment = idx.comment?.trim() ? idx.comment : undefined;
-    if (!this._indexes.has(table)) this._indexes.set(table, []);
-    this._indexes.get(table)!.push({
-      columns: idx.columns,
-      unique: idx.unique,
-      name: idx.name,
-      where: supportsPartialIndex ? idx.where : undefined,
-      orders: supportsSortOrder ? _emptyOptionToUndefined(idx.orders) : undefined,
-      using: usingStored,
-      type: idx.type,
-      lengths: _emptyOptionToUndefined(idx.lengths),
-      nullsNotDistinct: supportsNullsNotDistinct ? idx.nullsNotDistinct : undefined,
-      include: supportsIndexInclude ? idx.include : undefined,
-      comment,
-    });
   }
 
   async removeIndex(
@@ -2172,24 +1888,6 @@ export class MigrationContext {
     // and drops it in the right schema. Delegate rather than reimplementing that
     // name derivation — the adapter carries the single Rails-faithful copy.
     await this.connection.removeIndex(table, options);
-    // Mirror the drop in the in-memory `_indexes` the schema dump reads. Resolve
-    // the stored name the way `addIndex` recorded it: an explicit `:name`
-    // verbatim (PostgreSQL may carry a schema qualifier, so match the bare form
-    // too), else the adapter-derived default from the columns.
-    let stored = options.name;
-    if (stored == null && options.column != null) {
-      stored = this.connection.indexName(table, this.connection.indexNameOptions(options.column));
-    }
-    if (stored != null) {
-      const [, bareName] = this._splitSchemaQualified(stored);
-      const tableIndexes = this._indexes.get(table);
-      if (tableIndexes) {
-        this._indexes.set(
-          table,
-          tableIndexes.filter((i) => i.name !== stored && i.name !== bareName),
-        );
-      }
-    }
   }
 
   async renameTable(from: string, to: string): Promise<void> {
@@ -2201,26 +1899,8 @@ export class MigrationContext {
     // `ALTER TABLE ... RENAME TO`. Routing through `this.connection` (not a
     // bare SchemaStatements instance, whose abstract fallback misses those
     // side effects) is what reaches those overrides. MigrationContext keeps the
-    // prefix/suffix application the adapters do not perform, plus the in-memory
-    // bookkeeping the bespoke introspection reads.
+    // prefix/suffix application the adapters do not perform.
     await this.connection.renameTable(fullFrom, fullTo);
-    this._tables.delete(fullFrom);
-    this._tables.add(fullTo);
-    const cols = this._columns.get(fullFrom);
-    if (cols) {
-      this._columns.delete(fullFrom);
-      this._columns.set(fullTo, cols);
-    }
-    const meta = this._columnMeta.get(fullFrom);
-    if (meta) {
-      this._columnMeta.delete(fullFrom);
-      this._columnMeta.set(fullTo, meta);
-    }
-    const indexes = this._indexes.get(fullFrom);
-    if (indexes) {
-      this._indexes.delete(fullFrom);
-      this._indexes.set(fullTo, indexes);
-    }
   }
 
   async reversible(
@@ -2245,74 +1925,43 @@ export class MigrationContext {
     await fn();
   }
 
-  tableExists(name: string): boolean {
-    return this._tables.has(name);
+  // The introspection readers delegate to the connection's real introspection
+  // — the single Rails-faithful reflection path (`columns` →
+  // `new_column_from_field` → `fetch_type_metadata`, so catalog types are
+  // normalized through the adapter's type map; `indexes`, `data_source_exists?`
+  // …) — so a MigrationContext reflects the live database rather than any
+  // declared-schema bookkeeping.
+
+  async tableExists(name: string): Promise<boolean> {
+    return this.connection.tableExists(name);
   }
 
-  columnExists(table: string, column: string): boolean {
-    return this._columns.get(table)?.has(column) ?? false;
+  async columnExists(table: string, column: string): Promise<boolean> {
+    return this.connection.columnExists(table, column);
   }
 
-  indexExists(table: string, column: string): boolean {
-    return this._indexes.get(table)?.some((i) => i.columns.includes(column)) ?? false;
+  async indexExists(
+    table: string,
+    column: string | string[],
+    options?: { unique?: boolean; name?: string },
+  ): Promise<boolean> {
+    return this.connection.indexExists(table, column, options);
   }
 
-  tables(): string[] {
-    return Array.from(this._tables).sort();
+  async tables(): Promise<string[]> {
+    return this.connection.tables();
   }
 
-  columns(tableName: string): Array<{
-    name: string;
-    type: string;
-    sqlType?: string | null;
-    primaryKey?: boolean;
-    null?: boolean;
-    default?: unknown;
-    collation?: string | null;
-    comment?: string | null;
-    limit?: number | null;
-    precision?: number | null;
-    scale?: number | null;
-    array?: boolean;
-    isEnum?: boolean;
-    datetimePhysicalType?: string;
-  }> {
-    const meta = this._columnMeta.get(tableName);
-    if (meta) {
-      const isPg = this._adapterName === "postgres";
-      return Array.from(meta.entries()).map(([name, info]) => {
-        // PostgreSQL: rewrite datetime-family columns against the live
-        // datetime_type, mirroring what re-introspecting the stored physical
-        // type would yield (PostgreSQL::OID::DateTime#real_type_unless_aliased).
-        if (isPg && info.datetimePhysicalType) {
-          return { name, ...info, type: pgRealTypeUnlessAliased(info.datetimePhysicalType) };
-        }
-        return { name, ...info };
-      });
-    }
-    const cols = this._columns.get(tableName);
-    if (!cols) return [];
-    return Array.from(cols).map((name) => ({ name, type: "string" }));
+  async columns(tableName: string): Promise<import("./connection-adapters/column.js").Column[]> {
+    return this.connection.columns(tableName);
   }
 
-  indexes(tableName: string): Array<{
-    columns: string | string[];
-    unique: boolean;
-    name?: string;
-    where?: string;
-    orders?: string | Record<string, string>;
-    using?: string;
-    nullsNotDistinct?: boolean;
-    include?: string[];
-  }> {
-    const idxs = this._indexes.get(tableName);
-    if (!idxs) return [];
-    return idxs.map((i) => ({
-      ...i,
-      // Preserve an expression index's verbatim String; clone the array form.
-      columns: typeof i.columns === "string" ? i.columns : [...i.columns],
-      include: i.include ? [...i.include] : undefined,
-    }));
+  async indexes(
+    tableName: string,
+  ): Promise<Array<{ name: string; columns: string | string[]; unique: boolean }>> {
+    return this.connection.indexes(tableName) as Promise<
+      Array<{ name: string; columns: string | string[]; unique: boolean }>
+    >;
   }
 }
 

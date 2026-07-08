@@ -239,8 +239,8 @@ describe("MigrationTest", () => {
       });
 
       await ctx.renameTable("old", "new");
-      expect(ctx.tableExists("pre_old_suf")).toBe(false);
-      expect(ctx.tableExists("pre_new_suf")).toBe(true);
+      expect(await ctx.tableExists("pre_old_suf")).toBe(false);
+      expect(await ctx.tableExists("pre_new_suf")).toBe(true);
     } finally {
       await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     }
@@ -375,7 +375,7 @@ describe("MigrationTest", () => {
     });
 
     // The persisted column precision/scale survive the create_table path.
-    const cols = ctx.columns("big_numbers");
+    const cols = await ctx.columns("big_numbers");
     const byName = (n: string) => cols.find((c) => c.name === n)!;
     expect(byName("bank_balance").precision).toBe(10);
     expect(byName("bank_balance").scale).toBe(2);
@@ -544,7 +544,7 @@ describe("MigrationTest", () => {
     await ctx.createTable("binary_testings", {}, (t) => {
       t.column("data", "binary", { null: false });
     });
-    const cols = ctx.columns("binary_testings");
+    const cols = await ctx.columns("binary_testings");
     const dataColumn = cols.find((c) => c.name === "data");
     expect(dataColumn).toBeDefined();
     expect(dataColumn!.type).toBe("binary");
@@ -775,7 +775,7 @@ describe("MigrationTest", () => {
       await ctx.createTable("things", { ifNotExists: true }, (t) => {
         t.string("name");
       });
-      expect(ctx.tableExists("things")).toBe(true);
+      expect(await ctx.tableExists("things")).toBe(true);
     } finally {
       await ctx.dropTable("things", { ifExists: true });
     }
@@ -809,7 +809,7 @@ describe("MigrationTest", () => {
       await ctx.createTable("things", { ifNotExists: true }, (t) => {
         t.string("name");
       });
-      expect(ctx.tableExists("things")).toBe(true);
+      expect(await ctx.tableExists("things")).toBe(true);
     } finally {
       await ctx.dropTable("things", { ifExists: true });
     }
@@ -817,11 +817,11 @@ describe("MigrationTest", () => {
 
   it("create table with force true does not drop nonexisting table", async () => {
     const { ctx } = await freshContext();
-    expect(ctx.tableExists("nonexistent")).toBe(false);
+    expect(await ctx.tableExists("nonexistent")).toBe(false);
     await ctx.createTable("nonexistent", { force: true }, (t) => {
       t.string("name");
     });
-    expect(ctx.tableExists("nonexistent")).toBe(true);
+    expect(await ctx.tableExists("nonexistent")).toBe(true);
   });
 
   it("remove column with if exists set", async () => {
@@ -1264,12 +1264,12 @@ describe("MigrationTest", () => {
     });
     const rows = await adapter.execute(`SELECT * FROM table_from_query_testings`);
     expect(rows).toHaveLength(1);
-    expect(ctx.columnExists("table_from_query_testings", "person_id")).toBe(true);
+    expect(await ctx.columnExists("table_from_query_testings", "person_id")).toBe(true);
 
     // The CTAS column derivation reads back through the adapter's own
     // `columns()` (Rails `new_column_from_field`), so the persisted type is the
     // Rails-canonical name (not the raw catalog string).
-    const cols = ctx.columns("table_from_query_testings");
+    const cols = await ctx.columns("table_from_query_testings");
     const pid = cols.find((c) => c.name === "person_id");
     expect(pid?.type).toBe("integer");
 
@@ -1306,11 +1306,11 @@ describe("MigrationTest", () => {
         t.string("name");
         t.column("foo", "bar" as any);
       });
-      expect(ctx.columnExists("something", "foo")).toBe(true);
+      expect(await ctx.columnExists("something", "foo")).toBe(true);
       await ctx.removeColumn("something", "foo");
-      expect(ctx.columnExists("something", "foo")).toBe(false);
-      expect(ctx.columnExists("something", "name")).toBe(true);
-      expect(ctx.columnExists("something", "number")).toBe(true);
+      expect(await ctx.columnExists("something", "foo")).toBe(false);
+      expect(await ctx.columnExists("something", "name")).toBe(true);
+      expect(await ctx.columnExists("something", "number")).toBe(true);
       await ctx.dropTable("something");
     },
   );

@@ -139,7 +139,7 @@ describe("TimePrecisionTest", () => {
       t.time("start", { precision: 4 });
       t.time("finish", { precision: 6 });
     });
-    const output = SchemaDumper.dump(ctx) as string;
+    const output = await SchemaDumper.dumpTableSchema(adapter, "foos");
     expect(output).toMatch(/t\.time\("start",\s*\{[^}]*precision:\s*4/);
     expect(output).toMatch(/t\.time\("finish",\s*\{[^}]*precision:\s*6/);
   });

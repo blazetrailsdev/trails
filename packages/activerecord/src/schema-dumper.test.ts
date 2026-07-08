@@ -419,10 +419,16 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with regexp ignored table", async () => {
-    await ctx.createTable("users", { force: true }, (t) => t.string("name"));
-    await ctx.createTable("temp_cache", { force: true }, (t) => t.string("val"));
+    // The `ignoreTables` filter runs during table enumeration, so drive the
+    // dumper from a mock async SchemaSource of just the two tables under test
+    // rather than a full-DB dump of the shared canonical schema.
+    const source = {
+      tables: async () => ["users", "temp_cache"],
+      columns: async () => [{ name: "name", type: "string" }],
+      indexes: async () => [],
+    };
     SchemaDumper.ignoreTables = [/^temp_/];
-    const output = SchemaDumper.dump(ctx);
+    const output = await SchemaDumper.dump(source as any);
     expect(output).toContain("users");
     expect(output).not.toContain("temp_cache");
   });
@@ -440,7 +446,7 @@ describe("SchemaDumperTest", () => {
       t.string("key", { null: false });
     });
     await ctx.addIndex("string_key_objects", "key", { unique: true });
-    const output = SchemaDumper.dump(ctx);
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "string_key_objects");
     expect(output).toMatch(/createTable\("string_key_objects",\s*\{[^}]*id:\s*false/);
   });
 
@@ -528,7 +534,7 @@ describe("SchemaDumperTest", () => {
     await ctx.addIndex("users", "lower(first_name || ' ' || last_name)", {
       name: "idx_users_full_name",
     });
-    const output = SchemaDumper.dump(ctx);
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "users");
     expect(output).toContain("idx_users_full_name");
     expect(output).toContain("lower(first_name");
   });
@@ -615,7 +621,7 @@ describe("SchemaDumperTest", () => {
     await ctx.createTable("defaults", {}, (t) => {
       t.bigint("bigint_default", { default: 0 });
     });
-    const output = SchemaDumper.dump(ctx);
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "defaults");
     expect(output).toMatch(/t\.bigint\("bigint_default",\s*\{[^}]*default:\s*0[^}]*\}/);
   });
 
@@ -807,13 +813,15 @@ describe("SchemaDumperTest", () => {
   });
 
   it("schema dump with table name prefix and suffix", async () => {
-    await ctx.createTable("myapp_users_v1", {}, (t) => {
-      t.string("name");
-    });
-    const output = SchemaDumper.dump(ctx, {
+    const source = {
+      tables: async () => ["myapp_users_v1"],
+      columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
+    };
+    const output = await SchemaDumper.dump(source as any, {
       tableNamePrefix: "myapp_",
       tableNameSuffix: "_v1",
-    }) as string;
+    });
     expect(output).toContain('"users"');
     expect(output).not.toContain("myapp_users_v1");
   });
@@ -829,14 +837,13 @@ describe("SchemaDumperTest", () => {
     expect(output).not.toContain("app.prefix_users");
   });
   it("schema dump with table name prefix and ignoring tables", async () => {
-    await ctx.createTable("myapp_users", {}, (t) => {
-      t.string("name");
-    });
-    await ctx.createTable("myapp_posts", {}, (t) => {
-      t.string("title");
-    });
+    const source = {
+      tables: async () => ["myapp_users", "myapp_posts"],
+      columns: async (_t: string) => [{ name: "id", type: "integer", primaryKey: true }],
+      indexes: async () => [],
+    };
     SchemaDumper.ignoreTables = ["posts"];
-    const output = SchemaDumper.dump(ctx, { tableNamePrefix: "myapp_" }) as string;
+    const output = await SchemaDumper.dump(source as any, { tableNamePrefix: "myapp_" });
     expect(output).toContain('"users"');
     expect(output).not.toContain('"posts"');
     expect(output).not.toContain("myapp_");
@@ -849,7 +856,7 @@ describe("SchemaDumperTest", () => {
         t.string("title");
         t.timestamps();
       });
-      const output = SchemaDumper.dump(ctx);
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "posts");
       expect(output).toContain("datetime");
       expect(output).toContain("created_at");
       expect(output).toContain("updated_at");
@@ -866,7 +873,7 @@ describe("SchemaDumperTest", () => {
           t.column("without_time_zone", "timestamp");
           t.column("with_time_zone", "timestamptz");
         });
-        const output = SchemaDumper.dump(ctx) as string;
+        const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
         expect(output).toContain('t.datetime("this_should_remain_datetime"');
         expect(output).toContain('t.datetime("this_is_an_alias_of_datetime"');
         expect(output).toContain('t.timestamp("without_time_zone"');
@@ -896,13 +903,13 @@ describe("SchemaDumperTest", () => {
         t.column("with_time_zone", "timestamptz");
       });
 
-      let output = SchemaDumper.dump(ctx) as string;
+      let output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
       expect(output).toContain('t.datetime("default_format"');
       expect(output).toContain('t.datetime("without_time_zone"');
       expect(output).toContain('t.timestamptz("with_time_zone"');
 
       await withPostgresqlDatetimeType("timestamptz", async () => {
-        output = SchemaDumper.dump(ctx) as string;
+        output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
         expect(output).toContain('t.timestamp("default_format"');
         expect(output).toContain('t.timestamp("without_time_zone"');
         expect(output).toContain('t.datetime("with_time_zone"');
@@ -918,7 +925,7 @@ describe("SchemaDumperTest", () => {
         t.timestamp("also_without_time_zone");
         (t as any).timestamptz("with_time_zone");
       });
-      const output = SchemaDumper.dump(ctx) as string;
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
       expect(output).toContain('t.datetime("default_format"');
       expect(output).toContain('t.datetime("without_time_zone"');
       expect(output).toContain('t.datetime("also_without_time_zone"');
@@ -933,7 +940,7 @@ describe("SchemaDumperTest", () => {
         t.string("title");
       });
       await ctx.addColumn("posts", "created_at", "datetime");
-      const output = SchemaDumper.dump(ctx);
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "posts");
       expect(output).toContain("datetime");
       expect(output).toContain("created_at");
     },
@@ -963,7 +970,7 @@ describe("SchemaDumperTest", () => {
         t.string("title");
       });
       await ctx.addColumn("posts", "posted_at", "datetime");
-      const output = SchemaDumper.dump(ctx);
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "posts");
       expect(output).toContain("datetime");
       expect(output).toContain("posted_at");
     },
@@ -988,7 +995,7 @@ describe("SchemaDumperDefaultsTest", () => {
       t.datetime("datetime_with_default", { default: "2014-06-05 07:17:04" });
       t.decimal("decimal_with_default", { precision: 3, scale: 2, default: 2.78 });
     });
-    const output = SchemaDumper.dump(ctx);
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "dump_defaults");
     expect(output).toMatch(/string.*"string_with_default".*default: "Hello!"/);
     expect(output).toMatch(/date.*"date_with_default".*default: "2014-06-05"/);
     expect(output).toMatch(/datetime.*"datetime_with_default".*default:/);
@@ -1000,7 +1007,7 @@ describe("SchemaDumperDefaultsTest", () => {
     await ctx.createTable("dump_defaults", { force: true }, (t) => {
       t.text("text_with_default", { default: "John" });
     });
-    const output = SchemaDumper.dump(ctx);
+    const output = await SchemaDumper.dumpTableSchema(Base.connection, "dump_defaults");
     expect(output).toMatch(/text.*"text_with_default".*default: "John"/);
   });
 
