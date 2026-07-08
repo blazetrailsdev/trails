@@ -2411,17 +2411,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   // (`this.maxIdentifierLength()`) would hand these callers a Promise instead
   // of a number. The alias-length consumers (relation join-alias tracking) are
   // synchronous, so resolve the cached limit synchronously — the real value
-  // once `maxIdentifierLength` has been queried, else the abstract default 64.
+  // once `maxIdentifierLength` has been queried, else PostgreSQL's default
+  // (NAMEDATALEN-1 = 63), matching the `?? "63"` fallback maxIdentifierLength
+  // itself uses (postgresql_adapter.rb:619-622) rather than the abstract 64.
   tableAliasLength(): number {
-    return this._maxIdentifierLength ?? 64;
+    return this._maxIdentifierLength ?? 63;
   }
 
   tableNameLength(): number {
-    return this._maxIdentifierLength ?? 64;
+    return this._maxIdentifierLength ?? 63;
   }
 
   indexNameLength(): number {
-    return this._maxIdentifierLength ?? 64;
+    return this._maxIdentifierLength ?? 63;
   }
 
   // Mirrors: PostgreSQLAdapter#session_auth= (postgresql_adapter.rb:625)

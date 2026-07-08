@@ -36,10 +36,19 @@ export class AliasTracker {
     aliases?: Map<string, number>,
     quoter?: Quoting,
   ): AliasTracker {
+    // Rails: `pool.with_connection { |c| new(c.table_alias_length, ...) }`
+    // (alias_tracker.rb:24) — always the connection's alias length, so MySQL
+    // gets 256. Honor a connection-like arg's `tableAliasLength` (method or
+    // number) directly; a bare pool whose connection is only reachable via the
+    // async `withConnection` can't be resolved synchronously here, so it falls
+    // back to the base default (see the connection-threading follow-up story).
+    const tal = pool?.tableAliasLength;
     const tableAliasLength =
-      typeof pool?.withConnection === "function"
-        ? DEFAULT_TABLE_ALIAS_LENGTH
-        : (pool?.tableAliasLength ?? DEFAULT_TABLE_ALIAS_LENGTH);
+      typeof tal === "function"
+        ? tal.call(pool)
+        : typeof tal === "number"
+          ? tal
+          : DEFAULT_TABLE_ALIAS_LENGTH;
 
     const map = aliases ? new Map(aliases) : new Map<string, number>();
     map.set(initialTable, 1);
