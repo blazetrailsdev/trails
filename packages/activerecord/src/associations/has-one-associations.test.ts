@@ -294,6 +294,19 @@ describe("HasOneAssociationsTest", () => {
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([account.id]);
   });
 
+  // trails-only: the destroy `belongs_to` preload mirrors Rails' lazy load by
+  // materializing only the association the callback names. Account#before_destroy
+  // reads `firm` but never `unautosavedFirm` (its same-`firm_id` sibling), so a
+  // single owner SELECT fires, not one per belongs_to. No Rails counterpart.
+  it("direct destroy only preloads the belongs_to the callback references", async () => {
+    const account = (await Account.find(1)) as any;
+    expect(account.association("firm").isLoaded()).toBe(false);
+    expect(account.association("unautosavedFirm").isLoaded()).toBe(false);
+    await assertQueriesMatch(/FROM\s+.?companies.?/i, 1, false, async () => {
+      await account.destroy();
+    });
+  });
+
   it("exclusive dependence", async () => {
     const numAccounts = (await Account.count()) as number;
     const firm = (await ExclusivelyDependentFirm.find(9)) as any;

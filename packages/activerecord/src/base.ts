@@ -3881,11 +3881,14 @@ export class Base extends Model {
    * it). On a load failure we resolve the association to `null` rather than
    * leaving it unloaded, so a sync callback that *does* read it sees `null` and
    * not trails' async-reader Promise — keeping the bare `if (record.parent)`
-   * guard safe even when the preload could not materialize the parent. Because
-   * we no longer eager-load associations the callback never names, no per-load
-   * savepoint is needed: a doomed query (e.g. `tag_with_primary_key` →
-   * a non-existent column) only runs when the callback actually reads it, which
-   * is exactly when Rails would issue — and fail on — the same lazy query.
+   * guard safe even when the preload could not materialize the parent. On the
+   * narrowed path no per-load savepoint is needed: a doomed query (e.g.
+   * `tag_with_primary_key` → a non-existent column) only runs when the callback
+   * actually reads it, which is exactly when Rails would issue — and fail on —
+   * the same lazy query. The opaque load-all path keeps PR #4792's savepoint,
+   * since it may still fire a doomed query the (unreadable) callback never
+   * touches, which would otherwise abort the whole PostgreSQL transaction
+   * (25P02) — an abort swallowing the JS error cannot undo.
    *
    * @internal
    */
@@ -3894,6 +3897,7 @@ export class Base extends Model {
     if (typeof (this as any).association !== "function") return;
     const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
     if (!opaque && sources.length === 0) return;
+    const useSavepoint = opaque && _currentTransactionPublic().isOpen();
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
       // Narrow to associations the callback names (unless an opaque callback
       // forces loading all): Rails only queries the targets it dereferences.
@@ -3902,7 +3906,11 @@ export class Base extends Model {
       try {
         assoc = (this as any).association(ref.name);
         if (!assoc || assoc.isLoaded?.()) continue;
-        await assoc.loadTarget();
+        if (useSavepoint) {
+          await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
+        } else {
+          await assoc.loadTarget();
+        }
       } catch {
         // An unregistered target class, missing FK row, strict-loading
         // violation, or transient DB error must not abort the destroy. Resolve
