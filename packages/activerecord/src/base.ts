@@ -2852,6 +2852,7 @@ export class Base extends Model {
     row: Record<string, unknown>,
     block?: (record: InstanceType<T>) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+    overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): InstanceType<T> {
     // Delegate to the correct STI subclass when the row carries a present
     // inheritance-column value that names a different class. `inheritance_column`
@@ -2872,6 +2873,7 @@ export class Base extends Model {
         row,
         block as ((record: Base) => void) | undefined,
         columnTypes,
+        overrideTypes,
       ) as InstanceType<T>;
     }
 
@@ -2917,7 +2919,12 @@ export class Base extends Model {
     // Rails' `instantiate(record, column_types)` slice in find_by_sql /
     // JoinDependency#instantiate.
     for (const [key, value] of Object.entries(row)) {
-      record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
+      const override = overrideTypes?.[key];
+      if (override) {
+        record._attributes.overrideFromDatabase(key, value, override);
+      } else {
+        record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
+      }
     }
     // A SELECT that projects only a subset of columns yields a row with just
     // those keys, so hasAttribute() must reflect what was loaded rather than

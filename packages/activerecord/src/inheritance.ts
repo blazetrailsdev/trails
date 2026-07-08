@@ -609,6 +609,7 @@ function directInstantiate(
   row: Record<string, unknown>,
   block?: (record: Base) => void,
   columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
 ): Base {
   const hadOwnSuppress = Object.prototype.hasOwnProperty.call(klass, "_suppressInitializeCallback");
   const prevSuppress = klass._suppressInitializeCallback;
@@ -639,7 +640,12 @@ function directInstantiate(
   // — mirrors the non-STI Base._instantiate path. Building via `new klass(row)`
   // instead ran every column through the user cast, which rejects raw DB values.
   for (const [key, value] of Object.entries(row)) {
-    record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
+    const override = overrideTypes?.[key];
+    if (override) {
+      record._attributes.overrideFromDatabase(key, value, override);
+    } else {
+      record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
+    }
   }
   narrowToProjectedColumns(klass, record, row);
   record._newRecord = false;
@@ -669,8 +675,15 @@ export function instantiateSti(
   row: Record<string, unknown>,
   block?: (record: Base) => void,
   columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+  overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
 ): Base {
-  return directInstantiate(discriminateClassForRecord(baseClass, row), row, block, columnTypes);
+  return directInstantiate(
+    discriminateClassForRecord(baseClass, row),
+    row,
+    block,
+    columnTypes,
+    overrideTypes,
+  );
 }
 
 // ---------------------------------------------------------------------------

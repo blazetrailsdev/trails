@@ -21,7 +21,7 @@ import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport"
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
-import { IntegerType } from "@blazetrails/activemodel";
+import { IntegerType, Type } from "@blazetrails/activemodel";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -610,13 +610,29 @@ describe("BasicsTest", () => {
   });
 
   it("column types typecast", async () => {
-    class Developer extends Base {
-      static {
-        this.attribute("salary", "integer");
+    // Rails base_test.rb#test_column_types_typecast: instantiate a record with a
+    // per-attribute `types` override — a custom Type::Value subclass whose cast
+    // always returns "t.lo" — and assert the override wins over the column's
+    // declared type for `author_name`.
+    class Topic extends Base {}
+    const seed = await Topic.create({
+      title: "The First Topic",
+      author_name: "David",
+    } as any);
+    expect((seed as any).author_name).not.toBe("t.lo");
+
+    const attrs = { ...(seed as any).attributes };
+    delete attrs.id;
+
+    class Typecast extends Type {
+      readonly name = "typecast";
+      cast() {
+        return "t.lo";
       }
     }
-    const p = await Developer.create({ salary: "5" } as any);
-    expect((p as any).salary).toBe(5);
+
+    const topic = Topic.instantiate(attrs, { author_name: new Typecast() }) as any;
+    expect(topic.author_name).toBe("t.lo");
   });
 
   it("typecasting aliases", async () => {

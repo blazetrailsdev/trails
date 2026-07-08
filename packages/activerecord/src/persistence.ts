@@ -56,6 +56,7 @@ interface PersistenceHost {
     row: Record<string, unknown>,
     block?: (record: any) => void,
     columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
+    overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
   ): any;
   /** @internal */
   discriminateClassForRecord?(attributes: Record<string, unknown>): PersistenceHost;
@@ -149,13 +150,17 @@ export function instantiate(
   const klass = this.discriminateClassForRecord
     ? this.discriminateClassForRecord(attributes)
     : this;
-  // Schema cast types come from the model's attribute definitions; `columnTypes`
-  // only supplies types for extra/computed select columns absent from the schema,
-  // mirroring Rails' `instantiate(record, column_types)`. Thread the block so it
-  // runs before the find/initialize callbacks (Rails' `init_with_attributes`).
+  // The public `instantiate(attributes, types)` entry supplies an explicit
+  // per-attribute `types` map that must override the schema cast type even for a
+  // known column — Rails' `LazyAttributeHash` resolves `additional_types[name] ||
+  // types[name]`. Pass it as `overrideTypes` (not the result-set `columnTypes`
+  // slice, which the query path threads through `_instantiate` directly and which
+  // is ignored for known columns). Thread the block so it runs before the
+  // find/initialize callbacks (Rails' `init_with_attributes`).
   return klass._instantiate(
     attributes,
     block,
+    undefined,
     columnTypes as Record<string, { deserialize(value: unknown): unknown }>,
   );
 }

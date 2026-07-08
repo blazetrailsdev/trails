@@ -140,6 +140,28 @@ export class AttributeSet {
     }
   }
 
+  /**
+   * Force a database value to be cast through the supplied `type`, replacing any
+   * existing (schema-declared) attribute. Unlike {@link writeFromDatabase}, whose
+   * known-column path keeps the declared cast type, this always wins — mirroring
+   * how Rails' `LazyAttributeHash` resolves each name via
+   * `additional_types[name] || types[name]`, letting an explicit per-attribute
+   * `types` override supersede the schema type. Used only by the public
+   * `instantiate(attributes, types)` entry point; the result-set hydration path
+   * still ignores column types for known columns.
+   */
+  overrideFromDatabase(
+    name: string,
+    value: unknown,
+    type: { deserialize(value: unknown): unknown },
+  ): void {
+    this.assertNotFrozen();
+    this.attributes.set(
+      name,
+      Attribute.fromDatabase(name, value, type as import("./type/value.js").Type),
+    );
+  }
+
   writeFromUser(name: string, value: unknown): unknown {
     this.assertNotFrozen();
     // Rails one-liner (attribute_set.rb:58-61):
