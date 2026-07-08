@@ -632,6 +632,80 @@ describe("EnumTest", () => {
     expect(record.aliased_status).toBe("proposed");
   });
 
+  // Real Rails raises "Undeclared attribute type for enum" when `enum` is
+  // declared BEFORE `alias_attribute` on the same name: the enum keys a phantom
+  // attribute with no backing column. The raise fires lazily, on first use.
+  // (No dedicated Rails test — Rails treats it as the undeclared-type case.)
+  it("enum declared before alias_attribute raises on first use", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("aliased_status", ["proposed", "written", "published"] as any);
+        this.aliasAttribute("aliased_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    await expect((Klass as any).create({ status: "written" })).rejects.toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+    // Also raises via type_for_attribute (Rails materializes attribute_types).
+    expect(() => (Klass as any).typeForAttribute("aliased_status")).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+    // And via the enum helper path (predicate → castEnumValue → enumTypeOf),
+    // which keys off the un-aliased enum name: Rails routes type casting through
+    // type_for_attribute, whose decorate block raises.
+    expect(() => new (Klass as any)().isProposed()).toThrow(
+      /Undeclared attribute type for enum 'aliased_status' in Klass/,
+    );
+  });
+
+  // A column-backed enum whose name is LATER reused as an alias target must not
+  // raise: Rails' decorate block only raises when the decorated subtype is the
+  // default (no column), and a real column reflects its own subtype at replay
+  // regardless of a later alias. Guards against a coarse "pending ∩ alias-key"
+  // heuristic false-positiving a legitimate column-backed enum.
+  it("column-backed enum whose name is later aliased does not raise", () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("nullable_status", ["single", "married"] as any);
+        this.aliasAttribute("nullable_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    // Materialize (typeForAttribute + a fresh instance's predicate) without
+    // persisting — aliasing the enum name onto another real column would list it
+    // twice in an INSERT, which is orthogonal to the raise being tested.
+    expect(() => (Klass as any).typeForAttribute("nullable_status")).not.toThrow();
+    expect(() => new (Klass as any)().isSingle()).not.toThrow();
+  });
+
+  // An enum declared on an abstract parent with no column of its own must defer
+  // to its concrete subclass's columns (Rails replays the superclass decorator
+  // into the subclass attribute set). A concrete subclass that DOES back the enum
+  // (Lion has lions.gender via Cat) stays green; one that does NOT raises against
+  // its own columns — not silently install, and not throw TableNotSpecified on the
+  // abstract parent's tableless schema.
+  it("enum on abstract parent resolves against concrete subclass columns", () => {
+    class AbstractParent extends Base {
+      static {
+        this._abstractClass = true;
+        this.enum("typeless_genre", ["adventure", "comic"] as any);
+      }
+    }
+    class Concrete extends AbstractParent {
+      static _tableName = "books"; // books has no `typeless_genre` column
+    }
+    registerModel(Concrete);
+
+    expect(() => (Concrete as any).typeForAttribute("typeless_genre")).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
+    );
+  });
+
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
     expect((book as any).isAuthorVisibilityInvisible()).toBe(false);
