@@ -633,6 +633,45 @@ function referencesAssociationName(sources: string[], name: string): boolean {
 }
 
 /**
+ * Expand callback filter sources with the source of any model-defined instance
+ * method they (transitively) reference, so an association read reached through a
+ * helper — e.g. `before_destroy { this.makeComments() }` where `makeComments`
+ * reads `this.person` — is still detected. Only methods declared on the model's
+ * own prototype chain (below `Base`) are followed; framework methods and the
+ * association readers themselves are ignored. Bounded by the model's method
+ * count via the `seen` set, so mutually-recursive helpers can't loop.
+ */
+function expandCallbackSourcesWithHelpers(sources: string[], ctor: typeof Base): string[] {
+  const methods = new Map<string, string>();
+  for (
+    let proto = ctor.prototype;
+    proto && proto !== Base.prototype;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key === "constructor" || methods.has(key)) continue;
+      const desc = Object.getOwnPropertyDescriptor(proto, key);
+      if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
+    }
+  }
+  const result = [...sources];
+  const seen = new Set<string>();
+  const queue = [...sources];
+  while (queue.length > 0) {
+    const src = queue.pop()!;
+    for (const [name, body] of methods) {
+      if (seen.has(name)) continue;
+      if (new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(src)) {
+        seen.add(name);
+        result.push(body);
+        queue.push(body);
+      }
+    }
+  }
+  return result;
+}
+
+/**
  * Mirror of the `on:` context guard that `setOptionsForCallback`
  * (activemodel/validations/callbacks.ts) installs onto sync validators:
  * `options[:on].intersect?(Array(o.validation_context))`. Deferred (async)
@@ -3881,14 +3920,21 @@ export class Base extends Model {
    * it). On a load failure we resolve the association to `null` rather than
    * leaving it unloaded, so a sync callback that *does* read it sees `null` and
    * not trails' async-reader Promise — keeping the bare `if (record.parent)`
-   * guard safe even when the preload could not materialize the parent. On the
-   * narrowed path no per-load savepoint is needed: a doomed query (e.g.
-   * `tag_with_primary_key` → a non-existent column) only runs when the callback
-   * actually reads it, which is exactly when Rails would issue — and fail on —
-   * the same lazy query. The opaque load-all path keeps PR #4792's savepoint,
-   * since it may still fire a doomed query the (unreadable) callback never
-   * touches, which would otherwise abort the whole PostgreSQL transaction
-   * (25P02) — an abort swallowing the JS error cannot undo.
+   * guard safe even when the preload could not materialize the parent. Any load
+   * that runs inside an open transaction is isolated in its own savepoint: a
+   * doomed query (e.g. a `belongs_to ..., primary_key:` at a non-existent column
+   * like `tag_with_primary_key`) throwing here would otherwise abort the whole
+   * PostgreSQL transaction (25P02), and the surrounding `catch` swallowing the
+   * JS error cannot undo that abort. Narrowing removes the *per-association*
+   * savepoint churn PR #4792 paid on every `belongs_to` — only the (usually one)
+   * association the callback actually names is loaded, so an unread doomed query
+   * is never issued in the first place.
+   *
+   * The scan resolves reads reached through the record's own helper methods, not
+   * just those inline in the registered filter, by expanding the callback source
+   * with the source of any model-defined method it references (see
+   * `expandCallbackSourcesWithHelpers`). This mirrors Rails resolving
+   * associations by ordinary method dispatch at any call depth.
    *
    * @internal
    */
@@ -3897,11 +3943,12 @@ export class Base extends Model {
     if (typeof (this as any).association !== "function") return;
     const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
     if (!opaque && sources.length === 0) return;
-    const useSavepoint = opaque && _currentTransactionPublic().isOpen();
+    const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor);
+    const useSavepoint = _currentTransactionPublic().isOpen();
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
       // Narrow to associations the callback names (unless an opaque callback
       // forces loading all): Rails only queries the targets it dereferences.
-      if (!opaque && !referencesAssociationName(sources, ref.name)) continue;
+      if (!opaque && !referencesAssociationName(expanded, ref.name)) continue;
       let assoc: any;
       try {
         assoc = (this as any).association(ref.name);
