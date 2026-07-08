@@ -80,8 +80,6 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
  * shapes so pre-reflection casts are not identity no-ops.
  */
 function enumTypeFrom(
-  _klass: typeof Base,
-  _attribute: string,
   name: string,
   mapping: Record<string, EnumValue>,
   reflected: Type,
@@ -172,7 +170,7 @@ export function installEnumAttribute(
     if (isDecoratorReplay() && !target.abstractClass) {
       assertEnumTypeDeclared(target, attribute);
     }
-    return enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues);
+    return enumTypeFrom(name, mapping, reflected, raiseOnInvalidValues);
   });
 
   // Define the getter after attribute() so the EnumType is already in
