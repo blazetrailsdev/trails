@@ -308,6 +308,53 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(await ss.foreignKeyExists("users")).toBe(true);
   });
 
+  it("foreignKeyExists matches a composite column by value, not reference", async () => {
+    const ss = makeStatements();
+    const fk = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      ["rocket_tenant_id", "rocket_id"],
+      ["tenant_id", "id"],
+      "fk_rails_composite",
+    );
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
+
+    // A distinct array instance with the same elements must still match.
+    expect(
+      await ss.foreignKeyExists("astronauts", "rockets", {
+        column: ["rocket_tenant_id", "rocket_id"],
+      }),
+    ).toBe(true);
+    expect(
+      await ss.foreignKeyExists("astronauts", "rockets", {
+        column: ["rocket_id", "rocket_tenant_id"],
+      }),
+    ).toBe(false);
+  });
+
+  it("addForeignKey with ifNotExists is a no-op when a composite FK already exists", async () => {
+    const ss = makeStatements();
+    const fk = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      ["rocket_tenant_id", "rocket_id"],
+      ["tenant_id", "id"],
+      "fk_rails_composite",
+    );
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
+    const executeMutation = (ss as any).adapter.executeMutation as ReturnType<typeof vi.fn>;
+    executeMutation.mockClear();
+
+    await ss.addForeignKey("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+      ifNotExists: true,
+    });
+
+    // The composite column matches by value, so no ALTER TABLE is issued.
+    expect(executeMutation).not.toHaveBeenCalled();
+  });
+
   it("foreignKeyForBang throws when not found", async () => {
     const ss = makeStatements();
     vi.spyOn(ss, "foreignKeys").mockResolvedValue([]);
