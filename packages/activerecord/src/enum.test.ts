@@ -19,7 +19,7 @@
  * values).
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
-import { Base, registerModel } from "./index.js";
+import { Base, registerModel, Range } from "./index.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { Book } from "./test-helpers/models/book.js";
 import { fixtures } from "./test-helpers/fixtures.js";
@@ -158,8 +158,21 @@ describe("EnumTest", () => {
     // Pending: `last_read: "forgotten"` and `status: "prohibited"` (nil).
   });
 
-  // Rails uses 64-bit out-of-range labels and beginless/endless ranges.
-  it.skip("find via where with large number", () => {});
+  // Rails passes a 64-bit-out-of-range value (2^63) as an enum array element
+  // and as a Range end bound, plus numeric-string forms. Each element/bound
+  // serializes through EnumType → its integer subtype: the OOR value collapses
+  // via the Unboundable threading (array IN drops it; the Range end bound
+  // becomes unbounded), so every shape still finds the published book.
+  it("find via where with large number", async () => {
+    book = books("awdr");
+    const big = 9223372036854775808n;
+    expect((await Book.where({ status: [2, big] }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: ["2", "9223372036854775808"] }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: new Range(2, big) }).first())?.id).toBe(book.id);
+    expect((await Book.where({ status: new Range("2", "9223372036854775808") }).first())?.id).toBe(
+      book.id,
+    );
+  });
 
   it("find via where should be type casted", async () => {
     const created = await (Book as any).enabled().create();
