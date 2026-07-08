@@ -1881,11 +1881,13 @@ export class MigrationContext {
       throw new Error("Options `:force` and `:if_not_exists` cannot be used simultaneously.");
     }
     if (options?.force) {
-      // Rails' create_table force path drops with `if_exists: true`.
+      // Rails' create_table force path drops with `if_exists: true` and does
+      // not rescue: `IF EXISTS` covers the missing-table case, and any other
+      // adapter error must still abort create_table.
       await this.dropTable(name, {
         force: options.force === "cascade" ? "cascade" : undefined,
         ifExists: true,
-      }).catch(() => {});
+      });
     }
     if (options?.ifNotExists && this.tableExists(name)) {
       return;
