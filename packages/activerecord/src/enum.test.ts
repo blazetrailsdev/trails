@@ -206,9 +206,10 @@ describe("EnumTest", () => {
     // Rails also asserts `@book.update! cover: :hard` — `cover` enum absent.
   });
 
-  // Rails overrides `published!` to return a string; trails' generated bang
-  // setter isn't overridable in the same way.
-  it.skip("enum methods are overwritable", () => {});
+  it("enum methods are overwritable", async () => {
+    expect(await (book as any).publishedBang()).toBe("do publish work...");
+    expect((book as any).isPublished()).toBe(true);
+  });
 
   it("direct assignment", () => {
     (book as any).status = "written";

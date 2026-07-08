@@ -370,6 +370,7 @@ function enumMethodNamesFor(valueMethodName: string): {
  */
 export class EnumMethods {
   private _klass: typeof import("./base.js").Base;
+  private _carrier?: object;
 
   constructor(klass: typeof import("./base.js").Base) {
     this._klass = klass;
@@ -378,6 +379,29 @@ export class EnumMethods {
   /** @internal */
   get klass(): typeof import("./base.js").Base {
     return this._klass;
+  }
+
+  /**
+   * @internal
+   * The per-class prototype carrier that holds generated enum methods,
+   * interposed between the model prototype and its parent — the runtime
+   * analogue of Rails' anonymous `_enum_methods_module` `include`d into the
+   * class (enum.rb:251). Generated methods live BELOW the class body in the
+   * ancestor chain, so a class-body method of the same name shadows the
+   * generated one and reaches it via `super` (the interposed prototype is what
+   * `super.<method>()` resolves to from a method whose home object is the model
+   * prototype). Installing directly on `klass.prototype` instead would clobber
+   * (or be clobbered by) class-body methods with no `super` chain between them.
+   * Created lazily and once per class; all of a class's enums share it.
+   */
+  carrier(): object {
+    if (!this._carrier) {
+      const proto = this._klass.prototype as object;
+      const carrier = Object.create(Object.getPrototypeOf(proto)) as object;
+      Object.setPrototypeOf(proto, carrier);
+      this._carrier = carrier;
+    }
+    return this._carrier;
   }
 
   /**
@@ -406,7 +430,11 @@ export class EnumMethods {
     // `detect_enum_conflict!` here without false-positiving on a prior value's
     // auto `not*` scope). This generator only defines the surface.
     if (instanceMethods) {
-      Object.defineProperty(klass.prototype, predicateName, {
+      // Install on the interposed carrier (not `klass.prototype`) so a
+      // class-body method of the same name shadows the generated one and can
+      // delegate to it via `super`. Mirrors Rails' `_enum_methods_module`.
+      const carrier = this.carrier();
+      Object.defineProperty(carrier, predicateName, {
         value: function (this: EnumInstanceHost) {
           // Rails compares `#{name}_for_database == value`; trails stores the
           // label, so serialize the stored label back to its database value
@@ -417,7 +445,7 @@ export class EnumMethods {
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(klass.prototype, bangName, {
+      Object.defineProperty(carrier, bangName, {
         value: function (this: EnumInstanceHost) {
           // Returns update!'s result (true), mirroring Rails' bang setter.
           return this.updateBang({ [name]: value });
@@ -769,14 +797,15 @@ export function _enum(
     // bracket notation only.
     const originalName = methodName(n);
     if (instanceMethodsEnabled && /[^\w\x80-\uffff]/.test(originalName)) {
-      Object.defineProperty(this.prototype, `is${originalName}`, {
+      const carrier = methodsModule.carrier();
+      Object.defineProperty(carrier, `is${originalName}`, {
         value: function (this: Base) {
           return this.readAttribute(attrName) === n;
         },
         writable: true,
         configurable: true,
       });
-      Object.defineProperty(this.prototype, `${originalName}Bang`, {
+      Object.defineProperty(carrier, `${originalName}Bang`, {
         value: function (this: EnumInstanceHost) {
           return this.updateBang({ [attrName]: value });
         },

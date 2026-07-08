@@ -27,7 +27,6 @@ export class Book extends Base {
   declare static written: () => Relation<Book>;
   declare static notWritten: () => Relation<Book>;
   declare isPublished: () => boolean;
-  declare publishedBang: () => Promise<true | undefined>;
   declare static published: () => Relation<Book>;
   declare static notPublished: () => Relation<Book>;
   declare isUnread: () => boolean;
@@ -148,6 +147,19 @@ export class Book extends Base {
   declare tags_count: number | null;
   declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
   declare updated_on: Temporal.PlainDate;
+
+  // Mirrors book.rb's `def published!; super; "do publish work..."; end`: a
+  // class-body override of the generated bang that delegates to the generated
+  // method via `super`. At runtime `super.publishedBang` resolves through this
+  // prototype's parent — the interposed enum-methods carrier — because the
+  // generated bang lives there, not on `Book.prototype`.
+  async publishedBang(): Promise<string> {
+    // TS can't see the enum-methods carrier interposed below Book.prototype, so
+    // `super.publishedBang` is untyped; it exists at runtime.
+    // @ts-expect-error — generated bang lives on the interposed carrier.
+    await super.publishedBang();
+    return "do publish work...";
+  }
 
   static {
     this.belongsTo("author");
