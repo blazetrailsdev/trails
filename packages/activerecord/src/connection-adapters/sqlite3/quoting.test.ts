@@ -224,9 +224,15 @@ describe("SQLite3::Quoting", () => {
       expect(typeCast(NaN)).toBe(null);
     });
 
-    it("passes through strings and numbers", () => {
+    it("passes through strings and floats", () => {
       expect(typeCast("hello")).toBe("hello");
-      expect(typeCast(42)).toBe(42);
+      expect(typeCast(4.2)).toBe(4.2);
+    });
+
+    it("converts integer-valued numbers to BigInt so they bind as SQLITE_INTEGER", () => {
+      expect(typeCast(42)).toBe(42n);
+      expect(typeCast(0)).toBe(0n);
+      expect(typeCast(-7)).toBe(-7n);
     });
 
     it("returns null for symbol without description", () => {

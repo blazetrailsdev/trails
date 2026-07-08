@@ -169,7 +169,18 @@ export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === null || value === undefined) return null;
   if (typeof value === "boolean") return value ? unquotedTrue() : unquotedFalse();
-  if (typeof value === "number") return Number.isFinite(value) ? value : null;
+  if (typeof value === "number") {
+    if (!Number.isFinite(value)) return null;
+    // better-sqlite3 binds every JS number as SQLITE_FLOAT (there is no
+    // integer/float distinction in JS), so an integer-valued number like `1`
+    // binds as `real` and `LOWER(?)` yields `'1.0'`. MRI's sqlite3 gem binds a
+    // Ruby Integer as SQLITE_INTEGER, so `LOWER(1)` yields `'1'`. Handing the
+    // driver a BigInt makes it bind SQLITE_INTEGER, converging the text-forcing
+    // (e.g. `LOWER(col) = LOWER(?)`) path with Rails. Non-integer numbers keep
+    // binding as float. Rails: SQLite3::Quoting#_type_cast leaves the numeric
+    // type distinction to the type-cast layer above the driver.
+    return Number.isInteger(value) ? BigInt(value) : value;
+  }
   if (typeof value === "string" || typeof value === "bigint") return value;
   // Rails SQLite3::Quoting#_type_cast: `when BigDecimal then value.to_f` — a
   // float, NOT the abstract adapter's `value.to_s("F")` string. (quote() still
