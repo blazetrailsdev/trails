@@ -89,6 +89,16 @@ export function idForDatabase(this: PrimaryKeyRecord): unknown {
 // Instance accessor methods
 // ---------------------------------------------------------------------------
 
+/**
+ * Ruby `Object#inspect`-style rendering for the `id=` TypeError message, mirroring
+ * `CompositePrimaryKey#id=`'s `#{value.inspect}`.
+ */
+function inspectValue(value: unknown): string {
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "string") return JSON.stringify(value);
+  return String(value);
+}
+
 interface PrimaryKeyInstance {
   constructor: unknown;
   _readAttribute(name: string): unknown;
@@ -119,7 +129,7 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
   if (Array.isArray(pk)) {
     if (!Array.isArray(value)) {
       throw new TypeError(
-        `Expected an array for composite primary key [${pk.join(", ")}], got ${value === null ? "null" : typeof value}`,
+        `Expected value matching [${pk.map((col) => JSON.stringify(col)).join(", ")}], got ${inspectValue(value)}.`,
       );
     }
     pk.forEach((col, i) => this._writeAttribute(col, (value as unknown[])[i]));

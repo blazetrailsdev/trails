@@ -173,8 +173,8 @@ describe("WhereTest", () => {
   });
 
   it("where with tuple syntax on composite models", async () => {
-    const bookOne = await CpkBook.create({ author_id: 1, id: 2 });
-    const bookTwo = await CpkBook.create({ author_id: 3, id: 4 });
+    const bookOne = await CpkBook.create({ id: [1, 2] });
+    const bookTwo = await CpkBook.create({ id: [3, 4] });
 
     const r1 = await CpkBook.where(["author_id", "id"], [[1, 2]]);
     expect(ids(r1)).toStrictEqual([(bookOne as any).id]);
@@ -204,8 +204,8 @@ describe("WhereTest", () => {
   });
 
   it("where with tuple syntax and regular syntax combined", async () => {
-    const bookOne = await CpkBook.create({ author_id: 1, id: 2, title: "The Alchemist" });
-    const bookTwo = await CpkBook.create({ author_id: 3, id: 4, title: "The Alchemist" });
+    const bookOne = await CpkBook.create({ id: [1, 2], title: "The Alchemist" });
+    const bookTwo = await CpkBook.create({ id: [3, 4], title: "The Alchemist" });
 
     const r1 = await CpkBook.where({ title: "The Alchemist" });
     expect(sortedIds(r1)).toStrictEqual([(bookOne as any).id, (bookTwo as any).id].slice().sort());
@@ -244,12 +244,11 @@ describe("WhereTest", () => {
   });
 
   it("where with nil cpk association", async () => {
-    const order = await CpkOrder.create({ shop_id: 1, id: 2 });
+    const order = await CpkOrder.create({ id: [1, 2] });
     // Rails: order.books.create!(id: [3, 4]) — composite Book PK [author_id, id]
     // plus the order FK [shop_id, order_id] inherited from the order.
     const book = await CpkBook.create({
-      author_id: 3,
-      id: 4,
+      id: [3, 4],
       shop_id: (order as any).readAttribute("shop_id"),
       order_id: (order as any).readAttribute("id"),
     });

@@ -29,7 +29,6 @@ import type {
 } from "@blazetrails/globalid/signed-global-id";
 import {
   Model,
-  MissingAttributeError,
   Type,
   pushPendingDecorator,
   type AttributeOptions,
@@ -768,20 +767,10 @@ function _collectNestedAttributeSetterKeys(ctor: typeof Base | undefined): Set<s
  * handling: trails holds the `id` key out of super()'s attribute loop and
  * re-dispatches it here, once `initInternals` has run.
  *
- * - `id: [a, b]` goes through the `id=` setter (`setId`, mirroring
- *   `CompositePrimaryKey#id=`), which spreads the array across the key columns.
- * - a scalar `id` on a model-level composite PK is written straight to the `id`
- *   column when the table has one. trails' cpk test models (`cpk_orders`,
- *   `cpk_books`) declare a composite PK at the model level over tables that keep
- *   a real single `id` column, and the suite's established convention passes the
- *   key parts as scalars (`CpkBook.create({ author_id, id: 7 })`). Rails' native
- *   `CompositePrimaryKey#id=` would raise `TypeError` on a scalar (it wants
- *   `id: [author_id, id]`); converging that — and the many scalar-`id` cpk
- *   fixtures/tests that depend on it — is a distinct deviation out of scope for
- *   this unknown-attribute story, whose acceptance criteria explicitly keep
- *   composite-PK keys constructing (deferred), not raised. A model with no `id`
- *   column resolves to the Null attribute → MissingAttributeError, kept lenient
- *   here (the deferred composite-PK path is never an unknown-attribute error).
+ * `id: [a, b]` goes through the `id=` setter (`setId`, mirroring
+ * `CompositePrimaryKey#id=`), which spreads the array across the key columns. A
+ * scalar `id` on a model-level composite PK raises `TypeError` there, matching
+ * Rails (which wants `id: [author_id, id]`, not a bare scalar).
  * @internal
  */
 function _applyCompositePrimaryKey(
@@ -791,19 +780,9 @@ function _applyCompositePrimaryKey(
 ): void {
   const pk = (ctor as { primaryKey?: unknown }).primaryKey;
   if (!Array.isArray(pk) || !Object.prototype.hasOwnProperty.call(attrs, "id")) return;
-  const idVal = (attrs as { id: unknown }).id;
-  if (Array.isArray(idVal)) {
-    (record as unknown as { id: unknown }).id = idVal;
-    return;
-  }
-  try {
-    (record as unknown as { _writeAttribute: (n: string, v: unknown) => void })._writeAttribute(
-      "id",
-      idVal,
-    );
-  } catch (error) {
-    if (!(error instanceof MissingAttributeError)) throw error;
-  }
+  // Dispatch through the `id=` setter (`setId`): an array spreads across the key
+  // columns; a scalar raises TypeError, matching `CompositePrimaryKey#id=`.
+  (record as unknown as { id: unknown }).id = (attrs as { id: unknown }).id;
 }
 
 /**

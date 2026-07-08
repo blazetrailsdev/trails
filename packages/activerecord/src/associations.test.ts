@@ -78,7 +78,7 @@ describe("AssociationsTest", () => {
     // book is created THROUGH order.books so it lives in the association's
     // in-memory target before the reload — exercises the CPK reconciliation path.
     const order = await CpkOrder.create({ shop_id: 1, status: "paid" });
-    const book = await (order as any).books.create({ author_id: 3, id: 4, title: "Book" });
+    const book = await (order as any).books.create({ id: [3, 4], title: "Book" });
     // Update the book in DB behind the in-memory instance so persisted/in-memory diverge
     const dbBook = await CpkBook.where({ author_id: 3, id: 4 }).first();
     await dbBook!.updateColumns({ title: "A different title" });
@@ -2815,10 +2815,9 @@ describe("AssociationsTest", () => {
   });
 
   it("loading cpk association when persisted and in memory differ", async () => {
-    const order = await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
+    const order = await CpkOrder.create({ id: [1, 2], status: "paid" });
     await CpkBook.create({
-      author_id: 3,
-      id: 4,
+      id: [3, 4],
       shop_id: 1,
       order_id: 2,
       title: "Book",

@@ -27,9 +27,9 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("compiles `where(['c1','c2'], [[v1a,v1b], [v2a,v2b]])` to OR-of-AND of column equalities", async () => {
-    await CpkBook.create({ author_id: 1, id: 100, title: "match-1" });
-    await CpkBook.create({ author_id: 2, id: 200, title: "match-2" });
-    await CpkBook.create({ author_id: 1, id: 999, title: "no-match" });
+    await CpkBook.create({ id: [1, 100], title: "match-1" });
+    await CpkBook.create({ id: [2, 200], title: "match-2" });
+    await CpkBook.create({ id: [1, 999], title: "no-match" });
 
     const matched = await (CpkBook as any)
       .where(
@@ -44,7 +44,7 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("returns no rows when all tuples are filtered (empty after null-strip → none())", async () => {
-    await CpkBook.create({ author_id: 1, id: 100, title: "exists" });
+    await CpkBook.create({ id: [1, 100], title: "exists" });
     const matched = await (CpkBook as any)
       .where(
         ["author_id", "id"],
@@ -58,8 +58,8 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("filters null/undefined-bearing tuples instead of emitting IS NULL (SQL tuple-equality semantics)", async () => {
-    await CpkBook.create({ author_id: 1, id: 100, title: "valid" });
-    await CpkBook.create({ author_id: 2, id: 200, title: "also-valid" });
+    await CpkBook.create({ id: [1, 100], title: "valid" });
+    await CpkBook.create({ id: [2, 200], title: "also-valid" });
     // [1, null] is filtered out; [2, 200] remains.
     const matched = await (CpkBook as any)
       .where(
@@ -74,8 +74,8 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("single-column case (cols.length === 1) still works (degenerate composite)", async () => {
-    await CpkBook.create({ author_id: 1, id: 100, title: "a" });
-    await CpkBook.create({ author_id: 1, id: 200, title: "b" });
+    await CpkBook.create({ id: [1, 100], title: "a" });
+    await CpkBook.create({ id: [1, 200], title: "b" });
     const matched = await (CpkBook as any).where(["author_id"], [[1]]).toArray();
     expect(matched.map((r: any) => r.title).sort()).toEqual(["a", "b"]);
   });
@@ -170,8 +170,8 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("Base.whereNot(cols, tuples) routes through Relation#whereNot composite form", async () => {
-    await CpkBook.create({ author_id: 1, id: 100, title: "exclude" });
-    await CpkBook.create({ author_id: 2, id: 200, title: "keep" });
+    await CpkBook.create({ id: [1, 100], title: "exclude" });
+    await CpkBook.create({ id: [2, 200], title: "keep" });
     const matched = await (CpkBook as any).whereNot(["author_id", "id"], [[1, 100]]).toArray();
     expect(matched.map((r: any) => r.title)).toEqual(["keep"]);
   });
@@ -202,9 +202,9 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("whereNot(cols, tuples) negates the OR-of-AND grouping", async () => {
-    await CpkBook.create({ author_id: 1, id: 100, title: "exclude-me" });
-    await CpkBook.create({ author_id: 2, id: 200, title: "exclude-me-2" });
-    await CpkBook.create({ author_id: 3, id: 300, title: "keep" });
+    await CpkBook.create({ id: [1, 100], title: "exclude-me" });
+    await CpkBook.create({ id: [2, 200], title: "exclude-me-2" });
+    await CpkBook.create({ id: [3, 300], title: "keep" });
 
     const matched = await (CpkBook as any)
       .all()
@@ -220,8 +220,8 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("whereNot(cols, tuples) on all-filtered tuples is a no-op (matches Rails' empty-hash behavior)", async () => {
-    await CpkBook.create({ author_id: 1, id: 100, title: "a" });
-    await CpkBook.create({ author_id: 2, id: 200, title: "b" });
+    await CpkBook.create({ id: [1, 100], title: "a" });
+    await CpkBook.create({ id: [2, 200], title: "b" });
     // All tuples have a null component → filtered out → no predicate
     // added → all rows returned.
     const matched = await (CpkBook as any)

@@ -680,8 +680,8 @@ describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () 
 
   it("keys loaded targets by their composite primary key", async () => {
     const owner = await CpkAuthor.create({ name: "o" });
-    await CpkBook.create({ author_id: owner.id as number, id: 7, title: "a" });
-    await CpkBook.create({ author_id: owner.id as number, id: 9, title: "b" });
+    await CpkBook.create({ id: [owner.id as number, 7], title: "a" });
+    await CpkBook.create({ id: [owner.id as number, 9], title: "b" });
     const proxy = association<CpkBook>(owner, "books") as any;
     await proxy.load();
     const byKey = proxy.targetsByPrimaryKey() as Map<string, CpkBook>;
@@ -704,7 +704,7 @@ describe("CollectionProxy#targetsByPrimaryKey — non-default primary keys", () 
 
   it("skips a composite new record whose key parts are unassigned", async () => {
     const owner = await CpkAuthor.create({ name: "o" });
-    await CpkBook.create({ author_id: owner.id as number, id: 7, title: "a" });
+    await CpkBook.create({ id: [owner.id as number, 7], title: "a" });
     const proxy = association<CpkBook>(owner, "books") as any;
     await proxy.load();
     // `id` unassigned → null part in the composite key array.

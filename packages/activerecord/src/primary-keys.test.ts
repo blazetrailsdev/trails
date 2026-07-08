@@ -602,7 +602,7 @@ describe("CompositePrimaryKeyTest", () => {
     const book = new CpkBook();
     expect(() => {
       book.id = 1 as unknown as number[];
-    }).toThrow(TypeError);
+    }).toThrow(new TypeError('Expected value matching ["author_id", "id"], got 1.'));
   });
 
   it("id was composite", () => {

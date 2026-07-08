@@ -219,7 +219,7 @@ describe("WhereChainTest", () => {
 
   it("associated with composite primary key", async () => {
     const author = await CpkAuthor.create({ name: "Cpk" });
-    await CpkBook.create({ author_id: (author as any).id, id: 2 });
+    await CpkBook.create({ id: [(author as any).id, 2] });
     expect(await CpkAuthor.all().where().associated("books").exists()).toBe(true);
   });
 
@@ -366,7 +366,7 @@ describe("WhereChainTest", () => {
   });
 
   it("missing with composite primary key", async () => {
-    await CpkBook.create({ author_id: 1, id: 2 });
+    await CpkBook.create({ id: [1, 2] });
     expect(await CpkBook.all().where().missing("author").exists()).toBe(true);
   });
 
