@@ -136,80 +136,6 @@ export interface SchemaDumperOptions {
   version?: string;
 }
 
-interface DslMapping {
-  dslType: string;
-  extraOpts?: Record<string, unknown>;
-}
-
-/** Map SQL type strings (as returned by pg_catalog.format_type) to DSL method names. */
-const SQL_TYPE_MAP: Record<string, DslMapping> = {
-  "character varying": { dslType: "string" },
-  varchar: { dslType: "string" },
-  text: { dslType: "text" },
-  integer: { dslType: "integer" },
-  int: { dslType: "integer" },
-  int4: { dslType: "integer" },
-  bigint: { dslType: "bigint" },
-  int8: { dslType: "bigint" },
-  smallint: { dslType: "integer", extraOpts: { limit: 2 } },
-  int2: { dslType: "integer", extraOpts: { limit: 2 } },
-  "double precision": { dslType: "float" },
-  float8: { dslType: "float" },
-  real: { dslType: "float" },
-  float4: { dslType: "float" },
-  numeric: { dslType: "decimal" },
-  decimal: { dslType: "decimal" },
-  boolean: { dslType: "boolean" },
-  bool: { dslType: "boolean" },
-  date: { dslType: "date" },
-  "timestamp without time zone": { dslType: "datetime" },
-  timestamp: { dslType: "datetime" },
-  "timestamp with time zone": { dslType: "timestamptz" },
-  timestamptz: { dslType: "timestamptz" },
-  "time without time zone": { dslType: "time" },
-  time: { dslType: "time" },
-  "time with time zone": { dslType: "time" },
-  timetz: { dslType: "time" },
-  bytea: { dslType: "binary" },
-  json: { dslType: "json" },
-  jsonb: { dslType: "jsonb" },
-  uuid: { dslType: "uuid" },
-  money: { dslType: "money", extraOpts: { scale: 2 } },
-  inet: { dslType: "inet" },
-  cidr: { dslType: "cidr" },
-  macaddr: { dslType: "macaddr" },
-  hstore: { dslType: "hstore" },
-  xml: { dslType: "xml" },
-  point: { dslType: "point" },
-  line: { dslType: "line" },
-  lseg: { dslType: "lseg" },
-  box: { dslType: "box" },
-  path: { dslType: "path" },
-  polygon: { dslType: "polygon" },
-  circle: { dslType: "circle" },
-  interval: { dslType: "interval" },
-  bit: { dslType: "bit" },
-  "bit varying": { dslType: "bitVarying" },
-  varbit: { dslType: "bitVarying" },
-  citext: { dslType: "citext" },
-  ltree: { dslType: "ltree" },
-  tsvector: { dslType: "tsvector" },
-  oid: { dslType: "oid" },
-  int4range: { dslType: "int4range" },
-  int8range: { dslType: "int8range" },
-  numrange: { dslType: "numrange" },
-  daterange: { dslType: "daterange" },
-  tsrange: { dslType: "tsrange" },
-  tstzrange: { dslType: "tstzrange" },
-  serial: { dslType: "serial" },
-  bigserial: { dslType: "bigserial" },
-  character: { dslType: "char" },
-  bpchar: { dslType: "char" },
-  // SQLite types
-  blob: { dslType: "binary" },
-  "integer primary key autoincrement": { dslType: "integer" },
-};
-
 /**
  * DSL methods that actually exist as helpers on TableDefinition —
  * either the abstract base (connection-adapters/abstract/schema-definitions.ts)
@@ -273,119 +199,6 @@ const DSL_HELPER_METHODS = new Set([
 ]);
 
 /**
- * dsl type names `sqlTypeToDsl` may resolve to that must round-trip to
- * themselves when they re-appear as a bare SQL type — e.g. a SchemaDumper
- * second pass, or CTAS where SQLite preserves the dumped DSL name as the
- * column's declared type. Without this safety net such a name falls through
- * to the `{ dslType: "enum" }` catch-all; since these columns are not
- * `isEnum`, the emitter then routes them through the generic
- * `t.column(name, sqlType)` path (`t.enum(...)` is only emitted when
- * `col.isEnum`), silently losing the matching DSL helper.
- *
- * Derived from `DSL_HELPER_METHODS` (so every helper is covered by
- * construction) plus the non-helper dsl types `sqlTypeToDsl`/`SQL_TYPE_MAP`
- * also produce (`timestamptz`, `uuid`, `interval`, `oid`, `serial`,
- * `bigserial`, `char`).
- *
- * Caveat (consistent with `SQL_TYPE_MAP`'s existing behavior): a PG enum
- * type whose name collides with one of these (e.g. an enum literally named
- * `point` or `bitvarying`) resolves to the helper rather than `t.enum`.
- * Every `SQL_TYPE_MAP` key already carries this collision; this set only
- * adds `bitvarying` to it.
- */
-const KNOWN_DSL_TYPES = new Set<string>([
-  ...DSL_HELPER_METHODS,
-  "timestamptz",
-  "uuid",
-  "interval",
-  "oid",
-  "serial",
-  "bigserial",
-  "char",
-]);
-
-/**
- * Case-insensitive index into {@link KNOWN_DSL_TYPES}. `sqlTypeToDsl`
- * normalizes the incoming SQL type to lowercase, but dsl names like
- * `bitVarying` are camelCase — a plain `Set.has(lowercased)` would miss them.
- */
-const KNOWN_DSL_TYPES_BY_LOWER = new Map(
-  [...KNOWN_DSL_TYPES].map((dslType) => [dslType.toLowerCase(), dslType]),
-);
-
-function sqlTypeToDsl(sqlType: string): DslMapping {
-  const normalized = sqlType.toLowerCase().trim();
-  const isArray = normalized.endsWith("[]");
-  const baseType = isArray ? normalized.slice(0, -2) : normalized;
-
-  let result = SQL_TYPE_MAP[baseType];
-
-  if (!result) {
-    // Handle parameterized types (Postgres: "character varying(N)", SQLite: "varchar(N)")
-    const varcharMatch = baseType.match(/^(?:character varying|varchar)\((\d+)\)$/);
-    if (varcharMatch) {
-      result = { dslType: "string", extraOpts: { limit: Number(varcharMatch[1]) } };
-    } else {
-      const charMatch = baseType.match(/^(?:character|char|bpchar)\((\d+)\)$/);
-      const numericMatch = !charMatch
-        ? baseType.match(/^(?:numeric|decimal)\((\d+),\s*(\d+)\)$/)
-        : null;
-      const tsMatch =
-        !charMatch && !numericMatch
-          ? baseType.match(/^timestamp(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/)
-          : null;
-      const timeMatch =
-        !charMatch && !numericMatch && !tsMatch
-          ? baseType.match(/^time(\(\d+\))?\s+(with(?:out)?\s+time\s+zone)$/)
-          : null;
-
-      if (charMatch) {
-        result = { dslType: "char", extraOpts: { limit: Number(charMatch[1]) } };
-      } else if (numericMatch) {
-        result = {
-          dslType: "decimal",
-          extraOpts: { precision: Number(numericMatch[1]), scale: Number(numericMatch[2]) },
-        };
-      } else if (tsMatch) {
-        result =
-          tsMatch[2].startsWith("with ") || tsMatch[2] === "with time zone"
-            ? { dslType: "timestamptz" }
-            : { dslType: "datetime" };
-      } else if (timeMatch) {
-        result = { dslType: "time" };
-      } else if (/^bit\(\d+\)$/.test(baseType)) {
-        result = { dslType: "bit" };
-      } else if (/^(?:bit varying|varbit)\(\d+\)$/.test(baseType)) {
-        result = { dslType: "bitVarying" };
-      } else if (KNOWN_DSL_TYPES_BY_LOWER.has(baseType)) {
-        result = { dslType: KNOWN_DSL_TYPES_BY_LOWER.get(baseType)! };
-      } else {
-        result = { dslType: "enum", extraOpts: { enum_type: baseType } };
-      }
-    }
-  }
-
-  if (isArray) {
-    return { ...result, extraOpts: { ...result.extraOpts, array: true } };
-  }
-
-  return result;
-}
-
-/**
- * Wraps an already-formatted TS-DSL literal (the string returned by
- * `schemaDefault` / `Type#typeCastForSchema`, e.g. `"42"`, `'"hello"'`,
- * `'() => "now()"'`) so `formatColspec` / `formatOptions` emit it verbatim
- * instead of re-serializing it with `JSON.stringify`. Mirrors how the
- * `columnSpec`-routed emit path treats `prepareColumnOptions` values as raw
- * text (see {@link SchemaDumper.formatColspecRaw}).
- * @internal
- */
-export class RawSchemaLiteral {
-  constructor(public readonly text: string) {}
-}
-
-/**
  * Bridges a DatabaseAdapter to the SchemaSource protocol. Not public —
  * used internally by `SchemaDumper.dump(adapter, ...)` /
  * `dumpWithVersion(adapter, ...)` so adapter dumps don't require
@@ -425,11 +238,9 @@ class AdapterSchemaSource implements SchemaSource {
           : (col as any).virtual === true;
       return {
         name: col.name,
-        // Carry the dsl cast type in `type` and the raw SQL type in `sqlType`
-        // (Epic 3.3-U2). schemaType/schemaLimit/schemaPrecision read the dsl
-        // type off `type` and inspect the raw declaration off `sqlType`. The
-        // legacy `emitTable` path tolerates a dsl `type` via sqlTypeToDsl and
-        // sources limit/precision/scale from the dedicated fields below.
+        // Carry the dsl cast type in `type` and the raw SQL type in `sqlType`.
+        // schemaType/schemaLimit/schemaPrecision read the dsl type off `type`
+        // and inspect the raw declaration off `sqlType`.
         type: col.type || col.sqlType || "unknown",
         sqlType: col.sqlType ?? undefined,
         primaryKey: col.primaryKey,
@@ -519,6 +330,20 @@ export class SchemaDumper {
   /** @internal Mirrors Rails' `SchemaDumper.unique_ignore_pattern`. */
   static uniqueIgnorePattern: RegExp = /^uniq_rails_[0-9a-f]{10}$/;
 
+  /**
+   * The `ConnectionAdapters::SchemaDumper` subclass, registered by that module
+   * at load. Rails has a single dumper: the base `SchemaDumper#table` always
+   * drives column specs through the adapter's mixed-in
+   * `column_spec`/`prepare_column_options` (which live on the adapter subclass).
+   * TS can't mix a module into a class, so instead constructing the bare base
+   * for a non-adapter source (`create`/`dump` with a plain `SchemaSource`)
+   * transparently yields the adapter subclass — the sole `emitTable` /
+   * `columnSpec` dispatch. Dialect subclasses set `this` to themselves and are
+   * never redirected.
+   * @internal
+   */
+  static connectionAdaptersDumper?: typeof SchemaDumper;
+
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
   private _language: SchemaDumpLanguage;
@@ -588,7 +413,15 @@ export class SchemaDumper {
     source: SchemaSource,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
-    return new this(source, options) as InstanceType<T>;
+    // Redirect the bare base to the ConnectionAdapters subclass so the single
+    // `emitTable`/`columnSpec` dispatch (which lives there, mirroring Rails'
+    // adapter-mixed-in column_spec) serves every source. Dialect subclasses
+    // pass `this !== SchemaDumper` and construct themselves unchanged.
+    const Ctor =
+      this === SchemaDumper && SchemaDumper.connectionAdaptersDumper
+        ? SchemaDumper.connectionAdaptersDumper
+        : this;
+    return new Ctor(source, options) as InstanceType<T>;
   }
 
   /**
@@ -938,101 +771,15 @@ export class SchemaDumper {
   }
 
   /**
-   * DSL-typed primary-key options merged into `create_table` for non-default
-   * primary keys. Mirrors Rails' `column_spec_for_primary_key` call in
-   * `SchemaDumper#table` — but returns plain JS values for our TS DSL
-   * emitter rather than Ruby-format strings.
-   *
-   * Note: `SchemaDumper.dumpTableSchema(adapter, ...)` instantiates the base
-   * class (not an adapter-specific subclass), so this default branches on
-   * `column.type` directly. Rails has the same single dispatch point — its
-   * `column_spec_for_primary_key` lives on the adapter subclass, but our
-   * factory path doesn't pick that subclass yet, so we centralize.
+   * Resolves the adapter (or the raw source) backing this dumper — the object
+   * whose cast types drive `schema_default`. Lives on the base because
+   * `_source` is base-private; the Rails-mapped `schemaDefault` override
+   * (`connection-adapters/abstract/schema-dumper.ts`) consults it.
    * @internal
    */
-  protected primaryKeyTableOptions(column: ColumnInfo): Record<string, unknown> {
-    if (column.type === "uuid") {
-      const fn = column.defaultFunction;
-      if (typeof fn === "string" && fn.length > 0) {
-        // Emit as arrow returning the SQL expression — mirrors Rails'
-        // `default: -> { "gen_random_uuid()" }` and round-trips through
-        // `quoteDefaultExpression`, which routes function defaults to raw SQL.
-        return { id: "uuid", default: () => fn };
-      }
-      // Route the literal default through the same `schemaDefault` cast-type
-      // path `columnSpec` uses (Rails `schema_default`). The result is
-      // already-formatted TS-DSL text, so wrap it so `formatOptions` emits it
-      // verbatim.
-      const def = this.schemaDefault(column);
-      return { id: "uuid", default: def == null ? null : new RawSchemaLiteral(def) };
-    }
-    return {};
-  }
-
-  /**
-   * Rails `schema_default` (abstract/schema_dumper.rb): drive the column's
-   * default through the adapter's cast type — `deserialize` then
-   * `typeCastForSchema` — so every dialect's default emission agrees. Falls
-   * back to a plain literal when no adapter cast type is in hand (the
-   * in-memory / mock-source dump path). Returns already-formatted TS-DSL text.
-   *
-   * NOTE: the connection-adapters abstract subclass carries a
-   * structurally-identical `override` copy (the api:compare-mapped location for
-   * Rails' `schema_default`); keep the two bodies in lockstep — edit both.
-   * @internal
-   */
-  protected schemaDefault(column: ColumnInfo & { hasDefault?: boolean }): string | undefined {
-    if (!column.hasDefault && column.default === undefined) return undefined;
-    if (column.default == null) return this.schemaExpression(column);
-    const adapter = this._adapter();
-    if (adapter?.lookupCastTypeFromColumn) {
-      const type = adapter.lookupCastTypeFromColumn(column);
-      if (type != null && typeof type.deserialize === "function") {
-        const deserialized = type.deserialize(column.default);
-        if (deserialized == null) {
-          // column.default is already non-null (the `== null` guard above
-          // returned early). It may be a pre-deserialized JS value (e.g. []
-          // for a PG OID::Array column) that the scalar element type cannot
-          // deserialize. Apply typeCastForSchema directly on the original.
-          return type.typeCastForSchema(column.default);
-        }
-        return type.typeCastForSchema(deserialized);
-      }
-    }
-    if (typeof column.default === "string") return JSON.stringify(column.default);
-    return String(column.default);
-  }
-
-  /** @internal */
   protected _adapter(): any {
     const src = (this as any)._source;
     return src?.adapter ?? src;
-  }
-
-  /** @internal */
-  protected schemaExpression(column: ColumnInfo): string | undefined {
-    // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
-    // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
-    if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
-    return undefined;
-  }
-
-  /**
-   * Hook for adapter subclasses to adjust the introspected `precision` of a
-   * datetime/timestamp column before it is emitted. Default: identity.
-   *
-   * Mirrors Rails' `MySQL::SchemaDumper#schema_precision`: a bare MySQL
-   * `datetime` introspects as precision 0 (via `extract_precision`'s
-   * `super || 0`), and the dumper rewrites that to `precision: nil` so the
-   * column round-trips; a `timestamp(0)` instead omits precision entirely.
-   *
-   * @internal
-   */
-  protected mapDatetimePrecisionForDump(
-    _dslType: string,
-    precision: number | null | undefined,
-  ): number | null | undefined {
-    return precision;
   }
 
   /**
@@ -1047,143 +794,27 @@ export class SchemaDumper {
     return pkColumns;
   }
 
-  /** @internal */
+  /**
+   * Emit a single `create_table` block. Mirrors the column-emission half of
+   * Rails' `SchemaDumper#table`, whose `@connection.column_spec(column)` call
+   * is provided by the adapter's mixed-in `ConnectionAdapters::SchemaDumper`.
+   * TS has no module mixin, so the implementation lives on that subclass
+   * (`connection-adapters/abstract/schema-dumper.ts`) and every dump reaches it
+   * via {@link create}'s redirect — the bare base is never the emitter.
+   * @internal
+   */
   protected emitTable(
-    lines: string[],
-    tableName: string,
-    columns: ColumnInfo[],
-    indexes: IndexInfo[],
-    adapterTableOpts: Record<string, unknown> = {},
-    inlineConstraints: string[] = [],
+    _lines: string[],
+    _tableName: string,
+    _columns: ColumnInfo[],
+    _indexes: IndexInfo[],
+    _adapterTableOpts: Record<string, unknown> = {},
+    _inlineConstraints: string[] = [],
   ): void {
-    const pkColumns = this.orderPrimaryKeyColumns(
-      tableName,
-      columns.filter((c) => c.primaryKey),
+    throw new Error(
+      "SchemaDumper.emitTable must run on the ConnectionAdapters subclass; " +
+        "construct via SchemaDumper.create/dump so the column_spec dispatch is available.",
     );
-    const hasCompositePk = pkColumns.length > 1;
-    const pkColumn = pkColumns[0];
-    const hasId = !hasCompositePk && pkColumn?.name === "id";
-    const stripped = this.removePrefixAndSuffix(tableName);
-
-    const tableOpts: Record<string, unknown> = {};
-    if (hasCompositePk) {
-      tableOpts.primaryKey = pkColumns.map((c) => c.name);
-      tableOpts.id = false;
-    } else if (!hasId) {
-      tableOpts.id = false;
-    } else if (pkColumn) {
-      Object.assign(tableOpts, this.primaryKeyTableOptions(pkColumn));
-    }
-    if (typeof adapterTableOpts.charset === "string") tableOpts.charset = adapterTableOpts.charset;
-    if (typeof adapterTableOpts.collation === "string")
-      tableOpts.collation = adapterTableOpts.collation;
-    if (typeof adapterTableOpts.options === "string") tableOpts.options = adapterTableOpts.options;
-    if (typeof adapterTableOpts.comment === "string" && adapterTableOpts.comment.trim().length > 0)
-      tableOpts.comment = adapterTableOpts.comment;
-    tableOpts.force = "cascade";
-    const optStr = `{ ${this.formatOptions(tableOpts)} }`;
-
-    lines.push(`  await ctx.createTable(${JSON.stringify(stripped)}, ${optStr}, (t) => {`);
-
-    for (const col of columns) {
-      if (col.name === "id" && hasId) continue;
-
-      const { dslType: mappedDslType, extraOpts } = sqlTypeToDsl(col.type);
-      // PG serial/bigserial: Rails emits the shorthand and omits both the
-      // sequence default and the integer limit (schema_default / schema_limit
-      // return nil for a serial column). The SQL type still introspects as
-      // integer/bigint, so we override here off the carried isSerial flag.
-      const dslType = col.isSerial
-        ? col.type === "bigint"
-          ? "bigserial"
-          : "serial"
-        : mappedDslType;
-      const colspec: Record<string, unknown> = {};
-
-      if (col.null === false) colspec.null = false;
-      if (col.isSerial) {
-        // serial columns carry no user-visible default
-      } else if (col.defaultFunction) {
-        const fn = col.defaultFunction;
-        colspec.default = () => fn;
-      } else {
-        // Route through the same `schemaDefault` cast-type path `columnSpec`
-        // uses (Rails `schema_default`). The result is already-formatted
-        // TS-DSL text, so wrap it so `formatColspec` emits it verbatim.
-        const def = this.schemaDefault(col);
-        if (def !== undefined) {
-          colspec.default = new RawSchemaLiteral(def);
-        }
-      }
-      // Serial/bigserial emit a bare shorthand — Rails' schema_limit /
-      // schema_precision / schema_scale all suppress type options for a serial
-      // column, so skip the whole extraOpts spread (today int4/int8 carry none,
-      // but this keeps the invariant local rather than relying on that).
-      if (!col.isSerial && extraOpts) {
-        for (const [key, value] of Object.entries(extraOpts)) {
-          // `enum_type` carries the PG enum type name — consumed by
-          // the column-type fallback below, not a column option.
-          if (key === "enum_type") continue;
-          colspec[key] = value;
-        }
-      }
-      if (col.array && !colspec.array) colspec.array = true;
-      if (
-        !col.isSerial &&
-        col.limit !== undefined &&
-        col.limit !== null &&
-        extraOpts?.limit === undefined
-      )
-        colspec.limit = col.limit;
-      if (extraOpts?.precision === undefined) {
-        if (dslType === "datetime" || dslType === "timestamp") {
-          // precision: 6 is the default for datetime — omit it; precision: null → "nil".
-          // mapDatetimePrecisionForDump lets dialect dumpers adjust the introspected
-          // precision (e.g. MySQL maps a bare `datetime` (precision 0) to `nil`).
-          const precision = this.mapDatetimePrecisionForDump(dslType, col.precision);
-          if (precision === undefined) {
-            // not set — omit
-          } else if (precision === null) {
-            colspec.precision = null;
-          } else if (precision !== SchemaDumper.DEFAULT_DATETIME_PRECISION) {
-            colspec.precision = precision;
-          }
-        } else if (col.precision !== undefined && col.precision !== null) {
-          colspec.precision = col.precision;
-        }
-      }
-      if (col.scale !== undefined && col.scale !== null && extraOpts?.scale === undefined)
-        colspec.scale = col.scale;
-      if (col.collation != null) colspec.collation = col.collation;
-
-      const optionsStr =
-        Object.keys(colspec).length > 0 ? `, { ${this.formatColspec(colspec)} }` : "";
-
-      if (DSL_HELPER_METHODS.has(dslType)) {
-        lines.push(`    t.${dslType}(${JSON.stringify(col.name)}${optionsStr});`);
-      } else if (col.isEnum && dslType === "enum") {
-        // PG enum columns: emit t.enum("col", { enum_type: "typename", ... })
-        // Only when column.isEnum is set (OID-resolved type is "enum") to avoid
-        // misclassifying domains and other unmapped custom types.
-        // Prefer col.sqlType (raw adapter path: col.type="enum", col.sqlType="mood")
-        // over extraOpts.enum_type (AdapterSchemaSource path: col.type="mood").
-        const enumTypeName = (col as any).sqlType ?? extraOpts?.enum_type ?? col.type;
-        const enumSpec = { ...colspec, enum_type: enumTypeName };
-        const enumOptsStr = `, { ${this.formatColspec(enumSpec)} }`;
-        lines.push(`    t.enum(${JSON.stringify(col.name)}${enumOptsStr});`);
-      } else {
-        // Generic fallback: pass arbitrary SQL type through verbatim via t.column.
-        const columnType = dslType === "enum" ? (extraOpts?.enum_type ?? dslType) : dslType;
-        lines.push(
-          `    t.column(${JSON.stringify(col.name)}, ${JSON.stringify(columnType)}${optionsStr});`,
-        );
-      }
-    }
-
-    for (const line of inlineConstraints) lines.push(line);
-    lines.push("  });");
-
-    this.indexesInCreate(tableName, lines, indexes);
   }
 
   /** @internal */
@@ -1316,41 +947,18 @@ export class SchemaDumper {
     return DSL_HELPER_METHODS.has(dslType);
   }
 
-  /** @internal */
-  formatColspec(colspec: Record<string, unknown>): string {
-    return Object.entries(colspec)
-      .map(([k, v]) => {
-        if (v instanceof RawSchemaLiteral) {
-          return `${k}: ${v.text}`;
-        }
-        if (typeof v === "function") {
-          return `${k}: () => ${JSON.stringify((v as () => unknown)())}`;
-        }
-        if (v && typeof v === "object" && !Array.isArray(v)) {
-          const inner = this.formatColspec(v as Record<string, unknown>);
-          return `${k}: ${inner ? `{ ${inner} }` : "{}"}`;
-        }
-        return `${k}: ${JSON.stringify(v)}`;
-      })
-      .join(", ");
-  }
-
   /**
-   * Rails-faithful raw colspec formatter — mirrors `SchemaDumper#format_colspec`,
+   * Rails-faithful colspec formatter — mirrors `SchemaDumper#format_colspec`,
    * which joins `key: value` with the values emitted **verbatim** and recurses
    * into nested objects as `{ … }` (the primary-key `id: { type:, … }` spec).
    * The values produced by `columnSpec` / `prepareColumnOptions` are already
    * fully-formatted TS-DSL text (`"false"`, `"255"`, `"null"`, `'"hello"'`,
-   * `'() => "now()"'`), so they must NOT be re-quoted the way
-   * {@link formatColspec} re-serializes native JS values. This is the formatter
-   * the `columnSpec`-routed emit path uses (Epic 3.3-U); `formatColspec` stays
-   * on the legacy inline path until `emitTable` is wired (Story 3.3-U3).
+   * `'() => "now()"'`), so they are emitted as-is.
    *
    * Keys are interpolated raw (every colspec key is an identifier), matching
-   * Rails and the sibling `formatColspec`. The spec must be **compacted** —
-   * `prepareColumnOptions` only sets defined keys, mirroring Rails'
-   * `spec.compact!` before `format_colspec`; a stray `undefined`/`null` value
-   * would render literally.
+   * Rails. The spec must be **compacted** — `prepareColumnOptions` only sets
+   * defined keys, mirroring Rails' `spec.compact!` before `format_colspec`; a
+   * stray `undefined`/`null` value would render literally.
    * @internal
    */
   formatColspecRaw(colspec: Record<string, unknown>): string {
@@ -1371,9 +979,6 @@ export class SchemaDumper {
     return Object.entries(options)
       .map(([k, v]) => {
         const key = isIdent.test(k) ? k : JSON.stringify(k);
-        if (v instanceof RawSchemaLiteral) {
-          return `${key}: ${v.text}`;
-        }
         if (typeof v === "function") {
           // Emit as an arrow returning the SQL expression — mirrors Rails'
           // `-> { "fn()" }` syntax in dumped `schema.rb`.

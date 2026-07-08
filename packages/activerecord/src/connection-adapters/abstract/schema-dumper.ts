@@ -198,15 +198,12 @@ export class SchemaDumper extends BaseSchemaDumper {
 
   // Rails `schema_default` / `schema_expression` live in
   // `connection_adapters/abstract/schema_dumper.rb`, so the ports stay in this
-  // file (the api:compare-mapped location). The base `SchemaDumper`
-  // (../../schema-dumper.ts) carries structurally-identical copies so its
-  // legacy `emitTable` default callsites route through the same cast-type path;
-  // these overrides keep the Rails-faithful body where it belongs. `_adapter`
-  // is a trails-only helper and lives solely on the base. Keep these two bodies
-  // in lockstep with the base copies — edit both.
+  // file (the api:compare-mapped location) — the sole definitions, consumed by
+  // this class's single `emitTable`/`columnSpec` dispatch. `_adapter` is a
+  // trails-only helper on the base (it reaches base-private `_source`).
 
   /** @internal */
-  protected override schemaDefault(column: Column): string | undefined {
+  protected schemaDefault(column: Column): string | undefined {
     if (!column.hasDefault && column.default === undefined) return undefined;
     if (column.default == null) return this.schemaExpression(column);
     const adapter = this._adapter();
@@ -229,7 +226,7 @@ export class SchemaDumper extends BaseSchemaDumper {
   }
 
   /** @internal */
-  protected override schemaExpression(column: Column): string | undefined {
+  protected schemaExpression(column: Column): string | undefined {
     // TS-DSL arrow form (Rails dumps the Ruby lambda `-> { … }`); emitted verbatim
     // by formatColspecRaw and consumed by the DSL as `default: () => "fn()"`.
     if (column.defaultFunction) return `() => ${JSON.stringify(column.defaultFunction)}`;
@@ -334,3 +331,11 @@ export class SchemaDumper extends BaseSchemaDumper {
     this.indexesInCreate(tableName, lines, indexes);
   }
 }
+
+// Register this ConnectionAdapters subclass so `BaseSchemaDumper.create`/`dump`
+// with a plain (non-adapter) SchemaSource transparently constructs it — the
+// single `emitTable`/`columnSpec` dispatch, mirroring Rails' adapter-mixed-in
+// `column_spec`. Every file that can reach a bare-base dump also loads this
+// module (the public `SchemaDumper` export is this class), so the slot is set
+// before any redirect resolves.
+BaseSchemaDumper.connectionAdaptersDumper = SchemaDumper;
