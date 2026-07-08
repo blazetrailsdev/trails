@@ -34,4 +34,10 @@ describe("SQLite3Adapter integer bind serialization", () => {
     const rows = await adapter.execute("SELECT typeof(?) AS t", [1.5]);
     expect(rows[0].t).toBe("real");
   });
+
+  it("binds a boolean as SQLITE_INTEGER", async () => {
+    const rows = await adapter.execute("SELECT typeof(?) AS t, LOWER(?) AS l", [true, true]);
+    expect(rows[0].t).toBe("integer");
+    expect(rows[0].l).toBe("1");
+  });
 });

@@ -215,8 +215,8 @@ describe("SQLite3::Quoting", () => {
 
   describe("typeCast", () => {
     it("converts booleans to 1/0", () => {
-      expect(typeCast(true)).toBe(1);
-      expect(typeCast(false)).toBe(0);
+      expect(typeCast(true)).toBe(1n);
+      expect(typeCast(false)).toBe(0n);
     });
 
     it("converts non-finite numbers to null", () => {

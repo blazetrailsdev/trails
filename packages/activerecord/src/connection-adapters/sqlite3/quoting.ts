@@ -168,7 +168,14 @@ export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: 
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (value === null || value === undefined) return null;
-  if (typeof value === "boolean") return value ? unquotedTrue() : unquotedFalse();
+  // Rails routes booleans through `type_cast` to `unquoted_true` /
+  // `unquoted_false`, which SQLite defines as the Ruby Integers `1` / `0`
+  // (sqlite3/quoting.rb) — so they bind as SQLITE_INTEGER just like any other
+  // integer. Return BigInt so better-sqlite3 binds INTEGER rather than FLOAT;
+  // otherwise `LOWER(?)` on a boolean bind would serialize `1.0` / `0.0` and a
+  // `case_sensitive: false` uniqueness check on a boolean column would miss
+  // collisions (the same divergence the integer branch below fixes).
+  if (typeof value === "boolean") return BigInt(value ? unquotedTrue() : unquotedFalse());
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return null;
     // better-sqlite3 binds every JS number as SQLITE_FLOAT (there is no
