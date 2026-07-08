@@ -18,6 +18,7 @@ describe("buildTestDatabaseConfig", () => {
   });
 
   it("defaults to sqlite when no URL env vars are set", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("PG_TEST_URL", "");
     vi.stubEnv("MYSQL_TEST_URL", "");
     const { adapter, envConfig } = await buildTestDatabaseConfig();
@@ -27,6 +28,7 @@ describe("buildTestDatabaseConfig", () => {
   });
 
   it("inherits Rails' default pool size (5) on the file-backed lane", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("PG_TEST_URL", "");
     vi.stubEnv("MYSQL_TEST_URL", "");
     vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker.sqlite3");
@@ -35,6 +37,7 @@ describe("buildTestDatabaseConfig", () => {
   });
 
   it("pins pool 1 on a bare :memory: primary", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
     vi.stubEnv("PG_TEST_URL", "");
     vi.stubEnv("MYSQL_TEST_URL", "");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
@@ -53,5 +56,34 @@ describe("buildTestDatabaseConfig", () => {
     vi.stubEnv("MYSQL_TEST_URL", "mysql2://localhost/trails_test");
     const { adapter } = await buildTestDatabaseConfig();
     expect(adapter).toBe("mysql");
+  });
+
+  it("throws when ARCONN=postgresql but PG_TEST_URL is absent", async () => {
+    vi.stubEnv("ARCONN", "postgresql");
+    vi.stubEnv("PG_TEST_URL", "");
+    vi.stubEnv("MYSQL_TEST_URL", "");
+    await expect(buildTestDatabaseConfig()).rejects.toThrow(/ARCONN=postgresql but PG_TEST_URL/);
+  });
+
+  it("throws when ARCONN=mysql2 but MYSQL_TEST_URL is absent", async () => {
+    vi.stubEnv("ARCONN", "mysql2");
+    vi.stubEnv("PG_TEST_URL", "");
+    vi.stubEnv("MYSQL_TEST_URL", "");
+    await expect(buildTestDatabaseConfig()).rejects.toThrow(/ARCONN=mysql2 but MYSQL_TEST_URL/);
+  });
+
+  it("does not throw when ARCONN=postgresql and PG_TEST_URL is set", async () => {
+    vi.stubEnv("ARCONN", "postgresql");
+    vi.stubEnv("PG_TEST_URL", "postgresql://localhost/trails_test");
+    const { adapter } = await buildTestDatabaseConfig();
+    expect(adapter).toBe("postgres");
+  });
+
+  it("does not throw when ARCONN=sqlite3 and no URL env vars are set", async () => {
+    vi.stubEnv("ARCONN", "sqlite3");
+    vi.stubEnv("PG_TEST_URL", "");
+    vi.stubEnv("MYSQL_TEST_URL", "");
+    const { adapter } = await buildTestDatabaseConfig();
+    expect(adapter).toBe("sqlite");
   });
 });
