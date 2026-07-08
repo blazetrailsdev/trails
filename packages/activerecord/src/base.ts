@@ -120,7 +120,7 @@ import {
 import {
   runAllCallbacks as cbRunAll,
   runAfterCallbacksOnProto as cbRunAfter,
-  hasBeforeOrAroundCallbackOnProto,
+  beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   shouldValidate,
 } from "@blazetrails/activemodel";
@@ -618,6 +618,18 @@ function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   // non-all_queries `where` conditions propagate on create.
   const c = ctor as any;
   return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0 || hasDefaultScopeOverride(ctor);
+}
+
+/**
+ * True when any before/around destroy callback source dereferences the
+ * `belongs_to` reflection named `name` — matched as a whole identifier so
+ * `firm` doesn't match `firmId` and `tag` doesn't match `tagWithPrimaryKey`.
+ * Covers both dotted reads (`record.firm`) and the string form
+ * (`this.association("firm")`).
+ */
+function referencesAssociationName(sources: string[], name: string): boolean {
+  const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+  return sources.some((src) => pattern.test(src));
 }
 
 /**
@@ -3854,44 +3866,43 @@ export class Base extends Model {
    * reading the association sees a loaded record (matching Rails' lazy
    * synchronous query) rather than trails' async-reader Promise.
    *
-   * Scoped to classes that actually register a before/around destroy callback
-   * so a plain destroy issues no extra query (Rails only queries when the
-   * callback touches the association). A same-FK sibling (e.g. Account#firm and
-   * Account#unautosavedFirm share `firm_id`) is loaded too even when only one is
-   * read; the extra read is side-effect-free and resolves to the same owner row.
+   * Scoped to classes that actually register a before/around destroy callback,
+   * and further narrowed to the `belongs_to` targets whose association name
+   * appears in the callback source — mirroring Rails, which lazily loads only
+   * the associations a callback dereferences and issues no query for the rest.
+   * When a before/around destroy callback is an object/method filter whose body
+   * cannot be introspected, we conservatively load every `belongs_to` (we can't
+   * tell what it reads). A same-FK sibling (e.g. Account#firm and
+   * Account#unautosavedFirm share `firm_id`) referenced in the source is loaded
+   * too; the extra read is side-effect-free and resolves to the same owner row.
    *
    * Loading is best-effort: a `belongs_to` whose target class is unregistered or
    * whose row is missing must not abort the destroy (the callback may never read
    * it). On a load failure we resolve the association to `null` rather than
    * leaving it unloaded, so a sync callback that *does* read it sees `null` and
    * not trails' async-reader Promise — keeping the bare `if (record.parent)`
-   * guard safe even when the preload could not materialize the parent.
+   * guard safe even when the preload could not materialize the parent. Because
+   * we no longer eager-load associations the callback never names, no per-load
+   * savepoint is needed: a doomed query (e.g. `tag_with_primary_key` →
+   * a non-existent column) only runs when the callback actually reads it, which
+   * is exactly when Rails would issue — and fail on — the same lazy query.
    *
    * @internal
    */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
     const ctor = this.constructor as typeof Base;
-    if (!hasBeforeOrAroundCallbackOnProto(ctor.prototype, "destroy")) return;
     if (typeof (this as any).association !== "function") return;
-    // When this best-effort preload runs inside an open transaction, isolate
-    // each load in its own savepoint. A failing preload query (e.g. a
-    // `belongs_to ..., primary_key:` pointing at a column that doesn't exist,
-    // like `tag_with_primary_key`) aborts the whole PostgreSQL transaction
-    // (25P02) — and swallowing the JS error can't un-abort the connection.
-    // Rolling back to a per-load savepoint clears the aborted state so the
-    // outer transaction stays usable, matching Rails, which never issues this
-    // eager query at all (it lazily loads only what the callback reads).
-    const inTransaction = _currentTransactionPublic().isOpen();
+    const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
+    if (!opaque && sources.length === 0) return;
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
+      // Narrow to associations the callback names (unless an opaque callback
+      // forces loading all): Rails only queries the targets it dereferences.
+      if (!opaque && !referencesAssociationName(sources, ref.name)) continue;
       let assoc: any;
       try {
         assoc = (this as any).association(ref.name);
         if (!assoc || assoc.isLoaded?.()) continue;
-        if (inTransaction) {
-          await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
-        } else {
-          await assoc.loadTarget();
-        }
+        await assoc.loadTarget();
       } catch {
         // An unregistered target class, missing FK row, strict-loading
         // violation, or transient DB error must not abort the destroy. Resolve

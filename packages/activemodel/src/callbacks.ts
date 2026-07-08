@@ -355,6 +355,37 @@ export function hasBeforeOrAroundCallbackOnProto(proto: object, event: string): 
 }
 
 /**
+ * Source-text of every `before`/`around` callback registered for `event` whose
+ * filter is a plain function (so it can be introspected via
+ * `Function.prototype.toString`). `opaque` is true when any before/around entry
+ * is an object/method-name filter whose body cannot be read from here.
+ *
+ * Callers use this to approximate Rails' lazy association loading: a synchronous
+ * destroy callback only forces the `belongs_to` targets it actually
+ * dereferences, so scanning the callback source for association names lets us
+ * skip loading targets the callback never reads. When `opaque` is true the
+ * caller must fall back to a conservative load (it cannot tell what the callback
+ * touches).
+ *
+ * @internal
+ */
+export function beforeOrAroundCallbackSources(
+  proto: object,
+  event: string,
+): { sources: string[]; opaque: boolean } {
+  const chain = asPeekCallbackChain(proto, event);
+  if (!chain) return { sources: [], opaque: false };
+  const sources: string[] = [];
+  let opaque = false;
+  for (const e of chain.entries) {
+    if (e.kind !== "before" && e.kind !== "around") continue;
+    if (typeof e.filter === "function") sources.push(e.filter.toString());
+    else opaque = true;
+  }
+  return { sources, opaque };
+}
+
+/**
  * @internal
  */
 export function hasCallbackOnProto(

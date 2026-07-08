@@ -72,6 +72,7 @@ export {
   _registerCallbackOnProto,
   hasCallbackOnProto,
   hasBeforeOrAroundCallbackOnProto,
+  beforeOrAroundCallbackSources,
   skipCallbackOnProto,
   runAllCallbacks,
   runBeforeCallbacksOnProto,
