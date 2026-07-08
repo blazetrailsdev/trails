@@ -202,15 +202,11 @@ describe("SchemaDumperAdapterTest", () => {
       t.string("title", { null: false });
       t.text("body");
     });
-    const result = await TopLevelDumper.dump(adapter);
+    const result = await TopLevelDumper.dumpTableSchema(adapter, "horses");
     expect(result).toContain("horses");
     expect(result).toContain('"title"');
     expect(result).toContain('"body"');
-    // Adapter-introspection dumps walk the entire canonical schema (~200
-    // tables) on the shared PG worker DB; under 6-fork parallel load this
-    // legitimately exceeds vitest's 5s default. Bump to 60s (I/O contention,
-    // not a logic bug). See project_schema_dumper_trails_pg_schema_migrations_flake.
-  }, 60000);
+  });
 
   it("dumps schema with indexes from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
@@ -218,19 +214,19 @@ describe("SchemaDumperAdapterTest", () => {
       t.integer("post_id");
     });
     await ctx.addIndex("testings", "post_id", { name: "index_testings_on_post_id" });
-    const result = await TopLevelDumper.dump(adapter);
+    const result = await TopLevelDumper.dumpTableSchema(adapter, "testings");
     expect(result).toContain("addIndex");
     expect(result).toContain("index_testings_on_post_id");
-  }, 60000);
+  });
 
   it("adapter-backed dump emits precision: null for datetime column without precision", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
     await ctx.createTable("octopi", {}, (t) => {
       t.datetime("happened_at", { precision: null });
     });
-    const result = await TopLevelDumper.dump(adapter);
+    const result = await TopLevelDumper.dumpTableSchema(adapter, "octopi");
     expect(result).toMatch(/t\.datetime\("happened_at"[^}]*precision\s*:\s*null/);
-  }, 60000);
+  });
 
   it("adapter-backed dump preserves explicit string limit through AdapterSchemaSource", async () => {
     // Guards the U2 type/sqlType split: emitTable resolves the limit from the
@@ -241,9 +237,9 @@ describe("SchemaDumperAdapterTest", () => {
     await ctx.createTable("barcodes", {}, (t) => {
       t.string("code", { limit: 10 });
     });
-    const result = await TopLevelDumper.dump(adapter);
+    const result = await TopLevelDumper.dumpTableSchema(adapter, "barcodes");
     expect(result).toMatch(/t\.string\("code"[^}]*limit\s*:\s*10/);
-  }, 60000);
+  });
 
   it("skips internal tables when dumping from adapter", async () => {
     const { SchemaDumper: TopLevelDumper } = await import("./schema-dumper.js");
