@@ -17,8 +17,6 @@ import {
   makeEncryptedBookWithCustomCompressor,
   makeEncryptedTrafficLight,
   makeEncryptedTrafficLightWithStoreState,
-  makeEncryptedBookNormalizedFirst,
-  makeEncryptedBookNormalizedSecond,
   makeKeyProvider,
   assertEncryptedAttribute,
   ciphertextFor,
@@ -33,6 +31,10 @@ import { Configurable } from "./configurable.js";
 import { itIfSupports } from "../test-helpers/supports.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { EncryptableRecord } from "./encryptable-record.js";
+import {
+  EncryptedBookNormalizedFirst,
+  EncryptedBookNormalizedSecond,
+} from "../test-helpers/models/book-encrypted.js";
 import { isEncryptedAttribute } from "../encryption.js";
 import { RecordInvalid } from "../index.js";
 
@@ -781,16 +783,17 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     // ciphertext on PG/MariaDB (see the `serialized binary data can be encrypted`
     // skip). Until that impl gap closes we ride only the `name` half; a persisted
     // `logo` ciphertext would trip the record's reload, so it stays omitted.
-    // One adapter for both models: they share the canonical `encrypted_books`
-    // table, so re-installing the schema for a second adapter would reset the id
-    // sequence and collide with the first row's PK on PG.
-    const adp = await freshAdapter();
-    let book = await makeEncryptedBookNormalizedFirst(adp).create({ name: "Book" });
+    // Rides the canonical reflection-based `EncryptedBookNormalized{First,Second}`
+    // (name obtained via schema reflection, non-null default `<untitled>`), not
+    // an explicit `attribute("name", ...)` declaration — the reflected + bare
+    // `encrypts` path that a class-init-before-configure model exercises.
+    await freshAdapter();
+    let book = await EncryptedBookNormalizedFirst.create({ name: "Book" });
     await assertEncryptedAttribute(book, "name", "book");
     // TRACKED-PENDING-CONVERGENCE (binary text-ciphertext round-trip):
     // await assertEncryptedAttribute(book, "logo", "book");
 
-    book = await makeEncryptedBookNormalizedSecond(adp).create({ name: "Book" });
+    book = await EncryptedBookNormalizedSecond.create({ name: "Book" });
     await assertEncryptedAttribute(book, "name", "book");
     // await assertEncryptedAttribute(book, "logo", "book");
   });
