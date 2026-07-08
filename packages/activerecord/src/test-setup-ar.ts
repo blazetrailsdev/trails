@@ -11,10 +11,6 @@
 // in activerecord/index.ts) to keep better-sqlite3 a true optional peer for
 // non-test consumers.
 import "./sqlite/better-sqlite3.js";
-// Side-effect: register the `Base.encrypts` hooks up front (Rails wires
-// encryption at boot). Ensures the declaration path is ready before any model's
-// `encrypts` runs.
-import "./encryption.js";
 import { beforeEach } from "vitest";
 import { Base } from "./base.js";
 import { DelegateCache } from "./relation/delegation.js";
