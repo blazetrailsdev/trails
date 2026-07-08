@@ -1,4 +1,4 @@
-import { camelize, singularize } from "./inflector.js";
+import { camelize, singularize, underscore } from "./inflector.js";
 import { htmlEscape } from "./core-ext/string/output-safety.js";
 import { BigDecimal } from "./core-ext/big-decimal/conversions.js";
 import { Temporal } from "./temporal.js";
@@ -62,11 +62,36 @@ export interface XmlBuilder {
   closeTag(name: string): void;
 }
 
+/**
+ * A per-level cast-type table threaded through `to_tag`'s container recursion so
+ * nested attributes keep an adapter-agnostic `type=` (a bigint id stays
+ * `type="integer"` whether it arrives as a number, BigInt, or string). `types`
+ * maps a hash key to its explicit `type=` name; `nested` carries the same table
+ * for each container-valued key. Rails has no analog — its serialized hash still
+ * holds typed Ruby objects — but trails' flattened hash loses the cast type, so
+ * ActiveModel resolves it up front and threads it here.
+ */
+export interface XmlTypeInfo {
+  types: Record<string, string | undefined>;
+  nested: Record<string, XmlTypeInfo>;
+}
+
 export interface ToTagOptions extends RenameKeyOptions {
   /** The sink the emitted tag(s) are written to. */
   builder: XmlBuilder;
   /** Explicit `type=` name; suppresses runtime type inference when set. */
   type?: string;
+  /**
+   * Cast types for a container's children, threaded through `emitHash`/
+   * `emitArray` so nested attributes keep an adapter-agnostic `type=`.
+   */
+  typeInfo?: XmlTypeInfo;
+  /**
+   * Underscore each tag key before {@link renameKey} runs. ActiveModel's
+   * serialized keys are camelCase; Rails' are already snake_case, so this is
+   * off by default and set only by `Model#toXml`.
+   */
+  underscoreKeys?: boolean;
   /** Suppress the inferred `type=` attribute (any truthy value, per Rails). */
   skipTypes?: boolean | number;
   /** Overrides `DEFAULT_ENCODINGS[type]` for the `encoding=` attribute. */
@@ -182,6 +207,16 @@ function keyToString(key: unknown): string {
 }
 
 /**
+ * The final tag name for a key: {@link renameKey} applied to the stringified
+ * key, optionally underscored first (ActiveModel's camelCase keys) so
+ * `dasherize` has `_`/space separators to rewrite.
+ */
+function renameTag(key: unknown, options: ToTagOptions): string {
+  const name = keyToString(key);
+  return renameKey(options.underscoreKeys ? underscore(name) : name, options);
+}
+
+/**
  * Whether a value is the trails analog of a Ruby `Hash` for `to_tag`. Rails
  * only routes an object through `Hash#to_xml` (field expansion) when it
  * `respond_to?(:to_xml)` — a plain Hash does, an arbitrary object does not.
@@ -232,7 +267,7 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
   let typeName = explicitType ?? inferTypeName(value);
   if (typeName === "datetime") typeName = "dateTime";
 
-  const renamed = renameKey(keyToString(key), options);
+  const renamed = renameTag(key, options);
   const attributes: Record<string, string> = {};
   if (!(options.skipTypes || typeName == null)) attributes.type = typeName;
   if (value == null) attributes.nil = "true";
@@ -255,7 +290,7 @@ export function toTag(key: unknown, value: unknown, options: ToTagOptions): void
  * at this level and not forwarded to the element tags.
  */
 function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void {
-  const root = renameKey(keyToString(key), options);
+  const root = renameTag(key, options);
   const attributes: Record<string, string> = options.skipTypes ? {} : { type: "array" };
   // Rails special-cases an empty array to `builder.tag!(root, attributes)` with
   // no block — the self-closing `<root type="array"/>` form.
@@ -279,10 +314,13 @@ function emitArray(key: unknown, values: unknown[], options: ToTagOptions): void
  * `to_tag`, which renames the entry key.
  */
 function emitHash(key: unknown, hash: Record<string, unknown>, options: ToTagOptions): void {
-  const root = renameKey(keyToString(key), options);
+  const root = renameTag(key, options);
+  const info = options.typeInfo;
   options.builder.openTag(root, {});
   for (const [k, v] of Object.entries(hash)) {
-    toTag(k, v, { ...options, type: undefined, root: k });
+    // Resolve each child's explicit `type=` and next-level table from this
+    // level's `typeInfo` so nested cast types survive the descent.
+    toTag(k, v, { ...options, type: info?.types[k], typeInfo: info?.nested[k], root: k });
   }
   options.builder.closeTag(root);
 }
@@ -316,6 +354,53 @@ export class XmlStringBuilder implements XmlBuilder {
 
   closeTag(name: string): void {
     this.buffer += `</${name}>`;
+  }
+
+  /** The accumulated XML. Mirrors: `Builder::XmlMarkup#target!`. */
+  target(): string {
+    return this.buffer;
+  }
+}
+
+/**
+ * A depth-aware XML sink: each tag is emitted on its own line, indented two
+ * spaces per open container and terminated by a newline. `openTag`/`closeTag`
+ * track nesting so `to_tag`'s `emitHash`/`emitArray` produce the pretty-printed
+ * layout ActiveModel's `Model#toXml` emits. Mirrors `Builder::XmlMarkup` with
+ * `:indent => 2`.
+ */
+export class IndentedXmlStringBuilder implements XmlBuilder {
+  private buffer = "";
+  private depth = 0;
+
+  constructor(private readonly baseIndent = "") {}
+
+  private indent(): string {
+    return this.baseIndent + "  ".repeat(this.depth);
+  }
+
+  private attributeString(attributes: Record<string, string>): string {
+    return Object.entries(attributes)
+      .map(([k, v]) => ` ${k}="${htmlEscape(v).toString()}"`)
+      .join("");
+  }
+
+  tag(name: string, content?: string | null, attributes: Record<string, string> = {}): void {
+    const attrs = this.attributeString(attributes);
+    this.buffer +=
+      content == null
+        ? `${this.indent()}<${name}${attrs}/>\n`
+        : `${this.indent()}<${name}${attrs}>${htmlEscape(content).toString()}</${name}>\n`;
+  }
+
+  openTag(name: string, attributes: Record<string, string> = {}): void {
+    this.buffer += `${this.indent()}<${name}${this.attributeString(attributes)}>\n`;
+    this.depth += 1;
+  }
+
+  closeTag(name: string): void {
+    this.depth -= 1;
+    this.buffer += `${this.indent()}</${name}>\n`;
   }
 
   /** The accumulated XML. Mirrors: `Builder::XmlMarkup#target!`. */

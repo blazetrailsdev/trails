@@ -169,9 +169,11 @@ export {
   renameKey,
   toTag,
   XmlStringBuilder,
+  IndentedXmlStringBuilder,
   type RenameKeyOptions,
   type ToTagOptions,
   type XmlBuilder,
+  type XmlTypeInfo,
 } from "./xml-mini.js";
 
 export {
