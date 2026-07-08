@@ -1022,3 +1022,16 @@ function isDatabaseAdapter(v: unknown): v is DatabaseAdapter {
     typeof obj.adapterName === "string"
   );
 }
+
+// Load the `ConnectionAdapters::SchemaDumper` subclass so it registers itself
+// as `connectionAdaptersDumper` (see that field) even when a consumer imports
+// only this base module — the redirect in `create` then always has the single
+// `emitTable`/`columnSpec` emitter available, mirroring Rails' adapter dumper
+// factory which unconditionally returns `ConnectionAdapters::SchemaDumper`
+// (connection_adapters/abstract/schema_dumper.rb:8-10). The import must be
+// dynamic, not static: the subclass `extends` this class, so a static back-edge
+// would evaluate its `extends` clause before this class is defined (a temporal
+// dead zone) — the same static cycle this file already breaks for
+// `schema-introspection`. Placed after the class declaration, so by the time
+// the subclass module evaluates, this base class is fully defined.
+void import("./connection-adapters/abstract/schema-dumper.js");
