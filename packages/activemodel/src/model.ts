@@ -1657,20 +1657,29 @@ export class Model {
     // Attributes#initialize — @attributes = self.class._default_attributes.deep_dup
     this._attributes = ctor._defaultAttributes().deepDup();
 
-    // API#initialize — assign_attributes(attributes) (api.rb:80-82). Each key is
-    // routed through `_assignAttribute` → setter dispatch, exactly like Rails'
-    // `_assign_attribute` (attribute_assignment.rb:67-75): a key with a writer
-    // (a framework-generated attribute setter, a user-defined `set name`, or a
-    // nested-attribute `<assoc>Attributes=` setter) dispatches through it, and a
-    // genuinely-unknown, writer-less key routes to `attributeWriterMissing`
+    // API#initialize — assign_attributes(attributes) (api.rb:80-82), which runs
+    // `sanitize_for_mass_assignment` (ForbiddenAttributesProtection) before the
+    // per-key dispatch: an unpermitted `ActionController::Parameters`-like bag
+    // raises `ForbiddenAttributesError` at construction, a permitted one is
+    // unwrapped via `to_h`, and a plain hash passes through untouched. Each key
+    // is then routed through `_assignAttribute` → setter dispatch, exactly like
+    // Rails' `_assign_attribute` (attribute_assignment.rb:67-75): a key with a
+    // writer (a framework-generated attribute setter, a user-defined `set name`,
+    // or a nested-attribute `<assoc>Attributes=` setter) dispatches through it,
+    // and a genuinely-unknown, writer-less key routes to `attributeWriterMissing`
     // (→ `UnknownAttributeError`). The `_initializingAttributes` window lets the
     // AR write path detect construction (e.g. composite-PK `id=` remap) without
     // re-raising mid-construction. Empty bag is a no-op — mirrors
     // `assign_attributes`' `return if new_attributes.empty?` (so a subclass
-    // `_assignAttributes` override isn't invoked for `new Model({})`).
+    // `_assignAttributes` override isn't invoked for `new Model({})`, and neither
+    // is sanitization). The ActiveRecord `Base` constructor sanitizes before
+    // `super()`, converting any params wrapper to a plain hash, so this second
+    // sanitize on the AR path no-ops rather than double-checking.
     this._initializingAttributes = true;
     try {
-      if (Object.keys(attrs).length > 0) this._assignAttributes(attrs);
+      if (Object.keys(attrs).length > 0) {
+        this._assignAttributes(this.sanitizeForMassAssignment(attrs));
+      }
     } finally {
       this._initializingAttributes = false;
     }

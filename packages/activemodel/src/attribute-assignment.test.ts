@@ -1,5 +1,31 @@
 import { describe, it, expect } from "vitest";
 import { Model, ArgumentError } from "./index.js";
+import { ForbiddenAttributesError } from "./forbidden-attributes-protection.js";
+
+// Mirrors Rails' ProtectedParams stub (attribute_assignment_test.rb): a
+// params-like wrapper exposing `permitted?` and `to_h`. Trails dispatches on
+// the camelCase `permitted` / `toH` members.
+class ProtectedParams {
+  private parameters: Record<string, unknown>;
+  private _permitted = false;
+
+  constructor(attributes: Record<string, unknown>) {
+    this.parameters = attributes;
+  }
+
+  permitted(): boolean {
+    return this._permitted;
+  }
+
+  permitBang(): this {
+    this._permitted = true;
+    return this;
+  }
+
+  toH(): Record<string, unknown> {
+    return this.parameters;
+  }
+}
 
 describe("AttributeAssignmentTest", () => {
   it("simple assignment alias", () => {
@@ -152,23 +178,26 @@ describe("AttributeAssignmentTest", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
+        this.attribute("description", "string");
       }
     }
-    const p = new Person({});
-    // In our implementation, all attributes are permitted
-    p.assignAttributes({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
+    const params = new ProtectedParams({ name: "Guille", description: "m" });
+    expect(() => new Person(params as unknown as Record<string, unknown>)).toThrow(
+      ForbiddenAttributesError,
+    );
   });
 
   it("permitted attributes can be used for mass assignment", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
+        this.attribute("description", "string");
       }
     }
-    const p = new Person({});
-    p.assignAttributes({ name: "test" });
-    expect(p.readAttribute("name")).toBe("test");
+    const params = new ProtectedParams({ name: "Guille", description: "desc" }).permitBang();
+    const p = new Person(params as unknown as Record<string, unknown>);
+    expect(p.readAttribute("name")).toBe("Guille");
+    expect(p.readAttribute("description")).toBe("desc");
   });
 
   it("assigning no attributes should not raise, even if the hash is un-permitted", () => {
