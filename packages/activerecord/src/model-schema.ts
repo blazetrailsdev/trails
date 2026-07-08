@@ -1047,31 +1047,24 @@ function applyColumnsHash(
       // `_defaultAttributes` seeds it via from_database directly from the cached
       // column (Rails' column-seed-then-replay), then replays the user override.
       //
-      // Enums are the exception that still needs the reflected column type:
-      // Rails resolves the enum subtype from the column's real `Type::Value`
-      // inside `decorate_attributes` (enum.rb:239-246). Our column-seed-then-
-      // replay seeds the override itself, so the reflected type would never
-      // reach the enum decorator otherwise. Compute it here (the adapter is in
-      // hand) via the SAME `type_for_column` pipeline the non-enum path uses —
-      // immutable-string conversion + `hook_attribute_type` (attributes.rb:
-      // 301-302, model_schema.rb:622-629) — so the enum subtype carries the
-      // same tz-conversion / optimistic-locking wrappers Rails passes into
-      // `EnumType.new`. Stash it on the def so `enumTypeFrom` delegates to it.
-      //
-      // Skip when the enum's attribute was EXPLICITLY typed (`attribute(name,
-      // type)` before `enum`): Rails uses the declared type, which wins over
-      // the column's reflected type — overriding it here would, e.g., coerce an
-      // integer enum on a MySQL `TINYINT(1)` column through boolean and break
-      // the round-trip.
-      const enums = (host as unknown as { _enums?: Map<string, unknown> })._enums;
-      if (enums?.has(name) && !(existing as { enumTypeExplicit?: boolean }).enumTypeExplicit) {
-        (existing as { enumReflectedSubtype?: Type }).enumReflectedSubtype = reflectedTypeForColumn(
-          host,
-          adapter,
-          name,
-          column,
-        );
-      }
+      // Stash the reflected `type_for_column` on the def so phase 1 of
+      // `_defaultAttributes` can seed the override attribute with the real
+      // column `Type::Value` — matching Rails, which seeds
+      // `_default_attributes` from `type_for_column(connection, column)`
+      // (attributes.rb:241-245) and then replays the user's pending
+      // modifications on top. The decorators (enum / serialize / normalizes /
+      // encryption) therefore receive the reflected column type as their
+      // `subtype`; an explicit `attribute(name, type)` still wins because its
+      // PendingType overrides the seed during the phase-2 replay. Computed here
+      // (the adapter is in hand) via the SAME `type_for_column` pipeline the
+      // non-user schema path uses — immutable-string conversion +
+      // `hook_attribute_type` (attributes.rb:301-302, model_schema.rb:622-629).
+      (existing as { reflectedColumnType?: Type }).reflectedColumnType = reflectedTypeForColumn(
+        host,
+        adapter,
+        name,
+        column,
+      );
       continue;
     }
 

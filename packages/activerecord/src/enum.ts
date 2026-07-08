@@ -65,13 +65,12 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
  * so the EnumType always delegates cast/serialize/deserialize to the actual
  * column type.
  *
- * The reflected column type is the authoritative source. trails' column-seed-
- * then-replay seeds the enum override itself (not the raw column type, unlike
- * Rails), so the `reflected` argument the decorator receives at replay time is
- * the pre-reflection EnumType, not the column's `Type::Value`. Schema
- * reflection therefore stashes the real column cast type on the attribute def
- * as `enumReflectedSubtype` (model-schema.ts, where the adapter is in hand);
- * prefer it when present.
+ * trails' column-seed-then-replay now seeds the override attribute with the
+ * reflected `type_for_column` in phase 1 of `_defaultAttributes`
+ * (attributes.ts), so the `reflected` argument the decorator receives at replay
+ * time is already the column's real `Type::Value` — no per-def stash needed,
+ * mirroring Rails' block verbatim (`subtype = subtype.subtype if EnumType ===
+ * subtype`).
  *
  * Two fallbacks mirror the surrounding replay machinery rather than Rails
  * directly: an already-decorated EnumType is unwrapped to its own subtype (a
@@ -81,23 +80,18 @@ function subtypeInstance(subtype: string): ValueType<unknown> {
  * shapes so pre-reflection casts are not identity no-ops.
  */
 function enumTypeFrom(
-  klass: typeof Base,
-  attribute: string,
+  _klass: typeof Base,
+  _attribute: string,
   name: string,
   mapping: Record<string, EnumValue>,
   reflected: Type,
   raiseOnInvalidValues: boolean,
 ): EnumType {
-  const defs = (klass as unknown as { _attributeDefinitions?: Map<string, unknown> })
-    ._attributeDefinitions;
-  const stashed = (defs?.get(attribute) as { enumReflectedSubtype?: Type } | undefined)
-    ?.enumReflectedSubtype;
-  const source = stashed ?? reflected;
   let subtype: ValueType<unknown>;
-  if (source instanceof EnumType) {
-    subtype = source.subtypeType();
+  if (reflected instanceof EnumType) {
+    subtype = reflected.subtypeType();
   } else {
-    const rv = source as ValueType<unknown>;
+    const rv = reflected as ValueType<unknown>;
     subtype = rv.type() === "value" ? subtypeInstance(inferSubtype(Object.values(mapping))) : rv;
   }
   return new EnumType(name, new Map(Object.entries(mapping)), subtype, raiseOnInvalidValues);
@@ -619,18 +613,6 @@ export function _enum(
     options && "default" in options ? { default: options.default } : undefined,
   );
 
-  // Record whether the user explicitly typed the enum's attribute (e.g.
-  // `attribute("state", "integer")` before `enum`). Rails resolves the enum
-  // subtype from the attribute's *declared* type — an explicit type wins over
-  // the column's reflected type — so schema reflection must NOT override an
-  // explicitly-typed enum's subtype with the column type (e.g. a TINYINT(1)
-  // that MySQL reflects as boolean). See the `enumTypeExplicit` gate in
-  // model-schema's `applyColumnsHash`.
-  const enumDef = (
-    this as unknown as { _attributeDefinitions?: Map<string, unknown> }
-  )._attributeDefinitions?.get(attrName) as { enumTypeExplicit?: boolean } | undefined;
-  if (enumDef) enumDef.enumTypeExplicit = explicitlyTyped;
-
   // Rails' `_enum` takes `scopes: true, instance_methods: true` keyword
   // defaults; `scopes: false` suppresses per-value scope generation and
   // `instance_methods: false` suppresses predicate/bang generation.
@@ -1019,7 +1001,7 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
   // attribute set — the SAME path `Base.typeForAttribute` uses (base.ts). The
   // public `Base.loadSchema()` is async and would fire-and-forget, letting a
   // caller read the pre-reflection (mapping-inferred) EnumType; this sync
-  // reflection stashes `enumReflectedSubtype` and rebuilds `_defaultAttributes`
+  // reflection seeds the reflected column type and rebuilds `_defaultAttributes`
   // before we read it, so the reflected subtype is already in place.
   reflectSchemaSync.call(klass);
   // Mirror `Base.typeForAttribute`'s guard: a typeless enum (no backing column,

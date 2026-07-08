@@ -199,10 +199,20 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       if (source === "schema") {
         attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue ?? null, def.type));
       } else if (column !== undefined) {
-        // User type-override on a real DB column (e.g. enum): the cached column
-        // carries the authoritative raw default; seed via from_database so it
-        // deserializes through the (overridden) type.
-        attrMap.set(name, Attribute.fromDatabase(name, column.default ?? null, def.type));
+        // User type-override on a real DB column (e.g. enum, serialize,
+        // normalizes, encryption): seed with the REFLECTED column type, not the
+        // override's own type, mirroring Rails' `type_for_column(connection,
+        // column)` seed (attributes.rb:241-245). The cached column carries the
+        // authoritative raw default; from_database deserializes it through the
+        // reflected type. The user override is layered back on in phase 2 —
+        // decorators receive the reflected type as their `subtype`, and an
+        // explicit `attribute(name, type)` PendingType still wins over the seed.
+        // `reflectedColumnType` is stashed by applyColumnsHash (model-schema.ts)
+        // where the adapter is in hand; fall back to the def's own type before
+        // the schema has reflected.
+        const seedType =
+          (def as { reflectedColumnType?: typeof def.type }).reflectedColumnType ?? def.type;
+        attrMap.set(name, Attribute.fromDatabase(name, column.default ?? null, seedType));
       } else if (def.defaultValue != null) {
         const base = Attribute.withCastValue(name, null, def.type);
         attrMap.set(name, base.withUserDefault(def.defaultValue));
