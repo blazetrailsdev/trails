@@ -36,9 +36,11 @@ registerModel(Comment);
 });
 
 // A source-table (`comments.`) condition on a has_many-through (collection
-// source). The single-query JOIN can't cover a collection source (it fans the
-// through rows out), so trails keeps the two-step: the source condition is
-// applied at the source-preloader stage, NOT copied onto the through query.
+// source). Rails' `through_scope` copies the FULL where_clause onto the through
+// query and `includes!(source)` + `references!(source.table_name)`, eager-loading
+// the source via a JOIN whose JoinDependency dedups the middle records by PK — so
+// the source condition IS carried onto the through query (with the source JOIN)
+// rather than deferred to the source-preloader stage.
 (Author as any).hasMany("commentsWithSourceCondition", {
   className: "Comment",
   through: "posts",
@@ -69,10 +71,9 @@ registerModel(Comment);
 });
 
 // A MIXED predicate referencing both the through table (`posts`) and the source
-// table (`comments`) in one node. The two-step through query joins neither the
-// source nor anything else, so this predicate is NOT through-table-only and must
-// stay whole on the source scope — not be split off / copied onto the through
-// query where `comments` is unjoined.
+// table (`comments`) in one node. Rails copies the full where_clause and JOINs
+// the source, so both `posts` and `comments` are available on the through query
+// and the whole predicate resolves there in one query.
 (Author as any).hasMany("commentsWithMixedCondition", {
   className: "Comment",
   through: "posts",
@@ -109,12 +110,14 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
   it("keeps a source-table condition on a collection source at the source stage, not the through query", () => {
     const david = authors("david");
     const loader = throughLoader([david], "commentsWithSourceCondition");
-    // Collection source (has_many comments): the two-step keeps the through
-    // query free of the source condition (it would fan the through rows out).
+    // Rails copies the full where_clause and eager-loads the source (JOIN
+    // comments), whose JoinDependency dedups the middle records by PK — so the
+    // source condition rides the through query with the source JOIN, resolving
+    // in one query rather than being deferred to the source stage.
     const scope = (loader as any)._buildThroughScope();
     const sql = scope.toSql();
-    expect(sql).not.toContain("first comment");
-    expect(sql).not.toMatch(/JOIN/);
+    expect(sql).toContain("first comment");
+    expect(sql).toMatch(/JOIN .*comments/);
   });
 
   it("copies a through-table condition onto the through query for a collection source", () => {
@@ -140,9 +143,12 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     const loader = throughLoader([david], "commentsWithMixedCondition");
     const scope = (loader as any)._buildThroughScope();
     // The predicate references both `posts` (through) and `comments` (source) in
-    // one node. The through query can't resolve `comments`, so the whole node
-    // stays on the source scope — nothing from it is copied here.
-    expect(scope.toSql()).not.toContain("posts.title");
+    // one node. Rails copies the full where_clause and JOINs the source, so both
+    // tables are available on the through query and the whole predicate resolves
+    // there.
+    const sql = scope.toSql();
+    expect(sql).toContain("posts.title");
+    expect(sql).toMatch(/JOIN .*comments/);
   });
 
   it("cascades strict loading from the preload scope onto the through query", async () => {
