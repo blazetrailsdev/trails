@@ -177,8 +177,16 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     // Ruby Integer as SQLITE_INTEGER, so `LOWER(1)` yields `'1'`. Handing the
     // driver a BigInt makes it bind SQLITE_INTEGER, converging the text-forcing
     // (e.g. `LOWER(col) = LOWER(?)`) path with Rails. Non-integer numbers keep
-    // binding as float. Rails: SQLite3::Quoting#_type_cast leaves the numeric
-    // type distinction to the type-cast layer above the driver.
+    // binding as float.
+    //
+    // Fidelity boundary: MRI keys the INTEGER/FLOAT choice off the Ruby object
+    // class (Integer vs Float) set by the type-cast layer, whereas here both
+    // arrive as an indistinguishable JS number, so we key off the value. A
+    // whole-valued Float (e.g. a `2.0` from a float/decimal column) therefore
+    // binds as INTEGER rather than FLOAT — observable only through a
+    // text-forcing function (`LOWER(2.0)` → `'2'` not `'2.0'`), which is not a
+    // path AR generates for numeric columns; numeric comparisons coerce and are
+    // unaffected.
     return Number.isInteger(value) ? BigInt(value) : value;
   }
   if (typeof value === "string" || typeof value === "bigint") return value;
