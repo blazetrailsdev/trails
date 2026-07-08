@@ -216,6 +216,17 @@ describe("TableDefinition#new_foreign_key_definition", () => {
     expect(fk.column).toEqual(["rocket_tenant_id", "rocket_id"]);
   });
 
+  it("add_composite_foreign_key_raises_if_column_and_primary_key_sizes_mismatch", () => {
+    // Mirrors foreign_key_options' arity guard (schema_statements.rb:1258-1266):
+    // a composite primaryKey must be matched by an equal-arity column.
+    expect(() =>
+      new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
+        column: "rocket_id",
+        primaryKey: ["tenant_id", "id"],
+      }),
+    ).toThrow(":column must reference all the :primary_key columns");
+  });
+
   it("applies table_name_prefix/suffix to to_table before building the def", () => {
     const adapter = {
       tableNamePrefix: "app_",

@@ -119,6 +119,29 @@ export interface ReferenceForeignKeyOptions extends AddForeignKeyOptions {
 }
 
 /**
+ * Mirror Rails' composite-arity guard (schema_statements.rb:1258-1266): once
+ * `foreign_key_options` has filled the default `column`, a composite FK
+ * (either `column` or `primaryKey` given as an array) must reference exactly as
+ * many `column`s as `primaryKey`s. `Array(nil)` is empty in Ruby, so a lone
+ * array with no counterpart also mismatches.
+ * @internal
+ */
+export function assertCompositeForeignKeyArity(
+  toTable: string,
+  column: unknown,
+  primaryKey: unknown,
+): void {
+  if (!Array.isArray(column) && !Array.isArray(primaryKey)) return;
+  const size = (v: unknown): number => (Array.isArray(v) ? v.length : v == null ? 0 : 1);
+  if (size(primaryKey) !== size(column)) {
+    throw new ArgumentError(
+      `For composite primary keys, specify :column and :primary_key, where ` +
+        `:column must reference all the :primary_key columns from ${JSON.stringify(toTable)}`,
+    );
+  }
+}
+
+/**
  * Lookup options accepted by ForeignKeyDefinition#isDefinedFor / foreignKeyFor,
  * mirroring the keyword args Rails `defined_for?` matches generically.
  */
@@ -1133,6 +1156,7 @@ export class TableDefinition {
       const hex = getCrypto().createHash("sha256").update(identifier).digest("hex").slice(0, 10);
       result.name = `fk_rails_${hex}`;
     }
+    assertCompositeForeignKeyArity(toTable, result.column, result.primaryKey);
     return result;
   }
 
