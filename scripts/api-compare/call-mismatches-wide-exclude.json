@@ -20338,13 +20338,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "add_foreign_key",
-    "call": "foreign_key_exists?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/schema-statements.ts",
-    "rubyName": "add_foreign_key",
     "call": "slice",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
