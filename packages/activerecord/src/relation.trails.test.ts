@@ -71,6 +71,30 @@ describe("RelationTest", () => {
     expect(CanonPost.all().merge({ readonly: true } as any).isReadonly).toBe(true);
   });
 
+  // No like-named Rails test: guards trails' merge/merge! structure, which
+  // mirrors Rails' `merge` = `spawn.merge!` (spawn_methods.rb). `merge` clones
+  // first so the receiver is untouched; `merge!` runs the one Merger#merge
+  // algorithm in place, returning the same object. Both must land the same
+  // conditions — a regression that re-splits the two paths is caught here.
+  it("merge is non-destructive while mergeBang mutates in place through one path", () => {
+    const base = CanonPost.all().where({ title: "a" });
+    const baseSqlBefore = base.toSql();
+
+    const merged = base.merge(CanonPost.where({ type: "SpecialPost" }));
+    // merge() left the receiver untouched (spawn cloned first)...
+    expect(base.toSql()).toBe(baseSqlBefore);
+    // ...and produced the combined conditions on a fresh relation.
+    expect(merged.toSql()).toContain("title");
+    expect(merged.toSql()).toContain("type");
+
+    // mergeBang() mutates the receiver in place and returns it (same object),
+    // landing the identical conditions merge() produced on its clone.
+    const target = CanonPost.all().where({ title: "a" });
+    const returned = (target as any).mergeBang(CanonPost.where({ type: "SpecialPost" }));
+    expect(returned).toBe(target);
+    expect(target.toSql()).toBe(merged.toSql());
+  });
+
   it("dotted string order passes through as raw SQL (Rails treats all string orders as SqlLiteral)", () => {
     class Post extends Base {
       static _tableName = "posts";

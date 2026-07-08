@@ -3,6 +3,7 @@ import { assertValidKeys } from "@blazetrails/activesupport";
 
 import { arelColumns } from "./query-methods.js";
 import { foldMergeJoins, foldMergeOuterJoins } from "./merge-joins.js";
+import { foldMergeEagerLoad, foldMergePreloads } from "./merge-preloads.js";
 
 /**
  * Merges two Relations together, combining their conditions,
@@ -21,8 +22,14 @@ export class Merger {
     this.values = typeof other.values === "function" ? other.values() : {};
   }
 
+  // Rails' Merger#merge mutates the relation it is given and returns it
+  // (merger.rb) — it does NOT clone. Non-destructive `merge` gets its fresh copy
+  // from `spawn` before ever reaching here (SpawnMethods#merge = `spawn.merge!`),
+  // while `merge!` hands `self` straight in. Mirroring that in-place contract is
+  // what lets both entry points share this single algorithm; see mergeBang /
+  // performMerge in spawn-methods.ts.
   merge(): any {
-    const rel = this.relation._clone();
+    const rel = this.relation;
     this.mergeUnscope(rel);
     this.mergeWhereClause(rel);
     this.mergeSelectValues(rel);
@@ -30,6 +37,7 @@ export class Merger {
     this.mergeSingleValues(rel);
     this.mergeClauses(rel);
     this.mergeCtes(rel);
+    this.mergeEagerLoad(rel);
     this.mergePreloads(rel);
     this.mergeJoins(rel);
     this.mergeOuterJoins(rel);
@@ -74,31 +82,19 @@ export class Merger {
     rel._selectBang(...columns);
   }
 
-  private mergePreloads(rel: any): void {
-    if (this.other._preloadAssociations && this.other._preloadAssociations.length > 0) {
-      rel._preloadAssociations = [
-        ...(rel._preloadAssociations ?? []),
-        ...this.other._preloadAssociations,
-      ];
-    }
-    if (this.other._includesAssociations && this.other._includesAssociations.length > 0) {
-      rel._includesAssociations = [
-        ...(rel._includesAssociations ?? []),
-        ...this.other._includesAssociations,
-      ];
-    }
-    if (this.other._eagerLoadAssociations && this.other._eagerLoadAssociations.length > 0) {
-      rel._eagerLoadAssociations = [
-        ...(rel._eagerLoadAssociations ?? []),
-        ...this.other._eagerLoadAssociations,
-      ];
-    }
+  // Thin wrappers over the folders (merge-preloads.ts); api:compare still maps
+  // merger.rb's merge_preloads to this file. Both merge() and merge!() run
+  // through Merger#merge, so these fire on every merge.
+  private mergeEagerLoad(rel: any): void {
+    foldMergeEagerLoad(rel, this.other);
   }
 
-  // Thin wrappers over the shared folders (merge-joins.ts) so merge() and
-  // merge!() (spawn-methods mergeBang) fold joins through the same code and
-  // cannot drift, while api:compare still maps merger.rb's merge_joins /
-  // merge_outer_joins to this file.
+  private mergePreloads(rel: any): void {
+    foldMergePreloads(rel, this.other);
+  }
+
+  // Thin wrappers over the folders (merge-joins.ts); api:compare still maps
+  // merger.rb's merge_joins / merge_outer_joins to this file.
   private mergeJoins(rel: any): void {
     foldMergeJoins(rel, this.other);
   }
