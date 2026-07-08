@@ -123,6 +123,26 @@ describe("Callbacks", () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "before", (t: any) => t.log.push("before"));
+      // Register the after before the around so it wraps outside it (Rails
+      // compiles afters registered earlier onto the outer sequence).
+      setCallback(target, "save", "after", (t: any) => t.log.push("after"));
+      setCallback(target, "save", "around", (t: any, next: () => void) => {
+        t.log.push("around-pre");
+        next();
+        t.log.push("around-post");
+      });
+
+      runCallbacks(target, "save", () => target.log.push("block"));
+
+      expect(target.log).toEqual(["before", "around-pre", "block", "around-post", "after"]);
+    });
+
+    it("after registered after an around runs inside it", () => {
+      // Rails compiles an after registered later onto the inner (final) sequence,
+      // so it runs right after the block — before the around's post — rather than
+      // outside the around. Mirrors CallbackChain#compile's reverse fold.
+      const target = { log: [] as string[] };
+      defineCallbacks(target, "save");
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.log.push("around-pre");
         next();
@@ -132,7 +152,7 @@ describe("Callbacks", () => {
 
       runCallbacks(target, "save", () => target.log.push("block"));
 
-      expect(target.log).toEqual(["before", "around-pre", "block", "around-post", "after"]);
+      expect(target.log).toEqual(["around-pre", "block", "after", "around-post"]);
     });
   });
 
@@ -487,6 +507,11 @@ describe("Callbacks", () => {
         },
         { if: () => true },
       );
+      // after callback — registered before the arounds (as Rails' AroundPerson
+      // does) so it wraps outside them and runs last.
+      setCallback(target, "save", "after", (t: any) => {
+        t.history.push("tweedle");
+      });
       // around callbacks
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.history.push("tweedle dum pre");
@@ -509,10 +534,6 @@ describe("Callbacks", () => {
         next();
         t.history.push("tweedle deedle post");
       });
-      // after callback
-      setCallback(target, "save", "after", (t: any) => {
-        t.history.push("tweedle");
-      });
 
       runCallbacks(target, "save", () => {
         target.history.push("running");
@@ -530,6 +551,25 @@ describe("Callbacks", () => {
         "tweedle dum post",
         "tweedle",
       ]);
+    });
+  });
+
+  describe("around callback result", () => {
+    it("save around", () => {
+      // AroundCallbackResultTest#test_save_around — an around callback can capture
+      // the event return value via `@result = yield` (Rails invoke_sequence breaks
+      // with env.value, so next() returns the block result).
+      const target = { result: null as unknown };
+      defineCallbacks(target, "save");
+      setCallback(target, "save", "after", () => "tweedle_1");
+      setCallback(target, "save", "around", (t: any, next: any) => {
+        t.result = next();
+      });
+      setCallback(target, "save", "after", () => "tweedle_2");
+
+      runCallbacks(target, "save", () => "running");
+
+      expect(target.result).toBe("running");
     });
   });
 
@@ -1845,16 +1885,29 @@ describe("Callbacks — async propagation", () => {
   it("async around callback propagates Promise and runs after callbacks when complete", async () => {
     const t = { log: [] as string[] };
     defineCallbacks(t, "save");
+    // after registered before the around so it wraps outside it and runs last.
+    setCallback(t, "save", "after", (x: any) => x.log.push("after"));
     setCallback(t, "save", "around", async (x: any, next) => {
       x.log.push("ao");
       await next();
       x.log.push("ac");
     });
-    setCallback(t, "save", "after", (x: any) => x.log.push("after"));
     const r = runCallbacks(t, "save", async () => t.log.push("block"));
     expect(r).toBeInstanceOf(Promise);
     await r;
     expect(t.log).toEqual(["ao", "block", "ac", "after"]);
+  });
+
+  it("awaited next() resolves to the async block result", async () => {
+    // Rails invoke_sequence breaks with env.value, so `await next()` sees the
+    // block's return even when the block is async.
+    const t = { result: null as unknown };
+    defineCallbacks(t, "save");
+    setCallback(t, "save", "around", async (x: any, next: any) => {
+      x.result = await next();
+    });
+    await runCallbacks(t, "save", async () => "running");
+    expect(t.result).toBe("running");
   });
 
   it("strict:sync throws on async callback", () => {

@@ -230,9 +230,9 @@ const VALID_ON_VALUES = new Set(["create", "update", "destroy"]);
  * chain, while still storing the original object as `originalObject` so
  * `skip`-by-reference works.
  *
- * After callbacks are stored with `prepend: true` so activesupport's LIFO
- * reverse-iteration in `_runAfters` produces FIFO execution order — same as
- * Rails' `_define_after_model_callback prepend: true`.
+ * After callbacks are stored with `prepend: true` so the compiled sequence's
+ * `invokeAfter` produces FIFO execution order — same as Rails'
+ * `_define_after_model_callback prepend: true`.
  *
  * @internal
  */

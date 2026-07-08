@@ -786,6 +786,35 @@ export class CallbackSequence {
     return this.callTemplate!.expand(env.target, env.value, block);
   }
 
+  /**
+   * Dispatch this (non-final) sequence's around callback with `next` as its block
+   * continuation. Mirrors Rails' `target, block, method, *arguments =
+   * current.expand_call_template(env, invoke_sequence)` followed by
+   * `target.send(method, *arguments, &block)` — the CallTemplate's `expand`
+   * chooses the shape, and each of Ruby's `instance_exec` / `Proc#call` /
+   * `send`-with-block forms maps onto the JS call below.
+   */
+  invokeAround(env: FilterEnvironment, next: () => unknown): unknown {
+    const expanded = this.expandCallTemplate(env, next);
+    const method = expanded[2];
+    if (method === "instanceExec") {
+      // [target, fn, "instanceExec", ...arguments] — instance_exec(*arguments, &fn):
+      // run fn with `this` bound to target and the arguments (incl. continuation).
+      const fn = expanded[1] as (...args: unknown[]) => unknown;
+      return fn.apply(expanded[0], expanded.slice(3));
+    }
+    if (method === "call") {
+      // [fn, block, "call", target, value] — fn.call(target, value, &block):
+      // the proc keeps its own binding; forward args then the continuation.
+      const fn = expanded[0] as (...args: unknown[]) => unknown;
+      return fn(...expanded.slice(3), expanded[1]);
+    }
+    // [receiver, block, methodName, ...arguments] — receiver.send(methodName,
+    // *arguments, &block): the method receives the continuation as its last arg.
+    const receiver = expanded[0] as Record<PropertyKey, (...args: unknown[]) => unknown>;
+    return receiver[method as PropertyKey](...expanded.slice(3), expanded[1]);
+  }
+
   invokeBefore(
     env: FilterEnvironment,
     opts?: RunCallbacksOptions,
@@ -834,24 +863,177 @@ export class CallbackSequence {
     block?: () => unknown,
     opts?: RunCallbacksOptions,
   ): boolean | Promise<boolean> {
-    const callbackChain = this._callbackChain;
-    // Interim: chains containing around callbacks are not final and still run
-    // through the bespoke engine. A follow-up story ports the around loop
-    // (Rails run_callbacks' invoke_sequence) onto the compiled sequence and
-    // retires _invoke. See callbacks-around-loop-drives-compiled-sequence.
-    if (!this.isFinal()) {
-      return callbackChain!._invoke(target, block, opts);
+    const chainName = this._callbackChain?.name ?? "";
+    const env: FilterEnvironment = { target, halted: false, value: undefined };
+
+    // Common case (Rails run_callbacks' `if next_sequence.final?` branch):
+    // invoke_before → env.value = !halted && (!block || yield) → invoke_after.
+    if (this.isFinal()) {
+      const beforeDone = this.invokeBefore(env, opts, chainName);
+      if (isThenable(beforeDone)) {
+        return Promise.resolve(beforeDone).then(() =>
+          this._finishFinal(env, block, opts, chainName),
+        );
+      }
+      return this._finishFinal(env, block, opts, chainName);
     }
 
-    // Mirrors Rails run_callbacks' `if next_sequence.final?` branch:
-    // invoke_before → env.value = !halted && (!block || yield) → invoke_after.
-    const chainName = callbackChain?.name ?? "";
-    const env: FilterEnvironment = { target, halted: false, value: undefined };
-    const beforeDone = this.invokeBefore(env, opts, chainName);
-    if (isThenable(beforeDone)) {
-      return Promise.resolve(beforeDone).then(() => this._finishFinal(env, block, opts, chainName));
-    }
-    return this._finishFinal(env, block, opts, chainName);
+    // Around case: the port of Rails run_callbacks' `invoke_sequence` Proc.
+    return this._invokeAround(env, block, opts, chainName);
+  }
+
+  /**
+   * Port of Rails run_callbacks' `invoke_sequence` Proc (callbacks.rb): walk the
+   * nested sequences, running each `invoke_before`, dispatching around callbacks
+   * with the continuation as their block (`expand_call_template` + `send`), and
+   * running each `invoke_after` as the recursion unwinds. Async is threaded with
+   * the same fire-and-forget / awaited-rescue semantics the retired
+   * `_runAroundAndAfter` provided. Returns whether the final block executed
+   * without the chain halting.
+   */
+  private _invokeAround(
+    env: FilterEnvironment,
+    block: (() => unknown) | undefined,
+    opts: RunCallbacksOptions | undefined,
+    chainName: string,
+  ): boolean | Promise<boolean> {
+    let reachedFinal = false;
+
+    // Final sequence: env.value = !halted && (!block || yield); then invoke_after.
+    const runFinal = (current: CallbackSequence): void | Promise<void> => {
+      if (env.halted) {
+        env.value = false;
+        return current.invokeAfter(env, opts, chainName);
+      }
+      const y = block ? block() : true;
+      if (isThenable(y)) {
+        if (opts?.strict === "sync") {
+          swallowRejection(y);
+          throw new Error(`Async callback on sync chain "${chainName}" — block returned a Promise`);
+        }
+        return Promise.resolve(y).then((v) => {
+          env.value = v;
+          reachedFinal = true;
+          return current.invokeAfter(env, opts, chainName);
+        });
+      }
+      env.value = y;
+      reachedFinal = true;
+      return current.invokeAfter(env, opts, chainName);
+    };
+
+    const runSeq = (current: CallbackSequence): void | Promise<void> => {
+      const beforeDone = current.invokeBefore(env, opts, chainName);
+      if (isThenable(beforeDone)) {
+        return Promise.resolve(beforeDone).then(() => afterBefore(current));
+      }
+      return afterBefore(current);
+    };
+
+    const afterBefore = (current: CallbackSequence): void | Promise<void> => {
+      if (current.isFinal()) return runFinal(current);
+      // A skipped around (condition failed or chain halted) is not invoked; recurse
+      // straight into the nested sequence, then run its own invoke_after as Rails
+      // does via the deferred `skipped` stack (LIFO == recursion unwinding).
+      if (current.isSkip(env)) {
+        const inner = runSeq(current.nested!);
+        if (isThenable(inner)) {
+          return Promise.resolve(inner).then(() => current.invokeAfter(env, opts, chainName));
+        }
+        return current.invokeAfter(env, opts, chainName);
+      }
+      return runAround(current);
+    };
+
+    const runAround = (current: CallbackSequence): void | Promise<void> => {
+      let pendingProceed: Promise<void> | undefined;
+      let proceedObserved = false;
+      const next = (): unknown => {
+        const r = runSeq(current.nested!);
+        // Rails' invoke_sequence Proc breaks with `env.value`, so `yield` (next())
+        // returns the event value — the block's return. Surface it here so an
+        // around can do `const v = next()` / `await next()` (callbacks.rb#128,136).
+        if (!isThenable(r)) return env.value;
+        pendingProceed = Promise.resolve(r);
+        // Return a thenable wrapper so we can detect whether the around actually
+        // awaited/chained on next() (real observation) versus firing it and
+        // forgetting. `await` and `.then(_, r)` both wire an onRejected; bare
+        // `next();`, `.then(onFulfilled)`, and `.finally()` do not. It resolves to
+        // env.value so an awaited next() yields the block result.
+        const observed = pendingProceed.then(() => env.value);
+        observed.catch(() => {}); // guard the derived promise; real path is pendingProceed
+        return {
+          then(onFulfilled?: any, onRejected?: any) {
+            if (typeof onRejected === "function") {
+              proceedObserved = true;
+              return observed.then(onFulfilled, onRejected);
+            }
+            const p = observed.then(onFulfilled);
+            p.catch(() => {});
+            return p;
+          },
+          catch(onRejected?: any) {
+            if (typeof onRejected === "function") {
+              proceedObserved = true;
+              return observed.catch(onRejected);
+            }
+            const p = observed.catch(onRejected);
+            p.catch(() => {});
+            return p;
+          },
+          finally(onFinally?: any) {
+            const p = observed.finally(onFinally);
+            p.catch(() => {});
+            return p;
+          },
+        } as unknown as Promise<void>;
+      };
+
+      const afterAround = (): void | Promise<void> => current.invokeAfter(env, opts, chainName);
+
+      let cbResult: void | Promise<void>;
+      try {
+        cbResult = current.invokeAround(env, next) as void | Promise<void>;
+      } catch (err) {
+        if (pendingProceed) {
+          return (async () => {
+            await pendingProceed.catch(() => {});
+            throw err;
+          })();
+        }
+        throw err;
+      }
+      if (isThenable(cbResult) || pendingProceed) {
+        if (opts?.strict === "sync") {
+          swallowRejection(cbResult);
+          swallowRejection(pendingProceed);
+          throw new Error(
+            `Async callback on sync chain "${chainName}" — around callback or block returned a Promise`,
+          );
+        }
+        return (async () => {
+          try {
+            await cbResult;
+          } catch (err) {
+            if (pendingProceed) await pendingProceed.catch(() => {});
+            throw err;
+          }
+          if (pendingProceed) {
+            // Swallow only when the around actually observed next() (awaited or
+            // chained a rejection handler); fire-and-forget arounds couldn't have
+            // rescued, so propagate the inner rejection.
+            if (proceedObserved) await pendingProceed.catch(() => {});
+            else await pendingProceed;
+          }
+          return afterAround();
+        })();
+      }
+      return afterAround();
+    };
+
+    const result = runSeq(this);
+    if (isThenable(result)) return Promise.resolve(result).then(() => reachedFinal);
+    return reachedFinal;
   }
 
   private _finishFinal(
@@ -897,8 +1079,6 @@ export class CallbackSequence {
 export class CallbackChain {
   readonly name: string;
   readonly config: DefineCallbacksOptions;
-  /** True when a custom (non-default) terminator was supplied at define time. */
-  private readonly _hasCustomTerminator: boolean;
   private chain: Callback[];
   // Memoized compiled sequence (Rails' @all_callbacks). Reset to undefined on
   // every chain mutation (append/prepend/insert/delete/remove/clear), matching
@@ -908,11 +1088,10 @@ export class CallbackChain {
   private _allCallbacks: CallbackSequence | undefined;
 
   constructor(name: string, config: DefineCallbacksOptions = {}) {
-    this._hasCustomTerminator = typeof config.terminator === "function";
     this.name = name;
     // Do NOT inject a default terminator into config — undefined means "use default"
     // and is what gets passed when cloning chains. Injecting a function would make
-    // cloned chains think they have a custom terminator (_hasCustomTerminator).
+    // cloned chains think they have a custom terminator.
     this.config = { ...config };
     this.chain = [];
   }
@@ -976,358 +1155,6 @@ export class CallbackChain {
 
   get isEmpty(): boolean {
     return this.chain.length === 0;
-  }
-
-  /**
-   * Fire Rails' `halted_callback_hook(filter, name)` on the target for the
-   * before callback that halted the chain. Mirrors `Filters::Before#call`;
-   * kept here because the bespoke around-chain engine (`_invoke`) does not
-   * compile through `Before#call`. See `Before#halt` for the compiled path.
-   */
-  private _notifyHalt(target: object, entry: Callback): void {
-    const hook = (target as { haltedCallbackHook?: (filter: unknown, name: string) => void })
-      .haltedCallbackHook;
-    if (typeof hook === "function") hook.call(target, entry.filter, entry.name);
-  }
-
-  _invoke(
-    target: object,
-    block?: () => unknown,
-    opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean> {
-    const terminatorFn = this.config.terminator;
-    const skipAfterIfTerminated = this.config.skipAfterCallbacksIfTerminated ?? false;
-    const befores = this.chain.filter((e) => e.kind === "before");
-    const afters = this.chain.filter((e) => e.kind === "after");
-    const arounds = this.chain.filter((e) => e.kind === "around");
-
-    // ---- Before phase ----
-    let halted = false;
-    for (let i = 0; i < befores.length; i++) {
-      const entry = befores[i];
-      if (!Value.check(entry.options, target)) continue;
-      const cb = entry.filter as BeforeCallback;
-      // Capture cbResult as a side effect inside the terminator's fn() so the
-      // terminator controls whether the callback runs at all (its API contract).
-      let cbResult: unknown;
-      let terminatorHalted = false;
-      let aborted = false;
-      if (terminatorFn === false) {
-        cbResult = cb.call(target, target);
-      } else if (terminatorFn) {
-        // Custom terminator owns the halt decision. Rails scopes `catch(:abort)`
-        // to the default terminator (callbacks.rb#default_terminator), so the
-        // sentinel is NOT caught here — it propagates unless the terminator
-        // itself catches it, matching Rails' caller-supplied terminator contract.
-        terminatorHalted = terminatorFn(target, () => {
-          cbResult = cb.call(target, target);
-          return cbResult;
-        });
-      } else {
-        // Default terminator: Rails wraps the call in `catch(:abort)`. Halt the
-        // chain on the sentinel, no exception escapes; real errors propagate.
-        try {
-          cbResult = cb.call(target, target);
-        } catch (e) {
-          if (!isAbortSignal(e)) throw e;
-          aborted = true;
-        }
-      }
-
-      if (aborted) {
-        halted = true;
-        this._notifyHalt(target, entry);
-        break;
-      }
-
-      if (isThenable(cbResult)) {
-        if (opts?.strict === "sync") {
-          swallowRejection(cbResult);
-          // The `validate` chain is intentionally synchronous (Rails validations
-          // run sync; `valid?`/`isValid` return a boolean, not a Promise). An
-          // async validate callback is an authoring bug: rewrite it
-          // synchronously (e.g. read a loaded association via its sync reader),
-          // or, if the work is genuinely async, move it to a beforeSave /
-          // afterSave callback — those chains run async.
-          throw new Error(
-            `Async callback on sync chain "${this.name}" — before returned a Promise. ` +
-              `Validations are synchronous; move async work to a beforeSave/afterSave callback.`,
-          );
-        }
-        // Custom terminators receive fn()'s return value to decide halting, but async
-        // callbacks return a Promise — the terminator cannot await it to get the real
-        // result. Fail fast rather than silently apply wrong halt logic.
-        if (this._hasCustomTerminator) {
-          swallowRejection(cbResult);
-          throw new Error(
-            `Async before callback on chain "${this.name}" is unsupported with a custom terminator. ` +
-              `Custom terminators cannot evaluate Promise-returning callbacks. ` +
-              `Use the default terminator (halt via throwAbort()) or make all before callbacks synchronous.`,
-          );
-        }
-        const remaining = befores.slice(i + 1);
-        // Default-terminator async halt is sentinel-only: an async before halts
-        // by rejecting with the abort sentinel (handled in the catch blocks
-        // below). A `false` resolution no longer halts, matching Rails 5+.
-        return (async () => {
-          try {
-            await cbResult;
-          } catch (e) {
-            // Default terminator only (custom terminators already threw above;
-            // `terminator: false` never halts, so it must NOT swallow abort —
-            // Rails scopes `catch(:abort)` to the default terminator). An async
-            // before rejecting with the sentinel halts; real errors propagate.
-            if (!isAbortSignal(e) || terminatorFn === false) throw e;
-            this._notifyHalt(target, entry);
-            return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
-          }
-          for (const rem of remaining) {
-            if (!Value.check(rem.options, target)) continue;
-            // Invoke each remaining before through the terminator's lazy wrapper so
-            // the terminator retains invocation control (it may choose not to call fn).
-            let remVal: unknown;
-            let remSyncHalt = false;
-            try {
-              if (terminatorFn === false) {
-                remVal = (rem.filter as BeforeCallback).call(target, target);
-              } else if (terminatorFn) {
-                remSyncHalt = terminatorFn(target, () => {
-                  remVal = (rem.filter as BeforeCallback).call(target, target);
-                  return remVal;
-                });
-              } else {
-                remVal = (rem.filter as BeforeCallback).call(target, target);
-              }
-            } catch (e) {
-              if (!isAbortSignal(e) || terminatorFn === false) throw e;
-              this._notifyHalt(target, rem);
-              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
-            }
-            try {
-              if (isThenable(remVal)) await remVal;
-            } catch (e) {
-              if (!isAbortSignal(e) || terminatorFn === false) throw e;
-              this._notifyHalt(target, rem);
-              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
-            }
-            if (remSyncHalt) {
-              this._notifyHalt(target, rem);
-              return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
-            }
-          }
-          return this._runAroundAndAfter(
-            arounds,
-            afters,
-            target,
-            block,
-            skipAfterIfTerminated,
-            opts,
-          );
-        })();
-      }
-
-      if (terminatorFn === false) {
-        // never halt
-      } else if (terminatorFn && terminatorHalted) {
-        // Default terminator halts ONLY on the abort sentinel (handled above via
-        // `aborted`), matching Rails 5+ default_terminator. A `false` return no
-        // longer halts. A custom terminator owns its own halt decision.
-        halted = true;
-        this._notifyHalt(target, entry);
-        break;
-      }
-    }
-
-    if (halted) return this._runAfters(afters, true, skipAfterIfTerminated, target, opts, false);
-    return this._runAroundAndAfter(arounds, afters, target, block, skipAfterIfTerminated, opts);
-  }
-
-  private _runAfters(
-    afters: Callback[],
-    halted: boolean,
-    skipIfTerminated: boolean,
-    target: object,
-    opts?: RunCallbacksOptions,
-    // env.value (the run_callbacks block's return). After conditions read it —
-    // ActiveModel's after-model-callback conditional skips when value === false.
-    // Halted callers pass `false` (Rails sets env.value to false on halt); the
-    // normal path passes the block's actual return, which may legitimately be
-    // `undefined` (Rails nil — `nil != false` is true, so after callbacks run).
-    value?: unknown,
-  ): boolean | Promise<boolean> {
-    if (halted && skipIfTerminated) return false;
-    for (let i = afters.length - 1; i >= 0; i--) {
-      const entry = afters[i];
-      if (!Value.check(entry.options, target, value)) continue;
-      const result = (entry.filter as AfterCallback).call(target, target);
-      if (isThenable(result)) {
-        if (opts?.strict === "sync") {
-          swallowRejection(result);
-          throw new Error(`Async callback on sync chain "${this.name}" — after returned a Promise`);
-        }
-        const remaining: Callback[] = [];
-        for (let j = i - 1; j >= 0; j--) remaining.push(afters[j]);
-        return (async () => {
-          await result;
-          for (const rem of remaining) {
-            if (!Value.check(rem.options, target, value)) continue;
-            await (rem.filter as AfterCallback).call(target, target);
-          }
-          return !halted;
-        })();
-      }
-    }
-    return !halted;
-  }
-
-  private _runAroundAndAfter(
-    arounds: Callback[],
-    afters: Callback[],
-    target: object,
-    block: (() => unknown) | undefined,
-    skipAfterIfTerminated: boolean,
-    opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean> {
-    let blockExecuted = false;
-    // env.value — the block's return. Threaded into _runAfters so ActiveModel's
-    // after-model-callback conditional (`v != false`) can skip after callbacks
-    // when the block returned false, mirroring Rails callbacks.rb's
-    // `env.value = !env.halted && (!block_given? || yield)`.
-    let blockValue: unknown;
-    const trackedBlock = (): void | Promise<void> => {
-      // Track invocation, not successful completion: in Rails an around that
-      // rescues an exception raised by yield still runs the outer invoke_after
-      // (callbacks.rb#run_callbacks). Setting the flag here means a block
-      // rejection caught by an around no longer looks like "around did not yield".
-      blockExecuted = true;
-      const r = block?.();
-      if (isThenable(r)) {
-        return Promise.resolve(r).then((v) => {
-          blockValue = v;
-        });
-      }
-      blockValue = r;
-      return r as void | Promise<void>;
-    };
-
-    let chain: () => void | Promise<void> = trackedBlock;
-    for (let i = arounds.length - 1; i >= 0; i--) {
-      const entry = arounds[i];
-      if (!Value.check(entry.options, target)) continue;
-      const prev = chain;
-      chain = () => {
-        let pendingProceed: Promise<void> | undefined;
-        let proceedObserved = false;
-        const next = (): void | Promise<void> => {
-          const r = prev();
-          if (!isThenable(r)) return r;
-          pendingProceed = Promise.resolve(r);
-          // Return a thenable wrapper so we can detect whether the around
-          // actually awaited/chained on next() (real observation) versus
-          // calling it fire-and-forget. `await` and `.then(...)` both invoke
-          // .then on the wrapper; bare `next();` does not.
-          const observed = pendingProceed;
-          return {
-            then(onFulfilled?: any, onRejected?: any) {
-              // Only mark observed when a rejection path is wired — `await`
-              // internally passes an onRejected, `.then(_, r)` does too.
-              // `.then(onFulfilled)` alone doesn't rescue, so the rejection
-              // must still propagate via pendingProceed.
-              if (typeof onRejected === "function") {
-                proceedObserved = true;
-                return observed.then(onFulfilled, onRejected);
-              }
-              const p = observed.then(onFulfilled);
-              // Suppress unhandled-rejection on the unobserved chain; the
-              // canonical propagation path is pendingProceed.
-              p.catch(() => {});
-              return p;
-            },
-            catch(onRejected?: any) {
-              if (typeof onRejected === "function") {
-                proceedObserved = true;
-                return observed.catch(onRejected);
-              }
-              const p = observed.catch(onRejected);
-              p.catch(() => {});
-              return p;
-            },
-            finally(onFinally?: any) {
-              // .finally does not rescue rejections — the rejection still
-              // propagates through the returned promise. Don't mark observed.
-              const p = observed.finally(onFinally);
-              p.catch(() => {});
-              return p;
-            },
-          } as unknown as Promise<void>;
-        };
-        let cbResult: void | Promise<void>;
-        try {
-          cbResult = (entry.filter as AroundCallback).call(target, target, next);
-        } catch (err) {
-          if (pendingProceed) {
-            return (async () => {
-              await pendingProceed.catch(() => {});
-              throw err;
-            })();
-          }
-          throw err;
-        }
-        if (isThenable(cbResult) || pendingProceed) {
-          if (opts?.strict === "sync") {
-            swallowRejection(cbResult);
-            swallowRejection(pendingProceed);
-            throw new Error(
-              `Async callback on sync chain "${this.name}" — around callback or block returned a Promise`,
-            );
-          }
-          return (async () => {
-            try {
-              await cbResult;
-            } catch (err) {
-              if (pendingProceed) await pendingProceed.catch(() => {});
-              throw err;
-            }
-            if (pendingProceed) {
-              // Swallow only when the around actually observed next() (awaited
-              // or chained). Fire-and-forget arounds couldn't have rescued, so
-              // propagate the inner rejection.
-              if (proceedObserved) await pendingProceed.catch(() => {});
-              else await pendingProceed;
-            }
-          })();
-        }
-      };
-    }
-
-    const chainResult = chain();
-
-    const finish = (): boolean | Promise<boolean> => {
-      // Rails AS::Callbacks compiles arounds wrapping (befores + block + afters)
-      // as a single continuation: a non-yielding around skips the afters too.
-      if (!blockExecuted) return false;
-      const afterResult = this._runAfters(
-        afters,
-        false,
-        skipAfterIfTerminated,
-        target,
-        opts,
-        blockValue,
-      );
-      if (isThenable(afterResult)) return Promise.resolve(afterResult).then(() => blockExecuted);
-      return blockExecuted;
-    };
-
-    if (isThenable(chainResult)) {
-      if (opts?.strict === "sync") {
-        swallowRejection(chainResult);
-        throw new Error(
-          `Async callback on sync chain "${this.name}" — around callback or block returned a Promise`,
-        );
-      }
-      return Promise.resolve(chainResult).then(finish);
-    }
-    return finish();
   }
 }
 
