@@ -84,6 +84,7 @@ import type {
   ForeignKeyDefinition,
   IndexDefinition,
   AddForeignKeyOptions,
+  ForeignKeyLookupOptions,
   AddIndexOptions,
   ColumnType,
   ColumnOptions,
@@ -327,6 +328,11 @@ export interface AbstractAdapter {
   primaryKey(tableName: string): Promise<string | string[] | null>;
   indexes(tableName: string): Promise<unknown[]>;
   foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]>;
+  foreignKeyExists(
+    fromTable: string,
+    toTable?: string | ForeignKeyLookupOptions,
+    options?: Omit<ForeignKeyLookupOptions, "toTable">,
+  ): Promise<boolean>;
   addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
   removeForeignKey(
     fromTable: string,

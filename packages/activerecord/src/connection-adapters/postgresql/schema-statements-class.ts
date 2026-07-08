@@ -13,7 +13,6 @@ import {
   type AddForeignKeyOptions,
   type ColumnOptions,
   type ColumnType,
-  type ReferentialAction,
 } from "../abstract/schema-definitions.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Column } from "./column.js";
@@ -1194,13 +1193,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
         const toTable = unquoteIdentifier(row.to_table as string);
         const conkey = String(row.conkey).replace(/[{}]/g, "").split(",").map(Number);
         const confkey = String(row.confkey).replace(/[{}]/g, "").split(",").map(Number);
-        let column: string;
-        let primaryKey: string;
+        // Rails returns composite column/primary_key as arrays and a bare
+        // string for single-column FKs (postgresql/schema_statements.rb#foreign_keys).
+        let column: string | string[];
+        let primaryKey: string | string[];
         if (conkey.length > 1) {
-          const cols = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
-          const pks = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
-          column = cols.join(",");
-          primaryKey = pks.join(",");
+          column = await this.columnNamesFromColumnNumbers(Number(row.conrelid), conkey);
+          primaryKey = await this.columnNamesFromColumnNumbers(Number(row.confrelid), confkey);
         } else {
           column = unquoteIdentifier(row.column as string);
           primaryKey = row.primary_key as string;
@@ -1223,16 +1222,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   override async addForeignKey(
     fromTable: string,
     toTable: string,
-    options: {
-      column?: string;
-      primaryKey?: string;
-      name?: string;
-      onDelete?: ReferentialAction;
-      onUpdate?: ReferentialAction;
-      deferrable?: "immediate" | "deferred";
-      validate?: boolean;
-      ifNotExists?: boolean;
-    } = {},
+    options: AddForeignKeyOptions = {},
   ): Promise<void> {
     // Rails: assert_valid_deferrable runs before `super` (the abstract
     // add_foreign_key, where the if_not_exists short-circuit lives).
@@ -1242,13 +1232,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // We replicate the abstract body inline here, so replicate the guard too.
     if (!this.isUseForeignKeys()) return;
     if (options.ifNotExists === true) {
-      const fks = await this.foreignKeys(fromTable);
-      if (
-        fks.some(
-          (fk) =>
-            fk.toTable === toTable && (options.column == null || fk.column === options.column),
-        )
-      ) {
+      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
+      // compares `column` element-wise, so composite (array) columns match by
+      // value rather than by array identity (a bare `===` is always false for
+      // distinct array instances). Mirrors the abstract addForeignKey guard.
+      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
         return;
       }
     }
@@ -1261,7 +1249,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // schema_creation (visitAlterTable/visitForeignKeyDefinition) emits the
     // deferrable / NOT VALID / action / schema-qualified-name decoration, so no
     // bespoke inline SQL is needed here.
-    const fkOptions = this.foreignKeyOptions(fromTable, toTable, options);
+    const fkOptions = this.foreignKeyOptions(
+      fromTable,
+      toTable,
+      options as Record<string, unknown>,
+    );
     const at = this.pg.createAlterTable(fromTable);
     // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
     // (now converged): it applies table_name_prefix/suffix and re-runs

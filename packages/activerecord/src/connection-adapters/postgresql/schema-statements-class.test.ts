@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { PostgreSQLSchemaStatements } from "./schema-statements-class.js";
+import { ForeignKeyDefinition } from "../abstract/schema-definitions.js";
 import type { AbstractAdapter as DatabaseAdapter } from "../abstract-adapter.js";
 
 function makeFakeAdapter() {
@@ -163,6 +164,36 @@ describe("PostgreSQLSchemaStatements#addForeignKey use_foreign_keys? guard", () 
     const ss = new PostgreSQLSchemaStatements(adapter);
     expect(ss.isUseForeignKeys()).toBe(false);
     await ss.addForeignKey("articles", "authors", { column: "author_id" });
+    expect(executed).toEqual([]);
+  });
+
+  it("with ifNotExists is a no-op when a composite FK already exists", async () => {
+    // A composite `column: [...]` must match the existing FK by value, not by
+    // array identity — the guard routes through foreignKeyExists -> isDefinedFor
+    // for an element-wise compare, so the duplicate ADD CONSTRAINT is skipped.
+    const executed: string[] = [];
+    const adapter = {
+      adapterName: "postgres" as const,
+      supportsForeignKeys: () => true,
+      executeMutation: vi.fn(async (sql: string) => {
+        executed.push(sql);
+      }),
+    } as unknown as DatabaseAdapter;
+    const ss = new PostgreSQLSchemaStatements(adapter);
+    const fk = new ForeignKeyDefinition(
+      "astronauts",
+      "rockets",
+      ["rocket_tenant_id", "rocket_id"],
+      ["tenant_id", "id"],
+      "fk_rails_composite",
+    );
+    vi.spyOn(ss, "foreignKeys").mockResolvedValue([fk]);
+
+    await ss.addForeignKey("astronauts", "rockets", {
+      column: ["rocket_tenant_id", "rocket_id"],
+      primaryKey: ["tenant_id", "id"],
+      ifNotExists: true,
+    });
     expect(executed).toEqual([]);
   });
 });

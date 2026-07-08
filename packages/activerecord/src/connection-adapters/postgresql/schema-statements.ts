@@ -5,6 +5,7 @@
  */
 
 import type {
+  AddForeignKeyOptions,
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
@@ -203,19 +204,7 @@ export interface SchemaStatements {
     tableName: string,
     options: { column?: string | string[]; name?: string; _usesLegacyIndexName?: boolean },
   ): string;
-  addForeignKey(
-    fromTable: string,
-    toTable: string,
-    options?: {
-      column?: string;
-      primaryKey?: string;
-      name?: string;
-      onDelete?: "cascade" | "nullify" | "restrict" | "no_action" | "set_default";
-      onUpdate?: "cascade" | "nullify" | "restrict" | "no_action" | "set_default";
-      deferrable?: "immediate" | "deferred";
-      validate?: boolean;
-    },
-  ): Promise<void>;
+  addForeignKey(fromTable: string, toTable: string, options?: AddForeignKeyOptions): Promise<void>;
   checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]>;
   addExclusionConstraint(
     tableName: string,

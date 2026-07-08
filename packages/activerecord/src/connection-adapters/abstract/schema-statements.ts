@@ -816,13 +816,11 @@ export class SchemaStatements {
     // foreign_key_exists? matches via foreign_keys(from).detect { defined_for? },
     // scoping on to_table plus column when one is given.
     if (options.ifNotExists === true) {
-      const fks = await this.foreignKeys(fromTable);
-      if (
-        fks.some(
-          (fk) =>
-            fk.toTable === toTable && (options.column == null || fk.column === options.column),
-        )
-      ) {
+      // foreignKeyExists routes through foreignKeyFor/isDefinedFor, which
+      // compares `column` element-wise, so composite (array) columns match by
+      // value rather than by array identity (a bare `===` is always false for
+      // distinct array instances).
+      if (await this.foreignKeyExists(fromTable, toTable, { column: options.column })) {
         return;
       }
     }
