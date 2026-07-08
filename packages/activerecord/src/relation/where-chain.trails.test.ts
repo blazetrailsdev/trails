@@ -17,6 +17,8 @@ registerModel(Post);
 registerModel(Author);
 registerModel(Comment);
 
+const ids = (records: unknown[]): unknown[] => records.map((r) => (r as { id: unknown }).id).sort();
+
 const authorsJoinCount = (sql: string): number =>
   (sql.match(/join\s+["`]?authors["`]?/gi) ?? []).length;
 const joinCount = (sql: string): number => (sql.match(/\bjoin\b/gi) ?? []).length;
@@ -40,17 +42,45 @@ describe("WhereChain associated join guard (trails)", () => {
     expect(sql).toMatch(/["`]?authors["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
   });
 
-  // Self-join (Comment#children): trails converges the pending join-value and
-  // the where-join onto one aliased `children_comments` join via the alias
-  // tracker (not via the skip path, which self-joins are exempt from), so there
-  // is still exactly one join and the predicate lands on the alias.
+  // Self-join (Comment#children): routing the join through JoinDependency
+  // (`joins!`) unions the pending join-value with the where-join, so there is
+  // still exactly one join. The `:class_name` self-join predicate is keyed by
+  // the association name (`self.not(children => …)`), so it resolves to the
+  // same aliased join table (`children`) rather than the owner PK.
   it("does not duplicate a self-join already in joins_values", () => {
     const inner = Comment.joins("children").where().associated("children").toSql();
     expect(joinCount(inner)).toBe(1);
-    expect(inner).toMatch(/["`]?children_comments["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
+    expect(inner).toMatch(/["`]?children["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
 
     const loj = Comment.leftOuterJoins("children").where().associated("children").toSql();
     expect(joinCount(loj)).toBe(1);
-    expect(loj).toMatch(/["`]?children_comments["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
+    expect(loj).toMatch(/["`]?children["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
+  });
+});
+
+// Routing the join through JoinDependency (`joins!` / `left_outer_joins!`) makes
+// through-association shapes work for free — the bespoke resolver threw for them.
+// `Author has_many :comments, through: :posts` emits both intermediate joins.
+describe("WhereChain through association (trails)", () => {
+  fixtures(["authors", "posts", "comments", "authorAddresses"]);
+
+  it("associated builds the through join and filters present rows", async () => {
+    const relation = Author.all().where().associated("comments");
+    expect(relation.toSql()).toMatch(
+      /INNER JOIN\s+["`]?posts["`]?.*INNER JOIN\s+["`]?comments["`]?.*["`]?comments["`]?\.["`]?id["`]?\s+IS NOT NULL/is,
+    );
+    // Authors 1 and 2 have comments through their posts; author 3 has none.
+    const authors = await relation.distinct();
+    expect(ids(authors)).toEqual([1, 2]);
+  });
+
+  it("missing builds the through outer join and filters absent rows", async () => {
+    const relation = Author.all().where().missing("comments");
+    expect(relation.toSql()).toMatch(
+      /LEFT OUTER JOIN\s+["`]?posts["`]?.*LEFT OUTER JOIN\s+["`]?comments["`]?.*["`]?comments["`]?\.["`]?id["`]?\s+IS NULL/is,
+    );
+    // Author 3 has no comments through posts, so it is reported missing.
+    const authors = await relation.distinct();
+    expect(ids(authors)).toContain(3);
   });
 });

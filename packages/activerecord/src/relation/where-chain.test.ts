@@ -51,13 +51,11 @@ describe("WhereChainTest", () => {
     expect(includesRecord(relation, posts("authorless"))).toBe(false);
   });
 
-  // Self-join `children` (RFC 0027 convergence): where.associated / where.missing
-  // that must ADD the `Comment.children` self-join now alias it via the unified
-  // AliasTracker — the owner (FROM) table is pre-claimed, so the added join takes
-  // the `children_comments` alias and an identity-based ON rebind swaps only the
-  // target side, leaving `comments.id` intact. When a prior `leftJoins(:children)`
-  // already emits the aliased join, the predicate dedups onto that alias instead
-  // of the always-present owner PK, so childless rows filter correctly.
+  // Self-join `children`: where.associated / where.missing route the join through
+  // JoinDependency (`joins!` / `left_outer_joins!`), which aliases the added
+  // `Comment.children` self-join. The `:class_name` predicate is keyed by the
+  // association name so it resolves to that same aliased join table rather than
+  // the always-present owner PK, so childless rows filter correctly.
   it("associated with child association", async () => {
     const relation = await Comment.all().where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);
@@ -196,9 +194,9 @@ describe("WhereChainTest", () => {
     expect((first as any).id).toBe(((await Author.find(2)) as any).id);
   });
 
-  // Prior inner `joins("children")` supplies the JoinDependency self-join
-  // (aliased `children_comments`); the predicate dedups onto it. See the
-  // self-join note above.
+  // Prior inner `joins("children")` supplies the JoinDependency self-join;
+  // `joins!` unions with it so there is one join and the predicate dedups onto
+  // it. See the self-join note above.
   it("associated with add joins before", async () => {
     const relation = await Comment.joins("children").where().associated("children");
     expect(includesRecord(relation, comments("greetings"))).toBe(true);

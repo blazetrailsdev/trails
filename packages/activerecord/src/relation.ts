@@ -167,15 +167,6 @@ export type LoadedRelation<R> = Omit<R, "then">;
  * `EXPLAIN FORMAT=X ANALYZE` is invalid) from receiving orderings they
  * can't render.
  */
-/**
- * Add a join clause to `clauses` for whereMissing/whereAssociated.
- * - Skip if a join with the same table+ON already exists regardless of type
- *   (e.g. leftJoins(:assoc).whereAssociated(:assoc) is valid — the existing
- *   LEFT OUTER JOIN already covers the table; the IS NOT NULL predicate
- *   provides the restriction).
- * - Throw if a join to the same table with a *different* ON clause exists —
- *   that would require aliasing which is not supported.
- */
 function formatCacheTimestamp(ts: Temporal.Instant, format: "usec" | "number" | string): string {
   const dt = ts.toZonedDateTimeISO("UTC");
   const y = dt.year.toString().padStart(4, "0");
@@ -212,183 +203,19 @@ function _whereClauseToSql(
   return connection.toSql(node);
 }
 
-/** Structural equality for a join ON: Arel nodes compare by `eql`, raw SQL by string. */
-function _onEquals(a: string | Nodes.Node, b: string | Nodes.Node): boolean {
-  if (a instanceof Nodes.Node && b instanceof Nodes.Node) return a.eql(b);
-  return a === b;
-}
-
 /**
- * Rebind a self-joined target `Table` to its alias inside an ON predicate AST.
- * Walks the node tree and, for every attribute referencing the un-aliased
- * target table `fromName`, swaps its relation to a `Table(alias)` — the
- * node-level equivalent of the legacy `"#{table}." → "#{alias}."` string
- * substitution. Other operands (the owner-side attribute, a `Casted` STI-type
- * literal, raw values) are left untouched.
- *
- * A **true self-association** (e.g. `Comment has_many :children` or `Employee
- * has_many :subordinates`) shares one table NAME across owner and target, so an
- * ON like `comments.parent_id = comments.id` would rebind BOTH sides if matched
- * purely by name. Rails' AliasTracker aliases only the target `Table` object;
- * the caller threads that owner (source) `Table` instance in as `excludeNode` so
- * the owner-side attribute is skipped by identity while every other `fromName`
- * reference — the target column and any scope predicate on it — is rebound.
- *
- * One faithful limitation remains:
- *
- * - **`SqlLiteral` operand** (e.g. a raw `where("table.col = ?")` scope folded
- *   into the ON): opaque text with no walkable attribute, so it falls through
- *   unrebound. The builder call sites here emit purely Arel-node predicates, so
- *   this never fires today; a top-level raw-SQL `on` string still takes the
- *   `typeof join.on === "string"` substitution path in `_addAssocJoin`.
+ * Build the `Array(reflection.association_primary_key).index_with(nil)` hash
+ * used by where.associated / where.missing — one `{ pk: null }` entry per
+ * association-primary-key column (query_methods.rb:92 / 128).
  */
-function _rebindOperand(
-  value: unknown,
-  fromName: string,
-  alias: string,
-  excludeNode?: Table,
-): unknown {
-  return value instanceof Nodes.Node
-    ? _rebindTableInNode(value, fromName, alias, excludeNode)
-    : value;
-}
-
-function _rebindTableInNode(
-  node: Nodes.Node,
-  fromName: string,
-  alias: string,
-  // The owner-side Table instance of a self-join. Attributes whose relation IS
-  // this exact instance are left unaliased (the owner keeps the real table),
-  // while every OTHER `fromName`-named reference — the target column plus any
-  // scope predicate the association appended on the target — is rebound. Omitted
-  // for non-self-joins, where owner and target names differ and nothing collides.
-  excludeNode?: Table,
-): Nodes.Node {
-  if (node instanceof Nodes.Attribute) {
-    const rel = node.relation;
-    if (rel instanceof Table && !rel.tableAlias && rel.name === fromName && rel !== excludeNode) {
-      return new Nodes.Attribute(new Table(alias), node.name, node.caster);
-    }
-    return node;
-  }
-  const clone: any = Object.create(Object.getPrototypeOf(node));
-  if (node instanceof Nodes.Nary) {
-    return Object.assign(clone, node, {
-      children: node.children.map((c) => _rebindTableInNode(c, fromName, alias, excludeNode)),
-    });
-  }
-  if (node instanceof Nodes.Binary) {
-    return Object.assign(clone, node, {
-      left: _rebindOperand(node.left, fromName, alias, excludeNode),
-      right: _rebindOperand(node.right, fromName, alias, excludeNode),
-    });
-  }
-  if (node instanceof Nodes.Grouping || node instanceof Nodes.Unary) {
-    return Object.assign(clone, node, {
-      expr: _rebindOperand((node as { expr: unknown }).expr, fromName, alias, excludeNode),
-    });
-  }
-  return node;
-}
-
-function _addAssocJoin(
-  clauses: Array<{
-    type: "inner" | "left";
-    table: string;
-    on: string | Nodes.Node;
-    quoted?: boolean;
-    as?: string;
-    aliasBase?: string;
-    assoc?: string;
-  }>,
-  type: "inner" | "left",
-  join: { table: string; on: string | Nodes.Node; ownerNode?: Table },
-  assocName: string,
-  modelClass: any,
-  ownerTable: string,
-  quoteTable: (name: string) => string,
-  // One AliasTracker shared across every JoinDependency bucket (inner joins,
-  // left-outer joins, eager load) plus the flat where-joins already minted on
-  // this relation — mirroring Rails' single `JoinDependency#alias_tracker`. A
-  // self-join added here is therefore aliased relative to a sibling join in ANY
-  // bucket, not just the flat one. Mutated as joins are minted.
-  tracker: AliasTracker,
-  // Association joins already emitted via JoinDependency (joins/leftOuterJoins/
-  // eager). Used only for association-level dedup (a repeat of the same
-  // association reuses the existing join); their SQL is owned by JoinDependency
-  // and never re-emitted here.
-  jdJoins: ReadonlyArray<{ table: string; assoc: string; as: string }> = [],
-): string | undefined {
-  // Association-level dedup (Rails `left_outer_joins_values |= args`,
-  // query_methods.rb:124-128): a sibling join for the SAME association already
-  // emitted via JoinDependency (inner `joins`, `leftOuterJoins`, or eager) is
-  // reused. The IS NULL / IS NOT NULL predicate must land on that join's
-  // effective table: a self-join is aliased (e.g. `children_comments`), so
-  // return the alias; a plain join keeps its real table, so return undefined.
-  // `jd.as` already carries the effective alias the manager-build path emits —
-  // computed once, in bucket order, by `_unifiedJoinAliasTracker` (including the
-  // self-join case whose seed-time JD left `effectiveSqlName` un-aliased). Reuse
-  // it so a self-join predicate lands on the joined child rows (`children_comments`)
-  // rather than the always-present owner PK; a plain join keeps its real table.
-  const jd = jdJoins.find((j) => j.assoc === assocName && j.table === join.table);
-  if (jd) return jd.as !== join.table ? jd.as : undefined;
-  const sameAssoc = clauses.find((j) => j.assoc === assocName && j.table === join.table);
-  if (sameAssoc) return sameAssoc.as;
-  // Flat-to-flat repeat with a compatible ON collapses into the existing join.
-  const sameTableFlat = clauses.filter((j) => j.table === join.table);
-  if (sameTableFlat.length > 0 && sameTableFlat.every((j) => _onEquals(j.on, join.on))) {
-    return undefined;
-  }
-  // Mint via the unified tracker: real table on first use, else the Rails
-  // `{plural}_{owner_table}` candidate (with `_N` on repeat). When the target
-  // table is already claimed by a join in another bucket, this aliases the new
-  // join consistently — the cross-bucket self-join case (e.g. an inner
-  // `joins(:readingListing)` and a left-outer `missing(:unreadListing)` both on
-  // the books table).
-  const alias = _trackerAliasFor(tracker, join.table, assocName, ownerTable);
-  if (alias) {
-    // Rebind the target reference to the alias. An Arel predicate node is
-    // rebound at the AST level (swap the target `Table` inside its attributes);
-    // a raw-SQL ON string still references the target as `<quotedTable>.<col>`,
-    // so fall back to the string substitution for that legacy form.
-    const reboundOn =
-      typeof join.on === "string"
-        ? join.on.split(`${quoteTable(join.table)}.`).join(`${quoteTable(alias)}.`)
-        : _rebindTableInNode(join.on, join.table, alias, join.ownerNode);
-    clauses.push({
-      type,
-      table: join.table,
-      on: reboundOn,
-      quoted: true,
-      as: alias,
-      assoc: assocName,
-    });
-    return alias;
-  }
-  clauses.push({ type, table: join.table, on: join.on, quoted: true, assoc: assocName });
-  return undefined;
-}
-
-/**
- * Claim `table` in the shared AliasTracker and return the SQL alias to use:
- * `undefined` on the table's first use (it keeps its real name), else the
- * Rails `aliased_table_for` candidate `"#{plural_name}_#{owner_table}"`
- * (reflection.rb:328-330), suffixed `_N` on repeats by the tracker. Mirrors the
- * collision branch of `JoinDependency#addAssociation` so a flat where-join and a
- * JoinDependency join draw from one alias namespace.
- */
-function _trackerAliasFor(
-  tracker: AliasTracker,
-  table: string,
-  assocName: string,
-  ownerTable: string,
-): string | undefined {
-  // Thunk the candidate: it is only built when `table` is already claimed
-  // (mirroring Rails' block-arg to aliased_table_for).
-  return tracker.aliasNameForTable(
-    table,
-    () => `${_pluralize(_toUnderscore(assocName))}_${ownerTable}`,
-  );
+function whereChainNullConditions(reflection: {
+  associationPrimaryKey: string | string[];
+}): Record<string, null> {
+  const pk = reflection.associationPrimaryKey;
+  const pks = Array.isArray(pk) ? pk : [pk];
+  const conditions: Record<string, null> = {};
+  for (const col of pks) conditions[col] = null;
+  return conditions;
 }
 
 function validateExplainOptions(options: ExplainOption[]): void {
@@ -483,19 +310,14 @@ const StrictLoadingScope = {
 
 /**
  * One pre-resolved association JOIN: the SQL table + ON predicate. The resolved
- * target model is retained here (consumed by whereAssociated/whereMissing); it
- * is no longer copied onto `_joinClauses`, since a plain `.joins(:assoc)` now
- * resolves its klass through the join-dependency walk.
+ * target model is retained here; it is no longer copied onto `_joinClauses`,
+ * since a plain `.joins(:assoc)` now resolves its klass through the
+ * join-dependency walk.
  */
 type JoinClauseSpec = {
   table: string;
   on: string | Nodes.Node;
   klass?: unknown;
-  // The owner-side (source) `Table` instance inside `on`. For a self-join the
-  // owner and target share a table NAME but are distinct Table objects, so an
-  // alias rebind must swap every target reference by name yet leave THIS owner
-  // instance untouched (`_rebindTableInNode` excludes it by identity).
-  ownerNode?: Table;
 };
 
 /**
@@ -790,57 +612,20 @@ export class Relation<T extends Base> {
   whereAssociated(assocNames: string[], skipJoinFor?: ReadonlySet<string>): Relation<T> {
     let rel: Relation<T> = this;
     for (const assocName of assocNames) {
-      rel._requireAssociation(assocName);
-      const target = rel._resolveAssociationTarget(assocName);
-      if (!target) {
-        throw new Error(
-          `whereAssociated: association resolution failed for '${assocName}' on ${(rel._modelClass as any).name} — ` +
-            `through/HABTM associations may require a registered intermediate model, ` +
-            `and some join shapes (such as composite primary/foreign keys) are not supported.`,
-        );
+      const reflection = rel._whereChainReflection(assocName);
+      const scope = rel._clone();
+      // Rails query_methods.rb:89-91: `@scope.joins!(association)` unless it is
+      // already present in joins_values / left_outer_joins_values. Routing the
+      // join through JoinDependency (joins!) rather than a bespoke resolver is
+      // what makes through / HABTM / composite-key shapes work for free.
+      if (!skipJoinFor?.has(assocName)) {
+        QueryMethodBangs.joinsBang.call(scope as any, assocName);
       }
-      const cloned = rel._clone();
-      const ownerTable = (rel._modelClass as any).tableName;
-      const quoteTable = (n: string) => (rel._conn() as any).quoteTableName(n);
-      const aliasLength = (rel._conn() as any).tableAliasLength();
-      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
-      let effectiveTable = target.table;
-      // Rails' guard (query_methods.rb:91) skips re-joining an association
-      // already in joins_values / left_outer_joins_values. In trails the
-      // no-duplicate-join outcome is reached two ways depending on the shape:
-      //   - Self-join (owner and target share a table, e.g. Comment#children):
-      //     the join loop below routes through the unified alias tracker, which
-      //     dedups the pending join-value and this where-join onto one alias
-      //     (`children_comments`) — a single join whose alias the IS NOT NULL
-      //     predicate needs. This mirrors Rails' `class_name` branch, which
-      //     emits `not(:children => …)` resolving to that same alias. Skipping
-      //     here would strand `effectiveTable` on the base owner table and
-      //     misplace the predicate, so the guard must NOT skip self-joins.
-      //   - Distinct target table (e.g. Post#author): skip the redundant join;
-      //     `effectiveTable` stays the base table name, matching Rails' non-
-      //     class_name branch `not(reflection.table_name => …)`.
-      const skipJoin = skipJoinFor?.has(assocName) && target.table !== ownerTable;
-      if (!skipJoin) {
-        for (const join of target.joins) {
-          const alias = _addAssocJoin(
-            cloned._joinClauses,
-            "inner",
-            join,
-            assocName,
-            rel._modelClass as any,
-            ownerTable,
-            quoteTable,
-            tracker,
-            jdJoins,
-          );
-          if (alias && join.table === target.table) effectiveTable = alias;
-        }
-      }
-      const tgtTable = new Table(effectiveTable);
-      for (const pk of target.pks) {
-        cloned._whereClause.predicates.push(tgtTable.get(pk).notEq(null));
-      }
-      rel = cloned;
+      // Rails: `self.not(reflection.table_name => Array(pk).index_with(nil))`,
+      // or `self.not(association => …)` when a `:class_name` option is present
+      // (self-joins) so the predicate resolves to the aliased join table.
+      const key = reflection.options.className ? assocName : reflection.tableName;
+      rel = scope.whereNot({ [key]: whereChainNullConditions(reflection) });
     }
     return rel;
   }
@@ -854,266 +639,39 @@ export class Relation<T extends Base> {
   whereMissing(...assocNames: string[]): Relation<T> {
     let rel: Relation<T> = this;
     for (const assocName of assocNames) {
-      rel._requireAssociation(assocName);
-      const target = rel._resolveAssociationTarget(assocName);
-      if (!target) {
-        throw new Error(
-          `whereMissing: association resolution failed for '${assocName}' on ${(rel._modelClass as any).name} — ` +
-            `through/HABTM associations may require a registered intermediate model, ` +
-            `and some join shapes (such as composite primary/foreign keys) are not supported.`,
-        );
-      }
-      const cloned = rel._clone();
-      const ownerTable = (rel._modelClass as any).tableName;
-      const quoteTable = (n: string) => (rel._conn() as any).quoteTableName(n);
-      const aliasLength = (rel._conn() as any).tableAliasLength();
-      const { tracker, jdJoins } = cloned._unifiedJoinAliasTracker(aliasLength);
-      let effectiveTable = target.table;
-      for (const join of target.joins) {
-        const alias = _addAssocJoin(
-          cloned._joinClauses,
-          "left",
-          join,
-          assocName,
-          rel._modelClass as any,
-          ownerTable,
-          quoteTable,
-          tracker,
-          jdJoins,
-        );
-        if (alias && join.table === target.table) effectiveTable = alias;
-      }
-      const tgtTable = new Table(effectiveTable);
-      for (const pk of target.pks) {
-        cloned._whereClause.predicates.push(tgtTable.get(pk).eq(null));
-      }
-      rel = cloned;
+      const reflection = rel._whereChainReflection(assocName);
+      const scope = rel._clone();
+      // Rails query_methods.rb:126-128: `@scope.left_outer_joins!(association)`
+      // then `@scope.where!(reflection.table_name => Array(pk).index_with(nil))`
+      // (or `association => …` for a `:class_name` self-join).
+      QueryMethodBangs.leftOuterJoinsBang.call(scope as any, assocName);
+      const key = reflection.options.className ? assocName : reflection.tableName;
+      rel = scope.where({ [key]: whereChainNullConditions(reflection) });
     }
     return rel;
   }
 
-  private _requireAssociation(assocName: string): void {
-    const modelClass = this._modelClass as any;
-    const associations: any[] = modelClass._associations ?? [];
-    if (!associations.some((a: any) => a.name === assocName)) {
-      throw new Error(
-        `Association named '${assocName}' was not found on ${modelClass.name}; perhaps you misspelled it?`,
-      );
-    }
-  }
-
   /**
-   * Build one AliasTracker spanning the join buckets that actually emit SQL —
-   * inner `joins`, `leftOuterJoins`, eager load, and `includes` promoted to
-   * eager load — plus the flat association where-joins already minted on this
-   * relation. This mirrors Rails' single `JoinDependency#alias_tracker`: trails
-   * builds a JoinDependency per bucket, but seeding one tracker from all of them
-   * gives whereAssociated / whereMissing a unified alias namespace, so a
-   * self-join they add is aliased relative to a sibling join in ANY bucket (e.g.
-   * an inner `joins(:readingListing)` and a left-outer `missing(:unreadListing)`
-   * both on the books table).
-   *
-   * Preload-only `includes` (not promoted via `references`) are excluded: they
-   * never become SQL joins (`_applyJoinsToManager` skips them too), so claiming
-   * an alias for them would force a where-chain self-join alias Rails' build_joins
-   * never allocates (query_methods.rb:1882-1896 only builds the tracker for the
-   * emitted join buckets).
-   *
-   * The tracker is built with the adapter's `tableAliasLength` (mirroring Rails'
-   * `AliasTracker.create(connection, …)`) so long self-join aliases truncate
-   * identically to the JoinDependency/adapter path. It is seeded from the actual
-   * join *nodes*: a table joined in any bucket — including the owner table via a
-   * self-join — is claimed, so a later flat where-join on it aliases
-   * (`aliased_table_for`, alias_tracker.rb:58-77). The owner (FROM) table is
-   * pre-claimed below, so even a *standalone* true self-association (target ==
-   * owner with no prior join) aliases: the flat path rebinds the ON predicate by
-   * table NAME while excluding the owner `Table` instance by identity
-   * (`_rebindTableInNode`), so the target side takes the alias and the owner side
-   * stays put. `jdJoins` carries each JoinDependency join's (table, association,
-   * effective alias) for association-level dedup — a self-join predicate reuses
-   * the emitted alias rather than the always-present owner PK.
+   * Resolve the reflection for a where.associated / where.missing association,
+   * mirroring Rails' `WhereChain#scope_association_reflection`. Throws the same
+   * ArgumentError shape when the association does not exist.
    *
    * @internal
    */
-  private _unifiedJoinAliasTracker(aliasLength: number): {
-    tracker: AliasTracker;
-    jdJoins: Array<{ table: string; assoc: string; as: string }>;
+  private _whereChainReflection(assocName: string): {
+    name: string;
+    tableName: string;
+    options: Record<string, unknown>;
+    associationPrimaryKey: string | string[];
   } {
-    // Seed the tracker with the manual `_joinValues` (raw string / Arel join
-    // nodes) so a where-chain alias decision counts collisions against them via
-    // initialCountFor, mirroring Rails' `alias_tracker(leading_joins +
-    // join_nodes, aliases)` (query_methods.rb:1891-1896, alias_tracker.rb:28-43).
-    const manualJoins = this._joinValues.map((v) =>
-      typeof v === "string" ? new Nodes.StringJoin(new Nodes.SqlLiteral(v.trim())) : v,
-    );
-    const tracker = new AliasTracker(aliasLength, undefined, manualJoins, this._conn() as any);
-    const ownerTable = (this._modelClass as any).tableName;
-    // Claim the owner (FROM) table, mirroring Rails' JoinDependency, whose base
-    // node occupies the tracker before any association join. This forces a
-    // standalone self-join (target == owner, e.g. `Comment has_many :children`)
-    // that whereAssociated/whereMissing must ADD to alias itself (`aliased_table_for`
-    // sees the owner already taken) instead of colliding on the bare owner table.
-    // The ON rebind (`_rebindTableInNode`) then swaps the target references to the
-    // alias while excluding the owner `Table` instance by identity, leaving the
-    // owner side intact.
-    if ((tracker.aliases.get(ownerTable) ?? 0) === 0) tracker.aliases.set(ownerTable, 1);
-    const jdJoins: Array<{ table: string; assoc: string; as: string }> = [];
-
-    // Mirror the join buckets `_applyJoinsToManager` actually emits: named inner
-    // joins, eager load, includes promoted to eager load, and left-outer joins
-    // not already covered by eager.
-    const promotedIncludes = this._includesToPromoteFromReferences();
-    const eagerCovered = new Set([...this._eagerLoadAssociations, ...promotedIncludes]);
-    const emitted: AssociationSpec[] = [
-      ...this._namedInnerJoins,
-      ...this._eagerLoadAssociations,
-      ...promotedIncludes,
-      ...this._leftOuterJoinsValues.filter((v) => !eagerCovered.has(v)),
-    ];
-
-    const deps: JoinDependency[] = [];
-    if (emitted.length > 0) {
-      deps.push(QueryMethodBangs.constructJoinDependency.call(this as any, emitted, null));
-    }
-    // Cross-klass merged dependencies (Rails merge_joins / merge_outer_joins)
-    // are emitted directly, so include their joined tables too.
-    deps.push(...this._namedInnerJoinDeps, ...this._leftOuterJoinDeps);
-
-    for (const jd of deps) {
-      for (const node of jd.nodes) {
-        const table = node.tableName;
-        // Claim the joined table. Mirrors aliased_table_for: the real table
-        // count never rises above 1 (first use keeps the real name); repeat
-        // joins are counted under their alias name so the next `_N` is correct.
-        if ((tracker.aliases.get(table) ?? 0) === 0) tracker.aliases.set(table, 1);
-        let eff = node.effectiveSqlName;
-        if (eff && eff !== table) {
-          tracker.aliases.set(eff, (tracker.aliases.get(eff) ?? 0) + 1);
-        } else if (table === ownerTable) {
-          // Self-join whose seed-time JoinDependency did NOT run its alias
-          // assignment (`effectiveSqlName` is still the bare owner table). The
-          // manager-build path aliases it to the tracker candidate; mint that
-          // alias HERE, in bucket order, so the tracker's `_N` bookkeeping is the
-          // single source of truth and the stored `as` is the exact string the
-          // emitted `JOIN ... <alias>` will use — even when several self-joins on
-          // the same owner table are in play.
-          eff = _trackerAliasFor(tracker, table, node.immediateAssocName, ownerTable) ?? table;
-        }
-        jdJoins.push({
-          table,
-          assoc: node.immediateAssocName,
-          as: eff && eff !== table ? eff : table,
-        });
-      }
-    }
-    // Replay flat where-joins already on this relation so a repeat self-join in
-    // a later chained whereAssociated/whereMissing gets the next `_N` suffix.
-    for (const c of this._joinClauses) {
-      _trackerAliasFor(tracker, c.table, c.assoc ?? "", ownerTable);
-    }
-    return { tracker, jdJoins };
-  }
-
-  /**
-   * Resolve all join steps and target PK columns for a named association.
-   *
-   * `pks` mirrors Rails' `Array(reflection.association_primary_key)` — one
-   * entry per PK column so callers emit one IS NULL/NOT NULL predicate each.
-   * The ON clause produced by `_resolveAssociationJoin` is a column-to-column
-   * expression (e.g. `"authors"."id" = "books"."author_id"`); if an array FK
-   * were used it would stringify to `"a,b"` — an invalid column reference.
-   * We guard against that before returning (see composite-FK check below).
-   *
-   * When the target model is not in `modelRegistry` the fallback behavior
-   * differs by association type:
-   * - `belongsTo`: target table name is not safe to infer — Rails always has
-   *   a registered model class, so `tableName` is always available; without
-   *   registration the inferred name (e.g. "authors") may differ from the real
-   *   table (e.g. "wm_authors"). Falls back to WHERE source.fk IS NULL which
-   *   is data-correct but not the Rails JOIN form. **Register the model** to
-   *   get the JOIN form.
-   * - `hasOne`/`hasMany`: target table is inferred from className + pluralise,
-   *   and a JOIN ON is built from association options.
-   * - through/HABTM: returns null (caller throws).
-   */
-  private _resolveAssociationTarget(assocName: string): {
-    joins: Array<{ table: string; on: string | Nodes.Node; ownerNode?: Table }>;
-    table: string;
-    pks: string[];
-  } | null {
     const modelClass = this._modelClass as any;
-    const associations: any[] = modelClass._associations ?? [];
-    const assocDef = associations.find((a: any) => a.name === assocName);
-    if (!assocDef) return null;
-
-    // Primary path: registry-based resolution handles all association types.
-    const resolved = this._resolveAssociationJoin(assocName);
-    if (resolved) {
-      const joins = Array.isArray(resolved) ? resolved : [resolved];
-      const lastJoin = joins[joins.length - 1];
-      let rawPk: string | string[] = "id";
-      if (assocDef.type === "belongsTo") {
-        const targetModel = modelRegistry.get(assocDef.options.className ?? _camelize(assocName));
-        rawPk = assocDef.options.primaryKey ?? targetModel?.primaryKey ?? "id";
-      } else {
-        // Singularize for all plural collection association types.
-        const isPlural =
-          assocDef.type === "hasMany" ||
-          assocDef.type === "hasAndBelongsToMany" ||
-          (assocDef.type as string) === "hasManyThrough";
-        const className =
-          assocDef.options.className ?? _camelize(isPlural ? _singularize(assocName) : assocName);
-        const targetModel = modelRegistry.get(className);
-        rawPk = targetModel?.primaryKey ?? "id";
-      }
-      // _resolveAssociationJoin now zips composite FK/PK arrays into multiple
-      // Eq predicates AND'd together — emit one IS NOT NULL / IS NULL predicate
-      // per PK column at the call site (whereAssociated/whereMissing).
-      const pks = Array.isArray(rawPk) ? rawPk : [rawPk];
-      return { joins, table: lastJoin.table, pks };
-    }
-
-    // Fallback: target model not in registry — derive JOIN from options.
-    // NOTE: for belongsTo, the target table name is not reliably inferrable
-    // without a registered model (the actual tableName may differ from the
-    // class-name convention). We fall back to a source-table FK null/non-null
-    // predicate, which is data-correct but not the Rails JOIN form. **Register
-    // the model** to get the JOIN form.
-    const sourceTable = modelClass.tableName;
-    if (assocDef.type === "belongsTo") {
-      const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name);
-      const pks = Array.isArray(foreignKey) ? foreignKey : [foreignKey];
-      return { joins: [], table: sourceTable, pks };
-    }
-    if (Array.isArray(assocDef.options.foreignKey)) {
-      throw new Error(
-        `whereMissing/whereAssociated: composite foreignKey on '${assocName}' is not yet supported in fallback path.`,
+    const reflection = modelClass._reflectOnAssociation?.(assocName);
+    if (!reflection) {
+      throw argumentError(
+        `An association named \`:${assocName}\` does not exist on the model \`${modelClass.name}\`.`,
       );
     }
-    if (assocDef.type === "hasOne" || assocDef.type === "hasMany") {
-      const className =
-        assocDef.options.className ??
-        _camelize(assocDef.type === "hasMany" ? _singularize(assocName) : assocName);
-      const targetTable = assocDef.options.tableName ?? _pluralize(_toUnderscore(className));
-      const rawSourcePk = assocDef.options.primaryKey ?? modelClass.primaryKey ?? "id";
-      if (Array.isArray(rawSourcePk)) {
-        throw new Error(
-          `whereMissing/whereAssociated: composite primaryKey on '${assocName}' is not yet supported in fallback path.`,
-        );
-      }
-      const sourcePk = rawSourcePk;
-      const foreignKey = this._deriveForeignKey(assocDef, assocName, modelClass.name) as string;
-      const tgt = new Table(targetTable);
-      const src = new Table(sourceTable);
-      const onPredicates: Nodes.Node[] = [tgt.get(foreignKey).eq(src.get(sourcePk))];
-      if (assocDef.options.as) {
-        const typeCol = `${_toUnderscore(assocDef.options.as)}_type`;
-        onPredicates.push(tgt.get(typeCol).eq(modelClass.name));
-      }
-      const on = onPredicates.length === 1 ? onPredicates[0] : new Nodes.And(onPredicates);
-      return { joins: [{ table: targetTable, on }], table: targetTable, pks: ["id"] };
-    }
-    return null;
+    return reflection;
   }
 
   private _resolveHasManySubquery(
@@ -2153,7 +1711,6 @@ export class Relation<T extends Base> {
         table: targetTable,
         on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         klass: targetModel,
-        ownerNode: src,
       };
     }
 
@@ -2199,7 +1756,6 @@ export class Relation<T extends Base> {
         table: targetTable,
         on: predicates.length === 1 ? predicates[0] : new Nodes.And(predicates),
         klass: targetModel,
-        ownerNode: src,
       };
     }
 
