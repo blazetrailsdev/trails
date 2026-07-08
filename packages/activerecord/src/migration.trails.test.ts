@@ -202,6 +202,53 @@ describe("MigrationTest", () => {
     expect(idx?.name).toBe("index_users_on_lower_email");
   });
 
+  it("dropTable delegates to SchemaStatements and omits IF EXISTS by default", async () => {
+    // Regression: MigrationContext#dropTable now routes the DDL through the
+    // adapter's SchemaStatements instead of hand-rolling it. `IF EXISTS` must be
+    // emitted only when `ifExists: true` is passed — Rails' drop_table does not
+    // default it (the earlier bespoke builder did, a trails divergence).
+    const sqls: string[] = [];
+    const stub = {
+      adapterName: "sqlite" as const,
+      quoteIdentifier: (n: string) => `"${n}"`,
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteDefaultExpression: (v: unknown) => String(v),
+      executeMutation: async (sql: string) => {
+        sqls.push(sql);
+        return [];
+      },
+    };
+    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    await ctx.dropTable("widgets");
+    expect(sqls).toEqual([`DROP TABLE "widgets"`]);
+    sqls.length = 0;
+    await ctx.dropTable("widgets", { ifExists: true });
+    expect(sqls).toEqual([`DROP TABLE IF EXISTS "widgets"`]);
+  });
+
+  it("renameTable delegates to SchemaStatements with adapter identifier quoting", async () => {
+    // Regression: MigrationContext#renameTable keeps the tableNamePrefix/suffix
+    // application but delegates the ALTER TABLE ... RENAME to SchemaStatements,
+    // which quotes via the adapter (backticks here) — the earlier bespoke
+    // builder hardcoded double quotes, which is wrong for MySQL.
+    const sqls: string[] = [];
+    const stub = {
+      adapterName: "mysql" as const,
+      quoteIdentifier: (n: string) => `\`${n}\``,
+      quoteTableName: (n: string) => `\`${n}\``,
+      quoteDefaultExpression: (v: unknown) => String(v),
+      executeMutation: async (sql: string) => {
+        sqls.push(sql);
+        return [];
+      },
+    };
+    const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
+    ctx.tableNamePrefix = "pre_";
+    ctx.tableNameSuffix = "_suf";
+    await ctx.renameTable("old", "new");
+    expect(sqls).toEqual(["ALTER TABLE `pre_old_suf` RENAME TO `pre_new_suf`"]);
+  });
+
   it("addIndex bookkeeping stores using per default_index_type?", async () => {
     // Regression: MigrationContext#addIndex records `using` into `_indexes` for
     // the schema dump. Rails stores `using` unconditionally (add_index_options);
