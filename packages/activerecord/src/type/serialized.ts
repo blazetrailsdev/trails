@@ -24,6 +24,44 @@ function isValueComparable(value: unknown): boolean {
 }
 
 /**
+ * Whether a non-collection object carries value-based equality, mirroring a
+ * Ruby object whose `==` compares by value rather than identity (e.g.
+ * `Date`/`Time`). The JS analog is an object whose `valueOf()` returns a
+ * primitive other than the object itself: `Date.prototype.valueOf` yields a
+ * number, whereas the default `Object.prototype.valueOf` returns `this` (so a
+ * plain custom `object_class` instance falls through to reference equality,
+ * matching Ruby's default `Object#==`).
+ *
+ * @internal
+ */
+/**
+ * Whether a value exposes an explicit `equals(other)` method — our convention
+ * for a Ruby object that overrides `==`. Used to dispatch change detection to
+ * the value's own equality (e.g. ActiveSupport::TimeWithZone, which compares by
+ * UTC instant across Date/Time-like operands) rather than a primitive fallback.
+ *
+ * @internal
+ */
+function hasEquals(value: unknown): value is { equals(other: unknown): boolean } {
+  return (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { equals?: unknown }).equals === "function"
+  );
+}
+
+function hasValueEquality(value: unknown): boolean {
+  if (value === null || typeof value !== "object") return false;
+  // A null-prototype object (which isValueComparable treats as hash-like) does
+  // not inherit Object.prototype.valueOf, so guard the lookup rather than
+  // throwing when such a value reaches this fallback.
+  const valueOf = (value as { valueOf?: unknown }).valueOf;
+  if (typeof valueOf !== "function") return false;
+  const primitive = valueOf.call(value);
+  return primitive !== value && (primitive === null || typeof primitive !== "object");
+}
+
+/**
  * Structural JSON key used to compare a value against the coder's default.
  * Unwraps objects that expose `toHash()` (the HashWithIndifferentAccess
  * interface) so their contents — not their Map-backed internal shape — drive
@@ -147,10 +185,9 @@ export class Serialized extends ValueType {
   // same distinction `isValueComparable`/`canonicalKey` already draw for
   // `default_value?`. Sharing that scope is deliberate: a coder whose `load`
   // returns a non-Array/Hash value with its own value-based `==` (e.g.
-  // Date/Time) still falls through to reference equality — a narrow edge no
-  // serialized coder here hits. `canonicalKey` sorts object keys, so two
-  // content-equal hashes built in a different insertion order compare equal,
-  // matching Ruby's order-insensitive `Hash#==`.
+  // Date/Time) is compared through `hasValueEquality` below. `canonicalKey`
+  // sorts object keys, so two content-equal hashes built in a different
+  // insertion order compare equal, matching Ruby's order-insensitive `Hash#==`.
   override isChanged(
     oldValue: unknown,
     newValue: unknown,
@@ -163,6 +200,29 @@ export class Serialized extends ValueType {
       } catch {
         return true;
       }
+    }
+    // A coder whose `load` returns a value-== object mirrors Ruby's
+    // `old_value != new_value` dispatching to that object's own `==`. When the
+    // value defines an explicit `equals` (our convention for Ruby `==`, e.g.
+    // ActiveSupport::TimeWithZone whose `<=>`/`==` compares by UTC instant
+    // across Date/Time-like kinds), dispatch to it so cross-class time-like
+    // equality is honored. Rails' `old_value != new_value` calls the *left*
+    // operand's `==`, so dispatch on `oldValue` only — never `newValue`.
+    if (hasEquals(oldValue)) return !oldValue.equals(newValue);
+    // Otherwise a value object without an explicit `==` but with a primitive
+    // `valueOf` (e.g. Date) compares by that primitive. A Ruby value type's
+    // `==` only compares against its own kind, so require a shared constructor:
+    // two unrelated classes that happen to yield the same primitive are not
+    // equal, matching Ruby.
+    if (
+      hasValueEquality(oldValue) &&
+      hasValueEquality(newValue) &&
+      (oldValue as object).constructor === (newValue as object).constructor
+    ) {
+      return !Object.is(
+        (oldValue as { valueOf(): unknown }).valueOf(),
+        (newValue as { valueOf(): unknown }).valueOf(),
+      );
     }
     return true;
   }

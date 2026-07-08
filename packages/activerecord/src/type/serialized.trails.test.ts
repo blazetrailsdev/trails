@@ -35,4 +35,46 @@ describe("Serialized#isChanged", () => {
     const newValue = new HashWithIndifferentAccess({ b: 2, a: 1 });
     expect(type.isChanged(oldValue, newValue)).toBe(false);
   });
+
+  it("treats two value-equal Dates as unchanged, matching Ruby Date#==", () => {
+    expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-08"))).toBe(false);
+    expect(type.isChanged(new Date("2026-07-08"), new Date("2026-07-09"))).toBe(true);
+  });
+
+  it("dispatches to an explicit equals method, honoring cross-class value equality", () => {
+    // Mirrors ActiveSupport::TimeWithZone#== comparing by UTC instant across
+    // Date/Time-like kinds via its own equality method.
+    class Instant {
+      constructor(readonly ms: number) {}
+      equals(other: unknown) {
+        return other instanceof Date ? this.ms === other.getTime() : false;
+      }
+    }
+    expect(type.isChanged(new Instant(100), new Date(100))).toBe(false);
+    expect(type.isChanged(new Instant(100), new Date(200))).toBe(true);
+  });
+
+  it("does not equate unrelated classes that yield the same valueOf primitive", () => {
+    class Cents {
+      valueOf() {
+        return 100;
+      }
+    }
+    const cents = new Cents();
+    const sameMillis = new Date(100);
+    expect(type.isChanged(cents, sameMillis)).toBe(true);
+  });
+
+  it("reports changed (not throws) for a null-prototype hash vs a Date", () => {
+    const nullProto = Object.assign(Object.create(null), { a: 1 });
+    expect(type.isChanged(nullProto, new Date(100))).toBe(true);
+  });
+
+  it("falls back to reference equality for identity-== object_class instances", () => {
+    class Custom {}
+    const oldValue = new Custom();
+    const newValue = new Custom();
+    expect(type.isChanged(oldValue, newValue)).toBe(true);
+    expect(type.isChanged(oldValue, oldValue)).toBe(false);
+  });
 });
