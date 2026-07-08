@@ -1880,7 +1880,10 @@ export class MigrationContext {
 
   async removeIndex(
     table: string,
-    options: { column?: string | string[]; name?: string },
+    // Forward the adapter's full `remove_index` option surface: `ifExists`
+    // short-circuits before name resolution (Rails
+    // `remove_index`'s `return if options[:if_exists] && !index_exists?`).
+    options: { column?: string | string[]; name?: string; ifExists?: boolean },
   ): Promise<void> {
     // Rails' `Migration` delegates to `connection.remove_index`, which resolves
     // the concrete index name (schema-split of an explicit `:name`, raising on a
