@@ -239,7 +239,7 @@ describe("DateTimePrecisionTest", () => {
       await ctx.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: 6 });
       });
-      const output = SchemaDumper.dump(ctx) as string;
+      const output = await SchemaDumper.dumpTableSchema(adapter, "foos");
       expect(output).toMatch(/t\.datetime\("created_at",\s*\{[^}]*null:\s*false/);
       expect(output).not.toMatch(/precision/);
     },
@@ -252,7 +252,7 @@ describe("DateTimePrecisionTest", () => {
       await ctx.createTable("foos", { force: true }, (t) => {
         t.timestamps({ precision: null });
       });
-      const output = SchemaDumper.dump(ctx) as string;
+      const output = await SchemaDumper.dumpTableSchema(adapter, "foos");
       expect(output).toMatch(/t\.datetime\("created_at".*precision.*null/);
       expect(output).toMatch(/t\.datetime\("updated_at".*precision.*null/);
     },

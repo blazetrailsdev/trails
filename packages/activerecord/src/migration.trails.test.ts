@@ -3,7 +3,7 @@
  *
  * These guard trails-internal implementation details (the `_connectionOverride`
  * / `_poolOverride` connection routing, the async `migration()` proxy, and the
- * `_indexes` schema-dump bookkeeping) that have no counterpart in Rails'
+ * adapter-delegating DDL methods) that have no counterpart in Rails'
  * migration_test.rb. Relocated here
  * verbatim from migration.test.ts under RFC 0043 so the convention file tracks
  * Rails 1:1 while the invariants stay covered.
@@ -91,36 +91,44 @@ describe("MigrationTest", () => {
     expect(await migrator.currentVersion()).toBe(1);
   });
 
-  it("addIndex bookkeeping reduces a single-column expression index name", async () => {
-    // Regression: MigrationContext#addIndex delegates the DDL to the adapter but
-    // records the resolved name into `_indexes` for the schema dump. That name
-    // must match the DDL the adapter emitted. `indexNameOptions` only reduces an
-    // expression column ("lower(email)" → "lower_email") when it sees a bare
-    // String — a pre-arrayified `["lower(email)"]` fails its `typeof === "string"`
-    // check and leaks the raw parenthesised name into the dump. Guards that
-    // addIndex derives the bookkeeping name from the original `columns`.
+  it("addIndex delegates the un-arrayified expression column to the adapter", async () => {
+    // Regression: MigrationContext#addIndex delegates the DDL to the adapter
+    // without pre-arrayifying an expression column. `indexNameOptions` only
+    // reduces an expression column ("lower(email)" → "lower_email") when it sees
+    // a bare String — a pre-arrayified `["lower(email)"]` fails its
+    // `typeof === "string"` check and leaks the raw parenthesised name into the
+    // DDL. Guards that the adapter receives the original `columns`.
     const ss = new SchemaStatements({} as unknown as DatabaseAdapter);
     const ddlColumns: unknown[] = [];
     const stub = {
       adapterName: "sqlite" as const,
+      getDatabaseVersion: async () => "3.0.0",
       addIndex: async (_t: string, columns: string | string[]) => {
         ddlColumns.push(columns);
       },
       indexName: (t: string, o: { column?: string | string[]; name?: string }) =>
         ss.indexName(t, o),
       indexNameOptions: (c: string | string[]) => ss.indexNameOptions(c),
-      // addIndex now sources the `_indexes` bookkeeping from the adapter-built
-      // IndexDefinition, so the stub delegates to the real `addIndexOptions`.
-      addIndexOptions: (t: string, c: string | string[], o: Record<string, unknown>) =>
-        ss.addIndexOptions(t, c, o),
-      supportsIndexSortOrder: () => true,
     };
     const ctx = new MigrationContext(stub as unknown as DatabaseAdapter);
     await ctx.addIndex("users", "lower(email)");
     // The adapter (and thus the real DDL) receives the un-arrayified column.
     expect(ddlColumns[0]).toBe("lower(email)");
-    const idx = ctx.indexes("users").find((i) => i.columns.includes("lower(email)"));
-    expect(idx?.name).toBe("index_users_on_lower_email");
+  });
+
+  it("columnExists forwards type and columnOptionsKeys to the adapter", async () => {
+    // Regression: MigrationContext#columnExists is the live adapter-backed
+    // introspection path, so it must expose Rails' full
+    // `column_exists?(table, column, type = nil, **options)` surface and forward
+    // `type` + the columnOptionsKeys (schema_statements.rb:132-141) rather than
+    // matching on name alone. Ride the canonical `people` table
+    // (`first_name` string, null: false — schema.rb:933).
+    const ctx = new MigrationContext(Base.connection);
+    expect(await ctx.columnExists("people", "first_name")).toBe(true);
+    expect(await ctx.columnExists("people", "first_name", "string")).toBe(true);
+    expect(await ctx.columnExists("people", "first_name", "integer")).toBe(false);
+    expect(await ctx.columnExists("people", "first_name", "string", { null: false })).toBe(true);
+    expect(await ctx.columnExists("people", "first_name", "string", { null: true })).toBe(false);
   });
 
   it("dropTable delegates to the adapter drop_table, forwarding options", async () => {
@@ -128,8 +136,7 @@ describe("MigrationTest", () => {
     // (the adapter's own drop_table) rather than a bare SchemaStatements
     // instance, so the dialect overrides that emit `temporary:`/`force:
     // "cascade"` (e.g. MySQL's `DROP TEMPORARY TABLE ... CASCADE`) are reached.
-    // The options object is forwarded verbatim; the in-memory bookkeeping is
-    // still pruned per table name.
+    // The options object is forwarded verbatim.
     const calls: unknown[][] = [];
     const stub = {
       dropTable: async (...args: unknown[]) => {
@@ -163,52 +170,6 @@ describe("MigrationTest", () => {
     ctx.tableNameSuffix = "_suf";
     await ctx.renameTable("old", "new");
     expect(calls).toEqual([["pre_old_suf", "pre_new_suf"]]);
-  });
-
-  it("addIndex bookkeeping stores using per default_index_type?", async () => {
-    // Regression: MigrationContext#addIndex records `using` into `_indexes` for
-    // the schema dump. Rails stores `using` unconditionally (add_index_options);
-    // the dumper prints it only when `!default_index_type?(index)` — nil-only on
-    // the abstract adapter (so sqlite, which does not override, keeps a non-nil
-    // `using`), and nil-or-`:btree` on postgres/mysql. Mirror that per-adapter
-    // predicate here, not a postgres-only adapter-name check.
-    const ss = new SchemaStatements({} as unknown as DatabaseAdapter);
-    const makeStub = (an: "sqlite" | "mysql", defaultIndexType: (u?: string) => boolean) => ({
-      adapterName: an,
-      addIndex: async () => {},
-      indexName: (t: string, o: { column?: string | string[]; name?: string }) =>
-        ss.indexName(t, o),
-      indexNameOptions: (c: string | string[]) => ss.indexNameOptions(c),
-      addIndexOptions: (t: string, c: string | string[], o: Record<string, unknown>) =>
-        ss.addIndexOptions(t, c, o),
-      defaultIndexType,
-    });
-    // postgres/mysql: `using == :btree || using.nil?`; abstract/sqlite: `using.nil?`.
-    const mysqlDefault = (u?: string) => u === "btree" || u == null;
-    const sqliteDefault = (u?: string) => u == null;
-
-    const mysqlCtx = new MigrationContext(
-      makeStub("mysql", mysqlDefault) as unknown as DatabaseAdapter,
-    );
-    await mysqlCtx.addIndex("users", "email", { using: "hash" });
-    expect(mysqlCtx.indexes("users").find((i) => i.columns.includes("email"))?.using).toBe("hash");
-
-    const btreeCtx = new MigrationContext(
-      makeStub("mysql", mysqlDefault) as unknown as DatabaseAdapter,
-    );
-    await btreeCtx.addIndex("users", "email", { using: "btree" });
-    expect(
-      btreeCtx.indexes("users").find((i) => i.columns.includes("email"))?.using,
-    ).toBeUndefined();
-
-    // sqlite does NOT override default_index_type?, so a non-nil `using`
-    // round-trips (matches Rails: dumper prints `using:` whenever `using` is
-    // non-nil there).
-    const sqliteCtx = new MigrationContext(
-      makeStub("sqlite", sqliteDefault) as unknown as DatabaseAdapter,
-    );
-    await sqliteCtx.addIndex("users", "email", { using: "hash" });
-    expect(sqliteCtx.indexes("users").find((i) => i.columns.includes("email"))?.using).toBe("hash");
   });
 
   // Rails' IllegalMigrationNameError message carries an explanatory suffix

@@ -304,7 +304,22 @@ export interface AbstractAdapter {
     options?: { name?: string; unique?: boolean; valid?: boolean },
   ): Promise<boolean>;
   tableExists(tableName: string): Promise<boolean>;
-  columnExists(tableName: string, columnName: string): Promise<boolean>;
+  // Rails' `column_exists?(table, column, type = nil, **options)` narrows the
+  // match by column `type` and the columnOptionsKeys when given.
+  columnExists(
+    tableName: string,
+    columnName: string,
+    type?: string | null,
+    options?: {
+      limit?: unknown;
+      precision?: unknown;
+      scale?: unknown;
+      default?: unknown;
+      null?: unknown;
+      collation?: unknown;
+      comment?: unknown;
+    },
+  ): Promise<boolean>;
   tables(): Promise<string[]>;
   views(): Promise<string[]>;
   viewExists(viewName: string): Promise<boolean>;
