@@ -13,7 +13,6 @@ import {
   type AddForeignKeyOptions,
   type ColumnOptions,
   type ColumnType,
-  type ReferentialAction,
 } from "../abstract/schema-definitions.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
 import { Column } from "./column.js";
@@ -1223,16 +1222,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
   override async addForeignKey(
     fromTable: string,
     toTable: string,
-    options: {
-      column?: string | string[];
-      primaryKey?: string | string[];
-      name?: string;
-      onDelete?: ReferentialAction;
-      onUpdate?: ReferentialAction;
-      deferrable?: "immediate" | "deferred";
-      validate?: boolean;
-      ifNotExists?: boolean;
-    } = {},
+    options: AddForeignKeyOptions = {},
   ): Promise<void> {
     // Rails: assert_valid_deferrable runs before `super` (the abstract
     // add_foreign_key, where the if_not_exists short-circuit lives).
@@ -1259,7 +1249,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // schema_creation (visitAlterTable/visitForeignKeyDefinition) emits the
     // deferrable / NOT VALID / action / schema-qualified-name decoration, so no
     // bespoke inline SQL is needed here.
-    const fkOptions = this.foreignKeyOptions(fromTable, toTable, options);
+    const fkOptions = this.foreignKeyOptions(
+      fromTable,
+      toTable,
+      options as Record<string, unknown>,
+    );
     const at = this.pg.createAlterTable(fromTable);
     // Route through AlterTable#addForeignKey -> TableDefinition#newForeignKeyDefinition
     // (now converged): it applies table_name_prefix/suffix and re-runs

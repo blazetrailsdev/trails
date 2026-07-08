@@ -127,8 +127,8 @@ import {
   TableDefinition as AbstractTableDefinition,
   type ColumnOptions,
   type ColumnType,
-  type ReferentialAction,
   type ForeignKeyLookupOptions,
+  type AddForeignKeyOptions,
 } from "./abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./postgresql/schema-creation.js";
 import { SchemaDumper as PgSchemaDumper } from "./postgresql/schema-dumper.js";
@@ -3999,16 +3999,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async addForeignKey(
     fromTable: string,
     toTable: string,
-    options: {
-      column?: string | string[];
-      primaryKey?: string | string[];
-      name?: string;
-      onDelete?: ReferentialAction;
-      onUpdate?: ReferentialAction;
-      deferrable?: "immediate" | "deferred";
-      validate?: boolean;
-      ifNotExists?: boolean;
-    } = {},
+    options: AddForeignKeyOptions = {},
   ): Promise<void> {
     // Rails: PostgreSQL::SchemaStatements#add_foreign_key is just
     //   assert_valid_deferrable(options[:deferrable]); super
