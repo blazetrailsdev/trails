@@ -381,6 +381,20 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
     }
   }
 
+  // An EXPLICIT `attribute(name, type)` before `enum` must win over the
+  // reflected column type — Rails pushes a PendingType(type) that overrides the
+  // `type_for_column` seed during the phase-2 replay, so the enum decorator sees
+  // the declared type, not the column's. Here the declared "integer" must beat
+  // the reflected "decimal" column (mirrors the MySQL TINYINT(1) → integer case
+  // that must not coerce through the reflected boolean, exercised on sqlite).
+  class ExplicitNumericEnum extends Base {
+    static _tableName = "numeric_data";
+    static {
+      this.attribute("decimal_number", "integer");
+      this.enum("decimal_number", { low: 0, mid: 1, high: 2 });
+    }
+  }
+
   // Deliberately do NOT await `NumericEnum.loadSchema()` here: `enumTypeOf`
   // must reflect synchronously from the warm schema cache on its own (the same
   // sync path `Base.typeForAttribute` uses). Awaiting the async loader first
@@ -421,6 +435,15 @@ describe("Enum subtype resolved from a schema-reflected column type", () => {
     // mapping shape implies.
     expect(type!.subtype).toBe("decimal");
     expect(type!.subtypeType().type()).toBe("decimal");
+  });
+
+  it("keeps an explicitly-typed enum's declared subtype over the reflected column", () => {
+    const type = enumTypeOf(ExplicitNumericEnum, "decimal_number");
+    expect(type).toBeInstanceOf(EnumType);
+    // The declared "integer" wins over the reflected "decimal" column: the
+    // explicit `attribute(...)` PendingType overrides the `type_for_column` seed.
+    expect(type!.subtype).toBe("integer");
+    expect(type!.subtypeType().type()).toBe("integer");
   });
 });
 
