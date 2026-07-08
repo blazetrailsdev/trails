@@ -1,17 +1,30 @@
 /**
  * trails-only mechanism tests for the per-model prototype-carrier delegation
- * (story `delegation-generated-methods-per-model-prototype-carrier`). These
- * assert the *mechanism* — that generated relation methods resolve as real
- * methods via a per-model `Relation` subclass prototype carrier — rather than
- * observable behavior (covered by the Rails-mirrored `delegation.test.ts`).
+ * (stories `delegation-generated-methods-per-model-prototype-carrier` and
+ * `delegation-remaining-delegate-class-prototype-carriers`). These assert the
+ * *mechanism* — that generated relation methods resolve as real methods via
+ * per-model subclass prototype carriers for all four delegate classes
+ * (`Relation`, `AssociationRelation`, `DisableJoinsAssociationRelation`,
+ * `CollectionProxy`) — rather than observable behavior (covered by the
+ * Rails-mirrored `delegation.test.ts`).
  */
 import { describe, it, expect } from "vitest";
-import { generateRelationMethod, relationClassFor, uncacheableMethods } from "./delegation.js";
+import {
+  generateRelationMethod,
+  relationClassFor,
+  associationRelationClassFor,
+  disableJoinsAssociationRelationClassFor,
+  collectionProxyClassFor,
+  uncacheableMethods,
+} from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
-// Loading CollectionProxy registers it with the relation family so
-// `uncacheableMethods()` sees the subclass-only methods (`target`, …).
+// Loading these registers each delegate class with the relation family so the
+// carrier resolvers find their base ctor and `uncacheableMethods()` sees the
+// subclass-only methods (`target`, …).
 import { CollectionProxy } from "../associations/collection-proxy.js";
+import "../association-relation.js";
+import "../disable-joins-association-relation.js";
 
 describe("generated relation methods — per-model prototype carrier", () => {
   it("installs a generated delegator as a real method on the per-model carrier", () => {
@@ -63,6 +76,75 @@ describe("generated relation methods — per-model prototype carrier", () => {
     const carrier = relationClassFor(Post as never).prototype as Record<string, unknown>;
     for (const name of uncacheable) {
       expect(Object.prototype.hasOwnProperty.call(carrier, name)).toBe(false);
+    }
+  });
+});
+
+describe("generated relation methods — remaining delegate-class carriers", () => {
+  const allCarriersFor = (model: never) => [
+    relationClassFor(model),
+    associationRelationClassFor(model),
+    disableJoinsAssociationRelationClassFor(model),
+    collectionProxyClassFor(model),
+  ];
+
+  it("feeds one generated method to all four per-model carriers (propagation)", () => {
+    // Realize all four carriers first, then generate: the single
+    // `generatedRelationMethods(model)` module must propagate the new method to
+    // every already-registered carrier (Rails' `delegate.include
+    // generated_relation_methods` across each subclass).
+    const carriers = allCarriersFor(Post as never);
+    const fn = () => "shared";
+    generateRelationMethod(Post as never, "sharedAcrossCarriers", fn);
+    for (const carrier of carriers) {
+      const proto = carrier.prototype as Record<string, unknown>;
+      expect(Object.prototype.hasOwnProperty.call(proto, "sharedAcrossCarriers")).toBe(true);
+      expect(proto.sharedAcrossCarriers).toBe(fn);
+    }
+  });
+
+  it("installs already-generated methods when a carrier is created later (includeInto catch-up)", () => {
+    // Generate BEFORE the Comment association/proxy carriers exist: creating them
+    // must back-fill the stored method as a real own property (the `includeInto`
+    // catch-up loop), not miss it.
+    generateRelationMethod(Comment as never, "lateCarrierGenerated", () => "late");
+    for (const carrier of [
+      associationRelationClassFor(Comment as never),
+      disableJoinsAssociationRelationClassFor(Comment as never),
+      collectionProxyClassFor(Comment as never),
+    ]) {
+      const proto = carrier.prototype as Record<string, unknown>;
+      expect(Object.prototype.hasOwnProperty.call(proto, "lateCarrierGenerated")).toBe(true);
+    }
+  });
+
+  it("each carrier reports its base delegate class name (per-model subclass stays anonymous)", () => {
+    // Rails' ClassSpecificRelation::ClassMethods#name returns `superclass.name`,
+    // so `#inspect` (`this.constructor.name`) reads the base class name.
+    expect(associationRelationClassFor(Post as never).name).toBe("AssociationRelation");
+    expect(disableJoinsAssociationRelationClassFor(Post as never).name).toBe(
+      "DisableJoinsAssociationRelation",
+    );
+    expect(collectionProxyClassFor(Post as never).name).toBe("CollectionProxy");
+  });
+
+  it("gives distinct models distinct carriers per delegate class (no cross-model leakage)", () => {
+    expect(associationRelationClassFor(Post as never)).not.toBe(
+      associationRelationClassFor(Comment as never),
+    );
+    expect(collectionProxyClassFor(Post as never)).not.toBe(
+      collectionProxyClassFor(Comment as never),
+    );
+  });
+
+  it("never generates an uncacheable method onto any of the four carriers", () => {
+    const uncacheable = uncacheableMethods();
+    expect(uncacheable.has("target")).toBe(true); // guard: not a vacuous loop
+    for (const carrier of allCarriersFor(Post as never)) {
+      const proto = carrier.prototype as Record<string, unknown>;
+      for (const name of uncacheable) {
+        expect(Object.prototype.hasOwnProperty.call(proto, name)).toBe(false);
+      }
     }
   });
 });
