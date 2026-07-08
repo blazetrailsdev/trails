@@ -123,12 +123,14 @@ describe("Callbacks", () => {
       const target = { log: [] as string[] };
       defineCallbacks(target, "save");
       setCallback(target, "save", "before", (t: any) => t.log.push("before"));
+      // Register the after before the around so it wraps outside it (Rails
+      // compiles afters registered earlier onto the outer sequence).
+      setCallback(target, "save", "after", (t: any) => t.log.push("after"));
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.log.push("around-pre");
         next();
         t.log.push("around-post");
       });
-      setCallback(target, "save", "after", (t: any) => t.log.push("after"));
 
       runCallbacks(target, "save", () => target.log.push("block"));
 
@@ -487,6 +489,11 @@ describe("Callbacks", () => {
         },
         { if: () => true },
       );
+      // after callback — registered before the arounds (as Rails' AroundPerson
+      // does) so it wraps outside them and runs last.
+      setCallback(target, "save", "after", (t: any) => {
+        t.history.push("tweedle");
+      });
       // around callbacks
       setCallback(target, "save", "around", (t: any, next: () => void) => {
         t.history.push("tweedle dum pre");
@@ -508,10 +515,6 @@ describe("Callbacks", () => {
         t.history.push("tweedle deedle pre");
         next();
         t.history.push("tweedle deedle post");
-      });
-      // after callback
-      setCallback(target, "save", "after", (t: any) => {
-        t.history.push("tweedle");
       });
 
       runCallbacks(target, "save", () => {
@@ -1845,12 +1848,13 @@ describe("Callbacks — async propagation", () => {
   it("async around callback propagates Promise and runs after callbacks when complete", async () => {
     const t = { log: [] as string[] };
     defineCallbacks(t, "save");
+    // after registered before the around so it wraps outside it and runs last.
+    setCallback(t, "save", "after", (x: any) => x.log.push("after"));
     setCallback(t, "save", "around", async (x: any, next) => {
       x.log.push("ao");
       await next();
       x.log.push("ac");
     });
-    setCallback(t, "save", "after", (x: any) => x.log.push("after"));
     const r = runCallbacks(t, "save", async () => t.log.push("block"));
     expect(r).toBeInstanceOf(Promise);
     await r;
