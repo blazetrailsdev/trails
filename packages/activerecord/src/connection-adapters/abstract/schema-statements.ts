@@ -24,6 +24,7 @@ import {
   CreateIndexDefinition,
   ForeignKeyDefinition,
   CheckConstraintDefinition,
+  assertCompositeForeignKeyArity,
   type AddForeignKeyOptions,
   type AddIndexOptions,
   type ColumnType,
@@ -1725,6 +1726,8 @@ export class SchemaStatements {
         column: result.column as string | string[],
       });
     }
+
+    assertCompositeForeignKeyArity(toTable, result.column, result.primaryKey);
 
     return result;
   }

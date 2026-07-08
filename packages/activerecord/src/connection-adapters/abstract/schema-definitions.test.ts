@@ -210,12 +210,21 @@ describe("TableDefinition#new_foreign_key_definition", () => {
   it("maps a composite primaryKey array to a composite column array (bare-adapter fallback)", () => {
     // Mirrors foreign_key_options' array branch: each PK column gets its own
     // singularized foreign-key column.
-    // primaryKey/column are string|string[] on ForeignKeyDefinition; the scalar
-    // AddForeignKeyOptions DSL type is cast here to exercise the composite path.
     const fk = new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
-      primaryKey: ["tenant_id", "id"] as unknown as string,
+      primaryKey: ["tenant_id", "id"],
     });
     expect(fk.column).toEqual(["rocket_tenant_id", "rocket_id"]);
+  });
+
+  it("add_composite_foreign_key_raises_if_column_and_primary_key_sizes_mismatch", () => {
+    // Mirrors foreign_key_options' arity guard (schema_statements.rb:1258-1266):
+    // a composite primaryKey must be matched by an equal-arity column.
+    expect(() =>
+      new TableDefinition("astronauts").newForeignKeyDefinition("rockets", {
+        column: "rocket_id",
+        primaryKey: ["tenant_id", "id"],
+      }),
+    ).toThrow(":column must reference all the :primary_key columns");
   });
 
   it("applies table_name_prefix/suffix to to_table before building the def", () => {
