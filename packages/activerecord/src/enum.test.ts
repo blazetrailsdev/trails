@@ -661,6 +661,26 @@ describe("EnumTest", () => {
     );
   });
 
+  // A column-backed enum whose name is LATER reused as an alias target must not
+  // raise: Rails' decorate block only raises when the decorated subtype is the
+  // default (no column), and a real column reflects its own subtype at replay
+  // regardless of a later alias. Guards against a coarse "pending ∩ alias-key"
+  // heuristic false-positiving a legitimate column-backed enum.
+  it("column-backed enum whose name is later aliased does not raise", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("nullable_status", ["single", "married"] as any);
+        this.aliasAttribute("nullable_status", "status");
+      }
+    }
+    registerModel(Klass);
+
+    expect(() => (Klass as any).typeForAttribute("nullable_status")).not.toThrow();
+    const record: any = await (Klass as any).create({});
+    expect(() => record.isSingle()).not.toThrow();
+  });
+
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
     expect((book as any).isAuthorVisibilityInvisible()).toBe(false);

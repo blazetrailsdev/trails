@@ -6,6 +6,7 @@ import {
   IntegerType,
   Type,
   typeRegistry,
+  isDecoratorReplay,
 } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
 import { isDangerousClassMethod } from "./scoping/named.js";
@@ -153,18 +154,21 @@ export function installEnumAttribute(
   // _defaultAttributes replay, so once the schema is loaded `reflected` is the
   // column's real Type::Value and the EnumType delegates to it.
   klass.decorateAttributes([attribute], (_name: string, reflected: Type) => {
-    // Rails raises inside the `decorate_attributes` block when an enum's name
-    // resolves through `attribute_aliases` to no declared type. trails resolves
-    // an `alias_attribute` target eagerly in `_enum` (attrName above): if the
-    // alias existed when `enum` ran, `attribute` is already the real column and
-    // this decorator seeds the backing column type. But when `enum` is declared
-    // BEFORE `alias_attribute` on the same name, the alias didn't exist yet, so
-    // `attribute` is the un-aliased name with no column of its own — a phantom
-    // that Rails rejects. The eager (class-definition-time) application of this
-    // decorator runs before `alias_attribute`, so the alias is absent and the
-    // guard is a no-op; only the deferred replay (first use, after both macros)
-    // sees the alias and raises — matching Rails' lazy timing.
-    assertEnumAliasDeclaredBefore(klass, attribute);
+    // Rails raises inside the `decorate_attributes` block when the decorated
+    // subtype is `ActiveModel::Type.default_value` — an enum name with no backing
+    // column and no explicit type (enum.rb:240-245). Rails only ever runs this
+    // block on `_default_attributes` materialization, but trails ALSO applies
+    // decorators eagerly to `_attributeDefinitions` at declaration time (a
+    // back-compat convenience), when every enum's subtype is still the bare
+    // default — so gate the raise on `isDecoratorReplay()` to fire solely on the
+    // deferred replay, matching Rails' timing and avoiding a false positive on
+    // column-backed enums at class-definition time (including a subclass of an
+    // already-schema-loaded model). `assertEnumTypeDeclared` keys off the real
+    // column, so an `enum` declared before its `alias_attribute` (a phantom
+    // un-aliased name with no column) raises while a column-backed enum does not.
+    if (isDecoratorReplay()) {
+      assertEnumTypeDeclared(klass, attribute);
+    }
     return enumTypeFrom(klass, attribute, name, mapping, reflected, raiseOnInvalidValues);
   });
 
@@ -958,31 +962,6 @@ function undeclaredEnumTypeError(klass: typeof Base, name: string): Error {
 }
 
 /**
- * Raise when an enum was declared before the `alias_attribute` that would give
- * its name a backing column — the anti-Rails order. Detected by the enum name
- * being both a pending type-check target (no column/explicit type of its own at
- * `enum` time) AND, now, a registered attribute alias: the alias was added after
- * `enum`, so the enum keys a phantom attribute Rails rejects. Called from the
- * enum decorator's deferred replay so the raise fires on first use, mirroring
- * Rails raising inside its `decorate_attributes` block (enum.rb:240-245).
- *
- * @internal
- */
-export function assertEnumAliasDeclaredBefore(klass: typeof Base, name: string): void {
-  const host = klass as unknown as {
-    _enumsPendingTypeCheck?: Set<string>;
-    _attributeAliases?: Record<string, string>;
-  };
-  if (!host._enumsPendingTypeCheck?.has(name)) return;
-  if (
-    !host._attributeAliases ||
-    !Object.prototype.hasOwnProperty.call(host._attributeAliases, name)
-  )
-    return;
-  throw undeclaredEnumTypeError(klass, name);
-}
-
-/**
  * Fetch the single registered EnumType for an enum attribute — the one source
  * of truth built lazily from the reflected column type via the
  * `decorateAttributes` decorator. Resolves through the replayed AttributeSet
@@ -1000,13 +979,15 @@ export function enumTypeOf(klass: typeof Base, attribute: string): EnumType | nu
     _attributeAliases?: Record<string, string>;
     _defaultAttributes(): { getAttribute(n: string): { type: Type } };
   };
-  // Guard the *un-resolved* name before resolving the alias: an `enum` declared
+  // Check the *un-resolved* name before resolving the alias: an `enum` declared
   // before its `alias_attribute` keys a phantom `_enums` entry under the
   // un-aliased name, so resolving first would look past it to the backing column
-  // and silently return null. Mirrors Rails' type casting always routing through
-  // `type_for_attribute(name)`, whose `decorate_attributes` block raises
-  // (type_caster/map.rb:10-16, enum.rb:240-245).
-  assertEnumAliasDeclaredBefore(klass, attribute);
+  // and silently return null. `assertEnumTypeDeclared` raises only when the name
+  // has no column of its own (Rails' `subtype == default_value` condition), so a
+  // column-backed enum whose name is later aliased is unaffected. Mirrors Rails
+  // routing type casting through `type_for_attribute(name)`, whose
+  // `decorate_attributes` block raises (type_caster/map.rb:10-16, enum.rb:240-245).
+  assertEnumTypeDeclared(klass, attribute);
   const resolved = host._attributeAliases?.[attribute] ?? attribute;
   if (!host._enums?.has(resolved)) return null;
   // Reflect synchronously from the warm schema cache before reading the

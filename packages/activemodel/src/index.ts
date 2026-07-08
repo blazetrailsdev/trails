@@ -35,6 +35,7 @@ export {
 } from "./attribute-mutation-tracker.js";
 export {
   applyPendingAttributeModifications,
+  isDecoratorReplay,
   pushPendingDecorator,
   resetDefaultAttributes,
   registerWithSuperclass,

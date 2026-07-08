@@ -81,6 +81,22 @@ export class PendingDefault implements PendingModification {
   }
 }
 
+/**
+ * Depth counter set while a PendingDecorator replays during
+ * `_default_attributes` materialization. trails also applies decorators eagerly
+ * to `_attributeDefinitions` at declaration time (a back-compat convenience Rails
+ * lacks); a decorator that must mirror Rails' replay-only behavior — e.g. the
+ * enum decorator's "Undeclared attribute type" raise, which Rails fires inside
+ * its `decorate_attributes` block only on materialization — consults
+ * `isDecoratorReplay()` to run solely on the deferred replay, not the eager pass.
+ */
+let _decoratorReplayDepth = 0;
+
+/** True while a PendingDecorator is replaying during materialization. @internal */
+export function isDecoratorReplay(): boolean {
+  return _decoratorReplayDepth > 0;
+}
+
 /** @internal Rails-private helper. */
 export class PendingDecorator implements PendingModification {
   constructor(
@@ -93,7 +109,13 @@ export class PendingDecorator implements PendingModification {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      const newType = this.decorator(name, existing.type);
+      _decoratorReplayDepth++;
+      let newType: Type;
+      try {
+        newType = this.decorator(name, existing.type);
+      } finally {
+        _decoratorReplayDepth--;
+      }
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }
