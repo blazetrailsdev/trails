@@ -10,7 +10,7 @@
 
 export class TypeMetadata {
   readonly sqlType: string;
-  readonly type: string;
+  readonly type: string | undefined;
   readonly limit: number | null;
   readonly precision: number | null;
   readonly scale: number | null;
@@ -27,7 +27,10 @@ export class TypeMetadata {
     options: { extra?: string } = {},
   ) {
     this.sqlType = typeMetadata.sqlType;
-    this.type = typeMetadata.type ?? typeMetadata.sqlType;
+    // Rails' MySQL TypeMetadata delegates `type` to the wrapped SqlTypeMetadata
+    // (DelegateClass), which is nil for an unmapped sql_type — no sqlType
+    // fallback. Keep it nil-faithful.
+    this.type = typeMetadata.type ?? undefined;
     this.limit = typeMetadata.limit ?? null;
     this.precision = typeMetadata.precision ?? null;
     this.scale = typeMetadata.scale ?? null;
