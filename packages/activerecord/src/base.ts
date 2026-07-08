@@ -3857,12 +3857,25 @@ export class Base extends Model {
     const ctor = this.constructor as typeof Base;
     if (!hasBeforeOrAroundCallbackOnProto(ctor.prototype, "destroy")) return;
     if (typeof (this as any).association !== "function") return;
+    // When this best-effort preload runs inside an open transaction, isolate
+    // each load in its own savepoint. A failing preload query (e.g. a
+    // `belongs_to ..., primary_key:` pointing at a column that doesn't exist,
+    // like `tag_with_primary_key`) aborts the whole PostgreSQL transaction
+    // (25P02) — and swallowing the JS error can't un-abort the connection.
+    // Rolling back to a per-load savepoint clears the aborted state so the
+    // outer transaction stays usable, matching Rails, which never issues this
+    // eager query at all (it lazily loads only what the callback reads).
+    const inTransaction = _currentTransactionPublic().isOpen();
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
       let assoc: any;
       try {
         assoc = (this as any).association(ref.name);
         if (!assoc || assoc.isLoaded?.()) continue;
-        await assoc.loadTarget();
+        if (inTransaction) {
+          await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
+        } else {
+          await assoc.loadTarget();
+        }
       } catch {
         // An unregistered target class, missing FK row, strict-loading
         // violation, or transient DB error must not abort the destroy. Resolve
