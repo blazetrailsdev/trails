@@ -73,6 +73,33 @@ function registerCompanyModels(): void {
   registerSubclass(Client);
 }
 
+// Mirrors the SpecialBook/SpecialAuthor/SpecialSubscription models defined
+// inline in has_one_associations_test.rb — a has_one over an enum-carrying
+// child.
+class SpecialBook extends Base {
+  static {
+    this._tableName = "books";
+    this.belongsTo("author", { className: "SpecialAuthor" });
+    this.hasOne("subscription", {
+      className: "SpecialSubscription",
+      foreignKey: "subscriber_id",
+    });
+    this.enum("status", { proposed: 0, written: 1, published: 2 });
+  }
+}
+class SpecialAuthor extends Base {
+  static {
+    this._tableName = "authors";
+    this.hasOne("book", { className: "SpecialBook", foreignKey: "author_id" });
+  }
+}
+class SpecialSubscription extends Base {
+  static {
+    this._tableName = "subscriptions";
+    this.belongsTo("book", { className: "SpecialBook" });
+  }
+}
+
 // ==========================================================================
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
@@ -101,6 +128,9 @@ describe("HasOneAssociationsTest", () => {
     registerModel(AuditLog);
     registerModel(Room);
     registerModel(User);
+    registerModel("SpecialBook", SpecialBook);
+    registerModel("SpecialAuthor", SpecialAuthor);
+    registerModel("SpecialSubscription", SpecialSubscription);
     await Company.loadSchema();
     await Account.loadSchema();
     await Car.loadSchema();
@@ -886,12 +916,31 @@ describe("HasOneAssociationsTest", () => {
     expect((landlord as any).isDestroyed()).toBe(true);
   });
 
-  it.skip("association enum works properly", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): SpecialBook enum + has_one join — gap.
+  it("association enum works properly", async () => {
+    const author = await (SpecialAuthor as any).createBang({ name: "Test" });
+    const book = await (SpecialBook as any).createBang({ status: "published" });
+    author.book = book;
+
+    expect(book.status).toBe("published");
+    expect(
+      await (SpecialAuthor as any)
+        .joins("book")
+        .where({ books: { status: "published" } })
+        .count(),
+    ).not.toBe(0);
   });
 
-  it.skip("association enum works properly with nested join", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): SpecialBook enum + nested join — gap.
+  it("association enum works properly with nested join", async () => {
+    const author = await (SpecialAuthor as any).createBang({ name: "Test" });
+    const book = await (SpecialBook as any).createBang({ status: "published" });
+    author.book = book;
+
+    const whereClause = { books: { subscriptions: { subscriber_id: null } } };
+    // Mirrors Rails' assert_nothing_raised: building and running the nested
+    // enum-carrying join must not raise.
+    const relation = (SpecialAuthor as any).joins({ book: "subscription" }).whereNot(whereClause);
+    const rows = await relation.toArray();
+    expect(Array.isArray(rows)).toBe(true);
   });
 
   // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
