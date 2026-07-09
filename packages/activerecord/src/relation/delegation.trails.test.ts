@@ -19,6 +19,7 @@ import {
 } from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Company, Firm } from "../test-helpers/models/company.js";
 // Loading these registers each delegate class with the relation family so the
 // carrier resolvers find their base ctor and `uncacheableMethods()` sees the
 // subclass-only methods (`target`, …).
@@ -126,6 +127,34 @@ describe("generated relation methods — remaining delegate-class carriers", () 
       "DisableJoinsAssociationRelation",
     );
     expect(collectionProxyClassFor(Post as never).name).toBe("CollectionProxy");
+  });
+
+  it("inherits an STI base model's generated module onto the child carrier (include_relation_methods recursion)", () => {
+    // Rails' `include_relation_methods` recurses up the STI chain
+    // (`superclass.include_relation_methods(delegate) unless base_class?`,
+    // delegation.rb:57-60): a method generated on the base model (`Company`)
+    // must be a real method on the child (`Firm`) carrier's prototype — resolved
+    // by ordinary prototype lookup, not re-derived via the Proxy miss path.
+    // `Firm extends Company`; `Company` is the STI base_class.
+    generateRelationMethod(Company as never, "stiBaseGenerated", () => "base");
+    const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(firmCarrier, "stiBaseGenerated")).toBe(true);
+    expect((firmCarrier.stiBaseGenerated as () => string)()).toBe("base");
+  });
+
+  it("lets a child model's own generated method win over an inherited one", () => {
+    // Rails' ancestor-chain MRO puts the child module before the ancestor, so an
+    // own generated method shadows an inherited one of the same name. The win is
+    // *structural* (per-carrier module priority), NOT temporal: generate the
+    // child's fn FIRST, then the ancestor's — the reverse order that a naive
+    // last-write-wins carrier would get wrong — and the child must still win.
+    generateRelationMethod(Firm as never, "stiOverridden", () => "child");
+    generateRelationMethod(Company as never, "stiOverridden", () => "base");
+    const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
+    expect((firmCarrier.stiOverridden as () => string)()).toBe("child");
+    // The base carrier (Company) only sees its own module, so it resolves "base".
+    const companyCarrier = relationClassFor(Company as never).prototype as Record<string, unknown>;
+    expect((companyCarrier.stiOverridden as () => string)()).toBe("base");
   });
 
   it("gives distinct models distinct carriers per delegate class (no cross-model leakage)", () => {
