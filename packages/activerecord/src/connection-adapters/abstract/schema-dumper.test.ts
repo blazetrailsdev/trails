@@ -130,3 +130,27 @@ describe("SchemaDumper columnSpec emits TS-DSL-emittable text", () => {
     expect(text).not.toContain("-> {");
   });
 });
+
+describe("SchemaDumper raises on a column whose type is not a valid native type", () => {
+  // Mirrors Rails' SchemaDumper#table (schema_dumper.rb:196,220-224): an
+  // unmapped/composite column reflects a nil DSL type, so `valid_type?` is
+  // false, the per-column raise fires, and the whole create_table body is
+  // discarded in favor of the "Could not dump table" comment.
+  const source = {
+    tables: () => ["widgets"],
+    columns: (_t: string) => [
+      { name: "id", type: "integer", sqlType: "integer", primaryKey: true },
+      { name: "kind", type: null, sqlType: "composite_type" },
+    ],
+    indexes: (_t: string) => [],
+    isValidType: (type: string | null | undefined) => type === "integer",
+  };
+
+  it("emits the Could-not-dump comment instead of a fabricated t.column line", async () => {
+    const output = await SchemaDumper.dump(source as any);
+    expect(output).toContain(`# Could not dump table "widgets" because of following StandardError`);
+    expect(output).toContain(`#   Unknown type 'composite_type' for column 'kind'`);
+    expect(output).not.toContain("createTable");
+    expect(output).not.toContain('t.column("kind"');
+  });
+});
