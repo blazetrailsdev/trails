@@ -9,6 +9,7 @@ import {
   isDecoratorReplay,
 } from "@blazetrails/activemodel";
 import { dangerousAttributeMethods } from "./attribute-methods.js";
+import { getOrCreateModuleCarrier } from "./module-carrier.js";
 import { isDangerousClassMethod, isRelationInstanceMethod } from "./scoping/named.js";
 // The synchronous schema reflector (warm-cache path), NOT the async
 // `Base.loadSchema()` — mirrors what `Base.typeForAttribute` calls.
@@ -368,9 +369,14 @@ function enumMethodNamesFor(valueMethodName: string): {
  *
  * Mirrors: ActiveRecord::Enum::EnumMethods
  */
+/**
+ * Per-class memo of the interposed enum carrier, keyed independently of the
+ * store carrier so the two mechanisms stack rather than share.
+ */
+const _enumCarriers = new WeakMap<typeof import("./base.js").Base, object>();
+
 export class EnumMethods {
   private _klass: typeof import("./base.js").Base;
-  private _carrier?: object;
 
   constructor(klass: typeof import("./base.js").Base) {
     this._klass = klass;
@@ -395,13 +401,7 @@ export class EnumMethods {
    * Created lazily and once per class; all of a class's enums share it.
    */
   carrier(): object {
-    if (!this._carrier) {
-      const proto = this._klass.prototype as object;
-      const carrier = Object.create(Object.getPrototypeOf(proto)) as object;
-      Object.setPrototypeOf(proto, carrier);
-      this._carrier = carrier;
-    }
-    return this._carrier;
+    return getOrCreateModuleCarrier(this._klass, _enumCarriers);
   }
 
   /**
