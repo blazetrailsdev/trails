@@ -6,7 +6,7 @@
 import { describe, it, expect, beforeEach, afterAll, afterEach, vi } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Base, MigrationContext, Migrator, StatementInvalid } from "./index.js";
+import { Base, MigrationContext, Migrator, RecordNotUnique, StatementInvalid } from "./index.js";
 import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
@@ -1499,6 +1499,102 @@ describe("MigrationTest", () => {
         expect(await connection.indexExists("values", "value")).toBe(false);
       } finally {
         await connection.dropTable("values", { ifExists: true });
+      }
+    });
+  });
+
+  describe("IndexTest", () => {
+    // Mirrors ActiveRecord::Migration::IndexTest — drives the Migration-class
+    // index twins (isIndexExists/removeIndex) so the `valid`/`ifExists` option
+    // widenings forward to the adapter. Rails' bespoke `testings(foo, bar)`
+    // table is dropped in `finally` (Rails' `teardown`) so nothing leaks.
+    async function withTestings(body: () => Promise<void>): Promise<void> {
+      await Base.connection.createTable("testings", { force: true }, (t) => {
+        t.string("foo", { limit: 100 });
+        t.string("bar", { limit: 100 });
+      });
+      try {
+        await body();
+      } finally {
+        await Base.connection.dropTable("testings", { ifExists: true });
+      }
+    }
+
+    it("test_remove_index_which_does_not_exist_doesnt_raise_with_option", async () => {
+      await withTestings(async () => {
+        const mig = new (class extends Migration {})();
+        await mig.addIndex("testings", "foo");
+        await mig.removeIndex("testings", "foo");
+
+        await expect(mig.removeIndex("testings", "foo")).rejects.toThrow(ArgumentError);
+
+        await mig.removeIndex("testings", "foo", { ifExists: true });
+      });
+    });
+
+    it("test_remove_index_with_name_which_does_not_exist_doesnt_raise_with_option", async () => {
+      await withTestings(async () => {
+        const mig = new (class extends Migration {})();
+        await mig.addIndex("testings", ["foo"], { name: "foo" });
+
+        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(true);
+
+        await mig.removeIndex("testings", { name: "foo", ifExists: true });
+
+        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(false);
+      });
+    });
+
+    it("test_remove_index_with_column_array_which_does_not_exist_doesnt_raise_with_option", async () => {
+      await withTestings(async () => {
+        const mig = new (class extends Migration {})();
+        await mig.addIndex("testings", ["foo"], { name: "foo" });
+
+        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(true);
+
+        await mig.removeIndex("testings", { column: ["foo", "bar"], ifExists: true });
+
+        expect(await mig.isIndexExists("testings", "foo", { name: "foo" })).toBe(true);
+        expect(await mig.isIndexExists("testings", ["foo", "bar"], { name: "foo" })).toBe(false);
+      });
+    });
+  });
+
+  describeIfPg("PostgresqlIndexTest", () => {
+    // Mirrors PostgreSQLAdapterTest#test_invalid_index — a failed CONCURRENTLY
+    // unique index is left behind marked invalid; Migration#isIndexExists must
+    // forward `valid` to distinguish it, matching the adapter twin.
+    it("test_invalid_index", async () => {
+      const conn = Base.connection;
+      await conn.dropTable("ex", { ifExists: true });
+      await conn.createTable("ex", { force: true }, (t) => {
+        t.integer("number");
+      });
+      try {
+        await conn.execQuery("INSERT INTO ex (number) VALUES (1), (1)");
+        const mig = new (class extends Migration {})();
+
+        let error: unknown;
+        try {
+          await mig.addIndex("ex", "number", {
+            unique: true,
+            algorithm: "concurrently",
+            name: "invalid_index",
+          });
+        } catch (e) {
+          error = e;
+        }
+        expect(error).toBeInstanceOf(RecordNotUnique);
+
+        expect(await mig.isIndexExists("ex", "number", { name: "invalid_index" })).toBe(true);
+        expect(
+          await mig.isIndexExists("ex", "number", { name: "invalid_index", valid: true }),
+        ).toBe(false);
+        expect(
+          await mig.isIndexExists("ex", "number", { name: "invalid_index", valid: false }),
+        ).toBe(true);
+      } finally {
+        await conn.dropTable("ex", { ifExists: true });
       }
     });
   });
