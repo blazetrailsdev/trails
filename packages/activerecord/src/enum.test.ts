@@ -774,6 +774,55 @@ describe("EnumTest", () => {
     );
   });
 
+  // The inherited-enum raise must also fire through the create/materialization
+  // path — not only `type_for_attribute`. Rails replays a superclass's pending
+  // `decorate_attributes` block into the concrete subclass's attribute set
+  // (attribute_registration.rb:81-87), so the enum block runs and raises
+  // `Undeclared attribute type for enum` while `_default_attributes`
+  // materializes. Constructing a record (or bare `_defaultAttributes()`) is
+  // enough; no prior `type_for_attribute` lookup is required.
+  it("enum on abstract parent raises through subclass materialization", () => {
+    class AbstractParent extends Base {
+      static {
+        this._abstractClass = true;
+        this.enum("typeless_genre", ["adventure", "comic"] as any);
+      }
+    }
+    class Concrete extends AbstractParent {
+      static _tableName = "books"; // books has no `typeless_genre` column
+    }
+    registerModel(Concrete);
+
+    expect(() => (Concrete as any)._defaultAttributes()).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
+    );
+    expect(() => new (Concrete as any)({})).toThrow(
+      /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
+    );
+  });
+
+  // A concrete subclass that DOES back the inherited enum materializes cleanly:
+  // the replayed superclass decorator resolves against the subclass's own
+  // columns (books.nullable_status), so no false raise and — crucially — no
+  // `TableNotSpecified` from routing the predicate through the abstract parent.
+  it("enum on abstract parent materializes green against a backing subclass column", () => {
+    class AbstractParent extends Base {
+      static {
+        this._abstractClass = true;
+        this.enum("nullable_status", ["single", "married"] as any);
+      }
+    }
+    class Backed extends AbstractParent {
+      static _tableName = "books"; // books.nullable_status is an integer column
+    }
+    registerModel(Backed);
+
+    expect(() => (Backed as any)._defaultAttributes()).not.toThrow();
+    const record = new (Backed as any)({ nullable_status: "married" });
+    expect(record.isMarried()).toBe(true);
+    expect(record.isSingle()).toBe(false);
+  });
+
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
     expect((book as any).isAuthorVisibilityInvisible()).toBe(false);

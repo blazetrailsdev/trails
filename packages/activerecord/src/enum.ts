@@ -440,7 +440,15 @@ export class EnumMethods {
           // label, so serialize the stored label back to its database value
           // (via castEnumValue) and compare. Robust on fresh/unsaved records
           // where the raw `valueForDatabase` attribute path isn't wired yet.
-          return castEnumValue(klass, name, this.readAttribute(name)) === value;
+          //
+          // Resolve against the record's runtime class, not the captured
+          // declaring `klass`: an enum declared on an abstract parent (e.g.
+          // `Cat.enum :gender`) must serialize against the concrete subclass's
+          // columns (`Lion`), mirroring Rails' `type_for_attribute` on the
+          // record's own class. Keying off `klass` would send an abstract
+          // parent through `columnForAttribute`, raising `TableNotSpecified`.
+          const recordClass = (this as unknown as { constructor: typeof Base }).constructor;
+          return castEnumValue(recordClass, name, this.readAttribute(name)) === value;
         },
         writable: true,
         configurable: true,
