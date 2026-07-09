@@ -18,7 +18,9 @@ describe("Mysql2Adapter base _connection field", () => {
 
   function stubNewClient(): { end: ReturnType<typeof vi.fn> } {
     const end = vi.fn(() => Promise.resolve());
-    const fakeConn = { end, query: () => Promise.resolve() };
+    // The connect-once configure warms the server version (getFullVersion issues
+    // SELECT VERSION() before checkVersion); hand it a row so the warm resolves.
+    const fakeConn = { end, query: () => Promise.resolve([[{ v: "8.0.28" }]]) };
     vi.spyOn(Mysql2Adapter, "newClient").mockResolvedValue(fakeConn as never);
     return { end };
   }
