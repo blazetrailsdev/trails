@@ -9,8 +9,7 @@ import type {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
 } from "./schema-definitions.js";
-import type { Column } from "./column.js";
-import type { IndexInfo } from "../../schema-dumper.js";
+import type { ColumnInfo, IndexInfo } from "../../schema-dumper.js";
 
 export class SchemaDumper extends AbstractSchemaDumper {
   // Per-table constraint cache populated by filterIndexesForDump and consumed
@@ -19,7 +18,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   private _cachedExclConstraints: ExclusionConstraintDefinition[] | undefined;
   private _cachedUniqConstraints: UniqueConstraintDefinition[] | undefined;
   /** @internal */
-  protected override prepareColumnOptions(column: Column): Record<string, unknown> {
+  protected override prepareColumnOptions(column: ColumnInfo): Record<string, unknown> {
     const spec = super.prepareColumnOptions(column as any);
     if (column.array) spec["array"] = true;
 
@@ -42,7 +41,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override isDefaultPrimaryKey(column: Column): boolean {
+  protected override isDefaultPrimaryKey(column: ColumnInfo): boolean {
     // Mirrors Rails `schema_type(column) == :bigserial`. createTable now emits
     // BIGSERIAL for the default PK, so only bigserial is the default; a `serial`
     // PK is non-default and keeps its explicit `id: "serial"` option in dumps.
@@ -56,7 +55,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * `column.limit` is absent.
    * @internal
    */
-  protected override schemaLimit(column: Column): string | undefined {
+  protected override schemaLimit(column: ColumnInfo): string | undefined {
     // int4's limit (4) is the native default, so Rails `schema_limit` omits it
     // (`limit != native_database_types[:integer][:limit]`; typeToSql("integer", {limit: 4})
     // === "integer"). Without this an explicit `id: :integer` PK would dump
@@ -82,7 +81,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * from the element type's SQL type string (e.g. `"numeric(10,2)"`).
    * @internal
    */
-  protected override schemaPrecision(column: Column): string | undefined {
+  protected override schemaPrecision(column: ColumnInfo): string | undefined {
     const base = super.schemaPrecision(column);
     if (base !== undefined) return base;
     const sqlType = (column.sqlType ?? "").toLowerCase();
@@ -95,7 +94,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * the element type's SQL type string (e.g. `"numeric(10,2)"`).
    * @internal
    */
-  protected override schemaScale(column: Column): string | undefined {
+  protected override schemaScale(column: ColumnInfo): string | undefined {
     const base = super.schemaScale(column);
     if (base !== undefined) return base;
     const sqlType = (column.sqlType ?? "").toLowerCase();
@@ -104,12 +103,12 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected isExplicitPrimaryKeyDefault(column: Column): boolean {
+  protected isExplicitPrimaryKeyDefault(column: ColumnInfo): boolean {
     return column.type === "uuid" || (column.type === "integer" && !column.isSerial);
   }
 
   /** @internal */
-  protected override schemaType(column: Column): string {
+  protected override schemaType(column: ColumnInfo): string {
     // Use sqlType to detect bigint (works with both real Column objects and
     // plain ColumnInfo from AdapterSchemaSource, which has no isBigint() method).
     const isBigSql = /^bigint\b/i.test(column.sqlType ?? "");
@@ -124,7 +123,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override schemaTypeWithVirtual(column: Column): string {
+  protected override schemaTypeWithVirtual(column: ColumnInfo): string {
     if (this._isVirtual(column)) return "virtual";
     return this.schemaType(column);
   }
@@ -133,7 +132,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * Handles both real PG Column objects (which expose `isVirtual()`) and plain
    * `ColumnInfo` objects from `AdapterSchemaSource` (which expose `virtual`).
    */
-  private _isVirtual(column: Column): boolean {
+  private _isVirtual(column: ColumnInfo): boolean {
     return typeof (column as any).isVirtual === "function"
       ? (column as any).isVirtual()
       : !!(column as any).virtual;
@@ -151,7 +150,7 @@ export class SchemaDumper extends AbstractSchemaDumper {
    * (e.g. `t`/`f` → `true`/`false`, `1.5` → quoted decimal, `4` → bare integer).
    * @internal
    */
-  protected override schemaDefault(column: Column): string | undefined {
+  protected override schemaDefault(column: ColumnInfo): string | undefined {
     if (column.array && typeof column.default === "string" && /^\{.*\}$/.test(column.default)) {
       const elements = parsePgArrayLiteral(column.default);
       if (elements.length === 0) return "[]";
@@ -171,13 +170,13 @@ export class SchemaDumper extends AbstractSchemaDumper {
   }
 
   /** @internal */
-  protected override schemaExpression(column: Column): string | undefined {
+  protected override schemaExpression(column: ColumnInfo): string | undefined {
     if (column.isSerial) return undefined;
     return super.schemaExpression(column as any);
   }
 
   /** @internal */
-  protected extractExpressionForVirtualColumn(column: Column): string {
+  protected extractExpressionForVirtualColumn(column: ColumnInfo): string {
     return JSON.stringify(column.defaultFunction);
   }
 
