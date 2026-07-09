@@ -297,7 +297,15 @@ export default defineConfig({
     // instrumentation, peg a worker long enough to trip the `onTaskUpdate` RPC
     // timeout (an unhandled error) even when every test passes and the report is
     // written. Ignore it ONLY in these isolated, reporting-only runs.
-    dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE || AR_CLI_COVERAGE,
+    // AR_COVERAGE is included for the same reason: the full AR sqlite suite under
+    // v8 `--coverage.all` is a ~550s run whose end-of-run report generation pegs
+    // the main thread long enough to starve the worker's reporter heartbeat,
+    // surfacing the same `onTaskUpdate` RPC timeout as an unhandled error AFTER
+    // every test has passed and the coverage summary is written — reddening a
+    // job whose sole purpose is to emit numbers. Ignore it ONLY in this isolated,
+    // reporting-only run; the gating AR suite (`sqlite-tests`) runs without
+    // coverage and keeps unhandled errors as a real signal.
+    dangerouslyIgnoreUnhandledErrors: TRAILS_TSC_COVERAGE || AR_CLI_COVERAGE || AR_COVERAGE,
     coverage: {
       provider: "v8",
       // text-summary → CI log; json-summary → parsed into the step summary;
