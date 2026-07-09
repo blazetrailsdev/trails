@@ -843,8 +843,19 @@ export class SchemaDumper {
   // layer (connection-adapters/abstract/schema-dumper.ts). The bodies live there
   // to keep the api:compare file mapping; these thin `protected` wrappers put
   // them on this single class's prototype (so dialect subclasses' `super`/
-  // `override` resolve normally) without a cyclic `extends`. `this` is cast to
-  // the public host view because the wrapped helpers reach protected members.
+  // `override` resolve normally) without a cyclic `extends`. Each wrapper passes
+  // `this` through `_mixinHost` because the mixed-in helpers reach members this
+  // class declares `protected` (a free function can't see those through `this`).
+
+  /**
+   * The same instance, typed as the public host view the mixin helpers expect.
+   * Only a type reinterpretation — dynamic dispatch through `this` (dialect
+   * overrides of schemaType, schemaLimit, …) is preserved.
+   * @internal
+   */
+  private get _mixinHost(): SchemaDumperMixinHost {
+    return this as unknown as SchemaDumperMixinHost;
+  }
 
   /** @internal */
   protected emitTable(
@@ -856,7 +867,7 @@ export class SchemaDumper {
     inlineConstraints: string[] = [],
   ): void {
     return adapterDumper.emitTable.call(
-      this as unknown as SchemaDumperMixinHost,
+      this._mixinHost,
       lines,
       tableName,
       columns,
@@ -868,84 +879,72 @@ export class SchemaDumper {
 
   /** @internal */
   protected columnSpec(column: Column): [string, Record<string, unknown>] {
-    return adapterDumper.columnSpec.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.columnSpec.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
-    return adapterDumper.columnSpecForPrimaryKey.call(
-      this as unknown as SchemaDumperMixinHost,
-      column,
-    );
+    return adapterDumper.columnSpecForPrimaryKey.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected prepareColumnOptions(column: Column): Record<string, unknown> {
-    return adapterDumper.prepareColumnOptions.call(
-      this as unknown as SchemaDumperMixinHost,
-      column,
-    );
+    return adapterDumper.prepareColumnOptions.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected isDefaultPrimaryKey(column: Column): boolean {
-    return adapterDumper.isDefaultPrimaryKey.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.isDefaultPrimaryKey.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected isExplicitPrimaryKeyDefault(column: Column): boolean {
-    return adapterDumper.isExplicitPrimaryKeyDefault.call(
-      this as unknown as SchemaDumperMixinHost,
-      column,
-    );
+    return adapterDumper.isExplicitPrimaryKeyDefault.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaTypeWithVirtual(column: Column): string {
-    return adapterDumper.schemaTypeWithVirtual.call(
-      this as unknown as SchemaDumperMixinHost,
-      column,
-    );
+    return adapterDumper.schemaTypeWithVirtual.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaType(column: Column): string {
-    return adapterDumper.schemaType.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.schemaType.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected isBigint(column: Column): boolean {
-    return adapterDumper.isBigint.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.isBigint.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaLimit(column: Column): string | undefined {
-    return adapterDumper.schemaLimit.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.schemaLimit.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaPrecision(column: Column): string | undefined {
-    return adapterDumper.schemaPrecision.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.schemaPrecision.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaScale(column: Column): string | undefined {
-    return adapterDumper.schemaScale.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.schemaScale.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaDefault(column: Column): string | undefined {
-    return adapterDumper.schemaDefault.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.schemaDefault.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaExpression(column: Column): string | undefined {
-    return adapterDumper.schemaExpression.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.schemaExpression.call(this._mixinHost, column);
   }
 
   /** @internal */
   protected schemaCollation(column: Column): string | undefined {
-    return adapterDumper.schemaCollation.call(this as unknown as SchemaDumperMixinHost, column);
+    return adapterDumper.schemaCollation.call(this._mixinHost, column);
   }
 
   /** @internal */
