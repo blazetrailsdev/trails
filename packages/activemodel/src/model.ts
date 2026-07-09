@@ -199,7 +199,8 @@ function _xmlTypeInfo(
   const types: Record<string, string> = {};
   if (typeof ctor.typeForAttribute === "function") {
     for (const key of Object.keys(hash)) {
-      const xmlName = XML_MINI_TYPE_NAMES[ctor.typeForAttribute(key).type()];
+      const typeName = ctor.typeForAttribute(key).type();
+      const xmlName = typeName != null ? XML_MINI_TYPE_NAMES[typeName] : undefined;
       if (xmlName) types[key] = xmlName;
     }
   }

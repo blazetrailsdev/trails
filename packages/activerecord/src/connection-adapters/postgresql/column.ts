@@ -69,10 +69,15 @@ export class Column extends BaseColumn {
     return raw?.endsWith("[]") ? raw.slice(0, -2) : (raw ?? null);
   }
 
-  // Return the full SQL type string (including "[]" for arrays) — callers
-  // expecting the base type without the array suffix should use sqlType.
+  // Rails' Column#type delegates to sql_type_metadata with `allow_nil: true`
+  // (column.rb:12), so an unmapped sql_type — e.g. a composite OID — reflects
+  // `nil`. Do NOT coerce that to "" (the old override did, breaking
+  // `assert_nil column.type`). The declared `string` keeps the schema dumper's
+  // non-null ColumnInfo contract: the dump path only ever sees the coalesced
+  // (never-nil) ColumnInfo from `SchemaSource.columns()`, while the reflection
+  // path (`columnsHash()[...].type`) passes the real nil straight through.
   override get type(): string {
-    return super.type ?? "";
+    return super.type as string;
   }
 
   // Mirrors Rails Column#serial? — returns the stored flag, which the adapter

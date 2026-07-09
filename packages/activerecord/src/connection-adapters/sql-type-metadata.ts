@@ -9,7 +9,7 @@ import type { Deduplicable } from "./deduplicable.js";
 
 export class SqlTypeMetadata implements Deduplicable {
   readonly sqlType: string;
-  readonly type: string;
+  readonly type: string | undefined;
   readonly limit: number | null;
   readonly precision: number | null;
   readonly scale: number | null;
@@ -24,7 +24,11 @@ export class SqlTypeMetadata implements Deduplicable {
     } = {},
   ) {
     this.sqlType = options.sqlType ?? options.type ?? "";
-    this.type = options.type ?? options.sqlType ?? "";
+    // Rails' SqlTypeMetadata#type is just `@type` — nil for an unmapped
+    // sql_type (Value#type is nil). Keep it nil-faithful rather than falling
+    // back to the sql_type name, so `Column#type` mirrors Rails' `delegate
+    // :type, allow_nil: true`.
+    this.type = options.type ?? undefined;
     this.limit = options.limit ?? null;
     this.precision = options.precision ?? null;
     this.scale = options.scale ?? null;
@@ -70,7 +74,7 @@ export class SqlTypeMetadata implements Deduplicable {
 
 export interface SqlTypeMetadataJSON {
   sqlType: string;
-  type: string;
+  type: string | undefined;
   limit: number | null;
   precision: number | null;
   scale: number | null;

@@ -79,10 +79,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("column", async () => {
-      // Rails: assert_nil column.type — unknown composite OID maps to ValueType
-      // TS diverges: ValueType#type() returns "value" (TS has no nil type symbol)
+      // Rails: assert_nil column.type — an unknown composite OID maps to a
+      // ValueType, whose type() is nil; SqlTypeMetadata keeps `type` nil-faithful.
       const col = (PostgresqlComposite as any).columnsHash()["address"];
-      expect(col.type).toBe("value");
+      expect(col.type).toBeNull();
       expect(col.sqlType).toBe("full_address");
       expect(col.array).toBeFalsy();
       const type = PostgresqlComposite.typeForAttribute("address");

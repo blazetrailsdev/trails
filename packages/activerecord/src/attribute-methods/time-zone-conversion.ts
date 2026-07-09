@@ -37,7 +37,7 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return subtype instanceof TimeZoneConverter ? subtype : new TimeZoneConverter(subtype);
   }
 
-  override type(): string {
+  override type(): string | undefined {
     return this._subtype.type();
   }
 

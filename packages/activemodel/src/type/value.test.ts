@@ -8,6 +8,11 @@ describe("ValueTest", () => {
     expect(type1.constructor).toBe(type2.constructor);
   });
 
+  it("type is nil for the unmapped default", () => {
+    // Mirrors ActiveModel::Type::Value#type returning nil (value.rb:32-35).
+    expect(new ValueType().type()).toBeUndefined();
+  });
+
   it("as json not defined", () => {
     const type = Types.typeRegistry.lookup("value");
     // Value type passes through without transformation

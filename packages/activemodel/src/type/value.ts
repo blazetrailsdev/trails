@@ -33,7 +33,7 @@ export abstract class Type<T = unknown> {
     return true;
   }
 
-  type(): string {
+  type(): string | undefined {
     return this.name;
   }
 
@@ -200,6 +200,22 @@ export abstract class Type<T = unknown> {
 
 export class ValueType<T = unknown> extends Type<T> {
   readonly name: string = "value";
+
+  /**
+   * Mirrors: ActiveModel::Type::Value#type (value.rb:32-35)
+   *
+   *   def type
+   *   end
+   *
+   * Returns nil for the unmapped default. trails uses `name` as the
+   * type-name carrier (the base `Type#type` returns it), so the bare
+   * ValueType sentinel — `name === "value"` — must instead reflect as
+   * `undefined` to match Rails' nil. Subclasses set their own `name`
+   * (and usually override `type()`), so they keep reporting it.
+   */
+  override type(): string | undefined {
+    return this.name === "value" ? undefined : this.name;
+  }
 
   equals(other: Type): boolean {
     return (

@@ -6,7 +6,7 @@
 
 export class TypeMetadata {
   readonly sqlType: string;
-  readonly type: string;
+  readonly type: string | undefined;
   readonly oid: number | null;
   readonly fmod: number | null;
   readonly limit: number | null;
@@ -23,7 +23,10 @@ export class TypeMetadata {
     scale?: number | null;
   }) {
     this.sqlType = options.sqlType;
-    this.type = options.type ?? options.sqlType;
+    // Rails' PG TypeMetadata delegates `type` to the wrapped SqlTypeMetadata
+    // (DelegateClass), which is nil for an unmapped sql_type — no sqlType
+    // fallback. Keep it nil-faithful so Column#type is null for e.g. composites.
+    this.type = options.type ?? undefined;
     this.oid = options.oid ?? null;
     this.fmod = options.fmod ?? null;
     this.limit = options.limit ?? null;

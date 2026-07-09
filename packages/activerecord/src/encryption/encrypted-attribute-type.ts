@@ -171,7 +171,7 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return this.scheme.ignoreCase;
   }
 
-  override type(): string {
+  override type(): string | undefined {
     return this.castType.type();
   }
 
