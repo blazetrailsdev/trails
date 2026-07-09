@@ -533,8 +533,11 @@ export abstract class Migration {
   // Rails migration compatibility: `remove_index(table_name, column_name = nil, **options)`.
   async removeIndex(
     tableName: string,
-    columnOrOptions: string | string[] | { column?: string | string[]; name?: string } = {},
-    options: { column?: string | string[]; name?: string } = {},
+    columnOrOptions:
+      | string
+      | string[]
+      | { column?: string | string[]; name?: string; ifExists?: boolean } = {},
+    options: { column?: string | string[]; name?: string; ifExists?: boolean } = {},
   ): Promise<void> {
     if (this._recording) {
       // Record args as actually passed so command-recorder inversion sees the
@@ -1213,7 +1216,7 @@ export abstract class Migration {
   async isIndexExists(
     tableName: string,
     columnName: string | string[],
-    options?: { unique?: boolean; name?: string },
+    options?: { unique?: boolean; name?: string; valid?: boolean },
   ): Promise<boolean> {
     return this.schema.indexExists(this._pt(tableName), columnName, options);
   }
