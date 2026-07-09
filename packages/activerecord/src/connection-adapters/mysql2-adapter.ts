@@ -718,7 +718,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       ...this._poolConfig,
       initSql: this._buildInitSql(),
     }).then(
-      (conn): mysql.Connection | Promise<mysql.Connection> => {
+      async (conn): Promise<mysql.Connection> => {
         if (this._connectGeneration !== gen) {
           // disconnectBang()/close() happened while we were connecting. Clear
           // the promise ref then end the socket as part of this chain so
@@ -758,7 +758,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // so without this the eager query-loop connect would never configure
         // its first connection. Gated by _connectionConfigured so a following
         // verifyBang/reconnectBang can't double-configure.
-        this.configureConnection();
+        // Await so the connect-once warm + checkVersion complete before the
+        // socket is handed out — a too-old server rejects the connect (Rails'
+        // configure_connection → check_version raises during connect).
+        await this.configureConnection();
         return conn;
       },
       (err) => {
@@ -1713,7 +1716,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /** @internal */
-  override configureConnection(): void {
+  override async configureConnection(): Promise<void> {
     // In Rails this sets @raw_connection.query_options[:as] = :array and
     // database_timezone on the single raw connection. We have a single
     // persistent connection here too; mysql2's typeCast handles temporal
@@ -1734,6 +1737,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // the next connect re-runs it.
     if (this._connectionConfigured) return;
     this._connectionConfigured = true;
+    // Warm the server version before checkVersion runs. Rails' check_version
+    // reads database_version, a synchronous accessor that itself triggers the
+    // round-trip (get_database_version) when unmemoized — so Rails guarantees the
+    // version is fetched before the floor check. checkVersion() is sync in trails
+    // and can't issue the query itself, so we await the warm here (getDatabaseVersion
+    // memoizes into _databaseVersion) before super.configureConnection() invokes it.
+    await this.getDatabaseVersion();
     super.configureConnection();
   }
 
