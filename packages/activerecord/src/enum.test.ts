@@ -368,8 +368,16 @@ describe("EnumTest", () => {
     expect((invalidBook as any).isValid()).toBe(false);
   });
 
-  // Rails: `Book.where(id:).update_all("status = NULL")` (raw SQL fragment).
-  it.skip("NULL values from database should be casted to nil", () => {});
+  it("NULL values from database should be casted to nil", async () => {
+    await Book.where({ id: book.id }).updateAll("status = NULL");
+    await book.reload();
+    // Rails asserts only `assert_nil @book.reload.status`; the predicate checks
+    // confirm EnumType#deserialize(null) leaves every state query false.
+    expect((book as any).status).toBeNull();
+    expect((book as any).isPublished()).toBe(false);
+    expect((book as any).isWritten()).toBe(false);
+    expect((book as any).isProposed()).toBe(false);
+  });
 
   it("deserialize nil value to enum which defines nil value to hash", () => {
     expect((books("ddd") as any).last_read).toBe("forgotten");
