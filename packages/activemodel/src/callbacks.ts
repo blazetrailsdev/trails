@@ -355,6 +355,49 @@ export function hasBeforeOrAroundCallbackOnProto(proto: object, event: string): 
 }
 
 /**
+ * Source-text of every `before`/`around` callback registered for `event` whose
+ * filter is a plain function (so it can be introspected via
+ * `Function.prototype.toString`). `opaque` is true when any before/around entry
+ * is an object/method-name filter whose body cannot be read from here.
+ *
+ * Callers use this to approximate Rails' lazy association loading: a synchronous
+ * destroy callback only forces the `belongs_to` targets it actually
+ * dereferences, so scanning the callback source for association names lets us
+ * skip loading targets the callback never reads. When `opaque` is true the
+ * caller must fall back to a conservative load (it cannot tell what the callback
+ * touches) — this covers object/method-name filters and bound/native functions,
+ * whose bodies are not introspectable. The returned `sources` are only the outer
+ * filter bodies; a caller that must resolve reads reached through helper methods
+ * has to expand them itself (the callback source alone won't name those).
+ *
+ * @internal
+ */
+export function beforeOrAroundCallbackSources(
+  proto: object,
+  event: string,
+): { sources: string[]; opaque: boolean } {
+  const chain = asPeekCallbackChain(proto, event);
+  if (!chain) return { sources: [], opaque: false };
+  const sources: string[] = [];
+  let opaque = false;
+  for (const e of chain.entries) {
+    if (e.kind !== "before" && e.kind !== "around") continue;
+    if (typeof e.filter !== "function") {
+      opaque = true;
+      continue;
+    }
+    const src = e.filter.toString();
+    // A bound (`fn.bind(this)`) or native function stringifies to a wrapper with
+    // no body text ("... { [native code] }"), so it exposes no association reads.
+    // Treat it as opaque rather than as a callback that reads nothing, so the
+    // caller falls back to a conservative load instead of skipping the preload.
+    if (src.includes("[native code]")) opaque = true;
+    else sources.push(src);
+  }
+  return { sources, opaque };
+}
+
+/**
  * @internal
  */
 export function hasCallbackOnProto(

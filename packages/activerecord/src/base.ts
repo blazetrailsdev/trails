@@ -120,7 +120,7 @@ import {
 import {
   runAllCallbacks as cbRunAll,
   runAfterCallbacksOnProto as cbRunAfter,
-  hasBeforeOrAroundCallbackOnProto,
+  beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
   shouldValidate,
 } from "@blazetrails/activemodel";
@@ -618,6 +618,57 @@ function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
   // non-all_queries `where` conditions propagate on create.
   const c = ctor as any;
   return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0 || hasDefaultScopeOverride(ctor);
+}
+
+/**
+ * True when any before/around destroy callback source dereferences the
+ * `belongs_to` reflection named `name` — matched as a whole identifier so
+ * `firm` doesn't match `firmId` and `tag` doesn't match `tagWithPrimaryKey`.
+ * Covers both dotted reads (`record.firm`) and the string form
+ * (`this.association("firm")`).
+ */
+function referencesAssociationName(sources: string[], name: string): boolean {
+  const pattern = new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`);
+  return sources.some((src) => pattern.test(src));
+}
+
+/**
+ * Expand callback filter sources with the source of any model-defined instance
+ * method they (transitively) reference, so an association read reached through a
+ * helper — e.g. `before_destroy { this.makeComments() }` where `makeComments`
+ * reads `this.person` — is still detected. Only methods declared on the model's
+ * own prototype chain (below `Base`) are followed; framework methods and the
+ * association readers themselves are ignored. Bounded by the model's method
+ * count via the `seen` set, so mutually-recursive helpers can't loop.
+ */
+function expandCallbackSourcesWithHelpers(sources: string[], ctor: typeof Base): string[] {
+  const methods = new Map<string, string>();
+  for (
+    let proto = ctor.prototype;
+    proto && proto !== Base.prototype;
+    proto = Object.getPrototypeOf(proto)
+  ) {
+    for (const key of Object.getOwnPropertyNames(proto)) {
+      if (key === "constructor" || methods.has(key)) continue;
+      const desc = Object.getOwnPropertyDescriptor(proto, key);
+      if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
+    }
+  }
+  const result = [...sources];
+  const seen = new Set<string>();
+  const queue = [...sources];
+  while (queue.length > 0) {
+    const src = queue.pop()!;
+    for (const [name, body] of methods) {
+      if (seen.has(name)) continue;
+      if (new RegExp(`\\b${name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")}\\b`).test(src)) {
+        seen.add(name);
+        result.push(body);
+        queue.push(body);
+      }
+    }
+  }
+  return result;
 }
 
 /**
@@ -3854,40 +3905,55 @@ export class Base extends Model {
    * reading the association sees a loaded record (matching Rails' lazy
    * synchronous query) rather than trails' async-reader Promise.
    *
-   * Scoped to classes that actually register a before/around destroy callback
-   * so a plain destroy issues no extra query (Rails only queries when the
-   * callback touches the association). A same-FK sibling (e.g. Account#firm and
-   * Account#unautosavedFirm share `firm_id`) is loaded too even when only one is
-   * read; the extra read is side-effect-free and resolves to the same owner row.
+   * Scoped to classes that actually register a before/around destroy callback,
+   * and further narrowed to the `belongs_to` targets whose association name
+   * appears in the callback source — mirroring Rails, which lazily loads only
+   * the associations a callback dereferences and issues no query for the rest.
+   * When a before/around destroy callback is an object/method filter whose body
+   * cannot be introspected, we conservatively load every `belongs_to` (we can't
+   * tell what it reads). A same-FK sibling (e.g. Account#firm and
+   * Account#unautosavedFirm share `firm_id`) referenced in the source is loaded
+   * too; the extra read is side-effect-free and resolves to the same owner row.
    *
    * Loading is best-effort: a `belongs_to` whose target class is unregistered or
    * whose row is missing must not abort the destroy (the callback may never read
    * it). On a load failure we resolve the association to `null` rather than
    * leaving it unloaded, so a sync callback that *does* read it sees `null` and
    * not trails' async-reader Promise — keeping the bare `if (record.parent)`
-   * guard safe even when the preload could not materialize the parent.
+   * guard safe even when the preload could not materialize the parent. Any load
+   * that runs inside an open transaction is isolated in its own savepoint: a
+   * doomed query (e.g. a `belongs_to ..., primary_key:` at a non-existent column
+   * like `tag_with_primary_key`) throwing here would otherwise abort the whole
+   * PostgreSQL transaction (25P02), and the surrounding `catch` swallowing the
+   * JS error cannot undo that abort. Narrowing removes the *per-association*
+   * savepoint churn PR #4792 paid on every `belongs_to` — only the (usually one)
+   * association the callback actually names is loaded, so an unread doomed query
+   * is never issued in the first place.
+   *
+   * The scan resolves reads reached through the record's own helper methods, not
+   * just those inline in the registered filter, by expanding the callback source
+   * with the source of any model-defined method it references (see
+   * `expandCallbackSourcesWithHelpers`). This mirrors Rails resolving
+   * associations by ordinary method dispatch at any call depth.
    *
    * @internal
    */
   private async _preloadBelongsToForDestroyCallbacks(): Promise<void> {
     const ctor = this.constructor as typeof Base;
-    if (!hasBeforeOrAroundCallbackOnProto(ctor.prototype, "destroy")) return;
     if (typeof (this as any).association !== "function") return;
-    // When this best-effort preload runs inside an open transaction, isolate
-    // each load in its own savepoint. A failing preload query (e.g. a
-    // `belongs_to ..., primary_key:` pointing at a column that doesn't exist,
-    // like `tag_with_primary_key`) aborts the whole PostgreSQL transaction
-    // (25P02) — and swallowing the JS error can't un-abort the connection.
-    // Rolling back to a per-load savepoint clears the aborted state so the
-    // outer transaction stays usable, matching Rails, which never issues this
-    // eager query at all (it lazily loads only what the callback reads).
-    const inTransaction = _currentTransactionPublic().isOpen();
+    const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
+    if (!opaque && sources.length === 0) return;
+    const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor);
+    const useSavepoint = _currentTransactionPublic().isOpen();
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
+      // Narrow to associations the callback names (unless an opaque callback
+      // forces loading all): Rails only queries the targets it dereferences.
+      if (!opaque && !referencesAssociationName(expanded, ref.name)) continue;
       let assoc: any;
       try {
         assoc = (this as any).association(ref.name);
         if (!assoc || assoc.isLoaded?.()) continue;
-        if (inTransaction) {
+        if (useSavepoint) {
           await _transaction(ctor, () => assoc.loadTarget(), { requiresNew: true });
         } else {
           await assoc.loadTarget();
