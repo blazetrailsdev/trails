@@ -81,12 +81,38 @@ function canonicalKey(value: unknown): string {
 }
 
 /**
+ * Sentinel prefix for values `JSON.stringify` cannot represent and would
+ * otherwise collapse to `null` (or drop entirely): `undefined`, `NaN`, and the
+ * infinities. Tagging them keeps `canonicalKey` injective across these cases so
+ * change detection distinguishes them from an actual `null`, matching Ruby's
+ * `Hash#==` (where `nil`, `Float::NAN`, and a missing key are all distinct).
+ * This also fixes latent default detection: `{ a: undefined }` used to
+ * stringify to `{}` and so falsely matched the empty-hash coder default.
+ *
+ * The leading NUL keeps the tag from colliding with an ordinary string value —
+ * JSON payloads do not carry raw control characters — so a real string can
+ * never masquerade as an encoded `undefined`/`NaN`.
+ *
+ * Residual limitation: two distinct `NaN` values canonicalize identically and
+ * so compare equal here, whereas Ruby's `Float::NAN == Float::NAN` is false.
+ * This only surfaces for in-memory reassignment (JSON coders cannot carry a
+ * `NaN` across a DB round-trip) and is pinned by a test in the sibling suite.
+ *
+ * @internal
+ */
+const NONSERIALIZABLE_SENTINEL = "\u0000serialized:";
+
+/**
  * Recursively unwraps `toHash()`-bearing objects and sorts plain-object keys so
  * the resulting structure has a canonical, insertion-order-independent shape.
  *
  * @internal
  */
 function normalize(value: unknown): unknown {
+  if (value === undefined) return `${NONSERIALIZABLE_SENTINEL}undefined`;
+  if (typeof value === "number" && !Number.isFinite(value)) {
+    return `${NONSERIALIZABLE_SENTINEL}${String(value)}`;
+  }
   if (value === null || typeof value !== "object") return value;
   if (typeof (value as { toHash?: unknown }).toHash === "function") {
     return normalize((value as { toHash(): unknown }).toHash());

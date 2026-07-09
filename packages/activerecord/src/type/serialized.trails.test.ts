@@ -70,6 +70,29 @@ describe("Serialized#isChanged", () => {
     expect(type.isChanged(nullProto, new Date(100))).toBe(true);
   });
 
+  it("distinguishes NaN, undefined, and null Hash values, matching Ruby Hash#==", () => {
+    // JSON.stringify collapses NaN/undefined to null (and drops undefined
+    // object keys), which would make these compare equal; the sentinel encoding
+    // keeps them distinct, mirroring Ruby where nil, Float::NAN, and a missing
+    // key are all unequal.
+    expect(type.isChanged({ a: NaN }, { a: null })).toBe(true);
+    expect(type.isChanged({ a: undefined }, { a: null })).toBe(true);
+    expect(type.isChanged({ a: NaN }, { a: undefined })).toBe(true);
+    expect(type.isChanged({ a: Infinity }, { a: null })).toBe(true);
+    expect(type.isChanged([NaN], [null])).toBe(true);
+    // A dropped undefined key must not collapse onto an object missing that key.
+    expect(type.isChanged({ a: undefined }, {})).toBe(true);
+    // Same distinct value on both sides still compares equal.
+    expect(type.isChanged({ a: undefined }, { a: undefined })).toBe(false);
+  });
+
+  it("documents that two distinct NaN Hash values compare equal (JSON limitation)", () => {
+    // Ruby's Float::NAN == Float::NAN is false, but a deterministic canonical
+    // key cannot express NaN's non-reflexivity. Only manifests in-memory since
+    // JSON coders cannot round-trip NaN. Pinned to flag intentional divergence.
+    expect(type.isChanged({ a: NaN }, { a: NaN })).toBe(false);
+  });
+
   it("falls back to reference equality for identity-== object_class instances", () => {
     class Custom {}
     const oldValue = new Custom();
