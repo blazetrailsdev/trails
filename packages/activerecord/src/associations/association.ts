@@ -163,9 +163,7 @@ export class Association {
     // reload (the generated `reload_<name>` reader) clears the query cache
     // first, so the re-fetch bypasses any cached SELECT for this record.
     if (force) {
-      const klass = this.klass as (typeof Base & { connectionPool?: () => unknown }) | undefined;
-      const pool = klass?.connectionPool?.() as { clearQueryCache?: () => void } | undefined;
-      pool?.clearQueryCache?.();
+      this.klass.connectionPool().clearQueryCache();
     }
     this.reset();
     this.resetScope();
