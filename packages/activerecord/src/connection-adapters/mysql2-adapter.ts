@@ -1735,7 +1735,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // attemptConfigureConnection. Mirrors PostgreSQLAdapter's
     // _maybeConfigureConnection gate. Reset to false on raw-handle teardown so
     // the next connect re-runs it.
-    if (this._connectionConfigured) return;
+    // Only the connect-once warm+check needs a live socket. Rails'
+    // configure_connection always runs with @raw_connection set (called from
+    // connect!/reconnect! once the driver connection exists); a standalone
+    // configureConnection() on a not-yet-connected adapter (the timezone-seed
+    // reseed path) must not flip the gate or bootstrap an unawaited connect via
+    // getDatabaseVersion — so bail before the gate when there's no `_client`.
+    if (this._connectionConfigured || !this._client) return;
     this._connectionConfigured = true;
     // Warm the server version before checkVersion runs. Rails' check_version
     // reads database_version, a synchronous accessor that itself triggers the
