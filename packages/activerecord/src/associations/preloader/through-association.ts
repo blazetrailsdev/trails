@@ -42,6 +42,24 @@ export class ThroughAssociation extends Association {
 
   async recordsByOwner(): Promise<Map<Base, Base[]>> {
     const result = new Map<Base, Base[]>();
+
+    // When every owner already carries this association loaded — e.g. an outer
+    // through query eager-loaded this source sub-chain via `includes!`/
+    // `references!`, so the middle records arrive with their source association
+    // populated — return those targets directly. This is the hoisted
+    // loop-invariant of Rails' `records_by_owner`
+    // (preloader/through_association.rb:11-15): if every owner is loaded, every
+    // iteration takes the early `next`, so `through_records_by_owner` /
+    // `source_records_by_owner` are never forced and no fetch happens. The
+    // per-owner `isLoaded` check inside our loop only avoids re-associating, not
+    // the unconditional fetch above it, so the guard must be hoisted here.
+    if (this.owners.length > 0 && this.owners.every((owner) => this.isLoaded(owner))) {
+      for (const owner of this.owners) {
+        result.set(owner, this.targetFor(owner));
+      }
+      return result;
+    }
+
     const throughRecordsByOwner = await this._getThroughRecordsByOwner();
     const sourceRecordsByOwner = await this._getSourceRecordsByOwner();
 
@@ -619,29 +637,68 @@ export class ThroughAssociation extends Association {
         }
       } else if (sourceRefl) {
         // Collection source/target ("twoStep") or nested through source
-        // ("nested"): JOINing the source (or a to-many nested include such as
-        // the canonical `tag` source's own `includes(:tagging)`) onto the
-        // through query would fan the middle records out and duplicate them —
-        // Rails avoids that because its through query is an eager-load whose
-        // JoinDependency instantiates distinct parents by primary key, but
-        // trails' preloader collects raw rows. So the source / sub-chain
-        // predicates, order, and scope includes ride the recursive
-        // source-preloader stage (see `_getSourcePreloaders`) instead. Only a
-        // predicate the reflection scope carries that references the through
-        // table AND no other table (e.g. `miscPostFirstBlueTags_2`'s
-        // `posts.title IN (…)`, whose through reflection is `posts`) is copied
-        // here to constrain which intermediate rows this through query selects —
-        // it is fully resolvable against the through table this query already
-        // selects. A predicate mixing the through table with another table (e.g.
-        // `posts.title = ? OR categorizations.author_id = ?`) is NOT copied: the
-        // through query never joins the other table, so it stays whole on the
-        // source scope (hash/Arel or raw SQL both classified precisely).
-        const throughTable = throughKlass.tableName;
-        const throughPreds = whereClause.predicates.filter((p: any) =>
-          predicateIsThroughOnly(p, throughTable),
-        );
-        if (throughPreds.length > 0) {
-          scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...throughPreds]);
+        // ("nested"): mirror Rails' `through_scope` eager-load branch exactly.
+        // Copy the FULL reflection-scope where_clause and `includes!(source)` +
+        // `references!(source.table_name)`, promoting the source reflection to a
+        // LEFT OUTER JOIN eager-load on this through query. Unlike a bare
+        // `leftOuterJoins`, the eager-load runs through the JoinDependency, which
+        // instantiates distinct parents by primary key — so a to-many source (or
+        // a to-many nested include such as the canonical `tag` source's own
+        // `includes(:tagging)`) no longer fans the middle records out. The
+        // instantiated middle records carry their source association already
+        // loaded, so the recursive `_getSourcePreloaders` stage finds it loaded
+        // and issues no further query — collapsing authors+posts+taggings+tags
+        // to two queries. Every referenced column (through-table, source-table,
+        // or sub-chain intermediate) resolves in this one join, closing the
+        // latent gap where an outer predicate qualified a sub-chain table no
+        // single trails stage joined.
+        scope._whereClause = new WhereClause([
+          ...scope._whereClause.predicates,
+          ...whereClause.predicates,
+        ]);
+        const sourceName = sourceRefl.name;
+        const nestedIncludes: any[] = reflScope?._includesAssociations ?? [];
+        if (nestedIncludes.length > 0) {
+          scope = scope.includes({ [sourceName]: nestedIncludes });
+        } else {
+          scope = scope.includes(sourceName);
+        }
+
+        // references!(source.table_name) (rb:127-130): unless the scope already
+        // carries explicit references, reference the source table so `includes`
+        // promotes to the eager JOIN. Rails reads `source_reflection.table_name`
+        // unguarded here and raises for an unresolvable / polymorphic source
+        // (you can't get a static klass off a polymorphic belongs_to without an
+        // instance) — so this is intentionally NOT wrapped: it must fail loudly
+        // the way Rails does rather than silently degrade to an unreferenced
+        // `includes` (a differently-shaped query). The sibling `.klass` guards in
+        // `_scopeHasFanOutJoin` / `_includeSpecFansOut` are internal routing
+        // heuristics with no Rails counterpart; this branch is a direct port.
+        const refs: string[] = reflScope?._referencesValues ?? [];
+        if (refs.length > 0) {
+          scope = scope.references(...refs);
+        } else {
+          scope = scope.references(sourceRefl.klass.tableName);
+        }
+
+        // joins!(source => joins) / left_outer_joins!(source => …) (rb:132-137).
+        const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
+        const nestedJoins: any[] = reflScope?._namedInnerJoins ?? [];
+        if (nestedRawJoinValues.length > 0 || nestedJoins.length > 0) {
+          scope = scope.joins({ [sourceName]: [...nestedRawJoinValues, ...nestedJoins] });
+        }
+        const nestedLeftOuter: any[] = reflScope?._leftOuterJoinsValues ?? [];
+        if (nestedLeftOuter.length > 0) {
+          scope = scope.leftOuterJoins({ [sourceName]: nestedLeftOuter });
+        }
+
+        // scope.eager_loading? && order (rb:139-141): true here since we always
+        // includes! the source above.
+        const orderClauses: any[] = reflScope?._orderClauses ?? [];
+        const rawOrderClauses: string[] = reflScope?._rawOrderClauses ?? [];
+        if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
+          scope._orderClauses = [...scope._orderClauses, ...orderClauses];
+          scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
         }
 
         // A raw string / Arel-node join anywhere in the FLATTENED chain scope

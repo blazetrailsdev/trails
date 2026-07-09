@@ -90,12 +90,14 @@ type HasManyHost = {
       .where({ categories: { name: "General" } }),
 });
 
-// A has_MANY-through whose scope includes a FAN-OUT path (`categorizations`, a
-// has_many two levels deep) AND predicates on it. Joining it onto the through
-// query would multiply the middle records, so the whole preload falls back to
-// the two-step: the `categorizations` join + predicate ride the source stage,
-// and neither the join nor the predicate is left on the through query (which
-// would be an unjoined-table predicate).
+// A has_MANY-through whose scope includes a two-level nested path
+// (`categorizations`, a has_many via club → category → categorizations) AND
+// predicates on it. Rails' `through_scope` nests `values[:includes]` under the
+// source reflection and eager-loads it, whose JoinDependency instantiates
+// distinct parents by primary key — so the deeper join no longer fans the
+// middle records out. The join and its `categorizations.author_id` predicate
+// are realized on the through query, resolving there instead of leaking onto
+// the source stage.
 (Member as unknown as HasManyHost).hasMany("categorizedClubs", {
   through: "favoriteMemberships",
   source: "club",
@@ -169,14 +171,18 @@ describe("Preloader::ThroughAssociation#through_scope multi-level nested join ca
     expect(sql).toMatch(new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categories.name"))}`));
   });
 
-  it("routes a has_many-through with a fan-out include+predicate to the two-step", () => {
+  it("nests a has_many-through fan-out include+predicate onto the through query via eager-load", () => {
     const groucho = members("groucho");
     const sql = throughScopeSql([groucho], "categorizedClubs");
-    // `categorizations` is a to-many join that would fan the middle records out,
-    // so the whole preload takes the two-step: the through query joins neither
-    // `categorizations` nor carries its predicate (both ride the source stage) —
-    // crucially the predicate is NOT orphaned onto an unjoined table here.
-    expect(sql).not.toContain("categorizations");
+    // Rails nests the scope's `values[:includes]` under the source reflection
+    // and eager-loads it; the JoinDependency dedups the middle records by PK, so
+    // the two-level `categorizations` join is realized on the through query and
+    // the copied `categorizations.author_id` predicate resolves there rather than
+    // being deferred to (and orphaned on) the source stage.
+    expect(sql).toMatch(new RegExp(`JOIN ${escapeRegExp(quoteTableName("categorizations"))}`));
+    expect(sql).toMatch(
+      new RegExp(`WHERE.*${escapeRegExp(quoteTableName("categorizations.author_id"))}`),
+    );
   });
 
   type AssocHost = {
