@@ -41,6 +41,16 @@ describe("JoinDependency AliasTracker seeding", () => {
     expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(63));
   });
 
+  it("threads the connection length through the suffix-truncation branch (256 - 2)", () => {
+    const jd = new JoinDependency(stubBaseModel(256));
+    const tracker = trackerOf(jd);
+    const candidate = "a".repeat(300);
+    // First claim keeps the full 256-slice; the repeat aliases through
+    // `truncate` (slice to tableAliasLength - 2) with a `_2` suffix.
+    expect(tracker.aliasNameFor(candidate)).toBe("a".repeat(256));
+    expect(tracker.aliasNameFor(candidate)).toBe(`${"a".repeat(254)}_2`);
+  });
+
   it("falls back to the default cap when the base connection getter throws", () => {
     const noConnModel = {
       tableName: "posts",

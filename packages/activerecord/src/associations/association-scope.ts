@@ -8,6 +8,7 @@ import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
 import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
+import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
  * Lambda applied to each FK/type bind value before it reaches the
@@ -260,7 +261,12 @@ export class AssociationScope {
    */
   scope(association: AssociationScopeable): unknown {
     const { owner, reflection, klass } = association;
-    const quoter = klass.connection as unknown as Quoting;
+    // Prefer the connection threaded by the enclosing `withConnection` wrap over
+    // the deprecated `.connection` getter (which flips the lease permanent under
+    // `permanent_connection_checkout = :deprecated|:disallowed`), matching the
+    // resolution in join-dependency.ts and merged-join-alias-tracker.ts.
+    const connection = threadedConnectionFor(klass) ?? klass.connection;
+    const quoter = connection as unknown as Quoting;
     // Rails: `klass.unscoped` (association_scope.rb:23). Rails' unscoped
     // bypasses default_scope but STILL applies the STI `type_condition`
     // because `relation()` adds it for `finder_needs_type_condition?`
@@ -276,9 +282,9 @@ export class AssociationScope {
     // joins to the same table get unique aliases.
     // Rails builds the tracker with the connection (association_scope.rb:26),
     // so its alias cap is the connection's `table_alias_length` (256 on MySQL,
-    // 63 on PG). Pass the connection (`quoter` is `klass.connection`) — `create`
-    // reads its `tableAliasLength` — rather than `null`, which would fall back
-    // to the 64 default.
+    // 63 on PG). Pass the resolved connection — `create` reads its
+    // `tableAliasLength` — rather than `null`, which would fall back to the 64
+    // default.
     const tracker = AliasTracker.create(quoter, klass.arelTable.name, [], undefined, quoter);
     const chain = this.getChain(reflection, tracker);
     // Rails: `scope.extending! reflection.extensions` (association_scope.rb:28).
