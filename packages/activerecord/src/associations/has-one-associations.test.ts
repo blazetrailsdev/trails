@@ -936,8 +936,12 @@ describe("HasOneAssociationsTest", () => {
     author.book = book;
 
     const whereClause = { books: { subscriptions: { subscriber_id: null } } };
-    // Mirrors Rails' assert_nothing_raised: building and running the nested
-    // enum-carrying join must not raise.
+    // Rails' assert_nothing_raised wraps only relation *construction*
+    // (`joins(book: :subscription).where.not(...)` builds the Arel that would
+    // raise on a bad reference). In trails, join/reference resolution is
+    // deferred to SQL generation, so the equivalent raise surfaces at execution
+    // rather than at `.joins().whereNot()` build time — hence `toArray()` is the
+    // faithful analog of Rails' build-time check, not an extra assertion.
     const relation = (SpecialAuthor as any).joins({ book: "subscription" }).whereNot(whereClause);
     const rows = await relation.toArray();
     expect(Array.isArray(rows)).toBe(true);
