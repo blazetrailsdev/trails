@@ -226,10 +226,7 @@ export class LogSubscriber extends BaseLogSubscriber {
     if (resolved) {
       const isBinary = resolved.type?.isBinary?.() ?? resolved.type?.binary?.() ?? false;
       if (isBinary && resolved.value != null) {
-        const raw =
-          typeof resolved.valueForDatabase === "function"
-            ? resolved.valueForDatabase()
-            : resolved.valueForDatabase;
+        const raw = resolved.valueForDatabase;
         const bytes = byteLength(raw ?? resolved.value);
         value = `<${bytes} bytes of binary data>`;
       }
