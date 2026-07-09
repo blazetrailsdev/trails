@@ -166,7 +166,7 @@ export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: 
   return quote.call(this || { quotedDate, quotedTime }, value);
 }
 
-export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
+export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat = false): unknown {
   if (value === null || value === undefined) return null;
   // Rails routes booleans through `type_cast` to `unquoted_true` /
   // `unquoted_false`, which SQLite defines as the Ruby Integers `1` / `0`
@@ -186,14 +186,16 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     // (e.g. `LOWER(col) = LOWER(?)`) path with Rails. Non-integer numbers keep
     // binding as float.
     //
-    // Fidelity boundary: MRI keys the INTEGER/FLOAT choice off the Ruby object
-    // class (Integer vs Float) set by the type-cast layer, whereas here both
-    // arrive as an indistinguishable JS number, so we key off the value. A
-    // whole-valued Float (e.g. a `2.0` from a float/decimal column) therefore
-    // binds as INTEGER rather than FLOAT — observable only through a
-    // text-forcing function (`LOWER(2.0)` → `'2'` not `'2.0'`), which is not a
-    // path AR generates for numeric columns; numeric comparisons coerce and are
-    // unaffected.
+    // MRI keys the INTEGER/FLOAT choice off the Ruby object class (Integer vs
+    // Float) set by the type-cast layer, whereas both arrive here as an
+    // indistinguishable JS number. `_driverBind` recovers the distinction from
+    // the bind's cast type and sets `bindsAsFloat` for Float columns, so
+    // a whole-valued float (e.g. `2.0`) stays a JS number and better-sqlite3
+    // binds it as SQLITE_FLOAT (`typeof(?) => 'real'`, `LOWER(?) => '2.0'`) —
+    // matching MRI's Float → SQLITE_FLOAT dispatch. Absent type info (a bare
+    // number bind), fall back to the value heuristic: whole numbers bind as
+    // SQLITE_INTEGER via BigInt so `LOWER(1)` yields `'1'` like a Ruby Integer.
+    if (bindsAsFloat) return value;
     return Number.isInteger(value) ? BigInt(value) : value;
   }
   if (typeof value === "string" || typeof value === "bigint") return value;
