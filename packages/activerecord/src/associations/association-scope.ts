@@ -276,15 +276,10 @@ export class AssociationScope {
     // joins to the same table get unique aliases.
     // Rails builds the tracker with the connection (association_scope.rb:26),
     // so its alias cap is the connection's `table_alias_length` (256 on MySQL,
-    // 63 on PG). Pass the connection — `create` reads its `tableAliasLength` —
-    // rather than `null`, which would fall back to the 64 default.
-    const tracker = AliasTracker.create(
-      klass.connection,
-      klass.arelTable.name,
-      [],
-      undefined,
-      quoter,
-    );
+    // 63 on PG). Pass the connection (`quoter` is `klass.connection`) — `create`
+    // reads its `tableAliasLength` — rather than `null`, which would fall back
+    // to the 64 default.
+    const tracker = AliasTracker.create(quoter, klass.arelTable.name, [], undefined, quoter);
     const chain = this.getChain(reflection, tracker);
     // Rails: `scope.extending! reflection.extensions` (association_scope.rb:28).
     // Mix any `extend:`-declared modules onto the relation so extension

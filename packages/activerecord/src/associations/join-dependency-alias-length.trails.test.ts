@@ -40,4 +40,18 @@ describe("JoinDependency AliasTracker seeding", () => {
     tracker.aliasNameFor("posts");
     expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(63));
   });
+
+  it("falls back to the default cap when the base connection getter throws", () => {
+    const noConnModel = {
+      tableName: "posts",
+      arelTable: new Table("posts"),
+      get connection(): never {
+        throw new Error("no connection established");
+      },
+    } as unknown as BaseModelArg;
+    const jd = new JoinDependency(noConnModel);
+    const tracker = trackerOf(jd);
+    // maxIdentifierLength default is 64.
+    expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(64));
+  });
 });

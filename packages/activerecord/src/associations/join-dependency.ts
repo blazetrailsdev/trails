@@ -196,16 +196,21 @@ export class JoinDependency {
    * 63 on PostgreSQL, 64 (default) on SQLite. Prefer the connection threaded by
    * the enclosing `withConnection` wrap over the deprecated `.connection`
    * getter (which flips the lease permanent under a restricted checkout mode);
-   * returns `undefined` when no connection resolves, letting the tracker fall
-   * back to its default.
+   * returns `undefined` when no connection resolves (or the `.connection` getter
+   * throws because none is established), letting the tracker fall back to its
+   * default so construction never fails on account of alias sizing.
    * @internal
    */
   private _baseTableAliasLength(): number | undefined {
-    const connection =
-      threadedConnectionFor(this._baseModel) ?? (this._baseModel as any).connection;
-    return typeof connection?.tableAliasLength === "function"
-      ? connection.tableAliasLength()
-      : undefined;
+    try {
+      const connection =
+        threadedConnectionFor(this._baseModel) ?? (this._baseModel as any).connection;
+      return typeof connection?.tableAliasLength === "function"
+        ? connection.tableAliasLength()
+        : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   /**
