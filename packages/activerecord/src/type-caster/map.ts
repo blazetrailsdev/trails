@@ -30,25 +30,25 @@ export class Map {
   }
 
   typeForAttribute(name: string): Type {
-    // The resolved type already carries any NormalizedValueType decoration:
-    // `normalizes` decorates the attribute's cast type in `_attributeDefinitions`
-    // (single read+write decoration path), so no query-side re-wrap is needed.
+    // The resolved type already carries every decoration (NormalizedValueType,
+    // Serialized, EncryptedAttributeType): `_baseTypeForAttribute` delegates to
+    // `klass.typeForAttribute`, which resolves through the decorated default
+    // attribute set, so no query-side re-wrap is needed.
     return this._baseTypeForAttribute(name);
   }
 
   private _baseTypeForAttribute(name: string): Type {
     const klass = this._klass;
 
-    // Resolve through the decorated default attribute set — Rails'
-    // `attribute_types[name]` (attribute_registration.rb:43-50) — so pending
-    // decorators (serialize/normalizes/encrypts) are honored on the query side
-    // without a per-feature post-reflection replay onto `_attributeDefinitions`.
-    // Read the single attribute (O(1), `getAttribute` returns a `value`-typed Null
-    // for an unknown name) rather than the whole `attributeTypes()` record + Proxy
-    // — this runs once per predicate-builder bind.
-    const resolved = klass._attributeAliases?.[name] ?? name;
-    if (typeof klass._defaultAttributes === "function") {
-      return klass._defaultAttributes().getAttribute(resolved).type as Type;
+    // Rails' `TypeCaster::Map#type_for_attribute` is a one-line delegation to
+    // `klass.type_for_attribute(name)` (type_caster/map.rb:15-16). Delegating gets
+    // alias resolution, the enum `assertEnumTypeDeclared` guard, and the decorated
+    // default attribute set (`attribute_types`) for free — so pending decorators
+    // (serialize/normalizes/encrypts) are honored on the query side without a
+    // per-feature post-reflection replay onto `_attributeDefinitions`. `ValueType`
+    // is the fallback for non-model `klass` shapes lacking `typeForAttribute`.
+    if (typeof klass.typeForAttribute === "function") {
+      return klass.typeForAttribute(name) as Type;
     }
 
     return new ValueType();
