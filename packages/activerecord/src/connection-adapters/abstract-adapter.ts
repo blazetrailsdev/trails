@@ -1270,7 +1270,16 @@ export class AbstractAdapter implements Quoting {
   // --- Capability introspection ---
 
   isValidType(type: string | null | undefined): boolean {
-    return type != null && this.nativeDatabaseTypes()[type] != null;
+    if (type == null) return false;
+    const types = this.nativeDatabaseTypes();
+    if (types[type] != null) return true;
+    // Rails keys `native_database_types` by the same snake_case symbol that
+    // `Column#type` returns, so membership is a direct hit. trails instead keys
+    // by its camelCase DSL name (e.g. `bitVarying`) while `Column#type` stays
+    // Rails-snake (`bit_varying`); bridge the two spellings so a legit native
+    // type isn't misread as unmapped by `valid_type?` (schema dumper gate).
+    const camel = type.replace(/_([a-z])/g, (_m, c: string) => c.toUpperCase());
+    return camel !== type && types[camel] != null;
   }
 
   /**
