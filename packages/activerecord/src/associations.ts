@@ -3314,7 +3314,7 @@ function wrapCollectionProxy<T extends Base = Base>(
       const modelClass = target.model;
       const classMethod = modelClass[prop];
       if (typeof classMethod === "function") {
-        const delegator = classMethodDelegator(modelClass, prop, classMethod);
+        const delegator = classMethodDelegator(prop);
         if (!uncacheableMethods().has(prop)) {
           generateRelationMethod(modelClass, prop, delegator);
         }

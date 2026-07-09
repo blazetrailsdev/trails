@@ -372,23 +372,44 @@ function perModelCarrier(
       configurable: true,
     });
     cache.set(modelClass, subclass);
-    // Only the model's OWN generated module is included — deliberately NOT the
-    // Rails `include_relation_methods` superclass recursion
+    // Mirror Rails' `include_relation_methods` superclass recursion
     // (`superclass.include_relation_methods(delegate) unless base_class?`,
-    // delegation.rb:57-60). Rails can safely inherit an ancestor's generated
-    // module because its generated body is model-agnostic — `def m(...); scoping
-    // { model.m(...) }; end` reads `self.model` dynamically (delegation.rb:76-88).
-    // trails' delegator instead CAPTURES a specific `modelClass` + bound class
-    // method and scopes/guards that captured model (`classMethodDelegator`), so
-    // installing a parent model's delegator onto an STI child carrier would
-    // dispatch to the parent model — wrong scope and wrong STI type-condition.
-    // The child instead re-derives a correctly-bound delegator onto its own
-    // module via the `Proxy` miss path (keyed by the relation's real
-    // `_modelClass`), yielding identical observable behavior to Rails at the cost
-    // of one extra miss-path pass per (subclass, method).
-    includeRelationMethods(subclass.prototype, generatedRelationMethods(modelClass));
+    // delegation.rb:57-60): include each STI ancestor model's generated module
+    // (from `base_class` down) and finally the model's OWN module. Rails walks
+    // super first, then includes own last, so an own generated method wins over
+    // an inherited one; `stiCarrierChain` returns the chain base_class-first to
+    // preserve that order. This is safe because the generated delegator is now
+    // model-agnostic (`classMethodDelegator` reads the relation's live
+    // `_modelClass` at call time), so an ancestor's module installed onto an STI
+    // child carrier still dispatches to the child (child scope + child STI
+    // type-condition) — inherited generated methods resolve by ordinary
+    // prototype lookup instead of re-entering the `Proxy` miss path per
+    // subclass.
+    for (const ancestor of stiCarrierChain(modelClass)) {
+      includeRelationMethods(subclass.prototype, generatedRelationMethods(ancestor));
+    }
   }
   return subclass;
+}
+
+/**
+ * The STI ancestor chain of generated-module owners for a model, ordered
+ * `base_class`-first through the model itself. Mirrors the recursion in Rails'
+ * `DelegateCache#include_relation_methods` (delegation.rb:57-60), which walks
+ * Ruby superclasses up to (and stopping at) `base_class`. Each element's
+ * `generatedRelationMethods` module is `include`d into a child carrier so an
+ * STI child inherits every ancestor's generated relation methods.
+ */
+function stiCarrierChain(modelClass: typeof Base): (typeof Base)[] {
+  const chain: (typeof Base)[] = [];
+  let current: typeof Base | null = modelClass;
+  while (current) {
+    chain.push(current);
+    if (current.isBaseClass()) break;
+    const parent = Object.getPrototypeOf(current) as unknown;
+    current = typeof parent === "function" ? (parent as typeof Base) : null;
+  }
+  return chain.reverse();
 }
 
 /**
@@ -467,22 +488,30 @@ export function generateRelationMethod(
 /**
  * Build the function that delegates a model class method through a relation /
  * collection-proxy scope — Rails' `ClassSpecificRelation#method_missing`
- * `scoping { @klass.public_send(method, ...) }` (delegation.rb:118-131). The
+ * `scoping { model.public_send(method, ...) }` (delegation.rb:118-131). The
  * `this` it's invoked with becomes the current scope for the call's duration:
  * sync results (a Relation) restore the prior scope immediately so the result
  * is directly chainable; async results (a Promise) defer restoration until the
  * promise settles, mirroring Rails' synchronous block-scoping across the body.
  *
+ * The delegator is **model-agnostic** (Rails' generated body is
+ * `def m(...); scoping { model.m(...) }; end`, delegation.rb:76-88): it reads
+ * the live model off the relation it's invoked on (`this._modelClass`) rather
+ * than capturing a specific `modelClass`, resolving and scoping that model's
+ * class method at call time. This is what lets a single delegator be correct on
+ * any model in an STI hierarchy — a parent model's generated module can be
+ * inherited down onto an STI child carrier and still dispatch to the child
+ * (child scope + child STI type-condition), matching Rails'
+ * `include_relation_methods` superclass recursion.
+ *
  * This is also what `generateRelationMethod` caches (delegation.rb:127-129) so
  * subsequent calls skip the proxy miss path.
  */
-export function classMethodDelegator(
-  modelClass: typeof Base,
-  prop: string,
-  classMethod: AnyCallable,
-): AnyCallable {
+export function classMethodDelegator(prop: string): AnyCallable {
   return function (this: any, ...args: any[]) {
+    const modelClass = this._modelClass as typeof Base;
     guardBaseMethodDelegation(modelClass, prop);
+    const classMethod = (modelClass as any)[prop] as AnyCallable;
     const prev = ScopeRegistry.currentScope(modelClass);
     ScopeRegistry.setCurrentScope(modelClass, this);
     let result: unknown;
@@ -709,7 +738,7 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       // mirroring Rails' synchronous block-scoping across the full body.
       const classMethod = (modelClass as any)[prop];
       if (typeof classMethod === "function") {
-        const delegator = classMethodDelegator(modelClass, prop, classMethod);
+        const delegator = classMethodDelegator(prop);
         // Cache the delegation so subsequent calls resolve through the
         // generated method above rather than re-running this proxy miss path
         // (delegation.rb:127-129) — except uncacheable methods (to_a/records/

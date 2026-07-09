@@ -19,6 +19,7 @@ import {
 } from "./delegation.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Company, Firm } from "../test-helpers/models/company.js";
 // Loading these registers each delegate class with the relation family so the
 // carrier resolvers find their base ctor and `uncacheableMethods()` sees the
 // subclass-only methods (`target`, …).
@@ -126,6 +127,28 @@ describe("generated relation methods — remaining delegate-class carriers", () 
       "DisableJoinsAssociationRelation",
     );
     expect(collectionProxyClassFor(Post as never).name).toBe("CollectionProxy");
+  });
+
+  it("inherits an STI base model's generated module onto the child carrier (include_relation_methods recursion)", () => {
+    // Rails' `include_relation_methods` recurses up the STI chain
+    // (`superclass.include_relation_methods(delegate) unless base_class?`,
+    // delegation.rb:57-60): a method generated on the base model (`Company`)
+    // must be a real method on the child (`Firm`) carrier's prototype — resolved
+    // by ordinary prototype lookup, not re-derived via the Proxy miss path.
+    // `Firm extends Company`; `Company` is the STI base_class.
+    generateRelationMethod(Company as never, "stiBaseGenerated", () => "base");
+    const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
+    expect(Object.prototype.hasOwnProperty.call(firmCarrier, "stiBaseGenerated")).toBe(true);
+    expect((firmCarrier.stiBaseGenerated as () => string)()).toBe("base");
+  });
+
+  it("lets a child model's own generated method win over an inherited one", () => {
+    // Rails includes super first, own last, so an own generated method shadows
+    // an inherited one of the same name (`stiCarrierChain` returns base-first).
+    generateRelationMethod(Company as never, "stiOverridden", () => "base");
+    generateRelationMethod(Firm as never, "stiOverridden", () => "child");
+    const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
+    expect((firmCarrier.stiOverridden as () => string)()).toBe("child");
   });
 
   it("gives distinct models distinct carriers per delegate class (no cross-model leakage)", () => {
