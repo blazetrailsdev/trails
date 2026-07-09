@@ -1296,7 +1296,21 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     return sql;
   }
 
-  checkVersion(): void {}
+  // Mirrors: ActiveRecord::ConnectionAdapters::AbstractMysqlAdapter#check_version.
+  // Rails reads `database_version` (a synchronous accessor over the already-
+  // established connection); in trails the version is warmed asynchronously into
+  // `_databaseVersion` (getFullVersion) before checkVersion runs at connect time,
+  // so we read that cached value rather than issue a round-trip. When the version
+  // has not been warmed yet (`_databaseVersion` is null) we skip the floor check
+  // rather than raise a false positive — a query-issuing sync port isn't possible.
+  override checkVersion(): void {
+    const version = this._databaseVersion;
+    if (version && version.lt("5.6.4")) {
+      throw new DatabaseVersionError(
+        `Your version of MySQL (${version}) is too old. Active Record supports MySQL >= 5.6.4.`,
+      );
+    }
+  }
 
   /**
    * Escape-only string quoting per the Quoting interface contract

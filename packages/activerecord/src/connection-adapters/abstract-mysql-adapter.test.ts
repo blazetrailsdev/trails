@@ -791,3 +791,31 @@ describe("AbstractMysqlAdapter#tableAliasLength", () => {
     expect(adapter.tableAliasFor(long)).toBe("a".repeat(256));
   });
 });
+
+describe("AbstractMysqlAdapter#checkVersion", () => {
+  it("raises DatabaseVersionError when the warmed version is too old", async () => {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const { Version } = await import("./abstract-adapter.js");
+    const { DatabaseVersionError } = await import("../errors.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
+      typeof AbstractMysqlAdapter
+    >;
+    (adapter as unknown as { _databaseVersion: InstanceType<typeof Version> })._databaseVersion =
+      new Version("5.6.3");
+    expect(() => adapter.checkVersion()).toThrow(DatabaseVersionError);
+    expect(() => adapter.checkVersion()).toThrow(
+      "Your version of MySQL (5.6.3) is too old. Active Record supports MySQL >= 5.6.4.",
+    );
+  });
+
+  it("does not raise when the warmed version is supported", async () => {
+    const { AbstractMysqlAdapter } = await import("./abstract-mysql-adapter.js");
+    const { Version } = await import("./abstract-adapter.js");
+    const adapter = Object.create(AbstractMysqlAdapter.prototype) as InstanceType<
+      typeof AbstractMysqlAdapter
+    >;
+    (adapter as unknown as { _databaseVersion: InstanceType<typeof Version> })._databaseVersion =
+      new Version("5.6.4");
+    expect(() => adapter.checkVersion()).not.toThrow();
+  });
+});
