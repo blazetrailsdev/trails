@@ -143,8 +143,10 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: ["written", "written"] }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
-    // Pending: `last_read: forgotten`, `status: prohibited` (nil), and `cover`
-    // matches.
+    expect((await Book.where({ last_read: "forgotten" }).first())?.id).toBe(books("ddd").id);
+    expect(await Book.where({ status: "prohibited" }).first()).toBeNull();
+    expect((await Book.where({ cover: "soft" }).first())?.id).toBe(book.id);
+    expect((await Book.whereNot({ cover: "hard" }).first())?.id).toBe(book.id);
   });
 
   it("find via where with strings", async () => {
@@ -155,7 +157,8 @@ describe("EnumTest", () => {
     expect((await Book.where({ status: ["written", "written"] }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "published" }).first())?.id).not.toBe(book.id);
     expect((await Book.whereNot({ status: "written" }).first())?.id).toBe(book.id);
-    // Pending: `last_read: "forgotten"` and `status: "prohibited"` (nil).
+    expect((await Book.where({ last_read: "forgotten" }).first())?.id).toBe(books("ddd").id);
+    expect(await Book.where({ status: "prohibited" }).first()).toBeNull();
   });
 
   // Rails passes a 64-bit-out-of-range value (2^63) as an enum array element

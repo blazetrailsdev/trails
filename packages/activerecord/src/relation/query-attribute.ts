@@ -8,6 +8,7 @@
  */
 
 import { Attribute, Type, ActiveModelRangeError } from "@blazetrails/activemodel";
+import { Substitute } from "../statement-cache.js";
 
 type CastType = Pick<Type, "cast" | "serialize">;
 
@@ -70,8 +71,19 @@ export class QueryAttribute extends Attribute {
     return this.type.serialize(this.value);
   }
 
+  // Mirrors Rails QueryAttribute#nil? (query_attribute.rb:35-41): a bind is nil
+  // not only when its raw value is nil, but also when the type carries a
+  // `subtype` (enum) or `normalizer` and the value *serializes* to nil — so
+  // `where(last_read: :forgotten)` (a label mapped to null) or an unknown enum
+  // label routes through `IS NULL`. A StatementCache substitute is never nil.
   isNil(): boolean {
-    return this.valueBeforeTypeCast === null || this.valueBeforeTypeCast === undefined;
+    if (this.valueBeforeTypeCast instanceof Substitute) return false;
+    if (this.valueBeforeTypeCast === null || this.valueBeforeTypeCast === undefined) return true;
+    const type = this.type as { subtype?: unknown; normalizer?: unknown };
+    const hasSubtypeOrNormalizer = type.subtype !== undefined || type.normalizer !== undefined;
+    if (!hasSubtypeOrNormalizer || !this.isSerializable()) return false;
+    const forDatabase = this.valueForDatabase;
+    return forDatabase === null || forDatabase === undefined;
   }
 
   isInfinite(): boolean {
