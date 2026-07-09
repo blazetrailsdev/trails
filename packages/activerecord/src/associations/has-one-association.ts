@@ -103,6 +103,9 @@ export class HasOneAssociation extends SingularAssociation {
    * defers to the owner's next save (`autosaveHasOne`).
    */
   override writer(record: Base | null): void | Promise<void> {
+    // Delegate to an async helper rather than making `writer` itself `async`, so
+    // the base `void | Promise<void>` signature (shared with the through
+    // override, which can return synchronously) is preserved.
     return this.writeImmediate(record);
   }
 
