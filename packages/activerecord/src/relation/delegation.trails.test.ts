@@ -143,12 +143,18 @@ describe("generated relation methods — remaining delegate-class carriers", () 
   });
 
   it("lets a child model's own generated method win over an inherited one", () => {
-    // Rails includes super first, own last, so an own generated method shadows
-    // an inherited one of the same name (`stiCarrierChain` returns base-first).
-    generateRelationMethod(Company as never, "stiOverridden", () => "base");
+    // Rails' ancestor-chain MRO puts the child module before the ancestor, so an
+    // own generated method shadows an inherited one of the same name. The win is
+    // *structural* (per-carrier module priority), NOT temporal: generate the
+    // child's fn FIRST, then the ancestor's — the reverse order that a naive
+    // last-write-wins carrier would get wrong — and the child must still win.
     generateRelationMethod(Firm as never, "stiOverridden", () => "child");
+    generateRelationMethod(Company as never, "stiOverridden", () => "base");
     const firmCarrier = relationClassFor(Firm as never).prototype as Record<string, unknown>;
     expect((firmCarrier.stiOverridden as () => string)()).toBe("child");
+    // The base carrier (Company) only sees its own module, so it resolves "base".
+    const companyCarrier = relationClassFor(Company as never).prototype as Record<string, unknown>;
+    expect((companyCarrier.stiOverridden as () => string)()).toBe("base");
   });
 
   it("gives distinct models distinct carriers per delegate class (no cross-model leakage)", () => {

@@ -69,28 +69,61 @@ export interface ClassSpecificRelation {}
  *
  * Mirrors: ActiveRecord::Delegation::GeneratedRelationMethods
  */
+/**
+ * Per-carrier record of the highest module *priority* that has installed each
+ * method name, so a more-derived module's method structurally wins over a less-
+ * derived one regardless of `generate()` call order — mirroring Ruby's ancestor-
+ * chain MRO, where `Firm::GeneratedRelationMethods` precedes
+ * `Company::GeneratedRelationMethods` in `FirmDelegate.ancestors` independent of
+ * definition order. Without this, a late `generate()` on an ancestor module
+ * would silently clobber a child module's already-installed method on the shared
+ * carrier prototype (last-write-wins by time). Keyed by carrier prototype.
+ */
+const _carrierNamePriority = new WeakMap<object, Map<string, number>>();
+
+/**
+ * Install `fn` for `name` onto `carrier` only if `priority` is at least the
+ * priority of whatever module last claimed that name on this carrier. Higher
+ * priority = more-derived module (own wins over inherited); equal priority is a
+ * same-module re-`generate()` (latest fn wins). Lower priority (an ancestor
+ * writing after a child already claimed the name) is skipped.
+ */
+function installOnCarrier(carrier: object, name: string, fn: AnyCallable, priority: number): void {
+  let priorities = _carrierNamePriority.get(carrier);
+  if (!priorities) {
+    priorities = new Map();
+    _carrierNamePriority.set(carrier, priorities);
+  }
+  const existing = priorities.get(name);
+  if (existing !== undefined && priority < existing) return;
+  (carrier as Record<string, AnyCallable>)[name] = fn;
+  priorities.set(name, priority);
+}
+
 export class GeneratedRelationMethods {
   private _methods: Map<string, AnyCallable> = new Map();
-  private _carriers: object[] = [];
+  private _carriers: { carrier: object; priority: number }[] = [];
 
   generate(name: string, fn: AnyCallable): void {
     this._methods.set(name, fn);
-    for (const carrier of this._carriers) {
-      (carrier as Record<string, AnyCallable>)[name] = fn;
+    for (const { carrier, priority } of this._carriers) {
+      installOnCarrier(carrier, name, fn, priority);
     }
   }
 
   /**
-   * `include` this module into a delegate prototype carrier — install every
-   * already-generated method as a real own property and register the carrier so
-   * future {@link generate}s propagate to it. Mirrors Rails'
-   * `DelegateCache#include_relation_methods` (delegation.rb:57-60).
+   * `include` this module into a delegate prototype carrier at `priority` (its
+   * position in the carrier's STI module chain — higher = more derived): install
+   * every already-generated method as a real own property, respecting per-name
+   * priority, and register the carrier so future {@link generate}s propagate to
+   * it. Mirrors Rails' `DelegateCache#include_relation_methods`
+   * (delegation.rb:57-60).
    */
-  includeInto(carrier: object): void {
-    if (this._carriers.includes(carrier)) return;
-    this._carriers.push(carrier);
+  includeInto(carrier: object, priority: number): void {
+    if (this._carriers.some((entry) => entry.carrier === carrier)) return;
+    this._carriers.push({ carrier, priority });
     for (const [name, fn] of this._methods) {
-      (carrier as Record<string, AnyCallable>)[name] = fn;
+      installOnCarrier(carrier, name, fn, priority);
     }
   }
 
@@ -316,8 +349,12 @@ export function generatedRelationMethods(modelClass: typeof Base): GeneratedRela
  * `delegate.include generated_relation_methods` installs the per-model module's
  * generated methods as real methods on a delegate prototype carrier.
  */
-export function includeRelationMethods(carrier: object, methods: GeneratedRelationMethods): void {
-  methods.includeInto(carrier);
+export function includeRelationMethods(
+  carrier: object,
+  methods: GeneratedRelationMethods,
+  priority: number,
+): void {
+  methods.includeInto(carrier, priority);
 }
 
 /**
@@ -384,10 +421,14 @@ function perModelCarrier(
     // child carrier still dispatches to the child (child scope + child STI
     // type-condition) — inherited generated methods resolve by ordinary
     // prototype lookup instead of re-entering the `Proxy` miss path per
-    // subclass.
-    for (const ancestor of stiCarrierChain(modelClass)) {
-      includeRelationMethods(subclass.prototype, generatedRelationMethods(ancestor));
-    }
+    // subclass. The chain index is the module's priority (base_class = 0, own =
+    // highest), so `includeRelationMethods` structurally lets an own method win
+    // over an inherited one of the same name regardless of `generate()` order,
+    // mirroring Ruby's ancestor-chain MRO.
+    const carrierProto = subclass.prototype;
+    stiCarrierChain(modelClass).forEach((ancestor, priority) => {
+      includeRelationMethods(carrierProto, generatedRelationMethods(ancestor), priority);
+    });
   }
   return subclass;
 }
