@@ -508,24 +508,26 @@ describe("HasOneAssociationsTest", () => {
     const connection = (await Base.leaseConnection()) as any;
     connection.enableQueryCacheBang();
     connection.clearQueryCache();
+    try {
+      // Populate the cache with a query
+      const odegy = (await Company.find(odegyId)) as any;
+      // Populate the cache with a second query
+      await readHasOne(odegy, "account");
 
-    // Populate the cache with a query
-    const odegy = (await Company.find(odegyId)) as any;
-    // Populate the cache with a second query
-    await readHasOne(odegy, "account");
+      expect(connection.queryCache!.size).toBe(2);
 
-    expect(connection.queryCache!.size).toBe(2);
+      // Clear the cache and fetch the account again, populating the cache with a query
+      await assertQueriesCount(1, false, async () => {
+        await odegy.reloadAccount();
+      });
 
-    // Clear the cache and fetch the account again, populating the cache with a query
-    await assertQueriesCount(1, false, async () => {
-      await odegy.reloadAccount();
-    });
-
-    // This query is not cached anymore, so it should make a real SQL query
-    await assertQueriesCount(1, false, async () => {
-      await Company.find(odegyId);
-    });
-    connection.disableQueryCacheBang();
+      // This query is not cached anymore, so it should make a real SQL query
+      await assertQueriesCount(1, false, async () => {
+        await Company.find(odegyId);
+      });
+    } finally {
+      connection.disableQueryCacheBang();
+    }
   });
 
   it("reset association", async () => {
