@@ -602,6 +602,16 @@ describe("the to_sql visitor", () => {
       const node = users.get("id").eq(null);
       expect(new Visitors.ToSql().compile(node)).toContain("IS NULL");
     });
+
+    it("emits IS NULL for a BindParam wrapping a bare null", () => {
+      const node = new Nodes.Equality(users.get("id"), new Nodes.BindParam(null));
+      expect(new Visitors.ToSql().compile(node)).toContain("IS NULL");
+    });
+
+    it("emits IS NOT NULL for a NotEqual BindParam wrapping a bare null", () => {
+      const node = new Nodes.NotEqual(users.get("id"), new Nodes.BindParam(null));
+      expect(new Visitors.ToSql().compile(node)).toContain("IS NOT NULL");
+    });
   });
 
   describe("Nodes::InfixOperation", () => {

@@ -27,6 +27,21 @@ export class BindParam extends Node {
     return typeof v?.valueBeforeTypeCast === "function" ? v.valueBeforeTypeCast() : this.value;
   }
 
+  /**
+   * Mirrors `Arel::Nodes::BindParam#nil?` (bind_param.rb:23-25), which
+   * delegates to `value.nil?`. A bare raw `null` value is nil; a wrapped
+   * attribute (e.g. a QueryAttribute that serializes an enum/normalized value
+   * to nil) answers via its own `isNil()`. So a `BindParam` around a nil right
+   * reports nil and the equality visitors emit `IS NULL`. A valueless
+   * placeholder (`undefined`) is a trails positional-bind marker, not a Rails
+   * value, so it stays a `?` bind rather than collapsing to `IS NULL`.
+   */
+  isNil(): boolean {
+    if (this.value === null) return true;
+    const v = this.value as { isNil?: () => boolean } | undefined;
+    return typeof v?.isNil === "function" && v.isNil();
+  }
+
   isInfinite(): number | null {
     const v = this.value as { isInfinite?: () => number | null } | null | undefined;
     return typeof v?.isInfinite === "function" ? v.isInfinite() : null;
