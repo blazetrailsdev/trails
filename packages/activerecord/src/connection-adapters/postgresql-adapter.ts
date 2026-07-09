@@ -2396,7 +2396,26 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: PostgreSQLAdapter#max_identifier_length (postgresql_adapter.rb:620)
-  async maxIdentifierLength(): Promise<number> {
+  // Rails memoizes `query_value("SHOW max_identifier_length", "SCHEMA").to_i`
+  // and reads it synchronously. trails queries are async, so the query lives in
+  // the async `warmMaxIdentifierLength` (invoked lazily by the async callers
+  // that need the real value, e.g. renameTable — exactly where Rails' lazy
+  // `||=` first fires it), and this synchronous accessor — the receiver the
+  // inherited DatabaseLimits mixin dispatches to — returns the memo once warmed,
+  // else PostgreSQL's compile-time default (NAMEDATALEN-1 = 63). Because the
+  // server value is 63 on every stock build, the fallback matches what the
+  // query would return, so the synchronous alias/index/table-name-length callers
+  // stay correct without an eager per-connection round-trip Rails never pays.
+  maxIdentifierLength(): number {
+    return this._maxIdentifierLength ?? 63;
+  }
+
+  // Lazily populate the max_identifier_length memo via a logged SCHEMA query,
+  // matching Rails' `query_value("SHOW max_identifier_length", "SCHEMA")`
+  // (postgresql_adapter.rb:620-622). The null guard makes it a no-op once
+  // warmed; the memo persists across reconnects, mirroring Rails' `||=` which
+  // never resets.
+  async warmMaxIdentifierLength(): Promise<number> {
     if (this._maxIdentifierLength == null) {
       const rows = (await this.schemaQuery("SHOW max_identifier_length")) as Array<{
         max_identifier_length: string;
@@ -2404,26 +2423,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       this._maxIdentifierLength = parseInt(rows[0]?.max_identifier_length ?? "63", 10);
     }
     return this._maxIdentifierLength;
-  }
-
-  // trails' `maxIdentifierLength` is async (it queries `SHOW
-  // max_identifier_length`), so the DatabaseLimits mixin's receiver-dispatch
-  // (`this.maxIdentifierLength()`) would hand these callers a Promise instead
-  // of a number. The alias-length consumers (relation join-alias tracking) are
-  // synchronous, so resolve the cached limit synchronously — the real value
-  // once `maxIdentifierLength` has been queried, else PostgreSQL's default
-  // (NAMEDATALEN-1 = 63), matching the `?? "63"` fallback maxIdentifierLength
-  // itself uses (postgresql_adapter.rb:619-622) rather than the abstract 64.
-  tableAliasLength(): number {
-    return this._maxIdentifierLength ?? 63;
-  }
-
-  tableNameLength(): number {
-    return this._maxIdentifierLength ?? 63;
-  }
-
-  indexNameLength(): number {
-    return this._maxIdentifierLength ?? 63;
   }
 
   // Mirrors: PostgreSQLAdapter#session_auth= (postgresql_adapter.rb:625)
@@ -3801,7 +3800,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.exec(
       `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteIdentifier(unqualifiedNew)}`,
     );
-    const maxLen = await this.maxIdentifierLength();
+    // Rails reads max_identifier_length here, which lazily runs the SHOW query
+    // on first use; warm the memo so the truncation limit is the real server
+    // value rather than the synchronous fallback.
+    const maxLen = await this.warmMaxIdentifierLength();
     // After rename the table lives in the old schema; build the correct name for lookup.
     const renamedName = oldSchema
       ? `${this.quoteIdentifier(oldSchema)}.${this.quoteIdentifier(unqualifiedNew)}`
