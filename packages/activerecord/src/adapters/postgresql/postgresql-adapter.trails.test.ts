@@ -934,18 +934,17 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("maxIdentifierLength returns a positive integer", async () => {
-      // connectBang warms the memo via the logged SCHEMA query; the accessor
-      // itself is synchronous (read by the DatabaseLimits mixin).
-      await adapter.connectBang();
-      const len = adapter.maxIdentifierLength();
+      // warmMaxIdentifierLength runs the lazy SHOW query and populates the memo
+      // that the synchronous accessor (read by the DatabaseLimits mixin) returns.
+      const len = await adapter.warmMaxIdentifierLength();
       expect(len).toBeGreaterThan(0);
       expect(Number.isInteger(len)).toBe(true);
+      expect(adapter.maxIdentifierLength()).toBe(len);
     });
 
     it("maxIdentifierLength is cached after first call", async () => {
-      await adapter.connectBang();
-      const first = adapter.maxIdentifierLength();
-      const second = adapter.maxIdentifierLength();
+      const first = await adapter.warmMaxIdentifierLength();
+      const second = await adapter.warmMaxIdentifierLength();
       expect(first).toBe(second);
     });
 

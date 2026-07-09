@@ -97,10 +97,11 @@ describeIfPg("PostgresqlConnectionTest", () => {
   it("table alias length logs name", async () => {
     // Rails nils @max_identifier_length then calls table_alias_length to force
     // the logged "SHOW max_identifier_length" (SCHEMA) query. maxIdentifierLength
-    // is synchronous in trails, so the memo is warmed on connect via the same
-    // logged schemaQuery — a fresh connectBang emits it as the first SCHEMA query.
+    // is synchronous in trails, so the query lives in the async warm path that
+    // renameTable (and here, the test) drives lazily — it goes through the same
+    // logged schemaQuery, so it is logged with the SCHEMA name.
     (adapter as unknown as { _maxIdentifierLength: number | null })._maxIdentifierLength = null;
-    await adapter.connectBang();
+    await adapter.warmMaxIdentifierLength();
     expect(subscriber.logged[0][1]).toBe("SCHEMA");
   });
 

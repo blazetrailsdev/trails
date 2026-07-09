@@ -2396,28 +2396,33 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   // Mirrors: PostgreSQLAdapter#max_identifier_length (postgresql_adapter.rb:620)
-  // Synchronous like Rails: the memo is warmed eagerly on connect
-  // (_warmMaxIdentifierLength, driven by connectBang), so the inherited
-  // DatabaseLimits mixin's receiver-dispatch (`this.maxIdentifierLength()`)
-  // resolves the real server value (normally 63) for its synchronous callers
-  // (relation join-alias tracking). Falls back to PostgreSQL's compile-time
-  // default (NAMEDATALEN-1 = 63) before the memo is warmed.
+  // Rails memoizes `query_value("SHOW max_identifier_length", "SCHEMA").to_i`
+  // and reads it synchronously. trails queries are async, so the query lives in
+  // the async `warmMaxIdentifierLength` (invoked lazily by the async callers
+  // that need the real value, e.g. renameTable — exactly where Rails' lazy
+  // `||=` first fires it), and this synchronous accessor — the receiver the
+  // inherited DatabaseLimits mixin dispatches to — returns the memo once warmed,
+  // else PostgreSQL's compile-time default (NAMEDATALEN-1 = 63). Because the
+  // server value is 63 on every stock build, the fallback matches what the
+  // query would return, so the synchronous alias/index/table-name-length callers
+  // stay correct without an eager per-connection round-trip Rails never pays.
   maxIdentifierLength(): number {
     return this._maxIdentifierLength ?? 63;
   }
 
-  // Populate the max_identifier_length memo via a logged SCHEMA query, matching
-  // Rails' `query_value("SHOW max_identifier_length", "SCHEMA")`
-  // (postgresql_adapter.rb:620-622). trails can't run that query synchronously,
-  // so connectBang warms it once per adapter after the connection is live —
-  // the memo persists across reconnects, so the null guard makes this a no-op
-  // on every subsequent (re)connect.
-  private async _warmMaxIdentifierLength(): Promise<void> {
-    if (this._maxIdentifierLength != null) return;
-    const rows = (await this.schemaQuery("SHOW max_identifier_length")) as Array<{
-      max_identifier_length: string;
-    }>;
-    this._maxIdentifierLength = parseInt(rows[0]?.max_identifier_length ?? "63", 10);
+  // Lazily populate the max_identifier_length memo via a logged SCHEMA query,
+  // matching Rails' `query_value("SHOW max_identifier_length", "SCHEMA")`
+  // (postgresql_adapter.rb:620-622). The null guard makes it a no-op once
+  // warmed; the memo persists across reconnects, mirroring Rails' `||=` which
+  // never resets.
+  async warmMaxIdentifierLength(): Promise<number> {
+    if (this._maxIdentifierLength == null) {
+      const rows = (await this.schemaQuery("SHOW max_identifier_length")) as Array<{
+        max_identifier_length: string;
+      }>;
+      this._maxIdentifierLength = parseInt(rows[0]?.max_identifier_length ?? "63", 10);
+    }
+    return this._maxIdentifierLength;
   }
 
   // Mirrors: PostgreSQLAdapter#session_auth= (postgresql_adapter.rb:625)
@@ -2631,11 +2636,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   override async connectBang(): Promise<void> {
     await this.connect();
-    // The connection is now live and out of the configure barrier, so the
-    // logged schemaQuery is safe here (re-entering withRawConnection finds a
-    // non-null _connection and skips the connectBang pre-loop). Warms the
-    // synchronous maxIdentifierLength memo for relation join-alias tracking.
-    await this._warmMaxIdentifierLength();
   }
 
   /**
@@ -3800,7 +3800,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     await this.exec(
       `ALTER TABLE ${this.quoteTableName(oldName)} RENAME TO ${this.quoteIdentifier(unqualifiedNew)}`,
     );
-    const maxLen = this.maxIdentifierLength();
+    // Rails reads max_identifier_length here, which lazily runs the SHOW query
+    // on first use; warm the memo so the truncation limit is the real server
+    // value rather than the synchronous fallback.
+    const maxLen = await this.warmMaxIdentifierLength();
     // After rename the table lives in the old schema; build the correct name for lookup.
     const renamedName = oldSchema
       ? `${this.quoteIdentifier(oldSchema)}.${this.quoteIdentifier(unqualifiedNew)}`
