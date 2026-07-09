@@ -146,7 +146,12 @@ export class SchemaDumper extends BaseSchemaDumper {
   /** @internal */
   protected schemaType(column: Column): string {
     if (this.isBigint(column)) return "bigint";
-    return column.type;
+    // Column#type is nil for an unmapped sql_type (e.g. a composite OID),
+    // mirroring Rails' `allow_nil: true`. Fall back to the raw sql_type so the
+    // dump still round-trips (RFC 0056) rather than masking the nil as "". The
+    // coalesced `AdapterSchemaSource.columns()` shape is never-nil at runtime,
+    // so this guard only fires for a raw adapter dumped directly as SchemaSource.
+    return column.type ?? column.sqlType ?? "unknown";
   }
 
   /**

@@ -34,8 +34,12 @@ async function loadSchemaIntrospection(): Promise<typeof SchemaIntrospectionModu
 
 export interface ColumnInfo {
   name: string;
-  /** DSL cast type (`"string"`, `"integer"`, `"datetime"` …) — what `schemaType` reads. */
-  type: string;
+  /**
+   * DSL cast type (`"string"`, `"integer"`, `"datetime"` …) — what `schemaType`
+   * reads. Nil for an unmapped `sql_type` (e.g. a composite OID), mirroring
+   * Rails' `Column#type` `allow_nil: true`; `schemaType` coalesces it.
+   */
+  type: string | null;
   /**
    * Raw SQL type from the adapter (`"varchar(255)"`, `"timestamp"`, `"enum('a','b')"` …).
    * Carried separately from {@link type} so dialect dumpers (`schemaType`/`schemaLimit`/

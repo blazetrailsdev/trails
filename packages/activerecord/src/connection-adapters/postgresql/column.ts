@@ -72,12 +72,13 @@ export class Column extends BaseColumn {
   // Rails' Column#type delegates to sql_type_metadata with `allow_nil: true`
   // (column.rb:12), so an unmapped sql_type — e.g. a composite OID — reflects
   // `nil`. Do NOT coerce that to "" (the old override did, breaking
-  // `assert_nil column.type`). The declared `string` keeps the schema dumper's
-  // non-null ColumnInfo contract: the dump path only ever sees the coalesced
-  // (never-nil) ColumnInfo from `SchemaSource.columns()`, while the reflection
-  // path (`columnsHash()[...].type`) passes the real nil straight through.
-  override get type(): string {
-    return super.type as string;
+  // `assert_nil column.type`). The declared `string | null` tells the truth
+  // rather than casting the runtime nil away, so callers must null-guard. The
+  // schema dumper never sees this nil at runtime: the dump path only reads the
+  // coalesced (never-nil) ColumnInfo from `SchemaSource.columns()`, while the
+  // reflection path (`columnsHash()[...].type`) passes the real nil through.
+  override get type(): string | null {
+    return super.type;
   }
 
   // Mirrors Rails Column#serial? — returns the stored flag, which the adapter
