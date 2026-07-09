@@ -30,43 +30,25 @@ export class Map {
   }
 
   typeForAttribute(name: string): Type {
-    // The resolved type already carries any NormalizedValueType decoration:
-    // `normalizes` decorates the attribute's cast type in `_attributeDefinitions`
-    // (single read+write decoration path), so no query-side re-wrap is needed.
+    // The resolved type already carries every decoration (NormalizedValueType,
+    // Serialized, EncryptedAttributeType): `_baseTypeForAttribute` delegates to
+    // `klass.typeForAttribute`, which resolves through the decorated default
+    // attribute set, so no query-side re-wrap is needed.
     return this._baseTypeForAttribute(name);
   }
 
   private _baseTypeForAttribute(name: string): Type {
     const klass = this._klass;
 
-    // Prefer O(1) lookup via _attributeDefinitions (avoids building full attributeTypes object)
-    const attributeDefinitions = klass._attributeDefinitions;
-    if (attributeDefinitions) {
-      const definition =
-        attributeDefinitions instanceof globalThis.Map
-          ? attributeDefinitions.get(name)
-          : attributeDefinitions?.[name];
-      if (definition) {
-        const type =
-          typeof definition === "object" && definition !== null && "type" in definition
-            ? definition.type
-            : definition;
-        if (type) return type as Type;
-      }
-    }
-
-    // Fallback to attributeTypes (builds full object, O(n))
-    const attributeTypes =
-      typeof klass.attributeTypes === "function" ? klass.attributeTypes() : klass.attributeTypes;
-    if (attributeTypes) {
-      const type =
-        attributeTypes instanceof globalThis.Map ? attributeTypes.get(name) : attributeTypes[name];
-      if (type) return type as Type;
-    }
-
-    // Instance-level lookup fallback
+    // Rails' `TypeCaster::Map#type_for_attribute` is a one-line delegation to
+    // `klass.type_for_attribute(name)` (type_caster/map.rb:15-16). Delegating gets
+    // alias resolution, the enum `assertEnumTypeDeclared` guard, and the decorated
+    // default attribute set (`attribute_types`) for free — so pending decorators
+    // (serialize/normalizes/encrypts) are honored on the query side without a
+    // per-feature post-reflection replay onto `_attributeDefinitions`. `ValueType`
+    // is the fallback for non-model `klass` shapes lacking `typeForAttribute`.
     if (typeof klass.typeForAttribute === "function") {
-      return klass.typeForAttribute(name);
+      return klass.typeForAttribute(name) as Type;
     }
 
     return new ValueType();

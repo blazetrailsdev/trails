@@ -31,7 +31,6 @@ import {
   Model,
   MissingAttributeError,
   Type,
-  typeRegistry,
   pushPendingDecorator,
   type AttributeOptions,
   type TransactionalCallbackConditions,
@@ -330,10 +329,7 @@ import {
   writeStoreAttributeMethod as _writeStoreAttributeMethod,
   storeAccessorForMethod as _storeAccessorForMethod,
 } from "./store.js";
-import {
-  serialize as _serializeAttribute,
-  applyPendingSerializations as _applyPendingSerializations,
-} from "./serialize.js";
+import { serialize as _serializeAttribute } from "./serialize.js";
 import { YAMLColumn as _YAMLColumn } from "./coders/yaml-column.js";
 
 // Break store→serialize→json→store circular dep by injecting serialize into store at init.
@@ -1234,9 +1230,15 @@ export class Base extends Model {
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
       delete (this.prototype as any).id;
     }
+    // Encryption still needs a post-reflection pass: `registerEncryptedType`
+    // defers pushing its `decorateAttributes` decorator until the column is
+    // reflected (it threads the column default into the EncryptedAttributeType),
+    // and this hook also installs the frozen-encryption validator / column-size
+    // checks. `normalizes` / `serialize` push their durable decorator eagerly at
+    // declaration, so — now that `type_for_attribute` / `TypeCaster::Map` resolve
+    // through `attribute_types` (the decorated default attribute set) — they need
+    // no per-feature `_attributeDefinitions` replay here.
     encryptionHooks.applyPendingEncryptions(this);
-    this.applyPendingNormalizations();
-    _applyPendingSerializations(this as unknown as typeof Base);
   }
 
   /**
@@ -1270,7 +1272,16 @@ export class Base extends Model {
     // Rails raises inside enum's `decorate_attributes` block for an enum backed
     // by neither a DB column nor an explicit `attribute` type.
     _EnumModule.assertEnumTypeDeclared(this as unknown as typeof Base, resolved);
-    return (this._attributeDefinitions as any)?.get(resolved)?.type ?? typeRegistry.lookup("value");
+    // Resolve through the decorated default attribute set — Rails'
+    // `attribute_types[name]` is `_default_attributes.cast_types[name]` with a
+    // `Type.default_value` hash default (attribute_registration.rb:43-50). The set
+    // replays every pending decorator (serialize/normalizes/encrypts) onto the
+    // reflected column type, so query-side decorations are honored without a
+    // per-feature post-reflection replay onto `_attributeDefinitions`. Read the
+    // single attribute (O(1), and `getAttribute` returns a `value`-typed Null for
+    // an unknown name) rather than `attributeTypes()`, which rebuilds the whole
+    // cast-types record + Proxy on every call — this is a hot per-bind path.
+    return this._defaultAttributes().getAttribute(resolved).type;
   }
 
   /**

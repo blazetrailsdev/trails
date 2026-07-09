@@ -24,7 +24,6 @@ import { modelRegistry } from "./associations.js";
 import { realPool } from "./connection-adapters/abstract/connection-pool.js";
 import { TableNotSpecified } from "./errors.js";
 import { encryptionHooks } from "./encryption-hooks.js";
-import { applyPendingSerializations } from "./serialize.js";
 import { isWrappedType } from "./encryption/wrapped-type.js";
 import { FakePool, SchemaReflection } from "./connection-adapters/schema-cache.js";
 import { threadedConnectionFor, connectionPool } from "./connection-handling.js";
@@ -1147,12 +1146,12 @@ function applyColumnsHash(
   invalidate(host, { deleteOwn: false });
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
 
+  // Encryption still needs a post-reflection pass (`registerEncryptedType`
+  // defers pushing its decorator until the column reflects, to thread the column
+  // default). `normalizes` / `serialize` push their durable decorator eagerly, so
+  // — now that `type_for_attribute` / `TypeCaster::Map` resolve through
+  // `attribute_types` — no per-feature `_attributeDefinitions` replay is needed.
   encryptionHooks.applyPendingEncryptions(host);
-  // Re-apply normalization decorators now that columns are reflected, so the
-  // query-side type lookup (`type_for_attribute` / `TypeCaster::Map`) sees the
-  // decorated cast type. Mirrors the `applyPendingEncryptions` replay above.
-  (host as { applyPendingNormalizations?(): void }).applyPendingNormalizations?.();
-  applyPendingSerializations(host as unknown as typeof Base);
 
   // Now the DB column set is authoritative: re-run the ignoreCase
   // `original_<name>` requirement so a genuinely absent column raises even when
@@ -1189,8 +1188,6 @@ function applyColumnsHash(
     }
     originatingHost._attributeDefinitions = baseDefs;
     encryptionHooks.applyPendingEncryptions(originatingHost);
-    (originatingHost as { applyPendingNormalizations?(): void }).applyPendingNormalizations?.();
-    applyPendingSerializations(originatingHost as unknown as typeof Base);
     // Recompute the reflected column set against the subclass's own
     // `ignoredColumns` — an STI subclass may ignore a different set than its
     // base, so reusing the base's `reflectedColumnNames` could check against the

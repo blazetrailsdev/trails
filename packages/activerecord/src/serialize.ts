@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { type Type, ArgumentError, resetDefaultAttributes } from "@blazetrails/activemodel";
+import { type Type, ArgumentError } from "@blazetrails/activemodel";
 import { Json } from "./type/json.js";
 import { Serialized, type Coder } from "./type/serialized.js";
 import {
@@ -164,81 +164,10 @@ export function serialize(
     return new Serialized(subtype, coder);
   };
 
-  // Track the coder so `applyPendingSerializations` can re-wrap the reflected DB
-  // type once columns load: `decorateAttributes` replays into the default
-  // attribute set, but the raw `_attributeDefinitions` store that
-  // `type_for_attribute` / `TypeCaster::Map` read is only decorated for columns
-  // already reflected at declaration time. Without the replay a `serialize`d
-  // column resolves to its bare DB type on the query side, so `where` binds the
-  // un-encoded value instead of the coder's payload. Mirrors AR's
-  // `applyPendingNormalizations` / `applyPendingEncryptions` post-reflection hooks.
-  registerColumnSerializer(modelClass, attribute, coder, decorator);
-
+  // `decorateAttributes` pushes a durable pending decorator that replays on every
+  // `_defaultAttributes` rebuild, so the query-side lookup (`type_for_attribute` /
+  // `TypeCaster::Map`), which now resolves through `attribute_types` (the decorated
+  // default attribute set), sees the `Serialized` cast type once columns reflect —
+  // no per-feature `_attributeDefinitions` replay needed.
   modelClass.decorateAttributes([attribute], decorator);
-}
-
-interface SerializerEntry {
-  coder: Coder;
-  decorator: (name: string, castType: Type) => Type;
-}
-
-function columnSerializers(modelClass: typeof Base): Map<string, SerializerEntry> {
-  const cls = modelClass as unknown as { _columnSerializers?: Map<string, SerializerEntry> };
-  // Fork per-class (copying the parent's entries) so a subclass `serialize` never
-  // mutates the shared base map — mirrors `_normalizations`' own-property guard.
-  if (!Object.prototype.hasOwnProperty.call(modelClass, "_columnSerializers")) {
-    const parent = Object.getPrototypeOf(modelClass) as {
-      _columnSerializers?: Map<string, SerializerEntry>;
-    };
-    cls._columnSerializers = new Map(parent?._columnSerializers ?? undefined);
-  }
-  return cls._columnSerializers!;
-}
-
-function registerColumnSerializer(
-  modelClass: typeof Base,
-  attribute: string,
-  coder: Coder,
-  decorator: (name: string, castType: Type) => Type,
-): void {
-  columnSerializers(modelClass).set(attribute, { coder, decorator });
-}
-
-/**
- * Re-apply serialize decorators onto `_attributeDefinitions` once columns are
- * reflected, so the query-side lookup (`type_for_attribute`, `TypeCaster::Map`)
- * sees the `Serialized` cast type. Mirrors AR's `applyPendingNormalizations`
- * replay — mutates `_attributeDefinitions` directly rather than routing through
- * `decorateAttributes` (whose durable pending decorator already replays on every
- * `_defaultAttributes` rebuild). The coder-identity guard keeps it idempotent.
- *
- * @internal
- */
-export function applyPendingSerializations(modelClass: typeof Base): void {
-  const cls = modelClass as unknown as {
-    _columnSerializers?: Map<string, SerializerEntry>;
-    _attributeDefinitions?: Map<string, { name: string; type: Type }>;
-  };
-  const serializers = cls._columnSerializers;
-  if (!serializers || serializers.size === 0) return;
-  const defs = cls._attributeDefinitions;
-  if (!defs) return;
-  let mutated = false;
-  for (const [name, entry] of serializers) {
-    const def = defs.get(name);
-    if (!def) continue; // column not reflected yet; re-invoked once it appears
-    // The decorator returns the same type reference when it's already wrapped by
-    // this coder (idempotency guard), so this both no-ops the applied case and
-    // re-wraps a freshly-reflected raw column.
-    const newType = entry.decorator(name, def.type);
-    if (newType === def.type) continue;
-    if (!Object.prototype.hasOwnProperty.call(modelClass, "_attributeDefinitions")) {
-      cls._attributeDefinitions = new Map(defs);
-    }
-    cls._attributeDefinitions!.set(name, { ...def, type: newType });
-    mutated = true;
-  }
-  if (mutated) {
-    resetDefaultAttributes(modelClass as any);
-  }
 }

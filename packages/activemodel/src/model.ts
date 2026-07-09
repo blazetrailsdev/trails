@@ -101,7 +101,6 @@ import {
   decorateAttributes,
   pendingAttributeModifications as _pendingAttributeModificationsHelper,
   resetDefaultAttributesBang as _resetDefaultAttributesBangHelper,
-  resetDefaultAttributes as _resetDefaultAttributesHelper,
   resolveAttributeName as _resolveAttributeNameHelper,
   resolveTypeName as _resolveTypeNameHelper,
   hookAttributeType as _hookAttributeTypeHelper,
@@ -405,8 +404,10 @@ export class Model {
       this.decorateAttributes([attr], this._normalizationDecorator(attr));
     }
     // AR reflects columns after the class body runs, so at declaration time the
-    // decorate above no-ops on a not-yet-reflected column. `applyPendingNormalizations`
-    // re-runs once the column appears (wired next to `applyPendingEncryptions`).
+    // immediate `_attributeDefinitions` apply above no-ops on a not-yet-reflected
+    // column — but `decorateAttributes` also pushed a durable pending decorator
+    // that replays on every `_defaultAttributes` rebuild, so the reflected column
+    // is decorated in the default attribute set that `type_for_attribute` reads.
 
     // Rails' ActiveRecord::Normalization registers
     // `before_validation :normalize_changed_in_place_attributes` at include
@@ -460,9 +461,9 @@ export class Model {
   }
 
   /**
-   * Build the idempotent NormalizedValueType decorator for `name`. Reused by
-   * `normalizes` (immediate apply + pending replay) and `applyPendingNormalizations`
-   * (post-reflection). The `_normalizations` entry object is the identity token:
+   * Build the idempotent NormalizedValueType decorator for `name`, used by
+   * `normalizes` (immediate apply + durable pending replay via `decorateAttributes`).
+   * The `_normalizations` entry object is the identity token:
    * a decorator returns `null` (no change) when the cast type is already wrapped
    * with the SAME entry, and unwraps+rewraps when a different/older one is found
    * (so subclass stacking replaces the parent's wrap with the fuller combined set).
@@ -485,45 +486,6 @@ export class Model {
       };
       return normalizedValueType(base, normalizer, entry.applyToNil, entry);
     };
-  }
-
-  /**
-   * Re-apply normalization decorators onto `_attributeDefinitions` once columns
-   * are reflected — the query-side lookup (`type_for_attribute`, `TypeCaster::Map`)
-   * reads that store. Mirrors AR's `applyPendingEncryptions` replay.
-   *
-   * Unlike `normalizes` this mutates `_attributeDefinitions` DIRECTLY rather than
-   * routing through `decorateAttributes`: the durable `PendingDecorator` that
-   * `normalizes` already pushed replays on every `_defaultAttributes` rebuild, so
-   * pushing another one here would grow `_pendingAttributeModifications` without
-   * bound each time a schema reload resets a column's type back to raw. The
-   * `_normalizationDecorator` token guard keeps this idempotent and no-op once the
-   * stored type already carries the decoration.
-   *
-   * @internal
-   */
-  static applyPendingNormalizations(): void {
-    if (!this._normalizations || this._normalizations.size === 0) return;
-    const defs = this._attributeDefinitions;
-    if (!defs) return;
-    let mutated = false;
-    for (const [name, entry] of this._normalizations) {
-      const def = defs.get(name);
-      if (!def) continue; // column not reflected yet; re-invoked once it appears
-      if (normalizedValueToken(def.type) === entry) continue; // already applied
-      const newType = this._normalizationDecorator(name)(name, def.type);
-      if (!newType) continue; // decorator declined (already decorated by this entry)
-      if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
-        this._attributeDefinitions = new Map(defs);
-      }
-      this._attributeDefinitions.set(name, { ...def, type: newType });
-      mutated = true;
-    }
-    // Invalidate the cached default AttributeSet (and subclasses') so the next
-    // rebuild seeds from the freshly-decorated `_attributeDefinitions`.
-    if (mutated) {
-      _resetDefaultAttributesHelper(this as unknown as AttributeHostInternals);
-    }
   }
 
   /**
