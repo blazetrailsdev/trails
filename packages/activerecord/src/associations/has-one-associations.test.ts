@@ -7,7 +7,7 @@
  * `Account` models and the `companies`/`accounts` fixtures. No `defineSchema`.
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
+import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
@@ -39,7 +39,7 @@ import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Developer } from "../test-helpers/models/developer.js";
+import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Room } from "../test-helpers/models/room.js";
 import { User } from "../test-helpers/models/user.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -98,6 +98,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel(Author);
     registerModel(Post);
     registerModel(Developer);
+    registerModel(AuditLog);
     registerModel(Room);
     registerModel(User);
     await Company.loadSchema();
@@ -219,9 +220,12 @@ describe("HasOneAssociationsTest", () => {
     // (employable) — polymorphic has_one feature gap.
   });
 
-  it.skip("nullification on destroyed association", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Developer.create triggers a before_create that builds an
-    // `auditLogs` association whose `AuditLog` model is not ported/registered.
+  it("nullification on destroyed association", async () => {
+    const developer = await Developer.create({ name: "Someone" });
+    const ship = await Ship.create({ name: "Planet Caravan", developer });
+    await ship.destroy();
+    expect(ship.isPersisted()).toBe(false);
+    expect(developer.isPersisted()).toBe(false);
   });
 
   it.skip("nullification on cpk association", () => {
@@ -345,8 +349,24 @@ describe("HasOneAssociationsTest", () => {
     expect(await readHasOne(firm, "account")).not.toBeNull();
   });
 
-  it.skip("restrict with error with locale", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): requires I18n backend translation lookup.
+  it("restrict with error with locale", async () => {
+    I18n.storeTranslations("en", {
+      activerecord: { attributes: { restricted_with_error_firm: { account: "firm account" } } },
+    });
+    try {
+      const firm = (await RestrictedWithErrorFirm.create({ name: "restrict" })) as any;
+      await firm.createAccount({ credit_limit: 10 });
+      expect(await readHasOne(firm, "account")).not.toBeNull();
+      await firm.destroy();
+      expect(firm.errors.where("base").length).toBeGreaterThan(0);
+      expect(firm.errors.messagesFor("base")[0]).toBe(
+        "Cannot delete record because a dependent firm account exists",
+      );
+      expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBe(true);
+      expect(await readHasOne(firm, "account")).not.toBeNull();
+    } finally {
+      I18n.reset();
+    }
   });
 
   it("successful build association", async () => {
@@ -428,9 +448,17 @@ describe("HasOneAssociationsTest", () => {
     expect((error as RecordNotSaved).record).toBe(firm);
   });
 
-  it.skip("clearing an association clears the associations inverse", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): `post.update({ author: null })` does not nullify the belongs_to
-    // foreign key — belongs_to association assignment via update is a gap.
+  it("clearing an association clears the associations inverse", async () => {
+    const author = (await Author.create({ name: "Jimmy Tolkien" })) as any;
+    const post = await author.createPost({ title: "The silly medallion", body: "" });
+    expect((await readHasOne(author, "post")).id).toBe(post.id);
+    expect((await post.association("author").loadTarget()).id).toBe(author.id);
+
+    await post.update({ author: null });
+    expect(await post.association("author").loadTarget()).toBeNull();
+
+    await author.update({ name: "J.R.R. Tolkien" });
+    expect(await post.association("author").loadTarget()).toBeNull();
   });
 
   it("create association with bang", async () => {
@@ -474,8 +502,30 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(odegy, "account")).credit_limit).toBe(80);
   });
 
-  it.skip("reload association with query cache", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): requires connection query cache (enable_query_cache!).
+  it("reload association with query cache", async () => {
+    const odegyId = (companies("odegy") as any).id;
+
+    const connection = (await Base.leaseConnection()) as any;
+    connection.enableQueryCacheBang();
+    connection.clearQueryCache();
+
+    // Populate the cache with a query
+    const odegy = (await Company.find(odegyId)) as any;
+    // Populate the cache with a second query
+    await readHasOne(odegy, "account");
+
+    expect(connection.queryCache!.size).toBe(2);
+
+    // Clear the cache and fetch the account again, populating the cache with a query
+    await assertQueriesCount(1, false, async () => {
+      await odegy.reloadAccount();
+    });
+
+    // This query is not cached anymore, so it should make a real SQL query
+    await assertQueriesCount(1, false, async () => {
+      await Company.find(odegyId);
+    });
+    connection.disableQueryCacheBang();
   });
 
   it("reset association", async () => {
@@ -546,9 +596,10 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it.skip("assignment before child saved", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): trails defers has_one writer persistence to the owner's save,
-    // so `firm.account = Account.new(...)` does not immediately persist the
-    // child (Rails persists on assignment to a saved owner).
+    // BLOCKED (tracked: d2-has-one-assignment-before-child-saved): trails defers has_one
+    // writer persistence to the owner's save, so `firm.account = Account.new(...)` does
+    // not immediately persist the child (Rails persists on assignment to a saved owner).
+    // The JS property setter cannot `await` the immediate-persist path.
   });
 
   it("save still works after accessing nil has one", async () => {
