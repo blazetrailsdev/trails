@@ -269,10 +269,8 @@ export class SchemaDumper extends BaseSchemaDumper {
       // (schema_dumper.rb:196), raising on an unmapped/composite type whose
       // DSL type is nil so `valid_type?` is false. This includes the PK column.
       for (const col of columns) {
-        if (!this.validType((col as Column).type)) {
-          const err = new Error(
-            `Unknown type '${(col as Column).sqlType ?? ""}' for column '${col.name}'`,
-          );
+        if (!this.validType(col.type)) {
+          const err = new Error(`Unknown type '${col.sqlType ?? ""}' for column '${col.name}'`);
           // Rails raises a StandardError; surface that class in the comment.
           err.name = "StandardError";
           throw err;

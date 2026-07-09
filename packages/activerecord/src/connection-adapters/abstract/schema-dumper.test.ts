@@ -153,4 +153,22 @@ describe("SchemaDumper raises on a column whose type is not a valid native type"
     expect(output).not.toContain("createTable");
     expect(output).not.toContain('t.column("kind"');
   });
+
+  it("still dumps the table normally when every column type is a valid native type", async () => {
+    // The valid_type? gate must not over-reject: a table whose columns all map
+    // to native types dumps its create_table body unchanged.
+    const validSource = {
+      tables: () => ["widgets"],
+      columns: (_t: string) => [
+        { name: "id", type: "integer", sqlType: "integer", primaryKey: true },
+        { name: "name", type: "string", sqlType: "varchar(255)", limit: 255 },
+      ],
+      indexes: (_t: string) => [],
+      isValidType: (type: string | null | undefined) => type === "integer" || type === "string",
+    };
+    const output = await SchemaDumper.dump(validSource as any);
+    expect(output).not.toContain("# Could not dump table");
+    expect(output).toContain(`await ctx.createTable("widgets"`);
+    expect(output).toContain(`t.string("name"`);
+  });
 });
