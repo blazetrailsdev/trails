@@ -27,6 +27,7 @@ import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { ConfigurationError } from "../errors.js";
 import { AliasTracker } from "./alias-tracker.js";
+import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
  * Identity-cache key for a no-primary-key node. Rails uses `id = keys.map { nil }`
@@ -179,10 +180,32 @@ export class JoinDependency {
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
     this._baseAlias = (baseModel as any).tableName;
-    this._aliasTracker = new AliasTracker(undefined, new Map([[this._baseAlias, 1]]));
+    this._aliasTracker = new AliasTracker(
+      this._baseTableAliasLength(),
+      new Map([[this._baseAlias, 1]]),
+    );
     const baseTable = (baseModel as any).arelTable;
     this._joinRoot = new JoinBase(baseModel, baseTable);
     this._joinType = joinType ?? Nodes.OuterJoin;
+  }
+
+  /**
+   * The base model's connection `table_alias_length`, used to cap alias
+   * truncation. Rails always builds the tracker inside `pool.with_connection`
+   * (alias_tracker.rb:24), so the cap is the connection's value — 256 on MySQL,
+   * 63 on PostgreSQL, 64 (default) on SQLite. Prefer the connection threaded by
+   * the enclosing `withConnection` wrap over the deprecated `.connection`
+   * getter (which flips the lease permanent under a restricted checkout mode);
+   * returns `undefined` when no connection resolves, letting the tracker fall
+   * back to its default.
+   * @internal
+   */
+  private _baseTableAliasLength(): number | undefined {
+    const connection =
+      threadedConnectionFor(this._baseModel) ?? (this._baseModel as any).connection;
+    return typeof connection?.tableAliasLength === "function"
+      ? connection.tableAliasLength()
+      : undefined;
   }
 
   /**
@@ -666,7 +689,10 @@ export class JoinDependency {
     if (aliasTracker) {
       this._aliasTracker = aliasTracker;
     } else {
-      this._aliasTracker = new AliasTracker(undefined, new Map([[this._baseAlias, 1]]));
+      this._aliasTracker = new AliasTracker(
+        this._baseTableAliasLength(),
+        new Map([[this._baseAlias, 1]]),
+      );
     }
     // Clear each through-group's resolved flag so this fresh emit re-resolves
     // aliases from scratch. Cover the `joinsToAdd` (stashed/merged) roots too:
