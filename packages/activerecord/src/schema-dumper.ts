@@ -35,9 +35,10 @@ async function loadSchemaIntrospection(): Promise<typeof SchemaIntrospectionModu
 export interface ColumnInfo {
   name: string;
   /**
-   * DSL cast type (`"string"`, `"integer"`, `"datetime"` …) — what `schemaType`
-   * reads. Nil for an unmapped `sql_type` (e.g. a composite OID), mirroring
-   * Rails' `Column#type` `allow_nil: true`; `schemaType` coalesces it.
+   * DSL cast type (`"string"`, `"integer"`, `"datetime"` …) — what `schemaType` reads.
+   * `null` for an unmapped/composite `sqlType` (Rails' `SqlTypeMetadata#type` is nil);
+   * the dumper rejects such a column via `validType?` and emits the "Could not dump
+   * table" comment rather than fabricating a type.
    */
   type: string | null;
   /**
@@ -244,8 +245,11 @@ class AdapterSchemaSource implements SchemaSource {
         name: col.name,
         // Carry the dsl cast type in `type` and the raw SQL type in `sqlType`.
         // schemaType/schemaLimit/schemaPrecision read the dsl type off `type`
-        // and inspect the raw declaration off `sqlType`.
-        type: col.type || col.sqlType || "unknown",
+        // and inspect the raw declaration off `sqlType`. A nil dsl type
+        // (unmapped/composite sqlType) flows through as null so the dumper's
+        // `validType?` check rejects it — mirroring Rails, which raises rather
+        // than coalescing to the raw sqlType name.
+        type: col.type ?? null,
         sqlType: col.sqlType ?? undefined,
         primaryKey: col.primaryKey,
         null: col.null,
