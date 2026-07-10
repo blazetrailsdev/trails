@@ -218,14 +218,12 @@ export class CpkOrder extends Base {
     this.hasMany("orderAgreements", {
       className: "CpkOrderAgreement",
       foreignKey: "order_id",
-      primaryKey: "id",
     });
     this.hasMany("books", { className: "CpkBook", foreignKey: ["shop_id", "order_id"] });
     this.hasOne("book", { className: "CpkBook", foreignKey: ["shop_id", "order_id"] });
     this.hasMany("orderTags", {
       className: "CpkOrderTag",
       foreignKey: "order_id",
-      primaryKey: "id",
     });
     this.hasMany("tags", { className: "CpkTag", through: "orderTags" });
   }
@@ -283,7 +281,7 @@ export class CpkOrderWithPrimaryKeyAssociatedBook extends CpkOrder {
 
   static _demodulizedName = "OrderWithPrimaryKeyAssociatedBook";
   static {
-    this.hasOne("book", { className: "CpkBook", foreignKey: "order_id", primaryKey: "id" });
+    this.hasOne("book", { className: "CpkBook", foreignKey: "order_id" });
   }
 }
 

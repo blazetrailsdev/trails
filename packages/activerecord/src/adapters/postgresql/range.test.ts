@@ -298,14 +298,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(result.excludeEnd).toBe(true);
     });
     it("range schema dump", async () => {
+      // postgresql_ranges carries the user-defined `floatrange`/`stringrange`
+      // domains, whose DSL type is unmapped (not in native_database_types). Rails
+      // reflects them as OID::Range(:floatrange) and `valid_type?(:floatrange)` is
+      // false, so SchemaDumper#table raises and discards the whole create_table
+      // body in favor of the "Could not dump table" comment (schema_dumper.rb:196,
+      // 220-224) rather than fabricating a `t.column "float_range", "floatrange"`.
       const output = await SchemaDumper.dumpTableSchema(adapter, "postgresql_ranges");
-      expect(output).toContain('t.int4range("int4_range"');
-      expect(output).toContain('t.int8range("int8_range"');
-      expect(output).toContain('t.numrange("num_range"');
-      expect(output).toContain('t.daterange("date_range"');
-      expect(output).toContain('t.tsrange("ts_range"');
-      expect(output).toContain('t.tstzrange("tstz_range"');
-      expect(output).not.toContain('t.column("int4_range"');
+      expect(output).toContain(
+        '# Could not dump table "postgresql_ranges" because of following StandardError',
+      );
+      expect(output).toContain("#   Unknown type 'floatrange' for column 'float_range'");
+      expect(output).not.toContain('t.column("float_range"');
+      expect(output).not.toContain('t.int4range("int4_range"');
     });
     it("range migration", async () => {
       await adapter.exec(`DROP TABLE IF EXISTS range_migration_test`);

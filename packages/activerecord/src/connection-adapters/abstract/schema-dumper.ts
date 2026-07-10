@@ -58,19 +58,41 @@ export interface SchemaDumperMixinHost {
   formatColspec(colspec: Record<string, unknown>): string;
   indexesInCreate(tableName: string, lines: string[], indexes?: IndexInfo[]): void;
   _isDslHelper(dslType: string): boolean;
+  validType(type: string | null | undefined): boolean;
+  emitTableBody(
+    lines: string[],
+    tableName: string,
+    columns: ColumnInfo[],
+    indexes: IndexInfo[],
+    adapterTableOpts?: Record<string, unknown>,
+    inlineConstraints?: string[],
+  ): void;
+  /** @internal */
   columnSpec(column: Column): [string, Record<string, unknown>];
+  /** @internal */
   columnSpecForPrimaryKey(column: Column): Record<string, unknown>;
+  /** @internal */
   prepareColumnOptions(column: Column): Record<string, unknown>;
+  /** @internal */
   isDefaultPrimaryKey(column: Column): boolean;
+  /** @internal */
   isExplicitPrimaryKeyDefault(column: Column): boolean;
+  /** @internal */
   schemaTypeWithVirtual(column: Column): string;
+  /** @internal */
   schemaType(column: Column): string;
   isBigint(column: Column): boolean;
+  /** @internal */
   schemaLimit(column: Column): string | undefined;
+  /** @internal */
   schemaPrecision(column: Column): string | undefined;
+  /** @internal */
   schemaScale(column: Column): string | undefined;
+  /** @internal */
   schemaDefault(column: Column): string | undefined;
+  /** @internal */
   schemaExpression(column: Column): string | undefined;
+  /** @internal */
   schemaCollation(column: Column): string | undefined;
 }
 
@@ -142,12 +164,9 @@ export function schemaTypeWithVirtual(this: SchemaDumperMixinHost, column: Colum
 /** @internal */
 export function schemaType(this: SchemaDumperMixinHost, column: Column): string {
   if (this.isBigint(column)) return "bigint";
-  // Column#type is nil for an unmapped sql_type (e.g. a composite OID),
-  // mirroring Rails' `allow_nil: true`. Fall back to the raw sql_type so the
-  // dump still round-trips (RFC 0056) rather than masking the nil as "". The
-  // coalesced `AdapterSchemaSource.columns()` shape is never-nil at runtime,
-  // so this guard only fires for a raw adapter dumped directly as SchemaSource.
-  return column.type ?? column.sqlType ?? "unknown";
+  // `column.type` is non-null here: `emitTable` runs `validType?` over every
+  // column first and raises on a nil type, so a null never reaches schemaType.
+  return column.type ?? "";
 }
 
 /**
@@ -241,6 +260,20 @@ export function schemaCollation(this: SchemaDumperMixinHost, column: Column): st
 }
 
 /**
+ * Mirrors `abstract_adapter.rb:262` `valid_type?` — `!native_database_types[type]`.
+ * Delegates to the backing adapter's `isValidType`; raw/mock sources without an
+ * adapter can't validate a type map, so they accept (the pre-raise behavior).
+ * @internal
+ */
+export function validType(this: SchemaDumperMixinHost, type: string | null | undefined): boolean {
+  const adapter = this._adapter();
+  if (adapter && typeof adapter.isValidType === "function") {
+    return adapter.isValidType(type);
+  }
+  return true;
+}
+
+/**
  * The single `emitTable`, routed through `columnSpec` so per-dialect
  * `prepareColumnOptions` overrides (schemaType, schemaLimit, schemaPrecision,
  * schemaDefault, etc.) take effect. Mirrors the column-emission half of Rails'
@@ -248,9 +281,48 @@ export function schemaCollation(this: SchemaDumperMixinHost, column: Column): st
  * mixed-in method. Every dump reaches it — the single dumper class assigns this
  * onto its prototype, including the in-memory MigrationContext and mock-source
  * paths.
+ *
+ * Builds into a local buffer so a raise mid-table discards the partial
+ * `create_table` body (Rails writes into its own `tbl` StringIO and only prints
+ * it on success — schema_dumper.rb:220-224). On any error we emit the "Could
+ * not dump table" comment instead of the table.
  * @internal
  */
 export function emitTable(
+  this: SchemaDumperMixinHost,
+  lines: string[],
+  tableName: string,
+  columns: ColumnInfo[],
+  indexes: IndexInfo[],
+  adapterTableOpts: Record<string, unknown> = {},
+  inlineConstraints: string[] = [],
+): void {
+  const body: string[] = [];
+  try {
+    // Rails validates every column's type before emitting the body
+    // (schema_dumper.rb:196), raising on an unmapped/composite type whose
+    // DSL type is nil so `valid_type?` is false. This includes the PK column.
+    for (const col of columns) {
+      if (!this.validType(col.type)) {
+        const err = new Error(`Unknown type '${col.sqlType ?? ""}' for column '${col.name}'`);
+        // Rails raises a StandardError; surface that class in the comment.
+        err.name = "StandardError";
+        throw err;
+      }
+    }
+    this.emitTableBody(body, tableName, columns, indexes, adapterTableOpts, inlineConstraints);
+  } catch (e) {
+    const cls = e instanceof Error ? e.name : "StandardError";
+    const message = e instanceof Error ? e.message : String(e);
+    lines.push(`# Could not dump table ${JSON.stringify(tableName)} because of following ${cls}`);
+    lines.push(`#   ${message}`);
+    return;
+  }
+  for (const line of body) lines.push(line);
+}
+
+/** @internal */
+export function emitTableBody(
   this: SchemaDumperMixinHost,
   lines: string[],
   tableName: string,

@@ -15,58 +15,6 @@ function detectAdapter(adapter: DatabaseAdapter): "sqlite" | "postgres" | "mysql
 }
 
 /**
- * Normalize a SQLite default value expression.
- * PRAGMA table_info returns SQL expressions like 'foo', 0, NULL, CURRENT_TIMESTAMP.
- */
-function normalizeSqliteDefault(raw: unknown): unknown {
-  if (raw === null || raw === undefined) return undefined;
-  const str = String(raw);
-
-  // String literal: 'value' or 'it''s'
-  const strMatch = str.match(/^'((?:[^']|'')*)'$/);
-  if (strMatch) {
-    return strMatch[1].replace(/''/g, "'");
-  }
-
-  if (str === "NULL") return undefined;
-  if (str === "TRUE" || str === "true") return true;
-  if (str === "FALSE" || str === "false") return false;
-  if (/^-?\d+(\.\d+)?$/.test(str)) return Number(str);
-
-  // Expression defaults (CURRENT_TIMESTAMP, etc.) — omit to avoid mis-quoting on reload
-  return undefined;
-}
-
-/**
- * Normalize a Postgres default value expression.
- * Only emit literal defaults; omit expression defaults (nextval, now(), etc.)
- * to avoid semantic changes on schema round-trip.
- */
-function normalizePgDefault(raw: unknown): unknown {
-  if (raw === null || raw === undefined) return undefined;
-  const str = String(raw);
-
-  // String literal with type cast: 'value'::type
-  const strMatch = str.match(/^'((?:[^']|'')*)'(?:::[\w\s."[\](),]+)*$/);
-  if (strMatch) {
-    return strMatch[1].replace(/''/g, "'");
-  }
-
-  // Numeric literal with optional cast: 42::integer, (3.14)::numeric
-  const numMatch = str.match(/^\(?(-?\d+(?:\.\d+)?)\)?(?:::[\w\s."[\](),]+)*$/);
-  if (numMatch) {
-    return Number(numMatch[1]);
-  }
-
-  if (str === "true") return true;
-  if (str === "false") return false;
-  if (str === "NULL::*" || str === "NULL") return undefined;
-
-  // Expression defaults (nextval(...), now(), gen_random_uuid(), etc.) — omit
-  return undefined;
-}
-
-/**
  * Adapter-backed SchemaSource for use with SchemaDumper.
  * Queries the actual database for table, column, and index info.
  * Supports SQLite and Postgres.
@@ -109,51 +57,26 @@ export class AdapterSchemaSource implements SchemaSource {
     if (t === "mysql") {
       throw new Error("MySQL schema introspection is not yet supported by AdapterSchemaSource.");
     }
-
-    if (t === "postgres") {
-      // Use format_type for precise types (handles enums, domains, arrays)
-      const rows = await this.adapter.execute(
-        `SELECT a.attname AS column_name,
-                pg_catalog.format_type(a.atttypid, a.atttypmod) AS data_type,
-                NOT a.attnotnull AS is_nullable,
-                pg_get_expr(d.adbin, d.adrelid) AS column_default,
-                CASE WHEN a.atttypid = 1043 AND a.atttypmod > 0 THEN a.atttypmod - 4 ELSE NULL END AS character_maximum_length,
-                CASE WHEN a.atttypid IN (1700) AND a.atttypmod > 0 THEN ((a.atttypmod - 4) >> 16) & 65535 ELSE NULL END AS numeric_precision,
-                CASE WHEN a.atttypid IN (1700) AND a.atttypmod > 0 THEN (a.atttypmod - 4) & 65535 ELSE NULL END AS numeric_scale
-         FROM pg_attribute a
-         LEFT JOIN pg_attrdef d ON a.attrelid = d.adrelid AND a.attnum = d.adnum
-         WHERE a.attrelid = ?::regclass AND a.attnum > 0 AND NOT a.attisdropped
-         ORDER BY a.attnum`,
-        [tableName],
-      );
-      const pkRows = await this.adapter.execute(
-        `SELECT a.attname FROM pg_index i
-         JOIN pg_attribute a ON a.attrelid = i.indrelid AND a.attnum = ANY(i.indkey)
-         WHERE i.indrelid = ?::regclass AND i.indisprimary`,
-        [tableName],
-      );
-      const pkCols = new Set((pkRows as any[]).map((r: any) => r.attname));
-
-      return (rows as any[]).map((r: any) => ({
-        name: r.column_name,
-        type: r.data_type,
-        primaryKey: pkCols.has(r.column_name),
-        null: !!r.is_nullable,
-        default: normalizePgDefault(r.column_default),
-        limit: r.character_maximum_length != null ? Number(r.character_maximum_length) : undefined,
-        precision: r.numeric_precision != null ? Number(r.numeric_precision) : undefined,
-        scale: r.numeric_scale != null ? Number(r.numeric_scale) : undefined,
-      }));
-    }
-
-    // SQLite (PRAGMA doesn't support bind params, so escape the identifier)
-    const rows = await this.adapter.execute(`PRAGMA table_info(${sqliteId(tableName)})`);
-    return (rows as any[]).map((r: any) => ({
-      name: r.name,
-      type: r.type,
-      primaryKey: r.pk > 0,
-      null: r.notnull === 0,
-      default: normalizeSqliteDefault(r.dflt_value),
+    // Delegate to the adapter's own reflection so `type` carries the resolved
+    // DSL cast type (`"integer"`, `"bit_varying"`, …) — not the raw SQL type
+    // string. The dumper's `valid_type?` gate rejects unmapped types, and its
+    // `schema_type`/`schema_default` helpers key off the DSL type, so a raw
+    // `"INTEGER"`/`"character varying"` here would be misread as unmapped and
+    // dumped (or dropped) incorrectly. Mirrors the activerecord
+    // AdapterSchemaSource, which already reflects through `adapter.columns()`.
+    const cols = (await this.adapter.columns(tableName)) as any[];
+    return cols.map((c) => ({
+      name: c.name,
+      type: c.type,
+      sqlType: c.sqlType ?? undefined,
+      primaryKey: c.primaryKey,
+      null: c.null,
+      default: c.default,
+      defaultFunction: c.defaultFunction ?? undefined,
+      limit: c.limit ?? undefined,
+      precision: c.precision === undefined ? undefined : c.precision,
+      scale: c.scale ?? undefined,
+      collation: c.collation ?? undefined,
     }));
   }
 

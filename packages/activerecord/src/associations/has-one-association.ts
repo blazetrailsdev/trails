@@ -5,7 +5,8 @@ import { DeleteRestrictionError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "../reflection.js";
-import { ForeignAssociation } from "./foreign-association.js";
+import { ForeignAssociation, foreignKeyPresentFor } from "./foreign-association.js";
+import type { AssociationReflection } from "../reflection.js";
 import { SingularAssociation } from "./singular-association.js";
 import { polymorphicName } from "../inheritance.js";
 
@@ -189,6 +190,25 @@ export class HasOneAssociation extends SingularAssociation {
     } finally {
       this.target = currentTarget;
     }
+  }
+
+  /**
+   * Whether the target can be fetched for a new-record owner. A vanilla has_one
+   * requires the owner's `active_record_primary_key` to be present
+   * (`ForeignAssociation#foreign_key_present?`, foreign_association.rb:5), so a
+   * new-record owner with its PK assigned (e.g. `Author.new(id: 42)`) can still
+   * load its child. Mirrors `CollectionAssociation#foreignKeyPresent` — the
+   * rich reflection is resolved so a custom-PK owner isn't misreported.
+   *
+   * @internal
+   */
+  protected override foreignKeyPresent(): boolean {
+    const ctor = this.owner.constructor as typeof Base & {
+      _reflectOnAssociation?: (n: string) => unknown;
+    };
+    const reflection = (ctor._reflectOnAssociation?.(this.reflection.name) ??
+      this.reflection) as unknown as AssociationReflection;
+    return foreignKeyPresentFor(reflection, this.owner);
   }
 
   /**

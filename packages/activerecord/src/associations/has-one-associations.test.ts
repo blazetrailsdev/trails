@@ -7,7 +7,7 @@
  * `Account` models and the `companies`/`accounts` fixtures. No `defineSchema`.
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, UnknownAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
@@ -451,9 +451,11 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
-  it.skip("create with inexistent foreign key failing", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): building an Account through `account_with_inexistent_foreign_key`
-    // does not raise UnknownAttributeError for the bad foreign key column.
+  it("create with inexistent foreign key failing", async () => {
+    const firm = await Firm.create({ name: "GlobalMegaCorp" });
+    await expect((firm as any).createAccountWithInexistentForeignKey()).rejects.toThrow(
+      UnknownAttributeError,
+    );
   });
 
   it("reload association", async () => {
@@ -742,13 +744,22 @@ describe("HasOneAssociationsTest", () => {
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
   });
 
-  it.skip("has one autosave with primary key manually set", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): manual-PK autosave on Author/Post — gap.
+  it("has one loading for new record", async () => {
+    const post = await Post.createBang({ author_id: 42, title: "foo", body: "bar" });
+    const author = new Author({ id: 42 });
+    expect((await readHasOne(author, "post")).id).toBe(post.id);
   });
 
-  it.skip("has one loading for new record", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): a new (unsaved) Author with a manually-set id does not load its
-    // has_one post — has_one read on a new record short-circuits to null.
+  it("has one autosave with primary key manually set", async () => {
+    const post = await Post.create({ id: 1234, title: "Some title", body: "Some content" });
+    const author = new Author({ id: 33, name: "Hank Moody" });
+
+    (author as any).post = post;
+    await (author as any).save();
+    await author.reload();
+
+    expect(await readHasOne(author, "post")).not.toBeNull();
+    expect((await readHasOne(author, "post")).id).toBe(post.id);
   });
 
   it("has one relationship cannot have a counter cache", () => {
