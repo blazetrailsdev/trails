@@ -203,14 +203,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * (Mysql2Adapter) may still override for performance.
    */
   async columns(tableName: string): Promise<Column[]> {
-    // Warm the server-version/`isMariadb()` flag before reflecting. It's cold on
-    // a freshly leased connection until getFullVersion() runs, and callers gate
-    // engine-specific behavior on `isMariadb()` after reflecting a table's
-    // columns (e.g. version-conditional test skips). The retired information_schema
-    // columns() path warmed it unconditionally for the same reason (PR #4197);
-    // preserve that now that SHOW FULL FIELDS is the sole path. Memoized, so this
-    // is a no-op after the first call.
-    await this.getDatabaseVersion();
     const fields = await this.columnDefinitions(tableName);
     // newColumnFromField's broader function-default detection calls SHOW CREATE TABLE via the
     // sync createTableInfoFn callback. Pre-fetch once iff any field default falls through the
