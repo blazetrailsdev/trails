@@ -40,7 +40,7 @@ export class SingularAssociation extends Association {
   }
 
   async forceReloadReader(): Promise<Base | null> {
-    await this.reload();
+    await this.reload(true);
     return this.target;
   }
 
