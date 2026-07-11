@@ -7,7 +7,7 @@
  * `Account` models and the `companies`/`accounts` fixtures. No `defineSchema`.
  */
 import { describe, it, expect, beforeAll, beforeEach } from "vitest";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, I18n, UnknownAttributeError } from "@blazetrails/activemodel";
 import { throwAbort } from "@blazetrails/activesupport";
 import {
   Base,
@@ -39,7 +39,7 @@ import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
-import { Developer } from "../test-helpers/models/developer.js";
+import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Room } from "../test-helpers/models/room.js";
 import { User } from "../test-helpers/models/user.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -98,6 +98,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel(Author);
     registerModel(Post);
     registerModel(Developer);
+    registerModel(AuditLog);
     registerModel(Room);
     registerModel(User);
     await Company.loadSchema();
@@ -219,9 +220,12 @@ describe("HasOneAssociationsTest", () => {
     // (employable) — polymorphic has_one feature gap.
   });
 
-  it.skip("nullification on destroyed association", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Developer.create triggers a before_create that builds an
-    // `auditLogs` association whose `AuditLog` model is not ported/registered.
+  it("nullification on destroyed association", async () => {
+    const developer = await Developer.create({ name: "Someone" });
+    const ship = await Ship.create({ name: "Planet Caravan", developer });
+    await ship.destroy();
+    expect(ship.isPersisted()).toBe(false);
+    expect(developer.isPersisted()).toBe(false);
   });
 
   it.skip("nullification on cpk association", () => {
@@ -345,8 +349,24 @@ describe("HasOneAssociationsTest", () => {
     expect(await readHasOne(firm, "account")).not.toBeNull();
   });
 
-  it.skip("restrict with error with locale", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): requires I18n backend translation lookup.
+  it("restrict with error with locale", async () => {
+    I18n.storeTranslations("en", {
+      activerecord: { attributes: { restricted_with_error_firm: { account: "firm account" } } },
+    });
+    try {
+      const firm = (await RestrictedWithErrorFirm.create({ name: "restrict" })) as any;
+      await firm.createAccount({ credit_limit: 10 });
+      expect(await readHasOne(firm, "account")).not.toBeNull();
+      await firm.destroy();
+      expect(firm.errors.where("base").length).toBeGreaterThan(0);
+      expect(firm.errors.messagesFor("base")[0]).toBe(
+        "Cannot delete record because a dependent firm account exists",
+      );
+      expect(await RestrictedWithErrorFirm.exists({ name: "restrict" })).toBe(true);
+      expect(await readHasOne(firm, "account")).not.toBeNull();
+    } finally {
+      I18n.reset();
+    }
   });
 
   it("successful build association", async () => {
@@ -428,9 +448,17 @@ describe("HasOneAssociationsTest", () => {
     expect((error as RecordNotSaved).record).toBe(firm);
   });
 
-  it.skip("clearing an association clears the associations inverse", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): `post.update({ author: null })` does not nullify the belongs_to
-    // foreign key — belongs_to association assignment via update is a gap.
+  it("clearing an association clears the associations inverse", async () => {
+    const author = (await Author.create({ name: "Jimmy Tolkien" })) as any;
+    const post = await author.createPost({ title: "The silly medallion", body: "" });
+    expect((await readHasOne(author, "post")).id).toBe(post.id);
+    expect((await post.association("author").loadTarget()).id).toBe(author.id);
+
+    await post.update({ author: null });
+    expect(await post.association("author").loadTarget()).toBeNull();
+
+    await author.update({ name: "J.R.R. Tolkien" });
+    expect(await post.association("author").loadTarget()).toBeNull();
   });
 
   it("create association with bang", async () => {
@@ -451,9 +479,11 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
-  it.skip("create with inexistent foreign key failing", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): building an Account through `account_with_inexistent_foreign_key`
-    // does not raise UnknownAttributeError for the bad foreign key column.
+  it("create with inexistent foreign key failing", async () => {
+    const firm = await Firm.create({ name: "GlobalMegaCorp" });
+    await expect((firm as any).createAccountWithInexistentForeignKey()).rejects.toThrow(
+      UnknownAttributeError,
+    );
   });
 
   it("reload association", async () => {
@@ -472,8 +502,32 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(odegy, "account")).credit_limit).toBe(80);
   });
 
-  it.skip("reload association with query cache", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): requires connection query cache (enable_query_cache!).
+  it("reload association with query cache", async () => {
+    const odegyId = (companies("odegy") as any).id;
+
+    const connection = (await Base.leaseConnection()) as any;
+    connection.enableQueryCacheBang();
+    connection.clearQueryCache();
+    try {
+      // Populate the cache with a query
+      const odegy = (await Company.find(odegyId)) as any;
+      // Populate the cache with a second query
+      await readHasOne(odegy, "account");
+
+      expect(connection.queryCache!.size).toBe(2);
+
+      // Clear the cache and fetch the account again, populating the cache with a query
+      await assertQueriesCount(1, false, async () => {
+        await odegy.reloadAccount();
+      });
+
+      // This query is not cached anymore, so it should make a real SQL query
+      await assertQueriesCount(1, false, async () => {
+        await Company.find(odegyId);
+      });
+    } finally {
+      connection.disableQueryCacheBang();
+    }
   });
 
   it("reset association", async () => {
@@ -752,13 +806,22 @@ describe("HasOneAssociationsTest", () => {
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
   });
 
-  it.skip("has one autosave with primary key manually set", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): manual-PK autosave on Author/Post — gap.
+  it("has one loading for new record", async () => {
+    const post = await Post.createBang({ author_id: 42, title: "foo", body: "bar" });
+    const author = new Author({ id: 42 });
+    expect((await readHasOne(author, "post")).id).toBe(post.id);
   });
 
-  it.skip("has one loading for new record", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): a new (unsaved) Author with a manually-set id does not load its
-    // has_one post — has_one read on a new record short-circuits to null.
+  it("has one autosave with primary key manually set", async () => {
+    const post = await Post.create({ id: 1234, title: "Some title", body: "Some content" });
+    const author = new Author({ id: 33, name: "Hank Moody" });
+
+    (author as any).post = post;
+    await (author as any).save();
+    await author.reload();
+
+    expect(await readHasOne(author, "post")).not.toBeNull();
+    expect((await readHasOne(author, "post")).id).toBe(post.id);
   });
 
   it("has one relationship cannot have a counter cache", () => {

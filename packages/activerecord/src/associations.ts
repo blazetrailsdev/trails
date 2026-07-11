@@ -2280,18 +2280,26 @@ export function computeHasManyWhere(
     return conditions;
   }
 
-  // Scalar FK: a composite PK here is a mismatch too.
+  // Scalar FK against a composite-PK owner collapses to the "id" component,
+  // matching `reflection.active_record_primary_key` (reflection.rb) — the same
+  // resolver loadHasMany's AssociationScope path uses. A composite PK lacking
+  // "id" can't map to a scalar FK, so that remains a mismatch.
   if (Array.isArray(primaryKey)) {
-    // Route through the reflection's canonical checkValidityBang (Rails'
-    // single raise site) so the error carries the Rails-faithful message.
-    routeThroughCheckValidity(ctor, assocName);
-    // No reflection resolvable — minimal trails-only fallback guard.
-    throw new CompositePrimaryKeyMismatchError({
-      activeRecord: ctor.name,
-      name: assocName,
-      primaryKey,
-      foreignKey,
-    });
+    const inferred = reflection?.activeRecordPrimaryKey;
+    if (typeof inferred === "string") {
+      primaryKey = inferred;
+    } else {
+      // Route through the reflection's canonical checkValidityBang (Rails'
+      // single raise site) so the error carries the Rails-faithful message.
+      routeThroughCheckValidity(ctor, assocName);
+      // No reflection resolvable — minimal trails-only fallback guard.
+      throw new CompositePrimaryKeyMismatchError({
+        activeRecord: ctor.name,
+        name: assocName,
+        primaryKey,
+        foreignKey,
+      });
+    }
   }
   const pkValue = record._readAttribute(primaryKey);
   if (pkValue === null || pkValue === undefined) return null;

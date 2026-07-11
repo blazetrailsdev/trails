@@ -158,7 +158,13 @@ export class Association {
     }
   }
 
-  async reload(): Promise<this> {
+  async reload(force = false): Promise<this> {
+    // Mirrors Rails `Association#reload` (association.rb:72-78): a *forced*
+    // reload (the generated `reload_<name>` reader) clears the query cache
+    // first, so the re-fetch bypasses any cached SELECT for this record.
+    if (force) {
+      this.klass.connectionPool().clearQueryCache();
+    }
     this.reset();
     this.resetScope();
     await this.loadTarget();
