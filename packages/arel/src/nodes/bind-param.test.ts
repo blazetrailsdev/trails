@@ -50,6 +50,30 @@ describe("BindParam", () => {
     });
   });
 
+  describe("isNil", () => {
+    it("is true when wrapping a bare null", () => {
+      expect(new Nodes.BindParam(null).isNil()).toBe(true);
+    });
+
+    it("is false for a valueless positional-bind placeholder", () => {
+      expect(new Nodes.BindParam().isNil()).toBe(false);
+    });
+
+    it("is false when wrapping a non-nil scalar", () => {
+      expect(new Nodes.BindParam(42).isNil()).toBe(false);
+    });
+
+    it("delegates to value.isNil when present — true", () => {
+      const bp = new Nodes.BindParam({ isNil: () => true });
+      expect(bp.isNil()).toBe(true);
+    });
+
+    it("delegates to value.isNil when present — false", () => {
+      const bp = new Nodes.BindParam({ isNil: () => false });
+      expect(bp.isNil()).toBe(false);
+    });
+  });
+
   describe("isInfinite", () => {
     it("returns null when value has no isInfinite", () => {
       const bp = new Nodes.BindParam(42);

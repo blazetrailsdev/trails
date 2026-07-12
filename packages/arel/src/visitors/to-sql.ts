@@ -2120,10 +2120,10 @@ export class ToSql extends Visitor {
    */
   protected rightIsNull(right: unknown): boolean {
     if (right instanceof Nodes.Quoted && right.value === null) return true;
-    // A bound scalar arrives wrapped in a BindParam; peer at the wrapped
-    // attribute so an enum/normalized bind that serializes to nil is caught.
-    const node = right instanceof Nodes.BindParam ? right.value : right;
-    const maybe = node as { isNil?: () => boolean };
+    // A bound scalar arrives wrapped in a BindParam whose `isNil()` delegates
+    // to its wrapped value (bind_param.rb:23-25) — so a raw-null bind or an
+    // enum/normalized bind that serializes to nil is caught.
+    const maybe = right as { isNil?: () => boolean };
     return typeof maybe?.isNil === "function" && maybe.isNil();
   }
 }
