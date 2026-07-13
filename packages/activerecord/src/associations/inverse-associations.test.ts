@@ -434,7 +434,7 @@ describe("InverseHasOneTests", () => {
 
   it("parent instance should be shared with newly built child", async () => {
     const human = (await Human.first())!;
-    const face = (human as any).buildFace({ description: "haunted" });
+    const face = await (human as any).buildFace({ description: "haunted" });
     expect(face.human).not.toBeNull();
     expect(face.human.name).toBe((human as any).name);
     (human as any).name = "Bongo";

@@ -311,6 +311,22 @@ export class HasOneAssociation extends SingularAssociation {
     // raise FrozenError.
   }
 
+  /**
+   * Whether a `build#{name}` accessor call must first run Rails'
+   * `load_target` — mirrors `HasOneAssociation#set_new_record` →
+   * `replace(record, false)`, whose leading `load_target`
+   * (has_one_association.rb:59) materializes the current target before the
+   * freshly-built record displaces it. The sync `build` / nested-attributes
+   * paths can't await, so the awaitable accessor (builder/has-one.ts) consults
+   * this and issues the SELECT only when a query would actually run
+   * (`find_target?`): a persisted / FK-present owner whose target isn't loaded.
+   *
+   * @internal
+   */
+  needsTargetLoadForBuild(): boolean {
+    return !this.loaded && this.findTargetNeeded();
+  }
+
   protected override replace(record: Base | null, _save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const assigningAnother = !sameRecord(this.target, record);
