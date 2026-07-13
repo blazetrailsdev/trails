@@ -342,6 +342,31 @@ import {
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
 
+/**
+ * Formats a Temporal array element via the dialect-correct scalar formatter
+ * (`temporalToBindString`) so a datetime inside an inlined PG array literal
+ * emits the same `quoted_date` form the scalar path does (BC suffix + fixed-6
+ * microseconds); non-Temporal elements return `undefined` to fall through to
+ * `quoteArrayLiteral`'s generic quoting.
+ * @internal
+ */
+function temporalArrayElementFormatter(
+  dialect?: AdapterName,
+): (value: unknown) => string | undefined {
+  return (value: unknown): string | undefined => {
+    if (
+      value instanceof Temporal.Instant ||
+      value instanceof Temporal.PlainDateTime ||
+      value instanceof Temporal.PlainDate ||
+      value instanceof Temporal.PlainTime ||
+      value instanceof Temporal.ZonedDateTime
+    ) {
+      return String(temporalToBindString(value, dialect));
+    }
+    return undefined;
+  };
+}
+
 /** @internal */
 export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName): string {
   if (v === null || v === undefined) return "NULL";
@@ -367,7 +392,7 @@ export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName
     return Number.isNaN(v.getTime()) ? "NULL" : `'${v.toISOString()}'`;
   }
   if (asArray && Array.isArray(v)) {
-    const arrayLiteral = quoteArrayLiteral(v);
+    const arrayLiteral = quoteArrayLiteral(v, temporalArrayElementFormatter(dialect));
     return `'${arrayLiteral.replace(/'/g, "''")}'`;
   }
   if (!asArray && typeof v === "object") {
@@ -3708,7 +3733,7 @@ export class Base extends Model {
         !isArray && isBindableStringColumn(def?.type?.name) && typeof raw === "string"
           ? new Nodes.BindParam(raw)
           : isArray
-            ? arelSql(quoteSqlValue(raw, true))
+            ? arelSql(quoteSqlValue(raw, true, adapter.adapterName as AdapterName))
             : raw;
     });
 
@@ -3834,7 +3859,7 @@ export class Base extends Model {
           !isArray && isBindableStringColumn(def?.type?.name) && typeof val === "string"
             ? new Nodes.BindParam(val)
             : isArray
-              ? arelSql(quoteSqlValue(val, true))
+              ? arelSql(quoteSqlValue(val, true, adapter.adapterName as AdapterName))
               : val,
         ];
       },
