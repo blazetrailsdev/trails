@@ -1207,14 +1207,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // publish `newClient` — tear it down instead so we don't leak
       // a live socket onto a closed adapter.
       const racedDiscard = this._discardedAcquireGenerations.has(acquireGen);
+      // A disconnectBang/close/discardBang bumps _acquireGeneration when this
+      // acquire is in flight, so a mismatch means this acquire was orphaned by
+      // one of them. Checking the captured generation (not the mutable _closed
+      // flag) keeps the decision correct even when a racing reconnect clears
+      // _closed before the connect resolves — otherwise the stale acquire would
+      // adopt/publish its pre-disconnect newClient onto the reconnected adapter.
+      const staleGeneration = acquireGen !== this._acquireGeneration;
       if (
         this._closed ||
         this._pgClientOptions == null ||
         this._rawConnection != null ||
-        racedDiscard
+        racedDiscard ||
+        staleGeneration
       ) {
         this._teardownRacedClient(newClient, acquireGen);
-        if (this._closed || this._pgClientOptions == null || racedDiscard) {
+        if (this._closed || this._pgClientOptions == null || racedDiscard || staleGeneration) {
           throw new Error("PostgreSQLAdapter: connection is closed");
         }
         // Another caller raced ahead and already published a
@@ -2603,6 +2611,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._connectionConfigured = false;
     this._typeMapEagerLoaded = false;
     this._closed = true;
+    // Bump the in-flight acquire's generation (see disconnectBang) so a stale
+    // connect end()s its socket instead of adopting it onto a racing reconnect.
+    if (this._acquiring) this._acquireGeneration++;
     const conn = this._rawConnection;
     this._rawConnection = null;
     this._pgClientOptions = null;
@@ -2857,6 +2868,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._needsDeallocateAll = false;
     this._inTransaction = false;
     this._closed = true;
+    // If a connect is in flight, bump its generation so it tears down (end()s,
+    // not adopts) its socket when it resolves — even if a racing reconnect
+    // clears _closed first — and so a later reconnect opens a fresh acquire
+    // instead of reusing the orphaned one. Unlike discardBang, this generation
+    // is NOT recorded in _discardedAcquireGenerations, so _teardownRacedClient
+    // end()s the socket (matching Rails' disconnect!) rather than abandoning it.
+    if (this._acquiring) this._acquireGeneration++;
     conn?.end().catch(() => {});
     // Rails' disconnect! calls reset_transaction; super.disconnectBang() does not.
     this.resetTransaction();
