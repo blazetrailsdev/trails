@@ -302,6 +302,9 @@ describe("HasOneAssociationsTest", () => {
     const otherBook = await CpkBook.create({ id: [3, 4] });
     const order = await CpkOrderWithNullifiedBook.create({ book });
 
+    // Property setter queues the replace; `order.save()` flushes it
+    // (matching the sibling `nullification on association change` test),
+    // nullifying the displaced book's composite foreign key.
     (order as any).book = otherBook;
     await (order as any).save();
 
