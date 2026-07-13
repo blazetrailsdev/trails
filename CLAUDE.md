@@ -25,6 +25,10 @@ package list, and the `declare` / associations / enums / schema reference, see
   `vendor/rails/activerecord/test/fixtures/` (ours:
   `packages/activerecord/src/test-helpers/fixtures/`) — mirror those too
   rather than making up models or fixture rows.
+- To map a trails test name or method/constant to its vendored Rails
+  `file:line` instead of hand-grepping, run `pnpm rails:find <query>` — it
+  reuses the test-compare / api-compare manifests and falls back to a scoped
+  grep of `vendor/rails/activerecord/`, tagging each result with the mode.
 - Do NOT use subagents unless explicitly requested.
 - **AR work tracking lives in the `tasks` repo, not in docs.** Pick work via
   `pnpm tasks` (`ready` / `next-bundle` / `claim`) — never by hand-editing an
