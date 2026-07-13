@@ -23,6 +23,7 @@ import {
   TransactionIsolationError,
   NotImplementedError,
   RangeError as ARRangeError,
+  StatementInvalid,
 } from "../../errors.js";
 import {
   formatInstantForSql,
@@ -1383,6 +1384,11 @@ async function logSql<T>(
       // so subscribers (e.g. ExplainSubscriber) can detect failed queries.
       payload.exception = e;
       payload.exception_object = e;
+      // Mirrors AbstractAdapter#log's rescue: the driver error has already been
+      // translated to a StatementInvalid by with_raw_connection (with sql:/binds:
+      // nil), so we only attach the statement context here — set_query is a no-op
+      // when sql was already supplied, so this never double-translates.
+      if (e instanceof StatementInvalid) throw e.setQuery(sql, bindArray);
       throw e;
     }
   }) as Promise<T>;
