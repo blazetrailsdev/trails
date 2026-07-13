@@ -632,16 +632,10 @@ describe("WhereTest", () => {
     expect((found as any).id).toBe(author.id);
   });
 
-  it.skip("where with large number", async () => {
-    // BLOCKED: predicate-builder — Rails treats `9223372036854775808` (2^63, one
-    // past signed-bigint max) as an un-boundable query value, so `where(id: [3,
-    // 2^63])` matches only id 3 → [bob]. trails' MysqlBigInteger/PG integer type
-    // raises ActiveModelRangeError when casting the out-of-range query bind
-    // (passes on sqlite, which has no range enforcement, hence the adapter split).
-    // ROOT-CAUSE: same un-boundable-query-value gap as "where with invalid value"
-    // — relation/predicate-builder.ts should bind a contradiction, not raise.
-    // SCOPE: convergence tracked by RFC 0023
-    // predicate-builder-blank-and-unboundable-contradiction.
+  it("where with large number", async () => {
+    // Rails treats `9223372036854775808` (2^63, one past signed-bigint max) as
+    // an un-boundable query value, so `where(id: [3, 2^63])` drops the
+    // out-of-range element and matches only id 3 → [bob] on every adapter.
     const bob = authors("bob") as any;
     const r1 = await Author.where({ id: [3, 9223372036854775808n] });
     expect(ids(r1)).toStrictEqual([bob.id]);
@@ -649,12 +643,9 @@ describe("WhereTest", () => {
     expect(ids(r2)).toStrictEqual([bob.id]);
   });
 
-  it.skip("to sql with large number", async () => {
-    // BLOCKED: same out-of-range / un-boundable query-value gap as "where with
-    // large number" — `9223372036854775808` raises on MariaDB/PG instead of
-    // binding a contradiction.
-    // SCOPE: convergence tracked by RFC 0023
-    // predicate-builder-blank-and-unboundable-contradiction.
+  it("to sql with large number", async () => {
+    // The out-of-range bind is dropped from the generated SQL (not bound as a
+    // value the column can't hold), so replaying it via findBySql matches [bob].
     const bob = authors("bob") as any;
     const sql1 = Author.where({ id: [3, 9223372036854775808n] }).toSql();
     expect(ids(await Author.findBySql(sql1))).toStrictEqual([bob.id]);
