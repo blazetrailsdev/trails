@@ -113,6 +113,28 @@ class SpecialSubscription extends Base {
   }
 }
 
+// Mirrors the SpecialCar/SpecialBulb models defined inline in
+// has_one_associations_test.rb (:929) — a has_one whose child belongs_to the
+// owner with `touch: true`, used to prove that building a nonpersisted child
+// does not touch the parent.
+class SpecialCar extends Base {
+  static {
+    this._tableName = "cars";
+    this.hasOne("specialBulb", {
+      inverseOf: "car",
+      dependent: "destroy",
+      className: "SpecialBulb",
+      foreignKey: "car_id",
+    });
+  }
+}
+class SpecialBulb extends Base {
+  static {
+    this._tableName = "bulbs";
+    this.belongsTo("car", { inverseOf: "specialBulb", touch: true, className: "SpecialCar" });
+  }
+}
+
 // ==========================================================================
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
@@ -154,6 +176,8 @@ describe("HasOneAssociationsTest", () => {
     registerModel(CpkBrokenOrder);
     registerModel(CpkBrokenOrderWithNonCpkBooks);
     registerModel(CpkNonCpkBook);
+    registerModel("SpecialCar", SpecialCar);
+    registerModel("SpecialBulb", SpecialBulb);
     await Company.loadSchema();
     await Account.loadSchema();
     await Car.loadSchema();
@@ -452,7 +476,7 @@ describe("HasOneAssociationsTest", () => {
   it("successful build association", async () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     await (firm as any).save();
-    const account = (firm as any).buildAccount({ credit_limit: 1000 });
+    const account = await (firm as any).buildAccount({ credit_limit: 1000 });
     expect(await account.save()).toBeTruthy();
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
@@ -496,7 +520,7 @@ describe("HasOneAssociationsTest", () => {
     const pirate = pirates("blackbeard") as any;
     const scope = pirate.association("fooBulb").scope().whereValuesHash();
 
-    let bulb = pirate.buildFooBulb();
+    let bulb = await pirate.buildFooBulb();
     expect(bulb.scopeAfterInitialize.whereValuesHash()).not.toEqual(scope);
 
     bulb = await pirate.createFooBulb();
@@ -724,7 +748,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("build respects hash condition", async () => {
     const firm = companies("first_firm") as any;
-    const account = firm.buildAccountLimit500WithHashConditions();
+    const account = await firm.buildAccountLimit500WithHashConditions();
     expect(await account.save()).toBeTruthy();
     expect(account.credit_limit).toBe(500);
   });
@@ -737,7 +761,9 @@ describe("HasOneAssociationsTest", () => {
   });
 
   it("attributes are being set when initialized from has one association with where clause", async () => {
-    const newAccount = (companies("first_firm") as any).buildAccount({ firm_name: "Account" });
+    const newAccount = await (companies("first_firm") as any).buildAccount({
+      firm_name: "Account",
+    });
     expect(newAccount.firm_name).toBe("Account");
   });
 
@@ -796,7 +822,7 @@ describe("HasOneAssociationsTest", () => {
 
   it("build with block", async () => {
     const car = (await Car.create({ name: "honda" })) as any;
-    const bulb = car.buildBulb(undefined, (b: any) => {
+    const bulb = await car.buildBulb(undefined, (b: any) => {
       b.color = "Red";
     });
     expect(bulb.color).toBe("RED!");
@@ -962,9 +988,17 @@ describe("HasOneAssociationsTest", () => {
     // BLOCKED (tracked: d2-has-one-remaining-gaps): no-op save detection — gap.
   });
 
-  it.skip("has one with touch option on nonpersisted built associations doesnt update parent", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): SpecialCar/SpecialBulb touch on unpersisted built association —
-    // query-count gap.
+  it("has one with touch option on nonpersisted built associations doesnt update parent", async () => {
+    const car = await (SpecialCar as any).create({ name: "honda" });
+    // Rails' synchronous `build_special_bulb` runs one `load_target` SELECT
+    // inside `replace`; the JS accessor can't await, so the awaitable
+    // has_one build path is driven directly. The second build sees the loaded
+    // target and issues no query — 1 query total, and the built (nonpersisted)
+    // child never fires the `touch: true` callback, so the parent is untouched.
+    await assertQueriesCount(1, false, async () => {
+      await car.buildSpecialBulb();
+      await car.buildSpecialBulb();
+    });
   });
 
   it("has one double belongs to destroys both from either end", async () => {

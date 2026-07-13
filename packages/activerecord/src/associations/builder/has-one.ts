@@ -40,6 +40,42 @@ export class HasOne extends SingularAssociation {
     return super.build(model, name, scope, options);
   }
 
+  static override defineConstructors(mixin: any, name: string): void {
+    super.defineConstructors(mixin, name);
+    if (!mixin || typeof mixin !== "object") return;
+    const cap = name.charAt(0).toUpperCase() + name.slice(1);
+    // Redefine the `build#{name}` accessor to mirror Rails' synchronous
+    // `set_new_record` → `replace` → `load_target`: materialize the current
+    // target before the built record displaces it. The accessor returns a
+    // Promise (the sync `build` / nested-attributes paths can't await), so a
+    // second build sees the loaded target and issues no query — one
+    // `load_target` SELECT across repeated builds. `association.build` itself
+    // stays synchronous for the in-memory internal paths.
+    Object.defineProperty(mixin, `build${cap}`, {
+      value: function (this: { association(n: string): any }, ...args: unknown[]) {
+        const assoc = this.association(name);
+        // Only take the async load path when a query would actually run: a
+        // persisted / FK-present owner whose target isn't loaded. New-record
+        // owners build synchronously (no query), so their `build#{name}` returns
+        // the record directly and a synchronous build error (e.g. an invalid STI
+        // type from `build_record`) still throws synchronously — the shape the
+        // building-with-invalid-type tests assert. On the load path the same
+        // error surfaces as a rejected Promise instead, an unavoidable
+        // consequence of awaiting `load_target` in JS (Rails' `replace` is
+        // fully synchronous, so it raises inline regardless of persistence).
+        if (
+          typeof assoc.needsTargetLoadForBuild === "function" &&
+          assoc.needsTargetLoadForBuild()
+        ) {
+          return assoc.loadTarget().then(() => assoc.build(...args));
+        }
+        return assoc.build(...args);
+      },
+      writable: true,
+      configurable: true,
+    });
+  }
+
   static override defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
     const existing = Object.getOwnPropertyDescriptor(mixin, name);
