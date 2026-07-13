@@ -600,7 +600,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     return super.execInsert(sql, name, binds, pk, sequenceName, returning);
   }
 
+  // Public `exec_query` is wrapped by `dirties_query_cache`; the actual work
+  // lives in `internal_exec_query` (Rails' structure), which `select_all`
+  // routes through so cached reads never clear the cache.
   override async execQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean },
+  ): Promise<Result> {
+    return this.internalExecQuery(sql, name, binds, options);
+  }
+
+  override async internalExecQuery(
     sql: string,
     name?: string | null,
     binds?: unknown[],
@@ -2152,12 +2164,22 @@ function isMysql2ConnectionError(e: unknown): boolean {
 (Mysql2Adapter.prototype as unknown as { castResult: typeof mysql2CastResult }).castResult =
   mysql2CastResult;
 
-dirtiesQueryCache(Mysql2Adapter, "executeMutation");
-// The multi-column RETURNING read-back in `execInsert` runs through `execQuery`
-// (a read primitive that does not dirty the cache) rather than `executeMutation`,
-// so dirty `execInsert` too; the single-column path delegates to
-// `executeMutation` via `super`, where the double-clear is a harmless no-op.
-dirtiesQueryCache(Mysql2Adapter, "execInsert");
+// `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails
+// query_cache.rb:13). Overridden methods must be wrapped on the concrete class,
+// not on AbstractAdapter, or the override would run unwrapped. The write methods
+// this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
+// `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
+// Each logical write clears the cache exactly once; the still-lower
+// `executeMutation` these funnel through stays unwrapped, and reads route
+// through `internalExecQuery` (never tripping the wrapper).
+dirtiesQueryCache(
+  Mysql2Adapter,
+  "execInsert",
+  "rollbackDbTransaction",
+  "rollbackToSavepoint",
+  "execQuery",
+  "execute",
+);
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`

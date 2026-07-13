@@ -486,7 +486,13 @@ export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: s
     if (typeof original !== "function") continue;
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      if (this._queryCache?.dirties) {
+      // Rails routes schema reflection through the UNWRAPPED `internal_exec_query`
+      // (name "SCHEMA"), so those reads never dirty the query cache. trails reuses
+      // the wrapped `execute`/`exec_query` for schema reflection, passing the same
+      // "SCHEMA" name — skip the clear for them to reproduce Rails' behavior
+      // (otherwise re-reflecting columns inside a `cache` block would evict the
+      // cache). No cache-clearing write ever passes "SCHEMA" as its query name.
+      if (this._queryCache?.dirties && !args.includes("SCHEMA")) {
         this._queryCache.clear();
       }
       return (original as (...a: unknown[]) => unknown).apply(this, args);

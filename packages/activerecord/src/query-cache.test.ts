@@ -11,6 +11,7 @@ import { Topic } from "./test-helpers/models/topic.js";
 import { Category } from "./test-helpers/models/category.js";
 import { Post } from "./test-helpers/models/post.js";
 import { association } from "./associations.js";
+import { Rollback } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache } from "./query-cache.js";
 import { LogSubscriber } from "./log-subscriber.js";
@@ -67,16 +68,32 @@ describe("QueryCacheTest", () => {
     Base.connectionPool().disableQueryCacheBang();
   });
 
-  it.skip("execute clear cache", () => {
-    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-wiring-incomplete): Rails clears the query cache
-    // on any `execute`, trails only dirties on `executeMutation` (write path).
+  it("execute clear cache", async () => {
+    assertCache("off");
+
+    const mw = middleware(async () => {
+      await Post.first();
+      expect(Base.connectionPool().queryCache.size).toBe(1);
+      await (await Post.leaseConnection()).execute("SELECT 1");
+      expect(Base.connectionPool().queryCache.size).toBe(0);
+    });
+    await mw();
+
+    assertCache("off");
   });
 
-  it.skip("exec query clear cache", () => {
-    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-wiring-incomplete): Rails clears the query cache
-    // on any `exec_query`, trails only dirties on `executeMutation`.
+  it("exec query clear cache", async () => {
+    assertCache("off");
+
+    const mw = middleware(async () => {
+      await Post.first();
+      expect(Base.connectionPool().queryCache.size).toBe(1);
+      await (await Post.leaseConnection()).execQuery("SELECT 1");
+      expect(Base.connectionPool().queryCache.size).toBe(0);
+    });
+    await mw();
+
+    assertCache("off");
   });
 
   it("writes should always clear cache", async () => {
@@ -245,11 +262,13 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  it.skip("exists queries with cache", () => {
-    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-wiring-incomplete): trails `exists()` runs its probe
-    // via the raw `execute()` path, bypassing the cached `selectAll` override,
-    // so the second probe is not served from the query cache.
+  it("exists queries with cache", async () => {
+    await Post.cache(async () => {
+      await assertQueriesCount(1, false, async () => {
+        await Post.exists();
+        await Post.exists();
+      });
+    });
   });
 
   it("select all with cache", async () => {
@@ -432,11 +451,41 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  it.skip("query cache doesnt leak cached results of rolled back queries", () => {
-    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-wiring-incomplete): Rails dirties the query cache on
-    // `rollback_to_savepoint` / `rollback_db_transaction`; trails only dirties
-    // on `executeMutation`, so a rolled-back write's cached SELECT result leaks.
+  it("query cache doesnt leak cached results of rolled back queries", async () => {
+    (await Base.leaseConnection()).enableQueryCacheBang();
+    const post = await Post.first();
+
+    await Post.transaction(async () => {
+      await post!.update({ title: "rollback" });
+      expect((await Post.where({ title: "rollback" })).length).toBe(1);
+      throw new Rollback();
+    });
+
+    expect((await Post.where({ title: "rollback" })).length).toBe(0);
+
+    await (
+      await Base.leaseConnection()
+    ).uncached(async () => {
+      expect((await Post.where({ title: "rollback" })).length).toBe(0);
+    });
+
+    try {
+      await Post.transaction(async () => {
+        await post!.update({ title: "rollback" });
+        expect((await Post.where({ title: "rollback" })).length).toBe(1);
+        throw new Error("broken");
+      });
+    } catch {
+      // Rails: `rescue Exception` — swallow the non-Rollback error.
+    }
+
+    expect((await Post.where({ title: "rollback" })).length).toBe(0);
+
+    await (
+      await Base.leaseConnection()
+    ).uncached(async () => {
+      expect((await Post.where({ title: "rollback" })).length).toBe(0);
+    });
   });
 
   it("query cached even when types are reset", async () => {
@@ -698,14 +747,98 @@ describe("QueryCacheExpiryTest", () => {
   // several nested layers (insert → insertStatement → execInsert), clearing 2–3
   // times. These `assert_called(query_cache, :clear, times: 1)` tests stay
   // skipped until the dirties wiring moves to the public-method layer.
-  it.skip("update", () => {});
-  it.skip("destroy", () => {});
-  it.skip("insert", () => {});
-  it.skip("insert all", () => {});
-  it.skip("insert all bang", () => {});
-  it.skip("upsert all", () => {});
-  it.skip("cache is expired by habtm update", () => {});
-  it.skip("cache is expired by habtm delete", () => {});
+  it("update", async () => {
+    await Task.cache(async () => {
+      await assertClears(1, async () => {
+        const task = (await Task.find(1)) as never as {
+          starting: unknown;
+          save(): Promise<unknown>;
+        };
+        task.starting = new Date().toISOString();
+        await task.save();
+      });
+    });
+  });
+
+  it("destroy", async () => {
+    await Task.cache(async () => {
+      await assertClears(1, async () => {
+        await ((await Task.find(1)) as never as { destroy(): Promise<unknown> }).destroy();
+      });
+    });
+  });
+
+  it("insert", async () => {
+    await Task.cache(async () => {
+      await assertClears(1, async () => {
+        await Task.create();
+      });
+    });
+  });
+
+  // Rails guards with `skip unless supports_insert_on_duplicate_skip?`; every
+  // trails adapter (sqlite/postgresql/mysql2) supports it, so run unconditionally.
+  it("insert all", async () => {
+    await Task.cache(async () => {
+      await assertClears(1, async () => {
+        await Task.insert({ starting: new Date().toISOString() });
+      });
+
+      await assertClears(1, async () => {
+        await Task.insertAll([{ starting: new Date().toISOString() }]);
+      });
+    });
+  });
+
+  it("insert all bang", async () => {
+    await Task.cache(async () => {
+      await assertClears(1, async () => {
+        await Task.insertBang({ starting: new Date().toISOString() });
+      });
+
+      await assertClears(1, async () => {
+        await Task.insertAllBang([{ starting: new Date().toISOString() }]);
+      });
+    });
+  });
+
+  // Rails guards with `skip unless supports_insert_on_duplicate_update?`; every
+  // trails adapter supports it, so run unconditionally.
+  it("upsert all", async () => {
+    await Task.cache(async () => {
+      await assertClears(1, async () => {
+        await Task.upsert({ starting: new Date().toISOString() });
+      });
+
+      await assertClears(1, async () => {
+        await Task.upsertAll([{ starting: new Date().toISOString() }]);
+      });
+    });
+  });
+
+  it("cache is expired by habtm update", async () => {
+    await Base.cache(async () => {
+      await assertClears(1, async () => {
+        const c = await Category.first();
+        const p = await Post.first();
+        await (
+          p as never as { categories: { concat(...c: unknown[]): Promise<unknown> } }
+        ).categories.concat(c);
+      });
+    });
+  });
+
+  it("cache is expired by habtm delete", async () => {
+    await Base.cache(async () => {
+      await assertClears(1, async () => {
+        const p = (await Post.find(1)) as never as {
+          categories: { count(): Promise<number>; deleteAll(): Promise<unknown> };
+        };
+        expect(await p.categories.count()).toBeGreaterThan(0);
+        await p.categories.deleteAll();
+      });
+    });
+  });
 
   it.skip("query cache lru eviction", () => {
     // BLOCKED: relies on swapping `connection.query_cache=` to a Store with a

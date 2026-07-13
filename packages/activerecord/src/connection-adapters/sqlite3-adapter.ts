@@ -3158,17 +3158,23 @@ function translateException(
   return new StatementInvalid(message, { sql, binds, connectionPool, cause: exception });
 }
 
-// `executeMutation` is this adapter's write/DDL primitive (reads go through
-// `execute`/`execQuery`), so dirtying it clears the query cache on writes and
-// schema changes — the trails analogue of Rails' `dirties_query_cache base,
-// :execute` for the write side.
-dirtiesQueryCache(AbstractSQLite3Adapter, "executeMutation");
-// `execInsert`'s multi-column RETURNING read-back runs through `internalExecQuery`
-// rather than `executeMutation`, so dirty it too — otherwise a subsequent read
-// could be served stale from the query cache after such an INSERT. (The
-// single-column path delegates to `executeMutation`, which is already dirtied;
-// the double-clear there is a harmless no-op.)
-dirtiesQueryCache(AbstractSQLite3Adapter, "execInsert");
+// `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails
+// query_cache.rb:13). Overridden methods must be wrapped on the concrete class,
+// not on AbstractAdapter, or the override would run unwrapped. The write methods
+// this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
+// `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
+// Each logical write clears the cache exactly once; the still-lower
+// `executeMutation` these funnel through stays unwrapped, and reads route
+// through `internalExecQuery` (never tripping the wrapper).
+dirtiesQueryCache(
+  AbstractSQLite3Adapter,
+  "execInsert",
+  "rollbackDbTransaction",
+  "rollbackToSavepoint",
+  "truncate",
+  "execQuery",
+  "execute",
+);
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers

@@ -2548,29 +2548,26 @@ function ensureAbstractAdapterMixinsApplied(): void {
     });
   }
 
-  // Rails: `QueryCache.included` runs `dirties_query_cache base, :exec_query,
-  // :execute, :create, :insert, :update, :delete, ...` (query_cache.rb:13).
-  // trails' writes don't funnel through `execQuery` (that's the read path); they
-  // go through the `exec{Insert,Update,Delete}` / `create`/`insert`/`update`/`delete`
-  // methods mixed in from DatabaseStatements, plus rollback paths. Wrapping
-  // those clears the cache on every write while leaving reads untouched.
-  // `create` is Rails' `alias create insert`; Rails lists it explicitly in the
-  // dirties set, so we register it alongside `insert` for parity even though it
-  // delegates there.
+  // `dirties_query_cache` wiring (Rails query_cache.rb:13). trails' writes funnel
+  // through the low-level `execUpdate`/`execDelete`/`execInsertAll` (model
+  // `_performUpdate`/`_performDelete` call these directly, NOT the public
+  // `update`/`delete`) plus `truncate`/`truncateTables`/`restartDbTransaction`,
+  // so each logical write passes through exactly one of them. Wire the methods
+  // that are NOT overridden by a concrete adapter here — they're only defined on
+  // AbstractAdapter, and a subclass prototype doesn't yet inherit them when the
+  // per-adapter module runs (circular-import load order), so they must be wired
+  // on AbstractAdapter. The OVERRIDDEN write methods (`execInsert`, `execQuery`,
+  // `execute`, `rollbackDbTransaction`, `rollbackToSavepoint`, and sqlite's
+  // `truncate`) are wired on each concrete adapter instead — wiring them here too
+  // would leave the override unwrapped. Reads route through `internalExecQuery`
+  // and never trip the wrapper.
   dirtiesQueryCache(
     AbstractAdapter,
-    "execInsert",
     "execUpdate",
     "execDelete",
     "execInsertAll",
-    "create",
-    "insert",
-    "update",
-    "delete",
     "truncate",
     "truncateTables",
-    "rollbackDbTransaction",
-    "rollbackToSavepoint",
     "restartDbTransaction",
   );
 }

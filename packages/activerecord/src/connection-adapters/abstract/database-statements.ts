@@ -1539,6 +1539,12 @@ interface DatabaseStatementsDefaultsHost {
     binds?: unknown[],
     options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result>;
+  internalExecQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean },
+  ): Promise<Result>;
 }
 
 /**
@@ -1623,7 +1629,12 @@ export const DatabaseStatements = {
     const preparable = opts?.preparable ?? (binds != null && binds.length > 0);
     const prepare = !!((this as { preparedStatements?: boolean }).preparedStatements && preparable);
     try {
-      return await this.execQuery(sql, name, binds, {
+      // Rails' select_all runs `internal_exec_query` (the private work method),
+      // NOT the public `exec_query` — the latter is wrapped by
+      // `dirties_query_cache` and clearing the cache on every read would defeat
+      // it. Route reads through `internalExecQuery` so the cached read path
+      // never trips the write-dirtying wrapper on the public `execQuery`.
+      return await this.internalExecQuery(sql, name, binds, {
         allowRetry: opts?.allowRetry ?? false,
         prepare,
       });
