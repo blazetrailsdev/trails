@@ -303,8 +303,11 @@ describe("lazy composed_of inclusion", () => {
     class Plain extends Base {}
     expect(own(Plain, "reload")).toBe(false);
     expect(own(Plain, "initializeDup")).toBe(false);
-    // Its reload is Persistence#reload verbatim, not an aggregation-cache wrapper.
-    expect(Plain.prototype.reload).toBe(persistenceReload);
+    // Its reload is the inherited AutosaveAssociation#reload wrapper (which
+    // delegates to Persistence#reload), not an aggregation-cache wrapper. The
+    // aggregation wrapper is only mixed in by composed_of.
+    expect(Plain.prototype.reload).toBe(Base.prototype.reload);
+    expect(Plain.prototype.reload).not.toBe(persistenceReload);
   });
 
   it("mixes Aggregations onto a model that declares composed_of", () => {

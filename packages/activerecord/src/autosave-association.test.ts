@@ -70,12 +70,16 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
   }
 
   it("a marked for destruction record should not be be marked after reload", async () => {
-    const { Pirate } = makePirateShip();
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const { Pirate, Ship } = makePirateShip();
+    const pirate = await Pirate.create({ catchphrase: "Don' botharrr talkin' like one, savvy?" });
+    const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
+    cacheAssoc(pirate, "ship", ship);
+
     markForDestruction(pirate);
-    expect(isMarkedForDestruction(pirate)).toBe(true);
-    const reloaded = await Pirate.find(pirate.id!);
-    expect(isMarkedForDestruction(reloaded)).toBe(false);
+    markForDestruction(ship);
+
+    expect(isMarkedForDestruction(await pirate.reload())).toBe(false);
+    expect(isMarkedForDestruction(await ship.reload())).toBe(false);
   });
 
   it("should destroy a child association as part of the save transaction if it was marked for destruction", async () => {
