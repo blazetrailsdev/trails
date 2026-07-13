@@ -12,6 +12,7 @@ import { combineMultiStatements } from "../mysql/database-statements.js";
 
 export interface DatabaseStatementsHost {
   execQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
+  internalExecQuery(sql: string, name?: string | null, binds?: unknown[]): Promise<Result>;
   preparedStatements?: boolean;
 }
 
@@ -139,7 +140,10 @@ export async function selectAll(
   name?: string | null,
   binds?: unknown[],
 ): Promise<Result> {
-  return this.execQuery(sql, name, binds);
+  // Rails' `select_all` calls `super` → `internal_exec_query`, NOT the public
+  // `exec_query` (which `dirties_query_cache` wraps) — routing through the
+  // public method would clear the query cache on every read.
+  return this.internalExecQuery(sql, name, binds);
 }
 
 /**
