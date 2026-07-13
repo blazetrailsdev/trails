@@ -121,6 +121,7 @@ import {
   runAfterCallbacksOnProto as cbRunAfter,
   beforeOrAroundCallbackSources,
   sanitizeForMassAssignment,
+  isMassAssignmentEmpty,
   shouldValidate,
 } from "@blazetrails/activemodel";
 import { SignedGlobalID as _SignedGlobalIDCtor } from "@blazetrails/globalid/signed-global-id";
@@ -3156,7 +3157,7 @@ export class Base extends Model {
     // un-permitted) params object neither raises nor sanitizes. Only a
     // non-empty bag is checked.
     attrs ??= {};
-    if (Object.keys(attrs).length > 0) {
+    if (!isMassAssignmentEmpty(attrs)) {
       attrs = sanitizeForMassAssignment(attrs);
     }
     // STI dispatch at `new`: when the inheritance column names a subclass in
