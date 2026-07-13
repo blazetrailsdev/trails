@@ -4,11 +4,11 @@
     "_updateRecord": ["update"],
     "beforeCommittedBang": ["before_commit"],
     "committedBang": ["commit"],
-    "constructor": ["initialize"],
     "createOrUpdate": ["save"],
     "destroy": ["destroy"],
     "incrementBang": ["touch"],
     "initWithAttributes": ["find", "initialize"],
+    "initializeDup": ["initialize"],
     "rolledbackBang": ["rollback"],
     "touch": ["touch"]
   }

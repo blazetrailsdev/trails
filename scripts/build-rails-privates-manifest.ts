@@ -406,6 +406,26 @@ interface CallbackManifest {
   methods: Record<string, string[]>;
 }
 
+// Ruby → TS name resolution for the callback pass. This deliberately does NOT
+// reuse only `rubyMethodToTs`: that function's general-purpose `SKIP` set
+// (conventions.ts) drops Ruby object/value-protocol methods api:compare doesn't
+// track — including `initialize_dup`/`initialize_clone`/`initialize_copy`. Those
+// are irrelevant to parity but ARE real callback-firing sites here
+// (core.rb#initialize_dup fires `_run_initialize_callbacks`), so the callback
+// manifest must keep them. When rubyMethodToTs discards a name, fall back to a
+// plain snake→camel of these known callback-relevant methods.
+function callbackTsNames(rubyMethod: string): string[] {
+  const mapped = rubyMethodToTs(rubyMethod);
+  if (mapped && mapped.length > 0) return mapped;
+  // Function-local (not a module const) so it's available when
+  // emitCallbackInvocationsManifest runs at module top, ahead of later consts.
+  const skipFallback = new Set(["initialize_dup", "initialize_clone", "initialize_copy"]);
+  if (skipFallback.has(rubyMethod)) {
+    return [rubyMethod.replace(/_([a-z])/g, (_, c) => c.toUpperCase())];
+  }
+  return [];
+}
+
 function emitCallbackInvocationsManifest(): void {
   const CALLBACK_OUT = path.join(ROOT, "eslint/rails-callback-invocations.json");
   const libPaths = libPathsManifest();
@@ -420,7 +440,7 @@ function emitCallbackInvocationsManifest(): void {
     for (const rubyAbs of rubyFiles) {
       const perMethod = callbackEventsInRuby(fs.readFileSync(rubyAbs, "utf8"));
       for (const [rubyMethod, events] of perMethod) {
-        for (const tsName of rubyMethodToTs(rubyMethod) ?? []) {
+        for (const tsName of callbackTsNames(rubyMethod)) {
           // `constructor` (from Ruby `initialize`) is not a discrete named
           // method — nearly every AR class has one, so requiring
           // runCallbacks("initialize") on all of them is pure noise. The
