@@ -24,11 +24,21 @@ describe("MassAssignmentEmptyParametersTest", () => {
     expect(record!.readAttribute("name")).toBeNull();
   });
 
-  it("non-empty Parameters is treated as non-empty (empty? delegation)", () => {
+  it("non-empty Parameters proceeds past the empty-bag guard at construction", () => {
     // The guard must NOT count the wrapper's own instance fields: a non-empty
-    // Parameters reports `empty === false`, so the guard proceeds past the
-    // empty-bag short-circuit rather than being wrongly skipped.
-    const params = new Parameters({ name: "Bob" });
-    expect(params.empty).toBe(false);
+    // Parameters reports `empty === false`, so construction proceeds past the
+    // empty-bag short-circuit into sanitize_for_mass_assignment (contrast the
+    // empty no-op above). We assert only that it does NOT silently no-op — it
+    // throws — not the specific error class: an unpermitted Parameters SHOULD
+    // raise ForbiddenAttributesError, but real Parameters exposes `permitted`
+    // as a boolean getter (not a method), so sanitize currently misreads it as
+    // a plain hash and raises on its private fields instead. That
+    // permitted-getter divergence is tracked separately in
+    // `sanitize-mass-assignment-permitted-getter`; either way the guard is
+    // proven to proceed rather than skip.
+    expect(new Parameters({ name: "Bob" }).empty).toBe(false);
+    expect(
+      () => new Account(new Parameters({ name: "Bob" }) as unknown as Record<string, unknown>),
+    ).toThrow();
   });
 });
