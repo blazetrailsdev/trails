@@ -25,7 +25,7 @@ import {
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
 } from "./abstract/schema-statements.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
+import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -3172,9 +3172,11 @@ dirtiesQueryCache(
   "rollbackDbTransaction",
   "rollbackToSavepoint",
   "truncate",
-  "execQuery",
-  "execute",
 );
+// Schema reflection reuses the wrapped `execute`/`exec_query` with name
+// "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
+// use the schema-aware variant here — those reflection reads must not dirty.
+dirtiesQueryCacheExceptSchema(AbstractSQLite3Adapter, "execQuery", "execute");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers

@@ -2548,19 +2548,25 @@ function ensureAbstractAdapterMixinsApplied(): void {
     });
   }
 
-  // `dirties_query_cache` wiring (Rails query_cache.rb:13). trails' writes funnel
-  // through the low-level `execUpdate`/`execDelete`/`execInsertAll` (model
-  // `_performUpdate`/`_performDelete` call these directly, NOT the public
-  // `update`/`delete`) plus `truncate`/`truncateTables`/`restartDbTransaction`,
-  // so each logical write passes through exactly one of them. Wire the methods
-  // that are NOT overridden by a concrete adapter here — they're only defined on
-  // AbstractAdapter, and a subclass prototype doesn't yet inherit them when the
-  // per-adapter module runs (circular-import load order), so they must be wired
-  // on AbstractAdapter. The OVERRIDDEN write methods (`execInsert`, `execQuery`,
-  // `execute`, `rollbackDbTransaction`, `rollbackToSavepoint`, and sqlite's
-  // `truncate`) are wired on each concrete adapter instead — wiring them here too
-  // would leave the override unwrapped. Reads route through `internalExecQuery`
-  // and never trip the wrapper.
+  // `dirties_query_cache` wiring (Rails query_cache.rb:13). Rails wires the public
+  // `update`/`delete`/`insert`/`create`; trails wires one layer lower, on
+  // `execUpdate`/`execDelete`/`execInsert`/`execInsertAll`, because that is the
+  // single funnel every logical write shares. Two distinct update paths converge
+  // there: the model save path (`_performUpdate`/`_destroyRow` in base.ts) calls
+  // `execUpdate`/`execDelete` DIRECTLY, bypassing the public `update`/`delete`
+  // entirely, while `update_all`/`updateColumns` (persistence.ts `_updateRecord`)
+  // go through the public `update`/`delete` — which themselves call
+  // `execUpdate`/`execDelete`. Wiring the public methods would miss the direct
+  // save path; wiring the low-level method catches both, exactly once each (the
+  // still-lower `executeMutation` stays unwrapped). Wire the methods NOT overridden
+  // by a concrete adapter here — they're only defined on AbstractAdapter, and a
+  // subclass prototype doesn't yet inherit them when the per-adapter module runs
+  // (circular-import load order), so they must be wired on AbstractAdapter. The
+  // OVERRIDDEN write methods (`execInsert`, `execQuery`, `execute`,
+  // `rollbackDbTransaction`, `rollbackToSavepoint`, and sqlite's `truncate`) are
+  // wired on each concrete adapter instead — wiring them here too would leave the
+  // override unwrapped. Reads route through `internalExecQuery` and never trip
+  // the wrapper.
   dirtiesQueryCache(
     AbstractAdapter,
     "execUpdate",

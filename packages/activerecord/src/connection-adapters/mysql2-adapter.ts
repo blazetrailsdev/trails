@@ -20,7 +20,7 @@ import {
   RAW_CONNECTION_DEPRECATION_MESSAGE,
 } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
+import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
 import {
   ActiveRecordError,
   AdapterError,
@@ -2172,14 +2172,11 @@ function isMysql2ConnectionError(e: unknown): boolean {
 // Each logical write clears the cache exactly once; the still-lower
 // `executeMutation` these funnel through stays unwrapped, and reads route
 // through `internalExecQuery` (never tripping the wrapper).
-dirtiesQueryCache(
-  Mysql2Adapter,
-  "execInsert",
-  "rollbackDbTransaction",
-  "rollbackToSavepoint",
-  "execQuery",
-  "execute",
-);
+dirtiesQueryCache(Mysql2Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
+// Schema reflection reuses the wrapped `execute`/`exec_query` with name
+// "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
+// use the schema-aware variant here — those reflection reads must not dirty.
+dirtiesQueryCacheExceptSchema(Mysql2Adapter, "execQuery", "execute");
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`
