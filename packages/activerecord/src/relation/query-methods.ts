@@ -1306,7 +1306,12 @@ function havingBang(
   opts: string | Record<string, unknown> | Nodes.Node,
   ...rest: unknown[]
 ): any {
-  if (opts == null || (typeof opts === "string" && opts.trim() === "")) return this;
+  // Rails' `having` no-ops on a blank condition (`opts.blank? ? self : …`,
+  // query_methods.rb:1198) — including an empty hash. Guard it here (mirroring
+  // the same check `where` applies) so `having({})` stays a no-op rather than
+  // routing an empty hash through PredicateBuilder, which now expands it to the
+  // `1=0` contradiction.
+  if (opts == null || isBlankArgument(opts)) return this;
 
   if (typeof opts === "string") {
     const sql = rest.length > 0 ? this._modelClass.sanitizeSqlArray(opts, ...rest) : opts;
