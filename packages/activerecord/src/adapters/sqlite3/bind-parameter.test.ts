@@ -14,12 +14,14 @@ beforeEach(() => {
 
 afterEach(async () => {
   await adapter.exec(`DROP TABLE IF EXISTS "topics"`).catch(() => undefined);
-  adapter.close();
+  await adapter.close();
 });
 
 describeIfSqlite("SQLite3Adapter", () => {
-  beforeEach(() => {
-    adapter.exec(`CREATE TABLE "topics" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "title" TEXT)`);
+  beforeEach(async () => {
+    await adapter.exec(
+      `CREATE TABLE "topics" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "title" TEXT)`,
+    );
   });
 
   describe("BindParameterTest", () => {

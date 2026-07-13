@@ -9,9 +9,9 @@ const bigType = new BigIntegerType();
 const intType = new IntegerType();
 const boolType = new BooleanType();
 
-beforeEach(() => {
+beforeEach(async () => {
   adapter = new BetterSQLite3Adapter(":memory:");
-  adapter.exec(`
+  await adapter.exec(`
     CREATE TABLE "big_items" (
       "id"     INTEGER PRIMARY KEY AUTOINCREMENT,
       "score"  BIGINT NOT NULL,
@@ -23,7 +23,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await adapter.exec(`DROP TABLE IF EXISTS "big_items"`).catch(() => undefined);
-  adapter.close();
+  await adapter.close();
 });
 
 describeIfSqlite("SQLite3 bigint round-trip", () => {

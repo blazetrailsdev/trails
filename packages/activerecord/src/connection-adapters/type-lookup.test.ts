@@ -13,8 +13,8 @@ beforeEach(() => {
   adapter = new BetterSQLite3Adapter(":memory:");
 });
 
-afterEach(() => {
-  adapter.close();
+afterEach(async () => {
+  await adapter.close();
 });
 
 function assertLookupType(expected: string, sqlType: string) {

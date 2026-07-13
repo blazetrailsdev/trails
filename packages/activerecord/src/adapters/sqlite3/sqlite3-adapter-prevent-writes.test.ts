@@ -21,13 +21,13 @@ afterEach(async () => {
       `DROP TABLE IF EXISTS pw; DROP TABLE IF EXISTS pw2; DROP TABLE IF EXISTS pw3; DROP TABLE IF EXISTS pw4; DROP TABLE IF EXISTS pw5`,
     )
     .catch(() => undefined);
-  adapter.close();
+  await adapter.close();
 });
 
 // -- Rails test class: sqlite3_adapter_prevent_writes_test.rb --
 describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   it("errors when an insert query is called while preventing writes", async () => {
-    adapter.exec(`CREATE TABLE "pw" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await adapter.exec(`CREATE TABLE "pw" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.withPreventedWrites(async () => {
       await expect(
         adapter.executeMutation(`INSERT INTO "pw" ("name") VALUES ('x')`),
@@ -36,7 +36,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   });
 
   it("errors when an update query is called while preventing writes", async () => {
-    adapter.exec(`CREATE TABLE "pw2" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await adapter.exec(`CREATE TABLE "pw2" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.executeMutation(`INSERT INTO "pw2" ("name") VALUES ('x')`);
     await adapter.withPreventedWrites(async () => {
       await expect(adapter.executeMutation(`UPDATE "pw2" SET "name" = 'y'`)).rejects.toThrow(
@@ -46,7 +46,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   });
 
   it("errors when a delete query is called while preventing writes", async () => {
-    adapter.exec(`CREATE TABLE "pw3" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await adapter.exec(`CREATE TABLE "pw3" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.executeMutation(`INSERT INTO "pw3" ("name") VALUES ('x')`);
     await adapter.withPreventedWrites(async () => {
       await expect(adapter.executeMutation(`DELETE FROM "pw3"`)).rejects.toThrow(ReadOnlyError);
@@ -54,7 +54,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   });
 
   it("errors when a replace query is called while preventing writes", async () => {
-    adapter.exec(`CREATE TABLE "pw4" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await adapter.exec(`CREATE TABLE "pw4" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.withPreventedWrites(async () => {
       await expect(
         adapter.executeMutation(`REPLACE INTO "pw4" ("id", "name") VALUES (1, 'x')`),
@@ -63,7 +63,7 @@ describeIfSqlite("SQLite3AdapterPreventWritesTest", () => {
   });
 
   it("doesnt error when a select query is called while preventing writes", async () => {
-    adapter.exec(`CREATE TABLE "pw5" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+    await adapter.exec(`CREATE TABLE "pw5" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
     await adapter.withPreventedWrites(async () => {
       const rows = await adapter.execute(`SELECT * FROM "pw5"`);
       expect(rows).toHaveLength(0);

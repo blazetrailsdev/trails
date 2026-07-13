@@ -22,13 +22,13 @@ describe("SqliteAdapter", () => {
         )
         .catch(() => undefined);
     }
-    adapter.close();
+    await adapter.close();
   });
 
   // -- Basic adapter operations --
   describe("raw SQL execution", () => {
     it("creates tables and inserts data", async () => {
-      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "users" ("name") VALUES ('Alice')`);
       const rows = await adapter.execute(`SELECT * FROM "users"`);
       expect(rows).toHaveLength(1);
@@ -36,7 +36,7 @@ describe("SqliteAdapter", () => {
     });
 
     it("returns last insert rowid for INSERT", async () => {
-      adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       const id1 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
       const id2 = await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
       expect(id1).toBe(1);
@@ -44,7 +44,7 @@ describe("SqliteAdapter", () => {
     });
 
     it("returns affected rows for UPDATE", async () => {
-      adapter.exec(
+      await adapter.exec(
         `CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT, "active" INTEGER DEFAULT 1)`,
       );
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
@@ -54,7 +54,7 @@ describe("SqliteAdapter", () => {
     });
 
     it("returns affected rows for DELETE", async () => {
-      adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(`CREATE TABLE "items" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('A')`);
       await adapter.executeMutation(`INSERT INTO "items" ("name") VALUES ('B')`);
       const deleted = await adapter.executeMutation(`DELETE FROM "items" WHERE "name" = 'A'`);
@@ -64,8 +64,8 @@ describe("SqliteAdapter", () => {
 
   // -- Transactions --
   describe("transactions", () => {
-    beforeEach(() => {
-      adapter.exec(
+    beforeEach(async () => {
+      await adapter.exec(
         `CREATE TABLE "accounts" ("id" INTEGER PRIMARY KEY, "name" TEXT, "balance" INTEGER)`,
       );
     });
@@ -159,7 +159,7 @@ describe("SqliteAdapter", () => {
     });
 
     it("adds columns with migrations", async () => {
-      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
+      await adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "name" TEXT)`);
 
       class AddEmailToUsers extends Migration {
         async up() {
@@ -182,7 +182,7 @@ describe("SqliteAdapter", () => {
     });
 
     it("creates indexes", async () => {
-      adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "email" TEXT)`);
+      await adapter.exec(`CREATE TABLE "users" ("id" INTEGER PRIMARY KEY, "email" TEXT)`);
 
       class AddEmailIndex extends Migration {
         async up() {
@@ -274,8 +274,8 @@ describe("SQLite3Adapter._isMemoryFilename", () => {
 describe("SQLite3Adapter pragmas option", () => {
   let adapter: AbstractSQLite3Adapter | undefined;
 
-  afterEach(() => {
-    adapter?.close();
+  afterEach(async () => {
+    await adapter?.close();
     vi.restoreAllMocks();
   });
 

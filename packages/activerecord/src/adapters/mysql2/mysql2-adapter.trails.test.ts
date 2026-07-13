@@ -302,12 +302,12 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
     // up front. Asserts the seed lands immediately — the per-query re-sync
     // is covered by the mirror's timezone test.
     adapter.databaseTimezone = "utc";
-    await withTimezoneConfig({ default: "local" }, () => {
-      adapter.configureConnection();
+    await withTimezoneConfig({ default: "local" }, async () => {
+      await adapter.configureConnection();
       expect(adapter.databaseTimezone).toBe("local");
     });
-    await withTimezoneConfig({ default: "utc" }, () => {
-      adapter.configureConnection();
+    await withTimezoneConfig({ default: "utc" }, async () => {
+      await adapter.configureConnection();
       expect(adapter.databaseTimezone).toBe("utc");
     });
   });

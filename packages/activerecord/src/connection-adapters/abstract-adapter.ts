@@ -1597,7 +1597,7 @@ export class AbstractAdapter implements Quoting {
     return dbStatementsTransaction.call(this as any, block, opts) as Promise<T | undefined>;
   }
 
-  close(): void {
+  close(): void | Promise<void> {
     // Mirrors Rails' `close` (abstract_adapter.rb:830): `pool.checkin self`.
     // Rails adapters always carry a pool (NullPool by default), whose
     // `checkin` is a no-op; trails leaves `pool` null for standalone adapters,

@@ -139,7 +139,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       try {
         await withTimezoneConfig({ default: "utc", awareAttributes: true }, async () => {
-          adapter.reconnect();
+          await adapter.reconnect();
           class PostgresqlTimestampWithZone extends Base {
             static _tableName = "postgresql_timestamp_with_zones";
           }
@@ -155,7 +155,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
         });
       } finally {
-        adapter.reconnect();
+        await adapter.reconnect();
         await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
       }
     });
@@ -170,7 +170,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       );
       try {
         await withTimezoneConfig({ default: "local", awareAttributes: false }, async () => {
-          adapter.reconnect();
+          await adapter.reconnect();
           // make sure to use a non-UTC time zone
           await adapter.execute(`SET time zone 'America/Jamaica'`);
           class PostgresqlTimestampWithZone extends Base {
@@ -186,7 +186,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
         });
       } finally {
-        adapter.reconnect();
+        await adapter.reconnect();
         await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
       }
     });
@@ -210,7 +210,7 @@ describeIfPg("PostgreSQLAdapter", () => {
             awareTypes: ["timestamptz", "datetime", "time"],
           },
           async () => {
-            adapter.reconnect();
+            await adapter.reconnect();
             class PostgresqlTimestampWithZone extends Base {
               static _tableName = "postgresql_timestamp_with_zones";
             }
@@ -227,7 +227,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           },
         );
       } finally {
-        adapter.reconnect();
+        await adapter.reconnect();
         await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
       }
     });
@@ -251,7 +251,7 @@ describeIfPg("PostgreSQLAdapter", () => {
               awareTypes: ["timestamptz", "datetime", "time"],
             },
             async () => {
-              adapter.reconnect();
+              await adapter.reconnect();
               class PostgresqlTimestampWithZone extends Base {
                 static _tableName = "postgresql_timestamp_with_zones";
               }
@@ -269,7 +269,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
         });
       } finally {
-        adapter.reconnect();
+        await adapter.reconnect();
         await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
       }
     });
@@ -291,7 +291,7 @@ describeIfPg("PostgreSQLAdapter", () => {
               awareTypes: ["timestamptz", "datetime", "time"],
             },
             async () => {
-              adapter.reconnect();
+              await adapter.reconnect();
               class PostgresqlTimestampWithZone extends Base {
                 static _tableName = "postgresql_timestamp_with_zones";
               }
@@ -307,7 +307,7 @@ describeIfPg("PostgreSQLAdapter", () => {
           );
         });
       } finally {
-        adapter.reconnect();
+        await adapter.reconnect();
         await adapter.exec(`DROP TABLE IF EXISTS postgresql_timestamp_with_zones`);
       }
     });

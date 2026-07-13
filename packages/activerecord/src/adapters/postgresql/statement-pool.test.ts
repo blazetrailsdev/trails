@@ -244,7 +244,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       await adapter.beginDbTransaction();
       await adapter.execute("SELECT $1::int", [1]);
       await adapter.rollback();
-      adapter.reconnect();
+      await adapter.reconnect();
       // Re-pop a statement into the pool's history, then tear down
       // the live connection and trigger the reset-branch of
       // clearCacheBang so the drain flag is set.
@@ -266,6 +266,10 @@ describeIfPg("PostgreSQLAdapter", () => {
       const observed: string[] = [];
       const live = conn!;
       const origQuery = live.query.bind(live);
+      // pg's `query` is overloaded with a void-returning callback form, so the
+      // mock's Promise return trips checksVoidReturn; the Promise form is the one
+      // exercised here (execute awaits it), so the return is intentional.
+      // eslint-disable-next-line @typescript-eslint/no-misused-promises
       vi.spyOn(live, "query").mockImplementation(((sql: unknown, ...rest: unknown[]) => {
         if (typeof sql === "string") observed.push(sql);
         return (origQuery as (...a: unknown[]) => unknown)(sql, ...rest);

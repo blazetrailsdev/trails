@@ -1750,7 +1750,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // and can't issue the query itself, so we await the warm here (getDatabaseVersion
     // memoizes into _databaseVersion) before super.configureConnection() invokes it.
     await this.getDatabaseVersion();
-    super.configureConnection();
+    await super.configureConnection();
   }
 
   /**

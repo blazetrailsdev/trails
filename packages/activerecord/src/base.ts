@@ -3020,8 +3020,9 @@ export class Base extends Model {
     // (e.g. association inverse wiring) BEFORE running the find/initialize
     // callbacks, so an `after_find` hook already sees the inverse set.
     block?.(record);
-    cbRunAfter(this.prototype, "find", record, { strict: "sync" });
-    cbRunAfter(this.prototype, "initialize", record, { strict: "sync" });
+    // strict:"sync" guarantees synchronous completion — void the settled result.
+    void cbRunAfter(this.prototype, "find", record, { strict: "sync" });
+    void cbRunAfter(this.prototype, "initialize", record, { strict: "sync" });
     return record;
   }
 
@@ -3235,7 +3236,8 @@ export class Base extends Model {
         // before after_initialize — used by association `build_record` to run
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
         initBlock?.(this as unknown as Base);
-        cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
+        // strict:"sync" guarantees synchronous completion -- void the settled result.
+        void cbRunAfter(ctor.prototype, "initialize", this, { strict: "sync" });
       }
     } else {
       // For the regular (non-multiparameter) path, mirror the multiparameter
@@ -3331,7 +3333,8 @@ export class Base extends Model {
         // before after_initialize — used by association `build_record` to run
         // `initialize_attributes` (scope FK + set_inverse_instance) first.
         initBlock?.(this as unknown as Base);
-        cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
+        // strict:"sync" guarantees synchronous completion -- void the settled result.
+        void cbRunAfter(ctor2.prototype, "initialize", this, { strict: "sync" });
       }
     }
     // Suppressed-callback fallback: parent caller fires after_initialize, so

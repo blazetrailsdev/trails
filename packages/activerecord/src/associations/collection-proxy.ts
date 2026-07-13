@@ -4108,7 +4108,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       get loaded() {
         return proxy._targetLoaded;
       },
-      reset: () => this.reset(),
+      // reset() returns `this` (a thenable Relation); the contract here is a
+      // plain void reset, so discard the proxy return rather than leak it.
+      reset: () => {
+        this.reset();
+      },
     };
   }
 

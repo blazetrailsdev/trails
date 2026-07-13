@@ -1636,7 +1636,9 @@ export class Model {
     // then fire after_initialize in Rails-compatible order.
     const callbackSuppressor = ctor as typeof ctor & { _suppressInitializeCallback?: boolean };
     if (callbackSuppressor._suppressInitializeCallback !== true) {
-      runAfterCallbacksOnProto(ctor.prototype, "initialize", this, { strict: "sync" });
+      // strict:"sync" guarantees synchronous completion (async callbacks throw),
+      // so the returned Promise is already settled — void the sync-strict result.
+      void runAfterCallbacksOnProto(ctor.prototype, "initialize", this, { strict: "sync" });
     }
   }
 
@@ -1875,7 +1877,9 @@ export class Model {
   /** @internal */
   _runValidateCallbacks(): void {
     const ctor = this.constructor as typeof Model;
-    runBeforeCallbacksOnProto(ctor.prototype, "validate", this, { strict: "sync" });
+    // strict:"sync" guarantees synchronous completion (async callbacks throw),
+    // so the returned Promise is already settled — void the sync-strict result.
+    void runBeforeCallbacksOnProto(ctor.prototype, "validate", this, { strict: "sync" });
   }
 
   /**

@@ -17,10 +17,10 @@ describe("Transaction (public wrapper, Rails ActiveRecord::Transaction)", () => 
     expect(t.uuid()).toBeNull();
   });
 
-  it("afterCommit on a null transaction runs the block immediately", () => {
+  it("afterCommit on a null transaction runs the block immediately", async () => {
     const t = Transaction.NULL_TRANSACTION;
     let ran = false;
-    t.afterCommit(() => {
+    await t.afterCommit(() => {
       ran = true;
     });
     expect(ran).toBe(true);

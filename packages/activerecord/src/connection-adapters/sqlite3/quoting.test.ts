@@ -306,9 +306,9 @@ describe("SQLite3::Quoting", () => {
   describe("SQLite microsecond round-trip — integration", () => {
     let adapter: AbstractSQLite3Adapter;
 
-    beforeEach(() => {
+    beforeEach(async () => {
       adapter = new BetterSQLite3Adapter(":memory:");
-      adapter.exec(`CREATE TABLE "events" (
+      await adapter.exec(`CREATE TABLE "events" (
         "id" INTEGER PRIMARY KEY AUTOINCREMENT,
         "ts"  DATETIME,
         "dt"  DATETIME,
@@ -319,7 +319,7 @@ describe("SQLite3::Quoting", () => {
 
     afterEach(async () => {
       await adapter.exec(`DROP TABLE IF EXISTS "events"`).catch(() => undefined);
-      adapter.close();
+      await adapter.close();
     });
 
     it("Temporal.Instant with microsecond precision survives INSERT → SELECT as Instant", async () => {

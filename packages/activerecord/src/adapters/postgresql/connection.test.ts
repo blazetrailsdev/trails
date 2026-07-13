@@ -306,7 +306,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
   it("reconnect resets connection so queries work again", async () => {
     const a = new PostgreSQLAdapter(PG_TEST_URL);
     try {
-      a.reconnect();
+      await a.reconnect();
       expect(a.active).toBe(true);
       const rows = await a.execute("SELECT 1 AS n");
       expect(rows[0]?.n).toBe(1);
@@ -320,7 +320,7 @@ describeIfPg("PostgresqlConnectionTest", () => {
     try {
       a.disconnectBang();
       expect(a.active).toBe(false);
-      a.reconnect();
+      await a.reconnect();
       expect(a.active).toBe(true);
       const rows = await a.execute("SELECT 2 AS n");
       expect(rows[0]?.n).toBe(2);

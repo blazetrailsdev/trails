@@ -11,14 +11,16 @@ import { PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helpe
 
 let adapter: AbstractSQLite3Adapter;
 
-beforeEach(() => {
+beforeEach(async () => {
   adapter = new BetterSQLite3Adapter(":memory:");
-  adapter.exec(`CREATE TABLE "subscribers" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "nick" TEXT)`);
+  await adapter.exec(
+    `CREATE TABLE "subscribers" ("id" INTEGER PRIMARY KEY AUTOINCREMENT, "nick" TEXT)`,
+  );
 });
 
 afterEach(async () => {
   await adapter.exec(`DROP TABLE IF EXISTS "subscribers"`).catch(() => undefined);
-  adapter.close();
+  await adapter.close();
 });
 
 describe("AdapterPreventWritesTest", () => {

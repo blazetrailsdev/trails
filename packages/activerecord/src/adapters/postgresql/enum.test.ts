@@ -341,8 +341,8 @@ describeIfPg("PostgreSQLAdapter", () => {
               await schema.createTable(
                 "postgresql_enums_in_test_schema",
                 { force: "cascade" },
-                async (t) => {
-                  await t.enum("current_mood", { enum_type: "mood_in_test_schema" });
+                (t) => {
+                  t.enum("current_mood", { enum_type: "mood_in_test_schema" });
                 },
               );
             });

@@ -18,8 +18,8 @@ beforeEach(async () => {
   ]);
 });
 
-afterEach(() => {
-  adapter.close();
+afterEach(async () => {
+  await adapter.close();
 });
 
 describeIfSqlite("SQLite3VirtualTableTest", () => {
@@ -43,6 +43,6 @@ describeIfSqlite("SQLite3VirtualTableTest", () => {
     const adapter2 = new BetterSQLite3Adapter(":memory:");
     await adapter2.createVirtualTable("emails", "fts5", ["content", "meta UNINDEXED"]);
     expect(await adapter2.virtualTableExists("emails")).toBe(true);
-    adapter2.close();
+    await adapter2.close();
   });
 });

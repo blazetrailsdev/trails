@@ -50,7 +50,7 @@ describe("AdapterLeasingTest", () => {
     expect(adapter.inUse).toBe(true);
 
     // Close should put the adapter back in the pool
-    adapter.close();
+    await adapter.close();
     expect(adapter.inUse).toBe(false);
 
     expect(await pool.leaseConnection()).toBe(adapter);

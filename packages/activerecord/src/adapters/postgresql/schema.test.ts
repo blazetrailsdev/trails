@@ -915,7 +915,7 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("Active Record basics", async () => {
       await adapter.setSchemaSearchPath('"my.schema"');
-      await adapter.createTable("articles", async (t) => {
+      await adapter.createTable("articles", (t) => {
         t.string("title");
       });
       class Article extends Base {
