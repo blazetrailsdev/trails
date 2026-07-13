@@ -2,6 +2,7 @@ import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
+import { getOrCreateModuleCarrier } from "./module-carrier.js";
 
 // Injected by base.ts to break the store→serialize→json→store circular dep.
 // store() calls this when wiring IndifferentCoder for plain text/string columns.
@@ -125,12 +126,7 @@ const _storeModuleProtos = new WeakMap<typeof Base, object>();
  * @internal
  */
 function getOrCreateStoreModuleProto(modelClass: typeof Base): object {
-  if (_storeModuleProtos.has(modelClass)) return _storeModuleProtos.get(modelClass)!;
-  const currentParent = Object.getPrototypeOf(modelClass.prototype) as object;
-  const storeModule = Object.create(currentParent);
-  Object.setPrototypeOf(modelClass.prototype, storeModule);
-  _storeModuleProtos.set(modelClass, storeModule);
-  return storeModule;
+  return getOrCreateModuleCarrier(modelClass, _storeModuleProtos);
 }
 
 /**
