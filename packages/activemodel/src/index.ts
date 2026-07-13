@@ -25,6 +25,7 @@ export {
   assertHashAttributes,
   attributeWriterMissing,
   sanitizeForMassAssignment,
+  isMassAssignmentEmpty,
   ArgumentError,
 } from "./attribute-assignment.js";
 export type { AttributeAssignment } from "./attribute-assignment.js";

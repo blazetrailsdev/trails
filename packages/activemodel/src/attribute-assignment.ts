@@ -11,10 +11,49 @@ export function assignAttributes(model: AttributeAssignment, newAttributes: unkn
   assertHashAttributes(newAttributes);
 
   const attrs = newAttributes;
-  if (Object.keys(attrs).length === 0) return;
+  if (isMassAssignmentEmpty(attrs)) return;
 
   const sanitized = sanitizeForMassAssignment(attrs);
   _assignAttributes(model, sanitized);
+}
+
+/**
+ * The mass-assignment empty-bag guard shared by every entry point that runs
+ * `sanitize_for_mass_assignment` before per-key dispatch (the `Model`
+ * constructor, `Model#assignAttributes`, and the ActiveRecord `Base`
+ * constructor).
+ *
+ * Mirrors ActiveModel::AttributeAssignment#assign_attributes'
+ * `return if new_attributes.empty?` (attribute_assignment.rb:32). A params-like
+ * wrapper (the `ActionController::Parameters` analogue) delegates `empty?` to
+ * its private parameter store (strong_parameters.rb:250) — so counting the
+ * wrapper's own `Object.keys` reads its instance fields (`parameters`,
+ * `_permitted`), NOT its parameter count, and an EMPTY unpermitted wrapper
+ * would wrongly read as non-empty and proceed into sanitization instead of
+ * being a no-op. Consult the wrapper's `empty` when present; a plain hash has
+ * no such delegate, so it falls through to the key count.
+ *
+ * @internal Rails-private helper.
+ */
+export function isMassAssignmentEmpty(attrs: object): boolean {
+  if (isParamsLikeWrapper(attrs)) {
+    const empty = (attrs as { empty?: unknown }).empty;
+    if (typeof empty === "boolean") return empty;
+  }
+  return Object.keys(attrs).length === 0;
+}
+
+/**
+ * A non-plain object duck-typing the `ActionController::Parameters` surface
+ * (`permitted`/`toH`) — distinct from a plain hash, whose own keys ARE its
+ * contents. Only such a wrapper's `empty` should be consulted, so a plain hash
+ * that happens to carry an `empty: <boolean>` attribute is unaffected.
+ */
+function isParamsLikeWrapper(attrs: object): boolean {
+  const proto = Object.getPrototypeOf(attrs);
+  if (proto === Object.prototype || proto === null) return false;
+  const wrapper = attrs as PermittedAttributes;
+  return typeof wrapper.permitted === "function" || typeof wrapper.toH === "function";
 }
 
 export interface AttributeAssignment {

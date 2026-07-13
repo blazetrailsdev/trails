@@ -22,6 +22,13 @@ class ProtectedParams {
     return this;
   }
 
+  // Rails ProtectedParams: `delegate :empty?, to: :@parameters`. The wrapper's
+  // own instance fields (`parameters`, `_permitted`) are NOT its contents, so
+  // emptiness must delegate to the private parameter store.
+  get empty(): boolean {
+    return Object.keys(this.parameters).length === 0;
+  }
+
   toH(): Record<string, unknown> {
     return this.parameters;
   }
@@ -278,6 +285,50 @@ describe("AttributeAssignmentTest", () => {
     p.assignAttributes({ name: "Dave", role: "admin" });
     expect(p.readAttribute("name")).toBe("Dave");
     expect(p.readAttribute("role")).toBeNull();
+  });
+
+  it("empty params wrapper is a no-op on assignAttributes (empty? delegation)", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person({});
+    // Empty AND unpermitted: Rails `assign_attributes` returns before
+    // sanitizing (`return if new_attributes.empty?`), so no
+    // ForbiddenAttributesError despite the wrapper being unpermitted.
+    const params = new ProtectedParams({});
+    expect(() => p.assignAttributes(params as unknown as Record<string, unknown>)).not.toThrow();
+    expect(p.readAttribute("name")).toBeNull();
+  });
+
+  it("empty params wrapper is a no-op at construction (empty? delegation)", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const params = new ProtectedParams({});
+    let record: Person | undefined;
+    expect(() => {
+      record = new Person(params as unknown as Record<string, unknown>);
+    }).not.toThrow();
+    expect(record!.readAttribute("name")).toBeNull();
+  });
+
+  it("non-empty unpermitted params wrapper still raises (empty? delegation)", () => {
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    const p = new Person({});
+    // Non-empty (per empty? delegation, not the wrapper's Object.keys) → the
+    // guard proceeds into sanitize_for_mass_assignment, which forbids it.
+    const params = new ProtectedParams({ name: "Bob" });
+    expect(() => p.assignAttributes(params as unknown as Record<string, unknown>)).toThrow(
+      ForbiddenAttributesError,
+    );
   });
 
   it("subclass override of _assignAttribute is called by _assignAttributes", () => {

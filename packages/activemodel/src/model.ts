@@ -81,6 +81,7 @@ import {
   sanitizeForMassAssignment as attrSanitize,
   attributeWriterMissing as defaultAttributeWriterMissing,
   assertHashAttributes,
+  isMassAssignmentEmpty,
   ArgumentError,
 } from "./attribute-assignment.js";
 import { PresenceValidator } from "./validations/presence.js";
@@ -1620,7 +1621,7 @@ export class Model {
     // sanitize on the AR path no-ops rather than double-checking.
     this._initializingAttributes = true;
     try {
-      if (Object.keys(attrs).length > 0) {
+      if (!isMassAssignmentEmpty(attrs)) {
         this._assignAttributes(this.sanitizeForMassAssignment(attrs));
       }
     } finally {
@@ -2395,7 +2396,7 @@ export class Model {
   assignAttributes(newAttributes: unknown): void {
     assertHashAttributes(newAttributes);
     const attrs = newAttributes;
-    if (Object.keys(attrs).length === 0) return;
+    if (isMassAssignmentEmpty(attrs)) return;
     this._assignAttributes(this.sanitizeForMassAssignment(attrs));
   }
 
