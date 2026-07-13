@@ -5209,6 +5209,12 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
 // schema changes — the trails analogue of Rails' `dirties_query_cache base,
 // :execute` for the write side.
 dirtiesQueryCache(PostgreSQLAdapter, "executeMutation");
+// `execInsert`'s multi-column RETURNING read-back runs through `internalExecQuery`
+// rather than `executeMutation`, so dirty it too — otherwise a subsequent read
+// could be served stale from the query cache after such an INSERT. (The
+// single-column path delegates to `executeMutation`, which is already dirtied;
+// the double-clear there is a harmless no-op.)
+dirtiesQueryCache(PostgreSQLAdapter, "execInsert");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers
