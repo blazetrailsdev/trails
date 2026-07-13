@@ -12,6 +12,7 @@ import { Notifications } from "@blazetrails/activesupport";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Result } from "../result.js";
+import { Store } from "./abstract/query-cache.js";
 import { Uuid } from "./postgresql/oid/uuid.js";
 import { PostgreSQLAdapter, type StatementPool } from "./postgresql-adapter.js";
 
@@ -372,5 +373,42 @@ describe("PostgreSQLAdapter#executeMutation", () => {
       secondCallRan = true;
     });
     expect(secondCallRan).toBe(true);
+  });
+});
+
+describe("PostgreSQLAdapter#execInsert query cache", () => {
+  let adapter: PostgreSQLAdapter;
+
+  afterEach(async () => {
+    vi.restoreAllMocks();
+    if (adapter) await adapter.close().catch(() => undefined);
+  });
+
+  // The multi-column RETURNING read-back runs through internalExecQuery, not
+  // executeMutation, so only `dirtiesQueryCache(PostgreSQLAdapter, "execInsert")`
+  // clears the cache on that path — matching MySQL/SQLite. Rails dirties the
+  // query cache on every write; without the execInsert registration a cached
+  // SELECT after such an INSERT would be served stale.
+  it("clears the query cache on a multi-column RETURNING insert", async () => {
+    adapter = new PostgreSQLAdapter({ host: "localhost", port: 1 });
+    const qc = new Store();
+    qc.enabled = true;
+    qc.dirties = true;
+    await qc.computeIfAbsent("SELECT * FROM posts", async () => [{ id: 1 }]);
+    expect(qc.empty).toBe(false);
+    (adapter as unknown as { _queryCache: Store })._queryCache = qc;
+    (adapter as unknown as { _useInsertReturning: boolean })._useInsertReturning = true;
+
+    // The dirtiesQueryCache wrapper clears before delegating to the original
+    // execInsert; the delegated read-back has no live connection and rejects,
+    // but the cache is already cleared by then.
+    await adapter
+      .execInsert("INSERT INTO posts (title) VALUES ('t')", "SQL", [], "id", null, [
+        "id",
+        "created_at",
+      ])
+      .catch(() => undefined);
+
+    expect(qc.empty).toBe(true);
   });
 });
