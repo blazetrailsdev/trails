@@ -42,6 +42,19 @@ import { Post } from "../test-helpers/models/post.js";
 import { Developer, AuditLog } from "../test-helpers/models/developer.js";
 import { Room } from "../test-helpers/models/room.js";
 import { User } from "../test-helpers/models/user.js";
+import { Image } from "../test-helpers/models/image.js";
+import { Department } from "../test-helpers/models/department.js";
+import { Chef } from "../test-helpers/models/chef.js";
+import { DrinkDesignerWithPolymorphicDependentNullifyChef } from "../test-helpers/models/drink-designer.js";
+import {
+  CpkBook,
+  CpkOrder,
+  CpkOrderWithNullifiedBook,
+  CpkBrokenOrder,
+  CpkBrokenOrderWithNonCpkBooks,
+  CpkNonCpkBook,
+} from "../test-helpers/models/cpk.js";
+import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import {
   assertQueriesCount,
@@ -131,10 +144,26 @@ describe("HasOneAssociationsTest", () => {
     registerModel("SpecialBook", SpecialBook);
     registerModel("SpecialAuthor", SpecialAuthor);
     registerModel("SpecialSubscription", SpecialSubscription);
+    registerModel(Image);
+    registerModel(Department);
+    registerModel(Chef);
+    registerModel(DrinkDesignerWithPolymorphicDependentNullifyChef);
+    registerModel(CpkBook);
+    registerModel(CpkOrder);
+    registerModel(CpkOrderWithNullifiedBook);
+    registerModel(CpkBrokenOrder);
+    registerModel(CpkBrokenOrderWithNonCpkBooks);
+    registerModel(CpkNonCpkBook);
     await Company.loadSchema();
     await Account.loadSchema();
     await Car.loadSchema();
     await Bulb.loadSchema();
+    await Image.loadSchema();
+    await Department.loadSchema();
+    await Chef.loadSchema();
+    await DrinkDesignerWithPolymorphicDependentNullifyChef.loadSchema();
+    await CpkBook.loadSchema();
+    await CpkOrderWithNullifiedBook.loadSchema();
   });
 
   beforeEach(() => {
@@ -245,9 +274,19 @@ describe("HasOneAssociationsTest", () => {
     expect((await Account.find(oldAccountId)).firm_id).toBeNull();
   });
 
-  it.skip("nullify on polymorphic association", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): polymorphic dependent: :nullify on Department/Chef/DrinkDesigner
-    // (employable) — polymorphic has_one feature gap.
+  it("nullify on polymorphic association", async () => {
+    const department = await Department.create();
+    const designer = await DrinkDesignerWithPolymorphicDependentNullifyChef.create();
+    const chef = await (department as any).chefs.create({ employable: designer });
+
+    expect(chef.employable_id).toBe(designer.id);
+    expect(chef.employable_type).toBe((designer.constructor as typeof Base).name);
+
+    await designer.destroy();
+    await chef.reload();
+
+    expect(chef.employable_id).toBeNull();
+    expect(chef.employable_type).toBeNull();
   });
 
   it("nullification on destroyed association", async () => {
@@ -258,8 +297,19 @@ describe("HasOneAssociationsTest", () => {
     expect(developer.isPersisted()).toBe(false);
   });
 
-  it.skip("nullification on cpk association", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Cpk::Book / Cpk::OrderWithNullifiedBook composite-PK has_one — gap.
+  it("nullification on cpk association", async () => {
+    const book = await CpkBook.create({ id: [1, 2] });
+    const otherBook = await CpkBook.create({ id: [3, 4] });
+    const order = await CpkOrderWithNullifiedBook.create({ book });
+
+    // Property setter queues the replace; `order.save()` flushes it
+    // (matching the sibling `nullification on association change` test),
+    // nullifying the displaced book's composite foreign key.
+    (order as any).book = otherBook;
+    await (order as any).save();
+
+    expect(book.order_id).toBeNull();
+    expect(book.shop_id).toBeNull();
   });
 
   it("natural assignment to nil after destroy", async () => {
@@ -861,8 +911,18 @@ describe("HasOneAssociationsTest", () => {
     }).toThrow(ArgumentError);
   });
 
-  it.skip("with polymorphic has one with custom columns name", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Image polymorphic has_one with custom column names — gap.
+  it("with polymorphic has one with custom columns name", async () => {
+    const post = await Post.create({ title: "foo", body: "bar" });
+    const image = await Image.create();
+
+    (post as any).mainImage = image;
+    await (post as any).save();
+    await post.reload();
+
+    const mainImage = await readHasOne(post, "mainImage");
+    expect(mainImage.id).toBe(image.id);
+    const imageable = await (image as any).loadBelongsTo("imageable");
+    expect(imageable.id).toBe(post.id);
   });
 
   it("dangerous association name raises ArgumentError", () => {
@@ -1052,12 +1112,34 @@ describe("HasOneAssociationsTest", () => {
     expect(await UndestroyableBook.count()).toBe(bookCount);
   });
 
-  it.skip("composite primary key malformed association class", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Cpk::BrokenOrder CompositePrimaryKeyMismatchError — Cpk gap.
+  it("composite primary key malformed association class", () => {
+    registerModel(CpkBook);
+    const order = new CpkBrokenOrder();
+    let error: Error | undefined;
+    try {
+      order.association("book");
+    } catch (e) {
+      error = e as Error;
+    }
+    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
+    expect(error?.message).toBe(
+      `Association CpkBrokenOrder#book primary key ["shop_id", "status"] doesn't match with foreign key broken_order_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
   });
 
-  it.skip("composite primary key malformed association owner class", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Cpk::BrokenOrderWithNonCpkBooks mismatch error — Cpk gap.
+  it("composite primary key malformed association owner class", () => {
+    registerModel(CpkNonCpkBook);
+    const order = new CpkBrokenOrderWithNonCpkBooks();
+    let error: Error | undefined;
+    try {
+      order.association("book");
+    } catch (e) {
+      error = e as Error;
+    }
+    expect(error).toBeInstanceOf(CompositePrimaryKeyMismatchError);
+    expect(error?.message).toBe(
+      `Association CpkBrokenOrderWithNonCpkBooks#book primary key ["shop_id", "status"] doesn't match with foreign key broken_order_with_non_cpk_books_id. Please specify query_constraints, or primary_key and foreign_key values.`,
+    );
   });
 });
 

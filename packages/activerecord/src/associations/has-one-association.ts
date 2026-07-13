@@ -398,7 +398,8 @@ export class HasOneAssociation extends SingularAssociation {
     }
 
     if (this.reflection.options.as) {
-      const typeCol = `${underscore(this.reflection.options.as)}_type`;
+      const typeCol =
+        this.reflection.options.foreignType ?? `${underscore(this.reflection.options.as)}_type`;
       // Rails writes `owner.class.base_class.name` (polymorphic_name), so STI
       // subclasses store their base class name in the `as:` type column.
       const typeName = polymorphicName(ctor as typeof Base);
