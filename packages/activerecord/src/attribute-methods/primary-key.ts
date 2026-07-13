@@ -136,8 +136,11 @@ export function setId(this: PrimaryKeyInstance, value: unknown): void {
         `Expected value matching [${pk.map((col) => JSON.stringify(col)).join(", ")}], got ${inspectValue(value)}.`,
       );
     }
+    // Rails' `@primary_key.zip(value)` pads short values with nil, so
+    // `id = [1]` writes nil to the trailing key part rather than leaving it
+    // untouched. Coerce past-the-end elements to null (not undefined) to match.
     const values = Array.isArray(value) ? value : [...value];
-    pk.forEach((col, i) => this._writeAttribute(col, values[i]));
+    pk.forEach((col, i) => this._writeAttribute(col, i < values.length ? values[i] : null));
   } else if (pk == null) {
     // Key-less model: Rails does NOT install the PrimaryKey `id=` override
     // without a primary key (`instance_method_already_implemented?` gates the

@@ -19,4 +19,12 @@ describe("CompositePrimaryKey#id= — Enumerable acceptance (trails-only)", () =
       book.id = "1" as unknown as number[];
     }).toThrow(new TypeError('Expected value matching ["author_id", "id"], got "1".'));
   });
+
+  it("pads a short value with null like Ruby's zip", () => {
+    // `@primary_key.zip([1])` yields `[[author_id, 1], [id, nil]]`, so the
+    // trailing key part is written nil, not left untouched.
+    const book = new CpkBook();
+    book.id = [1] as unknown as number[];
+    expect(book.id).toEqual([1, null]);
+  });
 });
