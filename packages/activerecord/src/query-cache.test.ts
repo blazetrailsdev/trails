@@ -25,7 +25,12 @@ for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 // disabling + clearing it afterward.
 function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> {
   let hook: { run(): void; complete(): void } | null = null;
-  QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, [Base.connectionPool()]);
+  // Resolve the pool list lazily on each run/complete so pools established
+  // after the middleware is built (the multi-role `connected_to(role: :reading)`
+  // tests) are included, mirroring Rails' `connection_pool_list(:all)`.
+  QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, () =>
+    Base.connectionHandler.connectionPoolList("all"),
+  );
   return async () => {
     hook!.run();
     try {
@@ -59,12 +64,69 @@ function assertCache(
   }
 }
 
+// Reads the pool-level query-cache max size — the trails analogue of Rails'
+// `pool.query_cache.instance_variable_get(:@max_size)`. Rails reads it off the
+// per-connection `Store`; trails' `Store` coalesces a disabled pool's `nil`
+// size to `0`, so the faithful value lives on the pool's cache config
+// (`@query_cache_max_size` in Rails). `false`/`0` → `null`, an Integer → that
+// integer, `nil` → the default size (100). trails represents Rails' "unbounded"
+// `nil` (the fall-through for a raw string like "unlimited") as `Infinity`.
+function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
+  return (pool as unknown as { _cacheConfig: { _queryCacheMaxSize: number | null } })._cacheConfig
+    ._queryCacheMaxSize;
+}
+
+// Mirrors ActiveRecord::TestCase#clean_up_connection_handler: drop every
+// non-default (e.g. :reading) role a test established, leaving the writing pool.
+function cleanUpConnectionHandler(): void {
+  const managers: Map<string, { roleNames: string[]; removeRole(role: string): boolean }> = (
+    Base.connectionHandler as unknown as {
+      _connectionNameToPoolManager: Map<string, never>;
+    }
+  )._connectionNameToPoolManager as never;
+  for (const [, poolManager] of managers) {
+    for (const role of [...poolManager.roleNames]) {
+      if (role !== Base.defaultRole) poolManager.removeRole(role);
+    }
+  }
+}
+
+// Mirrors ActiveRecord::TestFixtures#setup_shared_connection_pool: point every
+// role's pool config at the writing pool config so a freshly-established
+// :reading pool shares the fixture-pinned connection (and therefore sees the
+// same rows), the same mechanism Rails uses to keep roles coherent under tests.
+function setupSharedConnectionPool(): void {
+  const writingRole = Base.writingRole;
+  const managers: Map<
+    string,
+    {
+      shardNames: string[];
+      roleNames: string[];
+      getPoolConfig(role: string, shard: string): unknown;
+      setPoolConfig(role: string, shard: string, config: unknown): void;
+    }
+  > = (Base.connectionHandler as unknown as { _connectionNameToPoolManager: Map<string, never> })
+    ._connectionNameToPoolManager as never;
+  for (const [, poolManager] of managers) {
+    for (const shard of [...poolManager.shardNames]) {
+      const writingPoolConfig = poolManager.getPoolConfig(writingRole, shard);
+      if (!writingPoolConfig) continue;
+      for (const role of [...poolManager.roleNames]) {
+        const poolConfig = poolManager.getPoolConfig(role, shard);
+        if (!poolConfig || poolConfig === writingPoolConfig) continue;
+        poolManager.setPoolConfig(role, shard, writingPoolConfig);
+      }
+    }
+  }
+}
+
 describe("QueryCacheTest", () => {
   fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"]);
 
   afterEach(async () => {
     Task.connectionPool().clearQueryCache();
     Base.connectionPool().disableQueryCacheBang();
+    cleanUpConnectionHandler();
   });
 
   it.skip("execute clear cache", () => {
@@ -128,22 +190,99 @@ describe("QueryCacheTest", () => {
     assertCache("off");
   });
 
-  it.skip("query cache is applied to all connections", () => {
-    // BLOCKED: multi-role connection handler (connected_to role: :reading) — not
-    // supported by trails' single-pool handler.
+  it("query cache is applied to all connections", async () => {
+    const dbConfig = Base.connectionPool().dbConfig;
+    await Base.connectedTo({ role: "reading" }, async () => {
+      Base.connectionHandler.establishConnection(dbConfig, { owner: "Base", role: "reading" });
+    });
+
+    const mw = middleware(async () => {
+      for (const pool of Base.connectionHandler.connectionPoolList("all")) {
+        await pool.leaseConnection();
+        expect(pool.queryCacheEnabled).toBe(true);
+      }
+    });
+
+    await mw();
   });
 
-  it.skip("cache is not applied when config is false", () => {
-    // BLOCKED: multi-role connection handler (connected_to role: :reading).
+  it("cache is not applied when config is false", async () => {
+    const dbConfig = Base.connectionPool().dbConfig;
+    await Base.connectedTo({ role: "reading" }, async () => {
+      Base.connectionHandler.establishConnection(
+        { ...dbConfig.configurationHash, queryCache: false },
+        { owner: "Base", role: "reading" },
+      );
+    });
+
+    const mw = middleware(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        assertCache("off");
+        expect(poolQueryCacheMaxSize(Base.connectionPool())).toBeNull();
+      });
+    });
+
+    await mw();
   });
-  it.skip("cache is applied when config is string", () => {
-    // BLOCKED: multi-role connection handler (connected_to role: :reading).
+
+  it("cache is applied when config is string", async () => {
+    const dbConfig = Base.connectionPool().dbConfig;
+    await Base.connectedTo({ role: "reading" }, async () => {
+      Base.connectionHandler.establishConnection(
+        { ...dbConfig.configurationHash, queryCache: "unlimited" },
+        { owner: "Base", role: "reading" },
+      );
+    });
+
+    const mw = middleware(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        assertCache("clean");
+        // Rails leaves `@max_size` nil (unbounded) for a raw string config;
+        // trails represents that unbounded size as `Infinity`.
+        expect(poolQueryCacheMaxSize(Base.connectionPool())).toBe(Number.POSITIVE_INFINITY);
+      });
+    });
+
+    await mw();
   });
-  it.skip("cache is applied when config is integer", () => {
-    // BLOCKED: multi-role connection handler (connected_to role: :reading).
+
+  it("cache is applied when config is integer", async () => {
+    const dbConfig = Base.connectionPool().dbConfig;
+    await Base.connectedTo({ role: "reading" }, async () => {
+      Base.connectionHandler.establishConnection(
+        { ...dbConfig.configurationHash, queryCache: 42 },
+        { owner: "Base", role: "reading" },
+      );
+    });
+
+    const mw = middleware(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        assertCache("clean");
+        expect(poolQueryCacheMaxSize(Base.connectionPool())).toBe(42);
+      });
+    });
+
+    await mw();
   });
-  it.skip("cache is applied when config is nil", () => {
-    // BLOCKED: multi-role connection handler (connected_to role: :reading).
+
+  it("cache is applied when config is nil", async () => {
+    const dbConfig = Base.connectionPool().dbConfig;
+    await Base.connectedTo({ role: "reading" }, async () => {
+      Base.connectionHandler.establishConnection(
+        { ...dbConfig.configurationHash, queryCache: null },
+        { owner: "Base", role: "reading" },
+      );
+    });
+
+    const mw = middleware(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        assertCache("clean");
+        // Rails ConnectionAdapters::QueryCache::DEFAULT_SIZE.
+        expect(poolQueryCacheMaxSize(Base.connectionPool())).toBe(100);
+      });
+    });
+
+    await mw();
   });
 
   it.skip("query cache with forked processes", () => {
@@ -477,8 +616,39 @@ describe("QueryCacheTest", () => {
     await mw();
   });
 
-  it.skip("clear query cache is called on all connections", () => {
-    // BLOCKED: multi-role connection handler (connected_to role: :reading).
+  // Rails guards this with `unless in_memory_db?` (a :memory: reading role
+  // can't see the writing role's database). trails' worker DB is file-backed
+  // and, via setupSharedConnectionPool, the reading role shares the
+  // fixture-pinned writing connection, so the guard doesn't apply.
+  it("clear query cache is called on all connections", async () => {
+    const dbConfig = Base.connectionPool().dbConfig;
+    await Base.connectedTo({ role: "reading" }, async () => {
+      Base.connectionHandler.establishConnection(dbConfig, { owner: "Base", role: "reading" });
+    });
+    setupSharedConnectionPool();
+
+    let topic: Topic | null = null;
+    const mw = middleware(async () => {
+      await Base.connectedTo({ role: "reading" }, async () => {
+        topic = await Topic.first();
+      });
+
+      expect(topic).toBeTruthy();
+
+      await Base.connectedTo({ role: "writing" }, async () => {
+        topic!.title = "Topic title";
+        await topic!.saveBang();
+      });
+
+      expect(topic!.title).toBe("Topic title");
+
+      await Base.connectedTo({ role: "reading" }, async () => {
+        topic = await Topic.first();
+        expect(topic!.title).toBe("Topic title");
+      });
+    });
+
+    await mw();
   });
 
   it.skip("query cache is enabled in threads with shared connection", () => {
