@@ -920,6 +920,12 @@ describe("HasOneAssociationsTest", () => {
     const author = await (SpecialAuthor as any).createBang({ name: "Test" });
     const book = await (SpecialBook as any).createBang({ status: "published" });
     author.book = book;
+    // Rails' `author.book = book` persists the FK synchronously (has_one
+    // replace saves the child). In trails, plain assignment routes through
+    // queueWrite, which defers persistence to the owner's next save() — so
+    // save() is required for book.author_id to actually hit the DB before the
+    // join count below observes it.
+    await author.save();
 
     expect(book.status).toBe("published");
     expect(
