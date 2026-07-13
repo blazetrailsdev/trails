@@ -632,13 +632,31 @@ function referencesAssociationName(sources: string[], name: string): boolean {
  * Expand callback filter sources with the source of any model-defined instance
  * method they (transitively) reference, so an association read reached through a
  * helper — e.g. `before_destroy { this.makeComments() }` where `makeComments`
- * reads `this.person` — is still detected. Only methods declared on the model's
- * own prototype chain (below `Base`) are followed; framework methods and the
- * association readers themselves are ignored. Bounded by the model's method
- * count via the `seen` set, so mutually-recursive helpers can't loop.
+ * reads `this.person` — is still detected. Methods declared on the model's own
+ * prototype chain (below `Base`) are followed, as are instance-own
+ * function-valued properties — arrow-function class fields
+ * (`makeComments = async () => { ... this.person }`) live on the instance, not
+ * the prototype, so the prototype walk alone would miss them. Framework methods
+ * and the association readers themselves are ignored. Bounded by the model's
+ * method count via the `seen` set, so mutually-recursive helpers can't loop.
  */
-function expandCallbackSourcesWithHelpers(sources: string[], ctor: typeof Base): string[] {
+function expandCallbackSourcesWithHelpers(
+  sources: string[],
+  ctor: typeof Base,
+  record?: InstanceType<typeof Base>,
+): string[] {
   const methods = new Map<string, string>();
+  // Instance-own function properties (arrow-field methods) first: they win
+  // method dispatch over a same-named prototype method, so their source is the
+  // one actually run — record them before the prototype walk, whose
+  // `methods.has(key)` guard then leaves them in place.
+  if (record) {
+    for (const key of Object.getOwnPropertyNames(record)) {
+      if (key === "constructor" || methods.has(key)) continue;
+      const desc = Object.getOwnPropertyDescriptor(record, key);
+      if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
+    }
+  }
   for (
     let proto = ctor.prototype;
     proto && proto !== Base.prototype;
@@ -3954,7 +3972,7 @@ export class Base extends Model {
     if (typeof (this as any).association !== "function") return;
     const { sources, opaque } = beforeOrAroundCallbackSources(ctor.prototype, "destroy");
     if (!opaque && sources.length === 0) return;
-    const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor);
+    const expanded = opaque ? sources : expandCallbackSourcesWithHelpers(sources, ctor, this);
     const useSavepoint = _currentTransactionPublic().isOpen();
     for (const ref of ctor.reflectOnAllAssociations("belongsTo")) {
       // Narrow to associations the callback names (unless an opaque callback
