@@ -25,7 +25,7 @@ import { JoinBase } from "./join-dependency/join-base.js";
 import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
-import { ConfigurationError } from "../errors.js";
+import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
 import { AliasTracker } from "./alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
@@ -196,21 +196,24 @@ export class JoinDependency {
    * 63 on PostgreSQL, 64 (default) on SQLite. Prefer the connection threaded by
    * the enclosing `withConnection` wrap over the deprecated `.connection`
    * getter (which flips the lease permanent under a restricted checkout mode);
-   * returns `undefined` when no connection resolves (or the `.connection` getter
-   * throws because none is established), letting the tracker fall back to its
-   * default so construction never fails on account of alias sizing.
+   * returns `undefined` only when no connection is established (the `.connection`
+   * getter throws `ConnectionNotDefined`), letting the tracker fall back to its
+   * default so construction never fails on account of alias sizing in
+   * connectionless contexts. A genuine connection/adapter error propagates,
+   * matching Rails' `pool.with_connection` raise semantics.
    * @internal
    */
   private _baseTableAliasLength(): number | undefined {
+    let connection;
     try {
-      const connection =
-        threadedConnectionFor(this._baseModel) ?? (this._baseModel as any).connection;
-      return typeof connection?.tableAliasLength === "function"
-        ? connection.tableAliasLength()
-        : undefined;
-    } catch {
-      return undefined;
+      connection = threadedConnectionFor(this._baseModel) ?? (this._baseModel as any).connection;
+    } catch (error) {
+      if (error instanceof ConnectionNotDefined) return undefined;
+      throw error;
     }
+    return typeof connection?.tableAliasLength === "function"
+      ? connection.tableAliasLength()
+      : undefined;
   }
 
   /**
