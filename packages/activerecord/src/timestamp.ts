@@ -82,11 +82,6 @@ export async function touch(
   const touchColSet = new Set<string>([...updateTimestampAttrs, ...resolvedNames]);
   const touchCols = Array.from(touchColSet);
 
-  // Mirrors Rails Persistence#touch (persistence.rb:805-810): when there are no
-  // timestamp columns and no caller-supplied names, the `else true end` branch
-  // returns true — touch is a successful no-op, not a failure.
-  if (touchCols.length === 0) return true;
-
   // Mirrors Rails: ActiveRecord::Transactions#touch wraps the persistence-layer
   // touch in `with_transaction_returning_status`, so the record is enrolled in
   // the current transaction and its `after_update_commit` /
@@ -117,6 +112,16 @@ function raiseRecordNotTouchedError(): never {
  */
 async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant): Promise<boolean> {
   const ctor = this.constructor as typeof Base;
+
+  // Mirrors Rails Callbacks#touch (`_run_touch_callbacks { super }`): the
+  // after_touch callbacks fire around the whole touch, even when the model has
+  // no timestamp columns and no caller-supplied names (persistence.rb:805-810's
+  // `else true end` no-op). This is how a `has_one ..., touch: true` on a model
+  // that itself has no timestamps still propagates the touch to its child.
+  if (touchCols.length === 0) {
+    await runAfterCallbacksOnProto(ctor.prototype, "touch", this);
+    return true;
+  }
 
   // Write new values via writeAttribute so changesApplied() populates previousChanges.
   for (const col of touchCols) {

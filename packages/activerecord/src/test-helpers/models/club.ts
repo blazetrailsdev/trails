@@ -7,6 +7,7 @@ import type { Sponsor } from "./sponsor.js";
 import type { SuperMembership } from "./membership.js";
 // vendor/rails/activerecord/test/models/club.rb
 import { Base } from "../../base.js";
+import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
 export class Club extends Base {
   declare membership: Membership | null;
@@ -59,6 +60,8 @@ export class Club extends Base {
     );
   }
 }
+
+acceptsNestedAttributesFor(Club, "membership");
 
 export class SuperClub extends Base {
   declare memberships: AssociationProxy<SuperMembership>;

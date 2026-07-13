@@ -108,14 +108,18 @@ export class HasOne extends SingularAssociation {
   static override defineCallbacks(model: any, reflection: any): void {
     super.defineCallbacks(model, reflection);
     const options = reflection.options ?? {};
-    if (options.touch) {
-      this.addTouchCallbacks(model, reflection);
-    }
     // Mirrors Rails AutosaveAssociation::AssociationBuilderExtension.build —
     // registered for every has_one regardless of the `autosave:` option.
     // The save callbacks gate on `options.autosave` internally; the validate
     // callback gates on `reflection.validate?` (true for `validate: true`).
+    // Registered BEFORE the touch callbacks so the child is autosaved (and thus
+    // persisted) before the after_create/after_update touch fires — mirrors
+    // Rails, where has_one.rb's `define_callbacks` runs `super` (which wires
+    // autosave) before `add_touch_callbacks`.
     addAutosaveAssociationCallbacks(model, reflection);
+    if (options.touch) {
+      this.addTouchCallbacks(model, reflection);
+    }
   }
 
   static override addDestroyCallbacks(model: any, reflection: any): void {
@@ -163,8 +167,13 @@ export class HasOne extends SingularAssociation {
       await HasOne.touchRecord(record, name, touch);
     };
 
-    afterCreate(model, callback);
-    afterUpdate(model, callback);
+    // Mirrors Rails `HasOne.add_touch_callbacks`: the create/update touch fires
+    // only when the owner actually saved changes (`if: :saved_changes?`), so a
+    // no-op `save` on an unchanged owner does not re-touch the child.
+    const savedChangesQ = (record: any) => Object.keys(record.savedChanges ?? {}).length > 0;
+
+    afterCreate(model, callback, { if: savedChangesQ });
+    afterUpdate(model, callback, { if: savedChangesQ });
     afterDestroy(model, async (record: any) => {
       if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
         await HasOne.touchRecord(record, name, touch);
