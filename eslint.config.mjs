@@ -9,6 +9,7 @@ import noNodeBuiltins from "./eslint/no-node-builtins.mjs";
 import noProcessBypass from "./eslint/no-process-bypass.mjs";
 import railsPrivateJsdoc from "./eslint/rails-private-jsdoc.mjs";
 import railsErrorParity from "./eslint/rails-error-parity.mjs";
+import railsCallbackInvocations from "./eslint/rails-callback-invocations.mjs";
 import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
@@ -145,6 +146,7 @@ export default defineConfig(
           "no-process-bypass": noProcessBypass,
           "rails-private-jsdoc": railsPrivateJsdoc,
           "rails-error-parity": railsErrorParity,
+          "rails-callback-invocations": railsCallbackInvocations,
           "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
@@ -253,6 +255,22 @@ export default defineConfig(
     ignores: ["**/*.test.ts"],
     rules: {
       "blazetrails/rails-error-parity": "error",
+    },
+  },
+
+  // ── rails-callback-invocations: a ported ActiveRecord method whose Rails
+  //    counterpart fires lifecycle callbacks (`_run_<event>_callbacks` /
+  //    `run_callbacks(:event)`) must keep firing them via
+  //    `runCallbacks("<event>")` / `runAllCallbacks`. Manifest:
+  //    eslint/rails-callback-invocations.json (built by
+  //    `pnpm tsx scripts/build-rails-privates-manifest.ts`, refreshed on
+  //    `pnpm api:compare`). Pre-existing violators are grandfathered in
+  //    eslint/rails-callback-invocations-exclude.json and ratcheted down. ──
+  {
+    files: ["packages/activerecord/src/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "blazetrails/rails-callback-invocations": "error",
     },
   },
 
