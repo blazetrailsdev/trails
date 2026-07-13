@@ -308,15 +308,41 @@ describe("QueryCacheTest", () => {
     });
   });
 
-  it.skip("cache notifications can be overridden", () => {
-    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-wiring-incomplete): Rails dups the connection and
-    // overrides `cache_notification_info` so the cached event payload carries
-    // `neat: true`. trails builds that payload from a module-level
-    // `cacheNotificationInfo` invoked via `cacheNotificationInfoResult.call(this)`
-    // (query-cache.ts) rather than an overridable per-connection method, so a
-    // per-connection override does not take effect and the `neat: true`
-    // assertion cannot be reproduced.
+  it("cache notifications can be overridden", async () => {
+    // Rails dups the connection and defines a singleton
+    // `connection.cache_notification_info(sql, name, binds)` that merges
+    // `neat: true` into `super`, then asserts the cached event carries it.
+    // trails dispatches the payload through the per-connection
+    // `cacheNotificationInfo` method, so an own-property override on the
+    // connection instance shadows the mixed-in one.
+    const events: NotificationEvent[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
+
+    const connection = (await Base.leaseConnection()) as unknown as {
+      cacheNotificationInfo(
+        sql: string,
+        name: string | null | undefined,
+        binds: unknown[],
+      ): Record<string, unknown>;
+      cache<T>(fn: () => T | Promise<T>): Promise<T>;
+      selectAll(sql: string): Promise<unknown>;
+    };
+    const original = connection.cacheNotificationInfo;
+    connection.cacheNotificationInfo = function (sql, name, binds) {
+      return { ...original.call(this, sql, name, binds), neat: true };
+    };
+
+    try {
+      await connection.cache(async () => {
+        await connection.selectAll("select 1");
+        await connection.selectAll("select 1");
+      });
+    } finally {
+      Notifications.unsubscribe(sub);
+      delete (connection as { cacheNotificationInfo?: unknown }).cacheNotificationInfo;
+    }
+
+    expect(events[events.length - 1].payload["neat"]).toBe(true);
   });
 
   it("cache does not raise exceptions", async () => {

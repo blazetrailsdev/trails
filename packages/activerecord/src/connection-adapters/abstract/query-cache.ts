@@ -170,6 +170,20 @@ export interface QueryCachePool {
 export interface QueryCacheHost extends DatabaseStatementsHost {
   _queryCache: Store | null;
   pool?: DatabaseStatementsHost["pool"] & QueryCachePool;
+  // Mixed in from the QueryCache module below. Dispatched through `this` (not
+  // the module-level functions) so a per-connection override is honored, as in
+  // Rails' `def connection.cache_notification_info`.
+  cacheNotificationInfo(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+  ): Record<string, unknown>;
+  cacheNotificationInfoResult(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+    result: Record<string, unknown>[],
+  ): Record<string, unknown>;
 }
 
 /**
@@ -537,7 +551,7 @@ function cacheNotificationInfoResult(
   binds: unknown[],
   result: Record<string, unknown>[],
 ): Record<string, unknown> {
-  const payload = cacheNotificationInfo.call(this, sql, name, binds);
+  const payload = this.cacheNotificationInfo(sql, name, binds);
   payload["row_count"] = result.length;
   return payload;
 }
@@ -568,7 +582,7 @@ function lookupSqlCache(
   if (result !== undefined) {
     Notifications.instrument(
       "sql.active_record",
-      cacheNotificationInfoResult.call(this, sql, name, binds, result),
+      this.cacheNotificationInfoResult(sql, name, binds, result),
     );
   }
   return result;
