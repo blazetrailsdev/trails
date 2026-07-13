@@ -329,14 +329,6 @@ export async function flushPendingReplaces(record: Base): Promise<void> {
   }
 }
 
-export function clearAutosaveState(record: Base): void {
-  const r = record as any;
-  r[MARKED_FOR_DESTRUCTION] = false;
-  r.destroyedByAssociation = null;
-  delete r[VALIDATING_BELONGS_TO_FOR];
-  delete r[AUTOSAVING_BELONGS_TO_FOR];
-}
-
 // ---------------------------------------------------------------------------
 // Validate & autosave (called from Base.isValid and Base.save)
 // ---------------------------------------------------------------------------
