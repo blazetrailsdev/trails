@@ -10,15 +10,24 @@
  * same logic across two classes — the base here in schema_dumper.rb
  * and a `ConnectionAdapters::SchemaDumper` subclass at
  * connection_adapters/abstract/schema_dumper.rb that adds adapter-
- * specific column-spec helpers. We keep the same file layout and
- * `inner extends outer` relationship; the inner lives at
- * connection-adapters/abstract/schema-dumper.ts.
+ * specific column-spec helpers. TypeScript can't `extends` the subclass
+ * back onto this base without an ESM temporal-dead-zone cycle, so we
+ * keep a single dumper class here and mix the subclass's column-spec
+ * helpers in as `this`-typed functions (CLAUDE.md "Module mixins"),
+ * whose bodies live at connection-adapters/abstract/schema-dumper.ts
+ * to preserve the api:compare file layout. Construction is fully
+ * synchronous and needs no other module to have loaded the adapter layer.
  */
 
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertSchemaAdapter } from "./connection-adapters/abstract/assert-schema-adapter.js";
 import type * as SchemaIntrospectionModule from "./schema-introspection.js";
+import * as adapterDumper from "./connection-adapters/abstract/schema-dumper.js";
+import type {
+  SchemaDumperMixinHost,
+  Column,
+} from "./connection-adapters/abstract/schema-dumper.js";
 import { SchemaMigration } from "./schema-migration.js";
 import { Base } from "./base.js";
 
@@ -339,19 +348,14 @@ export class SchemaDumper {
   static uniqueIgnorePattern: RegExp = /^uniq_rails_[0-9a-f]{10}$/;
 
   /**
-   * The `ConnectionAdapters::SchemaDumper` subclass, registered by that module
-   * at load. Rails has a single dumper: `SchemaDumper#table` drives columns
-   * through the unqualified `column_spec` (schema_dumper.rb:199), a private
-   * method defined only on the adapter subclass (abstract/schema_dumper.rb:13),
-   * so Rails always instantiates that subclass via `connection.create_schema_dumper`
-   * — a bare `ActiveRecord::SchemaDumper` would `NameError` on `column_spec`. TS
-   * can't mix a module into a class, so the emitter lives on the subclass and the
-   * base factory (`create`/`dump`/`dumpTableSchema`) redirects to it for
-   * non-adapter sources. Dialect subclasses set `this` to themselves and are
-   * never redirected.
+   * Per-table primary-key column order from `@connection.primary_key(table)`.
+   * Populated by `table()` before column iteration so `emitTable` can render
+   * `primaryKey: [...]` (and pick the single-PK column) in PK definition order
+   * rather than introspection/declaration order. Mirrors Rails' reliance on
+   * `@connection.primary_key(table)`, which already returns columns in key order.
    * @internal
    */
-  static connectionAdaptersDumper?: typeof SchemaDumper;
+  protected primaryKeyOrderCache: Record<string, string[] | undefined> = Object.create(null);
 
   private _source: SchemaSource;
   protected _options: Record<string, unknown>;
@@ -422,27 +426,11 @@ export class SchemaDumper {
     source: SchemaSource,
     options: Record<string, unknown> = {},
   ): InstanceType<T> {
-    // Redirect the bare base to the ConnectionAdapters subclass so the single
-    // `emitTable`/`columnSpec` dispatch (which lives there, mirroring Rails'
-    // adapter-mixed-in column_spec) serves every source. Dialect subclasses
-    // pass `this !== SchemaDumper` and construct themselves unchanged.
-    if (this !== SchemaDumper) return new this(source, options) as InstanceType<T>;
-    const Sub = SchemaDumper.connectionAdaptersDumper;
-    if (!Sub) {
-      // Like Rails, a bare base has no `column_spec` — `SchemaDumper#table`
-      // (schema_dumper.rb:199) calls the unqualified `column_spec`, private to
-      // the adapter subclass (abstract/schema_dumper.rb:13), so Rails always
-      // builds it via `connection.create_schema_dumper`. The public
-      // `SchemaDumper` export IS that subclass; this throw only fires for a deep
-      // import of the internal base module without the connection-adapters layer
-      // loaded. Deterministic (never a silent async/broken dump), not
-      // timing-dependent.
-      throw new Error(
-        "SchemaDumper has no column_spec on the base class; obtain the dumper via " +
-          "an adapter's createSchemaDumper() or the ConnectionAdapters SchemaDumper.",
-      );
-    }
-    return new Sub(source, options) as InstanceType<T>;
+    // Single dumper class: the `emitTable`/`columnSpec` dispatch is mixed onto
+    // this prototype (see the wrappers below), so a bare-base construction is
+    // fully self-contained. `this` is the concrete subclass, so calling
+    // `.create(...)` on a dialect subclass returns that subclass.
+    return new this(source, options) as InstanceType<T>;
   }
 
   /**
@@ -717,6 +705,17 @@ export class SchemaDumper {
 
   /** @internal */
   async table(tableName: string, lines: string[]): Promise<void> {
+    // Mirrors Rails' reliance on `@connection.primary_key(table)`: capture the
+    // authoritative PK column order before iterating columns so `emitTable` /
+    // `resolvePrimaryKeyColumns` render composite/promoted keys in key order.
+    const adapter = this._adapter();
+    if (adapter && typeof adapter.primaryKeys === "function") {
+      try {
+        this.primaryKeyOrderCache[tableName] = await adapter.primaryKeys(tableName);
+      } catch {
+        // Live introspection is best-effort; fall through to declaration order.
+      }
+    }
     this.tableName = tableName;
     try {
       const columns = await this._source.columns(tableName);
@@ -808,38 +807,173 @@ export class SchemaDumper {
   }
 
   /**
-   * Hook for adapter subclasses to reorder the primary-key column list emitted
-   * inside `tableOpts.primaryKey` for composite PKs. Default: identity
-   * (preserve `SHOW COLUMNS` declaration order). MySQL overrides this to
-   * mirror Rails' `@connection.primary_key(table)`, which returns columns in
-   * `seq_in_index` order.
+   * The table's primary-key columns, in key order. Defaults to the columns
+   * carrying the per-column `primaryKey` flag (reordered by the live PK order).
+   * Dialects whose per-column flag can over-report (e.g. MySQL's `column_key`
+   * promotes a UNIQUE NOT NULL index to `PRI` when there is no PRIMARY KEY)
+   * override this to consult the authoritative primary key instead.
    * @internal
    */
-  protected orderPrimaryKeyColumns(_tableName: string, pkColumns: ColumnInfo[]): ColumnInfo[] {
-    return pkColumns;
+  protected resolvePrimaryKeyColumns(tableName: string, columns: ColumnInfo[]): ColumnInfo[] {
+    return this.orderPrimaryKeyColumns(
+      tableName,
+      columns.filter((c) => c.primaryKey),
+    );
   }
 
   /**
-   * Emit a single `create_table` block. Mirrors the column-emission half of
-   * Rails' `SchemaDumper#table`, whose `@connection.column_spec(column)` call
-   * is provided by the adapter's mixed-in `ConnectionAdapters::SchemaDumper`.
-   * TS has no module mixin, so the implementation lives on that subclass
-   * (`connection-adapters/abstract/schema-dumper.ts`) and every dump reaches it
-   * via {@link create}'s redirect — the bare base is never the emitter.
+   * Reorder the primary-key column list to match the live PK order captured in
+   * `primaryKeyOrderCache` (`@connection.primary_key(table)`); falls back to the
+   * given order when no live order is known (in-memory / mock sources).
    * @internal
    */
+  protected orderPrimaryKeyColumns(tableName: string, pkColumns: ColumnInfo[]): ColumnInfo[] {
+    const order = this.primaryKeyOrderCache[tableName];
+    if (!order || order.length === 0) return pkColumns;
+    const byName = new Map(pkColumns.map((c) => [c.name, c]));
+    const reordered: ColumnInfo[] = [];
+    for (const name of order) {
+      const col = byName.get(name);
+      if (col) {
+        reordered.push(col);
+        byName.delete(name);
+      }
+    }
+    for (const col of byName.values()) reordered.push(col);
+    return reordered;
+  }
+
+  // Column-spec dispatch mixed in from the `ConnectionAdapters::SchemaDumper`
+  // layer (connection-adapters/abstract/schema-dumper.ts). The bodies live there
+  // to keep the api:compare file mapping; these thin `protected` wrappers put
+  // them on this single class's prototype (so dialect subclasses' `super`/
+  // `override` resolve normally) without a cyclic `extends`. Each wrapper passes
+  // `this` through `_mixinHost` because the mixed-in helpers reach members this
+  // class declares `protected` (a free function can't see those through `this`).
+
+  /**
+   * The same instance, typed as the public host view the mixin helpers expect.
+   * Only a type reinterpretation — dynamic dispatch through `this` (dialect
+   * overrides of schemaType, schemaLimit, …) is preserved.
+   * @internal
+   */
+  private get _mixinHost(): SchemaDumperMixinHost {
+    return this as unknown as SchemaDumperMixinHost;
+  }
+
+  /** @internal */
+  protected validType(type: string | null | undefined): boolean {
+    return adapterDumper.validType.call(this._mixinHost, type);
+  }
+
+  /** @internal */
   protected emitTable(
-    _lines: string[],
-    _tableName: string,
-    _columns: ColumnInfo[],
-    _indexes: IndexInfo[],
-    _adapterTableOpts: Record<string, unknown> = {},
-    _inlineConstraints: string[] = [],
+    lines: string[],
+    tableName: string,
+    columns: ColumnInfo[],
+    indexes: IndexInfo[],
+    adapterTableOpts: Record<string, unknown> = {},
+    inlineConstraints: string[] = [],
   ): void {
-    throw new Error(
-      "SchemaDumper.emitTable must run on the ConnectionAdapters subclass; " +
-        "construct via SchemaDumper.create/dump so the column_spec dispatch is available.",
+    return adapterDumper.emitTable.call(
+      this._mixinHost,
+      lines,
+      tableName,
+      columns,
+      indexes,
+      adapterTableOpts,
+      inlineConstraints,
     );
+  }
+
+  /** @internal */
+  protected emitTableBody(
+    lines: string[],
+    tableName: string,
+    columns: ColumnInfo[],
+    indexes: IndexInfo[],
+    adapterTableOpts: Record<string, unknown> = {},
+    inlineConstraints: string[] = [],
+  ): void {
+    return adapterDumper.emitTableBody.call(
+      this._mixinHost,
+      lines,
+      tableName,
+      columns,
+      indexes,
+      adapterTableOpts,
+      inlineConstraints,
+    );
+  }
+
+  /** @internal */
+  protected columnSpec(column: Column): [string, Record<string, unknown>] {
+    return adapterDumper.columnSpec.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected columnSpecForPrimaryKey(column: Column): Record<string, unknown> {
+    return adapterDumper.columnSpecForPrimaryKey.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected prepareColumnOptions(column: Column): Record<string, unknown> {
+    return adapterDumper.prepareColumnOptions.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected isDefaultPrimaryKey(column: Column): boolean {
+    return adapterDumper.isDefaultPrimaryKey.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected isExplicitPrimaryKeyDefault(column: Column): boolean {
+    return adapterDumper.isExplicitPrimaryKeyDefault.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaTypeWithVirtual(column: Column): string {
+    return adapterDumper.schemaTypeWithVirtual.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaType(column: Column): string {
+    return adapterDumper.schemaType.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected isBigint(column: Column): boolean {
+    return adapterDumper.isBigint.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaLimit(column: Column): string | undefined {
+    return adapterDumper.schemaLimit.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaPrecision(column: Column): string | undefined {
+    return adapterDumper.schemaPrecision.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaScale(column: Column): string | undefined {
+    return adapterDumper.schemaScale.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaDefault(column: Column): string | undefined {
+    return adapterDumper.schemaDefault.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaExpression(column: Column): string | undefined {
+    return adapterDumper.schemaExpression.call(this._mixinHost, column);
+  }
+
+  /** @internal */
+  protected schemaCollation(column: Column): string | undefined {
+    return adapterDumper.schemaCollation.call(this._mixinHost, column);
   }
 
   /** @internal */
