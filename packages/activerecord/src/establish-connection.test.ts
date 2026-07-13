@@ -8,9 +8,9 @@ import { writeFileSync, mkdirSync, rmSync } from "fs";
 import { join } from "path";
 import { tmpdir } from "os";
 
-function resetConnection() {
+async function resetConnection() {
   Base._adapter = null;
-  Base._connectionHandler.clearAllConnections();
+  await Base._connectionHandler.clearAllConnections();
   Base._connectionHandler = new ConnectionHandler();
 }
 
@@ -103,13 +103,13 @@ describe("Base.establishConnection with config file", () => {
   const tempDir = join(tmpdir(), `trails-test-${process.pid}`);
   const configPath = join(tempDir, "database.json");
 
-  beforeEach(() => {
-    resetConnection();
+  beforeEach(async () => {
+    await resetConnection();
     mkdirSync(tempDir, { recursive: true });
     Base._configPath = configPath;
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (originalEnv === undefined) {
       delete process.env.DATABASE_URL;
     } else {
@@ -121,7 +121,7 @@ describe("Base.establishConnection with config file", () => {
       process.env.NODE_ENV = originalNodeEnv;
     }
     Base._configPath = null;
-    resetConnection();
+    await resetConnection();
     try {
       rmSync(tempDir, { recursive: true });
     } catch {}
@@ -208,13 +208,13 @@ describe("Base.establishConnection with JS config file", () => {
   const tempDir = join(tmpdir(), `trails-jsconfig-${process.pid}`);
   const configDir = join(tempDir, "config");
 
-  beforeEach(() => {
-    resetConnection();
+  beforeEach(async () => {
+    await resetConnection();
     mkdirSync(configDir, { recursive: true });
     process.chdir(tempDir);
   });
 
-  afterEach(() => {
+  afterEach(async () => {
     if (originalEnv === undefined) {
       delete process.env.DATABASE_URL;
     } else {
@@ -227,7 +227,7 @@ describe("Base.establishConnection with JS config file", () => {
     }
     process.chdir(originalCwd);
     Base._configPath = null;
-    resetConnection();
+    await resetConnection();
     try {
       rmSync(tempDir, { recursive: true });
     } catch {}

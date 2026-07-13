@@ -31,7 +31,7 @@ beforeEach(async () => {
 afterEach(async () => {
   // Mirrors Rails JSONSharedTestCases#teardown: drop_table :json_data_type.
   await adapter.dropTable("json_data_type", { ifExists: true });
-  adapter.close();
+  await adapter.close();
 });
 
 describeIfSqlite("SQLite3JSONTest", () => {

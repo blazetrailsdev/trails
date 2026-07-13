@@ -53,7 +53,7 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     // reconnectBang's attemptConfigureConnection issues configureConnection()
     // argless after the raw connect — the gate must make the connect-once work
     // a no-op, but the (idempotent) timezone reseed still runs.
-    adapter.configureConnection();
+    await adapter.configureConnection();
 
     expect(checkVersionSpy).toHaveBeenCalledTimes(1);
     expect(timezoneSpy).toHaveBeenCalledTimes(2);

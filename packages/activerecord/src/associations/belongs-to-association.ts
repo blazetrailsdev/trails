@@ -74,7 +74,7 @@ export class BelongsToAssociation extends SingularAssociation {
     if ((await this.reader) == null) {
       const value = await block(this.owner);
       if (value != null) {
-        this.writer(value);
+        await this.writer(value);
       }
     }
   }

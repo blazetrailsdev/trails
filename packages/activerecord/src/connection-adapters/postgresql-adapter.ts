@@ -345,9 +345,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // constructor needing a non-Rails-shaped extra argument. Mirrors Rails,
       // where StatementPool#dealloc reaches @connection.@raw_connection to issue
       // the DEALLOCATE under the connection's control (postgresql_adapter.rb:307).
-      pgDeallocSerializers.set(value, (deallocSql) =>
-        this._enqueueMaintenance(() => value.query(deallocSql)),
-      );
+      pgDeallocSerializers.set(value, (deallocSql) => {
+        // Fire-and-forget by contract (serializer is typed void; callers ignore
+        // the result). The maintenance queue owns error handling and ordering.
+        void this._enqueueMaintenance(() => value.query(deallocSql));
+      });
     }
   }
   private _pgClientOptions: pg.ClientConfig | null = null;

@@ -390,7 +390,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     this.connect();
     // Async-only drivers (e.g. expo-sqlite) can't open in a sync constructor;
     // connect() flags them for the async path instead. See completeAsyncConnect.
-    if (!this._asyncConnectPending) this.configureConnection();
+    // Sync-driver path resolves synchronously; the async path is flagged out
+    // above and configured later via completeAsyncConnect. Fire-and-forget here.
+    if (!this._asyncConnectPending) void this.configureConnection();
     this._nativeTypeMap = AbstractSQLite3Adapter._buildTypeMap();
   }
 
@@ -2957,7 +2959,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * @internal
    */
   override configureConnection(): void | Promise<void> {
-    super.configureConnection();
+    // Base only runs the sync version check; SQLite's PRAGMAs are the async
+    // work, awaited by the driver-async branch below. Void the base call.
+    void super.configureConnection();
     const stmts = this.configurePragmas();
     const warn = (label: string, e: unknown) =>
       console.warn(`${label} failed: ${e instanceof Error ? e.message : String(e)}`);

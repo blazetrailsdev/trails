@@ -682,9 +682,12 @@ export async function updateBang<T extends UpdateRecord>(
     // See update(): raw loop preserves original error classes (matches Rails,
     // avoids Base#assignAttributes's AttributeAssignmentError wrap); nested
     // attribute writers still route through their setter.
+    const pending: Promise<void>[] = [];
     for (const [key, value] of Object.entries(attrs)) {
-      assignUpdateAttribute(self, key, value);
+      const p = assignUpdateAttribute(self, key, value);
+      if (p) pending.push(p);
     }
+    if (pending.length) await Promise.all(pending);
     return self.saveBang() as Promise<true | undefined>;
   }) as Promise<true | undefined>;
 }
@@ -1564,7 +1567,8 @@ export function dup<T extends DupRecord>(this: T): T {
   // NOT re-run `initialize_internals_callback`/`ensure_proper_type` (that lives
   // in Core#initialize), so the STI type column is carried solely by the
   // deep-dup'd `@attributes`, not re-asserted here.
-  runAfterCallbacksOnProto(ctor.prototype, "initialize", duped, { strict: "sync" });
+  // strict:"sync" guarantees synchronous completion — void the settled result.
+  void runAfterCallbacksOnProto(ctor.prototype, "initialize", duped, { strict: "sync" });
   // The Timestamp/Locking `initialize_dup` clears run AFTER the callbacks in
   // Rails: their modules `super` into `Core#initialize_dup` (which fires the
   // hook) and clear only as the stack unwinds. So the hook above observes the

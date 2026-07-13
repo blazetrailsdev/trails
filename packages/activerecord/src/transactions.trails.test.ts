@@ -43,10 +43,10 @@ interface AdapterTxView {
 
 const openAdapters: AbstractSQLite3Adapter[] = [];
 
-function makeSQLiteTopic() {
+async function makeSQLiteTopic() {
   const adp = new BetterSQLite3Adapter(":memory:");
   openAdapters.push(adp);
-  adp.exec(
+  await adp.exec(
     "CREATE TABLE topics (id INTEGER PRIMARY KEY AUTOINCREMENT, title TEXT, approved INTEGER DEFAULT 0)",
   );
   class Topic extends Base {
@@ -67,7 +67,7 @@ afterEach(async () => {
     } catch {
       /* adapter may already be closed */
     }
-    a.close();
+    await a.close();
   }
 });
 
@@ -112,7 +112,7 @@ describe("TransactionTest", () => {
     const log: string[] = [];
 
     await transaction(CanonicalTopic, async (tx) => {
-      tx.afterCommit(() => {
+      await tx.afterCommit(() => {
         log.push("committed");
       });
       await CanonicalTopic.create({ title: "Alice" });
@@ -247,7 +247,7 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
   });
 
   it("createSavepoint dirties the current (parent) transaction frame", async () => {
-    const { adapter } = makeSQLiteTopic();
+    const { adapter } = await makeSQLiteTopic();
     const tm = adapter.transactionManager;
     await tm.withinNewTransaction({}, async () => {
       // BEGIN is emitted with materializeTransactions:false, so the frame is
@@ -260,7 +260,7 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
   });
 
   it("a savepoint statement failing mid-flight still dirties the parent (ensure fires on the error path)", async () => {
-    const { adapter } = makeSQLiteTopic();
+    const { adapter } = await makeSQLiteTopic();
     const tm = adapter.transactionManager;
     await tm.withinNewTransaction({}, async () => {
       await tm.materializeTransactions();
@@ -282,7 +282,7 @@ describe("savepoint statements dirty the current transaction (trails ensure relo
 describe("rememberTransactionRecordState / restoreTransactionRecordState (Story K)", () => {
   it("rememberTransactionRecordState populates _startTransactionState with level and attributes", async () => {
     const { rememberTransactionRecordState } = await import("./transactions.js");
-    const { Topic } = makeSQLiteTopic();
+    const { Topic } = await makeSQLiteTopic();
     const topic = new Topic({ title: "before" });
     const internals = topic as unknown as TxRecordInternals;
     internals._newRecord = false;
@@ -300,7 +300,7 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
 
   it("rolledbackBang restores identity and clears mutation tracking", async () => {
     const { rolledbackBang, rememberTransactionRecordState } = await import("./transactions.js");
-    const { Topic } = makeSQLiteTopic();
+    const { Topic } = await makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
     const internals = topic as unknown as TxRecordInternals;
     internals._newRecord = false;
@@ -334,7 +334,7 @@ describe("rememberTransactionRecordState / restoreTransactionRecordState (Story 
 describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () => {
   it("rollback preserves in-TX user edits as dirty", async () => {
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
-    const { Topic } = makeSQLiteTopic();
+    const { Topic } = await makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
     const internals = topic as unknown as TxRecordInternals;
     internals._newRecord = false;
@@ -360,7 +360,7 @@ describe("DirtyTracker.redetectChanges after rollback (Story K-followup)", () =>
 
   it("rollback leaves clean attributes unchanged (no spurious dirty)", async () => {
     const { rememberTransactionRecordState, rolledbackBang } = await import("./transactions.js");
-    const { Topic } = makeSQLiteTopic();
+    const { Topic } = await makeSQLiteTopic();
     const topic = new Topic({ title: "original" });
     const internals = topic as unknown as TxRecordInternals;
     internals._newRecord = false;

@@ -9,9 +9,9 @@ import { SchemaDumper } from "../../schema-dumper.js";
 
 let adapter: AbstractSQLite3Adapter;
 
-beforeEach(() => {
+beforeEach(async () => {
   adapter = new BetterSQLite3Adapter(":memory:");
-  adapter.exec(`CREATE TABLE "collation_table_sqlite3" (
+  await adapter.exec(`CREATE TABLE "collation_table_sqlite3" (
     "id" INTEGER PRIMARY KEY AUTOINCREMENT,
     "string_nocase" VARCHAR(255) COLLATE "NOCASE",
     "text_rtrim" TEXT COLLATE "RTRIM",
@@ -22,7 +22,7 @@ beforeEach(() => {
 
 afterEach(async () => {
   await adapter.exec(`DROP TABLE IF EXISTS "collation_table_sqlite3"`).catch(() => undefined);
-  adapter.close();
+  await adapter.close();
 });
 
 describeIfSqlite("SQLite3CollationTest", () => {

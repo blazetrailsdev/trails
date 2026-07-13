@@ -188,7 +188,9 @@ describe("CollectionProxy — array-likeness (Phase R.1)", () => {
   it("array spread reads the loaded target", async () => {
     const author = await authorWithPosts();
     const proxy = association<Post>(author, "posts");
-    const titles = [...proxy].map((p) => p.title);
+    // proxy is a thenable Relation; spread it via its iterator contract so the
+    // lint sees an Iterable, not a Promise being spread.
+    const titles = [...(proxy as Iterable<Post>)].map((p) => p.title);
     expect(titles).toEqual(["a", "b", "c"]);
   });
 

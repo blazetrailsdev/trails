@@ -661,8 +661,9 @@ function directInstantiate(
   // Rails' init_with_attributes yields to the loader block (inverse wiring)
   // before firing after_find then after_initialize.
   block?.(record);
-  runAfterCallbacksOnProto((klass as any).prototype, "find", record, { strict: "sync" });
-  runAfterCallbacksOnProto((klass as any).prototype, "initialize", record, { strict: "sync" });
+  // strict:"sync" guarantees synchronous completion — void the settled result.
+  void runAfterCallbacksOnProto((klass as any).prototype, "find", record, { strict: "sync" });
+  void runAfterCallbacksOnProto((klass as any).prototype, "initialize", record, { strict: "sync" });
   return record;
 }
 

@@ -10,7 +10,7 @@ import {
 } from "./callbacks.js";
 
 describe("CallbacksTest", () => {
-  it("after callbacks are not executed if the block returns false", () => {
+  it("after callbacks are not executed if the block returns false", async () => {
     // Faithful port of Rails ModelCallbacks (callbacks_test.rb:6-87): an
     // around_create returning false, an after_create returning false, and a
     // final after_create, with `create` running run_callbacks(:create) whose
@@ -55,7 +55,7 @@ describe("CallbacksTest", () => {
       }
     }
     const model = new ModelCallbacks({ valid: false });
-    model.create();
+    await model.create();
     expect(model.callbacks).toEqual([
       "before_create",
       "before_around_create",
@@ -93,7 +93,7 @@ describe("CallbacksTest", () => {
     expect(p.isValid()).toBe(true);
   });
 
-  it("after_create callbacks with both callbacks declared in different lines", () => {
+  it("after_create callbacks with both callbacks declared in different lines", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -107,20 +107,20 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    runAfterCallbacksOnProto((p.constructor as typeof Model).prototype, "create", p);
+    await runAfterCallbacksOnProto((p.constructor as typeof Model).prototype, "create", p);
     expect(log).toEqual(["first", "second"]);
   });
 
-  it("complete callback chain", () => {
+  it("complete callback chain", async () => {
     const order: string[] = [];
     class Person extends Model {
       static {
         this.beforeSave(() => {
           order.push("before_save");
         });
-        this.aroundSave((_r, proceed) => {
+        this.aroundSave(async (_r, proceed) => {
           order.push("around_before");
-          proceed();
+          await proceed();
           order.push("around_after");
         });
         this.afterSave(() => {
@@ -128,7 +128,7 @@ describe("CallbacksTest", () => {
         });
       }
     }
-    new Person().runCallbacks("save", () => {
+    await new Person().runCallbacks("save", () => {
       order.push("save");
     });
     expect(order).toEqual(["before_save", "around_before", "save", "around_after", "after_save"]);
@@ -163,7 +163,7 @@ describe("CallbacksTest", () => {
     expect(order).not.toContain("after");
   });
 
-  it("only selects which types of callbacks should be created", () => {
+  it("only selects which types of callbacks should be created", async () => {
     // Test that before/after/around create callbacks exist
     const order: string[] = [];
     class Person extends Model {
@@ -176,13 +176,13 @@ describe("CallbacksTest", () => {
         });
       }
     }
-    new Person().runCallbacks("create", () => {
+    await new Person().runCallbacks("create", () => {
       order.push("create");
     });
     expect(order).toEqual(["before_create", "create", "after_create"]);
   });
 
-  it("after_create callbacks with both callbacks declared in one line", () => {
+  it("after_create callbacks with both callbacks declared in one line", async () => {
     const order: string[] = [];
     class Person extends Model {
       static {
@@ -194,7 +194,7 @@ describe("CallbacksTest", () => {
         });
       }
     }
-    new Person().runCallbacks("create", () => {
+    await new Person().runCallbacks("create", () => {
       order.push("create");
     });
     expect(order).toEqual(["create", "first_after", "second_after"]);
@@ -309,7 +309,7 @@ describe("CallbacksTest", () => {
     expect(log).toContain("camelCase called");
   });
 
-  it("class-based around callback object with proceed", () => {
+  it("class-based around callback object with proceed", async () => {
     const log: string[] = [];
     const wrapper = {
       aroundSave(record: any, proceed: () => void) {
@@ -325,13 +325,13 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    p.runCallbacks("save", () => {
+    await p.runCallbacks("save", () => {
       log.push("save");
     });
     expect(log).toEqual(["around_before", "save", "around_after"]);
   });
 
-  it("class-based callback via defineModelCallbacks-generated methods", () => {
+  it("class-based callback via defineModelCallbacks-generated methods", async () => {
     const log: string[] = [];
     const observer = {
       beforeProcess(record: any) {
@@ -346,7 +346,7 @@ describe("CallbacksTest", () => {
       }
     }
     const j = new Job({ name: "import" });
-    j.runCallbacks("process", () => {
+    await j.runCallbacks("process", () => {
       log.push("executed");
     });
     expect(log).toEqual(["processing import", "executed"]);
@@ -354,20 +354,20 @@ describe("CallbacksTest", () => {
 });
 
 describe("CallbackChain.run", () => {
-  it("runs after callbacks only after the block completes", () => {
+  it("runs after callbacks only after the block completes", async () => {
     const proto = Object.create(null);
     const log: string[] = [];
     _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    runAllCallbacks(proto, "save", {}, () => {
+    await runAllCallbacks(proto, "save", {}, () => {
       log.push("block:start");
       log.push("block:end");
     });
     expect(log).toEqual(["block:start", "block:end", "after"]);
   });
 
-  it("around callbacks wrap the block", () => {
+  it("around callbacks wrap the block", async () => {
     const proto = Object.create(null);
     const log: string[] = [];
     _registerCallbackOnProto(proto, "around", "save", (_record: any, proceed: () => void) => {
@@ -378,13 +378,13 @@ describe("CallbackChain.run", () => {
     _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    runAllCallbacks(proto, "save", {}, () => {
+    await runAllCallbacks(proto, "save", {}, () => {
       log.push("block");
     });
     expect(log).toEqual(["around:before", "block", "around:after", "after"]);
   });
 
-  it("after callbacks run in registration order", () => {
+  it("after callbacks run in registration order", async () => {
     const proto = Object.create(null);
     const log: string[] = [];
     _registerCallbackOnProto(proto, "after", "save", () => {
@@ -393,7 +393,7 @@ describe("CallbackChain.run", () => {
     _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after2");
     });
-    runAllCallbacks(proto, "save", {}, () => {
+    await runAllCallbacks(proto, "save", {}, () => {
       log.push("block");
     });
     expect(log).toEqual(["block", "after1", "after2"]);
@@ -404,16 +404,16 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
   // Rails `set_callback(name, type, filter, options)` /
   // `skip_callback(...)` / `reset_callbacks(name)` from
   // `ActiveSupport::Callbacks::ClassMethods`.
-  it("setCallback registers a function for arbitrary event + timing", () => {
+  it("setCallback registers a function for arbitrary event + timing", async () => {
     const log: string[] = [];
     class Thing extends Model {}
     Thing.setCallback("save", "before", () => log.push("before"));
     Thing.setCallback("save", "after", () => log.push("after"));
-    new Thing().runCallbacks("save", () => log.push("block"));
+    await new Thing().runCallbacks("save", () => log.push("block"));
     expect(log).toEqual(["before", "block", "after"]);
   });
 
-  it("skipCallback removes a previously registered callback by reference", () => {
+  it("skipCallback removes a previously registered callback by reference", async () => {
     const log: string[] = [];
     class Thing extends Model {}
     const cb = () => log.push("skipped-callback");
@@ -421,7 +421,7 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     Thing.setCallback("save", "before", () => log.push("kept"));
 
     expect(Thing.skipCallback("save", "before", cb)).toBe(true);
-    new Thing().runCallbacks("save", () => log.push("block"));
+    await new Thing().runCallbacks("save", () => log.push("block"));
     expect(log).toEqual(["kept", "block"]);
   });
 
@@ -430,7 +430,7 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     expect(Thing.skipCallback("save", "before", () => undefined)).toBe(false);
   });
 
-  it("resetCallbacks clears all callbacks for an event", () => {
+  it("resetCallbacks clears all callbacks for an event", async () => {
     const log: string[] = [];
     class Thing extends Model {}
     Thing.setCallback("save", "before", () => log.push("before"));
@@ -438,23 +438,23 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     Thing.setCallback("update", "before", () => log.push("update-before"));
 
     Thing.resetCallbacks("save");
-    new Thing().runCallbacks("save", () => log.push("save-block"));
-    new Thing().runCallbacks("update", () => log.push("update-block"));
+    await new Thing().runCallbacks("save", () => log.push("save-block"));
+    await new Thing().runCallbacks("update", () => log.push("update-block"));
     expect(log).toEqual(["save-block", "update-before", "update-block"]);
   });
 
-  it("setCallback on subclass does not leak up to parent (copy-on-first-write)", () => {
+  it("setCallback on subclass does not leak up to parent (copy-on-first-write)", async () => {
     const log: string[] = [];
     class Parent extends Model {}
     class Child extends Parent {}
     Child.setCallback("save", "before", () => log.push("child"));
-    new Parent().runCallbacks("save", () => log.push("parent-block"));
+    await new Parent().runCallbacks("save", () => log.push("parent-block"));
     expect(log).toEqual(["parent-block"]);
-    new Child().runCallbacks("save", () => log.push("child-block"));
+    await new Child().runCallbacks("save", () => log.push("child-block"));
     expect(log).toEqual(["parent-block", "child", "child-block"]);
   });
 
-  it("skipCallback miss does NOT isolate subclass from future parent callbacks", () => {
+  it("skipCallback miss does NOT isolate subclass from future parent callbacks", async () => {
     // A miss must preserve copy-on-first-write inheritance so a
     // subclass that later has callbacks added to its parent still sees
     // them via the prototype chain.
@@ -464,11 +464,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     expect(Child.skipCallback("save", "before", () => undefined)).toBe(false);
     // Now register on Parent — Child should still see it.
     Parent.setCallback("save", "before", () => log.push("from-parent"));
-    new Child().runCallbacks("save", () => log.push("child-block"));
+    await new Child().runCallbacks("save", () => log.push("child-block"));
     expect(log).toEqual(["from-parent", "child-block"]);
   });
 
-  it("skipCallback removes a CallbackObject registered by reference", () => {
+  it("skipCallback removes a CallbackObject registered by reference", async () => {
     // Rails `set_callback(:save, :before, CallbackObject.new)` looks up
     // `before_save` (or our camelCase `beforeSave`) on the object. The
     // same reference must identify it for `skip_callback` — even though
@@ -485,11 +485,11 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     Thing.setCallback("save", "before", () => log.push("fn-kept"));
 
     expect(Thing.skipCallback("save", "before", obj)).toBe(true);
-    new Thing().runCallbacks("save", () => log.push("block"));
+    await new Thing().runCallbacks("save", () => log.push("block"));
     expect(log).toEqual(["fn-kept", "block"]);
   });
 
-  it("skipCallback removes a CallbackObject registered via beforeX/afterX helpers", () => {
+  it("skipCallback removes a CallbackObject registered via beforeX/afterX helpers", async () => {
     // The generated `beforeX`/`afterX`/`aroundX` helpers from
     // `defineModelCallbacks` pass the original filter straight to
     // `register` so skipCallback(event, timing, originalObject) can
@@ -509,7 +509,7 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     (Thing as unknown as { beforeShip: (fn: () => void) => void }).beforeShip(() => log.push("fn"));
 
     expect(Thing.skipCallback("ship", "before", obj)).toBe(true);
-    new Thing().runCallbacks("ship", () => log.push("block"));
+    await new Thing().runCallbacks("ship", () => log.push("block"));
     expect(log).toEqual(["fn", "block"]);
   });
 
@@ -533,7 +533,7 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     ).not.toThrow();
   });
 
-  it("resetCallbacks clears CallbackObject-registered callbacks too", () => {
+  it("resetCallbacks clears CallbackObject-registered callbacks too", async () => {
     // Companion to the skipCallback-with-object case: resetCallbacks
     // must sweep the event bucket regardless of whether its entries
     // came from functions or CallbackObjects.
@@ -548,16 +548,16 @@ describe("Generic Model.setCallback / skipCallback / resetCallbacks (Rails fidel
     Thing.setCallback("save", "before", () => log.push("fn"));
 
     Thing.resetCallbacks("save");
-    new Thing().runCallbacks("save", () => log.push("block-after-reset"));
+    await new Thing().runCallbacks("save", () => log.push("block-after-reset"));
     expect(log).toEqual(["block-after-reset"]);
   });
 
-  it("setCallback respects prepend: true (runs before earlier-registered)", () => {
+  it("setCallback respects prepend: true (runs before earlier-registered)", async () => {
     const log: string[] = [];
     class Thing extends Model {}
     Thing.setCallback("save", "before", () => log.push("registered-first"));
     Thing.setCallback("save", "before", () => log.push("prepended"), { prepend: true });
-    new Thing().runCallbacks("save", () => log.push("block"));
+    await new Thing().runCallbacks("save", () => log.push("block"));
     expect(log).toEqual(["prepended", "registered-first", "block"]);
   });
 });
@@ -697,7 +697,7 @@ describe("unified sync/async runner", () => {
   });
 });
 describe("Callbacks", () => {
-  it("before/after callbacks run in order", () => {
+  it("before/after callbacks run in order", async () => {
     const order: string[] = [];
     class Ordered extends Model {
       static {
@@ -711,26 +711,26 @@ describe("Callbacks", () => {
       }
     }
     const o = new Ordered();
-    o.runCallbacks("save", () => {
+    await o.runCallbacks("save", () => {
       order.push("action");
     });
     expect(order).toEqual(["before", "action", "after"]);
   });
 
-  it("around callbacks wrap the action", () => {
+  it("around callbacks wrap the action", async () => {
     const order: string[] = [];
     class Around extends Model {
       static {
         this.attribute("name", "string");
-        this.aroundSave((_record, proceed) => {
+        this.aroundSave(async (_record, proceed) => {
           order.push("around_before");
-          proceed();
+          await proceed();
           order.push("around_after");
         });
       }
     }
     const a = new Around();
-    a.runCallbacks("save", () => {
+    await a.runCallbacks("save", () => {
       order.push("action");
     });
     expect(order).toEqual(["around_before", "action", "around_after"]);
@@ -773,16 +773,16 @@ describe("Callbacks", () => {
     expect(n.errors.count).toBe(0); // validations never ran
   });
 
-  it("complete callback chain", () => {
+  it("complete callback chain", async () => {
     const order: string[] = [];
     class Full extends Model {
       static {
         this.beforeSave(() => {
           order.push("before_save");
         });
-        this.aroundSave((_r, proceed) => {
+        this.aroundSave(async (_r, proceed) => {
           order.push("around_before");
-          proceed();
+          await proceed();
           order.push("around_after");
         });
         this.afterSave(() => {
@@ -790,7 +790,7 @@ describe("Callbacks", () => {
         });
       }
     }
-    new Full().runCallbacks("save", () => {
+    await new Full().runCallbacks("save", () => {
       order.push("save");
     });
     expect(order).toEqual(["before_save", "around_before", "save", "around_after", "after_save"]);
@@ -830,7 +830,7 @@ describe("Callbacks (extended)", () => {
     expect(order).toContain("after_validation");
   });
 
-  it("callback inheritance — child inherits parent callbacks", () => {
+  it("callback inheritance — child inherits parent callbacks", async () => {
     const order: string[] = [];
     class Parent extends Model {
       static {
@@ -848,7 +848,7 @@ describe("Callbacks (extended)", () => {
       }
     }
     const c = new Child();
-    c.runCallbacks("save", () => {
+    await c.runCallbacks("save", () => {
       order.push("action");
     });
     expect(order).toContain("parent_before");
@@ -856,7 +856,7 @@ describe("Callbacks (extended)", () => {
     expect(order.indexOf("parent_before")).toBeLessThan(order.indexOf("child_before"));
   });
 
-  it("child callbacks do not affect parent", () => {
+  it("child callbacks do not affect parent", async () => {
     const parentOrder: string[] = [];
     const childOrder: string[] = [];
     class Parent extends Model {
@@ -875,7 +875,7 @@ describe("Callbacks (extended)", () => {
         });
       }
     }
-    new Parent().runCallbacks("save", () => {
+    await new Parent().runCallbacks("save", () => {
       parentOrder.push("action");
     });
     expect(parentOrder).not.toContain("child");
@@ -923,7 +923,7 @@ describe("afterCommit / afterRollback callbacks", () => {
   });
 });
 describe("defineModelCallbacks()", () => {
-  it("creates before/after/around methods for custom events", () => {
+  it("creates before/after/around methods for custom events", async () => {
     class Payment extends Model {
       static {
         this.attribute("amount", "integer");
@@ -941,8 +941,8 @@ describe("defineModelCallbacks()", () => {
 
     const p = new Payment({ amount: 100 });
     // Run callbacks manually
-    runBeforeCallbacksOnProto(Payment.prototype, "process", p);
-    runAfterCallbacksOnProto(Payment.prototype, "process", p);
+    await runBeforeCallbacksOnProto(Payment.prototype, "process", p);
+    await runAfterCallbacksOnProto(Payment.prototype, "process", p);
     expect(log).toEqual(["before_process", "after_process"]);
   });
 
@@ -959,7 +959,7 @@ describe("defineModelCallbacks()", () => {
 });
 
 describe("callbacks with prepend option", () => {
-  it("prepend: true puts callback first in the chain", () => {
+  it("prepend: true puts callback first in the chain", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -977,7 +977,7 @@ describe("callbacks with prepend option", () => {
     );
 
     const u = new User({ name: "Alice" });
-    runBeforeCallbacksOnProto(User.prototype, "save", u);
+    await runBeforeCallbacksOnProto(User.prototype, "save", u);
     expect(order).toEqual(["prepended", "first"]);
   });
 });
@@ -1007,7 +1007,7 @@ describe("withOptions()", () => {
 });
 
 describe("skipCallbackOnProto with CallbackObject (mixin-level)", () => {
-  it("removes a CallbackObject from the chain by reference", () => {
+  it("removes a CallbackObject from the chain by reference", async () => {
     const log: string[] = [];
     const proto = Object.create(null);
     const obj = {
@@ -1018,7 +1018,7 @@ describe("skipCallbackOnProto with CallbackObject (mixin-level)", () => {
     _registerCallbackOnProto(proto, "before", "save", obj);
     _registerCallbackOnProto(proto, "before", "save", () => log.push("fn"));
     expect(skipCallbackOnProto(proto, "save", "before", obj)).toBe(true);
-    runBeforeCallbacksOnProto(proto, "save", {});
+    await runBeforeCallbacksOnProto(proto, "save", {});
     expect(log).toEqual(["fn"]);
   });
 });

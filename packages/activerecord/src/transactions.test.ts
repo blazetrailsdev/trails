@@ -119,19 +119,19 @@ describe("TransactionTest", () => {
 
   it("after all transactions commit", async () => {
     let called = 0;
-    afterAllTransactionsCommit(() => {
+    await afterAllTransactionsCommit(() => {
       called += 1;
     });
     expect(called).toBe(1);
 
-    afterAllTransactionsCommit(() => {
+    await afterAllTransactionsCommit(() => {
       called += 1;
     });
     expect(called).toBe(2);
 
     called = 0;
     await Topic.transaction(async () => {
-      afterAllTransactionsCommit(() => {
+      await afterAllTransactionsCommit(() => {
         called += 1;
       });
       expect(called).toBe(0);
@@ -142,7 +142,7 @@ describe("TransactionTest", () => {
     await Topic.transaction(async () => {
       await Topic.transaction(
         async () => {
-          afterAllTransactionsCommit(() => {
+          await afterAllTransactionsCommit(() => {
             called += 1;
           });
           expect(called).toBe(0);
@@ -155,7 +155,7 @@ describe("TransactionTest", () => {
 
     called = 0;
     await Topic.transaction(async () => {
-      afterAllTransactionsCommit(() => {
+      await afterAllTransactionsCommit(() => {
         called += 1;
       });
       expect(called).toBe(0);
@@ -169,7 +169,7 @@ describe("TransactionTest", () => {
     called = 0;
     await Topic.transaction(async (tx) => {
       tx._internalTransaction.invalidateBang();
-      afterAllTransactionsCommit(() => {
+      await afterAllTransactionsCommit(() => {
         called += 1;
       });
       expect(called).toBe(1);
@@ -186,19 +186,19 @@ describe("TransactionTest", () => {
     // Rails' multidb (ARUnit2Model) sub-case is omitted: there is no secondary
     // DB in the single-database test env.
     let called = 0;
-    Topic.currentTransaction().afterCommit(() => {
+    await Topic.currentTransaction().afterCommit(() => {
       called += 1;
     });
     expect(called).toBe(1);
 
-    Topic.currentTransaction().afterCommit(() => {
+    await Topic.currentTransaction().afterCommit(() => {
       called += 1;
     });
     expect(called).toBe(2);
 
     called = 0;
     await Topic.transaction(async () => {
-      Topic.currentTransaction().afterCommit(() => {
+      await Topic.currentTransaction().afterCommit(() => {
         called += 1;
       });
       expect(called).toBe(0);
@@ -209,7 +209,7 @@ describe("TransactionTest", () => {
     await Topic.transaction(async () => {
       await Topic.transaction(
         async () => {
-          Topic.currentTransaction().afterCommit(() => {
+          await Topic.currentTransaction().afterCommit(() => {
             called += 1;
           });
           expect(called).toBe(0);
@@ -222,7 +222,7 @@ describe("TransactionTest", () => {
 
     called = 0;
     await Topic.transaction(async () => {
-      Topic.currentTransaction().afterCommit(() => {
+      await Topic.currentTransaction().afterCommit(() => {
         called += 1;
       });
       expect(called).toBe(0);

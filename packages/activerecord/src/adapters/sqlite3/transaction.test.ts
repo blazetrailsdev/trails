@@ -23,7 +23,7 @@ const openAdapters: AbstractSQLite3Adapter[] = [];
 afterEach(async () => {
   while (openAdapters.length) {
     try {
-      openAdapters.pop()!.close();
+      await openAdapters.pop()!.close();
     } catch {
       // best-effort
     }
@@ -80,7 +80,7 @@ describeIfSqlite("SQLite3TransactionTest", () => {
   it.skip("opens a `read_uncommitted` transaction", async () => {
     // PERMANENT-SKIP: driver-limit (see scripts/api-compare/unported-files.ts) — single-process-sqlite
     const conn1 = withConn({ sharedCache: true });
-    conn1.exec(`CREATE TABLE IF NOT EXISTS "zines" ("id" INTEGER PRIMARY KEY, "title" TEXT)`);
+    await conn1.exec(`CREATE TABLE IF NOT EXISTS "zines" ("id" INTEGER PRIMARY KEY, "title" TEXT)`);
     await conn1.beginDbTransaction();
     await conn1.executeMutation(`INSERT INTO "zines" ("title") VALUES ('foo')`);
 
