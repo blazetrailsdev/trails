@@ -1222,6 +1222,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         staleGeneration
       ) {
         this._teardownRacedClient(newClient, acquireGen);
+        // A stale-generation acquire ALWAYS fails, uniformly — even in the
+        // narrow sub-case where a racing reconnect has already published a
+        // valid _rawConnection (i.e. we'd otherwise fall through to adopt it
+        // below). This is a deliberate behavior change: an acquire orphaned by
+        // disconnect!/close/discard! belongs to a connection epoch that was
+        // explicitly torn down, so adopting a POST-teardown connection would
+        // silently paper over the disconnect (the mirror of the adoption bug
+        // this guard fixes). Only same-generation callers that merely lost a
+        // benign open race are allowed to adopt the winner's connection below.
         if (this._closed || this._pgClientOptions == null || racedDiscard || staleGeneration) {
           throw new Error("PostgreSQLAdapter: connection is closed");
         }

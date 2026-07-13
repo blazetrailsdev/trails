@@ -1066,6 +1066,47 @@ describeIfPg("PostgreSQLAdapter", () => {
         await orphan.end().catch(() => {});
       }
     });
+
+    it("orphaned acquire still fails when the racing reconnect publishes first", async () => {
+      // The reconnect wins the open race and publishes _rawConnection BEFORE the
+      // orphaned pre-disconnect connect resolves. A stale-generation acquire
+      // must fail uniformly here too — it must NOT fall through to adopt the
+      // now-valid post-disconnect connection (the pre-#4842 _rawConnection != null
+      // fallback would have). Locks in the deliberate "orphaned acquire never
+      // succeeds" semantics rather than a race-timing-dependent outcome.
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const endSpy = vi.spyOn(orphan, "end");
+      const first = defer();
+      const spy = vi
+        .spyOn(PostgreSQLAdapter, "newClient")
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => Promise.resolve(reconnected));
+      try {
+        const firstAcquire = a.connect();
+        await waitForNewClientCalls(spy, 1);
+
+        a.disconnectBang();
+
+        // Reconnect resolves fully first: _rawConnection is now `reconnected`.
+        await a.reconnect();
+        expect(a._rawConnectionForTest()).toBe(reconnected);
+
+        // Only now does the orphaned pre-disconnect connect resolve.
+        first.resolve(orphan);
+        await expect(firstAcquire).rejects.toBeTruthy();
+
+        // It tore down its own client and left the valid reconnect untouched —
+        // it did NOT overwrite or adopt `reconnected`.
+        expect(endSpy).toHaveBeenCalled();
+        expect(a._rawConnectionForTest()).toBe(reconnected);
+      } finally {
+        spy.mockRestore();
+        await a.close();
+        await orphan.end().catch(() => {});
+      }
+    });
   });
 
   describe("lock sharing", () => {
