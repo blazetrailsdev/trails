@@ -944,13 +944,14 @@ describe("HasOneAssociationsTest", () => {
     const whereClause = { books: { subscriptions: { subscriber_id: null } } };
     // Rails' assert_nothing_raised wraps only relation *construction*
     // (`joins(book: :subscription).where.not(...)` builds the Arel that would
-    // raise on a bad reference). In trails, join/reference resolution is
-    // deferred to SQL generation, so the equivalent raise surfaces at execution
-    // rather than at `.joins().whereNot()` build time — hence `toArray()` is the
-    // faithful analog of Rails' build-time check, not an extra assertion.
+    // raise on a bad join/enum reference). In trails, that resolution is
+    // deferred to SQL generation, so `toSql()` — not execution — is the
+    // faithful analog. We must NOT execute here: `subscriptions.subscriber_id`
+    // is a string column (schema.rb:1178-1181) while `books.id` is bigint, so
+    // the has_one join renders `varchar = bigint`, which PostgreSQL rejects at
+    // query time. Rails never runs into that because the test only builds.
     const relation = (SpecialAuthor as any).joins({ book: "subscription" }).whereNot(whereClause);
-    const rows = await relation.toArray();
-    expect(Array.isArray(rows)).toBe(true);
+    expect(typeof relation.toSql()).toBe("string");
   });
 
   // Mirrors Rails' DestroyByParentBook/DestroyByParentAuthor: the child aborts
