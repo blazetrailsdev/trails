@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { Rollback } from "../../errors.js";
+import { Rollback, StatementInvalid } from "../../errors.js";
 import {
   buildFixtureSql,
   buildFixtureStatements,
@@ -240,6 +240,42 @@ describe("DatabaseStatements", () => {
       } as unknown as DatabaseStatementsHost;
       const result = await internalExecQuery.call(host, "SELECT 1", "SQL");
       expect((result as any).rows).toEqual([[1]]);
+    });
+
+    it("attaches sql and binds to a translated StatementInvalid via set_query", async () => {
+      const { internalExecQuery } = await import("./database-statements.js");
+      // Mirror with_raw_connection: internalExecute rejects with an already
+      // translated StatementInvalid carrying no statement context.
+      const host = {
+        internalExecute: async () => {
+          throw new StatementInvalid("duplicate key value violates unique constraint");
+        },
+      } as unknown as DatabaseStatementsHost;
+      const binds = [1, "x"];
+      const err = await internalExecQuery
+        .call(host, "INSERT INTO t (id, name) VALUES ($1, $2)", "SQL", binds)
+        .then(
+          () => null,
+          (e) => e,
+        );
+      expect(err).toBeInstanceOf(StatementInvalid);
+      expect(err.sql).toBe("INSERT INTO t (id, name) VALUES ($1, $2)");
+      expect(err.binds).toEqual(binds);
+    });
+
+    it("does not overwrite sql and binds already set on a StatementInvalid", async () => {
+      const { internalExecQuery } = await import("./database-statements.js");
+      const host = {
+        internalExecute: async () => {
+          throw new StatementInvalid("boom", { sql: "ORIGINAL", binds: [99] });
+        },
+      } as unknown as DatabaseStatementsHost;
+      const err = await internalExecQuery.call(host, "OUTER SQL", "SQL", [1]).then(
+        () => null,
+        (e) => e,
+      );
+      expect(err.sql).toBe("ORIGINAL");
+      expect(err.binds).toEqual([99]);
     });
 
     it("normalizes execute fallback result", async () => {

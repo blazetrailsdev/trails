@@ -2157,17 +2157,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             payload.row_count = count;
             return runResult;
           } catch (e: any) {
-            // A bound query is the exec_insert RETURNING read-back: translate with
-            // sql + binds here (mirroring _instrumentedQueryOnClient) so a
-            // constraint violation surfaces as RecordNotUnique/InvalidForeignKey
-            // carrying statement context. withRawConnection re-catches this AR
-            // error and passes it through unchanged; its own translate would
-            // otherwise re-wrap with null sql / empty binds. Transaction-control
-            // SQL (no binds) keeps the raw rethrow, matching pre-PR behavior.
-            const translated = hasBinds ? this._translateException(e, runSql, bindArray) : e;
-            payload.exception = translated;
-            payload.exception_object = translated;
-            throw translated;
+            // Rethrow raw: withRawConnection translates the driver error to an
+            // ActiveRecordError (with sql: null / binds: []), and the shared logSql
+            // rescue then attaches sql + binds via set_query — mirroring Rails'
+            // AbstractAdapter#log. Translating here would duplicate that and, on an
+            // already-translated error, re-wrap it as StatementInvalid.
+            payload.exception = e;
+            payload.exception_object = e;
+            throw e;
           }
         }),
       );
