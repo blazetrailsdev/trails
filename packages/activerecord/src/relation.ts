@@ -5742,17 +5742,29 @@ export class Relation<T extends Base> {
         | { isForceEquality?(v: unknown): boolean }
         | undefined;
       if (type?.isForceEquality?.(value)) return value;
-      return value.map((v) => this._modelClass._castAttributeValue(attrKey, v));
+      return value.map((v) => this._castPreservingUncastable(attrKey, v));
     }
+    return this._castPreservingUncastable(attrKey, value);
+  }
+
+  /**
+   * Cast a scalar `where` value through its column type, but preserve the raw
+   * value when the cast collapses a non-null input to `null`.
+   *
+   * Rails never pre-casts a `where` value to nil: an un-castable string
+   * (`where(parent_id: "not-a-number")`, `where(written_on: "")`, or such an
+   * element inside `where(parent_id: ["not-a-number"])`) keeps its raw value and
+   * the QueryAttribute bind serializes to NULL at compile time — yielding
+   * `col = NULL` / `col IN (NULL)` (matches nothing), not the `IS NULL` path
+   * (matches nulls). Collapsing to nil here would misroute BOTH the scalar
+   * (Equality → `rightIsNull`) and array (ArrayHandler's `values.compact!`
+   * nil-partition, array_handler.rb:16) paths onto explicit-nil handling. So the
+   * bind — evaluated by the visitor via `nil?`/`unboundable?` — decides
+   * nullness, not this pre-cast. A genuinely null input stays null (routes to
+   * `IS NULL`), matching Rails treating only real `nil` as null.
+   */
+  private _castPreservingUncastable(attrKey: string, value: unknown): unknown {
     const cast = this._modelClass._castAttributeValue(attrKey, value);
-    // Rails never pre-casts scalar `where` values to nil: an un-castable string
-    // (`where(parent_id: "not-a-number")`, `where(written_on: "")`) keeps its raw
-    // value, and the QueryAttribute bind serializes to NULL at compile time —
-    // yielding `col = NULL` (matches nothing), not `col IS NULL` (matches nulls).
-    // Collapsing to nil here would reroute the predicate builder onto the
-    // explicit-nil `IS NULL` path. Preserve the raw value so the bind, not this
-    // pre-cast, decides nullness (mirrors PredicateBuilder building a bind whose
-    // `nil?`/`unboundable?` is evaluated by the visitor).
     if ((cast === null || cast === undefined) && value !== null && value !== undefined) {
       return value;
     }

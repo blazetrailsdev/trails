@@ -138,6 +138,7 @@ describe("WhereTest", () => {
     const first = topics("first") as any;
     await first.update({ parent_id: 0, written_on: null, bonus_time: null, last_read: null });
     expect(await Topic.where({ parent_id: "not-a-number" })).toHaveLength(0);
+    expect(await Topic.where({ parent_id: ["not-a-number"] })).toHaveLength(0);
     expect(await Topic.where({ written_on: "" })).toHaveLength(0);
     expect(await Topic.where({ bonus_time: "" })).toHaveLength(0);
     expect(await Topic.where({ last_read: "" })).toHaveLength(0);

@@ -1915,8 +1915,13 @@ describe("RelationTest", () => {
   });
 
   it("doesnt add having values if options are blank", () => {
-    const sql = Post.group("title").toSql();
-    expect(sql).not.toContain("HAVING");
+    // Mirrors Rails: a blank `having` argument is a no-op leaving the having
+    // clause empty (relations_test.rb:1806). trails routes `{}` through the
+    // same `opts.blank?` guard as `""` / `[]`, so the empty hash never reaches
+    // PredicateBuilder's empty-hash `1=0` expansion.
+    expect(Post.having("").havingClause.isEmpty()).toBe(true);
+    expect(Post.having([] as any).havingClause.isEmpty()).toBe(true);
+    expect(Post.having({}).havingClause.isEmpty()).toBe(true);
   });
 
   it("having with binds for both where and having", async () => {
