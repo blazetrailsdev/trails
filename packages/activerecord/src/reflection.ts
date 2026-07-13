@@ -490,7 +490,15 @@ export class AbstractReflection {
     const iwucc = this.inverseWhichUpdatesCounterCache();
     if (iwucc && asConcrete(iwucc).options?.counterCache) {
       const col = this.counterCacheColumn();
-      if (col && (this._concrete().activeRecord as any)?.hasAttribute?.(col)) return true;
+      // Rails' class-level `has_attribute?` resolves attribute aliases
+      // (attribute_methods.rb:256) before checking `attribute_types`. Trails'
+      // static `hasAttribute` does not, so resolve the derived counter column
+      // (e.g. comments_count) through the owner's aliases first — the canonical
+      // posts table stores it as `legacy_comments_count`
+      // (aliasAttribute("commentsCount", "legacy_comments_count")).
+      const owner = this._concrete().activeRecord as any;
+      const resolved = col ? resolveAliasedColumn(owner, col) : col;
+      if (resolved && owner?.hasAttribute?.(resolved)) return true;
     }
     return false;
   }
