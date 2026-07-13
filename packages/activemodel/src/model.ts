@@ -1,3 +1,4 @@
+import { TypeError as RubyTypeError } from "./attribute-assignment.js";
 import { Errors, StrictValidationFailed } from "./errors.js";
 import {
   ValidationContext,
@@ -2290,12 +2291,14 @@ export class Model {
     const isPlainObject = (v: unknown): v is Record<string, unknown> =>
       typeof v === "object" && v !== null && !Array.isArray(v);
     if (!isPlainObject(attrs)) {
-      throw new TypeError(`fromJson expected a JSON object, got ${shapeOf(attrs)}`);
+      throw new RubyTypeError(`fromJson expected a JSON object, got ${shapeOf(attrs)}`);
     }
     if (root !== false && root != null) {
       attrs = Object.values(attrs)[0];
       if (!isPlainObject(attrs)) {
-        throw new TypeError(`fromJson root payload must be a JSON object, got ${shapeOf(attrs)}`);
+        throw new RubyTypeError(
+          `fromJson root payload must be a JSON object, got ${shapeOf(attrs)}`,
+        );
       }
     }
     for (const [key, value] of Object.entries(attrs)) {

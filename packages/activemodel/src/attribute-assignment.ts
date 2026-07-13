@@ -270,4 +270,16 @@ class NoMethodError extends NameError {
   }
 }
 
-export { ArgumentError, TypeError, NameError, NoMethodError };
+/**
+ * Mirror of Ruby's `NotImplementedError`. Raised by abstract base methods
+ * that subclasses are required to override — e.g. `Validator#validate` and
+ * `EachValidator#validate_each` (activemodel/lib/active_model/validator.rb:123,162).
+ */
+class NotImplementedError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NotImplementedError";
+  }
+}
+
+export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError };

@@ -1,3 +1,5 @@
+import { NoMethodError } from "../attribute-assignment.js";
+
 export abstract class Type<T = unknown> {
   abstract readonly name: string;
   #precision?: number;
@@ -104,7 +106,7 @@ export abstract class Type<T = unknown> {
   }
 
   asJson(): never {
-    throw new Error("Unimplemented");
+    throw new NoMethodError("Unimplemented");
   }
 
   /**
