@@ -1010,6 +1010,16 @@ describeIfPg("PostgreSQLAdapter", () => {
       const promise = new Promise<pg.Client>((r) => (resolve = r));
       return { promise, resolve };
     };
+    // Wait until `newClient` has been called at least `n` times — the acquire
+    // reaches the connect only after the _inFlightReset / _maintenanceTail
+    // awaits, so poll on the call count rather than a fixed microtask count.
+    const waitForNewClientCalls = async (
+      spy: { mock: { calls: unknown[] } },
+      n: number,
+    ): Promise<void> => {
+      for (let i = 0; i < 1000 && spy.mock.calls.length < n; i++) await Promise.resolve();
+      if (spy.mock.calls.length < n) throw new Error(`newClient not called ${n} time(s)`);
+    };
 
     it("disconnectBang orphans an in-flight acquire so it is not adopted by a racing reconnect", async () => {
       const a = new PostgreSQLAdapter(PG_TEST_URL);
@@ -1025,7 +1035,7 @@ describeIfPg("PostgreSQLAdapter", () => {
       try {
         // First acquire suspends at `await newClient(...)` (generation 0).
         const firstAcquire = a.connect();
-        await Promise.resolve();
+        await waitForNewClientCalls(spy, 1);
 
         // disconnect while the connect is in flight: bumps the generation.
         a.disconnectBang();
@@ -1033,16 +1043,18 @@ describeIfPg("PostgreSQLAdapter", () => {
         // A checkout reconnect clears _closed and _rawConnection, then opens a
         // fresh connect (generation 1) which also suspends.
         const reconnect = a.reconnect();
-        await Promise.resolve();
+        await waitForNewClientCalls(spy, 2);
 
         // The pre-disconnect connect resolves NOW, while _rawConnection is null
         // and _closed is false — the exact window the adoption race exploits.
         first.resolve(orphan);
         await expect(firstAcquire).rejects.toBeTruthy();
 
-        // The stale acquire tore its client down instead of adopting it.
+        // The stale acquire tore its client down instead of adopting it: it
+        // did NOT publish onto _rawConnection (still null — the reconnect's own
+        // connect has not resolved yet) and end()ed the socket.
         expect(endSpy).toHaveBeenCalled();
-        expect(a._rawConnectionForTest()).not.toBe(orphan);
+        expect(a._rawConnectionForTest()).toBeNull();
 
         // The fresh reconnect publishes its own client and works.
         second.resolve(reconnected);
