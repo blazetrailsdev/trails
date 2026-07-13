@@ -37,17 +37,21 @@ function render(results: FindResult[]): string {
 async function main(): Promise<void> {
   const args = process.argv.slice(2);
   const all = args.includes("--all");
+  // `--refresh` is consumed by run.sh (it rebuilds the manifests before this
+  // runs); strip it here too so a direct invocation doesn't treat it as a token.
   const query = args
-    .filter((a) => a !== "--all")
+    .filter((a) => a !== "--all" && a !== "--refresh")
     .join(" ")
     .trim();
   if (!query) {
-    console.error("usage: pnpm rails:find [--all] <test-name | method | constant | token>");
+    console.error(
+      "usage: pnpm rails:find [--all] [--refresh] <test-name | method | constant | token>",
+    );
     process.exit(2);
   }
   const dir = path.dirname(fileURLToPath(import.meta.url));
   const root = path.resolve(dir, "../..");
-  const { results, exactOnly, suppressed } = await railsFind(root, query, { all });
+  const { results, exactOnly, suppressed, stale } = await railsFind(root, query, { all });
   if (results.length === 0) {
     console.error(`no matches for "${query}" (index or grep)`);
     process.exit(1);
@@ -56,6 +60,12 @@ async function main(): Promise<void> {
   if (suppressed > 0) {
     const why = exactOnly ? "substring/capped" : "capped";
     console.log(`\n… ${suppressed} more (${why}) — re-run with --all to see them`);
+  }
+  if (stale.length > 0) {
+    console.error(
+      `\n! stale index (older than vendor lockfile): ${stale.join(", ")}\n` +
+        `  file:line may be outdated — rebuild with 'pnpm rails:find --refresh <query>'`,
+    );
   }
 }
 

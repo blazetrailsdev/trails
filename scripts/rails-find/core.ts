@@ -67,12 +67,26 @@ export const LIB_BASE: Record<string, string> = {
 export const TEST_MANIFEST = "scripts/test-compare/output/rails-tests.json";
 export const API_MANIFEST = "scripts/api-compare/output/rails-api.json";
 
+// Bumped by `pnpm vendor:fetch` whenever the pinned Rails/gem versions change;
+// a manifest older than it was built against a prior vendor tree and may be
+// stale. (New trails tests/methods can also stale it, but the vendored version
+// is the coarse, always-present signal — cf. api-compare's ts-cache drift.)
+export const LOCKFILE = "vendor/sources.lock.json";
+
 /** Grep fallback is scoped here — the fidelity work that drives this is AR. */
 const GREP_SCOPE = "vendor/rails/activerecord";
 const MAX_GREP_RESULTS = 40;
 
 function toPosix(p: string): string {
   return p.split(path.sep).join("/");
+}
+
+async function mtimeMs(root: string, rel: string): Promise<number | null> {
+  try {
+    return (await fs.stat(path.join(root, rel))).mtimeMs;
+  } catch {
+    return null;
+  }
 }
 
 async function readJson<T>(root: string, rel: string): Promise<T | null> {
@@ -85,17 +99,18 @@ async function readJson<T>(root: string, rel: string): Promise<T | null> {
 
 // ── Test-name lookup (reuses test-compare's rails-tests.json) ──
 
-// A test matches when the query (case-insensitive) is a substring of its human
-// description or qualified path, OR of the synthesized `test_snake_case` form —
-// so a trails description ("has primary key") and a Rails method name
-// (`test_has_primary_key`) both hit.
-// Returns `false` for no match, `"exact"` when the query equals the description
-// or synthesized `test_snake_case`, `"partial"` for a substring hit of either
-// (or the qualified path). So a trails description ("has primary key") and a
-// Rails method name (`test_has_primary_key`) both hit; exact wins.
+// A test matches when the query (case-insensitive) equals ("exact") or is a
+// substring ("partial") of its description, qualified path, or the Rails method
+// name Minitest derives from the description — so a trails description ("has
+// primary key") and the Rails method name (`test_has_primary_key`) both hit.
+// Rails builds that name as `test_#{name.gsub(/\s+/, '_')}` — collapsing
+// whitespace runs ONLY, preserving case and punctuation (activesupport/lib/
+// active_support/testing/declarative.rb). Replicate it exactly (lowercased,
+// since `needle` is), not a broader sanitize, or punctuation-bearing
+// descriptions ("doesn't …", "a != b") would diverge from the real method name.
 function testMatch(tc: TestCaseInfo, needle: string): "exact" | "partial" | false {
   const desc = tc.description.toLowerCase();
-  const railsName = "test_" + desc.replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "");
+  const railsName = ("test_" + tc.description.replace(/\s+/g, "_")).toLowerCase();
   if (desc === needle || railsName === needle) return "exact";
   if (desc.includes(needle) || railsName.includes(needle) || tc.path.toLowerCase().includes(needle))
     return "partial";
@@ -241,6 +256,12 @@ export interface FindOutput {
   exactOnly: boolean;
   /** How many matches were dropped by the exact filter + per-mode cap. */
   suppressed: number;
+  /**
+   * Manifest paths that predate `vendor/sources.lock.json` — i.e. built against
+   * an older vendor tree, so their `file:line` may be stale. Empty when fresh
+   * or when the manifest fell back to grep. Rebuild via `run.sh --refresh`.
+   */
+  stale: string[];
 }
 
 export interface FindOptions {
@@ -267,6 +288,19 @@ export async function railsFind(
   if (apiManifest) results.push(...findMethods(apiManifest, query));
   if (results.length === 0) results = await grepVendor(root, query);
 
+  // Flag any USED manifest whose mtime predates the vendor lockfile — its
+  // file:line may point into a since-changed Rails tree.
+  const lockMs = await mtimeMs(root, LOCKFILE);
+  const stale: string[] = [];
+  for (const [manifest, present, used] of [
+    [TEST_MANIFEST, testManifest, results.some((r) => r.mode === "test")],
+    [API_MANIFEST, apiManifest, results.some((r) => r.mode === "method" || r.mode === "constant")],
+  ] as const) {
+    if (lockMs === null || !present || !used) continue;
+    const m = await mtimeMs(root, manifest);
+    if (m !== null && m < lockMs) stale.push(manifest);
+  }
+
   const total = results.length;
   const exactOnly = !opts.all && results.some((r) => r.exact);
   if (exactOnly) results = results.filter((r) => r.exact);
@@ -281,5 +315,5 @@ export async function railsFind(
   }
 
   const modes = [...new Set(results.map((r) => r.mode))];
-  return { results, modes, exactOnly, suppressed: total - results.length };
+  return { results, modes, exactOnly, suppressed: total - results.length, stale };
 }

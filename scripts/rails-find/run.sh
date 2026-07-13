@@ -1,14 +1,22 @@
 #!/usr/bin/env bash
-# Driver for `pnpm rails:find <query>`. Ensures the two manifests the lookup
-# reads exist (building them once via the SAME extractors test:compare /
+# Driver for `pnpm rails:find [--refresh] <query>`. Ensures the two manifests the
+# lookup reads exist (building them once via the SAME extractors test:compare /
 # api:compare use), then runs the pure lookup in bin.ts. Subsequent runs are
-# fast — they hit the cached manifests and skip the build.
+# fast — they hit the cached manifests and skip the build. `--refresh` deletes
+# the cached manifests first, forcing a rebuild against the current vendor tree
+# (bin.ts warns when a manifest predates the vendor lockfile).
 set -euo pipefail
 
 DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 ROOT="$(cd "$DIR/../.." && pwd)"
 TEST_JSON="$ROOT/scripts/test-compare/output/rails-tests.json"
 API_JSON="$ROOT/scripts/api-compare/output/rails-api.json"
+
+for arg in "$@"; do
+  if [[ "$arg" == "--refresh" ]]; then
+    rm -f "$TEST_JSON" "$API_JSON"
+  fi
+done
 
 if [[ ! -f "$TEST_JSON" ]]; then
   echo "==> rails:find: building test manifest (one-time)…" >&2
