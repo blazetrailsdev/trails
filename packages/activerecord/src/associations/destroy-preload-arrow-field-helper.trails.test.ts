@@ -35,6 +35,9 @@ class ArrowFieldAccount extends Base {
   static _seenFirmIsThenable: boolean | null = null;
   static _seenFirmId: number | undefined = undefined;
 
+  // Arrow-function class field — lives on the instance, not the prototype. The
+  // `this.firm` read must be lexical here (not delegated to a free function) so
+  // the callback-source scan can see the association name.
   recordFirm = (): void => {
     const firm = this.firm as { then?: unknown; id?: number } | null;
     ArrowFieldAccount._seenFirmIsThenable = typeof firm?.then === "function";
@@ -44,6 +47,30 @@ class ArrowFieldAccount extends Base {
   static {
     this.belongsTo("firm", { className: "Company" });
     this.beforeDestroy(function (this: ArrowFieldAccount, record?: ArrowFieldAccount) {
+      (record ?? this).recordFirm();
+    });
+  }
+}
+
+// Prototype-method helper (the PR #4809 path) — asserts that resolution through
+// an ordinary prototype method is unchanged by the arrow-field expansion.
+class ProtoHelperAccount extends Base {
+  static _tableName = "accounts";
+  declare firm: Company | null;
+  declare firm_id: number;
+
+  static _seenFirmIsThenable: boolean | null = null;
+  static _seenFirmId: number | undefined = undefined;
+
+  recordFirm(): void {
+    const firm = this.firm as { then?: unknown; id?: number } | null;
+    ProtoHelperAccount._seenFirmIsThenable = typeof firm?.then === "function";
+    ProtoHelperAccount._seenFirmId = firm?.id;
+  }
+
+  static {
+    this.belongsTo("firm", { className: "Company" });
+    this.beforeDestroy(function (this: ProtoHelperAccount, record?: ProtoHelperAccount) {
       (record ?? this).recordFirm();
     });
   }
@@ -68,8 +95,10 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
     registerSubclass(RestrictedWithErrorFirm);
     registerSubclass(Client);
     registerModel("ArrowFieldAccount", ArrowFieldAccount);
+    registerModel("ProtoHelperAccount", ProtoHelperAccount);
     await Company.loadSchema();
     await ArrowFieldAccount.loadSchema();
+    await ProtoHelperAccount.loadSchema();
   });
 
   it("preloads the belongs_to a destroy callback reads through an arrow-field helper", async () => {
@@ -84,5 +113,17 @@ describe("destroy belongs_to preload through arrow-field helper", () => {
     // async reader's Promise.
     expect(ArrowFieldAccount._seenFirmIsThenable).toBe(false);
     expect(ArrowFieldAccount._seenFirmId).toBe(account.firm_id);
+  });
+
+  it("still preloads the belongs_to a destroy callback reads through a prototype helper", async () => {
+    ProtoHelperAccount._seenFirmIsThenable = null;
+    ProtoHelperAccount._seenFirmId = undefined;
+    const account = await ProtoHelperAccount.find((accounts("signals37") as { id: number }).id);
+    expect(account.association("firm").isLoaded()).toBe(false);
+
+    await account.destroy();
+
+    expect(ProtoHelperAccount._seenFirmIsThenable).toBe(false);
+    expect(ProtoHelperAccount._seenFirmId).toBe(account.firm_id);
   });
 });

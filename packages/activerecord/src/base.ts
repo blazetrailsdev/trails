@@ -646,6 +646,17 @@ function expandCallbackSourcesWithHelpers(
   record?: InstanceType<typeof Base>,
 ): string[] {
   const methods = new Map<string, string>();
+  // Instance-own function properties (arrow-field methods) first: they win
+  // method dispatch over a same-named prototype method, so their source is the
+  // one actually run — record them before the prototype walk, whose
+  // `methods.has(key)` guard then leaves them in place.
+  if (record) {
+    for (const key of Object.getOwnPropertyNames(record)) {
+      if (key === "constructor" || methods.has(key)) continue;
+      const desc = Object.getOwnPropertyDescriptor(record, key);
+      if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
+    }
+  }
   for (
     let proto = ctor.prototype;
     proto && proto !== Base.prototype;
@@ -654,13 +665,6 @@ function expandCallbackSourcesWithHelpers(
     for (const key of Object.getOwnPropertyNames(proto)) {
       if (key === "constructor" || methods.has(key)) continue;
       const desc = Object.getOwnPropertyDescriptor(proto, key);
-      if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
-    }
-  }
-  if (record) {
-    for (const key of Object.getOwnPropertyNames(record)) {
-      if (key === "constructor" || methods.has(key)) continue;
-      const desc = Object.getOwnPropertyDescriptor(record, key);
       if (typeof desc?.value === "function") methods.set(key, desc.value.toString());
     }
   }
