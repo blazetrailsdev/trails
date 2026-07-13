@@ -320,11 +320,13 @@ export class HasOneAssociation extends SingularAssociation {
    * paths can't await, so the awaitable accessor (builder/has-one.ts) consults
    * this and issues the SELECT only when a query would actually run
    * (`find_target?`): a persisted / FK-present owner whose target isn't loaded.
+   * `findTargetNeeded()` already returns false when the target is loaded
+   * (association.ts, `if (this.loaded) return false`), so it is the whole gate.
    *
    * @internal
    */
   needsTargetLoadForBuild(): boolean {
-    return !this.loaded && this.findTargetNeeded();
+    return this.findTargetNeeded();
   }
 
   protected override replace(record: Base | null, _save = true): void {

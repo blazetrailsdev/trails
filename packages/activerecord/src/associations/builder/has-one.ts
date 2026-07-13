@@ -56,9 +56,13 @@ export class HasOne extends SingularAssociation {
         const assoc = this.association(name);
         // Only take the async load path when a query would actually run: a
         // persisted / FK-present owner whose target isn't loaded. New-record
-        // owners build synchronously (no query), so their `build#{name}` still
-        // returns the record — and any synchronous error (e.g. an invalid STI
-        // type) still throws synchronously rather than rejecting a Promise.
+        // owners build synchronously (no query), so their `build#{name}` returns
+        // the record directly and a synchronous build error (e.g. an invalid STI
+        // type from `build_record`) still throws synchronously — the shape the
+        // building-with-invalid-type tests assert. On the load path the same
+        // error surfaces as a rejected Promise instead, an unavoidable
+        // consequence of awaiting `load_target` in JS (Rails' `replace` is
+        // fully synchronous, so it raises inline regardless of persistence).
         if (
           typeof assoc.needsTargetLoadForBuild === "function" &&
           assoc.needsTargetLoadForBuild()
