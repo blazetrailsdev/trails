@@ -212,7 +212,9 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
   afterEach(() => vi.restoreAllMocks());
 
   it("accepts preparable/async/allowRetry opts without error", async () => {
-    vi.spyOn(Topic.connection, "execQuery").mockResolvedValueOnce(Result.fromRowHashes([]));
+    // `find_by_sql` → `select_all` → `internal_exec_query` (Rails); trails'
+    // `selectAll` routes through `internalExecQuery`, so that is the seam.
+    vi.spyOn(Topic.connection, "internalExecQuery").mockResolvedValueOnce(Result.fromRowHashes([]));
     // _queryBySql returns the full Result so _loadFromSql can read column_types.
     const result = await _queryBySql.call(Topic, "SELECT 1", [], {
       preparable: true,
@@ -223,7 +225,7 @@ describe("_queryBySql — kwargs pass-through (Story J gap 1)", () => {
   });
 
   it("opts default to empty object — omitting opts still works", async () => {
-    vi.spyOn(Topic.connection, "execQuery").mockResolvedValueOnce(
+    vi.spyOn(Topic.connection, "internalExecQuery").mockResolvedValueOnce(
       Result.fromRowHashes([{ id: 1 }]),
     );
     const result = await _queryBySql.call(Topic, "SELECT 1");
