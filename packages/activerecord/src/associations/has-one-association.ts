@@ -104,6 +104,17 @@ export class HasOneAssociation extends SingularAssociation {
    * defers to the owner's next save (`autosaveHasOne`).
    */
   override writer(record: Base | null): void | Promise<void> {
+    // Delegate to an async helper rather than making `writer` itself `async`, so
+    // the base `void | Promise<void>` signature (shared with the through
+    // override, which can return synchronously) is preserved.
+    return this.writeImmediate(record);
+  }
+
+  private async writeImmediate(record: Base | null): Promise<void> {
+    // Mirror Rails `replace`'s leading `load_target`: materialize the currently
+    // associated record (possibly a DB row on a freshly-found owner) so it can
+    // be nullified/removed, rather than silently orphaning it.
+    if (!this.loaded) await this.loadTarget();
     const displaced = this.target;
     // Mirror Rails `replace`'s `assigning_another_record || has_changes_to_save?`
     // gate: only touch the DB when the assignment actually changes something, so

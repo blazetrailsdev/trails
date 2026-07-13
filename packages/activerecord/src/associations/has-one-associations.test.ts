@@ -597,11 +597,20 @@ describe("HasOneAssociationsTest", () => {
     expect(found.rating).toBe(10);
   });
 
-  it.skip("assignment before child saved", () => {
-    // BLOCKED (tracked: d2-has-one-assignment-before-child-saved): trails defers has_one
-    // writer persistence to the owner's save, so `firm.account = Account.new(...)` does
-    // not immediately persist the child (Rails persists on assignment to a saved owner).
-    // The JS property setter cannot `await` the immediate-persist path.
+  it("assignment before child saved", async () => {
+    // Rails persists the child synchronously on `firm.account = a`. The JS
+    // property setter cannot `await`, so the Rails-faithful immediate-persist
+    // path is reached through the awaitable writer
+    // (`association(name).writer(value)` → `persistImmediate`); the bare `=`
+    // setter defers to the owner's next save. Assigning through the writer
+    // therefore stands in for `firm.account = a` here.
+    const firm = (await Firm.find(1)) as any;
+    const a = new Account({ credit_limit: 1000 });
+    await firm.association("account").writer(a);
+    expect(a.isPersisted()).toBe(true);
+    expect((await readHasOne(firm, "account")).id).toBe(a.id);
+    await firm.association("account").reload();
+    expect((await readHasOne(firm, "account")).id).toBe(a.id);
   });
 
   it("save still works after accessing nil has one", async () => {
