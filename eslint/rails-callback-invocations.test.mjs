@@ -1,4 +1,5 @@
 import { RuleTester } from "eslint";
+import { describe, it, expect } from "vitest";
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
@@ -106,4 +107,39 @@ tester.run("rails-callback-invocations", rule, {
       ],
     },
   ],
+});
+
+// Ratchet hygiene: the committed exclude baseline must only grandfather
+// methods the committed manifest actually constrains. A dead/typo'd entry
+// (wrong path or a method name not in the manifest) would silently linger and
+// defeat the "list only shrinks" contract — the entry could never be reached,
+// so removing it could never be forced. This reads the real committed files
+// (not the tmp fixtures) to keep them honest.
+describe("rails-callback-invocations baseline", () => {
+  const manifestNames = new Set(
+    Object.keys(
+      JSON.parse(fs.readFileSync(path.join(__dirname, "rails-callback-invocations.json"), "utf8"))
+        .methods,
+    ),
+  );
+  const baseline = JSON.parse(
+    fs.readFileSync(path.join(__dirname, "rails-callback-invocations-exclude.json"), "utf8"),
+  );
+
+  it("every entry is `<packages/activerecord/src path>#<manifest method>`", () => {
+    for (const entry of baseline) {
+      const [rel, method] = entry.split("#");
+      expect(entry, `entry "${entry}" must be path#method`).toContain("#");
+      expect(rel, `entry "${entry}" path out of scope`).toMatch(
+        /^packages\/activerecord\/src\/.+\.ts$/,
+      );
+      expect(manifestNames, `entry "${entry}" names a method not in the manifest`).toContain(
+        method,
+      );
+    }
+  });
+
+  it("has no duplicate entries", () => {
+    expect(new Set(baseline).size).toBe(baseline.length);
+  });
 });
