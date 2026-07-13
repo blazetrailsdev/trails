@@ -11,6 +11,7 @@ import { describe, it, expect } from "vitest";
 import { Table } from "@blazetrails/arel";
 import { JoinDependency } from "./join-dependency.js";
 import { AliasTracker } from "./alias-tracker.js";
+import { ConnectionNotDefined, ConnectionTimeoutError } from "../errors.js";
 
 type BaseModelArg = ConstructorParameters<typeof JoinDependency>[0];
 
@@ -56,12 +57,37 @@ describe("JoinDependency AliasTracker seeding", () => {
       tableName: "posts",
       arelTable: new Table("posts"),
       get connection(): never {
-        throw new Error("no connection established");
+        throw new ConnectionNotDefined("No connection pool for posts");
       },
     } as unknown as BaseModelArg;
     const jd = new JoinDependency(noConnModel);
     const tracker = trackerOf(jd);
     // maxIdentifierLength default is 64.
     expect(tracker.aliasNameFor("a".repeat(200))).toBe("a".repeat(64));
+  });
+
+  it("propagates a genuine connection error instead of swallowing it", () => {
+    const brokenModel = {
+      tableName: "posts",
+      arelTable: new Table("posts"),
+      get connection(): never {
+        throw new Error("adapter blew up");
+      },
+    } as unknown as BaseModelArg;
+    expect(() => new JoinDependency(brokenModel)).toThrow("adapter blew up");
+  });
+
+  it("propagates a connection error that is not a no-connection error", () => {
+    // ConnectionTimeoutError is a ConnectionNotEstablished but not a
+    // ConnectionNotDefined, so it is a genuine failure that must not be
+    // swallowed into the default alias cap.
+    const timingOutModel = {
+      tableName: "posts",
+      arelTable: new Table("posts"),
+      get connection(): never {
+        throw new ConnectionTimeoutError("could not obtain a connection");
+      },
+    } as unknown as BaseModelArg;
+    expect(() => new JoinDependency(timingOutModel)).toThrow(ConnectionTimeoutError);
   });
 });
