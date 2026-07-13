@@ -193,11 +193,14 @@ describe("QueryCacheTest", () => {
   it("query cache is applied to all connections", async () => {
     const dbConfig = Base.connectionPool().dbConfig;
     await Base.connectedTo({ role: "reading" }, async () => {
-      Base.connectionHandler.establishConnection(dbConfig, { owner: "Base", role: "reading" });
+      await Base.establishConnection(dbConfig);
     });
 
     const mw = middleware(async () => {
       for (const pool of Base.connectionHandler.connectionPoolList("all")) {
+        // Rails checks `pool.lease_connection.query_cache_enabled`; trails
+        // holds the cache flag on the pool, so lease (to match Rails) then
+        // assert the pool-level flag.
         await pool.leaseConnection();
         expect(pool.queryCacheEnabled).toBe(true);
       }
@@ -209,10 +212,7 @@ describe("QueryCacheTest", () => {
   it("cache is not applied when config is false", async () => {
     const dbConfig = Base.connectionPool().dbConfig;
     await Base.connectedTo({ role: "reading" }, async () => {
-      Base.connectionHandler.establishConnection(
-        { ...dbConfig.configurationHash, queryCache: false },
-        { owner: "Base", role: "reading" },
-      );
+      await Base.establishConnection({ ...dbConfig.configurationHash, queryCache: false });
     });
 
     const mw = middleware(async () => {
@@ -228,10 +228,7 @@ describe("QueryCacheTest", () => {
   it("cache is applied when config is string", async () => {
     const dbConfig = Base.connectionPool().dbConfig;
     await Base.connectedTo({ role: "reading" }, async () => {
-      Base.connectionHandler.establishConnection(
-        { ...dbConfig.configurationHash, queryCache: "unlimited" },
-        { owner: "Base", role: "reading" },
-      );
+      await Base.establishConnection({ ...dbConfig.configurationHash, queryCache: "unlimited" });
     });
 
     const mw = middleware(async () => {
@@ -249,10 +246,7 @@ describe("QueryCacheTest", () => {
   it("cache is applied when config is integer", async () => {
     const dbConfig = Base.connectionPool().dbConfig;
     await Base.connectedTo({ role: "reading" }, async () => {
-      Base.connectionHandler.establishConnection(
-        { ...dbConfig.configurationHash, queryCache: 42 },
-        { owner: "Base", role: "reading" },
-      );
+      await Base.establishConnection({ ...dbConfig.configurationHash, queryCache: 42 });
     });
 
     const mw = middleware(async () => {
@@ -268,10 +262,7 @@ describe("QueryCacheTest", () => {
   it("cache is applied when config is nil", async () => {
     const dbConfig = Base.connectionPool().dbConfig;
     await Base.connectedTo({ role: "reading" }, async () => {
-      Base.connectionHandler.establishConnection(
-        { ...dbConfig.configurationHash, queryCache: null },
-        { owner: "Base", role: "reading" },
-      );
+      await Base.establishConnection({ ...dbConfig.configurationHash, queryCache: null });
     });
 
     const mw = middleware(async () => {
@@ -623,7 +614,7 @@ describe("QueryCacheTest", () => {
   it("clear query cache is called on all connections", async () => {
     const dbConfig = Base.connectionPool().dbConfig;
     await Base.connectedTo({ role: "reading" }, async () => {
-      Base.connectionHandler.establishConnection(dbConfig, { owner: "Base", role: "reading" });
+      await Base.establishConnection(dbConfig);
     });
     setupSharedConnectionPool();
 
