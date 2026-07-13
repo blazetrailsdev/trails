@@ -1,6 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SingularAssociation } from "./singular-association.js";
 import { afterCreate, afterUpdate, afterDestroy } from "../../callbacks.js";
+import { afterCreateCommit } from "../../transactions.js";
 import { addAutosaveAssociationCallbacks } from "../../autosave-association.js";
 
 /**
@@ -168,11 +169,19 @@ export class HasOne extends SingularAssociation {
     };
 
     // Mirrors Rails `HasOne.add_touch_callbacks`: the create/update touch fires
-    // only when the owner actually saved changes (`if: :saved_changes?`), so a
-    // no-op `save` on an unchanged owner does not re-touch the child.
-    const savedChangesQ = (record: any) => Object.keys(record.savedChanges ?? {}).length > 0;
+    // only when the owner actually saved changes (`if: :saved_changes?`). Reuse
+    // the existing `isSavedChanges` predicate (matches belongs-to.ts's touch
+    // callback) so a no-op `save` on an unchanged owner does not re-touch.
+    const savedChangesQ = (record: any) =>
+      typeof record.isSavedChanges === "function" && record.isSavedChanges();
 
     afterCreate(model, callback, { if: savedChangesQ });
+    // Mirrors Rails `after_create_commit { association(name).reset_negative_cache }`:
+    // once the create transaction commits, drop the negative (nil) target cache
+    // so a subsequent read re-queries and sees the freshly persisted child.
+    afterCreateCommit(model, async (record: any) => {
+      record.association(name).resetNegativeCache();
+    });
     afterUpdate(model, callback, { if: savedChangesQ });
     afterDestroy(model, async (record: any) => {
       if (typeof record.isNewRecord !== "function" || !record.isNewRecord()) {
