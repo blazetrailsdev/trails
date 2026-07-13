@@ -7121,7 +7121,7 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { cars } = fixtures(["cars", "topics", "ships", "treasures"]);
+  const { cars, posts } = fixtures(["cars", "topics", "ships", "treasures", "posts", "comments"]);
 
   beforeAll(() => {
     registerModel(HmCar);
@@ -7130,6 +7130,8 @@ describe("HasManyAssociationsTest", () => {
     registerModel(HmTreasure);
     registerModel(HmTopic);
     registerModel(HmReply);
+    registerModel(HmPost);
+    registerModel(Comment);
     enableSti(HmTopic);
     registerSubclass(HmReply);
   });
@@ -7209,15 +7211,13 @@ describe("HasManyAssociationsTest", () => {
     expect(reloaded.replies_count).toBe(1);
   });
 
-  // Rails uses posts(:welcome).comments; trails' posts table has `legacy_comments_count`
-  // (not `comments_count`), so hasCachedCounter? is false for post.comments and
-  // assertNoQueries would fail. Car/Engine (engines_count) tests the same path faithfully.
   it("calling empty with counter cache", async () => {
-    const car = cars("honda") as any;
-    await car.engines.create({});
-    const fresh = (await HmCar.find(car.id)) as any;
+    // Post.comments derives counter column `comments_count`, aliased to the
+    // canonical `legacy_comments_count` — hasCachedCounter? resolves the alias
+    // so isEmpty() reads the cache instead of querying (reflection.ts).
+    const post = posts("welcome") as any;
     await assertNoQueries(false, async () => {
-      expect(await fresh.engines.isEmpty()).toBe(false);
+      expect(await post.comments.isEmpty()).toBe(false);
     });
   });
 });
