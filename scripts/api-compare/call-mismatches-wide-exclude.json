@@ -13532,20 +13532,6 @@
   },
   {
     "package": "activerecord",
-    "tsFile": "associations/builder/has-one.ts",
-    "rubyName": "add_touch_callbacks",
-    "call": "after_create_commit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/has-one.ts",
-    "rubyName": "add_touch_callbacks",
-    "call": "association",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
     "tsFile": "associations/builder/singular-association.ts",
     "rubyName": "define_accessors",
     "call": "generated_association_methods",

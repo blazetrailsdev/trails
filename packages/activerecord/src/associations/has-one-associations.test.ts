@@ -35,6 +35,13 @@ import {
 import { Account } from "../test-helpers/models/account.js";
 import { Car } from "../test-helpers/models/car.js";
 import { Bulb } from "../test-helpers/models/bulb.js";
+import { Club } from "../test-helpers/models/club.js";
+import { Membership } from "../test-helpers/models/membership.js";
+import { Chef } from "../test-helpers/models/chef.js";
+import {
+  DrinkDesignerWithPolymorphicTouchChef,
+  DrinkDesignerWithPolymorphicDependentNullifyChef,
+} from "../test-helpers/models/drink-designer.js";
 import { Pirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -44,8 +51,6 @@ import { Room } from "../test-helpers/models/room.js";
 import { User } from "../test-helpers/models/user.js";
 import { Image } from "../test-helpers/models/image.js";
 import { Department } from "../test-helpers/models/department.js";
-import { Chef } from "../test-helpers/models/chef.js";
-import { DrinkDesignerWithPolymorphicDependentNullifyChef } from "../test-helpers/models/drink-designer.js";
 import {
   CpkBook,
   CpkOrder,
@@ -178,6 +183,9 @@ describe("HasOneAssociationsTest", () => {
     registerModel(CpkNonCpkBook);
     registerModel("SpecialCar", SpecialCar);
     registerModel("SpecialBulb", SpecialBulb);
+    registerModel(Club);
+    registerModel(Membership);
+    registerModel(DrinkDesignerWithPolymorphicTouchChef);
     await Company.loadSchema();
     await Account.loadSchema();
     await Car.loadSchema();
@@ -188,6 +196,9 @@ describe("HasOneAssociationsTest", () => {
     await DrinkDesignerWithPolymorphicDependentNullifyChef.loadSchema();
     await CpkBook.loadSchema();
     await CpkOrderWithNullifiedBook.loadSchema();
+    await Club.loadSchema();
+    await Membership.loadSchema();
+    await DrinkDesignerWithPolymorphicTouchChef.loadSchema();
   });
 
   beforeEach(() => {
@@ -960,32 +971,63 @@ describe("HasOneAssociationsTest", () => {
     }
   });
 
-  it.skip("has one with touch option on create", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Club/Membership touch via nested attributes — query-count gap.
+  it("has one with touch option on create", async () => {
+    await assertQueriesCount(5, false, async () => {
+      await Club.create({ name: "1000 Oaks", membershipAttributes: { favorite: true } });
+    });
   });
 
   it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): polymorphic touch + transaction commit — gap.
+    // BLOCKED (tracked: d2-has-one-touch-polymorphic-inverse-cache): touch: is
+    // honored, but the parent's after_create touch loads its child through the
+    // polymorphic association rather than the cached in-memory inverse, adding
+    // one extra SELECT (7 vs Rails' 6). Needs polymorphic inverse-set on assign
+    // plus after_create_commit reset_negative_cache.
   });
 
-  it.skip("polymorphic has one with touch option on update will touch record by fetching from database if needed", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): polymorphic touch on update — gap.
+  it("polymorphic has one with touch option on update will touch record by fetching from database if needed", async () => {
+    await DrinkDesignerWithPolymorphicTouchChef.create({ chef: new Chef() });
+    const designer = (await DrinkDesignerWithPolymorphicTouchChef.last()) as any;
+
+    await assertQueriesCount(5, false, async () => {
+      await designer.update({ name: "foo" });
+    });
   });
 
-  it.skip("has one with touch option on update", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Club/Membership touch — query-count gap.
+  it("has one with touch option on update", async () => {
+    const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
+    await newClub.createMembership();
+
+    await assertQueriesCount(4, false, async () => {
+      await newClub.update({ name: "Effingut" });
+    });
   });
 
-  it.skip("has one with touch option on touch", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): touch propagation chain — gap.
+  it("has one with touch option on touch", async () => {
+    const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
+    await newClub.createMembership();
+
+    await assertQueriesCount(3, false, async () => {
+      await newClub.touch();
+    });
   });
 
-  it.skip("has one with touch option on destroy", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): Club/Membership touch on destroy — query-count gap.
+  it("has one with touch option on destroy", async () => {
+    const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
+    await newClub.createMembership();
+
+    await assertQueriesCount(4, false, async () => {
+      await newClub.destroy();
+    });
   });
 
-  it.skip("has one with touch option on empty update", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): no-op save detection — gap.
+  it("has one with touch option on empty update", async () => {
+    const newClub = (await Club.create({ name: "1000 Oaks" })) as any;
+    await newClub.createMembership();
+
+    await assertNoQueries(false, async () => {
+      await newClub.save();
+    });
   });
 
   it("has one with touch option on nonpersisted built associations doesnt update parent", async () => {
