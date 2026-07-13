@@ -1388,7 +1388,7 @@ async function logSql<T>(
       // translated to a StatementInvalid by with_raw_connection (with sql:/binds:
       // nil), so we only attach the statement context here — set_query is a no-op
       // when sql was already supplied, so this never double-translates.
-      if (e instanceof StatementInvalid) throw e.setQuery(sql, binds ?? []);
+      if (e instanceof StatementInvalid) throw e.setQuery(sql, bindArray);
       throw e;
     }
   }) as Promise<T>;
