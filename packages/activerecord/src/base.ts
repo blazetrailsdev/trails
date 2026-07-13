@@ -1297,8 +1297,9 @@ export class Base extends Model {
     // reflected column type, so query-side decorations are honored without a
     // per-feature post-reflection replay onto `_attributeDefinitions`. Read the
     // single attribute (O(1), and `getAttribute` returns a `value`-typed Null for
-    // an unknown name) rather than `attributeTypes()`, which rebuilds the whole
-    // cast-types record + Proxy on every call — this is a hot per-bind path.
+    // an unknown name) rather than `attributeTypes()[name]` — even though the
+    // cast-types record + Proxy are now memoized, this avoids the record's
+    // full-set iteration on the cold call in a hot per-bind path.
     return this._defaultAttributes().getAttribute(resolved).type;
   }
 
