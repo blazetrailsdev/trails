@@ -30,6 +30,7 @@ export type AttributeRegistration = AttributeRegistrationClassMethods;
 
 export interface AttributeHostInternals {
   _cachedDefaultAttributes?: AttributeSet | null;
+  _cachedAttributeTypes?: Record<string, Type> | null;
   _attributesBuilder?: unknown;
   _attributeDefinitions?: Map<
     string,
@@ -218,15 +219,26 @@ export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
  * Rails: @attribute_types ||= _default_attributes.cast_types.tap { |h| h.default = Type.default_value }
  * Wraps the cast-types record in a Proxy so unknown keys return a fallback
  * ValueType — same effect as Rails setting `hash.default = Type.default_value`.
+ *
+ * Memoized on the class (own-property guarded) mirroring Rails' `||=`, and
+ * invalidated through resetDefaultAttributesBang wherever `_default_attributes`
+ * is reset — so both the cast-types record and its fallback Proxy are built once
+ * per schema/attribute revision rather than rebuilt on every call.
  */
 export function attributeTypes(this: AttributeHostInternals): Record<string, Type> {
+  if (
+    Object.prototype.hasOwnProperty.call(this, "_cachedAttributeTypes") &&
+    this._cachedAttributeTypes
+  ) {
+    return this._cachedAttributeTypes;
+  }
   // Dispatch through `this._defaultAttributes()` (not the bare AM function) so a
   // subclass override — notably ActiveRecord's column-inclusive
   // `_defaultAttributes`, which reflects schema columns into the set — is
   // honored. Mirrors Rails calling the polymorphic `_default_attributes`.
   const host = this as AttributeHostInternals & { _defaultAttributes(): AttributeSet };
   const cast = host._defaultAttributes().castTypes();
-  return new Proxy(cast, {
+  const proxy = new Proxy(cast, {
     get(target, prop, receiver) {
       if (typeof prop === "string" && !Object.hasOwn(target, prop)) {
         return typeRegistry.lookup("value");
@@ -234,6 +246,8 @@ export function attributeTypes(this: AttributeHostInternals): Record<string, Typ
       return Reflect.get(target, prop, receiver);
     },
   });
+  this._cachedAttributeTypes = proxy;
+  return proxy;
 }
 
 /**
@@ -302,6 +316,10 @@ export function resetDefaultAttributes(cls: AttributeHostInternals): void {
  */
 export function resetDefaultAttributesBang(this: AttributeHostInternals): void {
   this._cachedDefaultAttributes = null;
+  // Invalidate the memoized attribute_types record + fallback Proxy in the same
+  // cascade that clears _default_attributes, mirroring Rails resetting
+  // @attribute_types alongside @default_attributes.
+  this._cachedAttributeTypes = null;
   // _attributesBuilder is an AR-specific derived cache. Shadow with undefined
   // so prototype-chain lookup never returns a stale superclass builder after
   // this class's attributes change. STI subclasses remove the shadow after
