@@ -189,8 +189,9 @@ type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>
  */
 export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T> {
   return function (this: T, options?: ReloadOptions): Promise<T> {
-    (this as unknown as AutosaveAssociationHost)[MARKED_FOR_DESTRUCTION] = false;
-    (this as unknown as AutosaveAssociationHost).destroyedByAssociation = null;
+    const record = this as unknown as AutosaveAssociationHost;
+    record[MARKED_FOR_DESTRUCTION] = false;
+    record.destroyedByAssociation = null;
     return inheritedReload.call(this, options);
   };
 }
