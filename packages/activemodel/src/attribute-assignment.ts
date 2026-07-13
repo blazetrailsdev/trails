@@ -44,10 +44,18 @@ export function isMassAssignmentEmpty(attrs: object): boolean {
 }
 
 /**
- * A non-plain object duck-typing the `ActionController::Parameters` surface
- * (`permitted`/`toH`) — distinct from a plain hash, whose own keys ARE its
- * contents. Only such a wrapper's `empty` should be consulted, so a plain hash
- * that happens to carry an `empty: <boolean>` attribute is unaffected.
+ * A non-plain object duck-typing the `ActionController::Parameters` surface —
+ * the trails analogue of Rails' params wrapper, distinct from a plain hash whose
+ * own keys ARE its contents. Single source of truth for wrapper recognition on
+ * the mass-assignment path: `isHashLike` admits it as hash-like, and
+ * `isMassAssignmentEmpty` consults its `empty` (so a plain hash that happens to
+ * carry an `empty: <boolean>` attribute is unaffected).
+ *
+ * For the real ActionController::Parameters, `permitted` is a boolean getter
+ * (strong-parameters.ts:113), not a method, so `toH` is the load-bearing check
+ * that admits it here; the `permitted` function-probe covers other duck-typed
+ * wrappers. (sanitizeForMassAssignment has the same permitted-as-function
+ * assumption — tracked in `sanitize-mass-assignment-permitted-getter`.)
  */
 function isParamsLikeWrapper(attrs: object): boolean {
   const proto = Object.getPrototypeOf(attrs);
@@ -165,13 +173,7 @@ export function assertHashAttributes(attrs: unknown): asserts attrs is Record<st
 function isHashLike(attrs: object): boolean {
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return true;
-  const wrapper = attrs as PermittedAttributes;
-  // For the real ActionController::Parameters, `permitted` is a boolean getter
-  // (strong-parameters.ts:113), not a method, so `toH` is the load-bearing check
-  // that admits it here; the `permitted` function-probe covers other duck-typed
-  // wrappers. (sanitizeForMassAssignment has the same permitted-as-function
-  // assumption — tracked in `sanitize-mass-assignment-permitted-getter`.)
-  return typeof wrapper.permitted === "function" || typeof wrapper.toH === "function";
+  return isParamsLikeWrapper(attrs);
 }
 
 function typeNameForError(value: unknown): string {
