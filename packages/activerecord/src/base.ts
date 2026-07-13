@@ -75,6 +75,7 @@ import {
 import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
 import {
   AutosaveAssociation,
+  reload as _autosaveReload,
   flushPendingReplaces,
   computePrimaryKey as _computePrimaryKey,
   _ensureNoDuplicateErrors as _autosaveEnsureNoDuplicateErrors,
@@ -5077,6 +5078,22 @@ include(Base, TouchLater.InstanceMethods);
 };
 include(Base, _AttributeAssignment.InstanceMethods);
 include(Base, AutosaveAssociation);
+// AutosaveAssociation#reload resets marked-for-destruction / destroyed-by-
+// association state, then calls super. Capture the inherited reload (Persistence)
+// at wire time and slot it BELOW Aggregations' lazy wrap, so the MRO is
+// Aggregations → AutosaveAssociation → Persistence. Mirrors Ruby's module super
+// chain; trails has no super across mixins, so wire it explicitly.
+{
+  const inheritedReload = (Base.prototype as any).reload as (
+    this: Base,
+    options?: { lock?: boolean | string; unscoped?: boolean },
+  ) => Promise<Base>;
+  Object.defineProperty(Base.prototype, "reload", {
+    value: _autosaveReload(inheritedReload),
+    writable: true,
+    configurable: true,
+  });
+}
 include(Base, _NestedAttributes.InstanceMethods);
 include(Base, _AssocInstance.InstanceMethods);
 include(Base, {

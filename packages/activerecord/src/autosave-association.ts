@@ -175,6 +175,27 @@ interface AutosaveAssociationHost {
 // Module object — included into Base via include(Base, AutosaveAssociation)
 // ---------------------------------------------------------------------------
 
+type ReloadOptions = { lock?: boolean | string; unscoped?: boolean };
+type ReloadFn<T extends Base> = (this: T, options?: ReloadOptions) => Promise<T>;
+
+/**
+ * Reset the in-memory autosave flags before reloading from the database, then
+ * delegate to the inherited `reload` (Ruby `super`). `inheritedReload` is the
+ * reload method that sat on the prototype when AutosaveAssociation was mixed in,
+ * captured at include time so the delegation walks the real ancestry
+ * (AutosaveAssociation → Persistence) rather than hardcoding a jump.
+ *
+ * Mirrors: ActiveRecord::AutosaveAssociation#reload
+ */
+export function reload<T extends Base>(inheritedReload: ReloadFn<T>): ReloadFn<T> {
+  return function (this: T, options?: ReloadOptions): Promise<T> {
+    const record = this as unknown as AutosaveAssociationHost;
+    record[MARKED_FOR_DESTRUCTION] = false;
+    record.destroyedByAssociation = null;
+    return inheritedReload.call(this, options);
+  };
+}
+
 export const AutosaveAssociation = {
   markForDestruction(this: AutosaveAssociationHost): void {
     this[MARKED_FOR_DESTRUCTION] = true;
@@ -306,14 +327,6 @@ export async function flushPendingReplaces(record: Base): Promise<void> {
       await (assoc as any).persistReplace();
     }
   }
-}
-
-export function clearAutosaveState(record: Base): void {
-  const r = record as any;
-  r[MARKED_FOR_DESTRUCTION] = false;
-  r.destroyedByAssociation = null;
-  delete r[VALIDATING_BELONGS_TO_FOR];
-  delete r[AUTOSAVING_BELONGS_TO_FOR];
 }
 
 // ---------------------------------------------------------------------------

@@ -30,7 +30,6 @@ import {
 } from "./multiparameter-attribute-assignment.js";
 import { assignAssociationIfMatch } from "./attribute-assignment.js";
 import { threadedConnectionFor } from "./connection-handling.js";
-import { clearAutosaveState } from "./autosave-association.js";
 import {
   getStiBase,
   getInheritanceColumn,
@@ -1437,7 +1436,6 @@ export async function reload<T extends ReloadRecord>(
   for (const proxy of this._collectionProxies.values()) {
     (proxy as { owner: unknown }).owner = this;
   }
-  clearAutosaveState(this as unknown as Parameters<typeof clearAutosaveState>[0]);
   return this;
 }
 
