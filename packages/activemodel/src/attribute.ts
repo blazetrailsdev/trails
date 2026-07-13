@@ -226,7 +226,7 @@ export abstract class Attribute {
 
   withUserDefault(value: unknown): Attribute {
     if (!_UserProvidedDefaultCtor) {
-      throw new Error(
+      throw new RuntimeError(
         "UserProvidedDefault not loaded. Import '@blazetrails/activemodel' " +
           "or './attribute/user-provided-default.js' before calling withUserDefault().",
       );
@@ -371,5 +371,17 @@ export class Uninitialized extends Attribute {
 
   isInitialized(): boolean {
     return false;
+  }
+}
+
+/**
+ * Mirror of Ruby's `RuntimeError` (the default `raise "msg"` class). Guards the
+ * trails-invented module-load-order failure in `withUserDefault`, which has no
+ * Rails equivalent (Ruby loads `UserProvidedDefault` eagerly).
+ */
+class RuntimeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeError";
   }
 }

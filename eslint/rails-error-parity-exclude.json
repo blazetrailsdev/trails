@@ -1,9 +1,7 @@
 [
-  "packages/activemodel/src/attribute.ts",
   "packages/activemodel/src/errors.ts",
   "packages/activemodel/src/i18n.ts",
   "packages/activemodel/src/lint.ts",
-  "packages/activemodel/src/serialization.ts",
   "packages/activerecord/src/adapters/postgresql/pg-range.ts",
   "packages/activerecord/src/aggregations.ts",
   "packages/activerecord/src/associations.ts",

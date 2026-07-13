@@ -85,7 +85,7 @@ export function serializableHash(
       } else if (method in record) {
         safeSet(result, method, record[method]);
       } else {
-        throw new Error(
+        throw new NoMethodError(
           `undefined method '${method}' for an instance of ${record.constructor.name}`,
         );
       }
@@ -102,7 +102,7 @@ export function serializableHash(
     // with no `loaded` flag (plain arrays, `to_ary`-style wrappers) are ready.
     if (isSerializableCollection(records)) {
       if ((records as { loaded?: unknown }).loaded === false) {
-        throw new Error(
+        throw new RuntimeError(
           `Cannot serialize the '${assocName}' association: its collection is not ` +
             `loaded. Load it first (await the association, or eager-load via ` +
             `includes / preload) — synchronous serialization cannot query the database.`,
@@ -213,7 +213,9 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
   // A genuine function member is invoked (`send`); an absent member raises like
   // `send`'s `NoMethodError`.
   if (inRecord) return (reader as () => unknown).call(record);
-  throw new Error(`undefined method '${key}' for an instance of ${record.constructor.name}`);
+  throw new NoMethodError(
+    `undefined method '${key}' for an instance of ${record.constructor.name}`,
+  );
 }
 
 /** @internal */
@@ -520,7 +522,9 @@ export function thenableHash(
  */
 function sendAssociation(record: SerializationRecord, name: string): unknown {
   if (!(name in record)) {
-    throw new Error(`undefined method '${name}' for an instance of ${record.constructor.name}`);
+    throw new NoMethodError(
+      `undefined method '${name}' for an instance of ${record.constructor.name}`,
+    );
   }
   const reader = record[name];
   return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;
@@ -751,4 +755,40 @@ function normalizeIncludes(
     safeSet(result as Record<string, unknown>, k, v);
   }
   return result;
+}
+
+/**
+ * Mirror of Ruby's `NameError` — the base for `NoMethodError`. Kept local so
+ * the hierarchy is observable via `instanceof` without cross-file coupling.
+ */
+class NameError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "NameError";
+  }
+}
+
+/**
+ * Mirror of Ruby's `NoMethodError` (a subclass of `NameError`). Rails'
+ * `serializable_hash` calls `send(method)` / `send(association)` unconditionally
+ * (serialization.rb:191); an undefined name answers with `NoMethodError`.
+ */
+class NoMethodError extends NameError {
+  constructor(message: string) {
+    super(message);
+    this.name = "NoMethodError";
+  }
+}
+
+/**
+ * Mirror of Ruby's `RuntimeError` (the default `raise "msg"` class). Used for
+ * the trails-invented unloaded-collection guard on the synchronous
+ * serialization path, which has no Rails equivalent (`to_ary` would lazily
+ * load from the DB — RFC 0022 b2).
+ */
+class RuntimeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeError";
+  }
 }
