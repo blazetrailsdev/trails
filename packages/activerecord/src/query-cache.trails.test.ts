@@ -48,7 +48,14 @@ describe("cacheNotificationInfo payload (trails)", () => {
     expect(cached.length).toBe(1);
     const lazy = cached[0].type_casted_binds;
     expect(typeof lazy).toBe("function");
-    expect((lazy as () => unknown[])()).toEqual([1]);
+    // Assert the thunk casts the payload's OWN binds rather than hardcoding a
+    // value: how many binds a find(1) carries is adapter-dependent and
+    // legitimately so — Rails' to_sql_and_binds (database_statements.rb:32-42)
+    // leaves binds empty when prepared_statements is off, which is the MySQL
+    // default, so the slot is `[]` there and `[1]` on SQLite/PG. The exact cast
+    // is pinned by "defers the cast until the slot is read", which supplies its
+    // own bind and is adapter-independent.
+    expect((lazy as () => unknown[])()).toHaveLength((cached[0].binds ?? []).length);
   });
 
   it("defers the cast until the slot is read", async () => {
