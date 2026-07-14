@@ -6,6 +6,7 @@ import { SubstituteBinds } from "../collectors/substitute-binds.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
+import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
 
 // Mirrors Arel::Visitors::UnsupportedVisitError (defined in to_sql.rb:5
@@ -532,6 +533,13 @@ export class ToSql extends Visitor {
     reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
     reg(Nodes.BoundSqlLiteral, "visitArelNodesBoundSqlLiteral");
     reg(Nodes.BindParam, "visitArelNodesBindParam");
+    // ActiveModel::Attribute is not an Arel Node, but Rails dispatches it by
+    // class name like any other visitable object. Registering the abstract base
+    // lets the prototype-chain walk in `resolveDispatch` resolve every subclass
+    // (FromUser / FromDatabase / QueryAttribute / ...), mirroring Ruby's
+    // ancestors walk. The cast is required because the dispatch table is keyed
+    // by Node ctors; dispatch only ever reads `object.constructor`.
+    reg(ModelAttribute as unknown as NodeCtor, "visitActiveModelAttribute");
     reg(Nodes.Fragments, "visitArelNodesFragments");
     // Functions
     reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");

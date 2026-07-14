@@ -11,6 +11,7 @@ import {
   Visitors,
   Collectors,
 } from "../index.js";
+import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
 
 describe("the to_sql visitor", () => {
   const users = new Table("users");
@@ -1819,9 +1820,8 @@ describe("the to_sql visitor", () => {
     });
 
     it("visitActiveModelAttribute routes through bindBlock (Rails parity)", () => {
-      // ActiveModel::Attribute isn't a Node ctor so it's not reachable
-      // through standard dispatch — exercise the visitor method directly
-      // to confirm Rails' add_bind(o, &bind_block) shape is preserved.
+      // Exercise the visitor method directly to confirm Rails'
+      // add_bind(o, &bind_block) shape is preserved.
       class NumberedVisitor extends Visitors.ToSql {
         idx = 0;
         protected override bindBlock(): (i: number) => string {
@@ -1835,6 +1835,17 @@ describe("the to_sql visitor", () => {
       ).visitActiveModelAttribute({ value: "x" }, collector);
       // bindIndex starts at 1; the block receives 1, so `$1`
       expect(collector.value).toBe("$1");
+    });
+
+    it("dispatches a bare ActiveModel::Attribute to visitActiveModelAttribute", () => {
+      // Rails dispatches ActiveModel::Attribute by class name like any other
+      // visitable object (to_sql.rb:756). Trails registers the abstract base,
+      // so concrete subclasses resolve via the prototype-chain walk rather
+      // than raising UnsupportedVisitError.
+      const amAttr = AMAttribute.withCastValue("id", 7, new ValueType());
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(amAttr as unknown as Nodes.Node);
+      expect(sql).toBe("?");
+      expect(binds).toEqual([amAttr]);
     });
 
     it("visitArelSelectManager wraps the manager's AST in parens", () => {

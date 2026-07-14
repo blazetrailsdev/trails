@@ -17,11 +17,38 @@ import { BindParam } from "./bind-param.js";
  *   handles them via duck-type in specific contexts (see visitIn). When
  *   their AST is what's wanted, unwrap to the ast node so downstream
  *   visitors always receive a real Node.
- * - ActiveModel::Attribute isn't an Arel node either. Rails has
- *   visit_ActiveModel_Attribute that routes it through add_bind; we
- *   wrap it in BindParam so the value participates in prepared-statement
- *   bind extraction (visitBindParam handles valueForDatabase — both the
- *   method form on QueryAttribute and the getter form on AM Attribute).
+ * - ActiveModel::Attribute isn't an Arel node either. Rails passes it
+ *   through bare (casted.rb:50); we wrap it in BindParam. This is a
+ *   deliberate, behaviorally-equivalent shape difference — see below.
+ *
+ * ## Why the BindParam wrap is equivalent to Rails' bare pass-through
+ *
+ * Do not "fix" this as a bug. The two shapes emit identical SQL and record
+ * an identical bind payload, because Rails' two visitors converge:
+ *
+ *     def visit_ActiveModel_Attribute(o, collector)
+ *       collector.add_bind(o, &bind_block)         # to_sql.rb:756-758
+ *     end
+ *
+ *     def visit_Arel_Nodes_BindParam(o, collector)
+ *       collector.add_bind(o.value, &bind_block)   # to_sql.rb:760-762
+ *     end
+ *
+ * Rails' bare `attr` reaches `add_bind(attr)`; trails' `BindParam(attr)`
+ * reaches `add_bind(o.value)` — which *is* `attr`. Same payload, so
+ * `type_casted_binds` / prepared-statement paths still see the attribute
+ * and call `value_for_database` on it exactly as before.
+ *
+ * The predicate delegations survive the wrap too: BindParam#isUnboundable
+ * (bind-param.ts:50-52) and #isNil (:39-43) forward to the wrapped value,
+ * so `IS NULL` collapsing and unboundable-range handling behave the same.
+ *
+ * We wrap rather than pass through because a bare ActiveModel::Attribute is
+ * not a `Node`, and trails' AST is statically typed against `Node` — Ruby
+ * duck-types its way past this, TS cannot without widening every node slot.
+ * `ToSql#visitActiveModelAttribute` is still ported and dispatch-registered
+ * (to-sql.ts), so a bare attribute arriving from a path that bypasses
+ * buildQuoted / Attribute#quotedNode is handled Rails-identically.
  */
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
