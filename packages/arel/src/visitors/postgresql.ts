@@ -2,7 +2,8 @@ import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql } from "./to-sql.js";
-import { quoteArrayLiteral } from "../quote-array.js";
+import { postgresqlDefaultQuoter } from "./default-quoter.js";
+import type { ArelConnection } from "./connection.js";
 
 /**
  * PostgreSQL visitor — extends generic ToSql with PostgreSQL-specific features.
@@ -10,6 +11,17 @@ import { quoteArrayLiteral } from "../quote-array.js";
  * Mirrors: Arel::Visitors::PostgreSQL
  */
 export class PostgreSQL extends ToSql {
+  // Rails' Arel::Visitors::PostgreSQL defines no constructor — it inherits
+  // ToSql's, and @connection is always a real adapter. Trails constructs
+  // visitors with no connection (Node#toSql(), visitor unit tests), so the
+  // default has to name a PG-flavoured quoting host rather than the ANSI one.
+  // This is the only Rails-absent member here; the quote override it replaces
+  // was the larger deviation (Rails formats arrays in the adapter's quote —
+  // postgresql/quoting.rb:221-226 — never in the visitor).
+  constructor(connection: ArelConnection = postgresqlDefaultQuoter) {
+    super(connection);
+  }
+
   protected override visitArelNodesMatches(node: Nodes.Matches, collector: SQLString): SQLString {
     this.visitNodeOrValue(node.left, collector);
     collector.append(node.caseSensitive ? " LIKE " : " ILIKE ");
@@ -127,29 +139,6 @@ export class PostgreSQL extends ToSql {
     });
     collector.append(" )");
     return collector;
-  }
-
-  protected override quote(value: unknown): string {
-    if (Array.isArray(value)) {
-      const literal = quoteArrayLiteral(value, (v) => this.formatArrayDate(v));
-      return `'${literal.replace(/'/g, "''")}'`;
-    }
-    return super.quote(value);
-  }
-
-  // Mirrors Rails' `type_cast_array` → `type_cast` → `when Date, Time then
-  // quoted_date` (`abstract/quoting.rb:94-107`), so an array element matches
-  // the scalar path.
-  private formatArrayDate(value: unknown): string | undefined {
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "toISOString" in value &&
-      typeof (value as { toISOString: unknown }).toISOString === "function"
-    ) {
-      return this.quotedDate(value as { toISOString(): string });
-    }
-    return undefined;
   }
 }
 

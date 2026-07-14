@@ -25,8 +25,10 @@ import {
 } from "./quoting.js";
 
 // `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
-// PG's quotedDate so date/time values reach the BC-suffixing override.
-const HOST = { quotedDate };
+// PG's quotedDate so date/time values reach the BC-suffixing override, and its
+// quotedBinary so binary values reach the bytea-hex override — a real adapter
+// host carries both.
+const HOST = { quotedDate, quotedBinary };
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
@@ -204,6 +206,14 @@ describe("PostgreSQL quoting", () => {
 
   it("quote(BinaryData) unwraps to bytes via quotedBinary", () => {
     expect(quote(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
+  });
+
+  it("quote(non-Uint8Array ArrayBuffer view) normalizes to bytes via quotedBinary", () => {
+    // Views other than Uint8Array reach the inherited abstract quote, which
+    // normalizes them to bytes and self-dispatches to the adapter's
+    // quotedBinary rather than raising `can't quote Int8Array`.
+    expect(quote(new Int8Array([0x1f, 0x8b - 0x100]))).toBe("'\\x1f8b'");
+    expect(quote(new DataView(new Uint8Array([0x1f, 0x8b]).buffer))).toBe("'\\x1f8b'");
   });
 
   it("checkIntInRange is the Rails name for checkIntegerRange", () => {

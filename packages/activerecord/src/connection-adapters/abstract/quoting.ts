@@ -3,9 +3,15 @@
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting
  *
- * @boundary-file: SQL quoting accepts caller-supplied values; legacy callers
- *   may pass JS `Date` for date-typed columns. The dispatcher branches on
- *   `instanceof Date` alongside Temporal types and handles each separately.
+ * @boundary-file: SQL quoting accepts caller-supplied values of unknown type,
+ *   so the dispatcher branches on runtime shape.
+ *
+ *   Rails' `when Date, Time then "'#{quoted_date(value)}'"` (quoting.rb:85)
+ *   accepts Ruby's native time objects; trails' analogue is Temporal, not JS
+ *   `Date` — #939 ("close the dual-typed window") made Temporal the sole
+ *   date/time representation, so `quote` and `typeCast` both reject a JS `Date`
+ *   with guidance rather than formatting it. rb:85 is ported onto the Temporal
+ *   branches via `dispatchQuotedDate`.
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -33,6 +39,8 @@ export interface QuotingDispatchHost {
   quotedDate?(value: TemporalDateLike): string;
   /** @internal */
   quotedTime?(value: Temporal.PlainTime | Temporal.PlainDateTime): string;
+  /** @internal */
+  quotedBinary?(value: Uint8Array): string;
   /** @internal */
   quoteColumnName?(name: string): string;
 }
@@ -95,6 +103,23 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  // ArrayBuffer views have no Ruby analogue: they must be normalized to bytes
+  // rather than falling to the raise below. Sited at the position Rails gives
+  // binary dispatch (`when Type::Binary::Data then quoted_binary(value)`,
+  // abstract/quoting.rb:83 — after Numeric, before Time/Date) and
+  // self-dispatched so each adapter's quotedBinary applies.
+  //
+  // This is NOT the rb:83 port: that line's `Type::Binary::Data` branch is
+  // still missing here and re-implemented per-adapter (postgresql/quoting.ts,
+  // mysql/quoting.ts, sqlite3/quoting.ts), which also short-circuit Uint8Array
+  // to the module quotedBinary and so bypass this self-dispatch. Porting rb:83
+  // and collapsing those copies is story
+  // `abstract-quote-binary-data-self-dispatch` — behaviorally a no-op today
+  // (each override delegates to the same module function), hence deferred.
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return dispatchQuotedBinary(this, bytes);
+  }
   // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
   // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
   // BC-suffixing `quoted_date` — are honored. Thread `this` to mirror that.
@@ -299,8 +324,19 @@ export function unquotedFalse(): boolean {
  * Quote binary data for SQL.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_binary
+ * (abstract/quoting.rb:206 — `"'#{quote_string(value.to_s)}'"`).
+ *
+ * Rails' `value` is a `Type::Binary::Data` whose `to_s` is the raw byte
+ * string. JS has no such coercion — `String(new Uint8Array([0x1f, 0x8b]))` is
+ * `"31,139"`, the comma-joined decimals — so bytes are decoded latin1 to reach
+ * the byte string `quote_string` expects. Every real adapter overrides this
+ * with a dialect binary literal; this is the abstract fallback.
  */
 export function quotedBinary(value: unknown): string {
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return `'${quoteString(Buffer.from(bytes).toString("latin1"))}'`;
+  }
   return `'${quoteString(String(value))}'`;
 }
 
@@ -356,6 +392,19 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
     value.constructor?.name === "SqlLiteral" &&
     typeof (value as any).value === "string"
   );
+}
+
+/**
+ * Self-dispatch binary quoting through the host, mirroring Rails' `quote`
+ * calling `self.quoted_binary(value)` so an adapter override applies. Falls
+ * back to the module-level helper when the host omits it.
+ * @internal
+ */
+export function dispatchQuotedBinary(host: QuotingDispatchHost, value: Uint8Array): string {
+  if (typeof host.quotedBinary === "function") {
+    return host.quotedBinary(value);
+  }
+  return quotedBinary(value);
 }
 
 /**
