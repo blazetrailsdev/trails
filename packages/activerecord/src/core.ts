@@ -664,11 +664,17 @@ export function filterAttributes(
  * keys and association-key expansion flow through the associated_table
  * fallback — `buildFromHash({"schema.table.column": v})` expands to
  * `"schema.table"."column" = ?` without a hand-built TableMetadata.
+ *
+ * Memoize as an OWN property (not a prototype-chain read): the builder's
+ * TableMetadata is bound to `this`, so an STI subclass (same table_name) must
+ * not inherit the parent's builder — that would resolve associations/
+ * aggregates against the wrong klass. Rails gets this from `inherited`
+ * resetting `@predicate_builder = nil` in the subclass (core.rb:422-425).
  */
-export function predicateBuilder(this: CoreHost): any {
-  if (this._predicateBuilder) return this._predicateBuilder;
+export function predicateBuilder(this: CoreHost): PredicateBuilder {
+  if (Object.prototype.hasOwnProperty.call(this, "_predicateBuilder") && this._predicateBuilder)
+    return this._predicateBuilder;
   const table = this.arelTable;
-  if (!table) return null;
   const metadata = new TableMetadata(this as any, table);
   const pb = new PredicateBuilder(table);
   pb.setTableContext(metadata);
