@@ -142,6 +142,21 @@ export class PredicateBuilder {
     negated: boolean,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
+    // Mirrors Rails PredicateBuilder#expand_from_hash: `return ["1=0"] if
+    // attributes.empty?` (predicate_builder.rb:85). An empty hash is a
+    // contradiction, so `where(posts: {})` (nested empty hash) and
+    // `where(sink: {})` (empty hash, no foreign key) match nothing. Top-level
+    // `where({})` never reaches here — it short-circuits as a blank argument in
+    // `Relation#where` (like Rails' `args.first.blank?`), so this fires only for
+    // the nested/associated recursion.
+    //
+    // Under negation (`where.not(sink: {})`) trails threads `negated` into the
+    // recursion (Rails builds positively then inverts the WhereClause), so the
+    // contradiction inverts to the `1=1` tautology — `NOT (1=0)` matches every
+    // row, mirroring `WhereClause#invert` over Rails' `["1=0"]`.
+    if (Object.keys(conditions).length === 0) {
+      return [arelSql(negated ? "1=1" : "1=0")];
+    }
     const nodes: Nodes.Node[] = [];
     for (const [key, value] of Object.entries(conditions)) {
       if (

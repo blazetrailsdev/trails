@@ -541,12 +541,16 @@ export class Relation<T extends Base> {
     ...rest: unknown[]
   ): Relation<T> | WhereChain<Relation<T>> {
     if (conditionsOrSql === undefined) return new WhereChain<Relation<T>>(this._clone());
-    // Rails: `where([])` is blank (`args.length == 1 && args.first.blank?`,
-    // query_methods.rb:1036) and returns the relation unchanged, like
-    // `where({})` / `where(null)` / `where("")`. This applies ONLY to the
-    // single-argument call — `where([], tuples)` (a 2-arg composite) must fall
-    // through so the empty column list raises rather than silently no-opping.
-    if (Array.isArray(conditionsOrSql) && conditionsOrSql.length === 0 && rest.length === 0) {
+    // Rails: a single blank-ish argument (`args.length == 1 && args.first.blank?`,
+    // query_methods.rb:1036) makes `where` a no-op returning the relation
+    // unchanged — `where({})` / `where([])` / `where(null)` / `where("")` all
+    // match every row. This applies ONLY to the single-argument call:
+    // `where([], tuples)` (a 2-arg composite) must fall through so the empty
+    // column list raises rather than silently no-opping. Short-circuiting the
+    // empty top-level hash here (rather than in the predicate builder) is what
+    // lets a NESTED empty hash (`where(posts: {})`) still expand to the `1=0`
+    // contradiction Rails' `expand_from_hash` returns.
+    if (rest.length === 0 && _qm.isBlankArgument(conditionsOrSql)) {
       return this._clone();
     }
     // Composite-key form: array of column names + array of tuples. It is
@@ -5738,9 +5742,33 @@ export class Relation<T extends Base> {
         | { isForceEquality?(v: unknown): boolean }
         | undefined;
       if (type?.isForceEquality?.(value)) return value;
-      return value.map((v) => this._modelClass._castAttributeValue(attrKey, v));
+      return value.map((v) => this._castPreservingUncastable(attrKey, v));
     }
-    return this._modelClass._castAttributeValue(attrKey, value);
+    return this._castPreservingUncastable(attrKey, value);
+  }
+
+  /**
+   * Cast a scalar `where` value through its column type, but preserve the raw
+   * value when the cast collapses a non-null input to `null`.
+   *
+   * Rails never pre-casts a `where` value to nil: an un-castable string
+   * (`where(parent_id: "not-a-number")`, `where(written_on: "")`, or such an
+   * element inside `where(parent_id: ["not-a-number"])`) keeps its raw value and
+   * the QueryAttribute bind serializes to NULL at compile time — yielding
+   * `col = NULL` / `col IN (NULL)` (matches nothing), not the `IS NULL` path
+   * (matches nulls). Collapsing to nil here would misroute BOTH the scalar
+   * (Equality → `rightIsNull`) and array (ArrayHandler's `values.compact!`
+   * nil-partition, array_handler.rb:16) paths onto explicit-nil handling. So the
+   * bind — evaluated by the visitor via `nil?`/`unboundable?` — decides
+   * nullness, not this pre-cast. A genuinely null input stays null (routes to
+   * `IS NULL`), matching Rails treating only real `nil` as null.
+   */
+  private _castPreservingUncastable(attrKey: string, value: unknown): unknown {
+    const cast = this._modelClass._castAttributeValue(attrKey, value);
+    if ((cast === null || cast === undefined) && value !== null && value !== undefined) {
+      return value;
+    }
+    return cast;
   }
 
   private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {

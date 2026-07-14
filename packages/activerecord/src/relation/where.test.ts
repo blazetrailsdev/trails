@@ -134,17 +134,11 @@ describe("WhereTest", () => {
     expect(ids(chefs)).toStrictEqual([(chef as any).id]);
   });
 
-  it.skip("where with invalid value", async () => {
-    // BLOCKED: predicate-builder — an un-castable query value (non-numeric string
-    // for an integer column, "" for date/time) casts to `null` and emits `IS NULL`,
-    // so the query matches NULL rows instead of nothing.
-    // ROOT-CAUSE: relation/predicate-builder.ts not implementing Rails'
-    // QueryAttribute#boundable? contradiction (`1=0`) for un-boundable values.
-    // SCOPE: convergence tracked by RFC 0023
-    // predicate-builder-blank-and-unboundable-contradiction.
+  it("where with invalid value", async () => {
     const first = topics("first") as any;
     await first.update({ parent_id: 0, written_on: null, bonus_time: null, last_read: null });
     expect(await Topic.where({ parent_id: "not-a-number" })).toHaveLength(0);
+    expect(await Topic.where({ parent_id: ["not-a-number"] })).toHaveLength(0);
     expect(await Topic.where({ written_on: "" })).toHaveLength(0);
     expect(await Topic.where({ bonus_time: "" })).toHaveLength(0);
     expect(await Topic.where({ last_read: "" })).toHaveLength(0);
@@ -485,13 +479,7 @@ describe("WhereTest", () => {
     expect((found as any).id).toBe((post as any).id);
   });
 
-  it.skip("where with table name and empty hash", async () => {
-    // BLOCKED: predicate-builder — `where(posts: {})` should match nothing.
-    // ROOT-CAUSE: relation/predicate-builder.ts buildFromHashInternal expands an
-    // empty nested hash to zero predicate nodes (condition dropped → all rows),
-    // vs Rails expand_from_hash returning `["1=0"]` (predicate_builder.rb:85).
-    // SCOPE: convergence tracked by RFC 0023
-    // predicate-builder-blank-and-unboundable-contradiction.
+  it("where with table name and empty hash", async () => {
     expect(await Post.where({ posts: {} }).count()).toBe(0);
   });
 
@@ -499,13 +487,7 @@ describe("WhereTest", () => {
     expect(await Post.where({ id: [] }).count()).toBe(0);
   });
 
-  it.skip("where with empty hash and no foreign key", async () => {
-    // BLOCKED: predicate-builder — `where(sink: {})` should match nothing.
-    // ROOT-CAUSE: same empty-nested-hash gap as "where with table name and empty
-    // hash"; relation/predicate-builder.ts drops the empty hash instead of
-    // emitting Rails' `["1=0"]`.
-    // SCOPE: convergence tracked by RFC 0023
-    // predicate-builder-blank-and-unboundable-contradiction.
+  it("where with empty hash and no foreign key", async () => {
     expect(await Edge.where({ sink: {} }).count()).toBe(0);
   });
 
