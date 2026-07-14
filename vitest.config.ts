@@ -400,6 +400,7 @@ export default defineConfig({
             "scripts/test-deps/*.test.ts",
             "scripts/tasks/*.test.ts",
             "scripts/test-compare/*.test.ts",
+            "scripts/rails-find/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
