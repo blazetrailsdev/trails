@@ -10,6 +10,7 @@ import { describe, it, expect } from "vitest";
 import { Base, reflectOnAssociation, registerModel } from "./index.js";
 import { Associations, modelRegistry } from "./associations.js";
 import {
+  AssociationReflection,
   belongsToCounterCacheColumn,
   counterCacheColumnOption,
   resolveAliasedColumn,
@@ -161,6 +162,40 @@ describe("ReflectionTest", () => {
     registerModel("ShStableTarget", ShStableTarget);
     expect(modelRegistry.generation).toBe(generationBefore);
     expect(ref.klass).toBe(ShStableTarget);
+  });
+
+  it("inverse_of re-resolves when the registry rebinds the class name", () => {
+    // inverseOf/inverseName memo values resolved off `this.klass` — an inverse
+    // reflection owned by the target class, and a name derived from scanning it.
+    // They have to heal with `klass`, or a healed klass still hands back the
+    // previous target's reflection.
+    class ShInvFirst extends Base {
+      static {
+        this.attribute("name", "string");
+        this.belongsTo("shInvOwner", { className: "ShInvOwner" });
+      }
+    }
+    class ShInvSecond extends Base {
+      static {
+        this.attribute("name", "string");
+        this.belongsTo("shInvOwner", { className: "ShInvOwner" });
+      }
+    }
+    class ShInvOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("shInvTargets", { className: "ShInvTarget" });
+      }
+    }
+    registerModel("ShInvOwner", ShInvOwner);
+    registerModel("ShInvTarget", ShInvFirst);
+
+    const ref = reflectOnAssociation(ShInvOwner, "shInvTargets") as AssociationReflection;
+    expect(ref.inverseOf()!.activeRecord).toBe(ShInvFirst);
+
+    registerModel("ShInvTarget", ShInvSecond);
+    expect(ref.klass).toBe(ShInvSecond);
+    expect(ref.inverseOf()!.activeRecord).toBe(ShInvSecond);
   });
 
   it("through reflection source re-resolves when the through target is rebound", () => {
