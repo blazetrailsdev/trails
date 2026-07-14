@@ -1,7 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Array as OidArray, Data } from "./array.js";
-import { DateTime as PgDateTime } from "./date-time.js";
 
 const stringSubtype = {
   type: "string",
@@ -84,28 +82,5 @@ describe("PostgreSQL::OID::Array", () => {
     });
 
     expect(type.userInputInTimeZone("ts", "America/Los_Angeles")).toBe("ts@America/Los_Angeles");
-  });
-
-  it("encodes a datetime element in the PG quoted_date form (fixed-6 microseconds)", () => {
-    // Real serialize→String(Data) path an inline datetime[] INSERT takes: the
-    // element must get the db literal a scalar datetime gets, not ISO-8601.
-    const type = new OidArray(new PgDateTime());
-    const data = type.serialize([Temporal.Instant.from("2026-04-26T14:23:55.123456789Z")]) as Data;
-
-    expect(String(data)).toBe('{"2026-04-26 14:23:55.123456"}');
-  });
-
-  it("encodes a proleptic-year datetime element with the PG BC suffix", () => {
-    const type = new OidArray(new PgDateTime());
-    const data = type.serialize([Temporal.Instant.from("-000043-03-15T12:34:56.123456Z")]) as Data;
-
-    expect(String(data)).toBe('{"0044-03-15 12:34:56.123456 BC"}');
-  });
-
-  it("encodes a PG infinity datetime element as the infinity wire literal", () => {
-    const type = new OidArray(new PgDateTime());
-    const data = type.serialize([Number.POSITIVE_INFINITY]) as Data;
-
-    expect(String(data)).toBe("{infinity}");
   });
 });

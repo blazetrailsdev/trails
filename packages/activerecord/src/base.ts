@@ -1,4 +1,4 @@
-import { Temporal, isTemporal } from "@blazetrails/activesupport/temporal";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   Locator as _Locator,
   GlobalID as _GlobalIDCtor,
@@ -350,7 +350,13 @@ export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName
   // Temporal date/time values reach here because value_for_database now yields
   // the cast Temporal (not a pre-quoted SQL string). Render the dialect-correct
   // literal via the same formatter the bind path uses, then SQL-quote it.
-  if (isTemporal(v)) {
+  if (
+    v instanceof Temporal.Instant ||
+    v instanceof Temporal.PlainDateTime ||
+    v instanceof Temporal.PlainDate ||
+    v instanceof Temporal.PlainTime ||
+    v instanceof Temporal.ZonedDateTime
+  ) {
     return `'${String(temporalToBindString(v, dialect)).replace(/'/g, "''")}'`;
   }
   // boundary: defensive SQL literal quoting fallback for legacy callers.
@@ -3701,8 +3707,13 @@ export class Base extends Model {
       valuesMap[c] =
         !isArray && isBindableStringColumn(def?.type?.name) && typeof raw === "string"
           ? new Nodes.BindParam(raw)
-          : isArray
-            ? arelSql(quoteSqlValue(raw, true))
+          : // Array columns serialize to an OID::Array `Data`; quote it via the
+            // adapter's `quote` (Rails' `quote(encode_array(value))`) so every
+            // element gets `type_cast` — datetimes reach `quoted_date`, binary
+            // gets hex — rather than the bare `String(Data)` an inline literal
+            // would otherwise fall to (which emits ISO-8601 for datetimes).
+            isArray
+            ? arelSql(adapter.quote(raw))
             : raw;
     });
 
@@ -3828,7 +3839,7 @@ export class Base extends Model {
           !isArray && isBindableStringColumn(def?.type?.name) && typeof val === "string"
             ? new Nodes.BindParam(val)
             : isArray
-              ? arelSql(quoteSqlValue(val, true))
+              ? arelSql(adapter.quote(val))
               : val,
         ];
       },

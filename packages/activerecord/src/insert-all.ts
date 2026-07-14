@@ -701,7 +701,15 @@ export class Builder implements InsertBuilder {
       } else {
         value = SerializeCastValue.serializeCastValue(castValue);
       }
-      return new Nodes.SqlLiteral(quoteSqlValue(value, arrayCols.has(key), this._dialect));
+      // Array columns serialize to an OID::Array `Data`; quote via the adapter's
+      // `quote` (Rails' `quote(encode_array(value))`) so each element gets
+      // `type_cast` (datetimes → `quoted_date`, binary → hex) instead of the bare
+      // `String(Data)` an inline literal falls to. Non-array values keep the
+      // scalar inline path.
+      if (arrayCols.has(key)) {
+        return new Nodes.SqlLiteral(this._insertAll.connection.quote(value));
+      }
+      return new Nodes.SqlLiteral(quoteSqlValue(value, false, this._dialect));
     });
     return new Nodes.ValuesList(rows);
   }

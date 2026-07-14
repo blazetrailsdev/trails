@@ -66,6 +66,20 @@ describe("PostgreSQL quoting", () => {
     expect(quote(boxArray)).toBe("'{(1,1),(0,0);(2,2),(1,1)}'");
   });
 
+  it("type_casts datetime array elements through quoted_date (fixed-6, BC)", () => {
+    // encode_array → type_cast_array → type_cast → quoted_date: a datetime
+    // element gets the same db literal a scalar does (fixed-6 μs, " BC" for
+    // proleptic years), not ISO-8601. This is the Rails-shaped path an inline
+    // datetime[] INSERT must route through.
+    const dtArray = new ArrayData(new OidArray(stringSubtype), [
+      Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
+      Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
+    ]);
+    expect(quote(dtArray)).toBe(
+      '\'{"2026-04-26 14:23:55.123456","0044-03-15 12:34:56.123456 BC"}\'',
+    );
+  });
+
   it("encodes unbounded range bounds as empty, matching Ruby nil interpolation", () => {
     // Rails builds the literal with string interpolation, where a nil bound
     // (unbounded end) renders as "". `${null}` would emit "null" and PG rejects
