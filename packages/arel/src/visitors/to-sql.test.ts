@@ -1792,9 +1792,13 @@ describe("the to_sql visitor", () => {
       });
 
       it("honours an isUnboundable() protocol returning a sign or boolean", () => {
+        // Rails `case`s on the sign (`when 1` / `when -1`, to_sql.rb:438-475),
+        // so only those two values collapse. Every producer returns
+        // `1 | -1 | false`: QueryAttribute yields `value <=> 0`
+        // (query_attribute.rb:46-51), BindParam delegates, and RangeHandler's
+        // UnboundableBound carries the sign.
         expect(v().unboundableSign({ isUnboundable: () => 1 })).toBe(1);
         expect(v().unboundableSign({ isUnboundable: () => -1 })).toBe(-1);
-        expect(v().unboundableSign({ isUnboundable: () => true })).toBe(1);
         expect(v().unboundableSign({ isUnboundable: () => false })).toBe(0);
       });
 

@@ -2026,7 +2026,7 @@ export class ToSql extends Visitor {
     const v = value as { isUnboundable?: () => unknown } | null | undefined;
     if (typeof v?.isUnboundable !== "function") return 0;
     const r = v.isUnboundable();
-    if (r === 1 || r === true) return 1;
+    if (r === 1) return 1;
     if (r === -1) return -1;
     return 0;
   }
