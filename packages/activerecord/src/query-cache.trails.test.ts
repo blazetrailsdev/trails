@@ -46,13 +46,38 @@ describe("cacheNotificationInfo payload (trails)", () => {
 
     const cached = payloads.filter((p) => p.cached);
     expect(cached.length).toBe(1);
-    // The cast is deferred: the slot holds the thunk itself, and a subscriber
-    // that never reads it never pays for the cast. Calling it yields the same
-    // binds the eager cast used to produce.
     const lazy = cached[0].type_casted_binds;
     expect(typeof lazy).toBe("function");
     expect((lazy as () => unknown[])()).toEqual([1]);
-    expect((lazy as () => unknown[])()).toEqual([1]);
+  });
+
+  it("defers the cast until the slot is read", async () => {
+    // A thunk alone does not prove deferral — an eager `(() => alreadyCast)`
+    // wrapper is also a function. Drive cacheNotificationInfo with a bind whose
+    // valueForDatabase getter counts reads, so the assertion fails if the cast
+    // moves back ahead of the slot read (query_cache.rb:311).
+    let casts = 0;
+    const probe = {
+      get valueForDatabase() {
+        casts++;
+        return 1;
+      },
+    };
+
+    const connection = (await Base.leaseConnection()) as unknown as {
+      cacheNotificationInfo(
+        sql: string,
+        name: string | null | undefined,
+        binds: unknown[],
+      ): SqlPayload;
+    };
+
+    const payload = connection.cacheNotificationInfo("select 1", "Probe", [probe]);
+    expect(casts).toBe(0);
+
+    const casted = (payload.type_casted_binds as () => unknown[])();
+    expect(casts).toBe(1);
+    expect(casted).toEqual([1]);
   });
 
   it("passes name through unchanged", async () => {
