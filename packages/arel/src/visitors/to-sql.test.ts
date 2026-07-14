@@ -516,7 +516,6 @@ describe("the to_sql visitor", () => {
         ["NaN", NaN],
         ["TrueClass", true],
         ["FalseClass", false],
-        ["NilClass", null],
         ["a Time", new Date("2024-01-01T00:00:00Z")],
         ["a Hash", { a: 1 }],
       ] as const) {
@@ -524,6 +523,30 @@ describe("the to_sql visitor", () => {
           expect(() => compileRight(value)).toThrow(Visitors.UnsupportedVisitError);
         });
       }
+
+      it("renders IS NULL for a bare NilClass rather than dispatching", () => {
+        // Rails tests `right.nil?` (to_sql.rb:649) before visiting, and that is
+        // true for a bare nil as well as Quoted(nil) (`Quoted#nil?` delegates
+        // to `value.nil?`, casted.rb:41) — so nil never reaches raw dispatch
+        // here, even though visit_NilClass is aliased to `unsupported`.
+        expect(compileRight(null)).toBe('"users"."id" IS NULL');
+        const attr = new Table("users").get("id");
+        expect(new Visitors.ToSql().compile(new Nodes.NotEqual(attr, null))).toBe(
+          '"users"."id" IS NOT NULL',
+        );
+      });
+
+      it("raises UnsupportedVisitError for NilClass on a path that reaches dispatch", () => {
+        // visit_NilClass is aliased to `unsupported` (to_sql.rb:840); visitArray
+        // reaches it because there is no `nil?` guard on that path.
+        const v = new Visitors.ToSql();
+        const visitArray = (
+          v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
+        ).visitArray;
+        expect(() => visitArray.call(v, [null], new Collectors.SQLString())).toThrow(
+          Visitors.UnsupportedVisitError,
+        );
+      });
 
       it("raises UnsupportedVisitError for a non-finite Float", () => {
         // Not asserted through Equality: an unboundable Infinity short-circuits
@@ -537,6 +560,18 @@ describe("the to_sql visitor", () => {
         expect(() => visitArray.call(v, [Infinity], new Collectors.SQLString())).toThrow(
           Visitors.UnsupportedVisitError,
         );
+      });
+
+      it("raises for a bare Temporal but still renders it wrapped", () => {
+        // Temporal is the Time analogue, and `alias :visit_Time :unsupported`
+        // (to_sql.rb:844) — so a bare one raises. Wrapped in Quoted it routes
+        // through quote() (to_sql.rb:87-90) and still inlines, which is the
+        // only shape any AR caller produces.
+        const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
+        expect(() => compileRight(instant)).toThrow(Visitors.UnsupportedVisitError);
+        // Rendering shape here is whatever the quoter already does with a
+        // Temporal; this pins only that the wrapped path still inlines.
+        expect(compileRight(new Nodes.Quoted(instant))).toContain("2026-04-30");
       });
 
       it("renders once wrapped via quotedNode, as predications do", () => {

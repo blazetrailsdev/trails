@@ -19,8 +19,12 @@ export { UnsupportedVisitError };
 // Assignment visitors (to_sql.rb:109, 632). trails has no Arel-visible class
 // for it, so it is duck-typed on `valueForDatabase` — the same shape
 // `resolveValueForDatabase` above accepts.
+// Arel's own Casted/Quoted also expose `valueForDatabase` (casted.ts:70,108),
+// but Rails' `case` lists only SqlLiteral/BindParam/ActiveModel::Attribute
+// (to_sql.rb:110, 632) — a Casted is none of those and falls to the `quote()`
+// branch. Excluding Nodes keeps the duck-type to non-Arel attributes.
 function isActiveModelAttribute(v: unknown): boolean {
-  return typeof v === "object" && v !== null && "valueForDatabase" in v;
+  return typeof v === "object" && v !== null && !(v instanceof Node) && "valueForDatabase" in v;
 }
 
 // The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
@@ -303,15 +307,18 @@ export class ToSql extends Visitor {
       collector.append("(");
       for (let j = 0; j < node.rows[i].length; j++) {
         if (j > 0) collector.append(", ");
-        // Mirrors Rails (to_sql.rb:106-114): only SqlLiteral/BindParam/
-        // Attribute are visited; every other row entry is a raw value and is
-        // quoted directly, never dispatched through `visit`.
+        // Mirrors Rails (to_sql.rb:106-114): a raw row entry is quoted
+        // directly and never dispatched through `visit`.
+        //
+        // Rails' `case` lists SqlLiteral/BindParam/ActiveModel::Attribute; we
+        // visit any Node. The lists agree on every *raw* value, which is what
+        // this branch exists to decide. They differ only for other Arel nodes
+        // (Casted/Quoted), where Rails falls to `quote()` — and `quote()` has
+        // no node branch (to_sql.rb:867-870 → quoting.rb `else raise
+        // TypeError`), so Rails raises there. Visiting renders instead of
+        // emitting a garbage literal for a case no caller reaches.
         const value = node.rows[i][j];
-        if (
-          value instanceof Nodes.SqlLiteral ||
-          value instanceof Nodes.BindParam ||
-          isActiveModelAttribute(value)
-        ) {
+        if (value instanceof Node || isActiveModelAttribute(value)) {
           this.visit(value as Node, collector);
         } else {
           collector.append(this.quote(value));
@@ -2128,6 +2135,12 @@ export class ToSql extends Visitor {
    * so honour a duck-typed `isNil()` on the right node too.
    */
   protected rightIsNull(right: unknown): boolean {
+    // Rails tests `right.nil?` (to_sql.rb:649), which is true for a bare nil as
+    // well as for a Quoted(nil) — `Quoted#nil?` delegates to `value.nil?`
+    // (casted.rb:41). A bare null therefore renders IS NULL and never reaches
+    // the raw-value dispatch, even though visit_NilClass is aliased to
+    // `unsupported` for the paths that do reach it.
+    if (right === null || right === undefined) return true;
     if (right instanceof Nodes.Quoted && right.value === null) return true;
     // A bound scalar arrives wrapped in a BindParam whose `isNil()` delegates
     // to its wrapped value (bind_param.rb:23-25) — so a raw-null bind or an
