@@ -329,6 +329,14 @@ const EMPTY_VALUE_ARRAY: readonly never[] = Object.freeze([]);
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
+  /**
+   * @internal Ruby's `self.class.name` is the namespace-qualified constant path
+   * ("ActiveRecord::Relation"); JS `constructor.name` is unqualified and gets
+   * mangled by bundlers. Each relation class pins its Rails constant path here
+   * so `inspect` renders the wrapper Rails names.
+   */
+  static _railsClassName = "ActiveRecord::Relation";
+
   private _modelClass: typeof Base;
   /** @internal */
   _whereClause: WhereClause = WhereClause.empty();
@@ -1193,17 +1201,17 @@ export class Relation<T extends Base> {
     // model name: Rails' `self.class.name` is the relation class itself —
     // `"ActiveRecord::Relation"` for `Post.limit(2)`, not `Post` (relations_test
     // "relations show the records in #inspect", relations_test.rb:2108-2111) —
-    // so model identity surfaces only through the inspected records. We use
-    // `this.constructor.name` to keep that class-not-model semantics and to
-    // preserve the Relation / CollectionProxy / AssociationRelation distinction
-    // (three distinct Rails classes); the unqualified vs `ActiveRecord::`-
-    // namespaced gap is a pre-existing deviation shared with the loaded branch,
-    // not specific to this path.
+    // so model identity surfaces only through the inspected records. The name
+    // comes from the per-class `_railsClassName` rather than
+    // `constructor.name`, keeping the Relation / CollectionProxy /
+    // AssociationRelation distinction (three distinct Rails classes) while
+    // rendering each one's namespace-qualified Rails constant path.
+    const className = (this.constructor as typeof Relation)._railsClassName;
     if (this._loaded) {
       const max = this._limitValue !== null ? Math.min(this._limitValue, 11) : 11;
       const entries = this._records.slice(0, max).map((record) => record.inspect());
       if (entries.length === 11) entries[10] = "...";
-      return `#<${this.constructor.name} [${entries.join(", ")}]>`;
+      return `#<${className} [${entries.join(", ")}]>`;
     }
     // Unloaded: Rails blocks on DB I/O here to load the records; a synchronous
     // JS method returning a string cannot. Rather than invent a divergent
@@ -1212,7 +1220,7 @@ export class Relation<T extends Base> {
     // async — `await relation.toArray()` (or `prettyPrint`) loads first, after
     // which `inspect` takes the loaded branch above. This is the same sync-JS
     // deviation already documented on `prettyPrint`.
-    return `#<${this.constructor.name} [...]>`;
+    return `#<${className} [...]>`;
   }
 
   /**

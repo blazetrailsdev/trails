@@ -2177,15 +2177,18 @@ describe("RelationTest", () => {
     const relation = Post.limit(2);
     const records = await Post.limit(2);
     await relation.load();
-    const str = relation.inspect();
-    for (const record of records) {
-      expect(str).toContain(`id: ${record.id}`);
-    }
+    expect(relation.inspect()).toBe(
+      `#<ActiveRecord::Relation [${records.map((r) => r.inspect()).join(", ")}]>`,
+    );
   });
 
   it("relations limit the records in #inspect at 10", async () => {
     const relation = Post.limit(11);
-    expect(relation.inspect()).toContain("...");
+    const records = await Post.limit(10);
+    await relation.load();
+    expect(relation.inspect()).toBe(
+      `#<ActiveRecord::Relation [${records.map((r) => r.inspect()).join(", ")}, ...]>`,
+    );
   });
 
   it("relations don't load all records in #inspect", () => {

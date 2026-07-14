@@ -20,6 +20,9 @@ import { ArgumentError } from "@blazetrails/activemodel";
  * Mirrors: ActiveRecord::AssociationRelation
  */
 export class AssociationRelation<T extends Base> extends Relation<T> {
+  /** @internal */
+  static override _railsClassName = "ActiveRecord::AssociationRelation";
+
   /**
    * @internal The owning association. CollectionProxy-backed when created
    * via the collection proxy (the normal user-facing path); Association-backed
