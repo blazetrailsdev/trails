@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
 /** Minimum shape required of a record object passed to serialization helpers. */
 export interface SerializationRecord {
@@ -755,40 +756,4 @@ function normalizeIncludes(
     safeSet(result as Record<string, unknown>, k, v);
   }
   return result;
-}
-
-/**
- * Mirror of Ruby's `NameError` — the base for `NoMethodError`. Kept local so
- * the hierarchy is observable via `instanceof` without cross-file coupling.
- */
-class NameError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "NameError";
-  }
-}
-
-/**
- * Mirror of Ruby's `NoMethodError` (a subclass of `NameError`). Rails'
- * `serializable_hash` calls `send(method)` / `send(association)` unconditionally
- * (serialization.rb:191); an undefined name answers with `NoMethodError`.
- */
-class NoMethodError extends NameError {
-  constructor(message: string) {
-    super(message);
-    this.name = "NoMethodError";
-  }
-}
-
-/**
- * Mirror of Ruby's `RuntimeError` (the default `raise "msg"` class). Used for
- * the trails-invented unloaded-collection guard on the synchronous
- * serialization path, which has no Rails equivalent (`to_ary` would lazily
- * load from the DB — RFC 0022 b2).
- */
-class RuntimeError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RuntimeError";
-  }
 }

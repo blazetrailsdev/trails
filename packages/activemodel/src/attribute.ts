@@ -1,6 +1,7 @@
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { MissingAttributeError } from "./attribute-methods.js";
+import { RuntimeError } from "./attribute-assignment.js";
 
 // Symbol so identity comparisons work across module copies and can't collide with any user value.
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
@@ -371,17 +372,5 @@ export class Uninitialized extends Attribute {
 
   isInitialized(): boolean {
     return false;
-  }
-}
-
-/**
- * Mirror of Ruby's `RuntimeError` (the default `raise "msg"` class). Guards the
- * trails-invented module-load-order failure in `withUserDefault`, which has no
- * Rails equivalent (Ruby loads `UserProvidedDefault` eagerly).
- */
-class RuntimeError extends globalThis.Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "RuntimeError";
   }
 }
