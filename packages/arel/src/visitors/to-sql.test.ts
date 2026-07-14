@@ -494,6 +494,60 @@ describe("the to_sql visitor", () => {
       });
     }
 
+    describe("raw values reaching visit dispatch on their class", () => {
+      // Rails' raw-value dispatch: only `visit_Integer` renders
+      // (`collector << o.to_s`, to_sql.rb:824-826); every other scalar aliases
+      // to `unsupported` and raises (to_sql.rb:828-845). Equality visits its
+      // right (to_sql.rb:643), so a raw value placed there hits that dispatch.
+      const compileRight = (right: unknown): string =>
+        new Visitors.ToSql().compile(
+          new Nodes.Equality(new Table("users").get("id"), right as Nodes.NodeOrValue),
+        );
+
+      it("renders an Integer bare", () => {
+        expect(compileRight(1)).toBe('"users"."id" = 1');
+        // Ruby has no fixnum/bignum split at this layer — both are Integer.
+        expect(compileRight(9007199254740993n)).toBe('"users"."id" = 9007199254740993');
+      });
+
+      for (const [label, value] of [
+        ["a String", "x"],
+        ["a Float", 1.5],
+        ["NaN", NaN],
+        ["TrueClass", true],
+        ["FalseClass", false],
+        ["NilClass", null],
+        ["a Time", new Date("2024-01-01T00:00:00Z")],
+        ["a Hash", { a: 1 }],
+      ] as const) {
+        it(`raises UnsupportedVisitError for ${label}`, () => {
+          expect(() => compileRight(value)).toThrow(Visitors.UnsupportedVisitError);
+        });
+      }
+
+      it("raises UnsupportedVisitError for a non-finite Float", () => {
+        // Not asserted through Equality: an unboundable Infinity short-circuits
+        // to 1=0/1=1 before dispatch. visitArray (`inject_join`, to_sql.rb:858)
+        // reaches the raw-value path directly. Infinity is not integral, so it
+        // lands on the Float branch — there is no separate non-finite rule.
+        const v = new Visitors.ToSql();
+        const visitArray = (
+          v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
+        ).visitArray;
+        expect(() => visitArray.call(v, [Infinity], new Collectors.SQLString())).toThrow(
+          Visitors.UnsupportedVisitError,
+        );
+      });
+
+      it("renders once wrapped via quotedNode, as predications do", () => {
+        // The AR-facing path: `eq` wraps the raw value in a Casted node, which
+        // routes through quote() (to_sql.rb:87-90) rather than raw dispatch.
+        expect(new Visitors.ToSql().compile(new Table("users").get("id").eq("x"))).toBe(
+          '"users"."id" = \'x\'',
+        );
+      });
+    });
+
     it("visit_Set is aliased to visit_Array (joins with ', ')", () => {
       // Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861).
       const v = new Visitors.ToSql();
@@ -1782,11 +1836,17 @@ describe("the to_sql visitor", () => {
       const tbl = new Table("users");
       const v = new Visitors.ToSql();
       const collector = new Collectors.SQLString();
-      (v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }).visitArray(
-        [tbl.get("a"), 1, "text"],
-        collector,
+      const visitArray = (
+        v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
+      ).visitArray;
+      // Rails' `visit_Array` is `inject_join` (to_sql.rb:858-860): each entry
+      // goes through `visit`, so a Node and an Integer render while a raw
+      // String hits `visit_String` and raises.
+      visitArray.call(v, [tbl.get("a"), 1], collector);
+      expect(collector.value).toBe('"users"."a", 1');
+      expect(() => visitArray.call(v, ["text"], new Collectors.SQLString())).toThrow(
+        Visitors.UnsupportedVisitError,
       );
-      expect(collector.value).toBe('"users"."a", 1, \'text\'');
     });
   });
 
