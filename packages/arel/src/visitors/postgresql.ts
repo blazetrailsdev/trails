@@ -131,10 +131,25 @@ export class PostgreSQL extends ToSql {
 
   protected override quote(value: unknown): string {
     if (Array.isArray(value)) {
-      const literal = quoteArrayLiteral(value);
+      const literal = quoteArrayLiteral(value, (v) => this.formatArrayDate(v));
       return `'${literal.replace(/'/g, "''")}'`;
     }
     return super.quote(value);
+  }
+
+  // Mirrors Rails' `type_cast_array` → `type_cast` → `when Date, Time then
+  // quoted_date` (`abstract/quoting.rb:94-107`), so an array element matches
+  // the scalar path.
+  private formatArrayDate(value: unknown): string | undefined {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toISOString" in value &&
+      typeof (value as { toISOString: unknown }).toISOString === "function"
+    ) {
+      return this.quotedDate(value as { toISOString(): string });
+    }
+    return undefined;
   }
 }
 

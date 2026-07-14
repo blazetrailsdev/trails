@@ -52,4 +52,39 @@ describe("quoteArrayLiteral", () => {
   it("handles bigint values inside objects", () => {
     expect(quoteArrayLiteral([{ id: 42n }])).toBe('{"{\\"id\\":\\"42\\"}"}');
   });
+
+  describe("formatElement", () => {
+    it("wraps a formatted element in the array element quoting", () => {
+      const d = new Date("2026-03-26T12:00:00.000Z");
+      expect(quoteArrayLiteral([d], () => "2026-03-26 12:00:00")).toBe('{"2026-03-26 12:00:00"}');
+    });
+
+    it("falls through to the default handling when it returns undefined", () => {
+      expect(quoteArrayLiteral(["a", 1], () => undefined)).toBe('{"a",1}');
+    });
+
+    it("escapes quotes and backslashes in a formatted element", () => {
+      expect(quoteArrayLiteral(["x"], () => 'a\\b"c')).toBe('{"a\\\\b\\"c"}');
+    });
+
+    it("applies to nested array elements", () => {
+      expect(quoteArrayLiteral([["x"]], (v) => (v === "x" ? "X" : undefined))).toBe('{{"X"}}');
+    });
+
+    it("is offered numbers and booleans, which Rails also sends through type_cast", () => {
+      // type_cast_array recurses only `when ::Array`; every other element goes
+      // to type_cast, so the hook must see numbers/booleans too. Without this
+      // ordering a caller could never converge them (e.g. unquoted_true).
+      const seen: unknown[] = [];
+      quoteArrayLiteral([1, true, "s"], (v) => {
+        seen.push(v);
+        return undefined;
+      });
+      expect(seen).toEqual([1, true, "s"]);
+    });
+
+    it("lets the hook format a number element", () => {
+      expect(quoteArrayLiteral([1], (v) => (v === 1 ? "one" : undefined))).toBe('{"one"}');
+    });
+  });
 });
