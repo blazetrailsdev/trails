@@ -22,7 +22,11 @@ import { Post } from "./test-helpers/models/post.js";
 registerModel(Post as never);
 
 describe("QueryCache DDL dirties (trails)", () => {
-  fixtures(["posts"]);
+  // `useTransactionalTests: false`: this test issues real DDL (`add_column` /
+  // `remove_column`). MySQL implicitly commits on DDL, which would commit the
+  // fixture transaction mid-test and leak `posts` rows into the shared worker
+  // DB; run non-transactionally so the fixtures are cleaned up by reload instead.
+  fixtures(["posts"], { useTransactionalTests: false });
 
   afterEach(async () => {
     (await Post.leaseConnection()).clearQueryCache();

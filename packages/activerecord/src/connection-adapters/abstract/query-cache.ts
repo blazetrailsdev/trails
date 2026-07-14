@@ -585,6 +585,22 @@ export function dirtiesQueryCacheExceptSchema(
  * `executeMutation` on the real adapters (they use `internalExecute`), so it is
  * unaffected.
  *
+ * The guard is instance-scoped rather than stack-local (Rails' `super` is
+ * inherently stack-local) but that is sound here: an adapter wraps a single
+ * connection that executes statements strictly serially, so a logical write's
+ * `executeMutation` always settles — dropping `_writeDirtyDepth` back to 0 —
+ * before any subsequent statement (DDL included) can begin on that adapter.
+ * Concurrent writes run on *different* leased connections, each its own adapter
+ * instance with its own counter.
+ *
+ * Unlike {@link dirtiesQueryCacheExceptSchema}, this leaf does NOT skip on a
+ * `"SCHEMA"` name: that skip exists because trails reuses the wrapped
+ * `execute`/`exec_query` for schema *reflection reads* (Rails routes those
+ * through the unwrapped `internal_exec_query`). `executeMutation` only ever runs
+ * mutations/DDL — a mutation named `"SCHEMA"` must still dirty — so honouring
+ * `name` here would be wrong, matching the same rationale
+ * `dirtiesQueryCacheExceptSchema` gives for the generic write wiring.
+ *
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache.dirties_query_cache
  * (as applied to `execute`, the DDL entry point).
  */
