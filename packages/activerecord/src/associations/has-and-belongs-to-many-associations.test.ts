@@ -1022,7 +1022,13 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     expect(await scoped.count()).toBe(1);
     expect(await scoped.exists()).toBe(true);
-    expect(await scoped.pluck("name")).toEqual(["Yara"]);
+    // The `developers` scope is `distinct().order("developers.name desc,
+    // developers.id desc")`, so pluck must select both ordered columns —
+    // PostgreSQL requires every SELECT DISTINCT ORDER BY expression to appear in
+    // the select list (42P10).
+    expect(await scoped.pluck("developers.name", "developers.id")).toEqual([
+      ["Yara", developer.id],
+    ]);
   });
 
   it("dynamic find should respect association include", async () => {
