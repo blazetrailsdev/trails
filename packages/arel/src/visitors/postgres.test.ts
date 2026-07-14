@@ -336,7 +336,7 @@ describe("PostgresTest", () => {
     it("quotes array values as PG array literals", () => {
       const node = users.get("tags").eq(["a", "b"]);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain('\'{"a","b"}\'');
+      expect(sql).toContain("'{a,b}'");
     });
 
     it("quotes nested arrays", () => {
@@ -351,7 +351,10 @@ describe("PostgresTest", () => {
     it("escapes single quotes in array elements", () => {
       const node = users.get("tags").eq(["O'Reilly"]);
       const sql = new Visitors.PostgreSQL().compile(node);
-      expect(sql).toContain("'{\"O''Reilly\"}'");
+      // The apostrophe is escaped by the outer single-quoting, not the array
+      // encoder — `'` is not in PG::TextEncoder::Array's quote-triggering set,
+      // so the element itself stays bare.
+      expect(sql).toContain("'{O''Reilly}'");
     });
 
     it("quotes a Date array element as a db date, matching the scalar path", () => {
