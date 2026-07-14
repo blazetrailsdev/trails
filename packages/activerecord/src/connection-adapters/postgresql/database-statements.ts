@@ -254,14 +254,27 @@ export async function executeBatch(
   // preprocessQuery skips the transformer pass (write-checks still run); the flag
   // is consumed synchronously there before any await, so it never spans the await,
   // and the finally clears it if execute throws before consuming it.
-  const host = this as ExecuteBatchHost & { _inQueryTransformers?: boolean };
-  for (const statement of statements) {
-    host._inQueryTransformers = true;
-    try {
-      await this.execute(statement, [], name ?? undefined);
-    } finally {
-      host._inQueryTransformers = false;
+  // raw_execute is also NOT in `dirties_query_cache`'s set (query_cache.rb:13 wires
+  // `execute`), so batch statements leave the query cache intact. trails loops over
+  // the cache-wired `execute` (name `"Fixtures Load"` / `"Truncate Tables"`, which
+  // does not hit the `"SCHEMA"` skip); hold the `_writeDirtyDepth` guard across the
+  // batch so those per-statement clears are suppressed, matching raw_execute.
+  const host = this as ExecuteBatchHost & {
+    _inQueryTransformers?: boolean;
+    _writeDirtyDepth?: number;
+  };
+  host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) + 1;
+  try {
+    for (const statement of statements) {
+      host._inQueryTransformers = true;
+      try {
+        await this.execute(statement, [], name ?? undefined);
+      } finally {
+        host._inQueryTransformers = false;
+      }
     }
+  } finally {
+    host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) - 1;
   }
 }
 

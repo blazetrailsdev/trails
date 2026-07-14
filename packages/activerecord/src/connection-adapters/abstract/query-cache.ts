@@ -583,10 +583,12 @@ export function dirtiesQueryCacheExceptSchema(
  * nested and must defer to the outer clear. DDL reaches `executeMutation` at
  * depth 0 and clears. Transaction control (`BEGIN`/`COMMIT`) bypasses
  * `executeMutation` on the real adapters (they use `internalExecute`), so it is
- * unaffected. sqlite's `executeBatch` DOES funnel through `executeMutation` but
- * holds this guard around its call (mirroring Rails' `execute_batch` →
+ * unaffected. `executeBatch` DOES funnel through the cache-wired
+ * `executeMutation` / `execute` (per adapter), but every `executeBatch` body
+ * holds this guard around its statements (mirroring Rails' `execute_batch` →
  * `raw_execute`, which is NOT in the dirties set), so batch statements —
- * fixture loading, schema application — leave the cache intact like Rails.
+ * fixture loading, `truncate_tables`, schema application — leave the cache
+ * intact like Rails.
  *
  * The guard is instance-scoped rather than stack-local (Rails' `super` is
  * inherently stack-local) but that is sound here: an adapter wraps a single
