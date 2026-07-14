@@ -1994,19 +1994,12 @@ export class ToSql extends Visitor {
       collector.append(this.quote(v));
     } else if (typeof v === "bigint") {
       collector.append(v.toString());
-    } else if (
-      typeof v === "object" &&
-      v !== null &&
-      "toISOString" in v &&
-      typeof (v as { toISOString: unknown }).toISOString === "function"
-    ) {
-      // Mirrors Rails quote behavior: date-like values are formatted and inlined
-      // by the connection. Only BindParam/ActiveModel::Attribute go through addBind.
-      collector.append(this.quote(v));
     } else {
-      // Unknown object types (e.g. Temporal.Instant) — defer to `quote()`
-      // so the value is properly escaped/quoted rather than concatenated
-      // raw, matching the visitQuoted path.
+      // Everything else — dates, binary, Temporal types, unknown objects —
+      // defers to `quote()`, which hands the value to the connection. Rails'
+      // Arel does no date detection of its own, so there is no separate
+      // date-like branch here. Only BindParam/ActiveModel::Attribute go
+      // through addBind.
       collector.append(this.quote(v));
     }
     return collector;

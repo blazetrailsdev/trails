@@ -34,6 +34,8 @@ export interface QuotingDispatchHost {
   /** @internal */
   quotedTime?(value: Temporal.PlainTime | Temporal.PlainDateTime): string;
   /** @internal */
+  quotedBinary?(value: Uint8Array): string;
+  /** @internal */
   quoteColumnName?(name: string): string;
 }
 
@@ -111,6 +113,16 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     throw new TypeError(
       "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
+  // Rails: `when Type::Binary::Data then quoted_binary(value)` — binary
+  // dispatch is the adapter's job, self-dispatched so each adapter's
+  // quoted_binary applies. Each adapter's `quote` short-circuits the common
+  // Uint8Array case before reaching here; this catches the other ArrayBuffer
+  // views (Int8Array, Float64Array, DataView), which have no Ruby analogue and
+  // must be normalized to bytes rather than falling to the raise below.
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return dispatchQuotedBinary(this, bytes);
+  }
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
@@ -364,6 +376,19 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
  * receiver-less callers (every invocation threads an adapter `this`).
  * @internal
  */
+/**
+ * Self-dispatch binary quoting through the host, mirroring Rails' `quote`
+ * calling `self.quoted_binary(value)` so an adapter override applies. Falls
+ * back to the module-level helper when the host omits it.
+ * @internal
+ */
+export function dispatchQuotedBinary(host: QuotingDispatchHost, value: Uint8Array): string {
+  if (typeof host.quotedBinary === "function") {
+    return host.quotedBinary(value);
+  }
+  return quotedBinary(value);
+}
+
 export function dispatchQuotedDate(host: QuotingDispatchHost, value: TemporalDateLike): string {
   if (typeof host.quotedDate === "function") {
     return host.quotedDate(value);
