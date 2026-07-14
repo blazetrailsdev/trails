@@ -665,5 +665,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       await record.reload();
       expect((record.timestamps[0] as Temporal.Instant).epochNanoseconds % 1000000n).toBe(123000n);
     });
+
+    it("inlines a proleptic-year datetime[] element as a quoted_date BC literal", async () => {
+      // Regression guard for the inline INSERT path (base.ts create → adapter
+      // `quote` → encode_array → type_cast → quoted_date). A proleptic year <= 0
+      // only round-trips through the " BC" literal; the pre-fix ISO fallthrough
+      // (`{-000042-03-15T...Z}`) is not valid PG array input, so this pins the
+      // routing rather than a form PG happens to also accept (ISO datetimes do).
+      class PgArrays extends Base {
+        static tableName = "pg_arrays";
+        static {
+          this.attribute("id", "integer");
+        }
+      }
+      await PgArrays.loadSchema();
+      // Temporal proleptic year -42 == 43 BC.
+      const bc = Temporal.Instant.from("-000042-03-15T12:34:56.123456Z");
+      const record = await (PgArrays as any).create({ datetimes: [bc] });
+      await record.reload();
+      expect(record.datetimes).toHaveLength(1);
+      expect((record.datetimes[0] as Temporal.Instant).epochNanoseconds).toBe(bc.epochNanoseconds);
+    });
   });
 });

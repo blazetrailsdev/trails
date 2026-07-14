@@ -70,12 +70,12 @@ describe("quoteSqlValue", () => {
     // Regression guard: the PG inline VALUES path must carry the " BC" suffix
     // and fixed-6 microseconds, matching the adapter's quoted_date.
     const instant = Temporal.Instant.from("-000043-03-15T12:34:56.123456Z");
-    expect(quoteSqlValue(instant, false, "postgres")).toBe("'0044-03-15 12:34:56.123456 BC'");
+    expect(quoteSqlValue(instant, "postgres")).toBe("'0044-03-15 12:34:56.123456 BC'");
   });
 
   it("caps PG datetime literal fractional seconds at microseconds", () => {
     const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
-    expect(quoteSqlValue(instant, false, "postgres")).toBe("'2026-04-26 14:23:55.123456'");
+    expect(quoteSqlValue(instant, "postgres")).toBe("'2026-04-26 14:23:55.123456'");
   });
 });
 

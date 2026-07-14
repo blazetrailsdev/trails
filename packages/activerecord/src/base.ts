@@ -36,14 +36,7 @@ import {
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
 import "./type.js"; // Register AR type overrides into AM's type registry
-import {
-  Table,
-  quoteArrayLiteral,
-  UpdateManager,
-  DeleteManager,
-  Nodes,
-  sql as arelSql,
-} from "@blazetrails/arel";
+import { Table, UpdateManager, DeleteManager, Nodes, sql as arelSql } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
 import type { Relation } from "./relation.js";
@@ -343,7 +336,7 @@ import {
 } from "./multiparameter-attribute-assignment.js";
 
 /** @internal */
-export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName): string {
+export function quoteSqlValue(v: unknown, dialect?: AdapterName): string {
   if (v === null || v === undefined) return "NULL";
   if (typeof v === "number" || typeof v === "bigint") return String(v);
   if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
@@ -366,11 +359,7 @@ export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName
   if (v instanceof Date) {
     return Number.isNaN(v.getTime()) ? "NULL" : `'${v.toISOString()}'`;
   }
-  if (asArray && Array.isArray(v)) {
-    const arrayLiteral = quoteArrayLiteral(v);
-    return `'${arrayLiteral.replace(/'/g, "''")}'`;
-  }
-  if (!asArray && typeof v === "object") {
+  if (typeof v === "object") {
     let json: string | undefined;
     try {
       json = JSON.stringify(v, (_k, val) => (typeof val === "bigint" ? val.toString() : val));

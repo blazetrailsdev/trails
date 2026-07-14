@@ -709,7 +709,7 @@ export class Builder implements InsertBuilder {
       if (arrayCols.has(key)) {
         return new Nodes.SqlLiteral(this._insertAll.connection.quote(value));
       }
-      return new Nodes.SqlLiteral(quoteSqlValue(value, false, this._dialect));
+      return new Nodes.SqlLiteral(quoteSqlValue(value, this._dialect));
     });
     return new Nodes.ValuesList(rows);
   }
