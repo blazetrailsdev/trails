@@ -18,7 +18,10 @@ afterAll(() => {
 });
 
 // pg_arrays uses PG array columns not expressible via createTable's typed
-// builder, so it is created via raw DDL (mirroring the Rails array_test setup).
+// builder, so it is created via raw DDL. Use the IDENTICAL shape as the mirror
+// file (array.test.ts) — both drop/recreate `pg_arrays` in beforeAll/afterAll,
+// so a divergent shape would be a shared-DB shape-drift flake when the two land
+// on the same PG database.
 fixtures([]);
 
 describeIfPg("PostgreSQLAdapter", () => {
@@ -26,10 +29,16 @@ describeIfPg("PostgreSQLAdapter", () => {
   beforeAll(async () => {
     adapter = Base.connection as PostgreSQLAdapter;
     await adapter.exec(`DROP TABLE IF EXISTS pg_arrays`);
+    await adapter.exec(`CREATE EXTENSION IF NOT EXISTS hstore`);
     await adapter.exec(`
       CREATE TABLE pg_arrays (
         id serial primary key,
-        datetimes timestamp(6)[]
+        tags character varying(255)[],
+        ratings integer[],
+        datetimes timestamp(6)[],
+        hstores hstore[],
+        decimals numeric(10,2)[] DEFAULT '{}',
+        timestamps timestamp(6)[] DEFAULT '{}'
       )
     `);
     await adapter.loadAdditionalTypes();
