@@ -645,10 +645,15 @@ export function dirtiesQueryCacheExceptSchema(
  *
  * `executeBatch` (fixture loading, `truncate_tables`) DOES currently funnel
  * through the cache-wired `executeMutation` / `execute` and so still dirties,
- * whereas Rails' `execute_batch` → `raw_execute` is outside the dirties set. That
- * extra clear is idempotent and pre-#4858 (batches run outside `cache` blocks);
- * routing `executeBatch` through the unwired `rawExecute` to match Rails is
- * tracked by story `converge-execute-batch-through-raw-execute`.
+ * whereas Rails' `execute_batch` → `raw_execute` is outside the dirties set. On
+ * PG (the only adapter with its own `executeBatch`, looping the already-wired
+ * `execute`) that clear is pre-#4858; on sqlite/mysql2 the abstract mixin loops
+ * `executeMutation`, which THIS PR wired, so a bare batch (`"Fixtures Load"`) goes
+ * from zero clears to one per statement there — newly introduced, not pre-existing.
+ * Either way the clear is idempotent, gated on `dirties`, and batches run outside
+ * `cache` blocks, so the effect is nil; routing `executeBatch` through the unwired
+ * `rawExecute` to match Rails is tracked by story
+ * `converge-execute-batch-through-raw-execute`.
  *
  * The leaf guard is instance-scoped rather than stack-local, which is sufficient
  * for its sole job — collapsing a single sequential CRUD write
