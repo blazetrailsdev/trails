@@ -1406,6 +1406,10 @@ export async function reload<T extends ReloadRecord>(
   // then unconditionally clears the new-record flags; dirty tracking
   // re-baselines on the fresh values.
   this._attributes = fresh._attributes;
+  // Reconcile alias readers against the swapped-in attribute set: a plain
+  // reload drops any prior select alias, so the stale getter is removed (Rails'
+  // `@attributes.key?` gate would raise NoMethodError post-reload).
+  defineDynamicSelectReaders(this as unknown as import("./base.js").Base);
   this._newRecord = false;
   this._previouslyNewRecord = false;
   this._dirty.snapshot(this._attributes);
