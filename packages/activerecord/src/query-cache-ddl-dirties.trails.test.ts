@@ -16,7 +16,6 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { Base } from "./base.js";
 import { Post } from "./test-helpers/models/post.js";
 
 registerModel(Post as never);
@@ -33,13 +32,21 @@ describe("QueryCache DDL dirties (trails)", () => {
   });
 
   it("DDL inside a cache block clears the query cache", async () => {
-    const store = Base.connectionPool().queryCache as never as { clear(): void };
-    const real = store.clear.bind(store);
-    const conn = await Post.leaseConnection();
+    const conn = (await Post.leaseConnection()) as never as {
+      _queryCache: { clear(): void };
+      addColumn(t: string, c: string, ty: string): Promise<void>;
+      removeColumn(t: string, c: string): Promise<void>;
+    };
 
     await Post.cache(async () => {
-      // Warm the cache so there is something for the DDL to clear.
+      // Warm the cache so there is something for the DDL to clear. This also
+      // ensures the connection's `_queryCache` store is assigned (checkout) and
+      // enabled — that is the exact object the dirtying wrapper clears
+      // (`this._queryCache.clear()`), so spy on it rather than the
+      // execution-context-keyed pool store, which need not be the same object.
       await Post.find(1);
+      const store = conn._queryCache;
+      const real = store.clear.bind(store);
 
       let clears = 0;
       store.clear = () => {

@@ -489,7 +489,7 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
 function withWriteDirtyDepth(host: QueryCacheHost, original: () => unknown): unknown {
   host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) + 1;
   const release = (): void => {
-    host._writeDirtyDepth = (host._writeDirtyDepth ?? 1) - 1;
+    host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) - 1;
   };
   let result: unknown;
   try {
@@ -583,7 +583,10 @@ export function dirtiesQueryCacheExceptSchema(
  * nested and must defer to the outer clear. DDL reaches `executeMutation` at
  * depth 0 and clears. Transaction control (`BEGIN`/`COMMIT`) bypasses
  * `executeMutation` on the real adapters (they use `internalExecute`), so it is
- * unaffected.
+ * unaffected. sqlite's `executeBatch` DOES funnel through `executeMutation` but
+ * holds this guard around its call (mirroring Rails' `execute_batch` →
+ * `raw_execute`, which is NOT in the dirties set), so batch statements —
+ * fixture loading, schema application — leave the cache intact like Rails.
  *
  * The guard is instance-scoped rather than stack-local (Rails' `super` is
  * inherently stack-local) but that is sound here: an adapter wraps a single
@@ -614,7 +617,7 @@ export function dirtiesQueryCacheUnlessNested(
     if (typeof original !== "function") continue;
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      if (this._queryCache?.dirties && !(this._writeDirtyDepth ?? 0)) {
+      if (this._queryCache?.dirties && (this._writeDirtyDepth ?? 0) === 0) {
         this._queryCache.clear();
       }
       return (original as (...a: unknown[]) => unknown).apply(this, args);
