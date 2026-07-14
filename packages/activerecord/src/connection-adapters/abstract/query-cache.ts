@@ -170,6 +170,15 @@ export interface QueryCachePool {
 export interface QueryCacheHost extends DatabaseStatementsHost {
   _queryCache: Store | null;
   pool?: DatabaseStatementsHost["pool"] & QueryCachePool;
+  /**
+   * Re-entrancy depth of the wired write methods. Each `dirtiesQueryCache`
+   * wrapper bumps it around its (async) call so a lower-level
+   * `executeMutation` — which every CRUD write funnels through — can tell it
+   * is nested inside an already-dirtying write and skip a second clear. DDL
+   * reaches `executeMutation` directly (depth 0) and clears, matching Rails'
+   * `execute`-based DDL. @internal
+   */
+  _writeDirtyDepth?: number;
 }
 
 /**
@@ -469,6 +478,42 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
   };
 }
 
+/**
+ * Run `original` with `_writeDirtyDepth` incremented for the whole (possibly
+ * async) call, so a nested `executeMutation` sees depth > 0 and skips its own
+ * clear. The counter must stay raised until the returned promise settles —
+ * `executeMutation` is awaited *inside* `original`, after it returns the
+ * promise — so bracket both the sync and async completion paths.
+ * @internal
+ */
+function withWriteDirtyDepth(host: QueryCacheHost, original: () => unknown): unknown {
+  host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) + 1;
+  const release = (): void => {
+    host._writeDirtyDepth = (host._writeDirtyDepth ?? 1) - 1;
+  };
+  let result: unknown;
+  try {
+    result = original();
+  } catch (err) {
+    release();
+    throw err;
+  }
+  if (result != null && typeof (result as { then?: unknown }).then === "function") {
+    return (result as Promise<unknown>).then(
+      (value) => {
+        release();
+        return value;
+      },
+      (err) => {
+        release();
+        throw err;
+      },
+    );
+  }
+  release();
+  return result;
+}
+
 /** @internal Reassign each named prototype slot to a cache-dirtying wrapper. */
 function wireDirties(
   base: { prototype: object },
@@ -484,7 +529,9 @@ function wireDirties(
       if (this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"))) {
         this._queryCache.clear();
       }
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
+      return withWriteDirtyDepth(this, () =>
+        (original as (...a: unknown[]) => unknown).apply(this, args),
+      );
     };
   }
 }
@@ -521,6 +568,42 @@ export function dirtiesQueryCacheExceptSchema(
   ...methodNames: string[]
 ): void {
   wireDirties(base, methodNames, true);
+}
+
+/**
+ * Wraps `executeMutation` (the low-level write/DDL primitive) so it clears the
+ * query cache only when NOT nested inside an already-wired write. Rails wires
+ * `dirties_query_cache` on the public `execute`, through which DDL runs, so
+ * schema changes clear the cache. trails routes DDL through `executeMutation`;
+ * wiring it here reproduces that. But CRUD writes funnel
+ * `execInsert`/`execUpdate`/`execDelete` (already wired) → `executeMutation`, so
+ * an unconditional clear here would double-clear each logical write (breaking
+ * the `times: 1` expiry assertions). The `_writeDirtyDepth` guard, raised by the
+ * outer wired wrapper for the duration of its async call, tells this leaf it is
+ * nested and must defer to the outer clear. DDL reaches `executeMutation` at
+ * depth 0 and clears. Transaction control (`BEGIN`/`COMMIT`) bypasses
+ * `executeMutation` on the real adapters (they use `internalExecute`), so it is
+ * unaffected.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache.dirties_query_cache
+ * (as applied to `execute`, the DDL entry point).
+ */
+export function dirtiesQueryCacheUnlessNested(
+  base: { prototype: object },
+  ...methodNames: string[]
+): void {
+  const proto = base.prototype as Record<string, unknown>;
+  for (const methodName of methodNames) {
+    const original = proto[methodName];
+    if (typeof original !== "function") continue;
+
+    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
+      if (this._queryCache?.dirties && !(this._writeDirtyDepth ?? 0)) {
+        this._queryCache.clear();
+      }
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
+    };
+  }
 }
 
 /**

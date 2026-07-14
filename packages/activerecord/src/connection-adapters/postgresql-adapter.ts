@@ -70,7 +70,11 @@ import {
 } from "../errors.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
+import {
+  dirtiesQueryCache,
+  dirtiesQueryCacheExceptSchema,
+  dirtiesQueryCacheUnlessNested,
+} from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { JoinTableOptions } from "./abstract/schema-statements.js";
 import {
@@ -5222,13 +5226,19 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
 // this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
 // `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
 // Each logical write clears the cache exactly once; the still-lower
-// `executeMutation` these funnel through stays unwrapped, and reads route
-// through `internalExecQuery` (never tripping the wrapper).
+// `executeMutation` these funnel through is wrapped separately (below) but
+// guarded to defer to the outer clear, and reads route through
+// `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(PostgreSQLAdapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
 // Schema reflection reuses the wrapped `execute`/`exec_query` with name
 // "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
 // use the schema-aware variant here — those reflection reads must not dirty.
 dirtiesQueryCacheExceptSchema(PostgreSQLAdapter, "execQuery", "execute");
+// DDL funnels through `executeMutation` (schema-statements), not the wired
+// `execute`; wire it so schema changes dirty the cache like Rails' `execute`-based
+// DDL. Nested CRUD (`execInsert`/`execUpdate`/`execDelete` → `executeMutation`)
+// is suppressed by the `_writeDirtyDepth` guard to avoid a double-clear.
+dirtiesQueryCacheUnlessNested(PostgreSQLAdapter, "executeMutation");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers
