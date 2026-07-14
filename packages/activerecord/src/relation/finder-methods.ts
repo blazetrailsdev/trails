@@ -272,6 +272,8 @@ interface FinderRelation {
     ): Promise<R | undefined>;
   };
   _isNone: boolean;
+  /** @internal Rebase-then-report none short-circuit; see Relation. */
+  _isEmptyRelation(): boolean;
   _limitValue: number | null;
   _offsetValue: number | null;
   _orderClauses: any[];
@@ -413,12 +415,11 @@ function hasReversibleOrder(rel: FinderRelation): boolean {
 }
 
 export async function performFirst(this: FinderRelation, n?: number): Promise<any> {
-  // An AssociationRelation spawned off a stale new-owner `1=0` seed rebases onto
-  // the resolved association scope here — BEFORE the `_isNone` short-circuit, so
-  // a saved owner's persisted FK is picked up instead of returning null. No-op
-  // for ordinary relations (the hook is absent).
-  (this as { _maybeRebaseAssociationSeed?: () => void })._maybeRebaseAssociationSeed?.();
-  if (this._isNone) return n !== undefined ? [] : null;
+  // `_isEmptyRelation()` is the shared none-short-circuit chokepoint: on an
+  // AssociationRelation it first rebases a stale new-owner `1=0` seed onto the
+  // live association scope, so a saved owner's persisted FK is picked up instead
+  // of returning null.
+  if (this._isEmptyRelation()) return n !== undefined ? [] : null;
   // Rails: Relation#first(limit) → find_nth_with_limit(0, limit); no-arg
   // first → find_nth(0) → find_nth_with_limit(0, 1). find_nth_with_limit reads
   // the loaded cache when present, otherwise runs an ordered LIMIT query — and
@@ -445,9 +446,9 @@ function orderByPk(rel: FinderRelation, direction: "asc" | "desc"): any {
 }
 
 export async function performLast(this: FinderRelation, n?: number): Promise<any> {
-  // See performFirst: rebase a stale new-owner seed before the `_isNone` guard.
-  (this as { _maybeRebaseAssociationSeed?: () => void })._maybeRebaseAssociationSeed?.();
-  if (this._isNone) return n !== undefined ? [] : null;
+  // See performFirst: `_isEmptyRelation()` rebases a stale new-owner seed before
+  // reporting the none short-circuit.
+  if (this._isEmptyRelation()) return n !== undefined ? [] : null;
   // Rails: `return find_last(limit) if loaded? || has_limit_or_offset?`. When
   // the relation is already loaded — or carries a `limit`/`offset` that a
   // reverse-order query would otherwise discard — Rails materializes the

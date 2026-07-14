@@ -1008,6 +1008,29 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect((await scoped.first()).id).toBe(developer.id);
   });
 
+  // The non-finder terminals (count/exists/pluck) have their own `_isNone`
+  // short-circuits, so a HABTM relation spawned off the stale new-owner seed
+  // must rebase onto the resolved join scope for those too — not just the
+  // bounded finders covered above.
+  it("mutated count/exists/pluck on new-owner seed resolves the join after save", async () => {
+    const developer = await Developer.create({ name: "Yara" });
+    const project = new Project({ name: "Rails Counting" });
+    // `where(...)` spawns off the still-new owner's `1=0` seed.
+    const scoped = (project as any).developers.where({ name: "Yara" });
+    await (project as any).developers.push(developer);
+    await (project as any).saveBang();
+
+    expect(await scoped.count()).toBe(1);
+    expect(await scoped.exists()).toBe(true);
+    // The `developers` scope is `distinct().order("developers.name desc,
+    // developers.id desc")`, so pluck must select both ordered columns —
+    // PostgreSQL requires every SELECT DISTINCT ORDER BY expression to appear in
+    // the select list (42P10).
+    expect(await scoped.pluck("developers.name", "developers.id")).toEqual([
+      ["Yara", developer.id],
+    ]);
+  });
+
   it("dynamic find should respect association include", async () => {
     // SQL error in sort clause if :include is not included
     // due to Unknown column 'authors.id'

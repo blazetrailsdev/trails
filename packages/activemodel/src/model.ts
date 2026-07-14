@@ -1656,12 +1656,16 @@ export class Model {
     return this._attributes.fetchValue(resolved) ?? null;
   }
 
-  /** @internal */
-  _readAttribute(name: string): unknown {
-    if (!this._attributes.has(name)) {
-      return null;
-    }
-    return this._attributes.fetchValue(name) ?? null;
+  /**
+   * @internal
+   * Mirrors AR `_read_attribute(attr_name, &block)` — reads directly from the
+   * attribute store, optionally yielding a known-but-unselected column's name to
+   * `block` (which the generated getters / `[]` use to raise
+   * MissingAttributeError). Without a block, an unselected column reads as nil,
+   * matching plain `read_attribute`/`_read_attribute`.
+   */
+  _readAttribute(name: string, block?: (name: string) => unknown): unknown {
+    return this._attributes.fetchValue(name, block) ?? null;
   }
 
   /**

@@ -221,15 +221,16 @@ export function missingAttribute(this: InstanceHost, attrName: string, stack?: s
  */
 export function _readAttribute(
   this: InstanceHost & {
-    _attributes?: { fetchValue(name: string): unknown };
-    _readAttribute?(name: string): unknown;
+    _attributes?: { fetchValue(name: string, block?: (name: string) => unknown): unknown };
+    _readAttribute?(name: string, block?: (name: string) => unknown): unknown;
   },
   attr: string,
+  block?: (name: string) => unknown,
 ): unknown {
   if (typeof this._readAttribute === "function" && this._readAttribute !== _readAttribute) {
-    return this._readAttribute(attr);
+    return this._readAttribute(attr, block);
   }
-  return this._attributes?.fetchValue(attr) ?? null;
+  return this._attributes?.fetchValue(attr, block) ?? null;
 }
 
 // -- Public ClassMethods (use `this`, assigned to Model directly) -----------

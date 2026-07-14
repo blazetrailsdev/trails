@@ -402,11 +402,6 @@ export function timestampAttributesForUpdate(this: TimestampHost): string[] {
 // ---------------------------------------------------------------------------
 
 /** @internal */
-export function initializeDup(this: TimestampInstanceHost, _other: unknown): void {
-  clearTimestampAttributes.call(this);
-}
-
-/** @internal */
 export function initInternals(this: TimestampInstanceHost): void {
   this._touchRecord = null;
 }

@@ -36,8 +36,12 @@ interface AttributeHolder {
  *
  * Mirrors: ActiveRecord::AttributeMethods::Read#_read_attribute
  */
-export function _readAttribute(this: AttributeHolder, name: string): unknown {
-  return this._attributes.fetchValue(name) ?? null;
+export function _readAttribute(
+  this: AttributeHolder,
+  name: string,
+  block?: (name: string) => unknown,
+): unknown {
+  return this._attributes.fetchValue(name, block) ?? null;
 }
 
 // Mirrors: ActiveRecord::AttributeMethods::Read::ClassMethods private#define_method_attribute

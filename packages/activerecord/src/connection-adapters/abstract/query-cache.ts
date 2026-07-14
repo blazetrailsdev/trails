@@ -179,6 +179,31 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
    * `execute`-based DDL. @internal
    */
   _writeDirtyDepth?: number;
+  // Mixed in from the QueryCache module below. Dispatched through `this` (not
+  // the module-level functions) so a per-connection override is honored, as in
+  // Rails' `def connection.cache_notification_info`.
+  cacheNotificationInfo(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+  ): Record<string, unknown>;
+  cacheNotificationInfoResult(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+    result: Record<string, unknown>[],
+  ): Record<string, unknown>;
+  lookupSqlCache(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+  ): Record<string, unknown>[] | undefined;
+  cacheSql(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+    execute: () => Promise<Record<string, unknown>[]>,
+  ): Promise<Record<string, unknown>[]>;
 }
 
 /**
@@ -464,11 +489,24 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     const forwardOpts = { ...opts, preparable: resolvedPreparable };
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
-      const cached = lookupSqlCache.call(this, sql, name, binds ?? []);
+      // Rails splits this by `async`: the sync path is `cache_sql { super }`
+      // (which itself tracks `hit` and instruments, query_cache.rb:283,291-296),
+      // the async path is `lookup_sql_cache(...) || super`. trails has no async
+      // FutureResult path, so it always takes the `lookup_sql_cache || cacheSql`
+      // shape. INVARIANT: there must be no `await` between this lookupSqlCache
+      // and the cacheSql below — lookupSqlCache runs synchronously and cacheSql
+      // reaches `Store.computeIfAbsent`'s synchronous `get` immediately, so
+      // nothing can populate the key in between. That is why trails' cacheSql
+      // carries no `hit`/instrument branch of its own: a hit is always caught
+      // and instrumented here by lookupSqlCache; Rails' hit branch effectively
+      // lives in `Store.computeIfAbsent` (the dup-on-hit path). Break the
+      // no-await invariant and a concurrent write could turn the cacheSql call
+      // into a silent, uninstrumented cache hit.
+      const cached = this.lookupSqlCache(sql, name, binds ?? []);
       if (cached !== undefined) {
         return Result.fromRowHashes(cached.map((r) => ({ ...r })));
       }
-      const rows = await cacheSql.call(this, sql, name, binds ?? [], async () => {
+      const rows = await this.cacheSql(sql, name, binds ?? [], async () => {
         const result = await original.call(this, sql, name, binds, forwardOpts);
         return result.toArray();
       });
@@ -681,7 +719,7 @@ function cacheNotificationInfoResult(
   binds: unknown[],
   result: Record<string, unknown>[],
 ): Record<string, unknown> {
-  const payload = cacheNotificationInfo.call(this, sql, name, binds);
+  const payload = this.cacheNotificationInfo(sql, name, binds);
   payload["row_count"] = result.length;
   return payload;
 }
@@ -712,7 +750,7 @@ function lookupSqlCache(
   if (result !== undefined) {
     Notifications.instrument(
       "sql.active_record",
-      cacheNotificationInfoResult.call(this, sql, name, binds, result),
+      this.cacheNotificationInfoResult(sql, name, binds, result),
     );
   }
   return result;

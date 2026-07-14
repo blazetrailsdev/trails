@@ -2345,7 +2345,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#to_a / #load
    */
   async toArray(): Promise<T[]> {
-    if (this._isNone) return [];
+    if (this._isEmptyRelation()) return [];
     if (this._loaded) return [...this._records];
     if (this._loadAsyncPromise) {
       // A prior loadAsync() kicked off the query — share the in-flight
@@ -3292,7 +3292,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#exists?
    */
   async exists(conditions?: Record<string, unknown> | unknown): Promise<boolean> {
-    if (this._isNone) return false;
+    if (this._isEmptyRelation()) return false;
     // Rails FinderMethods#exists?: `return false if !conditions` — treats an
     // explicit `false` / `null` argument as "no match possible". This precedes
     // the `if eager_loading?` branch, so it short-circuits before the
@@ -3460,7 +3460,8 @@ export class Relation<T extends Base> {
   async pluck(
     ...columns: Array<string | Nodes.Attribute | Nodes.NamedFunction | Nodes.SqlLiteral>
   ): Promise<unknown[]> {
-    if (this._isNone) return [];
+    // `pick` routes through `limit(1).pluck(...)`, so it inherits this rebase.
+    if (this._isEmptyRelation()) return [];
     return this._withQueryConnection(() => this._pluckInner(...columns));
   }
 
@@ -6244,6 +6245,23 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#none?
    */
   isNone(): boolean {
+    return this._isNone;
+  }
+
+  /**
+   * The single none-short-circuit chokepoint consulted by every query terminal
+   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) BEFORE it returns
+   * its empty result. On a plain relation this is just `_isNone`; the override
+   * in `AssociationRelation` first rebases a stale new-owner `1=0` seed onto the
+   * live association scope, so a relation spawned off a new owner
+   * (`owner.things.where(...)`) resolves the persisted FK across all terminals
+   * once the owner is saved — mirroring Rails' CollectionProxy delegating every
+   * query to `association.scope`, rather than each terminal carrying its own
+   * rebase hook.
+   *
+   * @internal
+   */
+  _isEmptyRelation(): boolean {
     return this._isNone;
   }
 

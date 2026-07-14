@@ -5072,9 +5072,23 @@ include(Base, TouchLater.InstanceMethods);
 // mixins, so invoke each module's hook explicitly in that order. Aggregations'
 // initialize_dup slots in above this chain, wired by includeAggregations on
 // composed_of models only.
-(Base.prototype as any).initializeDup = function (this: Base, other: unknown): void {
-  LockingOptimistic.initializeDup.call(this as any, other);
-  Timestamp.initializeDup.call(this as any, other);
+//
+// Mirrors ActiveRecord::Core#initialize_dup (core.rb): fire the initialize
+// callbacks against the duped attributes, THEN run the Locking/Timestamp
+// clears. In Rails those modules `super` into Core (which runs the callbacks)
+// and clear only as the stack unwinds (optimistic.rb:72-75, timestamp.rb:50-53),
+// so the hook observes the source's lock_version / timestamps before they are
+// nulled. `initialize` is defined `only: :after`, so runAllCallbacks fires just
+// the after_initialize chain. persistence.ts `dup` calls this after the duped
+// attributes and dirty baseline are in place.
+(Base.prototype as any).initializeDup = function (this: Base, _other: unknown): void {
+  void cbRunAll((this.constructor as typeof Base).prototype, "initialize", this, undefined, {
+    strict: "sync",
+  });
+  if ((this.constructor as typeof Base).lockingEnabled) {
+    LockingOptimistic._clearLockingColumn.call(this as any);
+  }
+  Timestamp.clearTimestampAttributes.call(this as any);
 };
 include(Base, _AttributeAssignment.InstanceMethods);
 include(Base, AutosaveAssociation);

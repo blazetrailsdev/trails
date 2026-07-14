@@ -22,6 +22,7 @@ import {
 } from "./reflection.js";
 import { compactUniqIds, compactUniqTuples } from "./relation/compact-uniq-ids.js";
 import { PredicateBuilder } from "./relation/predicate-builder.js";
+import { TableMetadata } from "./table-metadata.js";
 import { argumentError } from "./relation/query-methods.js";
 import { formatForInspect } from "./attribute-inspection.js";
 import type { PrettyPrinter } from "./pretty-print.js";
@@ -659,15 +660,25 @@ export function filterAttributes(
  * Rails: PredicateBuilder.new(TableMetadata.new(self, arel_table))
  * Memoized per class.
  *
- * Note: Rails passes a TableMetadata to PredicateBuilder. Our PredicateBuilder
- * currently takes a Table directly. TableMetadata.predicateBuilder handles the
- * full Rails flow when accessed from that path.
+ * Backed by a TableMetadata (like Rails) so dot-notation / schema-qualified
+ * keys and association-key expansion flow through the associated_table
+ * fallback — `buildFromHash({"schema.table.column": v})` expands to
+ * `"schema.table"."column" = ?` without a hand-built TableMetadata.
+ *
+ * Memoize as an OWN property (not a prototype-chain read): the builder's
+ * TableMetadata is bound to `this`, so an STI subclass (same table_name) must
+ * not inherit the parent's builder — that would resolve associations/
+ * aggregates against the wrong klass. Rails gets this from `inherited`
+ * resetting `@predicate_builder = nil` in the subclass (core.rb:422-425).
  */
-export function predicateBuilder(this: CoreHost): any {
-  if (this._predicateBuilder) return this._predicateBuilder;
+export function predicateBuilder(this: CoreHost): PredicateBuilder {
+  if (Object.prototype.hasOwnProperty.call(this, "_predicateBuilder") && this._predicateBuilder)
+    return this._predicateBuilder;
   const table = this.arelTable;
-  if (!table) return null;
-  this._predicateBuilder = new PredicateBuilder(table);
+  const metadata = new TableMetadata(this as any, table);
+  const pb = new PredicateBuilder(table);
+  pb.setTableContext(metadata);
+  this._predicateBuilder = pb;
   return this._predicateBuilder;
 }
 

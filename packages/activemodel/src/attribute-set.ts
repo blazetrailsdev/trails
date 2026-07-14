@@ -1,4 +1,4 @@
-import { Attribute } from "./attribute.js";
+import { Attribute, Uninitialized } from "./attribute.js";
 import { typeRegistry } from "./type/registry.js";
 
 const LAZY_ATTR = Symbol("lazyAttr");
@@ -107,8 +107,17 @@ export class AttributeSet {
     return result;
   }
 
-  fetchValue(name: string): unknown {
-    return this.getAttribute(name).value;
+  fetchValue(name: string, block?: (name: string) => unknown): unknown {
+    // Mirrors ActiveModel::AttributeSet#fetch_value → `self[name].value(&block)`.
+    // A known-but-unselected column is stored as an Uninitialized attribute
+    // whose `value(&block)` yields the name to the block (letting `[]` raise
+    // MissingAttributeError); an unknown name resolves to the Null default,
+    // which ignores the block and returns nil.
+    const attr = this.getAttribute(name);
+    if (block !== undefined && attr instanceof Uninitialized) {
+      return block(name);
+    }
+    return attr.value;
   }
 
   writeFromDatabase(
