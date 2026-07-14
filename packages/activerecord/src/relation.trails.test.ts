@@ -12,6 +12,7 @@ import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 import { performMerge } from "./relation/spawn-methods.js";
+import { AssociationRelation } from "./association-relation.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
@@ -836,7 +837,16 @@ describe("inspect wrapper class name", () => {
   it("renders the qualified Rails class name for an AssociationRelation", async () => {
     const author = await CanonAuthor.first();
     const relation = (author!.posts as any).where({});
+    expect(relation).toBeInstanceOf(AssociationRelation);
     await relation.load();
     expect(relation.inspect().startsWith("#<ActiveRecord::AssociationRelation [")).toBe(true);
+  });
+
+  // The unloaded branch elides entries with `[...]` (sync JS can't block on the
+  // load Rails does here), but the wrapper name is Rails' either way.
+  it("renders the qualified Rails class name for an unloaded relation", () => {
+    const relation = CanonPost.all();
+    expect(relation.isLoaded).toBe(false);
+    expect(relation.inspect()).toBe("#<ActiveRecord::Relation [...]>");
   });
 });
