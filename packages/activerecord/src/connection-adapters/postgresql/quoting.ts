@@ -217,10 +217,11 @@ export function quoteDefaultExpression(
       serialized = castType.serialize(value);
     }
   }
-  // `quote` requires a host receiver; thread our own so a binary column's
-  // default (BinaryType#serialize returns BinaryData) reaches PG's bytea
-  // `quotedBinary` rather than the abstract byte-string fallback.
-  return ` DEFAULT ${quote.call(this || { quotedBinary }, serialized)}`;
+  // `quote` requires a host receiver; thread our own so a receiver-less binary
+  // default reaches PG's bytea `quotedBinary` rather than the abstract
+  // byte-string fallback, and a date default reaches PG's BC-suffixing
+  // `quotedDate` (postgresql/quoting.rb:143) rather than the abstract format.
+  return ` DEFAULT ${quote.call(this || { quotedDate, quotedBinary }, serialized)}`;
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

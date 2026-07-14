@@ -98,9 +98,17 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
-  // Rails: `when Type::Binary::Data then quoted_binary(value)` — self-dispatched
-  // so an adapter's `quoted_binary` override (PG's bytea escape, MySQL/SQLite's
-  // `x'..'` hex) is honored. Thread `this` to mirror that.
+  // Rails: `when Type::Binary::Data then quoted_binary(value)` (rb:83) —
+  // self-dispatched so an adapter's `quoted_binary` override (PG's bytea escape,
+  // MySQL/SQLite's `x'..'` hex) is honored. Thread `this` to mirror that.
+  //
+  // Deviation: Rails passes the `Type::Binary::Data` itself and each override
+  // unwraps it (`value.to_s` / `value.hex`); we pass the unwrapped bytes, so
+  // trails' `quotedBinary` implementations take a byte source instead. This is
+  // what lets the adapters' raw-view boundary branches (Uint8Array/ArrayBuffer,
+  // which Rails never sees here) share one dispatch path with `BinaryData`.
+  // Consequence: a Rails-shaped override calling `value.hex()` would not work
+  // here — trails overrides must accept bytes.
   if (value instanceof BinaryData) return dispatchQuotedBinary(this, value.bytes);
   // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
   // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
@@ -310,9 +318,18 @@ export function unquotedFalse(): boolean {
 export function quotedBinary(value: unknown): string {
   // Rails quotes `value.to_s` — for `Type::Binary::Data` that is the raw byte
   // string, not a comma-joined element list. `String(uint8array)` would yield
-  // "1,2,3", so decode byte-for-byte first.
-  if (value instanceof Uint8Array) {
-    return `'${quoteString(Array.from(value, (b) => String.fromCharCode(b)).join(""))}'`;
+  // "1,2,3" and `String(arraybuffer)` "[object ArrayBuffer]", so normalise both
+  // byte sources first. `dispatchQuotedBinary` receives raw views from the
+  // adapters' boundary branches (SQLite's passes ArrayBuffer), and this is the
+  // fallback when a host defines no `quotedBinary`.
+  const bytes =
+    value instanceof Uint8Array
+      ? value
+      : value instanceof ArrayBuffer
+        ? new Uint8Array(value)
+        : null;
+  if (bytes) {
+    return `'${quoteString(Array.from(bytes, (b) => String.fromCharCode(b)).join(""))}'`;
   }
   return `'${quoteString(String(value))}'`;
 }

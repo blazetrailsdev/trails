@@ -1,7 +1,14 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BinaryData } from "@blazetrails/activemodel";
-import { quote, quoteTableName, quotedDate, quotedTime, typeCast } from "./quoting.js";
+import {
+  quote,
+  quoteTableName,
+  quotedBinary,
+  quotedDate,
+  quotedTime,
+  typeCast,
+} from "./quoting.js";
 
 describe("quotedDate", () => {
   it("formats a Temporal.Instant as UTC datetime string", () => {
@@ -108,6 +115,13 @@ describe("quote dispatches through quoted_binary", () => {
     // Rails' abstract quoted_binary is `"'#{quote_string(value.to_s)}'"` —
     // the raw byte string, not a comma-joined element list.
     expect(quote.call({}, new BinaryData("ab"))).toBe("'ab'");
+  });
+
+  it("normalises ArrayBuffer in the module quoted_binary fallback", () => {
+    // SQLite's boundary branch dispatches ArrayBuffer; String(arraybuffer) would
+    // emit '[object ArrayBuffer]'.
+    expect(quotedBinary(new Uint8Array([0x61, 0x62]).buffer)).toBe("'ab'");
+    expect(quotedBinary(new Uint8Array([0x61, 0x62]))).toBe("'ab'");
   });
 });
 

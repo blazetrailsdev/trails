@@ -215,7 +215,12 @@ describe("SQLite3::Quoting", () => {
 
     it("quotes a binary default through SQLite's quotedBinary", () => {
       // Receiver-less: the fallback host must still reach the `x'..'` hex form,
-      // not the abstract byte-string fallback.
+      // not the abstract byte-string fallback. Cover both shapes that reach here
+      // — the raw Uint8Array trails' BinaryType#serialize actually returns, the
+      // ArrayBuffer the boundary branch accepts, and the BinaryData Rails'
+      // Binary#serialize returns (activemodel/.../binary.rb:31).
+      expect(quoteDefaultExpression(new Uint8Array([0xde, 0xad]))).toBe("x'dead'");
+      expect(quoteDefaultExpression(new Uint8Array([0xde, 0xad]).buffer)).toBe("x'dead'");
       expect(quoteDefaultExpression(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
     });
   });

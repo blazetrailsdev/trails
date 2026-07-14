@@ -1,4 +1,4 @@
-import { BinaryData } from "@blazetrails/activemodel";
+import { BinaryData, BinaryType } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, Array as OidArray } from "./oid/array.js";
@@ -106,10 +106,30 @@ describe("PostgreSQL quoting", () => {
 
   it("quotes a binary default through PG's quotedBinary", () => {
     // Receiver-less: the fallback host must still reach the bytea escape form,
-    // not the abstract byte-string fallback.
+    // not the abstract byte-string fallback. Cover both shapes that reach here —
+    // the raw Uint8Array trails' BinaryType#serialize actually returns, and the
+    // BinaryData Rails' Binary#serialize returns (activemodel/.../binary.rb:31).
+    expect(quoteDefaultExpression(new Uint8Array([0x1f, 0x8b]))).toBe(" DEFAULT '\\x1f8b'");
     expect(quoteDefaultExpression(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe(
       " DEFAULT '\\x1f8b'",
     );
+  });
+
+  it("quotes a BC date default through PG's quotedDate", () => {
+    // Receiver-less: the fallback host must reach PG's BC-suffixing quotedDate
+    // (postgresql/quoting.rb:143), not the abstract formatter which drops " BC".
+    expect(quoteDefaultExpression(Temporal.PlainDate.from("-000043-03-15"))).toBe(
+      " DEFAULT '0044-03-15 BC'",
+    );
+  });
+
+  it("quotes a binary default produced by BinaryType#serialize", () => {
+    // Guards the real quoteDefaultExpression path: whatever the type map's
+    // serialize emits must still reach PG's bytea form.
+    // `array` must be present: the serialize branch is gated on `"array" in column`.
+    const column = { sqlType: "bytea", array: false };
+    const typeMap = { lookup: () => new BinaryType() };
+    expect(quoteDefaultExpression("ab", column, typeMap)).toBe(" DEFAULT '\\x6162'");
   });
 
   it("serializes array defaults via fallback OidArray when type map misses", () => {
