@@ -526,7 +526,18 @@ function wireDirties(
     if (typeof original !== "function") continue;
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      if (this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"))) {
+      // Honor the same `_writeDirtyDepth` guard the `executeMutation` leaf does
+      // (`dirtiesQueryCacheUnlessNested`): a top-level logical write runs at
+      // depth 0 and clears, but a wired method reached while an outer write —
+      // or an `executeBatch` (which brackets the guard to mirror Rails'
+      // non-dirtying `raw_execute`) — holds the guard defers to that scope
+      // instead of clearing again. CRUD `times: 1` holds because each logical
+      // write's outermost wired method is still entered at depth 0.
+      if (
+        this._queryCache?.dirties &&
+        (this._writeDirtyDepth ?? 0) === 0 &&
+        !(skipSchemaReflection && args.includes("SCHEMA"))
+      ) {
         this._queryCache.clear();
       }
       return withWriteDirtyDepth(this, () =>
