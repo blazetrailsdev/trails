@@ -1,3 +1,4 @@
+import { ArgumentError } from "../attribute-assignment.js";
 import { Type, ValueType } from "./value.js";
 import { StringType } from "./string.js";
 import { IntegerType } from "./integer.js";
@@ -43,7 +44,7 @@ export class TypeRegistry {
 
   lookup(name: string): Type {
     const factory = this.registrations.get(name);
-    if (!factory) throw new Error(`Unknown type: ${name}`);
+    if (!factory) throw new ArgumentError(`Unknown type: ${name}`);
     return factory();
   }
 

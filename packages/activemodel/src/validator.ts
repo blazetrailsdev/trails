@@ -1,4 +1,5 @@
 import { isBlank, underscore } from "@blazetrails/activesupport";
+import { ArgumentError, NotImplementedError } from "./attribute-assignment.js";
 import type { Errors } from "./errors.js";
 
 /** Minimum shape required of a record passed to validators. */
@@ -109,7 +110,7 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
       rawAttrs === undefined ? [] : Array.isArray(rawAttrs) ? [...rawAttrs] : [rawAttrs],
     );
     if (this.attributes.length === 0 || this.attributes.some((attr) => isBlank(attr))) {
-      throw new Error(":attributes cannot be blank");
+      throw new ArgumentError(":attributes cannot be blank");
     }
     this.checkValidity();
   }
@@ -125,7 +126,10 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
   }
 
   validateEach(_record: ValidatableRecord<TBase>, _attribute: string, _value: unknown): void {
-    throw new Error("Subclasses must implement validateEach(record, attribute, value)");
+    // @nie disposition=keep-as-strategy-hook rails=activemodel/lib/active_model/validator.rb:162 cluster=activemodel-validator
+    throw new NotImplementedError(
+      "Subclasses must implement validateEach(record, attribute, value)",
+    );
   }
 
   checkValidityBang(): void {

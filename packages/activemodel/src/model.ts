@@ -2282,20 +2282,23 @@ export class Model {
     const ctor = this.constructor as typeof Model;
     const root = includeRoot ?? ctor.includeRootInJson;
     let attrs: unknown = JSON.parse(json);
-    // Rails calls hash.values.first / self.attributes = hash on the
-    // decoded payload — both raise NoMethodError if the input is not a
-    // Hash. Surface the same failure mode loudly with shape-accurate
-    // diagnostics, matching JSONSerializer.fromJson (serializers/json.ts).
+    // Rails' `self.attributes = hash` routes through `assign_attributes`,
+    // which raises `ArgumentError` when the payload isn't hash-like
+    // (attribute_assignment.rb:29-30). Surface the same class loudly with
+    // shape-accurate diagnostics, matching JSONSerializer.fromJson
+    // (serializers/json.ts).
     const shapeOf = (v: unknown) => (v === null ? "null" : Array.isArray(v) ? "array" : typeof v);
     const isPlainObject = (v: unknown): v is Record<string, unknown> =>
       typeof v === "object" && v !== null && !Array.isArray(v);
     if (!isPlainObject(attrs)) {
-      throw new TypeError(`fromJson expected a JSON object, got ${shapeOf(attrs)}`);
+      throw new ArgumentError(`fromJson expected a JSON object, got ${shapeOf(attrs)}`);
     }
     if (root !== false && root != null) {
       attrs = Object.values(attrs)[0];
       if (!isPlainObject(attrs)) {
-        throw new TypeError(`fromJson root payload must be a JSON object, got ${shapeOf(attrs)}`);
+        throw new ArgumentError(
+          `fromJson root payload must be a JSON object, got ${shapeOf(attrs)}`,
+        );
       }
     }
     for (const [key, value] of Object.entries(attrs)) {

@@ -9,6 +9,7 @@ import {
   type SerializationRecord,
 } from "../serialization.js";
 import { ModelName } from "../naming.js";
+import { ArgumentError } from "../attribute-assignment.js";
 
 function isPlainJsonObject(v: unknown): v is Record<string, unknown> {
   return typeof v === "object" && v !== null && !Array.isArray(v);
@@ -97,11 +98,12 @@ export class JSON {
     const ctor = this.constructor as typeof JSON;
     const root = includeRoot ?? ctor.includeRootInJson;
     let hash = globalThis.JSON.parse(json) as unknown;
-    // Rails calls `hash.values.first` and raises NoMethodError if the
-    // decoded JSON isn't a Hash. Surface the same failure mode loudly
-    // instead of silently writing `undefined` into `attributes`.
+    // Rails' `self.attributes = hash` routes through `assign_attributes`,
+    // which raises `ArgumentError` when the argument isn't hash-like
+    // (attribute_assignment.rb:29-30). Surface the same class loudly instead
+    // of silently writing `undefined` into `attributes`.
     if (!isPlainJsonObject(hash)) {
-      throw new TypeError(`fromJson expected a JSON object, got ${describeJsonShape(hash)}`);
+      throw new ArgumentError(`fromJson expected a JSON object, got ${describeJsonShape(hash)}`);
     }
     // Rails truthiness: false/nil skip; everything else (including
     // empty string and any string root key) triggers unwrap via
@@ -110,7 +112,7 @@ export class JSON {
     if (root !== false && root != null) {
       hash = Object.values(hash)[0];
       if (!isPlainJsonObject(hash)) {
-        throw new TypeError(
+        throw new ArgumentError(
           `fromJson root payload must be a JSON object, got ${describeJsonShape(hash)}`,
         );
       }
