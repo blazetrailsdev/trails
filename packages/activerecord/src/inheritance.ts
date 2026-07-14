@@ -640,15 +640,19 @@ export function defineDynamicSelectReaders(record: Base): void {
       }
     }
   }
-  // Hot path: a declared column already carries a prototype accessor (generated
-  // by defineAttributeMethods), so only keys absent from the schema can be bare
-  // select aliases. A full `SELECT *` load projects only declared columns, so
-  // this loop finds nothing to install and never walks the prototype chain —
-  // mirrors narrowToProjectedColumns' own full-projection early-out.
-  const columnNames = new Set(klass.columnNames());
+  // Hot path: every declared attribute (a real column, and also an ignored
+  // column) is a known attribute, so only keys absent from _attributeDefinitions
+  // can be bare select aliases. A full `SELECT *` load projects only declared
+  // columns, so this loop finds nothing to install and never walks the prototype
+  // chain — mirrors narrowToProjectedColumns' own full-projection early-out.
+  // Gating on _attributeDefinitions (not columnNames(), which drops ignored
+  // columns) keeps an ignored column — declared but accessor-less — from being
+  // mistaken for a select alias.
+  const definedAttrs = (klass as unknown as { _attributeDefinitions: Map<string, unknown> })
+    ._attributeDefinitions;
   const proto = Object.getPrototypeOf(record) as object;
   for (const name of attrs.keys()) {
-    if (columnNames.has(name)) continue;
+    if (definedAttrs.has(name)) continue;
     if (installed.has(name)) continue;
     if (Object.prototype.hasOwnProperty.call(record, name)) continue;
     // A non-column key can still resolve to a real method or an aliased
