@@ -116,6 +116,27 @@ describe("Arel::Nodes::Casted#nil?", () => {
     expect(new Nodes.Casted(0, attr).isNil()).toBe(false);
   });
 
+  // Ruby has one nil, so undefined is a nil? here too. This keeps
+  // attr.eq(undefined) spelling IS NULL: before this change quotedNode
+  // normalized undefined to Quoted(null), so a null-only isNil() would
+  // regress it to `= NULL`.
+  it("treats undefined as nil, so eq(undefined) still renders IS NULL", () => {
+    const attr = users.get("age");
+    expect(new Nodes.Casted(undefined, attr).isNil()).toBe(true);
+    expect(new Nodes.Quoted(undefined).isNil()).toBe(true);
+
+    const [sql] = new Visitors.ToSql().compileWithBinds(users.get("id").eq(undefined));
+    expect(sql).toBe('"users"."id" IS NULL');
+  });
+
+  // `= NULL` is never true in SQL; Quoted#nil? (casted.rb:41) is defined
+  // identically to Casted's, so an undefined-valued Quoted spells IS NULL too.
+  it("renders IS NULL for a Quoted(undefined) right-hand side", () => {
+    const eq = new Nodes.Equality(users.get("id"), new Nodes.Quoted(undefined));
+    const [sql] = new Visitors.ToSql().compileWithBinds(eq);
+    expect(sql).toBe('"users"."id" IS NULL');
+  });
+
   // casted.rb:15 reads the raw `value`, NOT `value_for_database` — a type whose
   // serialize(nil) is non-nil must still spell IS NULL.
   it("reads the raw value, not value_for_database", () => {
