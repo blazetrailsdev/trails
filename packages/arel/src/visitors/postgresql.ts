@@ -11,6 +11,13 @@ import type { ArelConnection } from "./connection.js";
  * Mirrors: Arel::Visitors::PostgreSQL
  */
 export class PostgreSQL extends ToSql {
+  // Rails' Arel::Visitors::PostgreSQL defines no constructor — it inherits
+  // ToSql's, and @connection is always a real adapter. Trails constructs
+  // visitors with no connection (Node#toSql(), visitor unit tests), so the
+  // default has to name a PG-flavoured quoting host rather than the ANSI one.
+  // This is the only Rails-absent member here; the quote override it replaces
+  // was the larger deviation (Rails formats arrays in the adapter's quote —
+  // postgresql/quoting.rb:221-226 — never in the visitor).
   constructor(connection: ArelConnection = postgresqlDefaultQuoter) {
     super(connection);
   }
