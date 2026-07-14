@@ -780,7 +780,10 @@ describe("EnumTest", () => {
   // (attribute_registration.rb:81-87), so the enum block runs and raises
   // `Undeclared attribute type for enum` while `_default_attributes`
   // materializes. Constructing a record (or bare `_defaultAttributes()`) is
-  // enough; no prior `type_for_attribute` lookup is required.
+  // enough; no prior `type_for_attribute` lookup is required. (The green
+  // counterpart — a subclass that DOES back the inherited enum — is the
+  // `Lion < abstract Cat` case, covered on the canonical models in
+  // enum.trails.test.ts.)
   it("enum on abstract parent raises through subclass materialization", () => {
     class AbstractParent extends Base {
       static {
@@ -800,14 +803,6 @@ describe("EnumTest", () => {
       /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
     );
   });
-
-  // The green path — a concrete subclass that DOES back the inherited enum, so
-  // the replayed superclass decorator resolves against the subclass's own
-  // columns and the `is{Value}()` predicate serializes through the record's
-  // class rather than the tableless parent — is the `Lion < abstract Cat` case.
-  // It is covered on the canonical models in enum.trails.test.ts (the synthetic
-  // `books`-backed stand-in that used to live here was only needed while `lions`
-  // had no registered fixture set).
 
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);

@@ -559,8 +559,10 @@ describe("Enum acronym method name consistency", () => {
 // backing `lions.gender` column. Rails replays the abstract parent's pending
 // decorator into the subclass's attribute set, so the enum must resolve — and
 // its generated predicate must serialize through the *record's* class, not the
-// tableless parent it was declared on (pre-fix that raised `TableNotSpecified`;
-// PR #4814 covered it only with synthetic `books`-backed classes).
+// tableless parent it was declared on (pre-fix that raised `TableNotSpecified`,
+// fixed in PR #4814). This supersedes the synthetic `books`-backed stand-in that
+// used to carry this coverage in enum.test.ts, which existed only because
+// `lions` had no registered fixture set.
 describe("Enum inherited from an abstract parent (Lion < Cat)", () => {
   const { lions } = fixtures(["lions"]);
 
