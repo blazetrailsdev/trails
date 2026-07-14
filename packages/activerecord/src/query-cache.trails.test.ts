@@ -96,6 +96,7 @@ describe("cacheNotificationInfo payload (trails)", () => {
     });
 
     const cached = payloads.filter((p) => p.cached);
+    expect(cached.length).toBe(1);
     expect(cached[0].name).toBe("Task Load");
   });
 
