@@ -106,6 +106,7 @@ import {
 } from "./association-cache.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+import { asAdapterName } from "./connection-adapters/abstract-adapter.js";
 import { temporalToBindString } from "./connection-adapters/abstract/database-statements.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
@@ -3717,7 +3718,7 @@ export class Base extends Model {
         !isArray && isBindableStringColumn(def?.type?.name) && typeof raw === "string"
           ? new Nodes.BindParam(raw)
           : isArray
-            ? arelSql(quoteSqlValue(raw, true, adapter.adapterName as AdapterName))
+            ? arelSql(quoteSqlValue(raw, true, asAdapterName(adapter.adapterName)))
             : raw;
     });
 
@@ -3843,7 +3844,7 @@ export class Base extends Model {
           !isArray && isBindableStringColumn(def?.type?.name) && typeof val === "string"
             ? new Nodes.BindParam(val)
             : isArray
-              ? arelSql(quoteSqlValue(val, true, adapter.adapterName as AdapterName))
+              ? arelSql(quoteSqlValue(val, true, asAdapterName(adapter.adapterName)))
               : val,
         ];
       },

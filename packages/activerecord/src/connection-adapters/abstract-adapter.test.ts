@@ -14,7 +14,7 @@ import { Time as TimeType } from "../type/time.js";
 import { DateTime as DateTimeType } from "../type/date-time.js";
 import { Json as JsonType } from "../type/json.js";
 import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
-import { AbstractAdapter } from "./abstract-adapter.js";
+import { AbstractAdapter, asAdapterName } from "./abstract-adapter.js";
 import { Column } from "./column.js";
 import { SqlTypeMetadata } from "./sql-type-metadata.js";
 import { Result } from "../result.js";
@@ -28,6 +28,21 @@ class TestAdapter extends AbstractAdapter {
     return "TestAdapter" as const;
   }
 }
+
+describe("asAdapterName", () => {
+  it("returns the name for each AdapterName family member", () => {
+    expect(asAdapterName("sqlite")).toBe("sqlite");
+    expect(asAdapterName("postgres")).toBe("postgres");
+    expect(asAdapterName("mysql")).toBe("mysql");
+  });
+
+  it("returns undefined for the abstract getter's non-family value", () => {
+    // The base AbstractAdapter#adapterName is "Abstract" (RFC 0010) — narrowing
+    // yields undefined rather than a lying `as AdapterName` cast.
+    expect(asAdapterName("Abstract")).toBeUndefined();
+    expect(asAdapterName("TestAdapter")).toBeUndefined();
+  });
+});
 
 describe("AbstractAdapter#returnValueAfterInsert", () => {
   it("returns true when column isAutoPopulated (has default function)", () => {
