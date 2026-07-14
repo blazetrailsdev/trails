@@ -111,11 +111,11 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
   //
-  // Rails must keep this ahead of Numeric (rb:82-83) because Ruby's BigDecimal
+  // Rails must keep this ahead of Numeric (rb:81-82) because Ruby's BigDecimal
   // *is* a Numeric, so a later arm would never be reached. That constraint does
   // not carry over: this chain dispatches on typeof/instanceof, under which
   // BigDecimal is an "object" and the Numeric arm below cannot swallow it. The
-  // order is kept to mirror rb:82-83, not because TS depends on it.
+  // order is kept to mirror rb:81-82, not because TS depends on it.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   // ArrayBuffer views have no Ruby analogue: they must be normalized to bytes
@@ -173,7 +173,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;
   // Rails dispatches `Type::Time::Value` through `self.quoted_time` and
-  // `Date`/`Time` through `self.quoted_date` (abstract/quoting.rb:93-101), the
+  // `Date`/`Time` through `self.quoted_date` (abstract/quoting.rb:103-104), the
   // same self-dispatch `quote` uses. Thread `this` so adapter overrides — e.g.
   // PostgreSQL's BC-suffixing `quotedDate` — flow into `type_cast` too.
   if (value instanceof Temporal.PlainTime) return dispatchQuotedTime(this, value);
