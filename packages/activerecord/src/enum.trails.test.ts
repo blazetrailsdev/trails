@@ -581,14 +581,21 @@ describe("Enum inherited from an abstract parent (Lion < Cat)", () => {
     expect(found.gender).toBe("female");
   });
 
-  it("applies Cat's default scope to a new Lion and to its queries", async () => {
-    // scope-for-create materializes the parent's `where(is_vegetarian: false)`
-    // through the tableless abstract class...
-    expect(new Lion().is_vegetarian).toBe(false);
-
-    // ...and the same scope filters reads: only the meat-eating fixture row
-    // survives it.
+  it("applies Cat's default scope to Lion's queries", async () => {
+    // The parent's `where(is_vegetarian: false)` filters reads through the
+    // tableless abstract class: only the meat-eating fixture row survives.
+    // (`lions.is_vegetarian` also defaults to false in the schema, so asserting
+    // the flag on a `new Lion` would pass with or without scope-for-create —
+    // filtering is what's actually observable here. The scope's SQL is asserted
+    // in scoping/default-scoping.test.ts, mirroring Rails'
+    // default_scoping_test.rb:708-709.)
     const ids = await Lion.all().pluck("id");
     expect(ids).toEqual([lions("meat_eating_lion").id]);
+  });
+
+  it("builds a new Lion without routing the parent's default scope through a tableless class", () => {
+    // The acceptance-criterion case: scope-for-create must materialize Cat's
+    // `default_scope` cleanly. Pre-fix this path raised `TableNotSpecified`.
+    expect(() => new Lion()).not.toThrow();
   });
 });

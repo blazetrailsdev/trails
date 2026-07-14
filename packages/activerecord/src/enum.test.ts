@@ -801,36 +801,13 @@ describe("EnumTest", () => {
     );
   });
 
-  // A concrete subclass that DOES back the inherited enum materializes cleanly:
+  // The green path — a concrete subclass that DOES back the inherited enum, so
   // the replayed superclass decorator resolves against the subclass's own
-  // columns (books.nullable_status), so no false raise and — crucially — no
-  // `TableNotSpecified` from routing the predicate through the abstract parent.
-  // The generated `is{Value}()` predicate must serialize through the *record's*
-  // class, not the abstract parent it was declared on (which has no table): this
-  // is the `Lion < abstract Cat` case, exercised here with a canonical books
-  // column since `lions` has no registered fixture set.
-  it("enum on abstract parent materializes green against a backing subclass column", () => {
-    class AbstractParent extends Base {
-      static {
-        this._abstractClass = true;
-        this.enum("nullable_status", ["single", "married"] as any);
-      }
-    }
-    class Backed extends AbstractParent {
-      static _tableName = "books"; // books.nullable_status is an integer column
-    }
-    registerModel(Backed);
-
-    expect(() => (Backed as any)._defaultAttributes()).not.toThrow();
-    const record = new (Backed as any)({ nullable_status: "married" });
-    // The predicate (`castEnumValue` on the record's own class) must not route
-    // through the abstract parent's tableless schema. Pre-fix this raised
-    // `TableNotSpecified: AbstractParent has no table configured`.
-    expect(() => record.isMarried()).not.toThrow();
-    expect(record.isMarried()).toBe(true);
-    expect(record.isSingle()).toBe(false);
-    expect(record.nullable_status).toBe("married");
-  });
+  // columns and the `is{Value}()` predicate serializes through the record's
+  // class rather than the tableless parent — is the `Lion < abstract Cat` case.
+  // It is covered on the canonical models in enum.trails.test.ts (the synthetic
+  // `books`-backed stand-in that used to live here was only needed while `lions`
+  // had no registered fixture set).
 
   it("query state by predicate with prefix", () => {
     expect((book as any).isAuthorVisibilityVisible()).toBe(true);
