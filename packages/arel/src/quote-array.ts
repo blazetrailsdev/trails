@@ -1,17 +1,58 @@
 /**
- * Formats an element as its BARE (un-quoted) content — `quoteArrayLiteral`
- * applies the `"..."` quoting itself. Returning `undefined` falls through to
- * the default handling. Offered every element except nested arrays (which
- * recurse first), mirroring how Rails' `type_cast_array` dispatches all
- * non-array elements into `type_cast` (`postgresql/quoting.rb:221-226`). Lets a
- * caller that owns a dialect's formatting give array elements what the same
- * value gets on the scalar path.
+ * Type-casts an element to the text `PG::TextEncoder::Array` would be handed,
+ * i.e. the BARE content — the encoder decides `"..."` quoting from that text.
+ * Returning `undefined` falls through to the default handling. Offered every
+ * element except nested arrays (which recurse first), mirroring how Rails'
+ * `type_cast_array` dispatches all non-array elements into `type_cast`
+ * (`postgresql/quoting.rb:221-226`). Lets a caller that owns a dialect's
+ * formatting give array elements what the same value gets on the scalar path.
  */
 export type FormatArrayElement = (value: unknown) => string | undefined;
 
+// `PG::TextEncoder::Array` quotes on content, never on type: an element is
+// wrapped only when leaving it bare would be ambiguous — empty, `NULL`
+// (case-insensitively), or carrying a delimiter, whitespace, quote or
+// backslash. Anything else is emitted bare, so `["a"]` encodes to `{a}`.
+// Whitespace is spelled out rather than `\s` because pg tests bytes with
+// `isspace()`, which excludes the non-ASCII spaces `\s` would match.
+const ELEMENT_NEEDS_QUOTING = /[{},"\\ \t\n\r\v\f]/;
+
+function encodeArrayElement(text: string): string {
+  if (text === "" || text.toUpperCase() === "NULL" || ELEMENT_NEEDS_QUOTING.test(text)) {
+    return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
+  return text;
+}
+
+function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement): string {
+  const formatted = formatElement?.(value);
+  if (formatted !== undefined) return formatted;
+  if (typeof value === "number") return String(value);
+  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  // boundary: defensive Date formatting for caller-supplied array literals.
+  if (value instanceof Date) return value.toISOString();
+  if (
+    typeof value === "object" &&
+    value !== null &&
+    "toISOString" in value &&
+    typeof (value as { toISOString: unknown }).toISOString === "function"
+  ) {
+    return (value as { toISOString: () => string }).toISOString();
+  }
+  if (typeof value === "object" && value !== null) {
+    const replacer = (_k: string, val: unknown) => (typeof val === "bigint" ? val.toString() : val);
+    try {
+      return JSON.stringify(value, replacer) ?? String(value);
+    } catch {
+      return String(value);
+    }
+  }
+  return String(value);
+}
+
 /**
  * Formats a JS array as a PostgreSQL array literal string (without outer single quotes).
- * e.g. ["a", "b"] => {"a","b"}
+ * e.g. ["a", "b"] => {a,b}
  *
  * Shared between the Arel PostgreSQL visitor and ActiveRecord's inline SQL quoting.
  */
@@ -22,38 +63,7 @@ export function quoteArrayLiteral(arr: unknown[], formatElement?: FormatArrayEle
     // `when ::Array` arm; every other element is offered to it uniformly,
     // as Rails dispatches all non-array elements into `type_cast`.
     if (Array.isArray(v)) return quoteArrayLiteral(v, formatElement);
-    const formatted = formatElement?.(v);
-    if (formatted !== undefined) {
-      return `"${formatted.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-    }
-    if (typeof v === "number") return String(v);
-    if (typeof v === "boolean") return v ? "TRUE" : "FALSE";
-    // boundary: defensive Date quoting for caller-supplied array literals.
-    if (v instanceof Date) {
-      return `"${v.toISOString()}"`;
-    }
-    if (
-      typeof v === "object" &&
-      v !== null &&
-      "toISOString" in v &&
-      typeof (v as { toISOString: unknown }).toISOString === "function"
-    ) {
-      return `"${(v as { toISOString: () => string }).toISOString()}"`;
-    }
-    let str: string;
-    if (typeof v === "object" && v !== null) {
-      const replacer = (_k: string, val: unknown) =>
-        typeof val === "bigint" ? val.toString() : val;
-      try {
-        str = JSON.stringify(v, replacer) ?? String(v);
-      } catch {
-        str = String(v);
-      }
-    } else {
-      str = String(v);
-    }
-    const escaped = str.replace(/\\/g, "\\\\").replace(/"/g, '\\"');
-    return `"${escaped}"`;
+    return encodeArrayElement(typeCastArrayElement(v, formatElement));
   });
   return `{${elements.join(",")}}`;
 }
