@@ -564,18 +564,15 @@ function wireDirties(
     if (typeof original !== "function") continue;
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      // Honor the same `_writeDirtyDepth` guard the `executeMutation` leaf does
-      // (`dirtiesQueryCacheUnlessNested`): a top-level logical write runs at
-      // depth 0 and clears, but a wired method reached while an outer write —
-      // or an `executeBatch` (which brackets the guard to mirror Rails'
-      // non-dirtying `raw_execute`) — holds the guard defers to that scope
-      // instead of clearing again. CRUD `times: 1` holds because each logical
-      // write's outermost wired method is still entered at depth 0.
-      if (
-        this._queryCache?.dirties &&
-        (this._writeDirtyDepth ?? 0) === 0 &&
-        !(skipSchemaReflection && args.includes("SCHEMA"))
-      ) {
+      // Clear unconditionally, mirroring Rails' `dirties_query_cache` (each wired
+      // method clears via `super`, query_cache.rb:13). The clear is idempotent, so
+      // a nested wired write clearing an already-cleared cache is harmless — do NOT
+      // gate this on `_writeDirtyDepth`: under concurrent writes on one connection
+      // (`Promise.all([a.save(), b.save()])`) B would be *entered* while A's depth
+      // is still raised across its await and would skip its clear, going stale.
+      // The depth guard lives only at the `executeMutation` leaf, where it exists
+      // to keep a single logical CRUD write to one clear (`times: 1`).
+      if (this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"))) {
         this._queryCache.clear();
       }
       return withWriteDirtyDepth(this, () =>
@@ -632,20 +629,21 @@ export function dirtiesQueryCacheExceptSchema(
  * nested and must defer to the outer clear. DDL reaches `executeMutation` at
  * depth 0 and clears. Transaction control (`BEGIN`/`COMMIT`) bypasses
  * `executeMutation` on the real adapters (they use `internalExecute`), so it is
- * unaffected. `executeBatch` DOES funnel through the cache-wired
- * `executeMutation` / `execute` (per adapter), but every `executeBatch` body
- * holds this guard around its statements (mirroring Rails' `execute_batch` →
- * `raw_execute`, which is NOT in the dirties set), so batch statements —
- * fixture loading, `truncate_tables`, schema application — leave the cache
- * intact like Rails.
+ * unaffected.
  *
- * The guard is instance-scoped rather than stack-local (Rails' `super` is
- * inherently stack-local) but that is sound here: an adapter wraps a single
- * connection that executes statements strictly serially, so a logical write's
- * `executeMutation` always settles — dropping `_writeDirtyDepth` back to 0 —
- * before any subsequent statement (DDL included) can begin on that adapter.
- * Concurrent writes run on *different* leased connections, each its own adapter
- * instance with its own counter.
+ * `executeBatch` (fixture loading, `truncate_tables`) DOES currently funnel
+ * through the cache-wired `executeMutation` / `execute` and so still dirties,
+ * whereas Rails' `execute_batch` → `raw_execute` is outside the dirties set. That
+ * extra clear is idempotent and pre-#4858 (batches run outside `cache` blocks);
+ * routing `executeBatch` through the unwired `rawExecute` to match Rails is
+ * tracked by story `converge-execute-batch-through-raw-execute`.
+ *
+ * The leaf guard is instance-scoped rather than stack-local, which is sufficient
+ * for its sole job — collapsing a single sequential CRUD write
+ * (`execInsert`/`execUpdate`/`execDelete` → `executeMutation`) to one clear so the
+ * `times: 1` expiry tests hold. It is NOT extended to the `wireDirties` wrappers
+ * (they clear unconditionally): doing so would make B skip its clear when entered
+ * during A's still-pending write on the same connection.
  *
  * Unlike {@link dirtiesQueryCacheExceptSchema}, this leaf does NOT skip on a
  * `"SCHEMA"` name: that skip exists because trails reuses the wrapped

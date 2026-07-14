@@ -154,25 +154,12 @@ export async function selectAll(
  * @internal
  */
 export async function executeBatch(
-  this: {
-    execute(sql: string, name?: string | null): Promise<unknown>;
-    _writeDirtyDepth?: number;
-  },
+  this: { execute(sql: string, name?: string | null): Promise<unknown> },
   statements: string[],
   name?: string | null,
 ): Promise<void> {
-  // raw_execute is NOT in `dirties_query_cache`'s set (query_cache.rb:13 wires
-  // `execute`), so batch statements leave the query cache intact. trails loops over
-  // the cache-wired `execute` (name `"Fixtures Load"` / `"Truncate Tables"`, which
-  // does not hit the `"SCHEMA"` skip); hold the `_writeDirtyDepth` guard across the
-  // batch so those per-statement clears are suppressed, matching raw_execute.
-  this._writeDirtyDepth = (this._writeDirtyDepth ?? 0) + 1;
-  try {
-    for (const statement of combineMultiStatements(statements)) {
-      await this.execute(statement, name);
-    }
-  } finally {
-    this._writeDirtyDepth = (this._writeDirtyDepth ?? 0) - 1;
+  for (const statement of combineMultiStatements(statements)) {
+    await this.execute(statement, name);
   }
 }
 

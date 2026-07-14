@@ -228,23 +228,12 @@ export async function executeBatch(
   // pass: batch statements carry no QueryLogs comment. Flag the call so
   // preprocessQuery skips the transformer pass (write-checks still run); the flag
   // is consumed synchronously there before any await, so it never spans the await.
-  //
-  // raw_execute is also NOT in `dirties_query_cache`'s set (query_cache.rb:13 wires
-  // `execute`, not `raw_execute`), so batch statements leave the query cache
-  // intact. trails routes executeBatch through the cache-wired `executeMutation`;
-  // hold the `_writeDirtyDepth` guard across the call so its clear is suppressed,
-  // reproducing raw_execute's untouched-cache behavior.
-  const host = this as ExecuteBatchHost & {
-    _inQueryTransformers?: boolean;
-    _writeDirtyDepth?: number;
-  };
+  const host = this as ExecuteBatchHost & { _inQueryTransformers?: boolean };
   host._inQueryTransformers = true;
-  host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) + 1;
   try {
     const sql = statements.join(";\n");
     await this.executeMutation(sql, [], name ?? "SQL");
   } finally {
-    host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) - 1;
     host._inQueryTransformers = false;
   }
 }
