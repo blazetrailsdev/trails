@@ -1,10 +1,9 @@
 /**
- * Formats a single array element as its bare (un-quoted) literal content, or
- * returns `undefined` to fall through to the default handling. Callers that own
- * a dialect's date formatting (the Arel PostgreSQL visitor's `quotedDate`) pass
- * one so array elements match what the same value gets on the scalar path —
- * Rails' `type_cast_array` sends each element through the same `type_cast` a
- * scalar takes (`postgresql/quoting.rb:221-226`).
+ * Formats an element as its BARE (un-quoted) content — `quoteArrayLiteral`
+ * applies the `"..."` quoting itself. Returning `undefined` falls through to
+ * the default handling. Lets a caller that owns a dialect's formatting give
+ * array elements what the same value gets on the scalar path, mirroring Rails'
+ * `type_cast_array` (`postgresql/quoting.rb:221-226`).
  */
 export type FormatArrayElement = (value: unknown) => string | undefined;
 

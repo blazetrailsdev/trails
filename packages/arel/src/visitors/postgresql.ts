@@ -137,14 +137,10 @@ export class PostgreSQL extends ToSql {
     return super.quote(value);
   }
 
-  /**
-   * Routes a date-like array element through the same formatting the scalar
-   * path takes (`quotedDate`), mirroring Rails' `type_cast_array` → `type_cast`
-   * → `when Date, Time then quoted_date` (`abstract/quoting.rb:94-107`). Uses
-   * the bare `formatDate` rather than `quotedDate` because `quoteArrayLiteral`
-   * applies its own `"..."` quoting — passing the `'`-wrapped form would
-   * double-quote. `undefined` leaves non-date elements to the default handling.
-   */
+  // Mirrors Rails' `type_cast_array` → `type_cast` → `when Date, Time then
+  // quoted_date` (`abstract/quoting.rb:94-107`), so an array element matches
+  // the scalar path. Uses bare `formatDate`, not `quotedDate`: the latter is
+  // already `'`-wrapped and `quoteArrayLiteral` adds its own quoting.
   private formatArrayDate(value: unknown): string | undefined {
     if (
       typeof value === "object" &&
