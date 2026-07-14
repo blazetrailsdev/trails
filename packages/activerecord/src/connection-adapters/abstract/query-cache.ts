@@ -481,11 +481,18 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
       // Rails splits this by `async`: the sync path is `cache_sql { super }`
-      // (which instruments the hit inside cache_sql, query_cache.rb:279-297),
+      // (which itself tracks `hit` and instruments, query_cache.rb:283,291-296),
       // the async path is `lookup_sql_cache(...) || super`. trails has no async
       // FutureResult path, so it always takes the `lookup_sql_cache || cacheSql`
-      // shape — the hit is caught (and instrumented) here by lookupSqlCache, so
-      // cacheSql below only ever runs on a miss and its own hit branch is inert.
+      // shape. INVARIANT: there must be no `await` between this lookupSqlCache
+      // and the cacheSql below — lookupSqlCache runs synchronously and cacheSql
+      // reaches `Store.computeIfAbsent`'s synchronous `get` immediately, so
+      // nothing can populate the key in between. That is why trails' cacheSql
+      // carries no `hit`/instrument branch of its own: a hit is always caught
+      // and instrumented here by lookupSqlCache; Rails' hit branch effectively
+      // lives in `Store.computeIfAbsent` (the dup-on-hit path). Break the
+      // no-await invariant and a concurrent write could turn the cacheSql call
+      // into a silent, uninstrumented cache hit.
       const cached = this.lookupSqlCache(sql, name, binds ?? []);
       if (cached !== undefined) {
         return Result.fromRowHashes(cached.map((r) => ({ ...r })));
