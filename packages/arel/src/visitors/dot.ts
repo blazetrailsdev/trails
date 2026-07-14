@@ -613,6 +613,19 @@ export class Dot extends Visitor {
     );
   }
 
+  /**
+   * Why this is an `instanceof` branch inside `visit` rather than a
+   * dispatch-table registration like `ToSql`'s (to-sql.ts):
+   *
+   * Registration only works where `visit` does the dispatching. `Dot`
+   * overrides `visit` and routes non-Node values structurally *before*
+   * reaching `super.visit` (see the `instanceof Node` branch above), so a
+   * ctor registration here would be dead code — an attribute would never
+   * reach the dispatch table to match it. `Dot` needs a branch here
+   * regardless, because Rails' Dot also dispatches raw Ruby values that have
+   * no Node ctor to key on: `visit_Hash` (dot.rb:220), `visit_Array`,
+   * `visit_String`.
+   */
   private isActiveModelAttribute(o: unknown): o is ModelAttribute {
     return o instanceof ModelAttribute;
   }
