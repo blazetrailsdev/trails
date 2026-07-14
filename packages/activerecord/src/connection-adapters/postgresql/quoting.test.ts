@@ -2,6 +2,7 @@ import { BinaryData } from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, Array as OidArray } from "./oid/array.js";
+import { DateTime as PgDateTime } from "./oid/date-time.js";
 import { Data as BitData } from "./oid/bit.js";
 import { Range } from "./oid/range.js";
 import { Data as XmlData } from "./oid/xml.js";
@@ -71,7 +72,7 @@ describe("PostgreSQL quoting", () => {
     // element gets the same db literal a scalar does (fixed-6 μs, " BC" for
     // proleptic years), not ISO-8601. This is the Rails-shaped path an inline
     // datetime[] INSERT must route through.
-    const dtArray = new ArrayData(new OidArray(stringSubtype), [
+    const dtArray = new ArrayData(new OidArray(new PgDateTime()), [
       Temporal.Instant.from("2026-04-26T14:23:55.123456789Z"),
       Temporal.Instant.from("-000043-03-15T12:34:56.123456Z"),
     ]);
