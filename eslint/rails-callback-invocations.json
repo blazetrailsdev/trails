@@ -1,0 +1,15 @@
+{
+  "methods": {
+    "_createRecord": ["create"],
+    "_updateRecord": ["update"],
+    "beforeCommittedBang": ["before_commit"],
+    "committedBang": ["commit"],
+    "createOrUpdate": ["save"],
+    "destroy": ["destroy"],
+    "incrementBang": ["touch"],
+    "initWithAttributes": ["find", "initialize"],
+    "initializeDup": ["initialize"],
+    "rolledbackBang": ["rollback"],
+    "touch": ["touch"]
+  }
+}
