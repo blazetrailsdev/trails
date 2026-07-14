@@ -311,7 +311,7 @@ describe("AttributeMethodsTest", () => {
     // `legacy_comments_count` is a real canonical `posts` column that wasn't in
     // the SELECT, so reading it raises (the synthetic `score` attribute isn't a
     // column and so wouldn't).
-    expect(() => (result as any).legacy_comments_count).toThrow(
+    expect(() => result?.readAttribute("legacy_comments_count")).toThrow(
       "missing attribute 'legacy_comments_count'",
     );
     // Mirrors: assert_nothing_raised { computer[:extendedWarranty] }
