@@ -2088,6 +2088,16 @@ export class ToSql extends Visitor {
       // arrays both flow through here, joined by ", ".
       return this.visitArray(v, collector);
     }
+    // An ActiveModel::Attribute binds, it does not quote. Rails branches on it
+    // explicitly before dispatching in the two places a bare one shows up —
+    // `visit_Arel_Nodes_ValuesList` (to_sql.rb:108-113, the INSERT values row)
+    // and `visit_Arel_Nodes_Assignment` (to_sql.rb:631-637) — and everywhere
+    // else Ruby's class dispatch would route it to visit_ActiveModel_Attribute
+    // anyway. There is no Rails path on which a bare one is quoted, so this
+    // branch is convergent for every caller of this helper, not just those two.
+    if (v instanceof ModelAttribute) {
+      return this.visit(v as unknown as Node, collector);
+    }
     if (v instanceof Node) {
       // Duck-type check to avoid circular dependency (SelectManager → ToSql → SelectManager)
       if ("ast" in v && "toSql" in v) {

@@ -1848,6 +1848,28 @@ describe("the to_sql visitor", () => {
       expect(binds).toEqual([amAttr]);
     });
 
+    it("binds a bare ActiveModel::Attribute in a values row rather than quoting it", () => {
+      // Rails' visit_Arel_Nodes_ValuesList branches on ActiveModel::Attribute
+      // before dispatching (to_sql.rb:108-113) — an attribute in an INSERT
+      // values row binds. Without the visitNodeOrValue branch it would fall to
+      // the raw-value path and be quoted as an opaque object.
+      const amAttr = AMAttribute.withCastValue("name", "Aaron", new ValueType());
+      const values = new Nodes.ValuesList([[amAttr as unknown as Nodes.Node]]);
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(values);
+      expect(sql).toBe("VALUES (?)");
+      expect(binds).toEqual([amAttr]);
+    });
+
+    it("binds a bare ActiveModel::Attribute on the right of an assignment", () => {
+      // Mirrors visit_Arel_Nodes_Assignment's `when ... ActiveModel::Attribute`
+      // arm (to_sql.rb:631-637).
+      const amAttr = AMAttribute.withCastValue("name", "Aaron", new ValueType());
+      const assign = new Nodes.Assignment(users.get("name"), amAttr as unknown as Nodes.Node);
+      const [sql, binds] = new Visitors.ToSql().compileWithBinds(assign);
+      expect(sql).toBe('"users"."name" = ?');
+      expect(binds).toEqual([amAttr]);
+    });
+
     it("visitArelSelectManager wraps the manager's AST in parens", () => {
       // Called directly — SelectManager isn't in the dispatch table because
       // it's a TreeManager, not a Node. Mirrors Rails' `visit_Arel_SelectManager`

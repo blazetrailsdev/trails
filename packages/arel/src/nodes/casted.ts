@@ -34,10 +34,18 @@ import { BindParam } from "./bind-param.js";
  *       collector.add_bind(o.value, &bind_block)   # to_sql.rb:760-762
  *     end
  *
- * Rails' bare `attr` reaches `add_bind(attr)`; trails' `BindParam(attr)`
- * reaches `add_bind(o.value)` — which *is* `attr`. Same payload, so
- * `type_casted_binds` / prepared-statement paths still see the attribute
- * and call `value_for_database` on it exactly as before.
+ * Rails' bare `attr` reaches `add_bind(attr)`; Rails' `BindParam(attr)`
+ * reaches `add_bind(o.value)` — which *is* `attr`. Same payload.
+ *
+ * Trails arrives at the same payload by a different route, so be precise:
+ * `visitArelNodesBindParam` (to-sql.ts) pushes the *node*, not `node.value`,
+ * because `compile` needs it to render the `?` marker. The unwrap to the
+ * attribute happens later, at the two extraction sites —
+ * `ToSql#compileWithBinds` and `SubstituteBinds#extractValue`
+ * (collectors/substitute-binds.ts), which recurse through `.value`. Net bind
+ * payload is the attribute either way, so `type_casted_binds` /
+ * prepared-statement paths still see it and call `value_for_database` on it
+ * exactly as before.
  *
  * The predicate delegations survive the wrap too: BindParam#isUnboundable
  * (bind-param.ts:50-52) and #isNil (:39-43) forward to the wrapped value,
@@ -46,9 +54,14 @@ import { BindParam } from "./bind-param.js";
  * We wrap rather than pass through because a bare ActiveModel::Attribute is
  * not a `Node`, and trails' AST is statically typed against `Node` — Ruby
  * duck-types its way past this, TS cannot without widening every node slot.
- * `ToSql#visitActiveModelAttribute` is still ported and dispatch-registered
- * (to-sql.ts), so a bare attribute arriving from a path that bypasses
- * buildQuoted / Attribute#quotedNode is handled Rails-identically.
+ * `ToSql#visitActiveModelAttribute` is still ported, and a bare attribute
+ * arriving from a path that bypasses buildQuoted / Attribute#quotedNode
+ * reaches it two ways, mirroring Rails' own two:
+ * - via `visit` — dispatch-registered against the abstract base (to-sql.ts),
+ *   the analogue of Ruby's name-derived dispatch + ancestors walk;
+ * - via `visitNodeOrValue` — the explicit branch, the analogue of Rails'
+ *   `when ... ActiveModel::Attribute` at to_sql.rb:109 (ValuesList) and
+ *   to_sql.rb:632 (Assignment), which likewise pre-empt class dispatch.
  */
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
