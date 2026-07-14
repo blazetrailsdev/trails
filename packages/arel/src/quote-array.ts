@@ -16,6 +16,10 @@ export type FormatArrayElement = (value: unknown) => string | undefined;
 // Whitespace is spelled out rather than `\s` because pg tests bytes with
 // `isspace()`, which excludes the non-ASCII spaces `\s` would match.
 const ELEMENT_NEEDS_QUOTING = /[{},"\\ \t\n\r\v\f]/;
+// `/i` on a non-unicode pattern folds ASCII only — it never maps a non-ASCII
+// char onto one — which is the exact shape of pg's `pg_strcasecmp(ptr, "NULL")`.
+// `toUpperCase()` would be a Unicode-aware fold, a wider net than pg casts.
+const NULL_LITERAL = /^null$/i;
 
 function encodeArrayElement(text: string | null): string {
   // Rendering nil as the bare `NULL` token is the encoder's job, not
@@ -23,7 +27,7 @@ function encodeArrayElement(text: string | null): string {
   // String then value`, `abstract/quoting.rb:101`). Keeping the split here is
   // what makes the `"NULL"` string quotable while real nil stays bare.
   if (text === null) return "NULL";
-  if (text === "" || text.toUpperCase() === "NULL" || ELEMENT_NEEDS_QUOTING.test(text)) {
+  if (text === "" || NULL_LITERAL.test(text) || ELEMENT_NEEDS_QUOTING.test(text)) {
     return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
   return text;
@@ -38,10 +42,10 @@ function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement
   if (typeof value === "number") return String(value);
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   // boundary: defensive Date formatting for caller-supplied array literals.
-  if (value instanceof Date) return value.toISOString();
+  // Duck-typed rather than `instanceof Date` so cross-realm dates and Temporal
+  // land here too; a real Date satisfies it, so it needs no arm of its own.
   if (
     typeof value === "object" &&
-    value !== null &&
     "toISOString" in value &&
     typeof (value as { toISOString: unknown }).toISOString === "function"
   ) {

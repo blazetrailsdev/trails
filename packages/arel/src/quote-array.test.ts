@@ -74,6 +74,14 @@ describe("quoteArrayLiteral", () => {
       expect(quoteArrayLiteral(["NULLx", "xNULL"])).toBe("{NULLx,xNULL}");
     });
 
+    it("folds the NULL literal over ASCII only, as pg_strcasecmp does", () => {
+      // A Unicode-aware fold would be a wider net than pg casts. The Kelvin
+      // sign folds to "K" under toUpperCase() but must not participate here;
+      // no non-ASCII char may stand in for N, U or L.
+      expect(quoteArrayLiteral(["nulK"])).toBe("{nulK}");
+      expect(quoteArrayLiteral(["ɴull"])).toBe("{ɴull}");
+    });
+
     it("quotes an element containing whitespace", () => {
       expect(quoteArrayLiteral(["a b"])).toBe('{"a b"}');
       expect(quoteArrayLiteral([" a"])).toBe('{" a"}');
@@ -92,7 +100,13 @@ describe("quoteArrayLiteral", () => {
       expect(quoteArrayLiteral(["a.b", "a-b", "a|b", "a(b"])).toBe("{a.b,a-b,a|b,a(b}");
     });
 
-    it("never inspects type, so the string 'true' encodes like the boolean", () => {
+    it("leaves a string that reads as a literal bare", () => {
+      // The encoder stage never inspects type — it sees only the text
+      // `type_cast` produced. These strings need no quoting, so they emit bare
+      // and become indistinguishable from the scalars they resemble, exactly
+      // as `PG::TextEncoder::Array` does. (The *boolean* `true` still encodes
+      // as `{TRUE}` until #4869 converges the type_cast arm onto
+      // `unquoted_true`; that divergence lives in the cast stage, not here.)
       expect(quoteArrayLiteral(["true"])).toBe("{true}");
       expect(quoteArrayLiteral(["1"])).toBe("{1}");
     });
@@ -102,6 +116,8 @@ describe("quoteArrayLiteral", () => {
     });
 
     it("encodes a mixed array as the Ruby encoder does", () => {
+      // The hook stands in for the `unquoted_true` cast arm #4869 converges;
+      // without it the booleans would still cast to `TRUE`/`FALSE` here.
       expect(
         quoteArrayLiteral([true, false, "a", "2026-04-26 14:23:55", 1], (v) =>
           typeof v === "boolean" ? String(v) : undefined,
