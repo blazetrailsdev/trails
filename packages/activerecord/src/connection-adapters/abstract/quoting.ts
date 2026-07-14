@@ -97,6 +97,17 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  // Rails: `when Type::Binary::Data then quoted_binary(value)`
+  // (abstract/quoting.rb:83) — binary dispatch sits here, before the
+  // Time/Date branches, and self-dispatches so each adapter's quoted_binary
+  // applies. Each adapter's `quote` short-circuits the common Uint8Array case
+  // before reaching here; this catches the other ArrayBuffer views (Int8Array,
+  // Float64Array, DataView), which have no Ruby analogue and must be
+  // normalized to bytes rather than falling to the raise below.
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return dispatchQuotedBinary(this, bytes);
+  }
   // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
   // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
   // BC-suffixing `quoted_date` — are honored. Thread `this` to mirror that.
@@ -113,16 +124,6 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     throw new TypeError(
       "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
-  // Rails: `when Type::Binary::Data then quoted_binary(value)` — binary
-  // dispatch is the adapter's job, self-dispatched so each adapter's
-  // quoted_binary applies. Each adapter's `quote` short-circuits the common
-  // Uint8Array case before reaching here; this catches the other ArrayBuffer
-  // views (Int8Array, Float64Array, DataView), which have no Ruby analogue and
-  // must be normalized to bytes rather than falling to the raise below.
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-    return dispatchQuotedBinary(this, bytes);
-  }
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
@@ -311,8 +312,19 @@ export function unquotedFalse(): boolean {
  * Quote binary data for SQL.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_binary
+ * (abstract/quoting.rb:206 — `"'#{quote_string(value.to_s)}'"`).
+ *
+ * Rails' `value` is a `Type::Binary::Data` whose `to_s` is the raw byte
+ * string. JS has no such coercion — `String(new Uint8Array([0x1f, 0x8b]))` is
+ * `"31,139"`, the comma-joined decimals — so bytes are decoded latin1 to reach
+ * the byte string `quote_string` expects. Every real adapter overrides this
+ * with a dialect binary literal; this is the abstract fallback.
  */
 export function quotedBinary(value: unknown): string {
+  if (ArrayBuffer.isView(value)) {
+    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+    return `'${quoteString(Buffer.from(bytes).toString("latin1"))}'`;
+  }
   return `'${quoteString(String(value))}'`;
 }
 
@@ -371,12 +383,6 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
 }
 
 /**
- * Dispatch through the host's `quotedDate` override if it defines one, else
- * the module-level helper. A host receiver is required — there are no
- * receiver-less callers (every invocation threads an adapter `this`).
- * @internal
- */
-/**
  * Self-dispatch binary quoting through the host, mirroring Rails' `quote`
  * calling `self.quoted_binary(value)` so an adapter override applies. Falls
  * back to the module-level helper when the host omits it.
@@ -389,6 +395,12 @@ export function dispatchQuotedBinary(host: QuotingDispatchHost, value: Uint8Arra
   return quotedBinary(value);
 }
 
+/**
+ * Dispatch through the host's `quotedDate` override if it defines one, else
+ * the module-level helper. A host receiver is required — there are no
+ * receiver-less callers (every invocation threads an adapter `this`).
+ * @internal
+ */
 export function dispatchQuotedDate(host: QuotingDispatchHost, value: TemporalDateLike): string {
   if (typeof host.quotedDate === "function") {
     return host.quotedDate(value);

@@ -245,6 +245,16 @@ describe("QuoteBooleanTest", () => {
     expect(quotedBinary("binary data")).toBe("'binary data'");
   });
 
+  it("quoted binary decodes bytes rather than String()-joining them", () => {
+    // Rails' quoted_binary is `'#{quote_string(value.to_s)}'` where value is a
+    // Type::Binary::Data whose to_s is the raw byte string. JS's
+    // String(Uint8Array) would emit the comma-joined decimals "31,139"; the
+    // byte string must round-trip instead.
+    const quoted = quotedBinary(new Uint8Array([0x1f, 0x8b]));
+    expect(quoted).not.toContain("31,139");
+    expect([...Buffer.from(quoted.slice(1, -1), "latin1")]).toEqual([0x1f, 0x8b]);
+  });
+
   it("sanitize as sql comment strips comment markers", () => {
     expect(sanitizeAsSqlComment("/* comment */")).toBe("comment");
     expect(sanitizeAsSqlComment("/*+ hint */")).toBe("hint");
