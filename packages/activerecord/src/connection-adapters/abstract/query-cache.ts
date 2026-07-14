@@ -184,6 +184,17 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
     binds: unknown[],
     result: Record<string, unknown>[],
   ): Record<string, unknown>;
+  lookupSqlCache(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+  ): Record<string, unknown>[] | undefined;
+  cacheSql(
+    sql: string,
+    name: string | null | undefined,
+    binds: unknown[],
+    execute: () => Promise<Record<string, unknown>[]>,
+  ): Promise<Record<string, unknown>[]>;
 }
 
 /**
@@ -469,11 +480,17 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
     const forwardOpts = { ...opts, preparable: resolvedPreparable };
     const qc = this._queryCache;
     if (qc?.enabled && !LOCKED_QUERY.test(sql)) {
-      const cached = lookupSqlCache.call(this, sql, name, binds ?? []);
+      // Rails splits this by `async`: the sync path is `cache_sql { super }`
+      // (which instruments the hit inside cache_sql, query_cache.rb:279-297),
+      // the async path is `lookup_sql_cache(...) || super`. trails has no async
+      // FutureResult path, so it always takes the `lookup_sql_cache || cacheSql`
+      // shape — the hit is caught (and instrumented) here by lookupSqlCache, so
+      // cacheSql below only ever runs on a miss and its own hit branch is inert.
+      const cached = this.lookupSqlCache(sql, name, binds ?? []);
       if (cached !== undefined) {
         return Result.fromRowHashes(cached.map((r) => ({ ...r })));
       }
-      const rows = await cacheSql.call(this, sql, name, binds ?? [], async () => {
+      const rows = await this.cacheSql(sql, name, binds ?? [], async () => {
         const result = await original.call(this, sql, name, binds, forwardOpts);
         return result.toArray();
       });

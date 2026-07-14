@@ -314,7 +314,10 @@ describe("QueryCacheTest", () => {
     // `neat: true` into `super`, then asserts the cached event carries it.
     // trails dispatches the payload through the per-connection
     // `cacheNotificationInfo` method, so an own-property override on the
-    // connection instance shadows the mixed-in one.
+    // connection instance shadows the mixed-in one. trails has no connection
+    // `dup`, so instead of Rails' throwaway copy we patch the shared leased
+    // connection and delete the own property in `finally` — the save/restore
+    // stands in for `dup`.
     const events: NotificationEvent[] = [];
     const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
 
