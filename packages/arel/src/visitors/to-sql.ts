@@ -19,12 +19,14 @@ export { UnsupportedVisitError };
 // Assignment visitors (to_sql.rb:109, 632). trails has no Arel-visible class
 // for it, so it is duck-typed on `valueForDatabase` — the same shape
 // `resolveValueForDatabase` above accepts.
-// Arel's own Casted/Quoted also expose `valueForDatabase` (casted.ts:70,108),
-// but Rails' `case` lists only SqlLiteral/BindParam/ActiveModel::Attribute
-// (to_sql.rb:110, 632) — a Casted is none of those and falls to the `quote()`
-// branch. Excluding Nodes keeps the duck-type to non-Arel attributes.
+// The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
+// Assignment visitors (to_sql.rb:110, 632). trails has no Arel-visible class
+// for it, so it is duck-typed on `valueForDatabase` — the same shape
+// `resolveValueForDatabase` accepts. Arel's own Casted/Quoted expose that
+// property too (casted.ts:70,108), but both call sites test `instanceof Node`
+// first, so this only ever sees non-Node values.
 function isActiveModelAttribute(v: unknown): boolean {
-  return typeof v === "object" && v !== null && !(v instanceof Node) && "valueForDatabase" in v;
+  return typeof v === "object" && v !== null && "valueForDatabase" in v;
 }
 
 // The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
@@ -36,9 +38,26 @@ function isPlainObject(v: unknown): boolean {
   return proto === Object.prototype || proto === null;
 }
 
-// A JS Date (or any date-like duck-type) is the analogue of Ruby's Time, which
-// Rails aliases to `unsupported` (to_sql.rb:844).
-function isDateLike(v: unknown): boolean {
+// Temporal types carry a `Temporal.X` Symbol.toStringTag; matching on it keeps
+// the check structural rather than importing the namespace into arel.
+function temporalTag(v: unknown): string | null {
+  if (typeof v !== "object" || v === null) return null;
+  const tag = (v as Record<symbol, unknown>)[Symbol.toStringTag];
+  return typeof tag === "string" && tag.startsWith("Temporal.") ? tag : null;
+}
+
+// The analogue of Ruby's Date, which Rails aliases to `unsupported`
+// (to_sql.rb:837). Temporal.PlainDate is the only wall-clock-date type here.
+function isDateOnly(v: unknown): boolean {
+  return temporalTag(v) === "Temporal.PlainDate";
+}
+
+// The analogue of Ruby's Time (to_sql.rb:844, also aliased to `unsupported`).
+// Temporal is the Time analogue in this codebase, and Temporal types expose no
+// `toISOString`, so they must be matched on their tag; a JS Date (or any
+// toISOString duck-type) is an instant-in-time and maps here too.
+function isTimeLike(v: unknown): boolean {
+  if (temporalTag(v) !== null) return !isDateOnly(v);
   return (
     typeof v === "object" &&
     v !== null &&
@@ -2085,7 +2104,8 @@ export class ToSql extends Visitor {
       return v ? this.visitTrueClass(v, collector) : this.visitFalseClass(v, collector);
     }
     if (typeof v === "symbol") return this.visitSymbol(v, collector);
-    if (isDateLike(v)) return this.visitTime(v, collector);
+    if (isDateOnly(v)) return this.visitDate(v, collector);
+    if (isTimeLike(v)) return this.visitTime(v, collector);
     if (isPlainObject(v)) return this.visitHash(v, collector);
     // Rails dispatches on the object's actual class (visitor.rb:29-30), so an
     // arbitrary object never reaches visit_Hash — it finds no handler and

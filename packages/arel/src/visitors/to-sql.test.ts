@@ -549,10 +549,19 @@ describe("the to_sql visitor", () => {
       });
 
       it("raises UnsupportedVisitError for a non-finite Float", () => {
-        // Not asserted through Equality: an unboundable Infinity short-circuits
-        // to 1=0/1=1 before dispatch. visitArray (`inject_join`, to_sql.rb:858)
-        // reaches the raw-value path directly. Infinity is not integral, so it
-        // lands on the Float branch — there is no separate non-finite rule.
+        // Infinity is not integral, so it lands on the Float branch — there is
+        // no separate non-finite rule.
+        //
+        // Asserted through visitArray (`inject_join`, to_sql.rb:858) rather
+        // than Equality because trails' `unboundableSign` short-circuits a raw
+        // Infinity to 1=0/1=1 first. That short-circuit is a KNOWN DEVIATION,
+        // not the rule this file documents: Rails' `unboundable?` is purely
+        // duck-typed (`value.respond_to?(:unboundable?) && value.unboundable?`,
+        // to_sql.rb:905-907) and a Float answers it false, so Rails reaches
+        // visit_Float and raises. Tracked by story
+        // arel-unboundable-sign-duck-types-like-rails; converging it is out of
+        // scope here (it also changes Quoted(INFINITY), which Rails renders as
+        // `= Infinity`).
         const v = new Visitors.ToSql();
         const visitArray = (
           v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
@@ -562,11 +571,46 @@ describe("the to_sql visitor", () => {
         );
       });
 
+      it("dispatches a bare Temporal on its Rails analogue", () => {
+        // Temporal is the Time analogue, so an Instant must reach visit_Time
+        // (`alias :visit_Time :unsupported`, to_sql.rb:844) and a PlainDate
+        // visit_Date (to_sql.rb:837) — not the generic no-handler tail.
+        // Temporal exposes no toISOString, so the tag is what routes them.
+        const v = new Visitors.ToSql();
+        const seen: string[] = [];
+        const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
+        spy.visitTime = () => {
+          seen.push("Time");
+          throw new Visitors.UnsupportedVisitError("x");
+        };
+        spy.visitDate = () => {
+          seen.push("Date");
+          throw new Visitors.UnsupportedVisitError("x");
+        };
+        const attr = new Table("users").get("id");
+        expect(() =>
+          spy.compile(
+            new Nodes.Equality(
+              attr,
+              Temporal.Instant.from("2026-04-30T12:34:56Z") as unknown as Nodes.NodeOrValue,
+            ),
+          ),
+        ).toThrow(Visitors.UnsupportedVisitError);
+        expect(() =>
+          spy.compile(
+            new Nodes.Equality(
+              attr,
+              Temporal.PlainDate.from("2026-04-30") as unknown as Nodes.NodeOrValue,
+            ),
+          ),
+        ).toThrow(Visitors.UnsupportedVisitError);
+        expect(seen).toEqual(["Time", "Date"]);
+      });
+
       it("raises for a bare Temporal but still renders it wrapped", () => {
-        // Temporal is the Time analogue, and `alias :visit_Time :unsupported`
-        // (to_sql.rb:844) — so a bare one raises. Wrapped in Quoted it routes
-        // through quote() (to_sql.rb:87-90) and still inlines, which is the
-        // only shape any AR caller produces.
+        // A bare Temporal raises; wrapped in Quoted it routes through quote()
+        // (to_sql.rb:87-90) and still inlines, which is the only shape any AR
+        // caller produces.
         const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
         expect(() => compileRight(instant)).toThrow(Visitors.UnsupportedVisitError);
         // Rendering shape here is whatever the quoter already does with a
