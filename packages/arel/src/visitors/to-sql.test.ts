@@ -1437,8 +1437,10 @@ describe("the to_sql visitor", () => {
     });
 
     it("an infinite-but-bounded BindParam does not short-circuit", () => {
+      // Infinity has no `unboundable?`, so the bind is bounded and renders as a
+      // placeholder rather than collapsing.
       const node = new Nodes.GreaterThan(users.get("id"), new Nodes.BindParam(Infinity));
-      expect(new Visitors.ToSql().compile(node)).not.toContain("1=");
+      expect(new Visitors.ToSql().compile(node)).toBe('"users"."id" > ?');
     });
   });
 
@@ -1776,9 +1778,11 @@ describe("the to_sql visitor", () => {
       });
 
       it("does not consult isInfinite(), which is a different predicate", () => {
-        // `infinite?` lives on Casted (casted.rb:43-45) for
-        // `Predications#open_ended?` (predications.rb:248); the visitor never
-        // calls it, and neither Quoted nor Casted defines `unboundable?`.
+        // `infinite?` serves `Predications#open_ended?` (predications.rb:256-258);
+        // the visitor never calls it, and neither Quoted nor Casted defines
+        // `unboundable?`. It is defined on Quoted (casted.rb:43-45 — the Quoted
+        // class lives in casted.rb) and NOT on Casted (casted.rb:5-35), which is
+        // why Casted answers 0 below on both predicates.
         expect(v().unboundableSign(new Nodes.Quoted(Infinity))).toBe(0);
         expect(v().unboundableSign(new Nodes.Quoted(-Infinity))).toBe(0);
         expect(v().unboundableSign({ isInfinite: () => 1 })).toBe(0);

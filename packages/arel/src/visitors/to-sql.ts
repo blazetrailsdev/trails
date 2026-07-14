@@ -2016,11 +2016,13 @@ export class ToSql extends Visitor {
    * `QueryAttribute` (query_attribute.rb:46-51), where it means "serializes
    * out of the column's range" (`value <=> 0`) — NOT "is infinite".
    *
-   * `infinite?` is a different predicate: it exists on `Casted`
-   * (casted.rb:43-45) for `Predications#open_ended?` (predications.rb:248) and
-   * is never consulted by the visitor. So a raw `Float::INFINITY`, or a
-   * `Quoted`/`Casted` wrapping one, is bounded here and renders as a value
-   * rather than collapsing.
+   * `infinite?` is a different predicate and is never consulted by the visitor;
+   * it serves `Predications#open_ended?` (predications.rb:256-258). Note it is
+   * defined on `Quoted` (casted.rb:43-45 — the `Quoted` class lives in
+   * casted.rb), NOT on `Casted`, which defines no `infinite?` at all
+   * (casted.rb:5-35). So a raw `Float::INFINITY`, or a `Quoted`/`Casted`
+   * wrapping one, is bounded here and renders as a value rather than
+   * collapsing.
    */
   protected unboundableSign(value: unknown): 1 | -1 | 0 {
     const v = value as { isUnboundable?: () => unknown } | null | undefined;

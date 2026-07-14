@@ -18,11 +18,17 @@ import { Between } from "./nodes/binary.js";
  *   `infinity?` / `unboundable?` / `open_ended?` — private helpers
  *
  * TS deviations (deliberate, called out in the audit):
- * - `infinitySign` / `unboundableSign` read the signed `isInfinite()` /
- *   `isUnboundable()` a bound value may expose (a QueryAttribute bind, or the
- *   RangeHandler out-of-range sentinel) — Trails' stand-in for Ruby's
- *   `infinity?` / `unboundable?` value protocols — plus bare `±Infinity`
- *   (and a `Quoted` wrapper around it).
+ * - `infinitySign` and `unboundableSign` are Trails' stand-ins for Ruby's
+ *   `infinity?` / `unboundable?` value protocols, and they read *different*
+ *   things — the two are not interchangeable:
+ *   - `infinitySign` mirrors `infinity?` (predications.rb:248-250): bare
+ *     `±Infinity`, a `Quoted` wrapper around it (`Quoted#infinite?`,
+ *     casted.rb:43-45), or a bound exposing `isInfinite()`. It deliberately
+ *     does NOT unwrap `Casted`, which defines no `infinite?` in Rails
+ *     (casted.rb:5-35) — see the note at `infinitySign` before "fixing" that.
+ *   - `unboundableSign` mirrors `unboundable?` (predications.rb:252-253) and is
+ *     purely duck-typed: only a bound exposing `isUnboundable()` answers it. A
+ *     bare `±Infinity` is open-ended, NOT unboundable.
  * - The TS port accepts three input shapes (array, object, positional)
  *   instead of Ruby's single `Range`.
  */
@@ -62,10 +68,26 @@ export function parseRange(beginOrRange: unknown, end: unknown, excludeEnd?: boo
   return { begin: beginOrRange, end, excludeEnd: excludeEnd === true };
 }
 
-// Mirrors Rails Predications#infinity? — signed infinity check. Recognizes
-// +/-Infinity (and a Quoted wrapper around the same) plus any bound value
-// exposing a signed `isInfinite()` (e.g. a QueryAttribute bind whose value is
-// ±Float::INFINITY).
+// Mirrors Rails Predications#infinity? (predications.rb:248-250) —
+// `value.respond_to?(:infinite?) && value.infinite?`, which yields the *sign*
+// because `Float#infinite?` returns `1 | -1 | nil`.
+//
+// Unwraps `Quoted` (whose `infinite?` lives at casted.rb:43-45) but deliberately
+// NOT `Casted`: Rails' `Casted` defines no `infinite?` (casted.rb:5-35), so
+// `open_ended?(Casted(INFINITY))` is false there and must be false here. Do not
+// "fix" this to unwrap Casted — it would silently change `between`.
+//
+// The `r === true` arm is NOT the same dead coercion removed from
+// `unboundableSign`: it compensates for a live producer. Rails'
+// `QueryAttribute#infinite?` (query_attribute.rb:42-44) returns
+// `infinity?(...)`, i.e. the sign; trails' returns a plain `boolean`
+// (`activerecord/src/relation/query-attribute.ts:89-94`), and `BindParam#isInfinite`
+// delegates to it (bind-param.ts:45-48) despite its `number | null` annotation.
+// Dropping the arm would stop detecting +Infinity binds; keeping it reports +1
+// for a -Infinity bind. Both are wrong — the root cause is the boolean return,
+// tracked in story `arel-predications-unboundable-duck-types-like-rails`. Latent
+// today: trails' RangeHandler passes cast values / UnboundableBound, never a
+// QueryAttribute, as a range bound.
 export function infinitySign(value: unknown): 1 | -1 | 0 {
   if (value === Infinity) return 1;
   if (value === -Infinity) return -1;
