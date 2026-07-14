@@ -782,6 +782,41 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
     expect(await rel.pick("title")).toBe("match");
     expect((await rel.find(match.id)).id).toBe(match.id);
   });
+
+  it("resolves the persisted FK on updateAll/updateCounters after save", async () => {
+    // The mutation terminals carry their own none short-circuits, so they must
+    // consult the same `_isEmptyRelation()` chokepoint the read terminals do.
+    const author = new Author({ name: "New Owner Four" });
+    const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
+
+    await author.save();
+    const authorId = author.id as number;
+    const match = await Post.create({ title: "match", body: "1", author_id: authorId });
+    // A non-matching sibling proves the mutation (`where(title:)`) is still
+    // applied on top of the rebuilt scope, not dropped.
+    const other = await Post.create({ title: "other", body: "2", author_id: authorId });
+
+    expect(await rel.updateCounters({ tags_count: 1 })).toBe(1);
+    expect((await Post.find(match.id)).tags_count).toBe(1);
+    expect((await Post.find(other.id)).tags_count).toBe(0);
+
+    expect(await rel.updateAll({ body: "updated" })).toBe(1);
+    expect((await Post.find(match.id)).body).toBe("updated");
+    expect((await Post.find(other.id)).body).toBe("2");
+  });
+
+  it("resolves the persisted FK on deleteAll after save", async () => {
+    const author = new Author({ name: "New Owner Five" });
+    const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
+
+    await author.save();
+    const authorId = author.id as number;
+    await Post.create({ title: "match", body: "1", author_id: authorId });
+    const other = await Post.create({ title: "other", body: "2", author_id: authorId });
+
+    expect(await rel.deleteAll()).toBe(1);
+    expect(await Post.where({ author_id: authorId }).pluck("id")).toEqual([other.id]);
+  });
 });
 
 // The in-memory `CollectionProxy#find` path (loaded `inverse_of` collection,

@@ -3701,7 +3701,7 @@ export class Relation<T extends Base> {
       const [sql, ...binds] = updates;
       if (!sql || typeof sql !== "string")
         throw new ArgumentError("Empty list of attributes to change");
-      if (this._isNone) return 0;
+      if (this._isEmptyRelation()) return 0;
       await this._materializeDeferredDistinctPkPredicates();
       const boundSql = new Nodes.BoundSqlLiteral(
         sql,
@@ -3714,14 +3714,14 @@ export class Relation<T extends Base> {
     }
     if (typeof updates === "string") {
       if (!updates) throw new ArgumentError("Empty list of attributes to change");
-      if (this._isNone) return 0;
+      if (this._isEmptyRelation()) return 0;
       await this._materializeDeferredDistinctPkPredicates();
       return this._execUpdateAll(new Nodes.SqlLiteral(updates));
     }
     // Mirrors Rails: blank check precedes none? check (relation.rb:588-591).
     if (Object.keys(updates).length === 0)
       throw new ArgumentError("Empty list of attributes to change");
-    if (this._isNone) return 0;
+    if (this._isEmptyRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     const table = this._modelClass.arelTable;
@@ -3808,7 +3808,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#delete_all
    */
   async deleteAll(): Promise<number> {
-    if (this._isNone) return 0;
+    if (this._isEmptyRelation()) return 0;
     await this._materializeDeferredDistinctPkPredicates();
 
     // Mirrors Rails `INVALID_METHODS_FOR_DELETE_ALL = [:distinct, :with,
@@ -3885,7 +3885,7 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#touch_all
    */
   async touchAll(...names: string[]): Promise<number> {
-    if (this._isNone) return 0;
+    if (this._isEmptyRelation()) return 0;
 
     // Use touchAttributesWithTime so alias-resolved column names are used
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
@@ -6053,7 +6053,7 @@ export class Relation<T extends Base> {
     counters: Record<string, number | { time?: Temporal.Instant }>,
     options?: { touch?: CounterCacheTouchOption },
   ): Promise<number> {
-    if (this._isNone) return 0;
+    if (this._isEmptyRelation()) return 0;
 
     // Rails extracts :touch from the counters hash itself (relation.rb: `touch = counters.delete(:touch)`)
     const touchFromCounters = (counters as Record<string, unknown>).touch;
@@ -6261,10 +6261,11 @@ export class Relation<T extends Base> {
 
   /**
    * The single none-short-circuit chokepoint consulted by every query terminal
-   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) BEFORE it returns
-   * its empty result. On a plain relation this is just `_isNone`; the override
-   * in `AssociationRelation` first rebases a stale new-owner `1=0` seed onto the
-   * live association scope, so a relation spawned off a new owner
+   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and every mutation
+   * terminal (`updateAll`/`deleteAll`/`touchAll`/`updateCounters`) BEFORE it
+   * returns its empty result. On a plain relation this is just `_isNone`; the
+   * override in `AssociationRelation` first rebases a stale new-owner `1=0` seed
+   * onto the live association scope, so a relation spawned off a new owner
    * (`owner.things.where(...)`) resolves the persisted FK across all terminals
    * once the owner is saved — mirroring Rails' CollectionProxy delegating every
    * query to `association.scope`, rather than each terminal carrying its own
