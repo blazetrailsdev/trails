@@ -617,13 +617,22 @@ export function narrowToProjectedColumns(
  * declared column) — matching Rails' `relation.map(&:post_count)`.
  */
 export function defineDynamicSelectReaders(record: Base): void {
-  const proto = Object.getPrototypeOf(record) as object;
   const attrs = (record as any)._attributes as { keys(): Iterable<string> };
+  const klass = record.constructor as typeof Base;
+  // Hot path: a declared column already carries a prototype accessor (generated
+  // by defineAttributeMethods), so only keys absent from the schema can be bare
+  // select aliases. A full `SELECT *` load projects only declared columns, so
+  // this loop finds nothing to install and never walks the prototype chain —
+  // mirrors narrowToProjectedColumns' own full-projection early-out.
+  const columnNames = new Set(klass.columnNames());
+  const proto = Object.getPrototypeOf(record) as object;
   for (const name of attrs.keys()) {
+    if (columnNames.has(name)) continue;
     if (Object.prototype.hasOwnProperty.call(record, name)) continue;
-    // Skip anything already reachable as a method/accessor on the prototype
-    // chain (declared columns, aliases, real methods) — only bare select
-    // aliases fall through to here.
+    // A non-column key can still resolve to a real method or an aliased
+    // accessor on the prototype chain (Rails' `respond_to_without_attributes?`
+    // short-circuit in method_missing); only truly unclaimed names fall
+    // through to an alias reader.
     let hasProtoMember = false;
     for (let p: object | null = proto; p != null; p = Object.getPrototypeOf(p)) {
       if (Object.getOwnPropertyDescriptor(p, name)) {

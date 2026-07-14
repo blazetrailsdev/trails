@@ -36,6 +36,7 @@ import {
   isStiSubclass,
   isDescendsFromActiveRecord,
   stiName,
+  defineDynamicSelectReaders,
 } from "./inheritance.js";
 import { withTransactionReturningStatus } from "./transactions.js";
 import { isSuppressed } from "./suppressor.js";
@@ -1548,6 +1549,11 @@ export function dup<T extends DupRecord>(this: T): T {
       ? defaultAttributes().map((attr) => attr.withValueFromUser(base.fetchValue(attr.name)))
       : base;
   (duped as { _attributes: DupAttributeSet })._attributes = dupedAttrs;
+  // Reinstall alias readers against the swapped-in attribute set so a duped
+  // record answers `dup.post_count` for any select alias that survived the
+  // deep-dup — matching Ruby, where method_missing keeps resolving aliases
+  // after dup because Object#dup leaves method dispatch untouched.
+  defineDynamicSelectReaders(duped as unknown as import("./base.js").Base);
   duped._readonly = this._readonly;
   // Rebind the dirty tracker to the duped attribute set BEFORE the hook (the
   // baseline from `new ctor({})` is stale against the swapped-in `_attributes`),
