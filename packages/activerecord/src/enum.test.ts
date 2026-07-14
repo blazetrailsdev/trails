@@ -780,7 +780,10 @@ describe("EnumTest", () => {
   // (attribute_registration.rb:81-87), so the enum block runs and raises
   // `Undeclared attribute type for enum` while `_default_attributes`
   // materializes. Constructing a record (or bare `_defaultAttributes()`) is
-  // enough; no prior `type_for_attribute` lookup is required.
+  // enough; no prior `type_for_attribute` lookup is required. (The green
+  // counterpart — a subclass that DOES back the inherited enum — is the
+  // `Lion < abstract Cat` case, covered on the canonical models in
+  // enum.trails.test.ts.)
   it("enum on abstract parent raises through subclass materialization", () => {
     class AbstractParent extends Base {
       static {
@@ -799,37 +802,6 @@ describe("EnumTest", () => {
     expect(() => new (Concrete as any)({})).toThrow(
       /Undeclared attribute type for enum 'typeless_genre' in Concrete/,
     );
-  });
-
-  // A concrete subclass that DOES back the inherited enum materializes cleanly:
-  // the replayed superclass decorator resolves against the subclass's own
-  // columns (books.nullable_status), so no false raise and — crucially — no
-  // `TableNotSpecified` from routing the predicate through the abstract parent.
-  // The generated `is{Value}()` predicate must serialize through the *record's*
-  // class, not the abstract parent it was declared on (which has no table): this
-  // is the `Lion < abstract Cat` case, exercised here with a canonical books
-  // column since `lions` has no registered fixture set.
-  it("enum on abstract parent materializes green against a backing subclass column", () => {
-    class AbstractParent extends Base {
-      static {
-        this._abstractClass = true;
-        this.enum("nullable_status", ["single", "married"] as any);
-      }
-    }
-    class Backed extends AbstractParent {
-      static _tableName = "books"; // books.nullable_status is an integer column
-    }
-    registerModel(Backed);
-
-    expect(() => (Backed as any)._defaultAttributes()).not.toThrow();
-    const record = new (Backed as any)({ nullable_status: "married" });
-    // The predicate (`castEnumValue` on the record's own class) must not route
-    // through the abstract parent's tableless schema. Pre-fix this raised
-    // `TableNotSpecified: AbstractParent has no table configured`.
-    expect(() => record.isMarried()).not.toThrow();
-    expect(record.isMarried()).toBe(true);
-    expect(record.isSingle()).toBe(false);
-    expect(record.nullable_status).toBe("married");
   });
 
   it("query state by predicate with prefix", () => {

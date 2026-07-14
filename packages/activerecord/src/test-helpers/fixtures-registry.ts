@@ -378,6 +378,10 @@ export const fixtureRegistry = {
     model: () => import("./models/legacy-thing.js").then((m) => m.LegacyThing),
     data: FixtureData.legacyThingFixtureData,
   },
+  lions: {
+    model: () => import("./models/cat.js").then((m) => m.Lion),
+    data: FixtureData.lionFixtureData,
+  },
   liveParrots: {
     model: () => import("./models/parrot.js").then((m) => m.LiveParrot),
     data: FixtureData.liveParrotFixtureData,

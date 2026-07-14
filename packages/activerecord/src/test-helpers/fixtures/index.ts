@@ -68,6 +68,7 @@ export * from "./interests.js";
 export * from "./items.js";
 export * from "./jobs.js";
 export * from "./legacy-things.js";
+export * from "./lions.js";
 export * from "./live-parrots.js";
 export * from "./mateys.js";
 export * from "./member-details.js";

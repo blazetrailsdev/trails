@@ -21,6 +21,7 @@ import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { Book } from "./test-helpers/models/book.js";
+import { Lion } from "./test-helpers/models/cat.js";
 
 describe("Enum name conflict detection", () => {
   // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
@@ -550,5 +551,53 @@ describe("Enum acronym method name consistency", () => {
         }
       }
     }).toThrow(/generate a instance method "isValid", which is already defined/);
+  });
+});
+
+// The `Lion < abstract Cat` case with the real canonical models: `Cat` is
+// abstract and declares `enum :gender`, but only the concrete `Lion` has the
+// backing `lions.gender` column. Rails replays the abstract parent's pending
+// decorator into the subclass's attribute set, so the enum must resolve — and
+// its generated predicate must serialize through the *record's* class, not the
+// tableless parent it was declared on (pre-fix that raised `TableNotSpecified`,
+// fixed in PR #4814). This supersedes the synthetic `books`-backed stand-in that
+// used to carry this coverage in enum.test.ts, which existed only because
+// `lions` had no registered fixture set.
+describe("Enum inherited from an abstract parent (Lion < Cat)", () => {
+  const { lions } = fixtures(["lions"]);
+
+  it("answers the inherited predicate on the concrete subclass", () => {
+    expect(() => Lion._defaultAttributes()).not.toThrow();
+
+    const lion = new Lion({ gender: "female" });
+    expect(lion.isFemale()).toBe(true);
+    expect(lion.isMale()).toBe(false);
+  });
+
+  it("resolves the inherited enum on a row read back from the table", async () => {
+    const lion = new Lion({ gender: "female" });
+    await lion.save();
+
+    const found = await Lion.find(lion.id);
+    expect(found.isFemale()).toBe(true);
+    expect(found.gender).toBe("female");
+  });
+
+  it("applies Cat's default scope to Lion's queries", async () => {
+    // The parent's `where(is_vegetarian: false)` filters reads through the
+    // tableless abstract class: only the meat-eating fixture row survives.
+    // (`lions.is_vegetarian` also defaults to false in the schema, so asserting
+    // the flag on a `new Lion` would pass with or without scope-for-create —
+    // filtering is what's actually observable here. The scope's SQL is asserted
+    // in scoping/default-scoping.test.ts, mirroring Rails'
+    // default_scoping_test.rb:708-709.)
+    const ids = await Lion.all().pluck("id");
+    expect(ids).toEqual([lions("meat_eating_lion").id]);
+  });
+
+  it("builds a new Lion without routing the parent's default scope through a tableless class", () => {
+    // The acceptance-criterion case: scope-for-create must materialize Cat's
+    // `default_scope` cleanly. Pre-fix this path raised `TableNotSpecified`.
+    expect(() => new Lion()).not.toThrow();
   });
 });
