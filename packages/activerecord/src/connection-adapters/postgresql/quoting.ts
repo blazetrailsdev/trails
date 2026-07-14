@@ -7,6 +7,7 @@
 import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote as abstractQuote,
+  dispatchQuotedBinary,
   quotedDate as abstractQuotedDate,
   quotedFalse as abstractQuotedFalse,
   quotedTrue as abstractQuotedTrue,
@@ -160,9 +161,11 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
     return String(value);
   }
-  if (value instanceof Uint8Array) return quotedBinary(value);
-  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
-  if (value instanceof BinaryData) return quotedBinary(value.bytes);
+  // Raw byte views have no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
+  // Self-dispatch so the adapter's `quotedBinary` override is honored, the same
+  // way the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
+  if (value instanceof Uint8Array) return dispatchQuotedBinary(this, value);
   if (typeof value === "string") return quoteString(value);
   // Thread `this` so the inherited date/time dispatch reaches PG's
   // BC-suffixing `quotedDate` (mirrors Rails' `super` call in PG#quote).

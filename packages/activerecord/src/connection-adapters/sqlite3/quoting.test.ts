@@ -18,8 +18,9 @@ import {
 
 // `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
 // SQLite's quotedDate / quotedTime so date/time literals keep the 2000-01-01
-// prefix on times.
-const HOST = { quotedDate, quotedTime };
+// prefix on times, and quotedBinary so binary self-dispatch reaches SQLite's
+// `x'..'` hex form — the same overrides AbstractSQLite3Adapter supplies.
+const HOST = { quotedDate, quotedTime, quotedBinary };
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 

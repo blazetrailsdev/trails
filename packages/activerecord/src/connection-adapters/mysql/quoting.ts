@@ -19,13 +19,13 @@ import {
 } from "../abstract/sql-datetime.js";
 import {
   quote as abstractQuote,
+  dispatchQuotedBinary,
   dispatchQuotedDate,
   dispatchQuotedTime,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
   unquotedTrue(): number;
@@ -173,8 +173,8 @@ export function columnNameWithOrderMatcher(): RegExp {
  * `quote` runs the abstract `quote` and the MySQL-specific behaviour flows in
  * through the dispatched helpers (`quote_string`, `quoted_binary`,
  * `quoted_date`/`quoted_time`). We mirror that here: only the branches whose
- * dispatch the abstract `quote` doesn't thread through `this` (binary, symbols,
- * strings — plus the trails-only non-finite guard) stay inline; everything else
+ * dispatch the abstract `quote` doesn't thread through `this` (symbols, strings
+ * — plus the trails-only raw-bytes and non-finite guards) stay inline; the rest
  * delegates to {@link abstractQuote} with `this` threaded so the date/time
  * dispatch lands on MySQL's {@link quotedDate}. Booleans fall through to the
  * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
@@ -185,9 +185,12 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // throws "Unknown column 'Infinity'". Mirror PG's behavior and quote them as
   // strings; MySQL coerces or rejects at the column-type boundary.
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
-  if (value instanceof Buffer || value instanceof Uint8Array) return quotedBinary(value);
-  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
-  if (value instanceof BinaryData) return quotedBinary(value.bytes);
+  // Raw byte views have no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
+  // Self-dispatch so MySQL's `quotedBinary` override is honored, the same way
+  // the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
+  // `Buffer` needs no separate branch: it extends `Uint8Array`.
+  if (value instanceof Uint8Array) return dispatchQuotedBinary(this, value);
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");

@@ -25,8 +25,10 @@ import {
 } from "./quoting.js";
 
 // `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
-// PG's quotedDate so date/time values reach the BC-suffixing override.
-const HOST = { quotedDate };
+// PG's quotedDate so date/time values reach the BC-suffixing override, and
+// quotedBinary so binary self-dispatch reaches PG's bytea escape — the same
+// overrides PostgreSQLAdapter supplies.
+const HOST = { quotedDate, quotedBinary };
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 

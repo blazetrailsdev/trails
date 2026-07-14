@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { BinaryData } from "@blazetrails/activemodel";
 import { quote, quoteTableName, quotedDate, quotedTime, typeCast } from "./quoting.js";
 
 describe("quotedDate", () => {
@@ -79,6 +80,34 @@ describe("quote dispatches through quoted_date/quoted_time", () => {
   it("falls back to the module quoted_time helper for PlainTime without a host", () => {
     const v = Temporal.PlainTime.from("14:23:55");
     expect(quote.call({}, v)).toBe("'14:23:55'");
+  });
+});
+
+describe("quote dispatches through quoted_binary", () => {
+  it("routes Type::Binary::Data through this.quotedBinary", () => {
+    const host = { quotedBinary: () => "DISPATCHED_BINARY" };
+    expect(quote.call(host, new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
+      "DISPATCHED_BINARY",
+    );
+  });
+
+  it("passes the unwrapped bytes to this.quotedBinary", () => {
+    let received: unknown;
+    const host = {
+      quotedBinary: (value: unknown) => {
+        received = value;
+        return "";
+      },
+    };
+    const bytes = new Uint8Array([0xde, 0xad]);
+    quote.call(host, new BinaryData(bytes));
+    expect(received).toBe(bytes);
+  });
+
+  it("falls back to the module quoted_binary helper without a host", () => {
+    // Rails' abstract quoted_binary is `"'#{quote_string(value.to_s)}'"` —
+    // the raw byte string, not a comma-joined element list.
+    expect(quote.call({}, new BinaryData("ab"))).toBe("'ab'");
   });
 });
 

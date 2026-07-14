@@ -10,7 +10,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import { Attribute as ModelAttribute, BinaryData } from "@blazetrails/activemodel";
 import { NotImplementedError } from "../../errors.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import {
@@ -26,13 +26,16 @@ import {
  * Threading `this` lets an adapter override (e.g. PostgreSQL's BC-aware
  * `quotedDate`) flow into the inherited `quote`. A host receiver is required —
  * every invocation goes through an adapter via `.call(this, value)`; a host
- * that omits `quotedDate` / `quotedTime` falls back to the module-level helpers.
+ * that omits `quotedDate` / `quotedTime` / `quotedBinary` falls back to the
+ * module-level helpers.
  */
 export interface QuotingDispatchHost {
   /** @internal */
   quotedDate?(value: TemporalDateLike): string;
   /** @internal */
   quotedTime?(value: Temporal.PlainTime | Temporal.PlainDateTime): string;
+  /** @internal */
+  quotedBinary?(value: unknown): string;
   /** @internal */
   quoteColumnName?(name: string): string;
 }
@@ -95,6 +98,10 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
+  // Rails: `when Type::Binary::Data then quoted_binary(value)` — self-dispatched
+  // so an adapter's `quoted_binary` override (PG's bytea escape, MySQL/SQLite's
+  // `x'..'` hex) is honored. Thread `this` to mirror that.
+  if (value instanceof BinaryData) return dispatchQuotedBinary(this, value.bytes);
   // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
   // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
   // BC-suffixing `quoted_date` — are honored. Thread `this` to mirror that.
@@ -301,6 +308,12 @@ export function unquotedFalse(): boolean {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_binary
  */
 export function quotedBinary(value: unknown): string {
+  // Rails quotes `value.to_s` — for `Type::Binary::Data` that is the raw byte
+  // string, not a comma-joined element list. `String(uint8array)` would yield
+  // "1,2,3", so decode byte-for-byte first.
+  if (value instanceof Uint8Array) {
+    return `'${quoteString(Array.from(value, (b) => String.fromCharCode(b)).join(""))}'`;
+  }
   return `'${quoteString(String(value))}'`;
 }
 
@@ -369,6 +382,18 @@ export function dispatchQuotedDate(host: QuotingDispatchHost, value: TemporalDat
     return host.quotedDate(value);
   }
   return quotedDate(value);
+}
+
+/**
+ * Dispatch through the host's `quotedBinary` override if it defines one, else
+ * the module-level helper — the binary twin of {@link dispatchQuotedDate}.
+ * @internal
+ */
+export function dispatchQuotedBinary(host: QuotingDispatchHost, value: unknown): string {
+  if (typeof host.quotedBinary === "function") {
+    return host.quotedBinary(value);
+  }
+  return quotedBinary(value);
 }
 
 /** @internal */

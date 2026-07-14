@@ -11,13 +11,13 @@
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
+  dispatchQuotedBinary,
   dispatchQuotedDate,
   dispatchQuotedTime,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
   quotedTrue(): string;
@@ -71,11 +71,12 @@ export function quoteString(value: string): string {
  * `quotedTime`. A host receiver is required — every invocation routes through
  * an adapter via `.call(this, value)`.
  *
- * The boolean, symbol, string, and binary branches stay inline because our
- * abstract `quote` renders those through module-level helpers (TRUE/FALSE,
+ * The boolean, symbol, and string branches stay inline because our abstract
+ * `quote` renders those through module-level helpers (TRUE/FALSE,
  * backslash-escaping `quoteString`) rather than dispatching through `this`, so
- * delegating would lose SQLite's overrides (1/0, `''`-only escaping, `x'..'`
- * hex). These are exactly the quoting primitives SQLite3::Quoting overrides.
+ * delegating would lose SQLite's overrides (1/0, `''`-only escaping). These are
+ * exactly the quoting primitives SQLite3::Quoting overrides. Binary does
+ * dispatch through `this`, so `BinaryData` rides the inherited abstract branch.
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
@@ -87,10 +88,13 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     return quoteString(value.description);
   }
   if (typeof value === "string") return quoteString(value);
-  if (value instanceof Uint8Array || value instanceof ArrayBuffer) return quotedBinary(value);
-  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
-  // BinaryData wraps raw bytes from serialize() (e.g. encryption ciphertext for binary columns).
-  if (value instanceof BinaryData) return quotedBinary(value.bytes);
+  // Raw byte views have no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
+  // Self-dispatch so SQLite's `quotedBinary` override is honored, the same way
+  // the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
+  if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
+    return dispatchQuotedBinary(this, value);
+  }
   return abstractQuote.call(this, value);
 }
 
