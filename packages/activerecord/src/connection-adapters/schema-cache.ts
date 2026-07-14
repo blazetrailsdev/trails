@@ -115,6 +115,11 @@ export class SchemaCache {
     return callback(fs.readFileSync(filename, "utf-8"));
   }
 
+  // Permanently grandfathered in rails-callback-invocations-exclude.json:
+  // SchemaCache is not an ActiveRecord model. Rails' SchemaCache#initialize_dup
+  // supers into Object (schema_cache.rb:264) and fires no model callbacks — the
+  // name-keyed lint rule only flags it because Core#initialize_dup (a different
+  // class) runs `_run_initialize_callbacks`. Firing them here would be wrong.
   initializeDup(): SchemaCache {
     const dup = new SchemaCache();
     dup._columns = new Map(this._columns);
