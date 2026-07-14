@@ -3885,7 +3885,11 @@ export class Relation<T extends Base> {
    * Mirrors: ActiveRecord::Relation#touch_all
    */
   async touchAll(...names: string[]): Promise<number> {
-    if (this._isEmptyRelation()) return 0;
+    // No `none?` guard here: Rails' touch_all (relation.rb:969-971) is a bare
+    // `update_all model.touch_attributes_with_time(...)` and inherits the
+    // `return 0 if @none` from update_all (relation.rb:592). Delegating rather
+    // than short-circuiting also routes the new-owner seed rebase through
+    // updateAll's chokepoint.
 
     // Use touchAttributesWithTime so alias-resolved column names are used
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
@@ -3897,6 +3901,9 @@ export class Relation<T extends Base> {
       updates[col] = new Nodes.Quoted(time);
     }
 
+    // Deviation: Rails passes the empty hash straight to update_all, which
+    // raises ArgumentError (relation.rb:589). Tracked by the
+    // `touch-all-update-counters-empty-updates-raise` story.
     if (Object.keys(updates).length === 0) return 0;
 
     return this.updateAll(updates);
@@ -6053,7 +6060,9 @@ export class Relation<T extends Base> {
     counters: Record<string, number | { time?: Temporal.Instant }>,
     options?: { touch?: CounterCacheTouchOption },
   ): Promise<number> {
-    if (this._isEmptyRelation()) return 0;
+    // No `none?` guard here: Rails' update_counters (relation.rb:926-944) ends
+    // in `update_all updates` and inherits the `return 0 if @none` from there
+    // (relation.rb:592), which is also what routes the new-owner seed rebase.
 
     // Rails extracts :touch from the counters hash itself (relation.rb: `touch = counters.delete(:touch)`)
     const touchFromCounters = (counters as Record<string, unknown>).touch;
@@ -6261,15 +6270,24 @@ export class Relation<T extends Base> {
 
   /**
    * The single none-short-circuit chokepoint consulted by every query terminal
-   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and every mutation
-   * terminal (`updateAll`/`deleteAll`/`touchAll`/`updateCounters`) BEFORE it
-   * returns its empty result. On a plain relation this is just `_isNone`; the
-   * override in `AssociationRelation` first rebases a stale new-owner `1=0` seed
-   * onto the live association scope, so a relation spawned off a new owner
-   * (`owner.things.where(...)`) resolves the persisted FK across all terminals
-   * once the owner is saved — mirroring Rails' CollectionProxy delegating every
-   * query to `association.scope`, rather than each terminal carrying its own
-   * rebase hook.
+   * (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and by the mutation
+   * terminals (`updateAll`/`deleteAll`) BEFORE returning an empty result.
+   * `touchAll`/`updateCounters` reach it by delegating to `updateAll`, as they
+   * do in Rails.
+   *
+   * On a plain relation this is just `_isNone`; the override in
+   * `AssociationRelation` first rebases a stale new-owner `1=0` seed onto the
+   * live association scope, so a relation SPAWNED off a new owner
+   * (`owner.things.where(...)`) resolves the persisted FK once the owner is
+   * saved — mirroring Rails' CollectionProxy delegating every query to
+   * `association.scope`, rather than each terminal carrying its own rebase hook.
+   *
+   * Note the scope of that override: `CollectionProxy` extends `Relation`, not
+   * `AssociationRelation`, and does not override this, so mutation terminals
+   * invoked on the PROXY itself (`owner.things.updateAll(...)`) still see the
+   * raw `_isNone`. Reads dodge this via `CollectionProxy#_finderScope`; the
+   * mutation side has no equivalent. Tracked by the
+   * `rebase-new-owner-seed-for-collection-proxy-mutations` story.
    *
    * @internal
    */
