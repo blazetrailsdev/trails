@@ -67,8 +67,6 @@ import {
   attributeMethodSuffix,
   attributeMethodAffix,
   aliasAttribute,
-  missingAttribute,
-  type InstanceHost,
   resolveAliasName,
   undefineAttributeMethods,
   attributeMissing,
@@ -1651,25 +1649,23 @@ export class Model {
     // Rails resolves alias_attribute names in `read_attribute`
     // (attribute_aliases[name] || name); `_read_attribute` skips it.
     const resolved = resolveAliasName(this.constructor as typeof Model, name);
-    if (this._attributes.has(resolved)) {
-      this._accessedFields.add(resolved);
-    }
-    // Mirrors AR `record[attr]` (attribute_methods.rb#[]): read_attribute is
-    // called with a block that raises MissingAttributeError, so a known column
-    // that wasn't selected raises while an unknown name still returns nil.
-    return (
-      this._attributes.fetchValue(resolved, (n) =>
-        missingAttribute.call(this as unknown as InstanceHost, n),
-      ) ?? null
-    );
-  }
-
-  /** @internal */
-  _readAttribute(name: string): unknown {
-    if (!this._attributes.has(name)) {
+    if (!this._attributes.has(resolved)) {
       return null;
     }
-    return this._attributes.fetchValue(name) ?? null;
+    this._accessedFields.add(resolved);
+    return this._attributes.fetchValue(resolved) ?? null;
+  }
+
+  /**
+   * @internal
+   * Mirrors AR `_read_attribute(attr_name, &block)` — reads directly from the
+   * attribute store, optionally yielding a known-but-unselected column's name to
+   * `block` (which the generated getters / `[]` use to raise
+   * MissingAttributeError). Without a block, an unselected column reads as nil,
+   * matching plain `read_attribute`/`_read_attribute`.
+   */
+  _readAttribute(name: string, block?: (name: string) => unknown): unknown {
+    return this._attributes.fetchValue(name, block) ?? null;
   }
 
   /**

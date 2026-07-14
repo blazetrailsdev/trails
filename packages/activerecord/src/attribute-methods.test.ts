@@ -308,15 +308,19 @@ describe("AttributeMethodsTest", () => {
     await Post.create({ title: "sel_test" });
     const result = await Post.select("title").first();
     // Mirrors: computer[:developer] → assert_raises MissingAttributeError.
+    // Rails `[]` reads via `_read_attribute(attr) { |n| missing_attribute(n) }`;
+    // trails has no `[]` operator, so its equivalent is the generated
+    // per-attribute getter, which supplies the same raising block.
     // `legacy_comments_count` is a real canonical `posts` column that wasn't in
-    // the SELECT, so reading it raises (the synthetic `score` attribute isn't a
-    // column and so wouldn't).
-    expect(() => result?.readAttribute("legacy_comments_count")).toThrow(
+    // the SELECT, so reading it raises.
+    expect(() => (result as any).legacy_comments_count).toThrow(
       "missing attribute 'legacy_comments_count'",
     );
     // Mirrors: assert_nothing_raised { computer[:extendedWarranty] }
+    // (block-less `read_attribute` never raises; a selected column reads back).
     expect(result?.readAttribute("title")).toBe("sel_test");
-    // Mirrors: assert_nothing_raised { computer[:no_column_exists] }
+    // Mirrors: assert_nothing_raised { computer[:no_column_exists] } — an unknown
+    // name returns nil even through the raising getter/`[]` block.
     expect(result?.readAttribute("no_column_exists")).toBeNull();
   });
   it("user-defined time attribute predicate", async () => {

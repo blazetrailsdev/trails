@@ -69,6 +69,8 @@ interface InstanceMethodHost {
 /** Minimal shape for inline property-descriptor get/set callbacks. */
 interface AttributeAccessorHost {
   readAttribute(name: string): unknown;
+  /** @internal */
+  _readAttribute(name: string, block?: (name: string) => unknown): unknown;
   writeAttribute(name: string, value: unknown): void;
 }
 
@@ -281,17 +283,15 @@ export function aliasAttributeMethodDefinition(
   // Define a direct getter/setter for the alias name.
   if (this.prototype && !(newName in this.prototype)) {
     Object.defineProperty(this.prototype, newName, {
-      get(
-        this: AttributeAccessorHost & {
-          _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
-        },
-      ) {
-        if (!this._attributes.getAttribute(oldName).isInitialized()) {
+      get(this: AttributeAccessorHost) {
+        // Rails' generated alias reader is `_read_attribute(canonical) { |n|
+        // missing_attribute(n, caller) }` — a known-but-unselected column yields
+        // to the block and raises, matching `record[attr]`.
+        return this._readAttribute(oldName, (n) => {
           throw new MissingAttributeError(
-            `missing attribute '${oldName}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+            `missing attribute '${n}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
           );
-        }
-        return this.readAttribute(oldName);
+        });
       },
       set(this: AttributeAccessorHost, value: unknown) {
         this.writeAttribute(oldName, value);
@@ -390,17 +390,15 @@ function generateConcreteAttributeMethods(this: AttributeMethodsHost): void {
       const ownDesc = Object.getOwnPropertyDescriptor(proto, name);
       const newDesc: PropertyDescriptor = { configurable: true };
       if (needsGetter) {
-        newDesc.get = function (
-          this: AttributeAccessorHost & {
-            _attributes: { getAttribute(n: string): { isInitialized(): boolean } };
-          },
-        ) {
-          if (!this._attributes.getAttribute(name).isInitialized()) {
+        newDesc.get = function (this: AttributeAccessorHost) {
+          // Rails' generated reader is `_read_attribute(name) { |n|
+          // missing_attribute(n, caller) }` — a known-but-unselected column
+          // yields to the block and raises, matching `record[attr]`.
+          return this._readAttribute(name, (n) => {
             throw new MissingAttributeError(
-              `missing attribute '${name}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
+              `missing attribute '${n}' for ${(this.constructor as { name?: string }).name ?? "unknown"}`,
             );
-          }
-          return this.readAttribute(name);
+          });
         };
       } else if (ownDesc?.get) {
         newDesc.get = ownDesc.get;
