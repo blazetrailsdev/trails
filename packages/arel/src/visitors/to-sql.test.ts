@@ -1943,14 +1943,15 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
 
   it("Uint8Array in value position is routed through quoter.quote(), not String()", () => {
     // Guards against the String(Uint8Array) → comma-joined decimals ('31,139')
-    // corruption path. The connection receives the Uint8Array via quotedBinary
-    // and emits the correct dialect binary literal.
+    // corruption path. The visitor hands the raw value to `connection.quote`
+    // (to_sql.rb:867-870); the connection dispatches binary to quotedBinary and
+    // emits the correct dialect binary literal.
     const received: unknown[] = [];
     const stubQuoter: Visitors.ArelConnection = {
       quoteTableName: (name) => `"${name}"`,
       quoteColumnName: (name) => `"${name}"`,
       quoteString: (s) => s.replace(/'/g, "''"),
-      quote: (v) => `'${v}'`,
+      quote: (v) => (v instanceof Uint8Array ? stubQuoter.quotedBinary(v) : `'${v}'`),
       quotedBinary: (v) => {
         received.push(v);
         return v instanceof Uint8Array ? `'\\x${Buffer.from(v).toString("hex")}'` : `'${v}'`;

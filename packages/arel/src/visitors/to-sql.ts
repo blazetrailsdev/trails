@@ -1499,54 +1499,15 @@ export class ToSql extends Visitor {
     return this.injectJoin(node.values, " ", collector);
   }
 
+  /**
+   * Mirrors `to_sql.rb#quote` (to_sql.rb:867-870): SqlLiteral passes through,
+   * everything else is handed to the connection. Rails' Arel does no value
+   * formatting of its own — every date/array/binary decision lives in the
+   * adapter's `quote`. Connection-less visitors reach the default quoters in
+   * `default-quoter.ts`, which stand in for an adapter.
+   */
   protected quote(value: unknown): string {
-    if (value === null || value === undefined) return "NULL";
-    if (typeof value === "number") {
-      // Non-finite numbers (Float::INFINITY / NaN) must be string-quoted so
-      // PostgreSQL parses them as float literals rather than identifiers.
-      // SQLite/MySQL reject the values either way; delegate to connection.quote
-      // for adapter-specific handling.
-      if (!Number.isFinite(value)) return this.connection.quote(value);
-      return String(value);
-    }
-    if (typeof value === "boolean")
-      return value ? this.connection.quotedTrue() : this.connection.quotedFalse();
-    if (typeof value === "bigint") return value.toString();
-    // Normalise all typed-array views (ArrayBuffer, SharedArrayBuffer) to
-    // Uint8Array before handing off so adapters' quotedBinary can rely on a
-    // consistent shape. Uint8Array itself passes through unchanged.
-    if (ArrayBuffer.isView(value)) {
-      const bytes =
-        value instanceof Uint8Array
-          ? value
-          : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
-      return this.connection.quotedBinary(bytes);
-    }
-    if (
-      typeof value === "object" &&
-      value !== null &&
-      "toISOString" in value &&
-      typeof (value as { toISOString: unknown }).toISOString === "function"
-    ) {
-      return `'${this.quotedDate(value as { toISOString(): string }).replace(/'/g, "''")}'`;
-    }
-    if (typeof value === "object" && value !== null) {
-      const proto = Object.getPrototypeOf(value);
-      const hasCustomToString =
-        proto === Object.prototype && value.toString !== Object.prototype.toString;
-      if ((proto === Object.prototype || proto === null) && !hasCustomToString) {
-        try {
-          const json = JSON.stringify(value);
-          if (json !== undefined) {
-            return `'${json.replace(/'/g, "''")}'`;
-          }
-        } catch {
-          // circular references, BigInt, etc. — fall through
-        }
-      }
-    }
-    // Unknown object types (custom classes, Temporal types without toISOString,
-    // etc.) — delegate to the connection, which knows the adapter-specific rules.
+    if (value instanceof Nodes.SqlLiteral) return value.value;
     return this.connection.quote(value);
   }
 
@@ -2039,9 +2000,9 @@ export class ToSql extends Visitor {
       "toISOString" in v &&
       typeof (v as { toISOString: unknown }).toISOString === "function"
     ) {
-      // Mirrors Rails quote behavior: date-like values are formatted and inlined.
-      // Only BindParam/ActiveModel::Attribute go through addBind.
-      collector.append(`'${this.quotedDate(v as { toISOString(): string }).replace(/'/g, "''")}'`);
+      // Mirrors Rails quote behavior: date-like values are formatted and inlined
+      // by the connection. Only BindParam/ActiveModel::Attribute go through addBind.
+      collector.append(this.quote(v));
     } else {
       // Unknown object types (e.g. Temporal.Instant) — defer to `quote()`
       // so the value is properly escaped/quoted rather than concatenated
@@ -2049,34 +2010,6 @@ export class ToSql extends Visitor {
       collector.append(this.quote(v));
     }
     return collector;
-  }
-
-  // Formats a date-like value as a SQL datetime string matching Rails'
-  // AbstractAdapter#quoted_date: YYYY-MM-DD HH:MM:SS[.microseconds].
-  // Returns the BARE form, as Rails does (`result = value.to_fs(:db)` plus the
-  // %06d usec suffix, abstract/quoting.rb:184-198) — callers add their own
-  // quoting (`"'#{quoted_date(value)}'"`, abstract/quoting.rb:99).
-  // When ms > 0 the fractional part is emitted as 6-digit microseconds,
-  // matching AR quoting.ts and preserving sub-second DB precision. When ms = 0
-  // the bare seconds form is used — matching Rails' default output for
-  // whole-second values.
-  //
-  // UTC handling: JS Date#toISOString() always appends Z; the regex also
-  // accepts strings without a trailing Z (treating absent timezone as UTC),
-  // which covers non-standard date-like objects. The Arel layer has no access
-  // to AR's defaultTimezone — adapter-level quoting in
-  // packages/activerecord/src/connection-adapters/abstract/quoting.ts is the
-  // authoritative path for timezone-aware bound values.
-  protected quotedDate(d: { toISOString(): string }): string {
-    // Matches "YYYY-MM-DDTHH:MM:SS.mmmZ", "YYYY-MM-DDTHH:MM:SSZ", or
-    // the same without trailing Z (treated as UTC).
-    const match = d.toISOString().match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?$/);
-    if (!match) return d.toISOString();
-    const [, date, time, frac] = match;
-    // Normalise to exactly 6 digits: pad short fractions, truncate long ones.
-    // "729" → "729000" (μs), "7" → "700000", "1234" → "123400", "729000" → "729000".
-    const micros = frac ? parseInt((frac + "000000").slice(0, 6), 10) : 0;
-    return micros > 0 ? `${date} ${time}.${String(micros).padStart(6, "0")}` : `${date} ${time}`;
   }
 
   /**
