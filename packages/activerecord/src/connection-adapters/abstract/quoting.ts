@@ -3,9 +3,15 @@
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting
  *
- * @boundary-file: SQL quoting accepts caller-supplied values; legacy callers
- *   may pass JS `Date` for date-typed columns. The dispatcher branches on
- *   `instanceof Date` alongside Temporal types and handles each separately.
+ * @boundary-file: SQL quoting accepts caller-supplied values of unknown type,
+ *   so the dispatcher branches on runtime shape.
+ *
+ *   Rails' `when Date, Time then "'#{quoted_date(value)}'"` (quoting.rb:85)
+ *   accepts Ruby's native time objects; trails' analogue is Temporal, not JS
+ *   `Date` — #939 ("close the dual-typed window") made Temporal the sole
+ *   date/time representation, so `quote` and `typeCast` both reject a JS `Date`
+ *   with guidance rather than formatting it. rb:85 is ported onto the Temporal
+ *   branches via `dispatchQuotedDate`.
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -97,13 +103,19 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
-  // Rails: `when Type::Binary::Data then quoted_binary(value)`
-  // (abstract/quoting.rb:83) — binary dispatch sits here, before the
-  // Time/Date branches, and self-dispatches so each adapter's quoted_binary
-  // applies. Each adapter's `quote` short-circuits the common Uint8Array case
-  // before reaching here; this catches the other ArrayBuffer views (Int8Array,
-  // Float64Array, DataView), which have no Ruby analogue and must be
-  // normalized to bytes rather than falling to the raise below.
+  // ArrayBuffer views have no Ruby analogue: they must be normalized to bytes
+  // rather than falling to the raise below. Sited at the position Rails gives
+  // binary dispatch (`when Type::Binary::Data then quoted_binary(value)`,
+  // abstract/quoting.rb:83 — after Numeric, before Time/Date) and
+  // self-dispatched so each adapter's quotedBinary applies.
+  //
+  // This is NOT the rb:83 port: that line's `Type::Binary::Data` branch is
+  // still missing here and re-implemented per-adapter (postgresql/quoting.ts,
+  // mysql/quoting.ts, sqlite3/quoting.ts), which also short-circuit Uint8Array
+  // to the module quotedBinary and so bypass this self-dispatch. Porting rb:83
+  // and collapsing those copies is story
+  // `abstract-quote-binary-data-self-dispatch` — behaviorally a no-op today
+  // (each override delegates to the same module function), hence deferred.
   if (ArrayBuffer.isView(value)) {
     const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
     return dispatchQuotedBinary(this, bytes);
