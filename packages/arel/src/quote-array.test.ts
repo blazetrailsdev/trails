@@ -70,5 +70,21 @@ describe("quoteArrayLiteral", () => {
     it("applies to nested array elements", () => {
       expect(quoteArrayLiteral([["x"]], (v) => (v === "x" ? "X" : undefined))).toBe('{{"X"}}');
     });
+
+    it("is offered numbers and booleans, which Rails also sends through type_cast", () => {
+      // type_cast_array recurses only `when ::Array`; every other element goes
+      // to type_cast, so the hook must see numbers/booleans too. Without this
+      // ordering a caller could never converge them (e.g. unquoted_true).
+      const seen: unknown[] = [];
+      quoteArrayLiteral([1, true, "s"], (v) => {
+        seen.push(v);
+        return undefined;
+      });
+      expect(seen).toEqual([1, true, "s"]);
+    });
+
+    it("lets the hook format a number element", () => {
+      expect(quoteArrayLiteral([1], (v) => (v === 1 ? "one" : undefined))).toBe('{"one"}');
+    });
   });
 });

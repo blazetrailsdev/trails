@@ -1528,7 +1528,7 @@ export class ToSql extends Visitor {
       "toISOString" in value &&
       typeof (value as { toISOString: unknown }).toISOString === "function"
     ) {
-      return this.quotedDate(value as { toISOString(): string });
+      return `'${this.quotedDate(value as { toISOString(): string }).replace(/'/g, "''")}'`;
     }
     if (typeof value === "object" && value !== null) {
       const proto = Object.getPrototypeOf(value);
@@ -2041,7 +2041,7 @@ export class ToSql extends Visitor {
     ) {
       // Mirrors Rails quote behavior: date-like values are formatted and inlined.
       // Only BindParam/ActiveModel::Attribute go through addBind.
-      collector.append(this.quotedDate(v as { toISOString(): string }));
+      collector.append(`'${this.quotedDate(v as { toISOString(): string }).replace(/'/g, "''")}'`);
     } else {
       // Unknown object types (e.g. Temporal.Instant) — defer to `quote()`
       // so the value is properly escaped/quoted rather than concatenated
@@ -2052,7 +2052,10 @@ export class ToSql extends Visitor {
   }
 
   // Formats a date-like value as a SQL datetime string matching Rails'
-  // AbstractAdapter#quoted_date: 'YYYY-MM-DD HH:MM:SS[.microseconds]'.
+  // AbstractAdapter#quoted_date: YYYY-MM-DD HH:MM:SS[.microseconds].
+  // Returns the BARE form, as Rails does (`result = value.to_fs(:db)` plus the
+  // %06d usec suffix, abstract/quoting.rb:184-198) — callers add their own
+  // quoting (`"'#{quoted_date(value)}'"`, abstract/quoting.rb:99).
   // When ms > 0 the fractional part is emitted as 6-digit microseconds,
   // matching AR quoting.ts and preserving sub-second DB precision. When ms = 0
   // the bare seconds form is used — matching Rails' default output for
@@ -2065,14 +2068,6 @@ export class ToSql extends Visitor {
   // packages/activerecord/src/connection-adapters/abstract/quoting.ts is the
   // authoritative path for timezone-aware bound values.
   protected quotedDate(d: { toISOString(): string }): string {
-    return `'${this.formatDate(d).replace(/'/g, "''")}'`;
-  }
-
-  // The bare (un-single-quoted) form behind `quotedDate`. PG array literals
-  // need the element content without the `'` wrapper — `quoteArrayLiteral`
-  // supplies its own `"..."` quoting — so the formatting lives here and
-  // `quotedDate` is the scalar `'`-quoting wrapper over it.
-  protected formatDate(d: { toISOString(): string }): string {
     // Matches "YYYY-MM-DDTHH:MM:SS.mmmZ", "YYYY-MM-DDTHH:MM:SSZ", or
     // the same without trailing Z (treated as UTC).
     const match = d.toISOString().match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?$/);
