@@ -97,11 +97,11 @@ export class Quoted extends Unary {
     return this.expr;
   }
 
-  valueBeforeTypeCast(): unknown {
+  valueForDatabase(): unknown {
     return this.value;
   }
 
-  valueForDatabase(): unknown {
+  valueBeforeTypeCast(): unknown {
     return this.value;
   }
 

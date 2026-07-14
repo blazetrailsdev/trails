@@ -80,9 +80,9 @@ export interface RelationLike {
   // `Table#tableAlias` is a plain string-or-nil. Both flow through here as
   // `o.relation.table_alias`.
   tableAlias?: string | SqlLiteral | null;
-  typeCastForDatabase?: (attrName: string, value: unknown) => unknown;
-  typeForAttribute?: (name: string) => unknown;
-  isAbleToTypeCast?: () => boolean;
+  typeCastForDatabase: (attrName: string, value: unknown) => unknown;
+  typeForAttribute: (name: string) => unknown;
+  isAbleToTypeCast: () => boolean;
 }
 
 /**
@@ -108,7 +108,7 @@ export class Attribute extends Node {
   }
 
   get typeCaster(): unknown {
-    return this.relation.typeForAttribute ? this.relation.typeForAttribute(this.name) : undefined;
+    return this.relation.typeForAttribute(this.name);
   }
 
   // -- String functions --
@@ -118,15 +118,11 @@ export class Attribute extends Node {
   }
 
   typeCastForDatabase(value: unknown): unknown {
-    return this.relation.typeCastForDatabase
-      ? this.relation.typeCastForDatabase(this.name, value)
-      : value;
+    return this.relation.typeCastForDatabase(this.name, value);
   }
 
   isAbleToTypeCast(): boolean {
-    return typeof this.relation.isAbleToTypeCast === "function"
-      ? this.relation.isAbleToTypeCast()
-      : false;
+    return this.relation.isAbleToTypeCast();
   }
 
   /**
