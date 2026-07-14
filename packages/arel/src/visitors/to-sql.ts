@@ -23,6 +23,15 @@ function isActiveModelAttribute(v: unknown): boolean {
   return typeof v === "object" && v !== null && "valueForDatabase" in v;
 }
 
+// The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
+// Object.prototype (or null). Anything else is an instance of some other class
+// and dispatches on that class in Rails, not on Hash.
+function isPlainObject(v: unknown): boolean {
+  if (typeof v !== "object" || v === null) return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
+}
+
 // A JS Date (or any date-like duck-type) is the analogue of Ruby's Time, which
 // Rails aliases to `unsupported` (to_sql.rb:844).
 function isDateLike(v: unknown): boolean {
@@ -2068,8 +2077,14 @@ export class ToSql extends Visitor {
     if (typeof v === "boolean") {
       return v ? this.visitTrueClass(v, collector) : this.visitFalseClass(v, collector);
     }
+    if (typeof v === "symbol") return this.visitSymbol(v, collector);
     if (isDateLike(v)) return this.visitTime(v, collector);
-    return this.visitHash(v, collector);
+    if (isPlainObject(v)) return this.visitHash(v, collector);
+    // Rails dispatches on the object's actual class (visitor.rb:29-30), so an
+    // arbitrary object never reaches visit_Hash — it finds no handler and
+    // raises. Going straight to `unsupported` keeps the reported class honest
+    // rather than mislabelling it as a Hash.
+    return this.unsupported(v, collector);
   }
 
   /**
