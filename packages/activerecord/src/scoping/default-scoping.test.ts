@@ -12,6 +12,7 @@
  */
 import { describe, it, expect } from "vitest";
 import { Nodes } from "@blazetrails/arel";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import "../index.js";
 import { registerModel, RecordNotFound } from "../index.js";
 import { captureSql } from "../testing/sql-capture.js";
@@ -837,7 +838,10 @@ describe("DefaultScopingTest", () => {
     const post = posts("thinking") as any;
     const expected = [comments("does_it_hurt").id];
 
-    await post.specialComments.updateAll({ deleted_at: new Date() });
+    // Rails: `post.special_comments.update_all(deleted_at: Time.now)`. A JS Date
+    // is not a quotable value in trails (abstract/quoting.ts rejects it in favor
+    // of Temporal); Temporal.Now.instant() is the Time.now analogue.
+    await post.specialComments.updateAll({ deleted_at: Temporal.Now.instant() });
 
     await expect(Post.joins("specialComments").find(post.id)).rejects.toThrow(RecordNotFound);
     expect(await (await post.specialComments.reload()).toArray()).toEqual([]);
