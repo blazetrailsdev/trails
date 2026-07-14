@@ -189,7 +189,7 @@ export function buildWhereNodeFromConstraints(
   const conditions: InstanceType<typeof Nodes.Node>[] = [];
   for (const [col, value] of Object.entries(constraints)) {
     const attr = table.get(col);
-    conditions.push(value === undefined || value === null ? attr.isNull() : attr.eq(value));
+    conditions.push(value === undefined || value === null ? attr.eq(null) : attr.eq(value));
   }
   if (conditions.length === 1) return conditions[0];
   return new Nodes.And(conditions);

@@ -352,7 +352,7 @@ export class PredicateBuilder {
       value = (value as { id: unknown }).id;
     }
     if (value === null || value === undefined) {
-      return attribute.isNotNull();
+      return attribute.notEq(null);
     }
     if (value instanceof Set) {
       value = Array.from(value);
@@ -420,7 +420,7 @@ export class PredicateBuilder {
     }
 
     if (hasNull) {
-      parts.push(attribute.isNotNull());
+      parts.push(attribute.notEq(null));
     }
 
     for (const range of ranges) {
@@ -460,11 +460,11 @@ export class PredicateBuilder {
     if (this.isScalarQueryValue(value)) {
       const normalized = this.normalizeQueryValue(attribute.name, value);
       if (normalized === null || normalized === undefined) {
-        return attribute.isNull();
+        return attribute.eq(null);
       }
     }
     if (value === null || value === undefined) {
-      return attribute.isNull();
+      return attribute.eq(null);
     }
     // Rails checks `table.type(attribute.name).force_equality?(value)` at the top
     // of `build` — right after the `id` deref and BEFORE any handler dispatch

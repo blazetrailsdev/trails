@@ -83,8 +83,8 @@ export class ArrayHandler {
     if (hasNull) {
       valuesPredicate =
         valuesPredicate === NullPredicate
-          ? attribute.isNull()
-          : groupedOr(valuesPredicate as Nodes.Node, attribute.isNull());
+          ? attribute.eq(null)
+          : groupedOr(valuesPredicate as Nodes.Node, attribute.eq(null));
     }
 
     if (ranges.length === 0) {

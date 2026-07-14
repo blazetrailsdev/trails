@@ -239,14 +239,6 @@ export class Attribute extends Node {
     return notBetweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
   }
 
-  isNull(): Equality {
-    return new Equality(this, new Quoted(null));
-  }
-
-  isNotNull(): NotEqual {
-    return new NotEqual(this, new Quoted(null));
-  }
-
   // -- _any / _all variants --
 
   eqAny(others: unknown[]): Grouping {
