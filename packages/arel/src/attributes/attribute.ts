@@ -71,10 +71,6 @@ function groupedAll(nodes: Node[]): Grouping {
  *
  * Mirrors: Arel::Attributes::Attribute
  */
-export interface TypeCaster {
-  typeCastForDatabase(value: unknown): unknown;
-}
-
 export interface RelationLike {
   // A `SqlLiteral` name (e.g. a `SelectManager#as` / set-op `from()` derived
   // table) renders bare; `quoteTableName` returns its value unchanged.
@@ -104,13 +100,11 @@ export class Attribute extends Node {
   readonly [ATTRIBUTE_BRAND] = true;
   readonly relation: RelationLike;
   readonly name: string;
-  readonly caster?: TypeCaster;
 
-  constructor(relation: RelationLike, name: string, caster?: TypeCaster) {
+  constructor(relation: RelationLike, name: string) {
     super();
     this.relation = relation;
     this.name = name;
-    this.caster = caster;
   }
 
   get typeCaster(): unknown {

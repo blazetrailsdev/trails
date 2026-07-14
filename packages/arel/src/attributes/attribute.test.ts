@@ -1061,35 +1061,39 @@ describe("AttributeTest", () => {
 
   describe("type casting", () => {
     it("does not type cast by default", () => {
-      const attr = new Nodes.Attribute(users, "name");
-      const node = attr.eq("hello");
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."name" = \'hello\'');
+      const table = new Table("foo");
+      const condition = table.get("id").eq("1");
+
+      expect(table.isAbleToTypeCast()).toBe(false);
+      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" = \'1\'');
     });
 
     it("type casts when given an explicit caster", () => {
-      const caster = {
-        typeCastForDatabase(value: unknown) {
-          return String(value).toUpperCase();
+      const fakeCaster = {
+        typeCastForDatabase(attrName: string, value: unknown) {
+          return attrName === "id" ? Number(value) : value;
         },
       };
-      const attr = new Nodes.Attribute(users, "name", caster);
-      const node = attr.eq("hello");
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."name" = \'HELLO\'');
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const condition = table.get("id").eq("1").and(table.get("other_id").eq("2"));
+
+      expect(table.isAbleToTypeCast()).toBe(true);
+      expect(new Visitors.ToSql().compile(condition)).toBe(
+        '"foo"."id" = 1 AND "foo"."other_id" = \'2\'',
+      );
     });
 
     it("does not type cast SqlLiteral nodes", () => {
-      const caster = {
-        typeCastForDatabase(value: unknown) {
-          return String(value).toUpperCase();
+      const fakeCaster = {
+        typeCastForDatabase(_attrName: string, value: unknown) {
+          return Number(value);
         },
       };
-      const attr = new Nodes.Attribute(users, "name", caster);
-      const literal = new Nodes.SqlLiteral("raw_value");
-      const node = attr.eq(literal);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain("raw_value");
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const condition = table.get("id").eq(new Nodes.SqlLiteral("(select 1)"));
+
+      expect(table.isAbleToTypeCast()).toBe(true);
+      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" = (select 1)');
     });
   });
 
