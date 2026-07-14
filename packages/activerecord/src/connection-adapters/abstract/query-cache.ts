@@ -588,6 +588,13 @@ function cacheNotificationInfo(
   return {
     sql,
     binds,
+    // KNOWN DIVERGENCE (story: type-casted-binds-payload-self-dispatch). Rails
+    // calls the adapter-dispatched Quoting#type_casted_binds (quoting.rb:224);
+    // this standalone helper never reaches adapter `type_cast`. trails has the
+    // faithful port at quoting.ts:451, but 17 payload producers across the
+    // adapters disagree on how they fill this slot (free function / raw binds /
+    // hardcoded []), so converging this one flips SQLite's cached binds 1 -> 1n
+    // and desyncs it from the uncached payload. The sweep moves all 17 at once.
     type_casted_binds: () => typeCastedBinds(binds),
     name,
     connection: this,
