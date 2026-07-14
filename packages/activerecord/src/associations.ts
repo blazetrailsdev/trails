@@ -224,21 +224,26 @@ interface ReflectionLike {
  * @internal
  */
 class ModelRegistry extends Map<string, typeof Base> {
-  generation = 0;
+  #generation = 0;
+
+  /** Bumps only on a mutation that can change what a name resolves to. */
+  get generation(): number {
+    return this.#generation;
+  }
 
   override set(name: string, model: typeof Base): this {
-    if (super.get(name) !== model) this.generation++;
+    if (super.get(name) !== model) this.#generation++;
     return super.set(name, model);
   }
 
   override delete(name: string): boolean {
     const deleted = super.delete(name);
-    if (deleted) this.generation++;
+    if (deleted) this.#generation++;
     return deleted;
   }
 
   override clear(): void {
-    if (this.size > 0) this.generation++;
+    if (this.size > 0) this.#generation++;
     super.clear();
   }
 }

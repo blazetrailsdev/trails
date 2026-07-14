@@ -357,11 +357,12 @@ export class AbstractReflection {
         const normFk = (fk: unknown): string[] =>
           Array.isArray(fk) ? fk.map(String) : [String(fk)];
         const btFkNorm = normFk(btFk);
-        // Use a live registry lookup (not self.klass) to avoid poisoning _klassCache
-        // with a stale registry entry during class-definition time (addCounterCacheCallbacks
-        // fires while the module is first loaded, potentially before the target class
-        // is properly registered — a bespoke registration in an earlier test would
-        // otherwise be cached permanently on the reflection's _klassCache).
+        // Use a live registry lookup (not self.klass): addCounterCacheCallbacks fires
+        // while the module is first loaded, potentially before the target class is
+        // properly registered, so resolving through the reflection here would seed its
+        // memo from a half-built registry. (`klass` now self-heals on re-registration
+        // via the registry generation, so this is no longer a permanent-poisoning
+        // hazard — it just avoids the needless early resolve.)
         const klassName = self.className;
         const resolvedKlass = modelRegistry.get(klassName);
         if (!resolvedKlass) throw new Error(`${klassName} not in registry`);
@@ -632,13 +633,15 @@ export class MacroReflection extends AbstractReflection {
     if (this._klassCache && this._klassCacheGeneration === modelRegistry.generation) {
       return this._klassCache;
     }
+    const resolved = this.options.anonymousClass
+      ? (this.options.anonymousClass as typeof Base)
+      : this._klass(this.className);
+    // Read the generation *after* resolving: an autoload miss registers the class
+    // it just found, bumping the generation mid-resolve. Recording the pre-resolve
+    // value would leave this memo flagged stale the moment it's written.
     this._klassCacheGeneration = modelRegistry.generation;
-    if (this.options.anonymousClass) {
-      this._klassCache = this.options.anonymousClass as typeof Base;
-      return this._klassCache;
-    }
-    this._klassCache = this._klass(this.className);
-    return this._klassCache;
+    this._klassCache = resolved;
+    return resolved;
   }
 
   /** @internal */
@@ -1596,6 +1599,10 @@ export class ThroughReflection extends AbstractReflection {
     if (this._klassCache) return this._klassCache;
     const anonymousClass = this._delegate.options.anonymousClass as typeof Base | undefined;
     this._klassCache = anonymousClass ?? this._delegate._klass(this.className);
+    // Resolving can autoload-and-register the target, bumping the generation
+    // mid-flight; re-sync so this memo isn't stale the moment it's written. The
+    // sibling memos were just cleared, so they recompute on demand regardless.
+    this._cacheGeneration = modelRegistry.generation;
     return this._klassCache;
   }
 
