@@ -657,6 +657,18 @@ export function dirtiesQueryCacheExceptSchema(
  * (they clear unconditionally): doing so would make B skip its clear when entered
  * during A's still-pending write on the same connection.
  *
+ * KNOWN LIMITATION (accepted): because the scope spans the outer write's whole
+ * async duration, a concurrent DDL on the SAME leased connection —
+ * `Promise.all([post.save(), conn.addColumn(...)])` — can enter `executeMutation`
+ * while the `save` holds depth 1 and skip its clear, leaving a read that
+ * repopulated the cache during the `save`'s await stale (Rails' DDL `execute`
+ * clears unconditionally via `super`). This is far more exotic than concurrent
+ * CRUD and interleaving DDL with a save on one connection is unusual; the real
+ * fix is not a better guard but removing the whole `execute`/`executeMutation`
+ * split (Rails has one `perform_query`), which deletes this counter and the
+ * hazard with it — tracked by story `unify-execute-mutation-into-perform-query`,
+ * which supersedes this PR's wiring.
+ *
  * Unlike {@link dirtiesQueryCacheExceptSchema}, this leaf does NOT skip on a
  * `"SCHEMA"` name: that skip exists because trails reuses the wrapped
  * `execute`/`exec_query` for schema *reflection reads* (Rails routes those
