@@ -562,21 +562,33 @@ describe("Enum acronym method name consistency", () => {
 // tableless parent it was declared on (pre-fix that raised `TableNotSpecified`;
 // PR #4814 covered it only with synthetic `books`-backed classes).
 describe("Enum inherited from an abstract parent (Lion < Cat)", () => {
-  fixtures(["lions"]);
+  const { lions } = fixtures(["lions"]);
 
-  it("materializes and answers predicates on the concrete subclass", async () => {
+  it("answers the inherited predicate on the concrete subclass", () => {
     expect(() => Lion._defaultAttributes()).not.toThrow();
 
     const lion = new Lion({ gender: "female" });
     expect(lion.isFemale()).toBe(true);
     expect(lion.isMale()).toBe(false);
+  });
 
-    // Cat's `default_scope { where(is_vegetarian: false) }` must materialize
-    // its scope-for-create cleanly through the abstract parent.
-    expect(lion.is_vegetarian).toBe(false);
-
+  it("resolves the inherited enum on a row read back from the table", async () => {
+    const lion = new Lion({ gender: "female" });
     await lion.save();
+
     const found = await Lion.find(lion.id);
     expect(found.isFemale()).toBe(true);
+    expect(found.gender).toBe("female");
+  });
+
+  it("applies Cat's default scope to a new Lion and to its queries", async () => {
+    // scope-for-create materializes the parent's `where(is_vegetarian: false)`
+    // through the tableless abstract class...
+    expect(new Lion().is_vegetarian).toBe(false);
+
+    // ...and the same scope filters reads: only the meat-eating fixture row
+    // survives it.
+    const ids = await Lion.all().pluck("id");
+    expect(ids).toEqual([lions("meat_eating_lion").id]);
   });
 });
