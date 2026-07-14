@@ -1028,9 +1028,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   quotedBinary(value: unknown): string {
-    // The standalone accepts BinaryData too, so the Rails-shaped call
-    // (`quoted_binary(Type::Binary::Data)`, mysql/quoting.rb:80) works here.
-    return mysqlQuotedBinary(value as Buffer | Uint8Array | string | BinaryData);
+    // The standalone accepts BinaryData and ArrayBuffer too (both via toBytes),
+    // so the Rails-shaped call (`quoted_binary(Type::Binary::Data)`,
+    // mysql/quoting.rb:80) works here and the union matches the PG/SQLite
+    // overrides. It raises on anything else rather than hexing garbage.
+    return mysqlQuotedBinary(value as Buffer | Uint8Array | ArrayBuffer | string | BinaryData);
   }
 
   unquoteIdentifier(identifier: string | null | undefined): string | null {

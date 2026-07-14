@@ -134,6 +134,27 @@ describe("MySQL quoting — quotedBinary", () => {
   it("formats a Uint8Array as hex literal", () => {
     expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]))).toBe("x'deadbeef'");
   });
+
+  it("formats an ArrayBuffer as hex literal", () => {
+    // Shares the toBytes union with the PG/SQLite overrides rather than relying
+    // on Buffer.from(arraybuffer, "binary") silently ignoring the encoding arg.
+    expect(quotedBinary(new Uint8Array([0xde, 0xad, 0xbe, 0xef]).buffer)).toBe("x'deadbeef'");
+  });
+
+  it("formats a byte-offset view over a larger buffer", () => {
+    // Buffer.from(bytes.buffer, ...) must honour byteOffset/byteLength — a
+    // subarray view would otherwise hex the whole backing buffer.
+    expect(quotedBinary(new Uint8Array([0x00, 0xde, 0xad, 0x00]).subarray(1, 3))).toBe("x'dead'");
+  });
+
+  it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
+    // mysql/quoting.rb:80 is `quoted_binary(value)` → `x'#{value.hex}'`.
+    expect(quotedBinary(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
+  });
+
+  it("raises on a non-byte source rather than hexing garbage", () => {
+    expect(() => quotedBinary(42 as unknown as Uint8Array)).toThrow(TypeError);
+  });
 });
 
 describe("MySQL quoting — quoteIdentifier", () => {

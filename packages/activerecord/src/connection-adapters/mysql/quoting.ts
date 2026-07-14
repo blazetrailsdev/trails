@@ -19,6 +19,7 @@ import {
 } from "../abstract/sql-datetime.js";
 import {
   quote as abstractQuote,
+  toBytes,
   dispatchQuotedBinary,
   dispatchQuotedDate,
   dispatchQuotedTime,
@@ -97,15 +98,23 @@ export function quoteString(value: string): string {
  * Mirrors: MySQL::Quoting#quoted_binary (`x'#{value.hex}'`, mysql/quoting.rb:80).
  * Rails' signature takes the `Type::Binary::Data` itself, so accept it alongside
  * the raw views our `quote` unwraps to — a Rails-shaped call then works here too.
+ * Shares {@link toBytes} with the PG/SQLite overrides so all three accept the
+ * same union. A latin1 `string` stays supported on top: Ruby's `Data#hex` reads
+ * a byte String, and callers here pass the JS stand-in for one.
  */
-export function quotedBinary(value: Buffer | Uint8Array | string | BinaryData): string {
-  const bytes = value instanceof BinaryData ? value.bytes : value;
-  const hex = Buffer.isBuffer(bytes)
-    ? bytes.toString("hex")
-    : bytes instanceof Uint8Array
-      ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("hex")
-      : Buffer.from(bytes, "binary").toString("hex");
-  return `x'${hex}'`;
+export function quotedBinary(
+  value: Buffer | Uint8Array | ArrayBuffer | string | BinaryData,
+): string {
+  const bytes = toBytes(value);
+  if (bytes) {
+    return `x'${Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("hex")}'`;
+  }
+  if (typeof value === "string") return `x'${Buffer.from(value, "binary").toString("hex")}'`;
+  throw new TypeError(
+    `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, string, or BinaryData; got ${
+      value === null ? "null" : typeof value
+    }`,
+  );
 }
 
 /** @internal */
