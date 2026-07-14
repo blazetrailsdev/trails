@@ -82,12 +82,18 @@ export function infinitySign(value: unknown): 1 | -1 | 0 {
   return 0;
 }
 
-// Mirrors Rails Predications#unboundable? — a bound is unboundable when it is
-// out of range for its column type. Trails threads that through a bound value
-// exposing `isUnboundable()` (a QueryAttribute bind, or the RangeHandler's
-// out-of-range sentinel), which returns a signed value (`1` past the max, `-1`
-// past the min) mirroring Ruby's `value <=> 0`. Falls back to infinitySign for
-// bare ±Infinity bounds.
+// Mirrors Rails Predications#unboundable? (predications.rb:252-253) —
+// `value.respond_to?(:unboundable?) && value.unboundable?`, the same duck-typed
+// predicate the visitor uses (to_sql.rb:905-907). A bound is unboundable when it
+// serializes out of range for its column type; trails threads that through a
+// bound exposing `isUnboundable()` (a QueryAttribute bind, or the RangeHandler's
+// out-of-range sentinel), returning the sign of Ruby's `value <=> 0`.
+//
+// A bare ±Infinity is NOT unboundable — Float has no `unboundable?`, so Rails
+// answers false and the bound falls through to the `open_ended?` / `infinity?`
+// arms of the between decision tree (predications.rb:38-51). `Float::INFINITY..`
+// still collapses to `in([])`, but via the nested `infinity?` check at
+// predications.rb:42, not this predicate.
 export function unboundableSign(value: unknown): 1 | -1 | 0 {
   if (
     value &&
@@ -95,11 +101,10 @@ export function unboundableSign(value: unknown): 1 | -1 | 0 {
     typeof (value as UnboundableLike).isUnboundable === "function"
   ) {
     const r = (value as UnboundableLike).isUnboundable!();
-    if (r === 1 || r === true) return 1;
+    if (r === 1) return 1;
     if (r === -1) return -1;
-    if (r === 0) return 0;
   }
-  return infinitySign(value);
+  return 0;
 }
 
 interface InfiniteLike {

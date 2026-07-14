@@ -49,14 +49,30 @@ describe("Predications range semantics", () => {
       expect(((node as Nodes.NotIn).right as unknown[]).length).toBe(0);
     });
 
-    it("Infinity..end (unboundable begin) collapses to In([])", () => {
+    // A bare ±Infinity is open-ended, not unboundable: Float has no
+    // `unboundable?` (predications.rb:252-253), so Rails skips the `in([])` arm
+    // and treats the bound as absent (predications.rb:38-51). Rails' own
+    // `Float::INFINITY..` → `In([])` case (attribute_test.rb:679-684) reaches
+    // `in([])` through the nested `infinity?` check at predications.rb:42,
+    // which only applies when *both* bounds are open-ended.
+    it("Infinity..end (open-ended begin) becomes LessThanOrEqual on the real end", () => {
       const node = id.between({ begin: Infinity, end: 3 });
+      expect(node).toBeInstanceOf(Nodes.LessThanOrEqual);
+    });
+
+    it("begin..-Infinity (open-ended end) becomes GreaterThanOrEqual on the real begin", () => {
+      const node = id.between({ begin: 1, end: -Infinity });
+      expect(node).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+    });
+
+    it("Infinity.. (both bounds open-ended) still collapses to In([]) via infinity?", () => {
+      const node = id.between({ begin: Infinity, end: null });
       expect(node).toBeInstanceOf(Nodes.In);
       expect(((node as Nodes.In).right as unknown[]).length).toBe(0);
     });
 
-    it("begin..-Infinity (unboundable end) collapses to In([])", () => {
-      const node = id.between({ begin: 1, end: -Infinity });
+    it("..-Infinity (both bounds open-ended) still collapses to In([]) via infinity?", () => {
+      const node = id.between({ begin: null, end: -Infinity });
       expect(node).toBeInstanceOf(Nodes.In);
       expect(((node as Nodes.In).right as unknown[]).length).toBe(0);
     });
@@ -127,8 +143,8 @@ describe("Predications range semantics", () => {
       expect(sql(id.between({ begin: -Infinity, end: Infinity }))).toBe("1=1");
     });
 
-    it("Infinity..end (unboundable begin) → 1=0", () => {
-      expect(sql(id.between({ begin: Infinity, end: 3 }))).toBe("1=0");
+    it("Infinity..end (open-ended begin) → col <= end", () => {
+      expect(sql(id.between({ begin: Infinity, end: 3 }))).toBe('"users"."id" <= 3');
     });
   });
 
@@ -194,13 +210,21 @@ describe("Predications range semantics", () => {
       expect(node).toBeInstanceOf(Nodes.In);
     });
 
-    it("Infinity..end (unboundable begin) becomes NotIn([])", () => {
+    // Same split as #between: a bare ±Infinity is open-ended, not unboundable,
+    // so it falls to the `gt(other.end)` / `lt(other.begin)` arms rather than
+    // the `not_in([])` arm (predications.rb:85-100).
+    it("Infinity..end (open-ended begin) becomes GreaterThan on the real end", () => {
       const node = id.notBetween({ begin: Infinity, end: 3 });
-      expect(node).toBeInstanceOf(Nodes.NotIn);
+      expect(node).toBeInstanceOf(Nodes.GreaterThan);
     });
 
-    it("begin..-Infinity (unboundable end) becomes NotIn([])", () => {
+    it("begin..-Infinity (open-ended end) becomes LessThan on the real begin", () => {
       const node = id.notBetween({ begin: 1, end: -Infinity });
+      expect(node).toBeInstanceOf(Nodes.LessThan);
+    });
+
+    it("Infinity.. (both bounds open-ended) still becomes NotIn([]) via infinity?", () => {
+      const node = id.notBetween({ begin: Infinity, end: null });
       expect(node).toBeInstanceOf(Nodes.NotIn);
     });
   });
