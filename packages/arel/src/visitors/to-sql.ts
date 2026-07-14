@@ -1354,8 +1354,19 @@ export class ToSql extends Visitor {
   // for stray values that drift into the visitor).
   // ---------------------------------------------------------------------
 
-  /** Mirrors Rails: `visit_Integer`. */
-  protected visitInteger(o: number, collector: SQLString): SQLString {
+  /**
+   * Mirrors Rails: `visit_Integer` (to_sql.rb:824-826) — a bare
+   * `collector << o.to_s`, with no `@connection` involvement. Accepts `bigint`
+   * as well as `number`: Ruby's `Integer` is arbitrary-precision and Arel has
+   * no separate bignum visitor, so both JS numeric types land here.
+   *
+   * Callers: `visitNodeOrValue` routes every `bigint` here, and every *finite*
+   * `number` — not merely integral ones. That `Number.isFinite` split is
+   * invented; Rails only ever reaches `visit_Integer` for an `Integer` and
+   * raises on `Float` (rb:839), so `1.5` arrives here where Rails would raise.
+   * See the note at the call site.
+   */
+  protected visitInteger(o: number | bigint, collector: SQLString): SQLString {
     collector.append(String(o));
     return collector;
   }
@@ -1374,10 +1385,16 @@ export class ToSql extends Visitor {
   // Rails aliases every Ruby value class with no SQL rendering to
   // `unsupported` (to_sql.rb:832-845): visiting one raises
   // `UnsupportedVisitError`. TS has no method-alias, so each delegates to
-  // the shared helper. They aren't wired into the dispatch table — the
-  // trails Arel pipeline never threads a raw JS Date/Class/Hash/etc. as a
-  // node — but the names exist so the unsupported contract is documented
-  // and directly testable. Each keeps the Rails `(o, collector)` shape.
+  // the shared helper. Each keeps the Rails `(o, collector)` shape.
+  //
+  // These are NOT wired into the dispatch table, and — contrary to what this
+  // comment claimed until #4871 — that is a deviation, not a no-op. Raw
+  // values (dates, strings, booleans, floats) *do* reach the visitor via
+  // `visitNodeOrValue`, which renders them instead of dispatching here, so
+  // the "unsupported contract" these names document is currently unenforced
+  // on the one path that could violate it. Converging that is tracked by
+  // story `arel-raw-value-dispatch-raises-like-rails` (RFC 0023); until then
+  // they stand as the documented contract and are directly testable.
 
   /** Rails: `alias :visit_ActiveSupport_Multibyte_Chars :unsupported`. */
   protected visitActiveSupportMultibyteChars(o: Node, collector: SQLString): never {
@@ -1982,18 +1999,42 @@ export class ToSql extends Visitor {
       }
       return this.visit(v, collector);
     }
+    // Raw-value dispatch — trails' stand-in for Rails' `visit` class dispatch
+    // on a stray Ruby value. Rails renders exactly ONE raw scalar here,
+    // Integer, via `visit_Integer` (to_sql.rb:824-826); the integral branches
+    // below delegate to our port of it (`visitInteger`) so the anchor is
+    // structural rather than a comment that can drift. NilClass (rb:841),
+    // String (rb:842), Float (rb:839), TrueClass (rb:845), FalseClass
+    // (rb:838), Date (rb:836), Time (rb:844), BigDecimal (rb:834), Symbol
+    // (rb:843) and Hash (rb:840) all alias to `unsupported` and raise
+    // (rb:828-845) — their ports exist below but this method renders instead
+    // of dispatching to them, which is the whole of the deviation. Note
+    // to_sql.rb:87-90 (`visit_Arel_Nodes_Casted`) is the *other* path, the one
+    // that routes through quote(); it is ported in `visitArelNodesCasted` and
+    // is what ActiveRecord actually uses.
+    // Converging the tolerances is a caller-facing narrowing tracked by story
+    // `arel-raw-value-dispatch-raises-like-rails` (RFC 0023).
     if (v === null || v === undefined) {
       collector.append("NULL");
     } else if (typeof v === "string") {
       collector.append(this.quote(v));
     } else if (typeof v === "number") {
-      // Non-finite numbers must route through quote() so the adapter can emit
-      // a string literal ('Infinity' / 'NaN') rather than a bareword identifier.
-      collector.append(Number.isFinite(v) ? String(v) : this.quote(v));
+      // The `Number.isFinite` split is INVENTED — it has no Rails analogue, so
+      // this branch does not mirror Rails' dispatch. Rails splits Integer
+      // (renders, rb:824-826) vs Float (raises via `unsupported`, rb:839); we
+      // split finite vs non-finite, so a Rails-shaped predicate would be
+      // `Number.isInteger`. Both halves therefore deviate: `1.5` is finite so
+      // it reaches visitInteger here where Rails raises, and the non-finite
+      // fallback to quote() (which lets the connection emit 'Infinity' rather
+      // than a bareword identifier) has no counterpart either — Infinity/NaN
+      // are Ruby Floats and also raise at rb:839. Tracked by story
+      // `arel-raw-value-dispatch-raises-like-rails` (RFC 0023).
+      if (Number.isFinite(v)) return this.visitInteger(v, collector);
+      collector.append(this.quote(v));
     } else if (typeof v === "boolean") {
       collector.append(this.quote(v));
     } else if (typeof v === "bigint") {
-      collector.append(v.toString());
+      return this.visitInteger(v, collector);
     } else {
       // Everything else — dates, binary, Temporal types, unknown objects —
       // defers to `quote()`, which hands the value to the connection. Rails'

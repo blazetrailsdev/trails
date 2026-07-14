@@ -1966,4 +1966,47 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
     new Visitors.ToSql(stubQuoter).compile(node);
     expect(received).toContain(bytes);
   });
+
+  it("integers in raw value position bypass quote(), matching Rails visit_Integer", () => {
+    // Rails' raw-value dispatch sends an Integer to `visit_Integer`, which is
+    // `collector << o.to_s` (to_sql.rb:824-826) — the connection is never
+    // consulted. `quote` governs the Casted-node path (to_sql.rb:87-90), not
+    // this one. A quoter that mangles everything must therefore not be able to
+    // reach an integer here.
+    const quoted: unknown[] = [];
+    class RecordingToSql extends Visitors.ToSql {
+      protected override quote(value: unknown): string {
+        quoted.push(value);
+        return `<<${String(value)}>>`;
+      }
+    }
+    // A raw JS number reaches the visitor only when placed directly into a
+    // node; `.in([1, 2])` instead wraps each value in a Casted node via
+    // `quotedNode`, which is the to_sql.rb:87-90 path and does route through
+    // quote(). InfixOperation carries the raw value through unwrapped.
+    const sql = new RecordingToSql().compile(
+      new Nodes.InfixOperation(
+        "+",
+        new Nodes.InfixOperation("+", users.get("id"), 1),
+        9007199254740993n,
+      ),
+    );
+    expect(quoted).toEqual([]);
+    expect(sql).toContain("+ 1");
+    expect(sql).toContain("+ 9007199254740993");
+  });
+
+  it("Casted values do route through quote(), unlike raw integers", () => {
+    // The companion to the guard above: to_sql.rb:87-90 sends a Casted /
+    // Quoted node's value through quote(), so the two paths must differ.
+    const quoted: unknown[] = [];
+    class RecordingToSql extends Visitors.ToSql {
+      protected override quote(value: unknown): string {
+        quoted.push(value);
+        return super.quote(value);
+      }
+    }
+    new RecordingToSql().compile(users.get("id").in([1, 2]));
+    expect(quoted).toEqual([1, 2]);
+  });
 });
