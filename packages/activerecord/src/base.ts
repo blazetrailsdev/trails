@@ -1,4 +1,4 @@
-import { Temporal } from "@blazetrails/activesupport/temporal";
+import { Temporal, isTemporal } from "@blazetrails/activesupport/temporal";
 import {
   Locator as _Locator,
   GlobalID as _GlobalIDCtor,
@@ -353,18 +353,8 @@ import {
 function temporalArrayElementFormatter(
   dialect?: AdapterName,
 ): (value: unknown) => string | undefined {
-  return (value: unknown): string | undefined => {
-    if (
-      value instanceof Temporal.Instant ||
-      value instanceof Temporal.PlainDateTime ||
-      value instanceof Temporal.PlainDate ||
-      value instanceof Temporal.PlainTime ||
-      value instanceof Temporal.ZonedDateTime
-    ) {
-      return String(temporalToBindString(value, dialect));
-    }
-    return undefined;
-  };
+  return (value: unknown): string | undefined =>
+    isTemporal(value) ? String(temporalToBindString(value, dialect)) : undefined;
 }
 
 /** @internal */
@@ -375,13 +365,7 @@ export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName
   // Temporal date/time values reach here because value_for_database now yields
   // the cast Temporal (not a pre-quoted SQL string). Render the dialect-correct
   // literal via the same formatter the bind path uses, then SQL-quote it.
-  if (
-    v instanceof Temporal.Instant ||
-    v instanceof Temporal.PlainDateTime ||
-    v instanceof Temporal.PlainDate ||
-    v instanceof Temporal.PlainTime ||
-    v instanceof Temporal.ZonedDateTime
-  ) {
+  if (isTemporal(v)) {
     return `'${String(temporalToBindString(v, dialect)).replace(/'/g, "''")}'`;
   }
   // boundary: defensive SQL literal quoting fallback for legacy callers.
