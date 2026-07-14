@@ -213,7 +213,7 @@ function writerMethod(
  * empty cache and we must copy from `other` (the source) explicitly rather than
  * from `this`.
  */
-export function initializeDup(this: Base, other: unknown): void {
+export function copyAggregationCacheForDup(this: Base, other: unknown): void {
   const src = (other as { _aggregationCache?: Map<string, unknown> })?._aggregationCache;
   if (src) (this as { _aggregationCache?: Map<string, unknown> })._aggregationCache = new Map(src);
 }
@@ -292,7 +292,7 @@ export function includeAggregations(modelClass: typeof Base): void {
     | undefined;
   Object.defineProperty(proto, "initializeDup", {
     value: function (this: Base, other: unknown): void {
-      initializeDup.call(this, other);
+      copyAggregationCacheForDup.call(this, other);
       if (inheritedInitializeDup) inheritedInitializeDup.call(this, other);
     },
     writable: true,
