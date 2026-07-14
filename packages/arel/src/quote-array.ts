@@ -16,9 +16,12 @@ export type FormatArrayElement = (value: unknown) => string | undefined;
 // Whitespace is spelled out rather than `\s` because pg tests bytes with
 // `isspace()`, which excludes the non-ASCII spaces `\s` would match.
 const ELEMENT_NEEDS_QUOTING = /[{},"\\ \t\n\r\v\f]/;
-// `/i` on a non-unicode pattern folds ASCII only — it never maps a non-ASCII
-// char onto one — which is the exact shape of pg's `pg_strcasecmp(ptr, "NULL")`.
-// `toUpperCase()` would be a Unicode-aware fold, a wider net than pg casts.
+// `/i` on a non-unicode pattern folds ASCII only, mirroring pg's
+// `pg_strcasecmp(ptr, "NULL")`; `toUpperCase()` would be a Unicode-aware fold,
+// a wider net than pg casts. The difference is unobservable by construction —
+// no codepoint in all of Unicode uppercases to `N`, `U` or `L`, so no input
+// can tell the two apart, and no test can guard this. It stays a regex because
+// it's the exact mirror, not because a collision is reachable.
 const NULL_LITERAL = /^null$/i;
 
 function encodeArrayElement(text: string | null): string {

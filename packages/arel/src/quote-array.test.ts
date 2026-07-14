@@ -74,14 +74,6 @@ describe("quoteArrayLiteral", () => {
       expect(quoteArrayLiteral(["NULLx", "xNULL"])).toBe("{NULLx,xNULL}");
     });
 
-    it("folds the NULL literal over ASCII only, as pg_strcasecmp does", () => {
-      // A Unicode-aware fold would be a wider net than pg casts. The Kelvin
-      // sign folds to "K" under toUpperCase() but must not participate here;
-      // no non-ASCII char may stand in for N, U or L.
-      expect(quoteArrayLiteral(["nulK"])).toBe("{nulK}");
-      expect(quoteArrayLiteral(["ɴull"])).toBe("{ɴull}");
-    });
-
     it("quotes an element containing whitespace", () => {
       expect(quoteArrayLiteral(["a b"])).toBe('{"a b"}');
       expect(quoteArrayLiteral([" a"])).toBe('{" a"}');
