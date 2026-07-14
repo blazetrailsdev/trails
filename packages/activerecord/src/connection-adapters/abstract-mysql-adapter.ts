@@ -94,6 +94,7 @@ import {
   FloatType,
   BooleanType,
   BinaryType,
+  BinaryData,
   DecimalType,
 } from "@blazetrails/activemodel";
 
@@ -1027,7 +1028,9 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   quotedBinary(value: unknown): string {
-    return mysqlQuotedBinary(value as Buffer | Uint8Array | string);
+    // The standalone accepts BinaryData too, so the Rails-shaped call
+    // (`quoted_binary(Type::Binary::Data)`, mysql/quoting.rb:80) works here.
+    return mysqlQuotedBinary(value as Buffer | Uint8Array | string | BinaryData);
   }
 
   unquoteIdentifier(identifier: string | null | undefined): string | null {

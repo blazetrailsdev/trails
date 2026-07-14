@@ -44,7 +44,7 @@ import {
   DatabaseConnectionError,
   TransactionIsolationError,
 } from "../errors.js";
-import { ArgumentError } from "@blazetrails/activemodel";
+import { ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import { TypeMap } from "../type/type-map.js";
 import { Date as DateType } from "../type/date.js";
 import { DateTime as ARDateTimeType } from "../type/date-time.js";
@@ -1039,14 +1039,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // values. The TS standalone iterates the value as a byte source,
     // so non-binary inputs (strings, plain arrays) silently produce
     // garbage hex. Validate at the interface boundary.
-    if (value instanceof Uint8Array) {
+    //
+    // Rails passes the `Type::Binary::Data` itself; our `quote` unwraps to bytes
+    // before dispatching, so accept both and this stays callable Rails-shaped.
+    if (value instanceof BinaryData || value instanceof Uint8Array) {
       return sqliteQuotedBinary(value);
     }
     if (value instanceof ArrayBuffer) {
       return sqliteQuotedBinary(new Uint8Array(value));
     }
     throw new TypeError(
-      `quotedBinary expects a Uint8Array, ArrayBuffer, or Buffer; got ${
+      `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, or BinaryData; got ${
         value === null ? "null" : typeof value
       }`,
     );

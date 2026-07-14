@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { BinaryData } from "@blazetrails/activemodel";
+import { BinaryData, BinaryType } from "@blazetrails/activemodel";
 import { mysqlSchemaQuoter } from "./schema-quoter.js";
 
 describe("mysqlSchemaQuoter", () => {
@@ -16,9 +16,20 @@ describe("mysqlSchemaQuoter", () => {
 
   it("quotes a binary default through MySQL's quotedBinary when host-less", () => {
     const q = mysqlSchemaQuoter();
+    // The abstract quoteDefaultExpression self-dispatches `quote`
+    // (abstract/quoting.rb:162), so both shapes reach MySQL's `x'..'` — the raw
+    // Uint8Array trails' BinaryType#serialize actually returns (which the
+    // abstract `quote` alone would reject with "can't quote Uint8Array") and the
+    // BinaryData Rails' Binary#serialize returns.
+    expect(q.quoteDefaultExpression(new Uint8Array([0xde, 0xad]))).toBe(" DEFAULT x'dead'");
     expect(q.quoteDefaultExpression(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
       " DEFAULT x'dead'",
     );
+  });
+
+  it("quotes a binary default produced by BinaryType#serialize", () => {
+    const q = mysqlSchemaQuoter();
+    expect(q.quoteDefaultExpression(new BinaryType().serialize("ab"))).toBe(" DEFAULT x'6162'");
   });
 
   it("dispatches binary through a threaded host's quotedBinary override", () => {

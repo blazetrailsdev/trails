@@ -1,6 +1,6 @@
 import pg from "pg";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { type Type, ValueType, ArgumentError } from "@blazetrails/activemodel";
+import { type Type, ValueType, ArgumentError, BinaryData } from "@blazetrails/activemodel";
 import {
   singularize,
   Notifications,
@@ -4172,11 +4172,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * and emit malformed bytea literals on PG.
    */
   override quotedBinary(value: unknown): string {
-    if (value instanceof Uint8Array) return pgQuotedBinary(value);
+    // Rails passes the `Type::Binary::Data` itself; our `quote` unwraps to bytes
+    // before dispatching, so accept both and this stays callable Rails-shaped.
+    if (value instanceof BinaryData || value instanceof Uint8Array) return pgQuotedBinary(value);
     if (value instanceof ArrayBuffer) return pgQuotedBinary(new Uint8Array(value));
     if (typeof value === "string") return pgQuotedBinary(value);
     throw new TypeError(
-      `quotedBinary expects Uint8Array, ArrayBuffer, Buffer, or string; got ${
+      `quotedBinary expects Uint8Array, ArrayBuffer, Buffer, string, or BinaryData; got ${
         value === null ? "null" : typeof value
       }`,
     );

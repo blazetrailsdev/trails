@@ -221,6 +221,11 @@ describe("PostgreSQL quoting", () => {
     expect(quoteSchemaName("public")).toBe('"public"');
   });
 
+  it("accepts the Type::Binary::Data Rails' quoted_binary is given", () => {
+    // postgresql/quoting.rb:152 is `quoted_binary(value)` → `escape_bytea(value.to_s)`.
+    expect(quotedBinary(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
+  });
+
   it("quotedBinary wraps escape_bytea output in SQL quotes", () => {
     expect(quotedBinary(Buffer.from("ab"))).toBe("'\\x6162'");
     expect(quotedBinary("ab")).toBe("'\\x6162'");

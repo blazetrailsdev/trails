@@ -127,10 +127,12 @@ export function quoteSchemaName(schemaName: string): string {
 /**
  * Mirrors: PostgreSQL::Quoting#quoted_binary. Rails passes `value.to_s`
  * through escape_bytea so the result is always a string wrapped in SQL
- * quotes, never nil.
+ * quotes, never nil. Rails' signature takes the `Type::Binary::Data` itself
+ * (`postgresql/quoting.rb:152`), so accept it alongside the raw views our
+ * `quote` unwraps to — a Rails-shaped call then works here too.
  */
-export function quotedBinary(value: Buffer | Uint8Array | string): string {
-  return `'${escapeBytea(value)}'`;
+export function quotedBinary(value: Buffer | Uint8Array | string | BinaryData): string {
+  return `'${escapeBytea(value instanceof BinaryData ? value.bytes : value)}'`;
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {

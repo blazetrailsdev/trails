@@ -117,11 +117,25 @@ describe("quote dispatches through quoted_binary", () => {
     expect(quote.call({}, new BinaryData("ab"))).toBe("'ab'");
   });
 
-  it("normalises ArrayBuffer in the module quoted_binary fallback", () => {
-    // SQLite's boundary branch dispatches ArrayBuffer; String(arraybuffer) would
-    // emit '[object ArrayBuffer]'.
-    expect(quotedBinary(new Uint8Array([0x61, 0x62]).buffer)).toBe("'ab'");
+  it("normalises every byte source in the module quoted_binary fallback", () => {
+    // SQLite's boundary branch dispatches ArrayBuffer, and Rails' signature
+    // (abstract/quoting.rb:206) takes the Data itself.
     expect(quotedBinary(new Uint8Array([0x61, 0x62]))).toBe("'ab'");
+    expect(quotedBinary(new Uint8Array([0x61, 0x62]).buffer)).toBe("'ab'");
+    expect(quotedBinary(new BinaryData("ab"))).toBe("'ab'");
+  });
+
+  it("keeps non-UTF-8 bytes byte-exact in the module quoted_binary fallback", () => {
+    // Rails' `value.to_s` returns a BINARY-encoded String, so quoted_binary is
+    // byte-exact. BinaryData#toString() UTF-8-decodes, which turns invalid
+    // sequences into U+FFFD — String(value) would silently corrupt 0xde 0xad
+    // 0xbe 0xef into 3 replacement chars. Normalise to bytes instead.
+    const bytes = [0xde, 0xad, 0xbe, 0xef];
+    const expected = `'${bytes.map((b) => String.fromCharCode(b)).join("")}'`;
+    expect(quotedBinary(new BinaryData(new Uint8Array(bytes)))).toBe(expected);
+    expect(quotedBinary(new Uint8Array(bytes))).toBe(expected);
+    expect(Array.from(quotedBinary(new Uint8Array(bytes)).slice(1, -1), (c) => c.charCodeAt(0))) //
+      .toEqual(bytes);
   });
 });
 

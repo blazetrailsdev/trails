@@ -11,6 +11,7 @@
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
+  toBytes,
   dispatchQuotedBinary,
   dispatchQuotedDate,
   dispatchQuotedTime,
@@ -18,6 +19,7 @@ import {
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
+import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
   quotedTrue(): string;
@@ -146,8 +148,18 @@ export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): 
   return quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
-export function quotedBinary(value: Uint8Array | ArrayBuffer): string {
-  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): string {
+  // Rails' signature is `quoted_binary(value)` taking the Type::Binary::Data
+  // itself (`value.hex`, sqlite3/quoting.rb:79). Accept it alongside the raw
+  // views our `quote` unwraps to, so the Rails-shaped call works too.
+  const bytes = toBytes(value);
+  if (!bytes) {
+    throw new TypeError(
+      `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, or BinaryData; got ${
+        value === null ? "null" : typeof value
+      }`,
+    );
+  }
   const hex = Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");

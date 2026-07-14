@@ -26,6 +26,7 @@ import {
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
+import { BinaryData } from "@blazetrails/activemodel";
 
 export interface Quoting {
   unquotedTrue(): number;
@@ -92,12 +93,18 @@ export function quoteString(value: string): string {
   return `'${value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch)}'`;
 }
 
-export function quotedBinary(value: Buffer | Uint8Array | string): string {
-  const hex = Buffer.isBuffer(value)
-    ? value.toString("hex")
-    : value instanceof Uint8Array
-      ? Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString("hex")
-      : Buffer.from(value, "binary").toString("hex");
+/**
+ * Mirrors: MySQL::Quoting#quoted_binary (`x'#{value.hex}'`, mysql/quoting.rb:80).
+ * Rails' signature takes the `Type::Binary::Data` itself, so accept it alongside
+ * the raw views our `quote` unwraps to — a Rails-shaped call then works here too.
+ */
+export function quotedBinary(value: Buffer | Uint8Array | string | BinaryData): string {
+  const bytes = value instanceof BinaryData ? value.bytes : value;
+  const hex = Buffer.isBuffer(bytes)
+    ? bytes.toString("hex")
+    : bytes instanceof Uint8Array
+      ? Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("hex")
+      : Buffer.from(bytes, "binary").toString("hex");
   return `x'${hex}'`;
 }
 

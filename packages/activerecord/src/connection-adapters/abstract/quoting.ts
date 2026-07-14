@@ -31,6 +31,8 @@ import {
  */
 export interface QuotingDispatchHost {
   /** @internal */
+  quote?(value: unknown): string;
+  /** @internal */
   quotedDate?(value: TemporalDateLike): string;
   /** @internal */
   quotedTime?(value: Temporal.PlainTime | Temporal.PlainDateTime): string;
@@ -103,12 +105,15 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // MySQL/SQLite's `x'..'` hex) is honored. Thread `this` to mirror that.
   //
   // Deviation: Rails passes the `Type::Binary::Data` itself and each override
-  // unwraps it (`value.to_s` / `value.hex`); we pass the unwrapped bytes, so
-  // trails' `quotedBinary` implementations take a byte source instead. This is
-  // what lets the adapters' raw-view boundary branches (Uint8Array/ArrayBuffer,
-  // which Rails never sees here) share one dispatch path with `BinaryData`.
-  // Consequence: a Rails-shaped override calling `value.hex()` would not work
-  // here — trails overrides must accept bytes.
+  // unwraps it (`value.to_s` / `value.hex`); we pass the unwrapped bytes, which
+  // is what lets the adapters' raw-view boundary branches (Uint8Array/
+  // ArrayBuffer, which Rails never sees here) share one dispatch path with
+  // `BinaryData`. Every trails `quotedBinary` therefore accepts the union —
+  // Data *and* raw views — so a Rails-shaped `quotedBinary(data)` call still
+  // works; only an override that assumed a `Data` arg (reading `.hex()` off it)
+  // would see bytes instead. The root cause is that `BinaryType#serialize`
+  // returns bare bytes rather than Rails' `Data.new(super)`; converging that is
+  // story `binary-type-serialize-returns-data-wrapper` (RFC 0023).
   if (value instanceof BinaryData) return dispatchQuotedBinary(this, value.bytes);
   // Rails dispatches date/time literals through `self.quoted_time` (Time::Value)
   // and `self.quoted_date` (Date/Time) so adapter overrides — e.g. PostgreSQL's
@@ -254,10 +259,13 @@ export function quoteDefaultExpression(
     );
   }
   if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
-  // `quote` requires a host receiver; thread our own (the adapter-free
-  // ABSTRACT_SCHEMA_QUOTER / mysql schema-quoter bind `this` to the quoter
-  // object, an empty QuotingDispatchHost that falls back to module helpers).
-  return ` DEFAULT ${quote.call(this || {}, value)}`;
+  // Rails: `quote(value)` (abstract/quoting.rb:162) — self-dispatched, so a host
+  // that overrides `quote` (the mysql schema-quoter binds the dialect's) gets its
+  // own dialect quoting, including the raw-view branches the abstract `quote`
+  // deliberately lacks. Falling straight to the module `quote` here would bypass
+  // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
+  // Hosts without a `quote` (ABSTRACT_SCHEMA_QUOTER) keep the module helper.
+  return ` DEFAULT ${dispatchQuote(this || {}, value)}`;
 }
 
 /**
@@ -311,23 +319,37 @@ export function unquotedFalse(): boolean {
 }
 
 /**
+ * Normalise every byte source `quotedBinary` may receive to a `Uint8Array`, or
+ * `null` if the value is not one. Rails' `quoted_binary` family takes a
+ * `Type::Binary::Data` and calls `value.to_s` / `value.hex`; trails' `quote`
+ * unwraps to bytes before dispatching, and the adapters' boundary branches pass
+ * raw views — so every implementation must accept the union.
+ *
+ * @internal
+ */
+export function toBytes(value: unknown): Uint8Array | null {
+  if (value instanceof BinaryData) return value.bytes;
+  if (value instanceof Uint8Array) return value;
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  return null;
+}
+
+/**
  * Quote binary data for SQL.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_binary
  */
 export function quotedBinary(value: unknown): string {
-  // Rails quotes `value.to_s` — for `Type::Binary::Data` that is the raw byte
-  // string, not a comma-joined element list. `String(uint8array)` would yield
-  // "1,2,3" and `String(arraybuffer)` "[object ArrayBuffer]", so normalise both
-  // byte sources first. `dispatchQuotedBinary` receives raw views from the
-  // adapters' boundary branches (SQLite's passes ArrayBuffer), and this is the
-  // fallback when a host defines no `quotedBinary`.
-  const bytes =
-    value instanceof Uint8Array
-      ? value
-      : value instanceof ArrayBuffer
-        ? new Uint8Array(value)
-        : null;
+  // Rails quotes `value.to_s`, which for `Type::Binary::Data` is a BINARY-encoded
+  // String — byte-exact. `String(value)` can't stand in for it: for a Uint8Array
+  // it yields "1,2,3", for an ArrayBuffer "[object ArrayBuffer]", and for a
+  // BinaryData it runs `toString()`, which UTF-8-decodes and silently replaces
+  // any invalid sequence with U+FFFD (0xde 0xad 0xbe 0xef → 3 lossy chars). So
+  // normalise every byte source and map bytes 1:1 instead. Rails' signature takes
+  // the `Data` itself (rb:206), so accept it even though our `quote` unwraps
+  // first; `dispatchQuotedBinary` also receives raw views from the adapters'
+  // boundary branches (SQLite's passes ArrayBuffer).
+  const bytes = toBytes(value);
   if (bytes) {
     return `'${quoteString(Array.from(bytes, (b) => String.fromCharCode(b)).join(""))}'`;
   }
@@ -399,6 +421,19 @@ export function dispatchQuotedDate(host: QuotingDispatchHost, value: TemporalDat
     return host.quotedDate(value);
   }
   return quotedDate(value);
+}
+
+/**
+ * Dispatch through the host's `quote` override if it defines one, else the
+ * module-level helper. Mirrors Rails' bare `quote(value)` self-dispatch inside
+ * `quote_default_expression` (abstract/quoting.rb:162).
+ * @internal
+ */
+export function dispatchQuote(host: QuotingDispatchHost, value: unknown): string {
+  if (typeof host.quote === "function") {
+    return host.quote(value);
+  }
+  return quote.call(host, value);
 }
 
 /**
