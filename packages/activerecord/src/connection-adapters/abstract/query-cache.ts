@@ -588,8 +588,8 @@ function cacheNotificationInfo(
   return {
     sql,
     binds,
-    type_casted_binds: typeCastedBinds(binds),
-    name: name ?? "SQL",
+    type_casted_binds: () => typeCastedBinds(binds),
+    name,
     connection: this,
     cached: true,
     transaction,
