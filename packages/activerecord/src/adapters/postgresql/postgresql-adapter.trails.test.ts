@@ -997,6 +997,118 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
   });
 
+  describe("in-flight acquire adoption race", () => {
+    // A disconnectBang()/close() that races an in-flight _doAcquire() (suspended
+    // at `await newClient(...)`) must not let that stale acquire adopt/publish
+    // its pre-disconnect client after a checkout verify → reconnect clears
+    // _closed. disconnectBang/close bump _acquireGeneration; the resolving
+    // connect sees a stale generation and end()s its socket instead of adopting
+    // it. The disconnect/close analogue of the discard fix in PR #4303.
+    type Deferred = { promise: Promise<pg.Client>; resolve: (c: pg.Client) => void };
+    const defer = (): Deferred => {
+      let resolve!: (c: pg.Client) => void;
+      const promise = new Promise<pg.Client>((r) => (resolve = r));
+      return { promise, resolve };
+    };
+    // Wait until `newClient` has been called at least `n` times — the acquire
+    // reaches the connect only after the _inFlightReset / _maintenanceTail
+    // awaits, so poll on the call count rather than a fixed microtask count.
+    const waitForNewClientCalls = async (
+      spy: { mock: { calls: unknown[] } },
+      n: number,
+    ): Promise<void> => {
+      for (let i = 0; i < 1000 && spy.mock.calls.length < n; i++) await Promise.resolve();
+      if (spy.mock.calls.length < n) throw new Error(`newClient not called ${n} time(s)`);
+    };
+
+    it("disconnectBang orphans an in-flight acquire so it is not adopted by a racing reconnect", async () => {
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const endSpy = vi.spyOn(orphan, "end");
+      const first = defer();
+      const second = defer();
+      const spy = vi
+        .spyOn(PostgreSQLAdapter, "newClient")
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => second.promise);
+      try {
+        // First acquire suspends at `await newClient(...)` (generation 0).
+        const firstAcquire = a.connect();
+        await waitForNewClientCalls(spy, 1);
+
+        // disconnect while the connect is in flight: bumps the generation.
+        a.disconnectBang();
+
+        // A checkout reconnect clears _closed and _rawConnection, then opens a
+        // fresh connect (generation 1) which also suspends.
+        const reconnect = a.reconnect();
+        await waitForNewClientCalls(spy, 2);
+
+        // The pre-disconnect connect resolves NOW, while _rawConnection is null
+        // and _closed is false — the exact window the adoption race exploits.
+        first.resolve(orphan);
+        await expect(firstAcquire).rejects.toBeTruthy();
+
+        // The stale acquire tore its client down instead of adopting it: it
+        // did NOT publish onto _rawConnection (still null — the reconnect's own
+        // connect has not resolved yet) and end()ed the socket.
+        expect(endSpy).toHaveBeenCalled();
+        expect(a._rawConnectionForTest()).toBeNull();
+
+        // The fresh reconnect publishes its own client and works.
+        second.resolve(reconnected);
+        await reconnect;
+        expect(a._rawConnectionForTest()).toBe(reconnected);
+      } finally {
+        spy.mockRestore();
+        await a.close();
+        await orphan.end().catch(() => {});
+      }
+    });
+
+    it("orphaned acquire still fails when the racing reconnect publishes first", async () => {
+      // The reconnect wins the open race and publishes _rawConnection BEFORE the
+      // orphaned pre-disconnect connect resolves. A stale-generation acquire
+      // must fail uniformly here too — it must NOT fall through to adopt the
+      // now-valid post-disconnect connection (the pre-#4842 _rawConnection != null
+      // fallback would have). Locks in the deliberate "orphaned acquire never
+      // succeeds" semantics rather than a race-timing-dependent outcome.
+      const a = new PostgreSQLAdapter(PG_TEST_URL);
+      const orphan = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const reconnected = await PostgreSQLAdapter.newClient({ connectionString: PG_TEST_URL });
+      const endSpy = vi.spyOn(orphan, "end");
+      const first = defer();
+      const spy = vi
+        .spyOn(PostgreSQLAdapter, "newClient")
+        .mockImplementationOnce(() => first.promise)
+        .mockImplementationOnce(() => Promise.resolve(reconnected));
+      try {
+        const firstAcquire = a.connect();
+        await waitForNewClientCalls(spy, 1);
+
+        a.disconnectBang();
+
+        // Reconnect resolves fully first: _rawConnection is now `reconnected`.
+        await a.reconnect();
+        expect(a._rawConnectionForTest()).toBe(reconnected);
+
+        // Only now does the orphaned pre-disconnect connect resolve.
+        first.resolve(orphan);
+        await expect(firstAcquire).rejects.toBeTruthy();
+
+        // It tore down its own client and left the valid reconnect untouched —
+        // it did NOT overwrite or adopt `reconnected`.
+        expect(endSpy).toHaveBeenCalled();
+        expect(a._rawConnectionForTest()).toBe(reconnected);
+      } finally {
+        spy.mockRestore();
+        await a.close();
+        await orphan.end().catch(() => {});
+      }
+    });
+  });
+
   describe("lock sharing", () => {
     // Regression: withRawConnection and the transaction manager must share one
     // reentrant lock (Rails' single @lock). With separate locks a transaction
