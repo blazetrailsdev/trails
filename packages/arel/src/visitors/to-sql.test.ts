@@ -524,6 +524,15 @@ describe("the to_sql visitor", () => {
         });
       }
 
+      it("renders IS NULL for Casted(nil) as well as Quoted(nil)", () => {
+        // Rails defines `nil?` as `value.nil?` on both wrappers — Casted
+        // (casted.rb:15) and Quoted (casted.rb:41) — so `right.nil?`
+        // (to_sql.rb:649) is true for either and both emit IS NULL.
+        const attr = new Table("users").get("id");
+        expect(compileRight(new Nodes.Quoted(null))).toBe('"users"."id" IS NULL');
+        expect(compileRight(new Nodes.Casted(null, attr))).toBe('"users"."id" IS NULL');
+      });
+
       it("renders IS NULL for a bare NilClass rather than dispatching", () => {
         // Rails tests `right.nil?` (to_sql.rb:649) before visiting, and that is
         // true for a bare nil as well as Quoted(nil) (`Quoted#nil?` delegates

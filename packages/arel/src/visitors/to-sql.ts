@@ -2158,13 +2158,15 @@ export class ToSql extends Visitor {
    * so honour a duck-typed `isNil()` on the right node too.
    */
   protected rightIsNull(right: unknown): boolean {
-    // Rails tests `right.nil?` (to_sql.rb:649), which is true for a bare nil as
-    // well as for a Quoted(nil) — `Quoted#nil?` delegates to `value.nil?`
-    // (casted.rb:41). A bare null therefore renders IS NULL and never reaches
-    // the raw-value dispatch, even though visit_NilClass is aliased to
-    // `unsupported` for the paths that do reach it.
+    // Rails tests `right.nil?` (to_sql.rb:649), which is true for a bare nil
+    // and for the two wrappers that define `nil?` as `value.nil?` — Casted
+    // (casted.rb:15) and Quoted (casted.rb:41). A bare null therefore renders
+    // IS NULL and never reaches the raw-value dispatch, even though
+    // visit_NilClass is aliased to `unsupported` for the paths that do reach
+    // it.
     if (right === null || right === undefined) return true;
     if (right instanceof Nodes.Quoted && right.value === null) return true;
+    if (right instanceof Nodes.Casted && right.value === null) return true;
     // A bound scalar arrives wrapped in a BindParam whose `isNil()` delegates
     // to its wrapped value (bind_param.rb:23-25) — so a raw-null bind or an
     // enum/normalized bind that serializes to nil is caught.
