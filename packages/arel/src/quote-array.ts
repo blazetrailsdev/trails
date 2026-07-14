@@ -11,10 +11,19 @@ export type FormatArrayElement = (value: unknown) => string | undefined;
 
 // `PG::TextEncoder::Array` quotes on content, never on type: an element is
 // wrapped only when leaving it bare would be ambiguous — empty, `NULL`
-// (case-insensitively), or carrying a delimiter, whitespace, quote or
+// (case-insensitively), or carrying the `,` delimiter, whitespace, quote or
 // backslash. Anything else is emitted bare, so `["a"]` encodes to `{a}`.
 // Whitespace is spelled out rather than `\s` because pg tests bytes with
 // `isspace()`, which excludes the non-ASCII spaces `\s` would match.
+//
+// ruby-pg reads the delimiter from `this->delimiter`, which Rails threads in
+// via `OID::Array#initialize(subtype, delimiter = ",")` (`oid/array.rb:15`).
+// It is hardcoded here because there is nothing to thread: Rails' PG `quote`
+// only encodes an `OID::Array::Data` (`postgresql/quoting.rb:117`) and sends a
+// bare `::Array` to `super`, which raises TypeError — whereas this function is
+// reached with a bare JS array, carrying no subtype and so no delimiter. `,`
+// is the default and the only reachable value on this path, not a
+// simplification of a parameter we could honour.
 const ELEMENT_NEEDS_QUOTING = /[{},"\\ \t\n\r\v\f]/;
 // `/i` on a non-unicode pattern folds ASCII only, mirroring pg's
 // `pg_strcasecmp(ptr, "NULL")`; `toUpperCase()` would be a Unicode-aware fold,
@@ -54,7 +63,7 @@ function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement
   ) {
     return (value as { toISOString: () => string }).toISOString();
   }
-  if (typeof value === "object" && value !== null) {
+  if (typeof value === "object") {
     const replacer = (_k: string, val: unknown) => (typeof val === "bigint" ? val.toString() : val);
     try {
       return JSON.stringify(value, replacer) ?? String(value);
