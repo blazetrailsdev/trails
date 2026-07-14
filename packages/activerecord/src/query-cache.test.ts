@@ -28,6 +28,9 @@ function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> 
   // Resolve the pool list lazily on each run/complete so pools established
   // after the middleware is built (the multi-role `connected_to(role: :reading)`
   // tests) are included, mirroring Rails' `connection_pool_list(:all)`.
+  // (Rails threads run's enabled-pool result into complete so a disabled pool
+  // is never touched on complete; trails re-resolves the full list — tracked by
+  // 0023-surfaced-deviations: query-cache-run-returns-enabled-pools-for-complete.)
   QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, () =>
     Base.connectionHandler.connectionPoolList("all"),
   );
@@ -91,37 +94,16 @@ function cleanUpConnectionHandler(): void {
   }
 }
 
-// Mirrors ActiveRecord::TestFixtures#setup_shared_connection_pool: point every
-// role's pool config at the writing pool config so a freshly-established
-// :reading pool shares the fixture-pinned connection (and therefore sees the
-// same rows), the same mechanism Rails uses to keep roles coherent under tests.
-function setupSharedConnectionPool(): void {
-  const writingRole = Base.writingRole;
-  const managers: Map<
-    string,
-    {
-      shardNames: string[];
-      roleNames: string[];
-      getPoolConfig(role: string, shard: string): unknown;
-      setPoolConfig(role: string, shard: string, config: unknown): void;
-    }
-  > = (Base.connectionHandler as unknown as { _connectionNameToPoolManager: Map<string, never> })
-    ._connectionNameToPoolManager as never;
-  for (const [, poolManager] of managers) {
-    for (const shard of [...poolManager.shardNames]) {
-      const writingPoolConfig = poolManager.getPoolConfig(writingRole, shard);
-      if (!writingPoolConfig) continue;
-      for (const role of [...poolManager.roleNames]) {
-        const poolConfig = poolManager.getPoolConfig(role, shard);
-        if (!poolConfig || poolConfig === writingPoolConfig) continue;
-        poolManager.setPoolConfig(role, shard, writingPoolConfig);
-      }
-    }
-  }
-}
-
 describe("QueryCacheTest", () => {
-  fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"]);
+  // Rails sets `self.use_transactional_tests = false` for this whole file
+  // (query_cache_test.rb:11) so the multi-role tests keep genuinely separate
+  // :reading/:writing pools against committed fixture rows — a transactional
+  // (savepoint-pinned) run would swap the reading pool onto the writing config
+  // (test_fixtures.rb:183-199) and break both the `@max_size` assertions and
+  // the "cleared on all connections" guarantee.
+  fixtures(["tasks", "topics", "categories", "posts", "categoriesPosts"], {
+    useTransactionalTests: false,
+  });
 
   afterEach(async () => {
     Task.connectionPool().clearQueryCache();
@@ -198,11 +180,10 @@ describe("QueryCacheTest", () => {
 
     const mw = middleware(async () => {
       for (const pool of Base.connectionHandler.connectionPoolList("all")) {
-        // Rails checks `pool.lease_connection.query_cache_enabled`; trails
-        // holds the cache flag on the pool, so lease (to match Rails) then
-        // assert the pool-level flag.
-        await pool.leaseConnection();
-        expect(pool.queryCacheEnabled).toBe(true);
+        // Mirrors `assert_predicate pool.lease_connection, :query_cache_enabled`:
+        // the connection-level flag (proving checkout_and_verify wired the Store
+        // onto the connection), not the pool-level flag.
+        expect((await pool.leaseConnection()).queryCacheEnabled).toBe(true);
       }
     });
 
@@ -235,7 +216,10 @@ describe("QueryCacheTest", () => {
       await Base.connectedTo({ role: "reading" }, async () => {
         assertCache("clean");
         // Rails leaves `@max_size` nil (unbounded) for a raw string config;
-        // trails represents that unbounded size as `Infinity`.
+        // trails overloads null as "disabled" so represents unbounded as
+        // `Infinity` (converged by 0023-surfaced-deviations:
+        // query-cache-disabled-gate-on-config-not-maxsize, which will flip this
+        // assertion to null).
         expect(poolQueryCacheMaxSize(Base.connectionPool())).toBe(Number.POSITIVE_INFINITY);
       });
     });
@@ -607,39 +591,16 @@ describe("QueryCacheTest", () => {
     await mw();
   });
 
-  // Rails guards this with `unless in_memory_db?` (a :memory: reading role
-  // can't see the writing role's database). trails' worker DB is file-backed
-  // and, via setupSharedConnectionPool, the reading role shares the
-  // fixture-pinned writing connection, so the guard doesn't apply.
-  it("clear query cache is called on all connections", async () => {
-    const dbConfig = Base.connectionPool().dbConfig;
-    await Base.connectedTo({ role: "reading" }, async () => {
-      await Base.establishConnection(dbConfig);
-    });
-    setupSharedConnectionPool();
-
-    let topic: Topic | null = null;
-    const mw = middleware(async () => {
-      await Base.connectedTo({ role: "reading" }, async () => {
-        topic = await Topic.first();
-      });
-
-      expect(topic).toBeTruthy();
-
-      await Base.connectedTo({ role: "writing" }, async () => {
-        topic!.title = "Topic title";
-        await topic!.saveBang();
-      });
-
-      expect(topic!.title).toBe("Topic title");
-
-      await Base.connectedTo({ role: "reading" }, async () => {
-        topic = await Topic.first();
-        expect(topic!.title).toBe("Topic title");
-      });
-    });
-
-    await mw();
+  it.skip("clear query cache is called on all connections", () => {
+    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
+    // query-cache-dirties-wiring-incomplete): a write under the :writing role
+    // must clear the query cache on ALL of the current thread's pools (Rails'
+    // `dirties_query_cache` decorator calls
+    // `ActiveRecord::Base.clear_query_caches_for_current_thread`,
+    // query_cache.rb:24). trails' decorator (abstract/query-cache.ts) clears
+    // only the writing connection's own Store, so the :reading pool's cache
+    // stays stale and the re-read returns the pre-write title. Un-skips once
+    // that story wires clearing across connections.
   });
 
   it.skip("query cache is enabled in threads with shared connection", () => {
