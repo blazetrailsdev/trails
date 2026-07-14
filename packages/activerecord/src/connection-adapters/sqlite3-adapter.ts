@@ -25,7 +25,11 @@ import {
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
 } from "./abstract/schema-statements.js";
-import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
+import {
+  dirtiesQueryCache,
+  dirtiesQueryCacheExceptSchema,
+  dirtiesQueryCacheUnlessNested,
+} from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -3164,8 +3168,9 @@ function translateException(
 // this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
 // `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
 // Each logical write clears the cache exactly once; the still-lower
-// `executeMutation` these funnel through stays unwrapped, and reads route
-// through `internalExecQuery` (never tripping the wrapper).
+// `executeMutation` these funnel through is wrapped separately (below) but
+// guarded to defer to the outer clear, and reads route through
+// `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(
   AbstractSQLite3Adapter,
   "execInsert",
@@ -3177,6 +3182,11 @@ dirtiesQueryCache(
 // "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
 // use the schema-aware variant here — those reflection reads must not dirty.
 dirtiesQueryCacheExceptSchema(AbstractSQLite3Adapter, "execQuery", "execute");
+// DDL funnels through `executeMutation` (schema-statements), not the wired
+// `execute`; wire it so schema changes dirty the cache like Rails' `execute`-based
+// DDL. Nested CRUD (`execInsert`/`execUpdate`/`execDelete` → `executeMutation`)
+// is suppressed by the `_writeDirtyDepth` guard to avoid a double-clear.
+dirtiesQueryCacheUnlessNested(AbstractSQLite3Adapter, "executeMutation");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers

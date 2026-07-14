@@ -20,7 +20,11 @@ import {
   RAW_CONNECTION_DEPRECATION_MESSAGE,
 } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
+import {
+  dirtiesQueryCache,
+  dirtiesQueryCacheExceptSchema,
+  dirtiesQueryCacheUnlessNested,
+} from "./abstract/query-cache.js";
 import {
   ActiveRecordError,
   AdapterError,
@@ -2170,13 +2174,19 @@ function isMysql2ConnectionError(e: unknown): boolean {
 // this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
 // `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
 // Each logical write clears the cache exactly once; the still-lower
-// `executeMutation` these funnel through stays unwrapped, and reads route
-// through `internalExecQuery` (never tripping the wrapper).
+// `executeMutation` these funnel through is wrapped separately (below) but
+// guarded to defer to the outer clear, and reads route through
+// `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(Mysql2Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
 // Schema reflection reuses the wrapped `execute`/`exec_query` with name
 // "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
 // use the schema-aware variant here — those reflection reads must not dirty.
 dirtiesQueryCacheExceptSchema(Mysql2Adapter, "execQuery", "execute");
+// DDL funnels through `executeMutation` (schema-statements), not the wired
+// `execute`; wire it so schema changes dirty the cache like Rails' `execute`-based
+// DDL. Nested CRUD (`execInsert`/`execUpdate`/`execDelete` → `executeMutation`)
+// is suppressed by the `_writeDirtyDepth` guard to avoid a double-clear.
+dirtiesQueryCacheUnlessNested(Mysql2Adapter, "executeMutation");
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`
