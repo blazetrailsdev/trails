@@ -87,6 +87,8 @@ interface CalculationRelation {
   _offsetValue: number | null;
   _optimizerHints: string[];
   _isNone: boolean;
+  /** @internal Rebase-then-report none short-circuit; see Relation. */
+  _isEmptyRelation(): boolean;
   _isDistinct: boolean;
   _groupColumns: string[];
   _whereClause: { isContradiction(): boolean };
@@ -663,7 +665,11 @@ async function groupedCompositeAssoc(
  * relation being ungrouped.
  */
 function isEmptyCalculationScope(rel: CalculationRelation): boolean {
-  if (rel._isNone) return true;
+  // `_isEmptyRelation()` is the shared none-short-circuit chokepoint: on an
+  // AssociationRelation it first rebases a stale new-owner `1=0` seed onto the
+  // live association scope, so count/sum/average/minimum/maximum on a relation
+  // spawned off a new owner pick up the persisted FK after `save`.
+  if (rel._isEmptyRelation()) return true;
   return rel._groupColumns.length === 0 && rel._whereClause.isContradiction();
 }
 

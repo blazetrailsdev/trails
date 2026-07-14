@@ -761,6 +761,27 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
 
     expect((await proxy.first()).id).toBe(kept.id);
   });
+
+  it("resolves the persisted FK on count/exists/pluck/pick/find after save", async () => {
+    // The bounded finders were rebased in PR #4465; the other query terminals
+    // (count/exists/pluck/pick/find) have their own `_isNone` short-circuits, so
+    // a relation spawned off the stale `1=0` seed must rebase there too.
+    const author = new Author({ name: "New Owner Three" });
+    const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
+
+    await author.save();
+    const authorId = author.id as number;
+    const match = await Post.create({ title: "match", body: "1", author_id: authorId });
+    // A non-matching sibling proves the mutation (`where(title:)`) is still
+    // applied on top of the rebuilt scope, not dropped.
+    await Post.create({ title: "other", body: "2", author_id: authorId });
+
+    expect(await rel.count()).toBe(1);
+    expect(await rel.exists()).toBe(true);
+    expect(await rel.pluck("title")).toEqual(["match"]);
+    expect(await rel.pick("title")).toBe("match");
+    expect((await rel.find(match.id)).id).toBe(match.id);
+  });
 });
 
 // The in-memory `CollectionProxy#find` path (loaded `inverse_of` collection,
