@@ -606,6 +606,43 @@ export function narrowToProjectedColumns(
 }
 
 /**
+ * Define per-instance readers for non-column select aliases so a loaded record
+ * exposes them via property access (`record.post_count`).
+ *
+ * Rails answers `record.post_count` for a `SELECT COUNT(*) AS post_count`
+ * projection through `method_missing` → `attribute_missing`, gated on
+ * `@attributes.key?(name)` (attribute_methods.rb). TypeScript has no
+ * method_missing, so we install own-property getters on the instance for each
+ * loaded attribute that has no accessor on the prototype chain (i.e. isn't a
+ * declared column) — matching Rails' `relation.map(&:post_count)`.
+ */
+export function defineDynamicSelectReaders(record: Base): void {
+  const proto = Object.getPrototypeOf(record) as object;
+  const attrs = (record as any)._attributes as { keys(): Iterable<string> };
+  for (const name of attrs.keys()) {
+    if (Object.prototype.hasOwnProperty.call(record, name)) continue;
+    // Skip anything already reachable as a method/accessor on the prototype
+    // chain (declared columns, aliases, real methods) — only bare select
+    // aliases fall through to here.
+    let hasProtoMember = false;
+    for (let p: object | null = proto; p != null; p = Object.getPrototypeOf(p)) {
+      if (Object.getOwnPropertyDescriptor(p, name)) {
+        hasProtoMember = true;
+        break;
+      }
+    }
+    if (hasProtoMember) continue;
+    Object.defineProperty(record, name, {
+      get(this: Base) {
+        return (this as any).readAttribute(name);
+      },
+      configurable: true,
+      enumerable: false,
+    });
+  }
+}
+
+/**
  * Directly instantiate a record without STI delegation (avoids recursion).
  */
 function directInstantiate(
@@ -652,6 +689,7 @@ function directInstantiate(
     }
   }
   narrowToProjectedColumns(klass, record, row, overrideTypes);
+  defineDynamicSelectReaders(record);
   record._newRecord = false;
   (record as any)._dirty.snapshot(record._attributes);
   record.changesApplied();

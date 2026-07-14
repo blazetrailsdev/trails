@@ -70,6 +70,7 @@ import {
   isBaseClass as _isBaseClass,
   ensureProperType as _ensureProperType,
   narrowToProjectedColumns,
+  defineDynamicSelectReaders,
   subclassFromAttributesForNew,
 } from "./inheritance.js";
 import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
@@ -3030,6 +3031,7 @@ export class Base extends Model {
       row,
       overrideTypes,
     );
+    defineDynamicSelectReaders(record as unknown as Base);
     record._newRecord = false;
     (record as any)._dirty.snapshot(record._attributes);
     record.changesApplied();
