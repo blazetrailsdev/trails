@@ -169,6 +169,9 @@ function assertValidLimit(n: number): void {
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class CollectionProxy<T extends Base = Base> extends Relation<T> {
+  /** @internal */
+  static override _railsClassName = "ActiveRecord::Associations::CollectionProxy";
+
   private _record: Base;
   private _assocName: string;
   private _assocDef: AssociationDefinition;
@@ -3860,7 +3863,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
       : await this.annotate("loading for inspect").limit(take);
     const entries = subject.slice(0, take).map((r) => (r as any).inspect() as string);
     if (entries.length === 11) entries[10] = "...";
-    return `#<${this.constructor.name} [${entries.join(", ")}]>`;
+    return `#<${(this.constructor as typeof Relation)._railsClassName} [${entries.join(", ")}]>`;
   }
 
   /**

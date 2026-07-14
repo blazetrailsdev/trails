@@ -85,6 +85,9 @@ function serializeKey(v: unknown, composite: boolean): unknown {
 }
 
 export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T> {
+  /** @internal */
+  static override _railsClassName = "ActiveRecord::DisableJoinsAssociationRelation";
+
   readonly key: DjarKey;
   /** Stored IDs (uniq'd at construction). Exposed as `ids()` to match
    * Rails' `attr_reader :ids` which shadows `Relation#ids` here. For

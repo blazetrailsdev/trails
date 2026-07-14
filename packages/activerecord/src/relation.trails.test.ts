@@ -817,3 +817,26 @@ describe("RelationTest", () => {
     expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(true);
   });
 });
+
+// Ruby's `self.class.name` is namespace-qualified, so Rails' inspect wrapper
+// reads `#<ActiveRecord::Relation ...>` — pinned for the plain Relation by
+// relations_test.rb:2108-2111. Its sibling wrapper classes have no like-named
+// Rails test, so guard their qualified names here: JS `constructor.name` is
+// unqualified (and bundler-manglable), which is why each class pins the Rails
+// constant path on `_railsClassName`.
+describe("inspect wrapper class name", () => {
+  fixtures(["authors", "posts"]);
+
+  it("renders the qualified Rails class name for a CollectionProxy", async () => {
+    const author = await CanonAuthor.first();
+    const str = await (author!.posts as any).inspect();
+    expect(str.startsWith("#<ActiveRecord::Associations::CollectionProxy [")).toBe(true);
+  });
+
+  it("renders the qualified Rails class name for an AssociationRelation", async () => {
+    const author = await CanonAuthor.first();
+    const relation = (author!.posts as any).where({});
+    await relation.load();
+    expect(relation.inspect().startsWith("#<ActiveRecord::AssociationRelation [")).toBe(true);
+  });
+});
