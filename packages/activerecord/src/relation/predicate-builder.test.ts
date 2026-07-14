@@ -110,10 +110,9 @@ describe("PredicateBuilderTest", () => {
     // TableMetadata.associated_table("schema.table") falls back to a bare
     // Arel::Table("schema.table"), so expand_from_hash produces:
     //   "schema.table"."column" = 'value'
-    // Rails' Topic.predicate_builder is always TableMetadata-backed; trails'
-    // Base.predicateBuilder is Table-backed, so we build the TableMetadata-backed
-    // PB explicitly to exercise the associated_table fallback expansion.
-    const [node] = new TableMetadata(Topic as any, Topic.arelTable).predicateBuilder.buildFromHash({
+    // Topic.predicateBuilder is TableMetadata-backed (like Rails), so the
+    // associated_table fallback expansion happens without a hand-built PB.
+    const [node] = Topic.predicateBuilder.buildFromHash({
       "schema.table.column": "value",
     });
     const sql = new Visitors.ToSql().compile(node);
