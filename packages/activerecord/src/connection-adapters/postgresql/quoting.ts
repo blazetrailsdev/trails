@@ -217,7 +217,10 @@ export function quoteDefaultExpression(
       serialized = castType.serialize(value);
     }
   }
-  return ` DEFAULT ${quote.call(this || {}, serialized)}`;
+  // `quote` requires a host receiver; thread our own so a binary column's
+  // default (BinaryType#serialize returns BinaryData) reaches PG's bytea
+  // `quotedBinary` rather than the abstract byte-string fallback.
+  return ` DEFAULT ${quote.call(this || { quotedBinary }, serialized)}`;
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

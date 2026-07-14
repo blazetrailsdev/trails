@@ -212,6 +212,12 @@ describe("SQLite3::Quoting", () => {
     it("returns non-function results as raw SQL", () => {
       expect(quoteDefaultExpression(() => "CURRENT_TIMESTAMP")).toBe("CURRENT_TIMESTAMP");
     });
+
+    it("quotes a binary default through SQLite's quotedBinary", () => {
+      // Receiver-less: the fallback host must still reach the `x'..'` hex form,
+      // not the abstract byte-string fallback.
+      expect(quoteDefaultExpression(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
+    });
   });
 
   describe("typeCast", () => {

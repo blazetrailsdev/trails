@@ -166,8 +166,9 @@ export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: 
     return str;
   }
   // `quote` requires a host receiver; thread our own so date/time defaults reach
-  // SQLite's quotedDate / quotedTime overrides (the adapter binds `this`).
-  return quote.call(this || { quotedDate, quotedTime }, value);
+  // SQLite's quotedDate / quotedTime overrides and binary defaults reach its
+  // `x'..'` quotedBinary (the adapter binds `this`).
+  return quote.call(this || { quotedDate, quotedTime, quotedBinary }, value);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat = false): unknown {

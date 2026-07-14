@@ -104,6 +104,14 @@ describe("PostgreSQL quoting", () => {
     expect(quoteDefaultExpression(41, column, typeMap)).toBe(" DEFAULT 42");
   });
 
+  it("quotes a binary default through PG's quotedBinary", () => {
+    // Receiver-less: the fallback host must still reach the bytea escape form,
+    // not the abstract byte-string fallback.
+    expect(quoteDefaultExpression(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe(
+      " DEFAULT '\\x1f8b'",
+    );
+  });
+
   it("serializes array defaults via fallback OidArray when type map misses", () => {
     const column = { sqlType: "text[]", array: true };
     const nullTypeMap = {
