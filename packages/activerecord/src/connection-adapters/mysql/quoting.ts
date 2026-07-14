@@ -98,9 +98,11 @@ export function quoteString(value: string): string {
  * Mirrors: MySQL::Quoting#quoted_binary (`x'#{value.hex}'`, mysql/quoting.rb:80).
  * Rails' signature takes the `Type::Binary::Data` itself, so accept it alongside
  * the raw views our `quote` unwraps to — a Rails-shaped call then works here too.
- * Shares {@link toBytes} with the PG/SQLite overrides so all three accept the
- * same union. A latin1 `string` stays supported on top: Ruby's `Data#hex` reads
- * a byte String, and callers here pass the JS stand-in for one.
+ * Shares {@link toBytes} with the abstract and SQLite overrides, so those three
+ * accept the same union (PG's hand-rolls the unwrap — exception noted on
+ * `toBytes`). A latin1 `string` stays supported on top: Ruby's `Data#hex` reads
+ * a byte String, and callers here pass the JS stand-in for one. PG accepts one
+ * too; SQLite's override rejects it.
  */
 export function quotedBinary(
   value: Buffer | Uint8Array | ArrayBuffer | string | BinaryData,

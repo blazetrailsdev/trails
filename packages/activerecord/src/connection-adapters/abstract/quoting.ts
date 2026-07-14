@@ -450,7 +450,10 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
  *
  * Takes `unknown` rather than `Uint8Array`: the rb:83 branch passes a
  * `BinaryData`'s bytes, but SQLite's boundary branch dispatches a raw
- * `ArrayBuffer`, and every `quotedBinary` normalises through {@link toBytes}.
+ * `ArrayBuffer`, and the abstract/MySQL/SQLite `quotedBinary` normalise through
+ * {@link toBytes} (PG's exception is noted there — it is unreachable from this
+ * dispatch, which only sees a raw `ArrayBuffer` from SQLite's branch, with a
+ * SQLite host).
  * @internal
  */
 export function dispatchQuotedBinary(host: QuotingDispatchHost, value: unknown): string {
