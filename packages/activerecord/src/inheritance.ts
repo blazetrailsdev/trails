@@ -605,6 +605,87 @@ export function narrowToProjectedColumns(
   attrs.narrowTo(keep, overrideTypes);
 }
 
+const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
+
+/**
+ * Reconcile per-instance readers for non-column select aliases so a loaded
+ * record exposes them via property access (`record.post_count`).
+ *
+ * Rails answers `record.post_count` for a `SELECT COUNT(*) AS post_count`
+ * projection through `method_missing` → `attribute_missing`, gated on
+ * `@attributes.key?(name)` (attribute_methods.rb). TypeScript has no
+ * method_missing, so we install own-property getters on the instance for each
+ * loaded attribute that has no accessor on the prototype chain (i.e. isn't a
+ * declared column) — matching Rails' `relation.map(&:post_count)`.
+ *
+ * This runs on every attribute-set swap (instantiate, dup, reload), so it also
+ * drops readers whose alias is gone from the new attribute set: Rails' gate is
+ * `@attributes.key?`, so once `reload` swaps in a plain `SELECT *` attribute set
+ * `record.post_count` raises `NoMethodError` — we mirror that by deleting the
+ * stale getter (property access then yields `undefined`, the trails analog).
+ */
+export function defineDynamicSelectReaders(record: Base): void {
+  const attrs = (record as any)._attributes as { keys(): Iterable<string> };
+  const klass = record.constructor as typeof Base;
+  const rec = record as unknown as Record<string | symbol, unknown>;
+  const installed = (rec[SELECT_ALIAS_READERS] as Set<string> | undefined) ?? new Set<string>();
+  // Drop readers whose alias no longer appears in the fresh attribute set
+  // (mirrors Rails' `@attributes.key?` gate now returning false after the swap).
+  if (installed.size > 0) {
+    const live = new Set(attrs.keys());
+    for (const name of installed) {
+      if (!live.has(name)) {
+        delete rec[name];
+        installed.delete(name);
+      }
+    }
+  }
+  // Hot path: every declared attribute (a real column, and also an ignored
+  // column) is a known attribute, so only keys absent from _attributeDefinitions
+  // can be bare select aliases. A full `SELECT *` load projects only declared
+  // columns, so this loop finds nothing to install and never walks the prototype
+  // chain — mirrors narrowToProjectedColumns' own full-projection early-out.
+  // Gating on _attributeDefinitions (not columnNames(), which drops ignored
+  // columns) keeps an ignored column — declared but accessor-less — from being
+  // mistaken for a select alias.
+  const definedAttrs = (klass as unknown as { _attributeDefinitions: Map<string, unknown> })
+    ._attributeDefinitions;
+  const proto = Object.getPrototypeOf(record) as object;
+  for (const name of attrs.keys()) {
+    if (definedAttrs.has(name)) continue;
+    if (installed.has(name)) continue;
+    if (Object.prototype.hasOwnProperty.call(record, name)) continue;
+    // A non-column key can still resolve to a real method or an aliased
+    // accessor on the prototype chain (Rails' `respond_to_without_attributes?`
+    // short-circuit in method_missing); only truly unclaimed names fall
+    // through to an alias reader.
+    let hasProtoMember = false;
+    for (let p: object | null = proto; p != null; p = Object.getPrototypeOf(p)) {
+      if (Object.getOwnPropertyDescriptor(p, name)) {
+        hasProtoMember = true;
+        break;
+      }
+    }
+    if (hasProtoMember) continue;
+    Object.defineProperty(record, name, {
+      get(this: Base) {
+        return (this as any).readAttribute(name);
+      },
+      configurable: true,
+      enumerable: false,
+    });
+    installed.add(name);
+  }
+  if (installed.size > 0 && rec[SELECT_ALIAS_READERS] === undefined) {
+    Object.defineProperty(record, SELECT_ALIAS_READERS, {
+      value: installed,
+      configurable: true,
+      enumerable: false,
+      writable: false,
+    });
+  }
+}
+
 /**
  * Directly instantiate a record without STI delegation (avoids recursion).
  */
@@ -652,6 +733,7 @@ function directInstantiate(
     }
   }
   narrowToProjectedColumns(klass, record, row, overrideTypes);
+  defineDynamicSelectReaders(record);
   record._newRecord = false;
   (record as any)._dirty.snapshot(record._attributes);
   record.changesApplied();
