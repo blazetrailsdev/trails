@@ -58,11 +58,24 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
   }
 
   /**
-   * @internal Hook invoked by the shared finder helpers (`first`/`last`) before
-   * their `_isNone` short-circuit, and by this class's `toArray`, so a relation
-   * spawned off a stale new-owner `1=0` seed is rebased onto the live
-   * association scope once the owner is saved. No-op unless this relation still
-   * carries the seed and the rebuilt scope resolves a real FK.
+   * The none-short-circuit chokepoint (see `Relation#_isEmptyRelation`): every
+   * query terminal (`toArray`/`exists`/`pluck`/`count`/the bounded finders)
+   * consults this before returning its empty result, so rebasing a stale
+   * new-owner `1=0` seed here covers all of them from one place. Reports the
+   * (possibly rebased) `_isNone`.
+   */
+  _isEmptyRelation(): boolean {
+    this._maybeRebaseAssociationSeed();
+    return super._isEmptyRelation();
+  }
+
+  /**
+   * @internal Rebase a relation spawned off a stale new-owner `1=0` seed onto
+   * the live association scope once the owner is saved and its FK resolves.
+   * No-op unless this relation still carries the seed and the rebuilt scope
+   * resolves a real FK. Clears the seed marker after a successful rebase so it
+   * runs exactly once — a second pass would re-merge the resolved scope onto an
+   * already-rebased relation (duplicate joins/predicates).
    */
   _maybeRebaseAssociationSeed(): void {
     if (!this._seededNoneNewOwner) return;
@@ -75,6 +88,7 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
       fresh as unknown,
       this._seedWherePredicates,
     );
+    this._seededNoneNewOwner = false;
   }
 
   /**
@@ -246,7 +260,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * way back, so accessing the inverse would re-query.
    */
   async toArray(): Promise<T[]> {
-    this._maybeRebaseAssociationSeed();
+    // The stale new-owner seed rebase runs in `super.toArray()` via the shared
+    // `_isEmptyRelation()` chokepoint, before the query is built.
     const owner = this._association.owner;
     const reflection = this._association.reflection;
     // Resolve the inverse association name via the registered Reflection,
