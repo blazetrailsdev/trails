@@ -27,6 +27,8 @@ export {
   sanitizeForMassAssignment,
   isMassAssignmentEmpty,
   ArgumentError,
+  NoMethodError,
+  RuntimeError,
 } from "./attribute-assignment.js";
 export type { AttributeAssignment } from "./attribute-assignment.js";
 export {

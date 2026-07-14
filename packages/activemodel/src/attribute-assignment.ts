@@ -246,6 +246,20 @@ class TypeError extends globalThis.Error {
 }
 
 /**
+ * Mirror of Ruby's `RuntimeError` (the default `raise "msg"` class). The
+ * activemodel home for the ported root class, so trails-invented guards with no
+ * Rails equivalent (serialization.ts' unloaded-collection guard, attribute.ts'
+ * `UserProvidedDefault not loaded` module-load-order guard) share one identity
+ * and stay `instanceof`-consistent across files.
+ */
+class RuntimeError extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "RuntimeError";
+  }
+}
+
+/**
  * Mirror of Ruby's `NameError`. Raised when a name reference is invalid —
  * e.g. `record.method(:missing)`, which Ruby answers with `NameError`
  * (not its `NoMethodError` subclass).
@@ -282,4 +296,4 @@ class NotImplementedError extends globalThis.Error {
   }
 }
 
-export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError };
+export { ArgumentError, TypeError, NameError, NoMethodError, NotImplementedError, RuntimeError };

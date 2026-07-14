@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { NoMethodError, RuntimeError } from "./attribute-assignment.js";
 
 /** Minimum shape required of a record object passed to serialization helpers. */
 export interface SerializationRecord {
@@ -85,7 +86,7 @@ export function serializableHash(
       } else if (method in record) {
         safeSet(result, method, record[method]);
       } else {
-        throw new Error(
+        throw new NoMethodError(
           `undefined method '${method}' for an instance of ${record.constructor.name}`,
         );
       }
@@ -102,7 +103,7 @@ export function serializableHash(
     // with no `loaded` flag (plain arrays, `to_ary`-style wrappers) are ready.
     if (isSerializableCollection(records)) {
       if ((records as { loaded?: unknown }).loaded === false) {
-        throw new Error(
+        throw new RuntimeError(
           `Cannot serialize the '${assocName}' association: its collection is not ` +
             `loaded. Load it first (await the association, or eager-load via ` +
             `includes / preload) — synchronous serialization cannot query the database.`,
@@ -213,7 +214,9 @@ export function readAttributeForSerialization(record: SerializationRecord, key: 
   // A genuine function member is invoked (`send`); an absent member raises like
   // `send`'s `NoMethodError`.
   if (inRecord) return (reader as () => unknown).call(record);
-  throw new Error(`undefined method '${key}' for an instance of ${record.constructor.name}`);
+  throw new NoMethodError(
+    `undefined method '${key}' for an instance of ${record.constructor.name}`,
+  );
 }
 
 /** @internal */
@@ -520,7 +523,9 @@ export function thenableHash(
  */
 function sendAssociation(record: SerializationRecord, name: string): unknown {
   if (!(name in record)) {
-    throw new Error(`undefined method '${name}' for an instance of ${record.constructor.name}`);
+    throw new NoMethodError(
+      `undefined method '${name}' for an instance of ${record.constructor.name}`,
+    );
   }
   const reader = record[name];
   return typeof reader === "function" ? (reader as () => unknown).call(record) : reader;

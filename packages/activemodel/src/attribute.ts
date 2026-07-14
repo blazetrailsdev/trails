@@ -1,6 +1,7 @@
 import { Type } from "./type/value.js";
 import { typeRegistry } from "./type/registry.js";
 import { MissingAttributeError } from "./attribute-methods.js";
+import { RuntimeError } from "./attribute-assignment.js";
 
 // Symbol so identity comparisons work across module copies and can't collide with any user value.
 export const UNINITIALIZED_ORIGINAL_VALUE: unique symbol = Symbol.for(
@@ -226,7 +227,7 @@ export abstract class Attribute {
 
   withUserDefault(value: unknown): Attribute {
     if (!_UserProvidedDefaultCtor) {
-      throw new Error(
+      throw new RuntimeError(
         "UserProvidedDefault not loaded. Import '@blazetrails/activemodel' " +
           "or './attribute/user-provided-default.js' before calling withUserDefault().",
       );

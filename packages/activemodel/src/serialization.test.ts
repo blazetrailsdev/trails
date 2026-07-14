@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { instant } from "@blazetrails/activesupport/testing/temporal-helpers";
 import { Model } from "./index.js";
 import { readAttributeForSerialization, type SerializationRecord } from "./serialization.js";
+import { NoMethodError } from "./attribute-assignment.js";
 
 // Plain ActiveModel serializes `include:` entries via `send(association)` —
 // the value behind a Ruby `attr_accessor :address` / `:friends` (see Rails'
@@ -91,6 +92,7 @@ describe("SerializationTest", () => {
       attributes: { name: "x" },
       constructor: { name: "Host" },
     } as unknown as SerializationRecord;
+    expect(() => readAttributeForSerialization(host, "nope")).toThrow(NoMethodError);
     expect(() => readAttributeForSerialization(host, "nope")).toThrow(/undefined method 'nope'/);
   });
 
@@ -102,6 +104,7 @@ describe("SerializationTest", () => {
       attributes: { name: "x" },
       constructor: { name: "Host" },
     } as unknown as SerializationRecord;
+    expect(() => readAttributeForSerialization(host, "name")).toThrow(NoMethodError);
     expect(() => readAttributeForSerialization(host, "name")).toThrow(/undefined method 'name'/);
   });
 
@@ -246,6 +249,7 @@ describe("SerializationTest", () => {
       }
     }
     const p = new Person({ name: "test" });
+    expect(() => p.serializableHash({ methods: ["nonexistent"] })).toThrow(NoMethodError);
     expect(() => p.serializableHash({ methods: ["nonexistent"] })).toThrow(
       /undefined method 'nonexistent'/,
     );
