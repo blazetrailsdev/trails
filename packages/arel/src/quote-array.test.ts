@@ -140,6 +140,17 @@ describe("quoteArrayLiteral", () => {
       expect(seen).toEqual([1, true, "s"]);
     });
 
+    it("is offered nil, which Rails' type_cast takes through `when nil`", () => {
+      const seen: unknown[] = [];
+      expect(
+        quoteArrayLiteral([null], (v) => {
+          seen.push(v);
+          return undefined;
+        }),
+      ).toBe("{NULL}");
+      expect(seen).toEqual([null]);
+    });
+
     it("lets the hook format a number element", () => {
       expect(quoteArrayLiteral([1], (v) => (v === 1 ? "one" : undefined))).toBe("{one}");
     });

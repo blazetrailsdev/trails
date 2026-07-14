@@ -17,16 +17,24 @@ export type FormatArrayElement = (value: unknown) => string | undefined;
 // `isspace()`, which excludes the non-ASCII spaces `\s` would match.
 const ELEMENT_NEEDS_QUOTING = /[{},"\\ \t\n\r\v\f]/;
 
-function encodeArrayElement(text: string): string {
+function encodeArrayElement(text: string | null): string {
+  // Rendering nil as the bare `NULL` token is the encoder's job, not
+  // `type_cast`'s — the latter returns nil unchanged (`when nil, Numeric,
+  // String then value`, `abstract/quoting.rb:101`). Keeping the split here is
+  // what makes the `"NULL"` string quotable while real nil stays bare.
+  if (text === null) return "NULL";
   if (text === "" || text.toUpperCase() === "NULL" || ELEMENT_NEEDS_QUOTING.test(text)) {
     return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
   return text;
 }
 
-function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement): string {
+function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement): string | null {
   const formatted = formatElement?.(value);
   if (formatted !== undefined) return formatted;
+  // boundary: JS has no nil/undefined distinction to port — Rails' type_cast
+  // takes nil through `when nil` and raises TypeError on anything unmapped.
+  if (value === null || value === undefined) return null;
   if (typeof value === "number") return String(value);
   if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
   // boundary: defensive Date formatting for caller-supplied array literals.
@@ -58,7 +66,6 @@ function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement
  */
 export function quoteArrayLiteral(arr: unknown[], formatElement?: FormatArrayElement): string {
   const elements = arr.map((v) => {
-    if (v === null || v === undefined) return "NULL";
     // Nested arrays recurse before the hook, per `type_cast_array`'s
     // `when ::Array` arm; every other element is offered to it uniformly,
     // as Rails dispatches all non-array elements into `type_cast`.
