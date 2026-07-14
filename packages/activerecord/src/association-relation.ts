@@ -65,9 +65,8 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
    * query terminal (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and
    * every mutation terminal (`updateAll`/`deleteAll`/`touchAll`/
    * `updateCounters`) consults this before returning its empty result, so
-   * rebasing a stale
-   * new-owner `1=0` seed here covers all of them from one place. Reports the
-   * (possibly rebased) `_isNone`.
+   * rebasing a stale new-owner `1=0` seed here covers all of them from one
+   * place. Reports the (possibly rebased) `_isNone`.
    */
   _isEmptyRelation(): boolean {
     this._maybeRebaseAssociationSeed();
