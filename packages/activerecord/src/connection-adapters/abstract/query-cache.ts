@@ -171,11 +171,12 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
   _queryCache: Store | null;
   pool?: DatabaseStatementsHost["pool"] & QueryCachePool;
   /**
-   * Re-entrancy depth of the wired write methods. Each `dirtiesQueryCache`
-   * wrapper bumps it around its (async) call so a lower-level
-   * `executeMutation` — which every CRUD write funnels through — can tell it
-   * is nested inside an already-dirtying write and skip a second clear. DDL
-   * reaches `executeMutation` directly (depth 0) and clears, matching Rails'
+   * Re-entrancy depth of the wired write methods. A `dirtiesQueryCache` wrapper
+   * bumps it around its (async) call ONLY when that call is itself dirtying (not
+   * on a `"SCHEMA"` reflection read or an `uncached(dirties: false)` write), so a
+   * lower-level `executeMutation` — which every CRUD write funnels through — can
+   * tell it is nested inside an already-dirtying write and skip a second clear.
+   * DDL reaches `executeMutation` directly (depth 0) and clears, matching Rails'
    * `execute`-based DDL. @internal
    */
   _writeDirtyDepth?: number;
@@ -567,17 +568,28 @@ function wireDirties(
       // Clear unconditionally, mirroring Rails' `dirties_query_cache` (each wired
       // method clears via `super`, query_cache.rb:13). The clear is idempotent, so
       // a nested wired write clearing an already-cleared cache is harmless — do NOT
-      // gate this on `_writeDirtyDepth`: under concurrent writes on one connection
-      // (`Promise.all([a.save(), b.save()])`) B would be *entered* while A's depth
-      // is still raised across its await and would skip its clear, going stale.
-      // The depth guard lives only at the `executeMutation` leaf, where it exists
-      // to keep a single logical CRUD write to one clear (`times: 1`).
-      if (this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"))) {
-        this._queryCache.clear();
+      // gate the clear on `_writeDirtyDepth`: under concurrent writes on one
+      // connection (`Promise.all([a.save(), b.save()])`) B would be *entered* while
+      // A's depth is still raised across its await and would skip its clear, going
+      // stale. The depth guard lives only at the `executeMutation` leaf, where it
+      // keeps a single logical CRUD write to one clear (`times: 1`).
+      const dirtying =
+        !!this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"));
+      if (dirtying) {
+        this._queryCache!.clear();
+        // Raise the write-dirty scope ONLY when this call is itself dirtying, so
+        // the leaf `executeMutation` it funnels into defers (times: 1). A
+        // non-dirtying call — cache off, `uncached(dirties: false)`, or a
+        // `"SCHEMA"` reflection *read* — must NOT raise the counter: a read that
+        // held `_writeDirtyDepth > 0` would make a DDL `executeMutation` entered in
+        // its window skip its clear (the counter is named for *writes*). The
+        // nested leaf of a non-dirtying write won't clear anyway — same `dirties`
+        // gate — so skipping the bump changes nothing there.
+        return withWriteDirtyDepth(this, () =>
+          (original as (...a: unknown[]) => unknown).apply(this, args),
+        );
       }
-      return withWriteDirtyDepth(this, () =>
-        (original as (...a: unknown[]) => unknown).apply(this, args),
-      );
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
   }
 }
