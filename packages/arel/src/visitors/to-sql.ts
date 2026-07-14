@@ -15,10 +15,43 @@ import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors
 // here so api:compare finds it where Rails defines it.
 export { UnsupportedVisitError };
 
-// The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
-// Assignment visitors (to_sql.rb:109, 632). trails has no Arel-visible class
-// for it, so it is duck-typed on `valueForDatabase` — the same shape
-// `resolveValueForDatabase` above accepts.
+import { defaultQuoter } from "./default-quoter.js";
+export type { ArelConnection } from "./connection.js";
+import type { ArelConnection } from "./connection.js";
+
+/**
+ * Connection-quoting surface exposed to the Arel visitor.
+ *
+ * Mirrors Rails' `@connection` object passed to `Arel::Visitors::ToSql`.
+ * Rails dispatches every quoting decision through the connection so adapters
+ * can specialise (PG hex-escapes binary, MySQL backtick-quotes identifiers,
+ * etc.).  We accept this subset so `arel` stays dependency-free from
+ * `activerecord`; `AbstractAdapter` is a structural superset and always
+ * satisfies this interface.
+ *
+ * @deprecated Use `ArelConnection` — this alias will be removed in a future release.
+ */
+export type ArelQuoter = ArelConnection;
+
+/**
+ * Resolve a bind's database value. QueryAttribute exposes
+ * `valueForDatabase` as a method; ActiveModel::Attribute (TS port)
+ * exposes it as a getter. A normal property read handles both shapes —
+ * the getter evaluates to its value, a method reference yields a
+ * function that we then invoke.
+ */
+export function resolveValueForDatabase(value: unknown): unknown {
+  if (!value || typeof value !== "object" || !("valueForDatabase" in value)) return value;
+  const v = (value as Record<string, unknown>).valueForDatabase;
+  return typeof v === "function" ? (v as () => unknown).call(value) : v;
+}
+
+// -- Raw-value dispatch helpers --
+//
+// Rails dispatches a raw value on its Ruby class (visitor.rb:29-30). These map
+// each JS analogue onto the class Rails would pick, so `visitNodeOrValue` can
+// hand off to the matching visit_* method.
+
 // The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
 // Assignment visitors (to_sql.rb:110, 632). trails has no Arel-visible class
 // for it, so it is duck-typed on `valueForDatabase` — the same shape
@@ -72,36 +105,6 @@ function isTimeLike(v: unknown): boolean {
 function constructorName(v: unknown): string {
   if (v === null || v === undefined) return "NilClass";
   return (v as { constructor?: { name?: string } }).constructor?.name ?? typeof v;
-}
-import { defaultQuoter } from "./default-quoter.js";
-export type { ArelConnection } from "./connection.js";
-import type { ArelConnection } from "./connection.js";
-
-/**
- * Connection-quoting surface exposed to the Arel visitor.
- *
- * Mirrors Rails' `@connection` object passed to `Arel::Visitors::ToSql`.
- * Rails dispatches every quoting decision through the connection so adapters
- * can specialise (PG hex-escapes binary, MySQL backtick-quotes identifiers,
- * etc.).  We accept this subset so `arel` stays dependency-free from
- * `activerecord`; `AbstractAdapter` is a structural superset and always
- * satisfies this interface.
- *
- * @deprecated Use `ArelConnection` — this alias will be removed in a future release.
- */
-export type ArelQuoter = ArelConnection;
-
-/**
- * Resolve a bind's database value. QueryAttribute exposes
- * `valueForDatabase` as a method; ActiveModel::Attribute (TS port)
- * exposes it as a getter. A normal property read handles both shapes —
- * the getter evaluates to its value, a method reference yields a
- * function that we then invoke.
- */
-export function resolveValueForDatabase(value: unknown): unknown {
-  if (!value || typeof value !== "object" || !("valueForDatabase" in value)) return value;
-  const v = (value as Record<string, unknown>).valueForDatabase;
-  return typeof v === "function" ? (v as () => unknown).call(value) : v;
 }
 
 /** Default placeholder block; mirrors Rails' module-level `BIND_BLOCK`. */
