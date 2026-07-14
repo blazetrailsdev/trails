@@ -106,7 +106,6 @@ import {
 } from "./association-cache.js";
 import { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
-import { asAdapterName } from "./connection-adapters/abstract-adapter.js";
 import { temporalToBindString } from "./connection-adapters/abstract/database-statements.js";
 import * as ConnectionHandling from "./connection-handling.js";
 import type { DatabaseConfig } from "./database-configurations/database-config.js";
@@ -343,21 +342,6 @@ import {
   executeMultiparameterAssignment,
 } from "./multiparameter-attribute-assignment.js";
 
-/**
- * Formats a Temporal array element via the dialect-correct scalar formatter
- * (`temporalToBindString`) so a datetime inside an inlined PG array literal
- * emits the same `quoted_date` form the scalar path does (BC suffix + fixed-6
- * microseconds); non-Temporal elements return `undefined` to fall through to
- * `quoteArrayLiteral`'s generic quoting.
- * @internal
- */
-function temporalArrayElementFormatter(
-  dialect?: AdapterName,
-): (value: unknown) => string | undefined {
-  return (value: unknown): string | undefined =>
-    isTemporal(value) ? String(temporalToBindString(value, dialect)) : undefined;
-}
-
 /** @internal */
 export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName): string {
   if (v === null || v === undefined) return "NULL";
@@ -377,7 +361,7 @@ export function quoteSqlValue(v: unknown, asArray = false, dialect?: AdapterName
     return Number.isNaN(v.getTime()) ? "NULL" : `'${v.toISOString()}'`;
   }
   if (asArray && Array.isArray(v)) {
-    const arrayLiteral = quoteArrayLiteral(v, temporalArrayElementFormatter(dialect));
+    const arrayLiteral = quoteArrayLiteral(v);
     return `'${arrayLiteral.replace(/'/g, "''")}'`;
   }
   if (!asArray && typeof v === "object") {
@@ -3718,7 +3702,7 @@ export class Base extends Model {
         !isArray && isBindableStringColumn(def?.type?.name) && typeof raw === "string"
           ? new Nodes.BindParam(raw)
           : isArray
-            ? arelSql(quoteSqlValue(raw, true, asAdapterName(adapter.adapterName)))
+            ? arelSql(quoteSqlValue(raw, true))
             : raw;
     });
 
@@ -3844,7 +3828,7 @@ export class Base extends Model {
           !isArray && isBindableStringColumn(def?.type?.name) && typeof val === "string"
             ? new Nodes.BindParam(val)
             : isArray
-              ? arelSql(quoteSqlValue(val, true, asAdapterName(adapter.adapterName)))
+              ? arelSql(quoteSqlValue(val, true))
               : val,
         ];
       },

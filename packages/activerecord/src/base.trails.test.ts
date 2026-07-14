@@ -77,33 +77,6 @@ describe("quoteSqlValue", () => {
     const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
     expect(quoteSqlValue(instant, false, "postgres")).toBe("'2026-04-26 14:23:55.123456'");
   });
-
-  it("renders a datetime array element in the PG quoted_date form (BC + microseconds)", () => {
-    // A datetime[] element inlined into a PG array literal must carry the same
-    // " BC" suffix and fixed-6 microseconds the scalar PG path emits, not the
-    // generic ISO-8601 JSON.stringify fallback.
-    const instant = Temporal.Instant.from("-000043-03-15T12:34:56.123456Z");
-    expect(quoteSqlValue([instant], true, "postgres")).toBe(
-      "'{\"0044-03-15 12:34:56.123456 BC\"}'",
-    );
-  });
-
-  it("caps a datetime PG array element's fractional seconds at microseconds", () => {
-    const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456789Z");
-    expect(quoteSqlValue([instant], true, "postgres")).toBe("'{\"2026-04-26 14:23:55.123456\"}'");
-  });
-
-  it("threads the dialect through only Temporal elements of a mixed PG array", () => {
-    // Non-Temporal siblings keep generic array-literal quoting; only the
-    // datetime element routes through the dialect-correct scalar formatter.
-    const instant = Temporal.Instant.from("2026-04-26T14:23:55Z");
-    expect(quoteSqlValue(["a", instant], true, "postgres")).toBe('\'{"a","2026-04-26 14:23:55"}\'');
-  });
-
-  it("uses the trimmed abstract datetime literal for a PG array element with no dialect", () => {
-    const instant = Temporal.Instant.from("2026-04-26T14:23:55Z");
-    expect(quoteSqlValue([instant], true)).toBe("'{\"2026-04-26 14:23:55\"}'");
-  });
 });
 
 describe("_applyScopeAttributes — scoping initializeInternalsCallback", () => {

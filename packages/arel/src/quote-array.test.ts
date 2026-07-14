@@ -52,20 +52,4 @@ describe("quoteArrayLiteral", () => {
   it("handles bigint values inside objects", () => {
     expect(quoteArrayLiteral([{ id: 42n }])).toBe('{"{\\"id\\":\\"42\\"}"}');
   });
-
-  it("uses formatElement for elements it claims and escapes the result", () => {
-    const formatElement = (v: unknown) =>
-      typeof v === "symbol" ? `dt:${String(v.description)}"` : undefined;
-    expect(quoteArrayLiteral([Symbol("2026")], formatElement)).toBe('{"dt:2026\\""}');
-  });
-
-  it("falls through to generic quoting when formatElement returns undefined", () => {
-    const formatElement = (v: unknown) => (typeof v === "symbol" ? "sym" : undefined);
-    expect(quoteArrayLiteral(["a", 1, Symbol("s")], formatElement)).toBe('{"a",1,"sym"}');
-  });
-
-  it("threads formatElement into nested arrays", () => {
-    const formatElement = (v: unknown) => (typeof v === "symbol" ? "X" : undefined);
-    expect(quoteArrayLiteral([[Symbol("a")], ["b"]], formatElement)).toBe('{{"X"},{"b"}}');
-  });
 });

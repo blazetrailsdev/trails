@@ -6,6 +6,8 @@
  */
 
 import { ValueType } from "@blazetrails/activemodel";
+import { isTemporal } from "@blazetrails/activesupport/temporal";
+import { temporalToBindString } from "../../abstract/database-statements.js";
 
 function stableStringify(value: unknown): string {
   try {
@@ -167,7 +169,16 @@ export class Array extends ValueType<unknown> {
       if (value == null) return "NULL";
       if (globalThis.Array.isArray(value)) return this.encode(value);
 
-      const str = String(value);
+      // Datetime/date/time subtypes serialize elements to Temporal values, which
+      // `String()` would render as ISO-8601 (`T`/`Z`, nanoseconds). Rails instead
+      // routes every array element through `type_cast` → `quoted_date`
+      // (encode_array → type_cast_array → type_cast, postgresql/quoting.rb), so a
+      // datetime element gets the same db literal a scalar does: fixed-6 μs and a
+      // " BC" suffix for proleptic years. The OID Array is PostgreSQL-only, so the
+      // dialect is always "postgres" (cf. postgresql-adapter.ts quotedDate).
+      const str = isTemporal(value)
+        ? String(temporalToBindString(value, "postgres"))
+        : String(value);
       if (
         str === "" ||
         str.toUpperCase() === "NULL" ||

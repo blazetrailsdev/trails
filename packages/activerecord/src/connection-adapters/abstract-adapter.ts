@@ -118,21 +118,6 @@ import { DecimalWithoutScale } from "../type/decimal-without-scale.js";
 export type AdapterName = "sqlite" | "postgres" | "mysql";
 
 /**
- * Narrow a raw `adapterName` getter result to the `AdapterName` family, or
- * `undefined` when it is not a member. The base getter returns `"Abstract"`
- * (RFC 0010, see `get adapterName`), so a blind `as AdapterName` cast lies to
- * the type system on that one adapter; callers that only need the dialect for
- * dialect-correct quoting narrow here instead, and `undefined` routes to the
- * adapter-agnostic format — the same result the abstract getter's value would
- * have produced at runtime.
- *
- * @internal
- */
-export function asAdapterName(name: string): AdapterName | undefined {
-  return name === "sqlite" || name === "postgres" || name === "mysql" ? name : undefined;
-}
-
-/**
  * Map a database.yml `adapter:` config string to the normalized `AdapterName` family.
  *
  * @internal
