@@ -1,5 +1,4 @@
 [
-  "packages/activerecord/src/aggregations.ts#initializeDup",
   "packages/activerecord/src/associations/association.ts#_createRecord",
   "packages/activerecord/src/associations/collection-association.ts#destroy",
   "packages/activerecord/src/associations/collection-proxy.ts#destroy",
@@ -17,7 +16,6 @@
   "packages/activerecord/src/encryption/encryptable-record.ts#_createRecord",
   "packages/activerecord/src/locking/optimistic.ts#_createRecord",
   "packages/activerecord/src/locking/optimistic.ts#incrementBang",
-  "packages/activerecord/src/locking/optimistic.ts#initializeDup",
   "packages/activerecord/src/persistence.ts#_updateRecord",
   "packages/activerecord/src/persistence.ts#destroy",
   "packages/activerecord/src/persistence.ts#incrementBang",
@@ -25,7 +23,6 @@
   "packages/activerecord/src/timestamp.ts#_createRecord",
   "packages/activerecord/src/timestamp.ts#_updateRecord",
   "packages/activerecord/src/timestamp.ts#createOrUpdate",
-  "packages/activerecord/src/timestamp.ts#initializeDup",
   "packages/activerecord/src/timestamp.ts#touch",
   "packages/activerecord/src/touch-later.ts#beforeCommittedBang",
   "packages/activerecord/src/touch-later.ts#touch",

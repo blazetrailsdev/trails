@@ -1560,21 +1560,18 @@ export function dup<T extends DupRecord>(this: T): T {
     // Re-mark attributes that differ from their database column default as changed.
     duped._dirty.reinstateNewRecordChanges(dupedAttrs);
   }
-  // Dispatch `after_initialize` against the duped attributes. Mirrors Rails
-  // Core#initialize_dup, which runs `_run_initialize_callbacks` only — it does
-  // NOT re-run `initialize_internals_callback`/`ensure_proper_type` (that lives
-  // in Core#initialize), so the STI type column is carried solely by the
-  // deep-dup'd `@attributes`, not re-asserted here.
-  // strict:"sync" guarantees synchronous completion — void the settled result.
-  void runAfterCallbacksOnProto(ctor.prototype, "initialize", duped, { strict: "sync" });
-  // The Timestamp/Locking `initialize_dup` clears run AFTER the callbacks in
-  // Rails: their modules `super` into `Core#initialize_dup` (which fires the
-  // hook) and clear only as the stack unwinds. So the hook above observes the
-  // source's `created_at`/`updated_at`/`lock_version`; we null them out here.
-  // Each clear rebinds its column's dirty baseline (`clear_attribute_change`),
-  // so the cleared columns read back as nil/default and not-dirty regardless of
-  // the reinstate pass above (test_dup_timestamps_are_cleared /
-  // _locking_column_is_not_dirty).
+  // Run `initializeDup` against the duped attributes. Mirrors Rails
+  // Core#initialize_dup, which dispatches `_run_initialize_callbacks`
+  // (after_initialize only) and then lets the Timestamp/Locking modules clear
+  // as the super stack unwinds: the hook observes the source's
+  // `created_at`/`updated_at`/`lock_version` before they are nulled. Each clear
+  // rebinds its column's dirty baseline (`clear_attribute_change`), so the
+  // cleared columns read back as nil/default and not-dirty regardless of the
+  // reinstate pass above (test_dup_timestamps_are_cleared /
+  // _locking_column_is_not_dirty). It does NOT re-run
+  // `initialize_internals_callback`/`ensure_proper_type` (that lives in
+  // Core#initialize), so the STI type column is carried solely by the deep-dup'd
+  // `@attributes`, not re-asserted here.
   duped.initializeDup(this);
   return duped;
 }
