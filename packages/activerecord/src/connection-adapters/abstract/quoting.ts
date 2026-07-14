@@ -109,8 +109,13 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   if (value === null || value === undefined) return "NULL";
   // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
-  // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`. Must stay
-  // ahead of the Numeric branch (rb:82-83): a BigDecimal is also Numeric in Ruby.
+  // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
+  //
+  // Rails must keep this ahead of Numeric (rb:82-83) because Ruby's BigDecimal
+  // *is* a Numeric, so a later arm would never be reached. That constraint does
+  // not carry over: this chain dispatches on typeof/instanceof, under which
+  // BigDecimal is an "object" and the Numeric arm below cannot swallow it. The
+  // order is kept to mirror rb:82-83, not because TS depends on it.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   // ArrayBuffer views have no Ruby analogue: they must be normalized to bytes
