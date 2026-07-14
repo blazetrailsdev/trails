@@ -131,10 +131,30 @@ export class PostgreSQL extends ToSql {
 
   protected override quote(value: unknown): string {
     if (Array.isArray(value)) {
-      const literal = quoteArrayLiteral(value);
+      const literal = quoteArrayLiteral(value, (v) => this.formatArrayDate(v));
       return `'${literal.replace(/'/g, "''")}'`;
     }
     return super.quote(value);
+  }
+
+  /**
+   * Routes a date-like array element through the same formatting the scalar
+   * path takes (`quotedDate`), mirroring Rails' `type_cast_array` → `type_cast`
+   * → `when Date, Time then quoted_date` (`abstract/quoting.rb:94-107`). Uses
+   * the bare `formatDate` rather than `quotedDate` because `quoteArrayLiteral`
+   * applies its own `"..."` quoting — passing the `'`-wrapped form would
+   * double-quote. `undefined` leaves non-date elements to the default handling.
+   */
+  private formatArrayDate(value: unknown): string | undefined {
+    if (
+      typeof value === "object" &&
+      value !== null &&
+      "toISOString" in value &&
+      typeof (value as { toISOString: unknown }).toISOString === "function"
+    ) {
+      return this.formatDate(value as { toISOString(): string });
+    }
+    return undefined;
   }
 }
 

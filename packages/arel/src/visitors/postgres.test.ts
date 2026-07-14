@@ -353,6 +353,30 @@ describe("PostgresTest", () => {
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("'{\"O''Reilly\"}'");
     });
+
+    it("quotes a Date array element as a db date, matching the scalar path", () => {
+      // Rails' type_cast_array sends each element through the same type_cast a
+      // scalar takes (`when Date, Time then quoted_date`), so the array element
+      // must carry the db form the scalar path emits — not ISO-8601.
+      const d = new Date(Date.UTC(2026, 3, 26, 14, 23, 55));
+      const scalar = new Visitors.PostgreSQL().compile(users.get("at").eq(d));
+      expect(scalar).toContain("'2026-04-26 14:23:55'");
+
+      const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([d]));
+      expect(sql).toContain("'{\"2026-04-26 14:23:55\"}'");
+    });
+
+    it("emits fixed-6 microseconds for a sub-second date array element", () => {
+      const d = new Date(Date.UTC(2026, 3, 26, 14, 23, 55, 123));
+      const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([d]));
+      expect(sql).toContain("'{\"2026-04-26 14:23:55.123000\"}'");
+    });
+
+    it("quotes date elements of a nested array as db dates", () => {
+      const d = new Date(Date.UTC(2026, 3, 26, 14, 23, 55));
+      const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([[d]]));
+      expect(sql).toContain("'{{\"2026-04-26 14:23:55\"}}'");
+    });
   });
 });
 

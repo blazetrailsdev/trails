@@ -2065,17 +2065,23 @@ export class ToSql extends Visitor {
   // packages/activerecord/src/connection-adapters/abstract/quoting.ts is the
   // authoritative path for timezone-aware bound values.
   protected quotedDate(d: { toISOString(): string }): string {
+    return `'${this.formatDate(d).replace(/'/g, "''")}'`;
+  }
+
+  // The bare (un-single-quoted) form behind `quotedDate`. PG array literals
+  // need the element content without the `'` wrapper — `quoteArrayLiteral`
+  // supplies its own `"..."` quoting — so the formatting lives here and
+  // `quotedDate` is the scalar `'`-quoting wrapper over it.
+  protected formatDate(d: { toISOString(): string }): string {
     // Matches "YYYY-MM-DDTHH:MM:SS.mmmZ", "YYYY-MM-DDTHH:MM:SSZ", or
     // the same without trailing Z (treated as UTC).
     const match = d.toISOString().match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?$/);
-    if (!match) return `'${d.toISOString().replace(/'/g, "''")}'`;
+    if (!match) return d.toISOString();
     const [, date, time, frac] = match;
     // Normalise to exactly 6 digits: pad short fractions, truncate long ones.
     // "729" → "729000" (μs), "7" → "700000", "1234" → "123400", "729000" → "729000".
     const micros = frac ? parseInt((frac + "000000").slice(0, 6), 10) : 0;
-    return micros > 0
-      ? `'${date} ${time}.${String(micros).padStart(6, "0")}'`
-      : `'${date} ${time}'`;
+    return micros > 0 ? `${date} ${time}.${String(micros).padStart(6, "0")}` : `${date} ${time}`;
   }
 
   /**

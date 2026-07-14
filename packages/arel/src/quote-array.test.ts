@@ -52,4 +52,23 @@ describe("quoteArrayLiteral", () => {
   it("handles bigint values inside objects", () => {
     expect(quoteArrayLiteral([{ id: 42n }])).toBe('{"{\\"id\\":\\"42\\"}"}');
   });
+
+  describe("formatElement", () => {
+    it("wraps a formatted element in the array element quoting", () => {
+      const d = new Date("2026-03-26T12:00:00.000Z");
+      expect(quoteArrayLiteral([d], () => "2026-03-26 12:00:00")).toBe('{"2026-03-26 12:00:00"}');
+    });
+
+    it("falls through to the default handling when it returns undefined", () => {
+      expect(quoteArrayLiteral(["a", 1], () => undefined)).toBe('{"a",1}');
+    });
+
+    it("escapes quotes and backslashes in a formatted element", () => {
+      expect(quoteArrayLiteral(["x"], () => 'a\\b"c')).toBe('{"a\\\\b\\"c"}');
+    });
+
+    it("applies to nested array elements", () => {
+      expect(quoteArrayLiteral([["x"]], (v) => (v === "x" ? "X" : undefined))).toBe('{{"X"}}');
+    });
+  });
 });
