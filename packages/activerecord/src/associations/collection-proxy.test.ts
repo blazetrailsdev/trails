@@ -834,11 +834,12 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
     const sail = await ShipPart.create({ name: "sail", ship_id: shipId, updated_at: stale });
 
     expect(await rel.touchAll()).toBe(1);
-    // The matching part is touched; the non-matching sibling proves the
-    // `where(...)` mutation still rides on top of the rebuilt scope.
-    expect((await ShipPart.find(mast.id)).updated_at).not.toEqual(
-      (await ShipPart.find(sail.id)).updated_at,
-    );
+    // Assert each row absolutely, not just that the two differ: the matching
+    // part moved off the stale timestamp, and the non-matching sibling is
+    // untouched — proving the `where(...)` mutation still rides on top of the
+    // rebuilt scope, and that touchAll hit the RIGHT row.
+    expect(String((await ShipPart.find(mast.id)).updated_at)).not.toBe(stale);
+    expect(String((await ShipPart.find(sail.id)).updated_at)).toBe(stale);
   });
 });
 
