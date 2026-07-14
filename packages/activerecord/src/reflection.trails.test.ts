@@ -8,8 +8,10 @@
  */
 import { describe, it, expect } from "vitest";
 import { Base, reflectOnAssociation, registerModel } from "./index.js";
-import { Associations } from "./associations.js";
+import { Associations, modelRegistry } from "./associations.js";
 import {
+  AssociationReflection,
+  ThroughReflection,
   belongsToCounterCacheColumn,
   counterCacheColumnOption,
   resolveAliasedColumn,
@@ -102,6 +104,183 @@ describe("ReflectionTest", () => {
     // When className is explicitly qualified it bypasses the demodulize path
     const nsRef = reflectOnAssociation(NsAdminUser, "adminUser");
     expect(nsRef!.klass).toBe(NsAdminUser);
+  });
+
+  it("reflection klass re-resolves when the registry rebinds the class name", () => {
+    // The klass memo is keyed by class NAME via the global modelRegistry, so a
+    // model re-registered under a name a reflection already resolved must not
+    // keep serving the old class (a bespoke registration in one test file would
+    // otherwise poison canonical reflections for the whole vitest worker).
+    class ShFirstTarget extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ShSecondTarget extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ShOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("shTargets", { className: "ShTarget" });
+      }
+    }
+    registerModel("ShOwner", ShOwner);
+    registerModel("ShTarget", ShFirstTarget);
+
+    const ref = reflectOnAssociation(ShOwner, "shTargets")!;
+    expect(ref.klass).toBe(ShFirstTarget);
+    // Memoized while the registry is unchanged.
+    expect(ref.klass).toBe(ShFirstTarget);
+
+    registerModel("ShTarget", ShSecondTarget);
+    expect(ref.klass).toBe(ShSecondTarget);
+  });
+
+  it("re-registering the same class under the same name keeps the klass memo", () => {
+    // Registration is idempotent and happens constantly during model loading;
+    // only a rebind to a *different* class may invalidate a memo.
+    class ShStableTarget extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ShStableOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("shStableTargets", { className: "ShStableTarget" });
+      }
+    }
+    registerModel("ShStableOwner", ShStableOwner);
+    registerModel("ShStableTarget", ShStableTarget);
+
+    const ref = reflectOnAssociation(ShStableOwner, "shStableTargets")!;
+    expect(ref.klass).toBe(ShStableTarget);
+    const generationBefore = modelRegistry.generation;
+    expect(typeof generationBefore).toBe("number");
+    registerModel("ShStableTarget", ShStableTarget);
+    expect(modelRegistry.generation).toBe(generationBefore);
+    expect(ref.klass).toBe(ShStableTarget);
+  });
+
+  it("inverse_of re-resolves when the registry rebinds the class name", () => {
+    // inverseOf/inverseName memo values resolved off `this.klass` — an inverse
+    // reflection owned by the target class, and a name derived from scanning it.
+    // They have to heal with `klass`, or a healed klass still hands back the
+    // previous target's reflection.
+    class ShInvFirst extends Base {
+      static {
+        this.attribute("name", "string");
+        this.belongsTo("shInvOwner", { className: "ShInvOwner" });
+      }
+    }
+    class ShInvSecond extends Base {
+      static {
+        this.attribute("name", "string");
+        this.belongsTo("shInvOwner", { className: "ShInvOwner" });
+      }
+    }
+    class ShInvOwner extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("shInvTargets", { className: "ShInvTarget" });
+      }
+    }
+    registerModel("ShInvOwner", ShInvOwner);
+    registerModel("ShInvTarget", ShInvFirst);
+
+    const ref = reflectOnAssociation(ShInvOwner, "shInvTargets") as AssociationReflection;
+    expect(ref.inverseOf()!.activeRecord).toBe(ShInvFirst);
+
+    registerModel("ShInvTarget", ShInvSecond);
+    expect(ref.klass).toBe(ShInvSecond);
+    expect(ref.inverseOf()!.activeRecord).toBe(ShInvSecond);
+  });
+
+  it("through reflection inverse_of re-resolves when the registry rebinds the class name", () => {
+    // ThroughReflection keeps its own _inverseOfCache holding a reflection
+    // resolved off its klass, so it needs the same gate as the
+    // AssociationReflection memo — a healed klass must not still hand back an
+    // inverse owned by the previous target.
+    class TiTagFirst extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("tiPosts", { className: "TiPost" });
+      }
+    }
+    class TiTagSecond extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("tiPosts", { className: "TiPost" });
+      }
+    }
+    class TiTagging extends Base {
+      static {
+        this.attribute("name", "string");
+        this.belongsTo("tiTag", { className: "TiTag" });
+      }
+    }
+    class TiPost extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("tiTaggings", { className: "TiTagging" });
+        this.hasMany("tiTags", { through: "tiTaggings", source: "tiTag", inverseOf: "tiPosts" });
+      }
+    }
+    registerModel("TiPost", TiPost);
+    registerModel("TiTagging", TiTagging);
+    registerModel("TiTag", TiTagFirst);
+
+    const ref = reflectOnAssociation(TiPost, "tiTags") as ThroughReflection;
+    expect(ref.inverseOf()!.activeRecord).toBe(TiTagFirst);
+
+    registerModel("TiTag", TiTagSecond);
+    expect(ref.klass).toBe(TiTagSecond);
+    expect(ref.inverseOf()!.activeRecord).toBe(TiTagSecond);
+  });
+
+  it("through reflection source re-resolves when the through target is rebound", () => {
+    // The shape of the PreloaderTest failure this fix targets: a bespoke
+    // through model with no source association is registered first, poisoning
+    // Post.tags' source/through memos; re-registering the real model must heal
+    // them rather than keep raising SourceAssociationNotFound.
+    class ShTag extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ShSourcelessTagging extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class ShRealTagging extends Base {
+      static {
+        this.attribute("name", "string");
+        this.belongsTo("shTag", { className: "ShTag" });
+      }
+    }
+    class ShTaggedPost extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("shTaggings", { className: "ShTagging" });
+        this.hasMany("shTags", { through: "shTaggings", source: "shTag" });
+      }
+    }
+    registerModel("ShTag", ShTag);
+    registerModel("ShTaggedPost", ShTaggedPost);
+    registerModel("ShTagging", ShSourcelessTagging);
+
+    const ref = reflectOnAssociation(ShTaggedPost, "shTags")!;
+    // Sourceless target: no source reflection resolvable, and the memo sticks.
+    expect(ref.sourceReflection).toBeNull();
+
+    registerModel("ShTagging", ShRealTagging);
+    expect(ref.sourceReflection).not.toBeNull();
+    expect(ref.sourceReflection!.name).toBe("shTag");
+    expect(ref.klass).toBe(ShTag);
   });
 
   it("counter cache column option extracts the explicit column from raw forms", () => {

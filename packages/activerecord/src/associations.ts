@@ -214,10 +214,45 @@ interface ReflectionLike {
 }
 
 /**
+ * Model registry that tracks a monotonic `generation`, bumped whenever a name
+ * is bound to a different class (or unbound). Reflections memoize their
+ * resolved `klass` alongside the generation it was resolved at, so a
+ * re-registration under the same name invalidates every stale memo at once
+ * instead of poisoning it permanently. Without this, a test file registering a
+ * bespoke model under a canonical name poisons the canonical reflections for
+ * the rest of the vitest worker's life.
+ * @internal
+ */
+class ModelRegistry extends Map<string, typeof Base> {
+  #generation = 0;
+
+  /** Bumps only on a mutation that can change what a name resolves to. */
+  get generation(): number {
+    return this.#generation;
+  }
+
+  override set(name: string, model: typeof Base): this {
+    if (super.get(name) !== model) this.#generation++;
+    return super.set(name, model);
+  }
+
+  override delete(name: string): boolean {
+    const deleted = super.delete(name);
+    if (deleted) this.#generation++;
+    return deleted;
+  }
+
+  override clear(): void {
+    if (this.size > 0) this.#generation++;
+    super.clear();
+  }
+}
+
+/**
  * Registry to hold model classes by name. Models must be registered
  * here so associations can resolve class references.
  */
-export const modelRegistry = new Map<string, typeof Base>();
+export const modelRegistry = new ModelRegistry();
 
 /**
  * Find the framework `Base` class in `model`'s prototype chain without
