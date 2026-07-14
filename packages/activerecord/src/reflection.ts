@@ -581,6 +581,7 @@ export class MacroReflection extends AbstractReflection {
   readonly pluralName: string;
   private _scope: ((...args: any[]) => any) | null;
   private _klassCache: typeof Base | null = null;
+  private _klassCacheGeneration = -1;
 
   constructor(
     name: string,
@@ -625,7 +626,13 @@ export class MacroReflection extends AbstractReflection {
   }
 
   get klass(): typeof Base {
-    if (this._klassCache) return this._klassCache;
+    // Rails memoizes `@klass ||=`. We additionally gate the memo on the model
+    // registry's generation so a class re-registered under this reflection's
+    // className re-resolves instead of returning a stale target forever.
+    if (this._klassCache && this._klassCacheGeneration === modelRegistry.generation) {
+      return this._klassCache;
+    }
+    this._klassCacheGeneration = modelRegistry.generation;
     if (this.options.anonymousClass) {
       this._klassCache = this.options.anonymousClass as typeof Base;
       return this._klassCache;
@@ -1465,11 +1472,28 @@ export class ThroughReflection extends AbstractReflection {
     undefined;
   private _sourceReflectionNameCache: string | null | undefined = undefined;
   private _klassCache: typeof Base | null = null;
+  private _cacheGeneration = -1;
 
   constructor(delegate: AssociationReflection) {
     super();
     this._delegate = delegate;
     this.ensureOptionNotGivenAsClassBang("sourceType");
+  }
+
+  /**
+   * Every memo below is derived from classes resolved out of the model
+   * registry, so they all go stale together when a name is rebound to a
+   * different class. Drop them as a unit rather than returning a target that
+   * the registry no longer maps this reflection to.
+   * @internal
+   */
+  private expireCachesIfRegistryChanged(): void {
+    if (this._cacheGeneration === modelRegistry.generation) return;
+    this._cacheGeneration = modelRegistry.generation;
+    this._klassCache = null;
+    this._sourceReflectionCache = undefined;
+    this._throughReflectionCache = undefined;
+    this._sourceReflectionNameCache = undefined;
   }
 
   get name(): string {
@@ -1568,6 +1592,7 @@ export class ThroughReflection extends AbstractReflection {
   get klass(): typeof Base {
     // Rails: @klass ||= delegate_reflection._klass(class_name), where @klass is
     // seeded with options[:anonymous_class] in the constructor.
+    this.expireCachesIfRegistryChanged();
     if (this._klassCache) return this._klassCache;
     const anonymousClass = this._delegate.options.anonymousClass as typeof Base | undefined;
     this._klassCache = anonymousClass ?? this._delegate._klass(this.className);
@@ -1622,6 +1647,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get sourceReflection(): AssociationReflection | ThroughReflection | null {
+    this.expireCachesIfRegistryChanged();
     if (this._sourceReflectionCache !== undefined) return this._sourceReflectionCache;
     const srcName = this.sourceReflectionName();
     if (!srcName) {
@@ -1644,6 +1670,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   get throughReflection(): AssociationReflection | ThroughReflection | null {
+    this.expireCachesIfRegistryChanged();
     if (this._throughReflectionCache !== undefined) return this._throughReflectionCache;
     const through = this.activeRecord._reflectOnAssociation(this.through) ?? null;
     this._throughReflectionCache = through;
@@ -1772,6 +1799,7 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   sourceReflectionName(): string | null {
+    this.expireCachesIfRegistryChanged();
     if (this._sourceReflectionNameCache !== undefined) return this._sourceReflectionNameCache;
 
     if (this.options.source) {
