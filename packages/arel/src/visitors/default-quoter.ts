@@ -121,6 +121,16 @@ export const mysqlDefaultQuoter: ArelConnection = {
     return "FALSE";
   },
 
+  // Mirrors ActiveRecord MySQL::Quoting — `quoted_true`/`quoted_false` are
+  // inherited, but the unquoted pair is overridden to 1/0
+  // (`mysql/quoting.rb:72-79`).
+  unquotedTrue(): number {
+    return 1;
+  },
+  unquotedFalse(): number {
+    return 0;
+  },
+
   // Mirrors ActiveRecord MySQL::Quoting#cast_bound_value: numerics/booleans
   // serialize to their string form (1/0 for booleans) before binding.
   castBoundValue(value: unknown): unknown {
@@ -175,6 +185,16 @@ export const defaultQuoter: ArelConnection = {
     return "FALSE";
   },
 
+  // Mirrors ActiveRecord Quoting#unquoted_true/#unquoted_false: the abstract
+  // adapter returns Ruby true/false (`abstract/quoting.rb:170-180`). PostgreSQL
+  // does not override the pair, so it inherits these.
+  unquotedTrue(): boolean {
+    return true;
+  },
+  unquotedFalse(): boolean {
+    return false;
+  },
+
   // Mirrors ActiveRecord Quoting#cast_bound_value: the abstract adapter
   // returns the value unchanged.
   castBoundValue(value: unknown): unknown {
@@ -202,7 +222,9 @@ export const postgresqlDefaultQuoter: ArelConnection = {
       // `type_cast_array` → `type_cast` → `when Date, Time then quoted_date`
       // (abstract/quoting.rb:94-107). quoteArrayLiteral applies the `"..."`
       // quoting, so the hook returns the bare form.
-      const literal = quoteArrayLiteral(value, (v) => (isDateLike(v) ? quotedDate(v) : undefined));
+      const literal = quoteArrayLiteral(value, this, (v) =>
+        isDateLike(v) ? quotedDate(v) : undefined,
+      );
       return `'${literal.replace(/'/g, "''")}'`;
     }
     return quoteScalar.call(this, value);

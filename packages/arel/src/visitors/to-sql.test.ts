@@ -1934,6 +1934,8 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
       quotedBinary: (v) => `'${v}'`,
       quotedTrue: () => "TRUE",
       quotedFalse: () => "FALSE",
+      unquotedTrue: () => true,
+      unquotedFalse: () => false,
       sanitizeAsSqlComment: (v) => v,
       castBoundValue: (v) => v,
     };
@@ -1958,6 +1960,8 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
       },
       quotedTrue: () => "TRUE",
       quotedFalse: () => "FALSE",
+      unquotedTrue: () => true,
+      unquotedFalse: () => false,
       sanitizeAsSqlComment: (v) => v,
       castBoundValue: (v) => v,
     };
