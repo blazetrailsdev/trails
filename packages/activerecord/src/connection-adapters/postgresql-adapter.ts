@@ -70,7 +70,7 @@ import {
 } from "../errors.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
+import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { JoinTableOptions } from "./abstract/schema-statements.js";
 import {
@@ -936,7 +936,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * this override is the Rails-faithful PG version that actually
    * populates them.
    */
+  // Public `exec_query` is wrapped by `dirties_query_cache`; the actual work
+  // lives in `internal_exec_query` (Rails' structure), which `select_all`
+  // routes through so cached reads never clear the cache.
   override async execQuery(
+    sql: string,
+    name?: string | null,
+    binds?: unknown[],
+    options?: { prepare?: boolean; allowRetry?: boolean },
+  ): Promise<Result> {
+    return this.internalExecQuery(sql, name, binds, options);
+  }
+
+  override async internalExecQuery(
     sql: string,
     name?: string | null,
     binds?: unknown[],
@@ -5204,17 +5216,19 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
 // the abstract `truncateTables` emits Rails' combined form instead of N per-table ones.
 (PostgreSQLAdapter.prototype as any).buildTruncateStatements = pgBuildTruncateStatements;
 
-// `executeMutation` is this adapter's write/DDL primitive (reads go through the
-// overridden `execQuery`), so dirtying it clears the query cache on writes and
-// schema changes — the trails analogue of Rails' `dirties_query_cache base,
-// :execute` for the write side.
-dirtiesQueryCache(PostgreSQLAdapter, "executeMutation");
-// `execInsert`'s multi-column RETURNING read-back runs through `internalExecQuery`
-// rather than `executeMutation`, so dirty it too — otherwise a subsequent read
-// could be served stale from the query cache after such an INSERT. (The
-// single-column path delegates to `executeMutation`, which is already dirtied;
-// the double-clear there is a harmless no-op.)
-dirtiesQueryCache(PostgreSQLAdapter, "execInsert");
+// `dirties_query_cache` for the write methods this adapter OVERRIDES (Rails
+// query_cache.rb:13). Overridden methods must be wrapped on the concrete class,
+// not on AbstractAdapter, or the override would run unwrapped. The write methods
+// this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
+// `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
+// Each logical write clears the cache exactly once; the still-lower
+// `executeMutation` these funnel through stays unwrapped, and reads route
+// through `internalExecQuery` (never tripping the wrapper).
+dirtiesQueryCache(PostgreSQLAdapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
+// Schema reflection reuses the wrapped `execute`/`exec_query` with name
+// "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
+// use the schema-aware variant here — those reflection reads must not dirty.
+dirtiesQueryCacheExceptSchema(PostgreSQLAdapter, "execQuery", "execute");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers

@@ -469,6 +469,26 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
   };
 }
 
+/** @internal Reassign each named prototype slot to a cache-dirtying wrapper. */
+function wireDirties(
+  base: { prototype: object },
+  methodNames: string[],
+  skipSchemaReflection: boolean,
+): void {
+  const proto = base.prototype as Record<string, unknown>;
+  for (const methodName of methodNames) {
+    const original = proto[methodName];
+    if (typeof original !== "function") continue;
+
+    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
+      if (this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"))) {
+        this._queryCache.clear();
+      }
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
+    };
+  }
+}
+
 /**
  * Wraps the named write methods on `base.prototype` so each clears the
  * per-connection query cache (when its `dirties` flag is set) before
@@ -480,18 +500,27 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache.dirties_query_cache
  */
 export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
-  const proto = base.prototype as Record<string, unknown>;
-  for (const methodName of methodNames) {
-    const original = proto[methodName];
-    if (typeof original !== "function") continue;
+  wireDirties(base, methodNames, false);
+}
 
-    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      if (this._queryCache?.dirties) {
-        this._queryCache.clear();
-      }
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
-    };
-  }
+/**
+ * Like {@link dirtiesQueryCache}, but skips the clear for schema-reflection
+ * queries (name `"SCHEMA"`). Use this ONLY for `execute`/`execQuery`: Rails
+ * routes schema reflection through the permanently-unwrapped `internal_exec_query`,
+ * so it never dirties the cache, whereas trails reuses the wrapped
+ * `execute`/`exec_query` (with name `"SCHEMA"`) for reflection. Skipping those
+ * reproduces Rails' behavior (otherwise re-reflecting columns inside a `cache`
+ * block would evict the cache). This is deliberately NOT applied to the generic
+ * write wiring — a real mutation whose `name` happened to be `"SCHEMA"` (e.g.
+ * `truncate(table, "SCHEMA")`) must still dirty — and within `execute`/`execQuery`
+ * the only non-SQL string argument is the `name`, so the check can't false-match
+ * a bind (binds are passed as an array, never the bare string `"SCHEMA"`).
+ */
+export function dirtiesQueryCacheExceptSchema(
+  base: { prototype: object },
+  ...methodNames: string[]
+): void {
+  wireDirties(base, methodNames, true);
 }
 
 /**

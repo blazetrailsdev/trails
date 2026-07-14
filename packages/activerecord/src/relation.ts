@@ -3349,8 +3349,12 @@ export class Relation<T extends Base> {
     // finder_methods.rb) — so LogSubscriber labels it instead of falling back
     // to the adapter's generic "SQL" default.
     const [existsSql, existsBinds] = this._compileAstWithBinds(probe.toArel().ast);
+    // Rails: `select_rows(relation.arel, "#{name} Exists?")` — the cached read
+    // path (select_rows → select_all), so repeated `exists?` probes inside a
+    // `cache` block are served from the query cache. Routing through the raw
+    // `execute()` here would bypass the cached `selectAll` override.
     const rows = await this._withQueryConnection(() =>
-      this._conn().execute(existsSql, existsBinds, `${this._modelClass.name} Exists?`),
+      this._conn().selectRows(existsSql, `${this._modelClass.name} Exists?`, existsBinds),
     );
     // Rails: `select_rows(...).size == 1` — with LIMIT 1 the probe returns at
     // most one row, so a non-empty result means a match.
