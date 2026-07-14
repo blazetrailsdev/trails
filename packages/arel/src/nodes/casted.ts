@@ -67,18 +67,14 @@ export class Casted extends NodeExpression {
     this.attribute = attribute;
   }
 
-  valueForDatabase(): unknown {
-    const attr = this.attribute as unknown as {
-      isAbleToTypeCast?: () => boolean;
-      typeCastForDatabase?: (v: unknown) => unknown;
-    };
-    if (attr?.isAbleToTypeCast?.() && attr.typeCastForDatabase) {
-      return attr.typeCastForDatabase(this.value);
-    }
+  valueBeforeTypeCast(): unknown {
     return this.value;
   }
 
-  valueBeforeTypeCast(): unknown {
+  valueForDatabase(): unknown {
+    if (this.attribute.isAbleToTypeCast()) {
+      return this.attribute.typeCastForDatabase(this.value);
+    }
     return this.value;
   }
 
@@ -101,6 +97,10 @@ export class Quoted extends Unary {
     return this.expr;
   }
 
+  valueBeforeTypeCast(): unknown {
+    return this.value;
+  }
+
   valueForDatabase(): unknown {
     return this.value;
   }
@@ -109,10 +109,6 @@ export class Quoted extends Unary {
     if (this.value === Infinity) return 1;
     if (this.value === -Infinity) return -1;
     return null;
-  }
-
-  valueBeforeTypeCast(): unknown {
-    return this.value;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
