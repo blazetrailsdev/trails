@@ -336,7 +336,15 @@ export function unquotedFalse(): boolean {
  * `null` if the value is not one. Rails' `quoted_binary` family takes a
  * `Type::Binary::Data` and calls `value.to_s` / `value.hex`; trails' `quote`
  * unwraps to bytes before dispatching, and the adapters' boundary branches pass
- * raw views — so every implementation must accept the union.
+ * raw views — so an implementation has to accept that union to be callable
+ * either way.
+ *
+ * The abstract, MySQL and SQLite `quotedBinary` route through this. PG's
+ * hand-rolls the unwrap instead and omits `ArrayBuffer` from its signature, so
+ * a direct `pgQuotedBinary(dataView)` raises where the other two hex it —
+ * unreachable via `quote` (which normalises views first) and via PG's own
+ * adapter override (which handles `ArrayBuffer` separately). Converging it is
+ * story `pg-quoted-binary-route-through-tobytes` (RFC 0023).
  *
  * @internal
  */
