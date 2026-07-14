@@ -21,6 +21,7 @@ import { Map as MapCaster } from "./type-caster/map.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { Book } from "./test-helpers/models/book.js";
+import { Lion } from "./test-helpers/models/cat.js";
 
 describe("Enum name conflict detection", () => {
   // Rails' `detect_enum_conflict!(name, name)` uses `dangerous_attribute_method?`,
@@ -550,5 +551,32 @@ describe("Enum acronym method name consistency", () => {
         }
       }
     }).toThrow(/generate a instance method "isValid", which is already defined/);
+  });
+});
+
+// The `Lion < abstract Cat` case with the real canonical models: `Cat` is
+// abstract and declares `enum :gender`, but only the concrete `Lion` has the
+// backing `lions.gender` column. Rails replays the abstract parent's pending
+// decorator into the subclass's attribute set, so the enum must resolve — and
+// its generated predicate must serialize through the *record's* class, not the
+// tableless parent it was declared on (pre-fix that raised `TableNotSpecified`;
+// PR #4814 covered it only with synthetic `books`-backed classes).
+describe("Enum inherited from an abstract parent (Lion < Cat)", () => {
+  fixtures(["lions"]);
+
+  it("materializes and answers predicates on the concrete subclass", async () => {
+    expect(() => Lion._defaultAttributes()).not.toThrow();
+
+    const lion = new Lion({ gender: "female" });
+    expect(lion.isFemale()).toBe(true);
+    expect(lion.isMale()).toBe(false);
+
+    // Cat's `default_scope { where(is_vegetarian: false) }` must materialize
+    // its scope-for-create cleanly through the abstract parent.
+    expect(lion.is_vegetarian).toBe(false);
+
+    await lion.save();
+    const found = await Lion.find(lion.id);
+    expect(found.isFemale()).toBe(true);
   });
 });
