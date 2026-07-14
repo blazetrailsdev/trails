@@ -227,5 +227,12 @@ describe("Predications range semantics", () => {
       const node = id.notBetween({ begin: Infinity, end: null });
       expect(node).toBeInstanceOf(Nodes.NotIn);
     });
+
+    it("..-Infinity (both bounds open-ended) still becomes NotIn([]) via infinity?", () => {
+      // Covers the second disjunct of predications.rb:89,
+      // `infinity?(other.end) == -1`.
+      const node = id.notBetween({ begin: null, end: -Infinity });
+      expect(node).toBeInstanceOf(Nodes.NotIn);
+    });
   });
 });

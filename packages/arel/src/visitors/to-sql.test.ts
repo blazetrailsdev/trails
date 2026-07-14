@@ -83,7 +83,8 @@ describe("the to_sql visitor", () => {
   // `values.delete_if { |v| unboundable?(v) }`.
   describe("unboundable values in IN / NOT IN lists", () => {
     // Rails' PredicateBuilder wraps out-of-range bounds in a QueryAttribute,
-    // which `Nodes.build_quoted` passes through unwrapped (casted.rb:55) so it
+    // which `Nodes.build_quoted` passes through unwrapped (casted.rb:50-51 —
+    // the `when ..., ActiveModel::Attribute` arm returning `other`) so it
     // answers `unboundable?` to the visitor directly (to_sql.rb:905-907).
     // Trails' equivalent is a BindParam, whose `isUnboundable` delegates to its
     // value (bind_param.rb:39-40). Only that shape short-circuits.

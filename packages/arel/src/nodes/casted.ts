@@ -28,7 +28,8 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other && typeof other === "object") {
     // Arel::Attributes::Attribute (duck-typed via symbol brand)
     if ((other as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true) return other as Node;
-    // ActiveModel::Attribute duck-type (Rails: casted.rb:55 `ActiveModel::Attribute`).
+    // ActiveModel::Attribute duck-type (Rails: casted.rb:50-51 — the
+    // `when ..., ActiveModel::Attribute` arm returning `other`).
     // Structural check so buildQuoted doesn't require a runtime import here.
     // valueForDatabase is a getter (not a method) on the TS port; check via 'in'.
     if (
@@ -67,6 +68,10 @@ export class Casted extends NodeExpression {
     this.attribute = attribute;
   }
 
+  valueBeforeTypeCast(): unknown {
+    return this.value;
+  }
+
   valueForDatabase(): unknown {
     const attr = this.attribute as unknown as {
       caster?: { typeCastForDatabase(v: unknown): unknown };
@@ -79,10 +84,6 @@ export class Casted extends NodeExpression {
     if (attr?.isAbleToTypeCast?.() && attr.typeCastForDatabase) {
       return attr.typeCastForDatabase(this.value);
     }
-    return this.value;
-  }
-
-  valueBeforeTypeCast(): unknown {
     return this.value;
   }
 
@@ -105,6 +106,10 @@ export class Quoted extends Unary {
     return this.expr;
   }
 
+  valueBeforeTypeCast(): unknown {
+    return this.value;
+  }
+
   valueForDatabase(): unknown {
     return this.value;
   }
@@ -113,10 +118,6 @@ export class Quoted extends Unary {
     if (this.value === Infinity) return 1;
     if (this.value === -Infinity) return -1;
     return null;
-  }
-
-  valueBeforeTypeCast(): unknown {
-    return this.value;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
