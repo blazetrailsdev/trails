@@ -1,3 +1,8 @@
+import type { ArelConnection } from "./visitors/connection.js";
+
+/** The slice of the connection an array element's `type_cast` needs. */
+export type ArrayElementQuoter = Pick<ArelConnection, "unquotedTrue" | "unquotedFalse">;
+
 /**
  * Type-casts an element to the text `PG::TextEncoder::Array` would be handed,
  * i.e. the BARE content — the encoder decides `"..."` quoting from that text.
@@ -45,14 +50,24 @@ function encodeArrayElement(text: string | null): string {
   return text;
 }
 
-function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement): string | null {
+function typeCastArrayElement(
+  value: unknown,
+  connection: ArrayElementQuoter,
+  formatElement?: FormatArrayElement,
+): string | null {
   const formatted = formatElement?.(value);
   if (formatted !== undefined) return formatted;
   // boundary: JS has no nil/undefined distinction to port — Rails' type_cast
   // takes nil through `when nil` and raises TypeError on anything unmapped.
   if (value === null || value === undefined) return null;
   if (typeof value === "number") return String(value);
-  if (typeof value === "boolean") return value ? "TRUE" : "FALSE";
+  // `when true then unquoted_true` / `when false then unquoted_false`
+  // (`abstract/quoting.rb:94-107`) — NOT the `quoted_true`/`quoted_false` pair
+  // `quote` uses (`:166-180`). PG inherits Ruby true/false, so this yields the
+  // bare `true` encodeArrayElement then leaves unquoted; MySQL and SQLite
+  // override the pair to 1/0.
+  if (typeof value === "boolean")
+    return String(value ? connection.unquotedTrue() : connection.unquotedFalse());
   // boundary: defensive Date formatting for caller-supplied array literals.
   // Duck-typed rather than `instanceof Date` so cross-realm dates and Temporal
   // land here too; a real Date satisfies it, so it needs no arm of its own.
@@ -80,13 +95,17 @@ function typeCastArrayElement(value: unknown, formatElement?: FormatArrayElement
  *
  * Shared between the Arel PostgreSQL visitor and ActiveRecord's inline SQL quoting.
  */
-export function quoteArrayLiteral(arr: unknown[], formatElement?: FormatArrayElement): string {
+export function quoteArrayLiteral(
+  arr: unknown[],
+  connection: ArrayElementQuoter,
+  formatElement?: FormatArrayElement,
+): string {
   const elements = arr.map((v) => {
     // Nested arrays recurse before the hook, per `type_cast_array`'s
     // `when ::Array` arm; every other element is offered to it uniformly,
     // as Rails dispatches all non-array elements into `type_cast`.
-    if (Array.isArray(v)) return quoteArrayLiteral(v, formatElement);
-    return encodeArrayElement(typeCastArrayElement(v, formatElement));
+    if (Array.isArray(v)) return quoteArrayLiteral(v, connection, formatElement);
+    return encodeArrayElement(typeCastArrayElement(v, connection, formatElement));
   });
   return `{${elements.join(",")}}`;
 }

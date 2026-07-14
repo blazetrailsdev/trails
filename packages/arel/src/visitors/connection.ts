@@ -24,6 +24,18 @@ export interface ArelConnection {
   /** @internal */
   quotedFalse(): string;
   /**
+   * The bare (un-quoted) boolean literals. Rails' `type_cast` uses this pair —
+   * not `quoted_true`/`quoted_false` — for booleans (`abstract/quoting.rb:94-107`),
+   * and PostgreSQL's `encode_array` routes every array element through
+   * `type_cast_array` -> `type_cast`. MySQL and SQLite both override the pair to
+   * `1`/`0` (`mysql/quoting.rb:72-79`, `sqlite3/quoting.rb:87-97`), so array
+   * elements must dispatch through the connection to reach the right literal.
+   * @internal
+   */
+  unquotedTrue(): boolean | number;
+  /** @internal */
+  unquotedFalse(): boolean | number;
+  /**
    * Sanitize a string for inclusion inside a SQL comment (optimizer hints,
    * query annotations). Mirrors Rails' `@connection.sanitize_as_sql_comment`,
    * which the Arel visitor delegates to so each adapter applies its own

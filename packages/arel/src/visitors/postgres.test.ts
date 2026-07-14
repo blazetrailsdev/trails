@@ -380,6 +380,18 @@ describe("PostgresTest", () => {
       const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([[d]]));
       expect(sql).toContain("'{{\"2026-04-26 14:23:55\"}}'");
     });
+
+    it("emits boolean array elements unquoted, as encode_array does", () => {
+      // PostgreSQL does not override unquoted_true (only mysql/quoting.rb:72 and
+      // sqlite3/quoting.rb:87 do), so it inherits Ruby true/false and
+      // encode_array emits '{true,false}'. The scalar path keeps quoted_true's
+      // TRUE — the two pairs legitimately differ.
+      const sql = new Visitors.PostgreSQL().compile(users.get("flags").eq([true, false]));
+      expect(sql).toContain("'{true,false}'");
+
+      const scalar = new Visitors.PostgreSQL().compile(users.get("flag").eq(true));
+      expect(scalar).toContain("TRUE");
+    });
   });
 });
 
