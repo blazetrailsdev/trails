@@ -119,9 +119,8 @@ describe("quoteArrayLiteral", () => {
       // The encoder stage never inspects type — it sees only the text
       // `type_cast` produced. These strings need no quoting, so they emit bare
       // and become indistinguishable from the scalars they resemble, exactly
-      // as `PG::TextEncoder::Array` does. (The *boolean* `true` still encodes
-      // as `{TRUE}` until #4869 converges the type_cast arm onto
-      // `unquoted_true`; that divergence lives in the cast stage, not here.)
+      // as `PG::TextEncoder::Array` does — the boolean `true` also encodes
+      // bare, via `unquoted_true`.
       expect(quoteArrayLiteral(["true"], defaultQuoter)).toBe("{true}");
       expect(quoteArrayLiteral(["1"], defaultQuoter)).toBe("{1}");
     });
