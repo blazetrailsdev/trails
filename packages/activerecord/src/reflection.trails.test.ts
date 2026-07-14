@@ -11,6 +11,7 @@ import { Base, reflectOnAssociation, registerModel } from "./index.js";
 import { Associations, modelRegistry } from "./associations.js";
 import {
   AssociationReflection,
+  ThroughReflection,
   belongsToCounterCacheColumn,
   counterCacheColumnOption,
   resolveAliasedColumn,
@@ -196,6 +197,48 @@ describe("ReflectionTest", () => {
     registerModel("ShInvTarget", ShInvSecond);
     expect(ref.klass).toBe(ShInvSecond);
     expect(ref.inverseOf()!.activeRecord).toBe(ShInvSecond);
+  });
+
+  it("through reflection inverse_of re-resolves when the registry rebinds the class name", () => {
+    // ThroughReflection keeps its own _inverseOfCache holding a reflection
+    // resolved off its klass, so it needs the same gate as the
+    // AssociationReflection memo — a healed klass must not still hand back an
+    // inverse owned by the previous target.
+    class TiTagFirst extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("tiPosts", { className: "TiPost" });
+      }
+    }
+    class TiTagSecond extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("tiPosts", { className: "TiPost" });
+      }
+    }
+    class TiTagging extends Base {
+      static {
+        this.attribute("name", "string");
+        this.belongsTo("tiTag", { className: "TiTag" });
+      }
+    }
+    class TiPost extends Base {
+      static {
+        this.attribute("name", "string");
+        this.hasMany("tiTaggings", { className: "TiTagging" });
+        this.hasMany("tiTags", { through: "tiTaggings", source: "tiTag", inverseOf: "tiPosts" });
+      }
+    }
+    registerModel("TiPost", TiPost);
+    registerModel("TiTagging", TiTagging);
+    registerModel("TiTag", TiTagFirst);
+
+    const ref = reflectOnAssociation(TiPost, "tiTags") as ThroughReflection;
+    expect(ref.inverseOf()!.activeRecord).toBe(TiTagFirst);
+
+    registerModel("TiTag", TiTagSecond);
+    expect(ref.klass).toBe(TiTagSecond);
+    expect(ref.inverseOf()!.activeRecord).toBe(TiTagSecond);
   });
 
   it("through reflection source re-resolves when the through target is rebound", () => {

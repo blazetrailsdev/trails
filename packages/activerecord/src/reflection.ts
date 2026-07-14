@@ -1509,12 +1509,34 @@ export class ThroughReflection extends AbstractReflection {
   }
 
   /**
-   * Every memo below is derived from classes resolved out of the model
-   * registry, so they all go stale together when a name is rebound to a
+   * Every memo this class owns (klass, through/source, and the inverse
+   * reflection resolved off `klass`) derives from classes resolved out of the
+   * model registry, so they all go stale together when a name is rebound to a
    * different class. Drop them as a unit rather than returning a target that
-   * the registry no longer maps this reflection to.
+   * the registry no longer maps this reflection to. `inverseName` is absent
+   * because it delegates to the AssociationReflection memo, which gates itself.
    * @internal
    */
+  /**
+   * Record the generation this reflection's memos are valid at.
+   *
+   * Every resolving caller stamps *after* it resolves, never before: resolving
+   * can autoload-and-register a class and bump the generation mid-flight, and
+   * stamping the pre-resolve value would leave the memo flagged stale the moment
+   * it is written, forcing the next touch of any memo here to wipe and recompute
+   * the whole through/source chain. The error paths stamp too — a resolve that
+   * threw can have bumped the generation just as easily as one that succeeded (a
+   * namespaced candidate walk may register a class and then reject it), and the
+   * negative memo they write is just as much a memo.
+   *
+   * `expireCachesIfRegistryChanged` is the one caller that stamps at entry; see
+   * its comment for why.
+   * @internal
+   */
+  private stampGeneration(): void {
+    this._cacheGeneration = modelRegistry.generation;
+  }
+
   private expireCachesIfRegistryChanged(): void {
     // Stamps at *entry* so a nested getter (sourceReflection → sourceReflectionName
     // → throughReflection) doesn't re-clear what its caller is mid-way through
@@ -1523,11 +1545,12 @@ export class ThroughReflection extends AbstractReflection {
     // through/source chain on the next touch.
 
     if (this._cacheGeneration === modelRegistry.generation) return;
-    this._cacheGeneration = modelRegistry.generation;
+    this.stampGeneration();
     this._klassCache = null;
     this._sourceReflectionCache = undefined;
     this._throughReflectionCache = undefined;
     this._sourceReflectionNameCache = undefined;
+    this._inverseOfCache = undefined;
   }
 
   get name(): string {
@@ -1639,7 +1662,7 @@ export class ThroughReflection extends AbstractReflection {
     // synchronous resolve is an autoload registering a name that was, by
     // definition, absent from the registry — a registry *miss* is what triggers
     // the autoload — so it cannot change what any earlier lookup resolved to.
-    this._cacheGeneration = modelRegistry.generation;
+    this.stampGeneration();
     return this._klassCache;
   }
 
@@ -1706,10 +1729,11 @@ export class ThroughReflection extends AbstractReflection {
     try {
       const src = throughRef.klass._reflectOnAssociation(srcName) ?? null;
       this._sourceReflectionCache = src;
-      this._cacheGeneration = modelRegistry.generation;
+      this.stampGeneration();
       return src;
     } catch {
       this._sourceReflectionCache = null;
+      this.stampGeneration();
       return null;
     }
   }
@@ -1719,7 +1743,7 @@ export class ThroughReflection extends AbstractReflection {
     if (this._throughReflectionCache !== undefined) return this._throughReflectionCache;
     const through = this.activeRecord._reflectOnAssociation(this.through) ?? null;
     this._throughReflectionCache = through;
-    this._cacheGeneration = modelRegistry.generation;
+    this.stampGeneration();
     return through;
   }
 
@@ -1824,10 +1848,12 @@ export class ThroughReflection extends AbstractReflection {
     // the underlying reflection would resolve the inverse against the delegate's
     // name-derived klass (`leadDeveloper` → nonexistent `LeadDeveloper`) instead
     // of the source class (`Developer`).
+    this.expireCachesIfRegistryChanged();
     const name = this.inverseName();
     if (!name) return null;
     if (this._inverseOfCache !== undefined) return this._inverseOfCache;
     this._inverseOfCache = this.klass._reflectOnAssociation(name) ?? null;
+    this.stampGeneration();
     return this._inverseOfCache;
   }
   private _inverseOfCache: AssociationReflection | ThroughReflection | null | undefined = undefined;
@@ -1872,10 +1898,11 @@ export class ThroughReflection extends AbstractReflection {
         );
       }
       this._sourceReflectionNameCache = matching[0] ?? null;
-      this._cacheGeneration = modelRegistry.generation;
+      this.stampGeneration();
     } catch (e: unknown) {
       if (e instanceof AmbiguousSourceReflectionForThroughAssociation) throw e;
       this._sourceReflectionNameCache = null;
+      this.stampGeneration();
     }
     return this._sourceReflectionNameCache ?? null;
   }
