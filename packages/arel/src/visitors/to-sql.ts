@@ -2006,35 +2006,28 @@ export class ToSql extends Visitor {
   }
 
   /**
-   * Mirrors `to_sql.rb#unboundable?` returning a sign — `1` for +∞, `-1`
-   * for -∞, `0` for bounded values. Comparison visitors `case` on the
-   * sign; equality/IN visitors use a truthy check (`sign !== 0`).
+   * Mirrors `to_sql.rb#unboundable?` (to_sql.rb:905-907), returning the sign
+   * the Ruby predicate yields so the comparison visitors can `case` on it:
    *
-   * Unwraps Quoted/Casted/BindParam to inspect the wrapped value, and
-   * recognises `Float::INFINITY` analogues (`±Infinity`) plus any value
-   * exposing `isInfinite()` / `isUnboundable()`.
+   *     value.respond_to?(:unboundable?) && value.unboundable?
+   *
+   * It is purely duck-typed. Only two types answer it: `BindParam`
+   * (bind_param.rb:39-40, itself delegating to its value) and
+   * `QueryAttribute` (query_attribute.rb:46-51), where it means "serializes
+   * out of the column's range" (`value <=> 0`) — NOT "is infinite".
+   *
+   * `infinite?` is a different predicate: it exists on `Casted`
+   * (casted.rb:43-45) for `Predications#open_ended?` (predications.rb:248) and
+   * is never consulted by the visitor. So a raw `Float::INFINITY`, or a
+   * `Quoted`/`Casted` wrapping one, is bounded here and renders as a value
+   * rather than collapsing.
    */
   protected unboundableSign(value: unknown): 1 | -1 | 0 {
-    if (value === Infinity) return 1;
-    if (value === -Infinity) return -1;
-    if (value && typeof value === "object") {
-      const v = value as {
-        value?: unknown;
-        isInfinite?: () => unknown;
-        isUnboundable?: () => unknown;
-      };
-      if (typeof v.isInfinite === "function") {
-        const r = v.isInfinite();
-        if (r === 1) return 1;
-        if (r === -1) return -1;
-      }
-      if (typeof v.isUnboundable === "function") {
-        const r = v.isUnboundable();
-        if (r === 1 || r === true) return 1;
-        if (r === -1) return -1;
-      }
-      if ("value" in v) return this.unboundableSign(v.value);
-    }
+    const v = value as { isUnboundable?: () => unknown } | null | undefined;
+    if (typeof v?.isUnboundable !== "function") return 0;
+    const r = v.isUnboundable();
+    if (r === 1 || r === true) return 1;
+    if (r === -1) return -1;
     return 0;
   }
 
