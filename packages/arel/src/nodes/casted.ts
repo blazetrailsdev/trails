@@ -62,7 +62,8 @@ import { BindParam } from "./bind-param.js";
  * bypasses this function still reaches it. Both of Rails' own pre-emptive
  * `when ... ActiveModel::Attribute` arms are ported and each gets there by its
  * own route:
- * - `visitArelNodesValuesList` (Rails to_sql.rb:110) calls `visit` on it,
+ * - `visitArelNodesValuesList` (Rails to_sql.rb:109-110 — the `when` arm at
+ *   :109, its `visit(value)` at :110) calls `visit` on it,
  *   which resolves via the ActiveModel::Attribute dispatch registration —
  *   trails' analogue of Ruby's name-derived dispatch + ancestors walk;
  * - `visitArelNodesAssignment` (Rails to_sql.rb:632) hands it to

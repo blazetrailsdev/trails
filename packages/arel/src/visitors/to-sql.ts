@@ -541,8 +541,8 @@ export class ToSql extends Visitor {
     // by Node ctors; dispatch only ever reads `object.constructor`.
     //
     // This is load-bearing, not a safety net: `visitArelNodesValuesList` ports
-    // Rails' `when ..., ActiveModel::Attribute` arm (to_sql.rb:110) by calling
-    // `visit(value)` on it. Without an entry here that call finds no dispatch
+    // Rails' `when ..., ActiveModel::Attribute` arm (to_sql.rb:109) by calling
+    // `visit(value)` on it (:110). Without an entry here that call finds no dispatch
     // target and raises UnsupportedVisitError, so an attribute in an INSERT
     // values row cannot bind.
     reg(ModelAttribute as unknown as NodeCtor, "visitActiveModelAttribute");
