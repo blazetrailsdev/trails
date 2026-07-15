@@ -66,7 +66,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 
   it("seeds the holder without resolving the target class from the registry", () => {
     const child = new CpkSeedChild();
-    const parent = new CompositePkParent({ shop_id: 1, id: 2 });
+    const parent = new CompositePkParent({ id: [1, 2] });
 
     expect(() => child.association("compositePkParent").setTarget(parent)).not.toThrow();
 
@@ -77,7 +77,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 
   it("reads the target PK from the held instance, not the registry", () => {
     const child = new CpkSeedChild();
-    const parent = new CompositePkParent({ shop_id: 1, id: 2 });
+    const parent = new CompositePkParent({ id: [1, 2] });
 
     // Build the holder first (constructor-level checkKlass resolves the class);
     // the spy only guards the setTarget → staleState → foreignKeyNames path.
@@ -94,7 +94,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 
   it("scalar FK + composite-PK target collapses to id component on assignment", () => {
     const child = new CpkSeedChild();
-    const parent = new CompositePkParent({ shop_id: 7, id: 42 });
+    const parent = new CompositePkParent({ id: [7, 42] });
 
     (child.association("compositePkParent") as unknown as { writer(target: unknown): void }).writer(
       parent,
@@ -105,7 +105,7 @@ describe("belongs_to inverse seeding with a composite-PK target", () => {
 
   it("infers id as the association primary key for a [tenant_key, id]-PK target", () => {
     const child = new CpkSeedChild();
-    const parent = new CompositePkParent({ shop_id: 7, id: 42 });
+    const parent = new CompositePkParent({ id: [7, 42] });
 
     const holder = child.association("compositePkParent") as unknown as {
       associationPrimaryKeys(target: unknown): string[];

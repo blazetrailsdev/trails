@@ -52,10 +52,10 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   async function seedBooks(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
     await CpkAuthor.create({ id: 2, name: "Author Two" });
-    await CpkBook.create({ author_id: 1, id: 1, title: "Alpha", revision: 1 });
-    await CpkBook.create({ author_id: 1, id: 2, title: "Beta", revision: 2 });
-    await CpkBook.create({ author_id: 2, id: 3, title: "Gamma", revision: 3 });
-    await CpkChapter.create({ author_id: 1, id: 10, book_id: 1, title: "ch-1" });
+    await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 1 });
+    await CpkBook.create({ id: [1, 2], title: "Beta", revision: 2 });
+    await CpkBook.create({ id: [2, 3], title: "Gamma", revision: 3 });
+    await CpkChapter.create({ id: [1, 10], book_id: 1, title: "ch-1" });
   }
 
   it("eagerLoad('chapters') builds a composite FK↔PK tuple JOIN node", () => {

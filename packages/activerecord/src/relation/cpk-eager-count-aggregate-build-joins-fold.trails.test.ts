@@ -41,11 +41,11 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   async function seedBooksWithChapters(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
-    await CpkBook.create({ author_id: 1, id: 1, title: "Alpha", revision: 1 });
-    await CpkBook.create({ author_id: 1, id: 2, title: "Beta", revision: 2 });
+    await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 1 });
+    await CpkBook.create({ id: [1, 2], title: "Beta", revision: 2 });
     // Two chapters on book 1 would fan the row count to 3 without DISTINCT.
-    await CpkChapter.create({ author_id: 1, id: 10, book_id: 1, title: "ch-1" });
-    await CpkChapter.create({ author_id: 1, id: 11, book_id: 1, title: "ch-2" });
+    await CpkChapter.create({ id: [1, 10], book_id: 1, title: "ch-1" });
+    await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
   }
 
   it("eager_load(:assoc).count on a composite-PK model de-duplicates via DISTINCT", async () => {
@@ -82,13 +82,13 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     // ROWS (Rails) from bounding distinct VALUES: limit(2) by pk order picks
     // books 1 & 2 (rev 5, 5) → COUNT(DISTINCT revision) = 1, whereas truncating
     // the distinct value list {5, 9} to 2 would (wrongly) yield 2.
-    await CpkBook.create({ author_id: 1, id: 1, title: "Alpha", revision: 5 });
-    await CpkBook.create({ author_id: 1, id: 2, title: "Beta", revision: 5 });
-    await CpkBook.create({ author_id: 1, id: 3, title: "Gamma", revision: 9 });
+    await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 5 });
+    await CpkBook.create({ id: [1, 2], title: "Beta", revision: 5 });
+    await CpkBook.create({ id: [1, 3], title: "Gamma", revision: 9 });
     // Chapters on book 1 fan the LEFT OUTER JOIN so the DISTINCT-pk id fetch
     // must de-duplicate.
-    await CpkChapter.create({ author_id: 1, id: 10, book_id: 1, title: "ch-1" });
-    await CpkChapter.create({ author_id: 1, id: 11, book_id: 1, title: "ch-2" });
+    await CpkChapter.create({ id: [1, 10], book_id: 1, title: "ch-1" });
+    await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
   }
 
   it("eager_load(:assoc).limit(n).count(column) bounds ROWS via a DISTINCT-pk id fetch, then re-counts", async () => {
@@ -153,11 +153,11 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
 
   async function seedBooksWithOrders(): Promise<void> {
     await CpkAuthor.create({ id: 1, name: "Author One" });
-    await CpkOrder.create({ shop_id: 1, id: 100, status: "open" });
-    await CpkOrder.create({ shop_id: 1, id: 200, status: "open" });
-    await CpkBook.create({ author_id: 1, id: 1, shop_id: 1, order_id: 100, title: "Alpha" });
-    await CpkBook.create({ author_id: 1, id: 2, shop_id: 1, order_id: 100, title: "Beta" });
-    await CpkBook.create({ author_id: 1, id: 3, shop_id: 1, order_id: 200, title: "Gamma" });
+    await CpkOrder.create({ id: [1, 100], status: "open" });
+    await CpkOrder.create({ id: [1, 200], status: "open" });
+    await CpkBook.create({ id: [1, 1], shop_id: 1, order_id: 100, title: "Alpha" });
+    await CpkBook.create({ id: [1, 2], shop_id: 1, order_id: 100, title: "Beta" });
+    await CpkBook.create({ id: [1, 3], shop_id: 1, order_id: 200, title: "Gamma" });
   }
 
   // Re-key a Map<Order record, value> by the order's `id` component, coercing

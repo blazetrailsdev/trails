@@ -1009,7 +1009,7 @@ describe("EagerAssociationTest", () => {
   it("preloading belongs_to with cpk", async () => {
     // CpkOrder's PK is composite (["shop_id", "id"]), so `order.id` is the
     // `[shop_id, id]` array; the `order_id` FK column wants the scalar `id`.
-    const order = await CpkOrder.create({ shop_id: 2, id: 2 });
+    const order = await CpkOrder.create({ id: [2, 2] });
     const orderId = (order as any).id[1];
     const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
 
@@ -1022,7 +1022,7 @@ describe("EagerAssociationTest", () => {
   });
 
   it("preloading has_many with cpk", async () => {
-    const order = await CpkOrder.create({ shop_id: 2, id: 2 });
+    const order = await CpkOrder.create({ id: [2, 2] });
     const orderId = (order as any).id[1];
     const orderAgreement = await CpkOrderAgreement.create({ order_id: orderId });
 
@@ -1035,11 +1035,10 @@ describe("EagerAssociationTest", () => {
   });
 
   it("preloading has_one with cpk", async () => {
-    const order = await CpkOrder.create({ shop_id: 2, id: 2 });
+    const order = await CpkOrder.create({ id: [2, 2] });
     const orderId = (order as any).id[1];
     const book = await CpkBook.create({
-      author_id: 1,
-      id: 3,
+      id: [1, 3],
       shop_id: order.shop_id,
       order_id: orderId,
     });

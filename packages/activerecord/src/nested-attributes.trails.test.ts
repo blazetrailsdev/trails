@@ -37,7 +37,7 @@ describe("nested attributes (trails-only)", () => {
   it("builds a new belongs_to record with a composite foreign key", async () => {
     CpkBook.acceptsNestedAttributesFor("order");
 
-    const book = await CpkBook.createBang({ author_id: 1, id: 1, title: "T" });
+    const book = await CpkBook.createBang({ id: [1, 1], title: "T" });
     cols(book).orderAttributes = { shop_id: 7, status: "open" };
     await book.save();
 
@@ -52,7 +52,7 @@ describe("nested attributes (trails-only)", () => {
   });
 
   it("find with duplicate composite ids uniqs to a single wrapped record", async () => {
-    await CpkBook.createBang({ author_id: 1, id: 1, title: "Dup" });
+    await CpkBook.createBang({ id: [1, 1], title: "Dup" });
 
     // Rails `find_with_ids` applies `ids.compact.uniq` to the composite tuple
     // list too, so `find([[1, 1], [1, 1]])` collapses to one tuple and returns
@@ -66,7 +66,7 @@ describe("nested attributes (trails-only)", () => {
   });
 
   it("find with variadic duplicate composite ids uniqs to a bare record", async () => {
-    await CpkBook.createBang({ author_id: 2, id: 2, title: "VarDup" });
+    await CpkBook.createBang({ id: [2, 2], title: "VarDup" });
 
     // Rails `expects_array = ids.first.first.is_a?(Array)` is false for a
     // variadic call, so `find([2, 2], [2, 2])` dedupes to one tuple and

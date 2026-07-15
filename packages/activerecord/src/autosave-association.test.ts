@@ -682,7 +682,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     registerModel("AiCpkOrder", AiCpkOrder);
     registerModel("AiCpkOrderAgreement", AiCpkOrderAgreement);
 
-    const order = await AiCpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
+    const order = await AiCpkOrder.create({ id: [1, 1], status: "paid" });
     const a1 = await AiCpkOrderAgreement.create({ signature: "signed" });
     const a2 = await AiCpkOrderAgreement.create({ signature: "signed" });
     const orderAgreements = [a1.id, a2.id];
@@ -746,17 +746,15 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     registerModel("AiCpkTwoOrder", AiCpkTwoOrder);
     registerModel("AiCpkTwoBook", AiCpkTwoBook);
 
-    const order = await AiCpkTwoOrder.create({ shop_id: 1, id: 1, status: "paid" });
+    const order = await AiCpkTwoOrder.create({ id: [1, 1], status: "paid" });
     const b1 = await AiCpkTwoBook.create({
-      author_id: 1,
-      id: 1,
+      id: [1, 1],
       title: "First",
       shop_id: 0,
       order_id: 0,
     });
     const b2 = await AiCpkTwoBook.create({
-      author_id: 1,
-      id: 2,
+      id: [1, 2],
       title: "Second",
       shop_id: 0,
       order_id: 0,
@@ -813,7 +811,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     registerModel("CpkOrderPk", CpkOrderPk);
     registerModel("CpkBookFk", CpkBookFk);
     // has_one with single-column FK on CPK parent (like OrderWithPrimaryKeyAssociatedBook)
-    const order = new CpkOrderPk({ shop_id: 5, id: 7, status: "open" });
+    const order = new CpkOrderPk({ id: [5, 7], status: "open" });
     const book = new CpkBookFk({ signature: "My Book" });
     cacheAssoc(order, "cpkBookFk", book);
     const saved = await order.save();
@@ -2315,8 +2313,8 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
     registerModel("CpkOrder2", CpkOrder2);
     registerModel("CpkBook2", CpkBook2);
     // Provide explicit composite PK values (Rails: Order.create!(id: [1, 2], ...))
-    const order = new CpkOrder2({ shop_id: 1, id: 2, status: "pending" });
-    const book = new CpkBook2({ author_id: 77, id: 77, title: "Composite Key Book" });
+    const order = new CpkOrder2({ id: [1, 2], status: "pending" });
+    const book = new CpkBook2({ id: [77, 77], title: "Composite Key Book" });
     cacheAssoc(order, "cpkBook2", book);
     const saved = await order.save();
     expect(saved).toBe(true);

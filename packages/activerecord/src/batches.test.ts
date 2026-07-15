@@ -1144,9 +1144,9 @@ describe("EachTest", () => {
     // Fixture cpk_orders have null shop_ids (schema uses single-pk id); create
     // explicit records with non-null composite keys so start: works correctly.
     await CpkOrder.deleteAll();
-    await CpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
-    await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
-    await CpkOrder.create({ shop_id: 2, id: 3, status: "cancelled" });
+    await CpkOrder.create({ id: [1, 1], status: "paid" });
+    await CpkOrder.create({ id: [1, 2], status: "paid" });
+    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
     const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
     const order = allOrders[1]; // second
     let firstRelation: any = null;
@@ -1160,9 +1160,9 @@ describe("EachTest", () => {
 
   it(".in_batches should end at the finish option when using composite primary key", async () => {
     await CpkOrder.deleteAll();
-    await CpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
-    await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
-    await CpkOrder.create({ shop_id: 2, id: 3, status: "cancelled" });
+    await CpkOrder.create({ id: [1, 1], status: "paid" });
+    await CpkOrder.create({ id: [1, 2], status: "paid" });
+    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
     const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
     const order = allOrders[allOrders.length - 2]; // second_to_last
     const batches: any[] = [];
@@ -1177,9 +1177,9 @@ describe("EachTest", () => {
 
   it(".in_batches with scope and using composite primary key", async () => {
     await CpkOrder.deleteAll();
-    await CpkOrder.create({ shop_id: 1, id: 1, status: "paid" });
-    await CpkOrder.create({ shop_id: 1, id: 2, status: "paid" });
-    await CpkOrder.create({ shop_id: 2, id: 3, status: "cancelled" });
+    await CpkOrder.create({ id: [1, 1], status: "paid" });
+    await CpkOrder.create({ id: [1, 2], status: "paid" });
+    await CpkOrder.create({ id: [2, 3], status: "cancelled" });
     const allOrders = await CpkOrder.order(...(CpkOrder.primaryKey as string[]));
     const [order1, order2] = allOrders;
     const [shopId, id] = (order1 as any).id as [number, number];
@@ -1199,9 +1199,9 @@ describe("EachTest", () => {
   });
 
   it(".find_each with multiple column ordering and using composite primary key", async () => {
-    await CpkBook.create({ author_id: 1, id: 1 });
-    await CpkBook.create({ author_id: 2, id: 1 });
-    await CpkBook.create({ author_id: 2, id: 2 });
+    await CpkBook.create({ id: [1, 1] });
+    await CpkBook.create({ id: [2, 1] });
+    await CpkBook.create({ id: [2, 2] });
     const books = await CpkBook.order({ author_id: "asc", id: "desc" });
     const bookIds = books.map((b: any) => JSON.stringify(b.id));
     let index = 0;
@@ -1213,9 +1213,9 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should start from the start option when using composite primary key with multiple column ordering", async () => {
-    await CpkBook.create({ author_id: 1, id: 1 });
-    await CpkBook.create({ author_id: 1, id: 2 });
-    await CpkBook.create({ author_id: 1, id: 3 });
+    await CpkBook.create({ id: [1, 1] });
+    await CpkBook.create({ id: [1, 2] });
+    await CpkBook.create({ id: [1, 3] });
     const secondBook = await CpkBook.order({ author_id: "asc", id: "desc" }).offset(1).first();
     let firstRelation: any = null;
     for await (const rel of CpkBook.inBatches({
@@ -1231,9 +1231,9 @@ describe("EachTest", () => {
   });
 
   it(".in_batches should end at the finish option when using composite primary key with multiple column ordering", async () => {
-    await CpkBook.create({ author_id: 1, id: 1 });
-    await CpkBook.create({ author_id: 1, id: 2 });
-    await CpkBook.create({ author_id: 1, id: 3 });
+    await CpkBook.create({ id: [1, 1] });
+    await CpkBook.create({ id: [1, 2] });
+    await CpkBook.create({ id: [1, 3] });
     const secondBook = await CpkBook.order({ author_id: "asc", id: "desc" }).offset(1).first();
     const batches: any[] = [];
     for await (const rel of CpkBook.inBatches({
@@ -1249,9 +1249,9 @@ describe("EachTest", () => {
   });
 
   it(".in_batches with scope and multiple column ordering and using composite primary key", async () => {
-    await CpkBook.create({ author_id: 1, id: 1 });
-    await CpkBook.create({ author_id: 1, id: 2 });
-    await CpkBook.create({ author_id: 1, id: 3 });
+    await CpkBook.create({ id: [1, 1] });
+    await CpkBook.create({ id: [1, 2] });
+    await CpkBook.create({ id: [1, 3] });
     const [book1, book2] = await CpkBook.order({ author_id: "asc", id: "desc" }).limit(2);
     const [authorId, id] = (book1 as any).id as [number, number];
     let firstRelation: any = null;
