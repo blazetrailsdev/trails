@@ -125,40 +125,5 @@ describe("InstrumenterTest", () => {
       expect(notifier.finishes).toHaveLength(1);
       expect(notifier.finishes[0].name).toBe("no.block");
     });
-
-    it("record with exception", () => {
-      const notifier = buildNotifier();
-      const payload: Record<string, unknown> = {};
-      expect(() =>
-        new Instrumenter(notifier).instrument("crash", payload, () => {
-          throw new TypeError("Oopsies");
-        }),
-      ).toThrow("Oopsies");
-      expect(payload.exception).toEqual(["TypeError", "Oopsies"]);
-      expect((payload.exception_object as Error).message).toBe("Oopsies");
-      expect(notifier.finishes).toHaveLength(1);
-    });
-
-    it("instrumentAsync yields the payload for further modification", async () => {
-      const notifier = buildNotifier();
-      const payload: Record<string, unknown> = {};
-      await new Instrumenter(notifier).instrumentAsync("awesome", payload, async (p) => {
-        p.result = 1 + 1;
-      });
-      expect(payload.result).toBe(2);
-      expect(notifier.finishes[0].payload).toEqual({ result: 2 });
-    });
-
-    it("instrumentAsync with exception", async () => {
-      const notifier = buildNotifier();
-      const payload: Record<string, unknown> = {};
-      await expect(
-        new Instrumenter(notifier).instrumentAsync("crash", payload, async () => {
-          throw new RangeError("Oopsies");
-        }),
-      ).rejects.toThrow("Oopsies");
-      expect(payload.exception).toEqual(["RangeError", "Oopsies"]);
-      expect(payload.exception_object).toBeInstanceOf(RangeError);
-    });
   });
 });

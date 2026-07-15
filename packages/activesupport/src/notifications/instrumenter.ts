@@ -107,6 +107,12 @@ export class Instrumenter {
     }
   }
 
+  // Rails' #instrument never builds an Event — it hands the raw payload to a
+  // Fanout handle, so subscribers see the block's mutations (that is how
+  // payload[:exception] reaches them). trails routes it through an Event, which
+  // works only because Event holds the payload by reference. Rails' Event#dups
+  // it (instrumenter.rb:105); converging that dup without first moving this path
+  // off Event would silently hide the exception keys from subscribers.
   private _push(name: string, payload: EventPayload): Event {
     const event = new Event(name, Temporal.Now.instant(), payload, this.id);
     const parent = this._stack[this._stack.length - 1];
