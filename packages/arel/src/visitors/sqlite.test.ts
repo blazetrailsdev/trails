@@ -30,10 +30,10 @@ describe("SqliteTest", () => {
     const visitor = new Visitors.SQLite();
     expect(visitor.compile(new Nodes.True())).toBe("1");
     expect(visitor.compile(new Nodes.False())).toBe("0");
+    // `eq` wraps the raw `true` via quotedNode into a Casted node, which is
+    // how a boolean reaches the visitor; a raw `true` placed straight into
+    // Equality raises UnsupportedVisitError, as it does in Rails.
     expect(visitor.compile(users.get("active").eq(true))).toBe('"users"."active" = 1');
-    expect(visitor.compile(new Nodes.Equality(users.get("active"), true))).toBe(
-      '"users"."active" = 1',
-    );
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {

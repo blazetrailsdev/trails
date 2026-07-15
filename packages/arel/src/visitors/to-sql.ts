@@ -14,6 +14,7 @@ import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors
 // hierarchy alongside BindError/EmptyJoinError, but re-exports it from
 // here so api:compare finds it where Rails defines it.
 export { UnsupportedVisitError };
+
 import { defaultQuoter } from "./default-quoter.js";
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
@@ -43,6 +44,72 @@ export function resolveValueForDatabase(value: unknown): unknown {
   if (!value || typeof value !== "object" || !("valueForDatabase" in value)) return value;
   const v = (value as Record<string, unknown>).valueForDatabase;
   return typeof v === "function" ? (v as () => unknown).call(value) : v;
+}
+
+// -- Raw-value dispatch helpers --
+//
+// Rails dispatches a raw value on its Ruby class (visitor.rb:29-30). These map
+// each JS analogue onto the class Rails would pick, so `visitNodeOrValue` can
+// hand off to the matching visit_* method.
+
+// The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
+// Assignment visitors (to_sql.rb:110, 632). trails has no Arel-visible class
+// for it, so it is duck-typed on `valueForDatabase` — the same shape
+// `resolveValueForDatabase` accepts.
+//
+// The `instanceof Node` exclusion is load-bearing: Arel's own Casted/Quoted
+// expose `valueForDatabase` too (casted.ts:70,108), and ValuesList's Rails
+// `case` (to_sql.rb:110) does NOT list them — without this they would take the
+// visit branch there instead of falling to `quote()`, which is where Rails
+// sends them. Assignment tests `instanceof Node` itself before calling this,
+// matching its own wider `case` (to_sql.rb:631).
+function isActiveModelAttribute(v: unknown): boolean {
+  return typeof v === "object" && v !== null && !(v instanceof Node) && "valueForDatabase" in v;
+}
+
+// The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
+// Object.prototype (or null). Anything else is an instance of some other class
+// and dispatches on that class in Rails, not on Hash.
+function isPlainObject(v: unknown): boolean {
+  if (typeof v !== "object" || v === null) return false;
+  const proto = Object.getPrototypeOf(v);
+  return proto === Object.prototype || proto === null;
+}
+
+// Temporal types carry a `Temporal.X` Symbol.toStringTag; matching on it keeps
+// the check structural rather than importing the namespace into arel.
+function temporalTag(v: unknown): string | null {
+  if (typeof v !== "object" || v === null) return null;
+  const tag = (v as Record<symbol, unknown>)[Symbol.toStringTag];
+  return typeof tag === "string" && tag.startsWith("Temporal.") ? tag : null;
+}
+
+// The analogue of Ruby's Date, which Rails aliases to `unsupported`
+// (to_sql.rb:837). Temporal.PlainDate is the only wall-clock-date type here.
+function isDateOnly(v: unknown): boolean {
+  return temporalTag(v) === "Temporal.PlainDate";
+}
+
+// The analogue of Ruby's Time (to_sql.rb:844, also aliased to `unsupported`).
+// Temporal is the Time analogue in this codebase, and Temporal types expose no
+// `toISOString`, so they must be matched on their tag; a JS Date (or any
+// toISOString duck-type) is an instant-in-time and maps here too.
+function isTimeLike(v: unknown): boolean {
+  if (temporalTag(v) !== null) return !isDateOnly(v);
+  return (
+    typeof v === "object" &&
+    v !== null &&
+    "toISOString" in v &&
+    typeof (v as { toISOString: unknown }).toISOString === "function"
+  );
+}
+
+// Rails' UnsupportedVisitError message interpolates `object.class.name`
+// (to_sql.rb:5-8). `null`/`undefined` have no constructor; Ruby's analogue for
+// both is NilClass.
+function constructorName(v: unknown): string {
+  if (v === null || v === undefined) return "NilClass";
+  return (v as { constructor?: { name?: string } }).constructor?.name ?? typeof v;
 }
 
 /** Default placeholder block; mirrors Rails' module-level `BIND_BLOCK`. */
@@ -267,7 +334,27 @@ export class ToSql extends Visitor {
       collector.append("(");
       for (let j = 0; j < node.rows[i].length; j++) {
         if (j > 0) collector.append(", ");
-        this.visitNodeOrValue(node.rows[i][j] as Nodes.NodeOrValue, collector);
+        // Mirrors Rails' `case` exactly (to_sql.rb:106-114): only SqlLiteral,
+        // BindParam and ActiveModel::Attribute are visited; every other row
+        // entry is a raw value and is quoted directly, never dispatched
+        // through `visit`.
+        //
+        // The list is deliberately narrower than Assignment's (which visits any
+        // Node, to_sql.rb:631). Rails' rows carry raw values — see
+        // `create_values_list([%w{ a b }, ...])`, insert_manager_test.rb:10 —
+        // so a Casted/Quoted row falls to `quote()`, which has no node branch
+        // (to_sql.rb:867-870 → quoting.rb:86 `else raise TypeError`) and
+        // raises. Keeping the list narrow preserves that.
+        const value = node.rows[i][j];
+        if (
+          value instanceof Nodes.SqlLiteral ||
+          value instanceof Nodes.BindParam ||
+          isActiveModelAttribute(value)
+        ) {
+          this.visit(value as Node, collector);
+        } else {
+          collector.append(this.quote(value));
+        }
       }
       collector.append(")");
     }
@@ -1105,12 +1192,17 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesAssignment(node: Nodes.Assignment, collector: SQLString): SQLString {
-    // Mirrors Rails: bare `visit(left) = visit(right)`. Column-name
-    // unqualification is the responsibility of `UnqualifiedColumn`,
+    // Column-name unqualification is the responsibility of `UnqualifiedColumn`,
     // which `UpdateManager#set` wraps each LHS in.
     this.visitNodeOrValue(node.left, collector);
     collector.append(" = ");
-    this.visitNodeOrValue(node.right, collector);
+    // Mirrors Rails (to_sql.rb:630-641): a Node/Attribute right is visited; a
+    // raw value is quoted directly rather than dispatched through `visit`.
+    if (node.right instanceof Node || isActiveModelAttribute(node.right)) {
+      this.visitNodeOrValue(node.right, collector);
+    } else {
+      collector.append(this.quote(node.right));
+    }
     return collector;
   }
 
@@ -1360,11 +1452,10 @@ export class ToSql extends Visitor {
    * as well as `number`: Ruby's `Integer` is arbitrary-precision and Arel has
    * no separate bignum visitor, so both JS numeric types land here.
    *
-   * Callers: `visitNodeOrValue` routes every `bigint` here, and every *finite*
-   * `number` — not merely integral ones. That `Number.isFinite` split is
-   * invented; Rails only ever reaches `visit_Integer` for an `Integer` and
-   * raises on `Float` (rb:839), so `1.5` arrives here where Rails would raise.
-   * See the note at the call site.
+   * Callers: `visitNodeOrValue` routes every `bigint` here, and every
+   * *integral* `number` — the `Number.isInteger` split mirrors Ruby's
+   * Integer-vs-Float, so a `1.5` reaches `visitFloat` and raises (rb:839) as
+   * it does in Rails.
    */
   protected visitInteger(o: number | bigint, collector: SQLString): SQLString {
     collector.append(String(o));
@@ -1376,9 +1467,9 @@ export class ToSql extends Visitor {
    * to match the Rails signature even though it's unused after the raise. The
    * message mirrors `UnsupportedVisitError.new(o)` (to_sql.rb:5-8).
    */
-  protected unsupported(o: Node, _collector: SQLString): never {
+  protected unsupported(o: unknown, _collector: SQLString): never {
     throw new UnsupportedVisitError(
-      `Unsupported argument type: ${o.constructor.name}. Construct an Arel node instead.`,
+      `Unsupported argument type: ${constructorName(o)}. Construct an Arel node instead.`,
     );
   }
 
@@ -1387,82 +1478,79 @@ export class ToSql extends Visitor {
   // `UnsupportedVisitError`. TS has no method-alias, so each delegates to
   // the shared helper. Each keeps the Rails `(o, collector)` shape.
   //
-  // These are NOT wired into the dispatch table, and — contrary to what this
-  // comment claimed until #4871 — that is a deviation, not a no-op. Raw
-  // values (dates, strings, booleans, floats) *do* reach the visitor via
-  // `visitNodeOrValue`, which renders them instead of dispatching here, so
-  // the "unsupported contract" these names document is currently unenforced
-  // on the one path that could violate it. Converging that is tracked by
-  // story `arel-raw-value-dispatch-raises-like-rails` (RFC 0023); until then
-  // they stand as the documented contract and are directly testable.
+  // `visitNodeOrValue` dispatches raw values onto these, so the unsupported
+  // contract is enforced on the one path that can reach it — they are not
+  // documentation-only. The exception is the Ruby-specific string classes
+  // (Multibyte::Chars, StringInquirer), which have no JS analogue to dispatch
+  // from and stand as the documented contract, directly testable.
 
   /** Rails: `alias :visit_ActiveSupport_Multibyte_Chars :unsupported`. */
-  protected visitActiveSupportMultibyteChars(o: Node, collector: SQLString): never {
+  protected visitActiveSupportMultibyteChars(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_ActiveSupport_StringInquirer :unsupported`. */
-  protected visitActiveSupportStringInquirer(o: Node, collector: SQLString): never {
+  protected visitActiveSupportStringInquirer(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_BigDecimal :unsupported` (to_sql.rb:834). */
-  protected visitBigDecimal(o: Node, collector: SQLString): never {
+  protected visitBigDecimal(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Class :unsupported`. */
-  protected visitClass(o: Node, collector: SQLString): never {
+  protected visitClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Date :unsupported`. */
-  protected visitDate(o: Node, collector: SQLString): never {
+  protected visitDate(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_DateTime :unsupported`. */
-  protected visitDateTime(o: Node, collector: SQLString): never {
+  protected visitDateTime(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_FalseClass :unsupported`. */
-  protected visitFalseClass(o: Node, collector: SQLString): never {
+  protected visitFalseClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Float :unsupported`. */
-  protected visitFloat(o: Node, collector: SQLString): never {
+  protected visitFloat(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Hash :unsupported`. */
-  protected visitHash(o: Node, collector: SQLString): never {
+  protected visitHash(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_NilClass :unsupported`. */
-  protected visitNilClass(o: Node, collector: SQLString): never {
+  protected visitNilClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_String :unsupported`. */
-  protected visitString(o: Node, collector: SQLString): never {
+  protected visitString(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Symbol :unsupported` (to_sql.rb:843). */
-  protected visitSymbol(o: Node, collector: SQLString): never {
+  protected visitSymbol(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_Time :unsupported`. */
-  protected visitTime(o: Node, collector: SQLString): never {
+  protected visitTime(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
   /** Rails: `alias :visit_TrueClass :unsupported`. */
-  protected visitTrueClass(o: Node, collector: SQLString): never {
+  protected visitTrueClass(o: unknown, collector: SQLString): never {
     return this.unsupported(o, collector);
   }
 
@@ -2001,49 +2089,42 @@ export class ToSql extends Visitor {
     }
     // Raw-value dispatch — trails' stand-in for Rails' `visit` class dispatch
     // on a stray Ruby value. Rails renders exactly ONE raw scalar here,
-    // Integer, via `visit_Integer` (to_sql.rb:824-826); the integral branches
-    // below delegate to our port of it (`visitInteger`) so the anchor is
-    // structural rather than a comment that can drift. NilClass (rb:841),
+    // Integer, via `visit_Integer` (to_sql.rb:824-826). NilClass (rb:841),
     // String (rb:842), Float (rb:839), TrueClass (rb:845), FalseClass
     // (rb:838), Date (rb:836), Time (rb:844), BigDecimal (rb:834), Symbol
     // (rb:843) and Hash (rb:840) all alias to `unsupported` and raise
-    // (rb:828-845) — their ports exist below but this method renders instead
-    // of dispatching to them, which is the whole of the deviation. Note
-    // to_sql.rb:87-90 (`visit_Arel_Nodes_Casted`) is the *other* path, the one
-    // that routes through quote(); it is ported in `visitArelNodesCasted` and
-    // is what ActiveRecord actually uses.
-    // Converging the tolerances is a caller-facing narrowing tracked by story
-    // `arel-raw-value-dispatch-raises-like-rails` (RFC 0023).
-    if (v === null || v === undefined) {
-      collector.append("NULL");
-    } else if (typeof v === "string") {
-      collector.append(this.quote(v));
-    } else if (typeof v === "number") {
-      // The `Number.isFinite` split is INVENTED — it has no Rails analogue, so
-      // this branch does not mirror Rails' dispatch. Rails splits Integer
-      // (renders, rb:824-826) vs Float (raises via `unsupported`, rb:839); we
-      // split finite vs non-finite, so a Rails-shaped predicate would be
-      // `Number.isInteger`. Both halves therefore deviate: `1.5` is finite so
-      // it reaches visitInteger here where Rails raises, and the non-finite
-      // fallback to quote() (which lets the connection emit 'Infinity' rather
-      // than a bareword identifier) has no counterpart either — Infinity/NaN
-      // are Ruby Floats and also raise at rb:839. Tracked by story
-      // `arel-raw-value-dispatch-raises-like-rails` (RFC 0023).
-      if (Number.isFinite(v)) return this.visitInteger(v, collector);
-      collector.append(this.quote(v));
-    } else if (typeof v === "boolean") {
-      collector.append(this.quote(v));
-    } else if (typeof v === "bigint") {
-      return this.visitInteger(v, collector);
-    } else {
-      // Everything else — dates, binary, Temporal types, unknown objects —
-      // defers to `quote()`, which hands the value to the connection. Rails'
-      // Arel does no date detection of its own, so there is no separate
-      // date-like branch here. Only BindParam/ActiveModel::Attribute go
-      // through addBind.
-      collector.append(this.quote(v));
+    // (rb:828-845); the branches below dispatch to those ports so the anchor
+    // is structural rather than a comment that can drift.
+    //
+    // Note to_sql.rb:87-90 (`visit_Arel_Nodes_Casted`) is the *other* value
+    // path, the one that routes through quote(); it is ported in
+    // `visitArelNodesCasted` and is what ActiveRecord actually uses, so
+    // nothing on the AR-facing path reaches this dispatch.
+    if (typeof v === "number") {
+      // Ruby splits Integer (renders) from Float (raises); `Number.isInteger`
+      // is that split. A non-finite number is never integral, so it lands on
+      // the Float branch and raises, as Rails' Float does.
+      return Number.isInteger(v) ? this.visitInteger(v, collector) : this.visitFloat(v, collector);
     }
-    return collector;
+    if (typeof v === "bigint") {
+      // Ruby has no fixnum/bignum distinction at this layer — both are
+      // Integer, so a bigint renders bare via visit_Integer.
+      return this.visitInteger(v, collector);
+    }
+    if (v === null || v === undefined) return this.visitNilClass(v, collector);
+    if (typeof v === "string") return this.visitString(v, collector);
+    if (typeof v === "boolean") {
+      return v ? this.visitTrueClass(v, collector) : this.visitFalseClass(v, collector);
+    }
+    if (typeof v === "symbol") return this.visitSymbol(v, collector);
+    if (isDateOnly(v)) return this.visitDate(v, collector);
+    if (isTimeLike(v)) return this.visitTime(v, collector);
+    if (isPlainObject(v)) return this.visitHash(v, collector);
+    // Rails dispatches on the object's actual class (visitor.rb:29-30), so an
+    // arbitrary object never reaches visit_Hash — it finds no handler and
+    // raises. Going straight to `unsupported` keeps the reported class honest
+    // rather than mislabelling it as a Hash.
+    return this.unsupported(v, collector);
   }
 
   /**
@@ -2082,7 +2163,15 @@ export class ToSql extends Visitor {
    * so honour a duck-typed `isNil()` on the right node too.
    */
   protected rightIsNull(right: unknown): boolean {
+    // Rails tests `right.nil?` (to_sql.rb:649), which is true for a bare nil
+    // and for the two wrappers that define `nil?` as `value.nil?` — Casted
+    // (casted.rb:15) and Quoted (casted.rb:41). A bare null therefore renders
+    // IS NULL and never reaches the raw-value dispatch, even though
+    // visit_NilClass is aliased to `unsupported` for the paths that do reach
+    // it.
+    if (right === null || right === undefined) return true;
     if (right instanceof Nodes.Quoted && right.value === null) return true;
+    if (right instanceof Nodes.Casted && right.value === null) return true;
     // A bound scalar arrives wrapped in a BindParam whose `isNil()` delegates
     // to its wrapped value (bind_param.rb:23-25) — so a raw-null bind or an
     // enum/normalized bind that serializes to nil is caught.

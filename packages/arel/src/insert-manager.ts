@@ -103,9 +103,12 @@ export class InsertManager extends TreeManager {
   /**
    * Create a ValuesList from multiple rows.
    *
-   * Mirrors: Arel::InsertManager#create_values_list
+   * Mirrors: Arel::InsertManager#create_values_list — rows carry arbitrary
+   * values, not necessarily Nodes (`create_values_list([%w{ a b }, %w{ c d }])`,
+   * insert_manager_test.rb:10); the visitor quotes raw entries (to_sql.rb:112).
+   * Matches `createValues` and the ValuesList node, which both take `unknown`.
    */
-  createValuesList(rows: Node[][]): ValuesList {
+  createValuesList(rows: unknown[][]): ValuesList {
     return new ValuesList(rows);
   }
 }

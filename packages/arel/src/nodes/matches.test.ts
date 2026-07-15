@@ -6,7 +6,7 @@ describe("MatchesTest", () => {
 
   describe("escape", () => {
     it("wraps a string escape in a Quoted node (matches Rails build_quoted)", () => {
-      const node = new Nodes.Matches(users.get("name"), "x%", "!");
+      const node = users.get("name").matches("x%", "!");
       expect(node.escape).toBeInstanceOf(Nodes.Quoted);
       expect((node.escape as Nodes.Quoted).value).toBe("!");
     });
@@ -26,7 +26,7 @@ describe("MatchesTest", () => {
   describe("ESCAPE under bind extraction (compileWithBinds)", () => {
     it("inlines a string escape literal even in bind-extraction mode", async () => {
       const { Visitors } = await import("../index.js");
-      const node = new Nodes.Matches(users.get("name"), "x%", "!");
+      const node = users.get("name").matches("x%", "!");
       const visitor = new Visitors.ToSql();
       const [sql] = visitor.compileWithBinds(node);
       // ESCAPE value must be inlined ('!'), not turned into a bind placeholder.

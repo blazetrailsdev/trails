@@ -455,19 +455,19 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
 
   describe("Matches ESCAPE", () => {
     it("hard-quotes a string escape", () => {
-      const node = new Nodes.Matches(users.get("name"), "x%", "!");
+      const node = users.get("name").matches("x%", "!");
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("ESCAPE '!'");
     });
 
     it("visits a Node escape", () => {
-      const node = new Nodes.Matches(users.get("name"), "x%", new Nodes.Quoted("!"));
+      const node = users.get("name").matches("x%", new Nodes.Quoted("!"));
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("ESCAPE '!'");
     });
 
     it("visits a Node escape on DoesNotMatch", () => {
-      const node = new Nodes.DoesNotMatch(users.get("name"), "x%", new Nodes.Quoted("!"));
+      const node = users.get("name").doesNotMatch("x%", new Nodes.Quoted("!"));
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("ESCAPE '!'");
     });

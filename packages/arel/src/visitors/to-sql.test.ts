@@ -500,6 +500,148 @@ describe("the to_sql visitor", () => {
       });
     }
 
+    describe("raw values reaching visit dispatch on their class", () => {
+      // Rails' raw-value dispatch: only `visit_Integer` renders
+      // (`collector << o.to_s`, to_sql.rb:824-826); every other scalar aliases
+      // to `unsupported` and raises (to_sql.rb:828-845). Equality visits its
+      // right (to_sql.rb:643), so a raw value placed there hits that dispatch.
+      const compileRight = (right: unknown): string =>
+        new Visitors.ToSql().compile(
+          new Nodes.Equality(new Table("users").get("id"), right as Nodes.NodeOrValue),
+        );
+
+      it("renders an Integer bare", () => {
+        expect(compileRight(1)).toBe('"users"."id" = 1');
+        // Ruby has no fixnum/bignum split at this layer — both are Integer.
+        expect(compileRight(9007199254740993n)).toBe('"users"."id" = 9007199254740993');
+      });
+
+      for (const [label, value] of [
+        ["a String", "x"],
+        ["a Float", 1.5],
+        ["NaN", NaN],
+        ["TrueClass", true],
+        ["FalseClass", false],
+        ["a Time", new Date("2024-01-01T00:00:00Z")],
+        ["a Hash", { a: 1 }],
+      ] as const) {
+        it(`raises UnsupportedVisitError for ${label}`, () => {
+          expect(() => compileRight(value)).toThrow(Visitors.UnsupportedVisitError);
+        });
+      }
+
+      it("renders IS NULL for Casted(nil) as well as Quoted(nil)", () => {
+        // Rails defines `nil?` as `value.nil?` on both wrappers — Casted
+        // (casted.rb:15) and Quoted (casted.rb:41) — so `right.nil?`
+        // (to_sql.rb:649) is true for either and both emit IS NULL.
+        const attr = new Table("users").get("id");
+        expect(compileRight(new Nodes.Quoted(null))).toBe('"users"."id" IS NULL');
+        expect(compileRight(new Nodes.Casted(null, attr))).toBe('"users"."id" IS NULL');
+      });
+
+      it("renders IS NULL for a bare NilClass rather than dispatching", () => {
+        // Rails tests `right.nil?` (to_sql.rb:649) before visiting, and that is
+        // true for a bare nil as well as Quoted(nil) (`Quoted#nil?` delegates
+        // to `value.nil?`, casted.rb:41) — so nil never reaches raw dispatch
+        // here, even though visit_NilClass is aliased to `unsupported`.
+        expect(compileRight(null)).toBe('"users"."id" IS NULL');
+        const attr = new Table("users").get("id");
+        expect(new Visitors.ToSql().compile(new Nodes.NotEqual(attr, null))).toBe(
+          '"users"."id" IS NOT NULL',
+        );
+      });
+
+      it("raises UnsupportedVisitError for NilClass on a path that reaches dispatch", () => {
+        // visit_NilClass is aliased to `unsupported` (to_sql.rb:840); visitArray
+        // reaches it because there is no `nil?` guard on that path.
+        const v = new Visitors.ToSql();
+        const visitArray = (
+          v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
+        ).visitArray;
+        expect(() => visitArray.call(v, [null], new Collectors.SQLString())).toThrow(
+          Visitors.UnsupportedVisitError,
+        );
+      });
+
+      it("raises UnsupportedVisitError for a non-finite Float", () => {
+        // Infinity is not integral, so it lands on the Float branch — there is
+        // no separate non-finite rule.
+        //
+        // Asserted through visitArray (`inject_join`, to_sql.rb:858) rather
+        // than Equality because trails' `unboundableSign` short-circuits a raw
+        // Infinity to 1=0/1=1 first. That short-circuit is a KNOWN DEVIATION,
+        // not the rule this file documents: Rails' `unboundable?` is purely
+        // duck-typed (`value.respond_to?(:unboundable?) && value.unboundable?`,
+        // to_sql.rb:905-907) and a Float answers it false, so Rails reaches
+        // visit_Float and raises. Tracked by story
+        // arel-unboundable-sign-duck-types-like-rails; converging it is out of
+        // scope here (it also changes Quoted(INFINITY), which Rails renders as
+        // `= Infinity`).
+        const v = new Visitors.ToSql();
+        const visitArray = (
+          v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
+        ).visitArray;
+        expect(() => visitArray.call(v, [Infinity], new Collectors.SQLString())).toThrow(
+          Visitors.UnsupportedVisitError,
+        );
+      });
+
+      it("dispatches a bare Temporal on its Rails analogue", () => {
+        // Temporal is the Time analogue, so an Instant must reach visit_Time
+        // (`alias :visit_Time :unsupported`, to_sql.rb:844) and a PlainDate
+        // visit_Date (to_sql.rb:837) — not the generic no-handler tail.
+        // Temporal exposes no toISOString, so the tag is what routes them.
+        const v = new Visitors.ToSql();
+        const seen: string[] = [];
+        const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
+        spy.visitTime = () => {
+          seen.push("Time");
+          throw new Visitors.UnsupportedVisitError("x");
+        };
+        spy.visitDate = () => {
+          seen.push("Date");
+          throw new Visitors.UnsupportedVisitError("x");
+        };
+        const attr = new Table("users").get("id");
+        expect(() =>
+          spy.compile(
+            new Nodes.Equality(
+              attr,
+              Temporal.Instant.from("2026-04-30T12:34:56Z") as unknown as Nodes.NodeOrValue,
+            ),
+          ),
+        ).toThrow(Visitors.UnsupportedVisitError);
+        expect(() =>
+          spy.compile(
+            new Nodes.Equality(
+              attr,
+              Temporal.PlainDate.from("2026-04-30") as unknown as Nodes.NodeOrValue,
+            ),
+          ),
+        ).toThrow(Visitors.UnsupportedVisitError);
+        expect(seen).toEqual(["Time", "Date"]);
+      });
+
+      it("raises for a bare Temporal but still renders it wrapped", () => {
+        // A bare Temporal raises; wrapped in Quoted it routes through quote()
+        // (to_sql.rb:87-90) and still inlines, which is the only shape any AR
+        // caller produces.
+        const instant = Temporal.Instant.from("2026-04-30T12:34:56.000Z");
+        expect(() => compileRight(instant)).toThrow(Visitors.UnsupportedVisitError);
+        // Rendering shape here is whatever the quoter already does with a
+        // Temporal; this pins only that the wrapped path still inlines.
+        expect(compileRight(new Nodes.Quoted(instant))).toContain("2026-04-30");
+      });
+
+      it("renders once wrapped via quotedNode, as predications do", () => {
+        // The AR-facing path: `eq` wraps the raw value in a Casted node, which
+        // routes through quote() (to_sql.rb:87-90) rather than raw dispatch.
+        expect(new Visitors.ToSql().compile(new Table("users").get("id").eq("x"))).toBe(
+          '"users"."id" = \'x\'',
+        );
+      });
+    });
+
     it("visit_Set is aliased to visit_Array (joins with ', ')", () => {
       // Rails: `alias :visit_Set :visit_Array` (to_sql.rb:861).
       const v = new Visitors.ToSql();
@@ -1271,9 +1413,57 @@ describe("the to_sql visitor", () => {
   });
 
   it("works with lists", () => {
-    const node = new Nodes.ValuesList([[new Nodes.Quoted(1)], [new Nodes.Quoted(2)]]);
+    const node = new Nodes.ValuesList([[1], [2]]);
     const sql = new Visitors.ToSql().compile(node);
     expect(sql).toBe("VALUES (1), (2)");
+  });
+
+  describe("Nodes::ValuesList row dispatch", () => {
+    // Rails' `case` (to_sql.rb:106-114) visits only SqlLiteral/BindParam/
+    // ActiveModel::Attribute; everything else — including a Casted/Quoted —
+    // falls to `quote()`. Routing is asserted through a connection whose
+    // `quote` is distinguishable, so this pins which branch each row takes
+    // rather than just the rendered text.
+    const probe = {
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteColumnName: (n: string) => `"${n}"`,
+      quoteString: (s: string) => s,
+      quote: (v: unknown) => `Q(${String(v)})`,
+      quotedBinary: (v: unknown) => `'${String(v)}'`,
+      quotedTrue: () => "TRUE",
+      quotedFalse: () => "FALSE",
+      unquotedTrue: () => true,
+      unquotedFalse: () => false,
+      sanitizeAsSqlComment: (v: string) => v,
+    } as unknown as Visitors.ArelConnection;
+
+    it("quotes a raw row value instead of visiting it", () => {
+      const sql = new Visitors.ToSql(probe).compile(new Nodes.ValuesList([[1, "a"]]));
+      expect(sql).toBe("VALUES (Q(1), Q(a))");
+    });
+
+    it("visits a SqlLiteral row without quoting it", () => {
+      const sql = new Visitors.ToSql(probe).compile(
+        new Nodes.ValuesList([[new Nodes.SqlLiteral("DEFAULT")]]),
+      );
+      expect(sql).toBe("VALUES (DEFAULT)");
+    });
+
+    it("sends a Quoted row to quote(), which is where Rails raises TypeError", () => {
+      // Rails: quote(Quoted) → to_sql.rb:867-870 → quoting.rb:86
+      // `else raise TypeError, "can't quote Arel::Nodes::Quoted"`. Trails'
+      // adapter quote does the same (abstract/quoting.ts:151), so a connection
+      // that raises proves the row reaches quote() rather than visit.
+      const raising = {
+        ...probe,
+        quote: (v: unknown) => {
+          throw new TypeError(`can't quote ${(v as object)?.constructor?.name}`);
+        },
+      } as unknown as Visitors.ArelConnection;
+      expect(() =>
+        new Visitors.ToSql(raising).compile(new Nodes.ValuesList([[new Nodes.Quoted(1)]])),
+      ).toThrow(/can't quote Quoted/);
+    });
   });
 
   describe("Nodes::BoundSqlLiteral", () => {
@@ -1820,11 +2010,17 @@ describe("the to_sql visitor", () => {
       const tbl = new Table("users");
       const v = new Visitors.ToSql();
       const collector = new Collectors.SQLString();
-      (v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }).visitArray(
-        [tbl.get("a"), 1, "text"],
-        collector,
+      const visitArray = (
+        v as unknown as { visitArray(a: ReadonlyArray<unknown>, c: unknown): void }
+      ).visitArray;
+      // Rails' `visit_Array` is `inject_join` (to_sql.rb:858-860): each entry
+      // goes through `visit`, so a Node and an Integer render while a raw
+      // String hits `visit_String` and raises.
+      visitArray.call(v, [tbl.get("a"), 1], collector);
+      expect(collector.value).toBe('"users"."a", 1');
+      expect(() => visitArray.call(v, ["text"], new Collectors.SQLString())).toThrow(
+        Visitors.UnsupportedVisitError,
       );
-      expect(collector.value).toBe('"users"."a", 1, \'text\'');
     });
   });
 
