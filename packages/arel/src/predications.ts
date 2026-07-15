@@ -27,6 +27,7 @@ import {
   unboundableSign,
   isNilBound,
   type RangeHost,
+  type RangePredicates,
 } from "./predications-range.js";
 
 /**
@@ -184,7 +185,7 @@ export const Predications = {
   // half-comparisons, exclusive end uses `<` / `>=`, and degenerate
   // `b == e` collapses to eq.
   between: function (
-    this: Node & PredicationHost & RangeHost,
+    this: Node & PredicationHost & RangeHost & RangePredicates,
     beginOrRange: unknown,
     end?: unknown,
     excludeEnd?: boolean,
@@ -192,13 +193,16 @@ export const Predications = {
     const range = parseRange(beginOrRange, end, excludeEnd);
     return betweenFromRange(this, range);
   } as {
-    (this: Node & PredicationHost & RangeHost, range: readonly [unknown, unknown]): Node;
     (
-      this: Node & PredicationHost & RangeHost,
+      this: Node & PredicationHost & RangeHost & RangePredicates,
+      range: readonly [unknown, unknown],
+    ): Node;
+    (
+      this: Node & PredicationHost & RangeHost & RangePredicates,
       range: { begin: unknown; end: unknown; excludeEnd?: boolean },
     ): Node;
     (
-      this: Node & PredicationHost & RangeHost,
+      this: Node & PredicationHost & RangeHost & RangePredicates,
       begin: unknown,
       end: unknown,
       excludeEnd?: boolean,
@@ -206,7 +210,7 @@ export const Predications = {
   },
 
   notBetween: function (
-    this: Node & PredicationHost & RangeHost,
+    this: Node & PredicationHost & RangeHost & RangePredicates,
     beginOrRange: unknown,
     end?: unknown,
     excludeEnd?: boolean,
@@ -214,13 +218,16 @@ export const Predications = {
     const range = parseRange(beginOrRange, end, excludeEnd);
     return notBetweenFromRange(this, range);
   } as {
-    (this: Node & PredicationHost & RangeHost, range: readonly [unknown, unknown]): Node;
     (
-      this: Node & PredicationHost & RangeHost,
+      this: Node & PredicationHost & RangeHost & RangePredicates,
+      range: readonly [unknown, unknown],
+    ): Node;
+    (
+      this: Node & PredicationHost & RangeHost & RangePredicates,
       range: { begin: unknown; end: unknown; excludeEnd?: boolean },
     ): Node;
     (
-      this: Node & PredicationHost & RangeHost,
+      this: Node & PredicationHost & RangeHost & RangePredicates,
       begin: unknown,
       end: unknown,
       excludeEnd?: boolean,

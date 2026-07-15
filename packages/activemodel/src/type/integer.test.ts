@@ -29,6 +29,13 @@ describe("IntegerTest", () => {
   });
 
   it("casting objects without to_i", () => {
+    // Rails integer_test.rb:30-32 asserts `assert_nil type.cast(::Object.new)`:
+    // Object has no `to_i`, so `to_i rescue nil` (integer.rb:90) yields nil.
+    expect(type.cast({})).toBeNull();
+    // Same case, the way it arises in JS: an object with no `toString` makes
+    // `String(value)` throw. `cast` must answer null, not raise — the rescue is
+    // scoped to the conversion in Rails.
+    expect(type.cast(Object.create(null))).toBeNull();
     // Objects without a numeric representation cast to null
     expect(type.cast("not_a_number")).toBeNull();
     expect(type.cast(undefined)).toBeNull();

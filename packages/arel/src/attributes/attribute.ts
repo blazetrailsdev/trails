@@ -26,7 +26,13 @@ import { Sum, Max, Min, Avg } from "../nodes/function.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
 import { buildQuoted } from "../nodes/casted.js";
-import { parseRange, betweenFromRange, notBetweenFromRange } from "../predications-range.js";
+import {
+  parseRange,
+  betweenFromRange,
+  notBetweenFromRange,
+  type RangeHost,
+  type RangePredicates,
+} from "../predications-range.js";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
 import { Or } from "../nodes/or.js";
@@ -207,14 +213,25 @@ export class Attribute extends Node {
   between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
 
   between(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
-    return betweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
+    return betweenFromRange(this.asRangeHost(), parseRange(beginOrRange, end, excludeEnd));
   }
   notBetween(range: [unknown, unknown]): Node;
   notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
 
   notBetween(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
-    return notBetweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
+    return notBetweenFromRange(this.asRangeHost(), parseRange(beginOrRange, end, excludeEnd));
+  }
+
+  /**
+   * `between` / `notBetween` dispatch `infinity?` / `unboundable?` /
+   * `open_ended?` on self (predications.rb:38-51). This class has all three, but
+   * as `protected` — a compile-time visibility rule that keeps it from being
+   * assignable to the public `RangePredicates`. The runtime dispatch is real, so
+   * subclass overrides are honored.
+   */
+  private asRangeHost(): RangeHost & RangePredicates {
+    return this as unknown as RangeHost & RangePredicates;
   }
 
   // -- _any / _all variants --

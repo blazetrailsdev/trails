@@ -60,6 +60,20 @@ export interface RangeLike {
   excludeEnd: boolean;
 }
 
+/**
+ * The `self` half of Rails' `between` contract: `between` / `not_between`
+ * (predications.rb:38-51) and `open_ended?` (255-257) dispatch these on self, so
+ * an including class overriding one is honored. Kept separate from `RangeHost`
+ * because `Attribute` re-exposes them as `protected` — a compile-time visibility
+ * rule, so the class is not assignable to a public interface and its two call
+ * sites widen. Callers must supply them; the runtime dispatch is real.
+ */
+export interface RangePredicates {
+  isInfinity(value: unknown): 1 | -1 | 0;
+  isUnboundable(value: unknown): 1 | -1 | 0;
+  isOpenEnded(value: unknown): boolean;
+}
+
 export interface RangeHost extends Node {
   quotedNode(other: unknown): Node;
   in(values: unknown[]): Node;
@@ -165,26 +179,8 @@ export function isNilBound(value: unknown): boolean {
   return typeof v.isNil === "function" && v.isNil();
 }
 
-/**
- * Rails' `between` / `not_between` call `unboundable?` / `open_ended?` /
- * `infinity?` on **self** (predications.rb:38-51), so an including class that
- * overrides one is honored — the same implicit-self dispatch `open_ended?` uses.
- * Every host reaching here carries the three: the Predications mixin installs
- * them by `include()`, and `Attribute` re-exposes them as protected (which is a
- * compile-time visibility rule only, hence the widening).
- */
-interface RangePredicates {
-  isInfinity(value: unknown): 1 | -1 | 0;
-  isUnboundable(value: unknown): 1 | -1 | 0;
-  isOpenEnded(value: unknown): boolean;
-}
-
-function selfOf(host: RangeHost): RangePredicates {
-  return host as unknown as RangePredicates;
-}
-
-export function betweenFromRange(host: RangeHost, range: RangeLike): Node {
-  const self = selfOf(host);
+export function betweenFromRange(host: RangeHost & RangePredicates, range: RangeLike): Node {
+  const self = host;
   if (self.isUnboundable(range.begin) === 1 || self.isUnboundable(range.end) === -1) {
     return host.in([]);
   }
@@ -209,8 +205,8 @@ export function betweenFromRange(host: RangeHost, range: RangeLike): Node {
   return new Between(host, new And([host.quotedNode(range.begin), host.quotedNode(range.end)]));
 }
 
-export function notBetweenFromRange(host: RangeHost, range: RangeLike): Node {
-  const self = selfOf(host);
+export function notBetweenFromRange(host: RangeHost & RangePredicates, range: RangeLike): Node {
+  const self = host;
   if (self.isUnboundable(range.begin) === 1 || self.isUnboundable(range.end) === -1) {
     return host.notIn([]);
   }

@@ -12,8 +12,15 @@ import type { Range } from "../../connection-adapters/postgresql/oid/range.js";
  *
  * Trails threads only the out-of-range bounds through this sentinel — in-range
  * bounds stay as their plain cast values so ordinary ranges emit unchanged
- * SQL. `arel`'s `unboundableSign` / `isOpenEnded` recognise it via
- * `isUnboundable()`; it never reaches the visitor as a bind.
+ * SQL. `arel`'s `unboundableSign` recognises it via `isUnboundable()` (reached
+ * through `Predications#unboundable?` / `open_ended?`, which `between`
+ * dispatches on self); it never reaches the visitor as a bind.
+ *
+ * This class has no Rails counterpart: range_handler.rb:12-16 wraps BOTH bounds
+ * in `build_bind_attribute` and lets `QueryAttribute#unboundable?` answer.
+ * Converging is tracked by story
+ * `0023-surfaced-deviations/converge-range-handler-bind-attribute-bounds`, which
+ * deletes this class.
  */
 export class UnboundableBound {
   constructor(readonly sign: 1 | -1) {}

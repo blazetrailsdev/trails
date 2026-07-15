@@ -54,20 +54,11 @@ export class IntegerType extends NumericValueType {
     // `narrowBigInt`, keeping arbitrary precision, where `Number()` would
     // collapse `2n**63n` and `2n**63n-1n` onto the same float and let an
     // exactly-2^63 value test in-range on an 8-byte column (see `isInRange`).
-    // It also decides ±Infinity and NaN: `cast_value` is `to_i rescue nil`
-    // (integer.rb:90), so they cast to nil and `in_range?(nil)` is `!value` =>
-    // true. Casting here rather than trusting the caller keeps this predicate
-    // correct for a raw value, independent of whether the caller pre-cast.
-    let castValue: number | bigint | null;
-    try {
-      castValue = this.cast(value) as number | bigint | null;
-    } catch {
-      // The `rescue nil` in cast_value: a value that cannot be cast at all
-      // (e.g. a Symbol, whose `String()` throws) is nil in Rails, and
-      // `in_range?(nil)` is true.
-      return true;
-    }
-    return this.isInRange(castValue);
+    // It also decides ±Infinity, NaN and uncastable values: all are nil out of
+    // `castValue` (`to_i rescue nil`, integer.rb:90), and `in_range?(nil)` is
+    // `!value` => true. Casting here rather than trusting the caller keeps this
+    // predicate correct for a raw value, whether or not the caller pre-cast.
+    return this.isInRange(this.cast(value) as number | bigint | null);
   }
 
   /**
@@ -141,7 +132,19 @@ export class IntegerType extends NumericValueType {
     if (typeof value === "bigint") {
       return this.narrowBigInt(value);
     }
-    const parsed = parseInt(String(value), 10);
+    // The `rescue nil` of integer.rb:90 is scoped to the conversion itself, so
+    // `cast` answers nil — never raises — for a value with no numeric
+    // conversion. Ruby: `Object.new.to_i` raises NoMethodError (integer_test.rb:30-32
+    // asserts `assert_nil type.cast(::Object.new)`). Here: `String(value)` throws
+    // for an object with no `toString` (a null-prototype object, say). A Symbol is
+    // NOT that case — `String(sym)` returns "Symbol(x)", which parses to NaN => null.
+    let str: string;
+    try {
+      str = String(value);
+    } catch {
+      return null;
+    }
+    const parsed = parseInt(str, 10);
     return isNaN(parsed) ? null : parsed;
   }
 
