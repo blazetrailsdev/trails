@@ -10,6 +10,7 @@ import {
   Visitors,
 } from "../index.js";
 import { DotNode } from "./dot.js";
+import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
 
 describe("TestDot", () => {
   const users = new Table("users");
@@ -371,7 +372,18 @@ describe("TestDot", () => {
       const bind = new Nodes.BindParam(fakeAttribute);
       const out = dot.compile(bind);
       expect(out).toContain("BindParam");
-      // visitActiveModelAttribute walks valueBeforeTypeCast.
+      // A bare object literal is a Hash in Rails, not an ActiveModel::Attribute:
+      // Dot#visit dispatches on `o.is_a?(ActiveModel::Attribute)`, so carrying a
+      // `valueBeforeTypeCast` key does not buy the attribute arm.
+      expect(out).toMatch(/\[label="pair_0"\]/);
+      expect(out).toContain("valueBeforeTypeCast");
+      expect(out).toContain("42");
+    });
+
+    it("a real ActiveModel::Attribute takes the attribute arm", () => {
+      const bind = new Nodes.BindParam(AMAttribute.fromDatabase("id", 42, new ValueType()));
+      const out = dot.compile(bind);
+      expect(out).toContain("BindParam");
       expect(out).toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
       expect(out).toContain("42");
     });

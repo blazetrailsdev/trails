@@ -3,6 +3,7 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { PlainString } from "../collectors/plain-string.js";
+import { Attribute as AMAttribute } from "@blazetrails/activemodel";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -501,10 +502,8 @@ export class Dot extends Visitor {
       } else if (object instanceof Node) {
         super.visit(object);
       } else if (this.isActiveModelAttribute(object)) {
-        // Mirrors Rails' `visit_ActiveModel_Attribute`. Checked after the
-        // Node branch — Trails' BindParam *also* exposes a
-        // `valueBeforeTypeCast` method via NodeExpression duck-typing, so
-        // we only fall here for non-Node value objects.
+        // Mirrors Rails' `visit_ActiveModel_Attribute`, reached in Rails via
+        // Visitor#visit's ancestor walk (`o.is_a?(ActiveModel::Attribute)`).
         this.visitActiveModelAttribute(object as { valueBeforeTypeCast?: unknown });
       } else if (this.isPlainObject(object)) {
         this.visitHash(object as Record<string, unknown>);
@@ -614,9 +613,7 @@ export class Dot extends Visitor {
   }
 
   private isActiveModelAttribute(o: unknown): boolean {
-    return (
-      typeof o === "object" && o !== null && "valueBeforeTypeCast" in (o as Record<string, unknown>)
-    );
+    return o instanceof AMAttribute;
   }
 
   private isPlainObject(o: unknown): boolean {
