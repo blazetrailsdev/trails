@@ -80,6 +80,20 @@ describe("Arel::Nodes.build_quoted", () => {
     expect((node as Nodes.Quoted).value).toBe(42);
   });
 
+  it("wraps nil in Casted when the second arg is an Arel::Attribute", () => {
+    const attr = users.get("age");
+    const node = buildQuoted(null, attr);
+    expect(node).toBeInstanceOf(Nodes.Casted);
+    expect((node as Nodes.Casted).value).toBeNull();
+    expect((node as Nodes.Casted).attribute).toBe(attr);
+  });
+
+  it("wraps nil in Quoted when no attribute is given", () => {
+    const node = buildQuoted(null);
+    expect(node).toBeInstanceOf(Nodes.Quoted);
+    expect((node as Nodes.Quoted).value).toBeNull();
+  });
+
   it("wraps duck-typed ActiveModel::Attribute in BindParam without requiring activemodel import", () => {
     const duckAttr = { name: "age", valueForDatabase: 42 };
     const node = buildQuoted(duckAttr);
@@ -90,5 +104,61 @@ describe("Arel::Nodes.build_quoted", () => {
   it("does not treat plain objects with only name as ActiveModel::Attribute", () => {
     const node = buildQuoted({ name: "x" });
     expect(node).toBeInstanceOf(Nodes.Quoted);
+  });
+});
+
+describe("Arel::Nodes::Casted#nil?", () => {
+  const users = new Table("users");
+
+  it("is true for a nil value and false otherwise", () => {
+    const attr = users.get("age");
+    expect(new Nodes.Casted(null, attr).isNil()).toBe(true);
+    expect(new Nodes.Casted(0, attr).isNil()).toBe(false);
+  });
+
+  // Ruby has one nil, so undefined is a nil? here too. This keeps
+  // attr.eq(undefined) spelling IS NULL: before this change quotedNode
+  // normalized undefined to Quoted(null), so a null-only isNil() would
+  // regress it to `= NULL`.
+  it("treats undefined as nil, so eq(undefined) still renders IS NULL", () => {
+    const attr = users.get("age");
+    expect(new Nodes.Casted(undefined, attr).isNil()).toBe(true);
+    expect(new Nodes.Quoted(undefined).isNil()).toBe(true);
+
+    const [sql] = new Visitors.ToSql().compileWithBinds(users.get("id").eq(undefined));
+    expect(sql).toBe('"users"."id" IS NULL');
+  });
+
+  // `= NULL` is never true in SQL; Quoted#nil? (casted.rb:41) is defined
+  // identically to Casted's, so an undefined-valued Quoted spells IS NULL too.
+  it("renders IS NULL for a Quoted(undefined) right-hand side", () => {
+    const eq = new Nodes.Equality(users.get("id"), new Nodes.Quoted(undefined));
+    const [sql] = new Visitors.ToSql().compileWithBinds(eq);
+    expect(sql).toBe('"users"."id" IS NULL');
+  });
+
+  // casted.rb:15 reads the raw `value`, NOT `value_for_database` — a type whose
+  // serialize(nil) is non-nil must still spell IS NULL.
+  it("reads the raw value, not value_for_database", () => {
+    const table = new Table("users");
+    (table as unknown as { isAbleToTypeCast?: () => boolean }).isAbleToTypeCast = () => true;
+    (
+      table as unknown as { typeCastForDatabase?: (n: string, v: unknown) => unknown }
+    ).typeCastForDatabase = (_name, value) => (value === null ? "NIL" : value);
+
+    const node = new Nodes.Casted(null, table.get("age"));
+    expect(node.valueForDatabase()).toBe("NIL");
+    expect(node.isNil()).toBe(true);
+  });
+
+  // quoted_node is build_quoted(other, self), so a nil from an Attribute is
+  // Casted — carrying the column's type-cast context — not a bare Quoted.
+  it("is what an Attribute's quoted_node builds for nil, and still renders IS NULL", () => {
+    const attr = users.get("id");
+    const eq = attr.eq(null);
+    expect(eq.right).toBeInstanceOf(Nodes.Casted);
+    expect((eq.right as Nodes.Casted).attribute).toBe(attr);
+    const [sql] = new Visitors.ToSql().compileWithBinds(eq);
+    expect(sql).toBe('"users"."id" IS NULL');
   });
 });

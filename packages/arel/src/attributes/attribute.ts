@@ -25,10 +25,8 @@ import { Count } from "../nodes/count.js";
 import { Sum, Max, Min, Avg } from "../nodes/function.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
-import { Quoted, Casted, buildQuoted } from "../nodes/casted.js";
+import { buildQuoted } from "../nodes/casted.js";
 import { parseRange, betweenFromRange, notBetweenFromRange } from "../predications-range.js";
-import { BindParam } from "../nodes/bind-param.js";
-import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
 import { Or } from "../nodes/or.js";
@@ -126,25 +124,15 @@ export class Attribute extends Node {
   }
 
   /**
-   * Mirrors: Arel::Predications#quoted_node — the type-aware wrapper
-   * that the Predications mixin calls to bring an arbitrary right-hand
-   * value into the AST. Attribute's impl wraps in `Casted(value, this)`
-   * so the visitor can apply column-level type-casting; ActiveModel
-   * attribute instances become BindParam so they extract as binds; raw
-   * Nodes are passed through.
+   * Mirrors: Arel::Predications#quoted_node — `Nodes.build_quoted(other, self)`
+   * (arel/predications.rb). Passing `self` as the attribute means every
+   * non-pass-through raw value — nil included — becomes `Casted(value, this)`
+   * (casted.rb:48-58), so the visitor can apply column-level type-casting.
    *
    * @internal
    */
   quotedNode(value: unknown): Node {
-    if (value instanceof Node) return value;
-    if (value === null || value === undefined) return new Quoted(null);
-    // ActiveModel::Attribute instances (QueryAttribute etc.) carry their
-    // own type + value. Wrap in BindParam so the visitor extracts them
-    // as binds rather than inlining via Casted.
-    if (value instanceof ModelAttribute) {
-      return new BindParam(value);
-    }
-    return new Casted(value, this);
+    return buildQuoted(value, this);
   }
 
   // -- Predicates --

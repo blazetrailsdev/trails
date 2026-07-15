@@ -64,11 +64,10 @@ describe("Attribute concat / contains / overlaps return typed infix subclasses",
 });
 
 describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
-  // Mirrors Rails' Arel::Predications#quoted_node — Predications calls
-  // `this.quotedNode(other)` on its host. Attribute's impl preserves the
-  // column type-cast path: scalars become Casted(value, this), nulls
-  // become Quoted(null), ActiveModel::Attribute instances become
-  // BindParam, and raw Nodes pass through.
+  // Mirrors Rails' Arel::Predications#quoted_node — `build_quoted(other, self)`.
+  // Passing the attribute means every non-pass-through value, nil included,
+  // becomes Casted(value, this) and keeps the column type-cast path;
+  // ActiveModel::Attribute instances become BindParam and raw Nodes pass through.
   it("wraps a scalar in Casted(value, attribute)", () => {
     const attr = users.attr("id");
     const out = attr.quotedNode(42);
@@ -77,9 +76,14 @@ describe("Attribute#quotedNode (the public PredicationHost contract)", () => {
     expect((out as Nodes.Casted).attribute).toBe(attr);
   });
 
-  it("returns Quoted(null) for null/undefined", () => {
-    expect(users.attr("id").quotedNode(null)).toBeInstanceOf(Nodes.Quoted);
-    expect(users.attr("id").quotedNode(undefined)).toBeInstanceOf(Nodes.Quoted);
+  it("wraps null/undefined in Casted(nil, attribute)", () => {
+    for (const nil of [null, undefined]) {
+      const attr = users.attr("id");
+      const out = attr.quotedNode(nil);
+      expect(out).toBeInstanceOf(Nodes.Casted);
+      expect((out as Nodes.Casted).attribute).toBe(attr);
+      expect((out as Nodes.Casted).isNil()).toBe(true);
+    }
   });
 
   it("passes through raw Nodes unchanged", () => {

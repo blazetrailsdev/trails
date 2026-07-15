@@ -72,6 +72,20 @@ export class Casted extends NodeExpression {
     return this.value;
   }
 
+  /**
+   * Mirrors: Arel::Nodes::Casted#nil? (casted.rb:15) — `value.nil?`.
+   *
+   * Both of TS' nils count: Ruby has only `nil`, so `undefined` is as much a
+   * `nil?` here as `null` is. This is deliberately WIDER than
+   * `BindParam#isNil` (bind_param.rb:23-25), which excludes `undefined`
+   * because a valueless `new BindParam()` is a trails positional-bind marker
+   * rather than a value. A `Casted`/`Quoted` always wraps a value, so that
+   * carve-out does not apply.
+   */
+  isNil(): boolean {
+    return this.value === null || this.value === undefined;
+  }
+
   valueForDatabase(): unknown {
     if (this.attribute.isAbleToTypeCast()) {
       return this.attribute.typeCastForDatabase(this.value);
@@ -104,6 +118,14 @@ export class Quoted extends Unary {
 
   valueBeforeTypeCast(): unknown {
     return this.value;
+  }
+
+  /**
+   * Mirrors: Arel::Nodes::Quoted#nil? (casted.rb:41) — `value.nil?`, defined
+   * identically to Casted's; see the note there on why `undefined` counts.
+   */
+  isNil(): boolean {
+    return this.value === null || this.value === undefined;
   }
 
   isInfinite(): number | null {
