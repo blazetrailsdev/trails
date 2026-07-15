@@ -11,6 +11,7 @@ import {
   Visitors,
   Collectors,
 } from "../index.js";
+import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
 
 describe("the to_sql visitor", () => {
   const users = new Table("users");
@@ -1070,6 +1071,18 @@ describe("the to_sql visitor", () => {
     expect(sql).toBe('"users"."name" = \'x\'');
   });
 
+  // Rails: to_sql.rb:632's `when ..., ActiveModel::Attribute` arm visits the
+  // right, reaching visit_ActiveModel_Attribute (rb:756) and its add_bind.
+  it("visits an ActiveModel::Attribute assignment right instead of quoting it", () => {
+    // `NodeOrValue` doesn't name ActiveModel::Attribute — Rails' `case` accepts
+    // it at runtime, which is what this asserts.
+    const node = new Nodes.Assignment(
+      users.get("name"),
+      AMAttribute.fromUser("name", "x", new ValueType()) as unknown as Nodes.NodeOrValue,
+    );
+    expect(new Visitors.ToSql().compile(node)).toBe('"users"."name" = ?');
+  });
+
   it("should visit_Arel_Nodes_Or", () => {
     const node = new Nodes.Or(users.get("id").eq(1), users.get("id").eq(2));
     const sql = new Visitors.ToSql().compile(node);
@@ -1463,6 +1476,21 @@ describe("the to_sql visitor", () => {
       expect(() =>
         new Visitors.ToSql(raising).compile(new Nodes.ValuesList([[new Nodes.Quoted(1)]])),
       ).toThrow(/can't quote Quoted/);
+    });
+
+    it("visits an ActiveModel::Attribute row instead of quoting it", () => {
+      const attr = AMAttribute.fromUser("id", 1, new ValueType());
+      const sql = new Visitors.ToSql(probe).compile(new Nodes.ValuesList([[attr]]));
+      expect(sql).toBe("VALUES (?)");
+    });
+
+    // Rails' `when` at to_sql.rb:110 dispatches on the class, so an object that
+    // merely looks like an ActiveModel::Attribute is not one and reaches quote().
+    it("quotes an ActiveModel::Attribute duck-type instead of visiting it", () => {
+      const sql = new Visitors.ToSql(probe).compile(
+        new Nodes.ValuesList([[{ name: "id", valueForDatabase: 1 }]]),
+      );
+      expect(sql).toBe("VALUES (Q([object Object]))");
     });
   });
 

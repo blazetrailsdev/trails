@@ -7,6 +7,7 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
+import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 // Mirrors Arel::Visitors::UnsupportedVisitError (defined in to_sql.rb:5
 // in Rails as `class UnsupportedVisitError < StandardError`). Trails
@@ -53,18 +54,13 @@ export function resolveValueForDatabase(value: unknown): unknown {
 // hand off to the matching visit_* method.
 
 // The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
-// Assignment visitors (to_sql.rb:110, 632). trails has no Arel-visible class
-// for it, so it is duck-typed on `valueForDatabase` — the same shape
-// `resolveValueForDatabase` accepts.
-//
-// The `instanceof Node` exclusion is load-bearing: Arel's own Casted/Quoted
-// expose `valueForDatabase` too (casted.ts:70,108), and ValuesList's Rails
-// `case` (to_sql.rb:110) does NOT list them — without this they would take the
-// visit branch there instead of falling to `quote()`, which is where Rails
-// sends them. Assignment tests `instanceof Node` itself before calling this,
-// matching its own wider `case` (to_sql.rb:631).
+// Assignment visitors (to_sql.rb:110, 632). Rails dispatches on the class, and
+// so does trails — the same predicate `Nodes.build_quoted` uses (casted.ts).
+// Arel's own Casted/Quoted expose `valueForDatabase` but are Nodes, not
+// ActiveModel::Attributes, so they keep falling to `quote()` in ValuesList as
+// rb:110's narrow `when` requires.
 function isActiveModelAttribute(v: unknown): boolean {
-  return typeof v === "object" && v !== null && !(v instanceof Node) && "valueForDatabase" in v;
+  return v instanceof ModelAttribute;
 }
 
 // The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
@@ -532,6 +528,11 @@ export class ToSql extends Visitor {
     reg(Nodes.InfixOperation, "visitArelNodesInfixOperation");
     reg(Nodes.BoundSqlLiteral, "visitArelNodesBoundSqlLiteral");
     reg(Nodes.BindParam, "visitArelNodesBindParam");
+    // Not an Arel node, but Rails' dispatch is by class for every object it
+    // visits (visitor.rb:29-30) and to_sql.rb:756 defines a handler for it,
+    // so ValuesList/Assignment's visit branch resolves here rather than
+    // raising UnsupportedVisitError.
+    reg(ModelAttribute as unknown as NodeCtor, "visitActiveModelAttribute");
     reg(Nodes.Fragments, "visitArelNodesFragments");
     // Functions
     reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
@@ -1198,8 +1199,14 @@ export class ToSql extends Visitor {
     collector.append(" = ");
     // Mirrors Rails (to_sql.rb:630-641): a Node/Attribute right is visited; a
     // raw value is quoted directly rather than dispatched through `visit`.
-    if (node.right instanceof Node || isActiveModelAttribute(node.right)) {
+    if (node.right instanceof Node) {
       this.visitNodeOrValue(node.right, collector);
+    } else if (isActiveModelAttribute(node.right)) {
+      // `visitNodeOrValue` is the raw-value path and has no class dispatch, so
+      // an ActiveModel::Attribute has to go through `visit` to reach
+      // `visitActiveModelAttribute` — which is what rb:634's `visit o.right`
+      // does for this arm.
+      this.visit(node.right as unknown as Node, collector);
     } else {
       collector.append(this.quote(node.right));
     }

@@ -4,6 +4,7 @@ import { Unary } from "./unary.js";
 import type { Attribute } from "../attributes/attribute.js";
 import { ATTRIBUTE_BRAND } from "./binary.js";
 import { BindParam } from "./bind-param.js";
+import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 /**
  * Arel::Nodes.build_quoted — coerce `other` into a Node suitable for the AST.
@@ -28,15 +29,9 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other && typeof other === "object") {
     // Arel::Attributes::Attribute (duck-typed via symbol brand)
     if ((other as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true) return other as Node;
-    // ActiveModel::Attribute duck-type (Rails: casted.rb:50-51 — the
-    // `when ..., ActiveModel::Attribute` arm returning `other`).
-    // Structural check so buildQuoted doesn't require a runtime import here.
-    // valueForDatabase is a getter (not a method) on the TS port; check via 'in'.
-    if (
-      "valueForDatabase" in (other as Record<string, unknown>) &&
-      "name" in (other as Record<string, unknown>)
-    )
-      return new BindParam(other);
+    // Rails: casted.rb:50-51 — the `when ..., ActiveModel::Attribute` arm
+    // returning `other`. Class dispatch, like Rails.
+    if (other instanceof ModelAttribute) return new BindParam(other);
     // SelectManager / TreeManager — expose a Node `ast`; use that so the
     // visitor always receives a real Node.
     const maybeAst = (other as { ast?: unknown }).ast;

@@ -94,16 +94,18 @@ describe("Arel::Nodes.build_quoted", () => {
     expect((node as Nodes.Quoted).value).toBeNull();
   });
 
-  it("wraps duck-typed ActiveModel::Attribute in BindParam without requiring activemodel import", () => {
-    const duckAttr = { name: "age", valueForDatabase: 42 };
-    const node = buildQuoted(duckAttr);
+  it("wraps an ActiveModel::Attribute in BindParam", () => {
+    const attr = AMAttribute.fromUser("age", 42, new ValueType());
+    const node = buildQuoted(attr);
     expect(node).toBeInstanceOf(Nodes.BindParam);
-    expect((node as Nodes.BindParam).value).toBe(duckAttr);
+    expect((node as Nodes.BindParam).value).toBe(attr);
   });
 
-  it("does not treat plain objects with only name as ActiveModel::Attribute", () => {
-    const node = buildQuoted({ name: "x" });
-    expect(node).toBeInstanceOf(Nodes.Quoted);
+  // Rails dispatches casted.rb:50's `when` arm on the class, so an object that
+  // merely looks like an ActiveModel::Attribute falls through to the `else`.
+  it("does not treat an ActiveModel::Attribute duck-type as one", () => {
+    expect(buildQuoted({ name: "age", valueForDatabase: 42 })).toBeInstanceOf(Nodes.Quoted);
+    expect(buildQuoted({ name: "x" })).toBeInstanceOf(Nodes.Quoted);
   });
 });
 
