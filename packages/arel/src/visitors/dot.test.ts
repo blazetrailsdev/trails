@@ -298,6 +298,20 @@ describe("TestDot", () => {
       expect(out).toContain("<f0>Time|<f1>2024-01-02T03:04:05Z");
     });
 
+    it("Temporal types with no Ruby analogue raise rather than becoming Time leaves", () => {
+      // Duration / PlainYearMonth / PlainMonthDay have no visitable Rails
+      // ancestor — dot.rb defines no visitor for ActiveSupport::Duration
+      // (a plain Object subclass, not a Numeric), so Rails raises at
+      // visitor.rb:39. Only the Date/DateTime/Time analogues are whitelisted.
+      const v = new Visitors.Dot();
+      type Internals = { visit(o: unknown): void };
+      const iv = v as unknown as Internals;
+      v.compile(new Nodes.SqlLiteral("seed"));
+      expect(() => iv.visit(Temporal.Duration.from({ hours: 1 }))).toThrow(TypeError);
+      expect(() => iv.visit(Temporal.PlainYearMonth.from("2024-01"))).toThrow(TypeError);
+      expect(() => iv.visit(Temporal.PlainMonthDay.from("01-02"))).toThrow(TypeError);
+    });
+
     it("visitEdge throws on a typo'd field (Rails NoMethodError parity)", () => {
       // Regression: Rails' visit_edge uses public_send which raises
       // NoMethodError on a typo; the TS port silently treated missing
@@ -521,12 +535,12 @@ describe("TestDot", () => {
       // Ruby's `class Config < Object` finds no visit_Object ancestor and so
       // never reaches visit_Hash; the JS analogue is any class instance,
       // whose prototype's constructor is the class rather than Object.
+      // Finding no handler is exactly visitor.rb:39, so it raises rather than
+      // rendering — the class name survives in the message.
       class Config {
         alpha = "A";
       }
-      const out = visitStandalone(new Config());
-      expect(out).toContain("<f0>Config");
-      expect(out).not.toContain('[label="pair_0"]');
+      expect(() => visitStandalone(new Config())).toThrow(new TypeError("Cannot visit Config"));
     });
   });
 });
