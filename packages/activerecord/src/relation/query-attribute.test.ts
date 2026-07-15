@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { ActiveModelRangeError } from "@blazetrails/activemodel";
 import { QueryAttribute } from "./query-attribute.js";
 
 class StringType {
@@ -127,5 +128,33 @@ describe("QueryAttribute", () => {
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.valueBeforeTypeCast).toBe("25");
     expect(attr.value).toBe(25);
+  });
+
+  it("isUnboundable memoizes so the value is serialized exactly once", () => {
+    // query_attribute.rb:45-51 guards with `unless defined?(@_unboundable)`, so
+    // the serialization attempt happens once however often the predicate is
+    // read — and both `between` and the visitor read it.
+    let serializeCalls = 0;
+    const rangeLimited = {
+      cast: (v: unknown) => v,
+      serialize: (v: unknown) => {
+        serializeCalls += 1;
+        if (typeof v === "number" && v > 2147483647)
+          throw new ActiveModelRangeError("out of range");
+        return v;
+      },
+    };
+
+    const outOfRange = new QueryAttribute("id", 2 ** 40, rangeLimited);
+    expect(outOfRange.isUnboundable()).toBe(1);
+    expect(outOfRange.isUnboundable()).toBe(1);
+    expect(serializeCalls).toBe(1);
+
+    serializeCalls = 0;
+    const inRange = new QueryAttribute("id", 5, rangeLimited);
+    // The `false` result caches too — `defined?` is true once assigned.
+    expect(inRange.isUnboundable()).toBe(false);
+    expect(inRange.isUnboundable()).toBe(false);
+    expect(serializeCalls).toBe(1);
   });
 });

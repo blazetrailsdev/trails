@@ -63,6 +63,15 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
     expect(isInfinity({ isInfinite: () => 1 as const })).toBe(1);
   });
 
+  it("isInfinity reaches a Quoted through its own infinite?, not a structural unwrap", () => {
+    // casted.rb:43-45 duck-types the wrapped value, so a Quoted around anything
+    // answering `infinite?` (e.g. a QueryAttribute) reports the sign. predications.rb:248-250
+    // is a plain dispatch — it does not know Quoted exists.
+    expect(isInfinity(new Nodes.Quoted({ isInfinite: () => 1 as const }))).toBe(1);
+    expect(isInfinity(new Nodes.Quoted({ isInfinite: () => -1 as const }))).toBe(-1);
+    expect(isInfinity(new Nodes.Quoted(3))).toBe(0);
+  });
+
   it("isInfinity does not unwrap Casted, which defines no infinite? in Rails", () => {
     // casted.rb:5-35 — Casted has no `infinite?`, so open_ended?(Casted(INFINITY))
     // is false in Rails and must stay false here.

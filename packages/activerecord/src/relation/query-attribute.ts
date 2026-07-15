@@ -40,6 +40,9 @@ function ensureType(type: CastType): Type {
 }
 
 export class QueryAttribute extends Attribute {
+  /** Rails' `@_unboundable`; `undefined` stands in for `defined?` being false. @internal */
+  private _unboundable?: 1 | -1 | false;
+
   constructor(name: string, value: unknown, type: CastType) {
     super(name, value, ensureType(type));
   }
@@ -100,19 +103,30 @@ export class QueryAttribute extends Attribute {
     );
   }
 
+  /**
+   * Mirrors: ActiveRecord::Relation::QueryAttribute#unboundable?
+   * (query_attribute.rb:45-51) — `serializable? { |value| @_unboundable = value <=> 0 }`,
+   * memoized behind `unless defined?(@_unboundable)` so the serialization is
+   * attempted exactly once. `_unboundable === undefined` is this port's
+   * `defined?` guard, so a `false` result caches too; both `between` and the
+   * visitor call this, and serializing re-raises otherwise.
+   */
   isUnboundable(): 1 | -1 | false {
-    try {
-      void this.valueForDatabase;
-    } catch (e) {
-      if (e instanceof ActiveModelRangeError) {
-        // Mirror Rails query_attribute.rb:46-50: serializable? yields value <=> 0.
-        const v = this.value;
-        if (typeof v === "bigint") return v >= 0n ? 1 : -1;
-        if (typeof v === "number") return v >= 0 ? 1 : -1;
-        return 1;
+    if (this._unboundable === undefined) {
+      this._unboundable = false;
+      try {
+        void this.valueForDatabase;
+      } catch (e) {
+        if (e instanceof ActiveModelRangeError) {
+          // Mirror Rails query_attribute.rb:46-50: serializable? yields value <=> 0.
+          const v = this.value;
+          if (typeof v === "bigint") this._unboundable = v >= 0n ? 1 : -1;
+          else if (typeof v === "number") this._unboundable = v >= 0 ? 1 : -1;
+          else this._unboundable = 1;
+        }
       }
     }
-    return false;
+    return this._unboundable;
   }
 }
 

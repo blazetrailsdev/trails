@@ -1,5 +1,4 @@
 import { Node } from "./nodes/node.js";
-import { Quoted } from "./nodes/casted.js";
 import { And } from "./nodes/and.js";
 import { Or } from "./nodes/or.js";
 import { Grouping } from "./nodes/grouping.js";
@@ -29,10 +28,10 @@ import { Between } from "./nodes/binary.js";
  *   `unboundable?` value protocols. Both are duck-typed and both yield the
  *   *sign*, but they read *different* things — the two are not interchangeable:
  *   - `infinitySign` mirrors `infinity?` (predications.rb:248-250): bare
- *     `±Infinity`, a `Quoted` wrapper around it (`Quoted#infinite?`,
- *     casted.rb:43-45), or a bound exposing `isInfinite()`. It deliberately
- *     does NOT unwrap `Casted`, which defines no `infinite?` in Rails
- *     (casted.rb:5-35) — see the note at `infinitySign` before "fixing" that.
+ *     `±Infinity` (Ruby's `Float` responds to `infinite?`), or a bound exposing
+ *     `isInfinite()` — which is how a `Quoted` answers (casted.rb:43-45). A
+ *     `Casted` defines no `infinite?` in Rails (casted.rb:5-35), so it never
+ *     answers — see the note at `infinitySign` before "fixing" that.
  *   - `unboundableSign` mirrors `unboundable?` (predications.rb:252-253) and is
  *     purely duck-typed: only a bound exposing `isUnboundable()` answers it. A
  *     bare `±Infinity` is open-ended, NOT unboundable.
@@ -79,20 +78,20 @@ export function parseRange(beginOrRange: unknown, end: unknown, excludeEnd?: boo
 // `value.respond_to?(:infinite?) && value.infinite?`, which yields the *sign*
 // because `Float#infinite?` returns `1 | -1 | nil`.
 //
-// Unwraps `Quoted` (whose `infinite?` lives at casted.rb:43-45) but deliberately
-// NOT `Casted`: Rails' `Casted` defines no `infinite?` (casted.rb:5-35), so
-// `open_ended?(Casted(INFINITY))` is false there and must be false here. Do not
-// "fix" this to unwrap Casted — it would silently change `between`.
+// A plain duck-type dispatch, like Rails: bare ±Infinity (Ruby's `Float`
+// responds to `infinite?`), or anything exposing `isInfinite()`. `Quoted` is
+// NOT special-cased — it answers through its own `isInfinite` (casted.rb:43-45)
+// like any other value, and structurally unwrapping it here would be a second
+// copy of that method. `Casted` defines no `infinite?` (casted.rb:5-35), so it
+// answers 0 and `open_ended?(Casted(INFINITY))` stays false.
 //
-// Every trails producer of the protocol returns the sign, matching Ruby:
-// `Quoted#isInfinite` (casted.ts), `BindParam#isInfinite` (bind-param.ts), and
-// `QueryAttribute#isInfinite` (activerecord/src/relation/query-attribute.ts).
-// Do not add a `true` arm back — a boolean producer would report `+1` for a
-// -Infinity bound.
+// Every trails producer returns the sign, matching Ruby: `Quoted#isInfinite`
+// (casted.ts), `BindParam#isInfinite` (bind-param.ts), `QueryAttribute#isInfinite`
+// (activerecord/src/relation/query-attribute.ts). Do not add a `true` arm back —
+// a boolean producer would report `+1` for a -Infinity bound.
 export function infinitySign(value: unknown): 1 | -1 | 0 {
   if (value === Infinity) return 1;
   if (value === -Infinity) return -1;
-  if (value instanceof Quoted) return infinitySign(value.value);
   if (
     value &&
     typeof value === "object" &&

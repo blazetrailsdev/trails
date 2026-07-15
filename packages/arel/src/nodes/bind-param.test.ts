@@ -91,6 +91,13 @@ describe("BindParam", () => {
       const bp = new Nodes.BindParam({ isInfinite: () => -1 });
       expect(bp.isInfinite()).toBe(-1);
     });
+
+    it("reports the sign for a bare ±Infinity value, which Float answers in Ruby", () => {
+      // bind_param.rb:33-35 duck-types `infinite?`, and Float responds — so
+      // BindParam(Float::INFINITY).infinite? is 1 and the bound is open-ended.
+      expect(new Nodes.BindParam(Infinity).isInfinite()).toBe(1);
+      expect(new Nodes.BindParam(-Infinity).isInfinite()).toBe(-1);
+    });
   });
 
   describe("isUnboundable", () => {

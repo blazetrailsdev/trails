@@ -129,14 +129,20 @@ export class Quoted extends Unary {
   }
 
   /**
-   * Mirrors: Arel::Nodes::Quoted#infinite? (casted.rb:43-45) — the sign, not a
-   * boolean. `Casted` deliberately defines no counterpart (casted.rb:5-35), so
+   * Mirrors: Arel::Nodes::Quoted#infinite? (casted.rb:43-45) —
+   * `value.respond_to?(:infinite?) && value.infinite?`, which yields the sign
+   * rather than a boolean (Ruby's `Float#infinite?` returns `1 | -1 | nil`).
+   *
+   * Duck-typed, not a bare `=== ±Infinity` check: in Ruby anything answering
+   * `infinite?` participates, so `Quoted(QueryAttribute(INFINITY))#infinite?`
+   * is `1`. `Casted` deliberately defines no counterpart (casted.rb:5-35), so
    * `open_ended?(Casted(INFINITY))` is false in Rails and must stay false here.
    */
   isInfinite(): 1 | -1 | false {
     if (this.value === Infinity) return 1;
     if (this.value === -Infinity) return -1;
-    return false;
+    const v = this.value as { isInfinite?: () => 1 | -1 | false } | null | undefined;
+    return typeof v?.isInfinite === "function" ? v.isInfinite() : false;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
