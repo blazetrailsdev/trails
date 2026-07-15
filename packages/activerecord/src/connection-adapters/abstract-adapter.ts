@@ -22,6 +22,7 @@ import {
   type SQLWarning,
 } from "../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
+import type { EventPayload } from "@blazetrails/activesupport";
 import { disablePreparedStatements } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
@@ -2333,8 +2334,13 @@ export class AbstractAdapter implements Quoting {
    * Mirrors: AbstractAdapter#log
    *
    * `block` receives the notification payload, mirroring Rails' `yield payload`.
-   * `raw_execute` threads it into `perform_query`, which reports back by
-   * mutating it (`row_count`, `statement_name`) before subscribers read it.
+   * It is the same object subscribers read after the block returns, so a block
+   * reports back by mutating it — which is how Rails' `raw_execute` hands
+   * `notification_payload` to `perform_query` for `row_count`/`statement_name`.
+   *
+   * trails' `rawExecute` does not call `log` yet; wiring that up is part of
+   * `unify-execute-mutation-into-perform-query` (RFC 0023), which first needs
+   * `performQuery` on sqlite3/mysql2 (only PG assigns one today).
    */
   async log<T>(
     sql: string,
@@ -2342,7 +2348,7 @@ export class AbstractAdapter implements Quoting {
     binds: unknown[] = [],
     typeCastedBinds: unknown[] = [],
     isAsync = false,
-    block?: (payload: Record<string, unknown>) => Promise<T>,
+    block?: (payload: EventPayload) => Promise<T>,
   ): Promise<T | void> {
     try {
       const tx = this.currentTransaction();

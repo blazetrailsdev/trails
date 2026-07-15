@@ -23,7 +23,9 @@ describe("SubscribeEventObjectsTest", () => {
   it("subscribe to events where payload is changed during instrumentation", () => {
     const events: Event[] = [];
     Notifications.subscribe("foo", (e) => events.push(e));
-    Notifications.instrument("foo", {}, (payload) => {
+    // Rails passes no payload here, so the block mutates the default one the
+    // event was built with — the subscriber must observe that same object.
+    Notifications.instrument("foo", undefined, (payload) => {
       payload.my_key = "success!";
     });
     expect(events[0].payload.my_key).toBe("success!");

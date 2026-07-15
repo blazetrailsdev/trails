@@ -2,6 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
+import type { EventPayload } from "@blazetrails/activesupport";
 import { Collectors } from "@blazetrails/arel";
 
 describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
@@ -70,13 +71,13 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
 
     it("yields the notification payload so the block can report row_count", async () => {
       const a = new AbstractAdapter();
-      const events: any[] = [];
-      const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
+      const payloads: EventPayload[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (e) => payloads.push(e.payload));
       try {
         await a.log("SELECT 1", "SQL", [], [], false, async (payload) => {
           payload.row_count = 7;
         });
-        expect(events[0].payload.row_count).toBe(7);
+        expect(payloads[0].row_count).toBe(7);
       } finally {
         Notifications.unsubscribe(sub);
       }

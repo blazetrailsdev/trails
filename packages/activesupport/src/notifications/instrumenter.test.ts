@@ -22,8 +22,11 @@ describe("InstrumenterTest", () => {
     Notifications.subscribe("foo", (e) => {
       received = e.payload;
     });
-    Notifications.instrument("foo", { key: "original" }, () => {});
+    Notifications.instrument("foo", { key: "original" }, (payload) => {
+      payload.added = "modified";
+    });
     expect(received.key).toBe("original");
+    expect(received.added).toBe("modified");
   });
 
   it("instrument works without a block", () => {
@@ -58,8 +61,11 @@ describe("InstrumenterTest", () => {
   it("record yields the payload for further modification", () => {
     const events: Event[] = [];
     Notifications.subscribe("modify.test", (e) => events.push(e));
-    Notifications.instrument("modify.test", { original: true }, () => {});
+    Notifications.instrument("modify.test", { original: true }, (payload) => {
+      payload.added = "later";
+    });
     expect(events[0].payload.original).toBe(true);
+    expect(events[0].payload.added).toBe("later");
   });
 
   it("record works without a block", () => {
