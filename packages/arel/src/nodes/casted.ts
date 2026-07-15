@@ -54,10 +54,14 @@ import { BindParam } from "./bind-param.js";
  * We wrap rather than pass through because a bare ActiveModel::Attribute is
  * not a `Node`, and trails' AST is statically typed against `Node` — Ruby
  * duck-types its way past this, TS cannot without widening every node slot.
+ * This is the only wrap-site: `Attribute#quotedNode` delegates straight here
+ * (`buildQuoted(value, this)`, matching Rails' `Nodes.build_quoted(other,
+ * self)`), so the AST shape cannot diverge by call path.
+ *
  * `ToSql#visitActiveModelAttribute` is still ported, and a bare attribute that
- * bypasses buildQuoted / Attribute#quotedNode still reaches it. Both of Rails'
- * own pre-emptive `when ... ActiveModel::Attribute` arms are ported and each
- * gets there by its own route:
+ * bypasses this function still reaches it. Both of Rails' own pre-emptive
+ * `when ... ActiveModel::Attribute` arms are ported and each gets there by its
+ * own route:
  * - `visitArelNodesValuesList` (Rails to_sql.rb:110) calls `visit` on it,
  *   which resolves via the ActiveModel::Attribute dispatch registration —
  *   trails' analogue of Ruby's name-derived dispatch + ancestors walk;
@@ -76,13 +80,13 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
     //
     // The "structural so we don't need a runtime import" rationale this used to
     // carry is stale: arel already depends on @blazetrails/activemodel, which
-    // does not depend back (no cycle), and attributes/attribute.ts +
-    // visitors/to-sql.ts already import Attribute from it at runtime. Rails
-    // identifies it by class (casted.rb:50), so `instanceof` is the convergent
-    // shape; the structural check also disagrees with the other two arel
-    // predicates. Tracked by story
-    // `arel-am-attribute-predicates-diverge-across-sites` — a behaviour change
-    // (a duck-typed object stops binding), so not folded into #4879.
+    // does not depend back (no cycle), and visitors/to-sql.ts already imports
+    // Attribute from it at runtime. Rails identifies it by class
+    // (casted.rb:50), so `instanceof` is the convergent shape; this check also
+    // disagrees with the other two in arel — to-sql's `isActiveModelAttribute`
+    // omits the `name` half, dot's tests `valueBeforeTypeCast` instead.
+    // Tracked by story `arel-am-attribute-predicates-diverge-across-sites` — a
+    // behaviour change (a duck-typed object stops binding), so not folded in.
     if (
       "valueForDatabase" in (other as Record<string, unknown>) &&
       "name" in (other as Record<string, unknown>)
