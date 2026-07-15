@@ -1,5 +1,5 @@
-import { describe, it, expect } from "vitest";
-import { ActiveModelRangeError } from "@blazetrails/activemodel";
+import { describe, it, expect, vi } from "vitest";
+import { BigIntegerType, IntegerType } from "@blazetrails/activemodel";
 import { QueryAttribute } from "./query-attribute.js";
 
 class StringType {
@@ -101,9 +101,13 @@ describe("QueryAttribute", () => {
   });
 
   it("isInfinite handles Ruby-style duck-typed `infinite()` (nil for finite, 1/-1 for infinite)", () => {
-    const finite = { infinite: () => null };
-    const positiveInf = { infinite: () => 1 };
-    const negativeInf = { infinite: () => -1 };
+    // Rails has ONE `respond_to?(:infinite?)` protocol (query_attribute.rb:53-55),
+    // which ports to `isInfinite()` — the spelling Quoted / BindParam /
+    // UnboundableBound / arel's infinitySign all use. Reading a second name here
+    // forked the protocol.
+    const finite = { isInfinite: () => false };
+    const positiveInf = { isInfinite: () => 1 };
+    const negativeInf = { isInfinite: () => -1 };
     const passthrough = { cast: (v: unknown) => v, serialize: (v: unknown) => v };
     expect(new QueryAttribute("x", finite, passthrough).isInfinite()).toBe(false);
     expect(new QueryAttribute("x", positiveInf, passthrough).isInfinite()).toBe(1);
@@ -130,31 +134,48 @@ describe("QueryAttribute", () => {
     expect(attr.value).toBe(25);
   });
 
-  it("isUnboundable memoizes so the value is serialized exactly once", () => {
+  it("isUnboundable reports the sign of `value <=> 0` for an out-of-range bound", () => {
+    // query_attribute.rb:45-51 — serializable? yields the cast value when it is
+    // out of range for the column type; the sign tells Arel which side collapses.
+    const int4 = new IntegerType({ limit: 4 });
+    expect(new QueryAttribute("id", 2 ** 40, int4).isUnboundable()).toBe(1);
+    expect(new QueryAttribute("id", -(2 ** 40), int4).isUnboundable()).toBe(-1);
+    expect(new QueryAttribute("id", 5, int4).isUnboundable()).toBe(false);
+
+    // The #4433 bignum path: a bigint column is Integer(limit: 8).
+    const int8 = new IntegerType({ limit: 8 });
+    expect(new QueryAttribute("id", 2n ** 63n, int8).isUnboundable()).toBe(1);
+    expect(new QueryAttribute("id", -(2n ** 63n) - 1n, int8).isUnboundable()).toBe(-1);
+    expect(new QueryAttribute("id", 2n ** 63n - 1n, int8).isUnboundable()).toBe(false);
+  });
+
+  it("isUnboundable is never true for :big_integer, whose max_value is INFINITY", () => {
+    // big_integer.rb:33 — in_range? is always true, so serializable? never
+    // yields and unboundable? stays nil however large the value.
+    const big = new BigIntegerType();
+    expect(new QueryAttribute("id", 2n ** 63n, big).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", -(2n ** 100n), big).isUnboundable()).toBe(false);
+  });
+
+  it("isUnboundable memoizes so the value is inspected exactly once", () => {
     // query_attribute.rb:45-51 guards with `unless defined?(@_unboundable)`, so
-    // the serialization attempt happens once however often the predicate is
-    // read — and both `between` and the visitor read it.
-    let serializeCalls = 0;
-    const rangeLimited = {
-      cast: (v: unknown) => v,
-      serialize: (v: unknown) => {
-        serializeCalls += 1;
-        if (typeof v === "number" && v > 2147483647)
-          throw new ActiveModelRangeError("out of range");
-        return v;
-      },
-    };
+    // the check happens once however often the predicate is read — and both
+    // `between` and the visitor read it.
+    const int4 = new IntegerType({ limit: 4 });
+    const spy = vi.spyOn(int4, "isSerializable");
 
-    const outOfRange = new QueryAttribute("id", 2 ** 40, rangeLimited);
-    expect(outOfRange.isUnboundable()).toBe(1);
-    expect(outOfRange.isUnboundable()).toBe(1);
-    expect(serializeCalls).toBe(1);
-
-    serializeCalls = 0;
-    const inRange = new QueryAttribute("id", 5, rangeLimited);
-    // The `false` result caches too — `defined?` is true once assigned.
+    // The `false` result caches too — Rails assigns on both paths, so `defined?`
+    // is true either way.
+    const inRange = new QueryAttribute("id", 5, int4);
     expect(inRange.isUnboundable()).toBe(false);
     expect(inRange.isUnboundable()).toBe(false);
-    expect(serializeCalls).toBe(1);
+    expect(inRange.isUnboundable()).toBe(false);
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    spy.mockClear();
+    const outOfRange = new QueryAttribute("id", 2 ** 40, int4);
+    expect(outOfRange.isUnboundable()).toBe(1);
+    expect(outOfRange.isUnboundable()).toBe(1);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

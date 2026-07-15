@@ -35,6 +35,16 @@ import { Between } from "./nodes/binary.js";
  *   - `unboundableSign` mirrors `unboundable?` (predications.rb:252-253) and is
  *     purely duck-typed: only a bound exposing `isUnboundable()` answers it. A
  *     bare `±Infinity` is open-ended, NOT unboundable.
+ * - Two sentinel conventions, deliberately, both standing in for Ruby's
+ *   `1 | -1 | nil`. The HELPERS here (`infinitySign` / `unboundableSign`) return
+ *   `1 | -1 | 0` and callers test `!== 0`, because Ruby's `0` is truthy and so
+ *   could not double as "absent" — `0` is unreachable anyway (see the note on
+ *   `unboundableSign`). The VALUE PROTOCOL (`Quoted#isInfinite`,
+ *   `BindParam#isInfinite` / `#isUnboundable`, `QueryAttribute`,
+ *   `UnboundableBound`) returns `1 | -1 | false`, mirroring the shape of Ruby's
+ *   `respond_to?(:x) && value.x` — `false` is the `&&` short-circuit, `nil` the
+ *   predicate's own miss. Do not "unify" them: the helper's `0` means no bound
+ *   answered, the producer's `false` means this value has no opinion.
  * - The TS port accepts three input shapes (array, object, positional)
  *   instead of Ruby's single `Range`.
  */

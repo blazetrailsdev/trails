@@ -7,7 +7,7 @@
  * Mirrors: ActiveRecord::Relation::QueryAttribute < ActiveModel::Attribute
  */
 
-import { Attribute, Type, ActiveModelRangeError } from "@blazetrails/activemodel";
+import { Attribute, Type } from "@blazetrails/activemodel";
 import { Substitute } from "../statement-cache.js";
 
 type CastType = Pick<Type, "cast" | "serialize">;
@@ -105,26 +105,24 @@ export class QueryAttribute extends Attribute {
 
   /**
    * Mirrors: ActiveRecord::Relation::QueryAttribute#unboundable?
-   * (query_attribute.rb:45-51) — `serializable? { |value| @_unboundable = value <=> 0 }`,
-   * memoized behind `unless defined?(@_unboundable)` so the serialization is
-   * attempted exactly once. `_unboundable === undefined` is this port's
-   * `defined?` guard, so a `false` result caches too; both `between` and the
-   * visitor call this, and serializing re-raises otherwise.
+   * (query_attribute.rb:45-51) —
+   * `serializable? { |value| @_unboundable = value <=> 0 } && @_unboundable = nil`,
+   * memoized behind `unless defined?(@_unboundable)`. `_unboundable === undefined`
+   * is that `defined?` guard, so the `false` result caches too: Rails assigns on
+   * both paths, and both `between` and the visitor read this.
+   *
+   * No exception handling, because Rails has none here: `serializable?`
+   * (attribute.rb:62-64) delegates to `Type#serializable?`, which is a
+   * predicate — `Integer#serializable?` (integer.rb:74-80) tests `in_range?`
+   * and yields the *cast* value to the block rather than raising. A serializer
+   * error is therefore never swallowed; it propagates as in Rails.
    */
   isUnboundable(): 1 | -1 | false {
     if (this._unboundable === undefined) {
-      this._unboundable = false;
-      try {
-        void this.valueForDatabase;
-      } catch (e) {
-        if (e instanceof ActiveModelRangeError) {
-          // Mirror Rails query_attribute.rb:46-50: serializable? yields value <=> 0.
-          const v = this.value;
-          if (typeof v === "bigint") this._unboundable = v >= 0n ? 1 : -1;
-          else if (typeof v === "number") this._unboundable = v >= 0 ? 1 : -1;
-          else this._unboundable = 1;
-        }
-      }
+      // Ruby's `value <=> 0` on the yielded cast value. Rails hands the block
+      // `cast(value)` (integer.rb:75), not QueryAttribute#value — which is the
+      // raw value, since QueryAttribute#type_cast is a no-op (query_attribute.rb:22-24).
+      this._unboundable = this.isSerializable() ? false : compareToZero(this.type.cast(this.value));
     }
     return this._unboundable;
   }
@@ -137,15 +135,35 @@ export class QueryAttribute extends Attribute {
  * — `value.respond_to?(:infinite?) && value.infinite?`. Returns the sign rather
  * than a boolean; see `isInfinite` above.
  *
+ * `infinite?` ports to `isInfinite()`, the one spelling the protocol has across
+ * the port — `Quoted` (casted.ts), `BindParam` (bind-param.ts), `UnboundableBound`
+ * (predicate-builder/range-handler.ts) and arel's `infinitySign` all read it.
+ * Rails has a single `respond_to?(:infinite?)` protocol, so this must not fork
+ * into a second name: reading `infinite()` here made
+ * `QueryAttribute(Quoted(INFINITY)).infinite?` false while `infinitySign` said 1.
+ *
  * @internal
  */
 function isInfinity(value: unknown): 1 | -1 | false {
   if (value === Infinity) return 1;
   if (value === -Infinity) return -1;
   if (value === null || value === undefined) return false;
-  const fn = (value as { infinite?: unknown }).infinite;
+  const fn = (value as { isInfinite?: unknown }).isInfinite;
   if (typeof fn !== "function") return false;
   const result = (fn as () => unknown).call(value);
   if (result === 1 || result === -1) return result;
   return false;
+}
+
+/**
+ * Ruby's `value <=> 0` for the numeric shapes a bound can take. Only the sign is
+ * used; a non-numeric value that failed serialization is treated as past the
+ * upper bound.
+ *
+ * @internal
+ */
+function compareToZero(value: unknown): 1 | -1 {
+  if (typeof value === "bigint") return value >= 0n ? 1 : -1;
+  if (typeof value === "number") return value >= 0 ? 1 : -1;
+  return 1;
 }
