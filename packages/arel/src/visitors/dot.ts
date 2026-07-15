@@ -499,6 +499,10 @@ export class Dot extends Visitor {
         this.visitString(object);
       } else if (Array.isArray(object)) {
         this.visitArray(object);
+      } else if (object instanceof Set) {
+        // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). Without this
+        // arm a Set reaches no handler and falls to the leaf below.
+        this.visitSet(object);
       } else if (object instanceof Node) {
         super.visit(object);
       } else if (this.isActiveModelAttribute(object)) {
@@ -506,7 +510,7 @@ export class Dot extends Visitor {
         // Ruby reaches by class dispatch — including via the ancestor walk in
         // visitor.rb:36-41, so every Attribute subclass lands here too.
         this.visitActiveModelAttribute(object);
-      } else if (this.isPlainObject(object)) {
+      } else if (this.isHash(object)) {
         this.visitHash(object as Record<string, unknown>);
       } else {
         // Unknown non-Node object — render as a leaf with its String form
@@ -617,13 +621,46 @@ export class Dot extends Visitor {
     return o instanceof ModelAttribute;
   }
 
-  private isPlainObject(o: unknown): boolean {
+  /**
+   * The trails analogue of Ruby's `o.is_a?(Hash)`.
+   *
+   * Rails' `Visitor#visit` (visitor.rb:36-41) walks `object.class.ancestors`
+   * for a visitable class, so `class MyHash < Hash` reaches `visit_Hash`
+   * while `class Config < Object` finds no handler and raises TypeError.
+   * JS has no Hash class — the object literal *is* the Hash — so the
+   * equivalent of that ancestor split is whether the prototype chain is
+   * made only of plain objects:
+   *
+   *   - `{ a: 1 }` and `Object.create(null)` are Hashes;
+   *   - `Object.create({ a: 1 })` is the JS way to derive a record from
+   *     another record — Ruby's `MyHash < Hash` — so it's a Hash too;
+   *   - a class instance (including `class Config extends Object`) has a
+   *     prototype whose `constructor` is that class, which is Ruby's
+   *     `Config < Object`: no ancestor handler, so it does not route here.
+   *
+   * `visitHash` reads `Object.entries`, which sees only own enumerable
+   * string keys — inherited and symbol keys are not walked, matching the
+   * fields Rails' `each_with_index` over a Hash would yield for the
+   * derived record's own pairs.
+   */
+  private isHash(o: unknown): boolean {
     if (!o || typeof o !== "object") return false;
     if (Array.isArray(o)) return false;
     // Node covers Table (which extends Node).
     if (o instanceof Node) return false;
-    const proto = Object.getPrototypeOf(o);
-    return proto === Object.prototype || proto === null;
+    for (
+      let proto = Object.getPrototypeOf(o);
+      proto !== null;
+      proto = Object.getPrototypeOf(proto)
+    ) {
+      if (proto === Object.prototype) return true;
+      // A prototype with no `constructor` at all descends from
+      // Object.create(null) — still a record, so keep walking. Only a
+      // constructor naming some *other* class marks a class prototype.
+      const ctor = (proto as { constructor?: unknown }).constructor;
+      if (ctor !== undefined && ctor !== Object) return false;
+    }
+    return true;
   }
 
   /**
@@ -631,6 +668,15 @@ export class Dot extends Visitor {
    * Rails-style class names for primitives and nil values — `String`,
    * `Integer`, `Float`, `TrueClass`, `FalseClass`, `NilClass`, `Symbol`,
    * `Time` — so leaf nodes match Rails' shape.
+   *
+   * Values matching the Hash analogue (see isHash) are named `Hash` rather
+   * than JS's ctor name `Object`. Rails labels the node `o.class.name`
+   * (dot.rb:253), so a *named* Hash subclass would be "MyHash" — but no
+   * value reaching this arm can supply such a name: isHash admits only
+   * object literals, `Object.create(null)`, and records derived from those,
+   * every one of which reports a ctor name of `Object`. Class instances,
+   * the only objects with a distinct ctor name, are Ruby's `Config < Object`
+   * and never route here. So "Hash" is the whole of the analogue's range.
    */
   private classNameOf(o: unknown): string {
     if (o === null) return "NilClass";
@@ -642,6 +688,7 @@ export class Dot extends Visitor {
     if (typeof o === "symbol") return "Symbol";
     // boundary: legacy JS Date values stringify to Rails' `Time` class name.
     if (o instanceof Date) return "Time";
+    if (this.isHash(o)) return "Hash";
     const ctor = (o as { constructor?: { name?: string } }).constructor;
     return ctor?.name ?? "Object";
   }

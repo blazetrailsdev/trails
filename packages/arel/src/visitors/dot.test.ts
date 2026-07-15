@@ -12,6 +12,17 @@ import {
 } from "../index.js";
 import { DotNode } from "./dot.js";
 
+/**
+ * Drive Dot#visit on a bare value (rather than an AST root) and render the
+ * graph, so dispatch for non-Node values can be asserted directly.
+ */
+function visitStandalone(value: unknown): string {
+  const v = new Visitors.Dot();
+  v.compile(new Nodes.SqlLiteral("")); // initialize state
+  (v as unknown as { visit(o: unknown): void }).visit(value);
+  return (v as unknown as { toDot(): string }).toDot();
+}
+
 describe("TestDot", () => {
   const users = new Table("users");
   const dot = new Visitors.Dot();
@@ -390,17 +401,98 @@ describe("TestDot", () => {
       // labeled "pair_<i>" pointing at an Array node, which itself emits
       // index-labeled edges for the [key, value] tuple. Both halves of
       // the entry must end up in the graph.
-      const v = new Visitors.Dot();
-      type Internals = { visit(o: unknown): void };
-      v.compile(new Nodes.SqlLiteral("")); // initialize state
-      (v as unknown as Internals).visit({ alpha: "A", beta: "B" });
-      const out = (v as unknown as { toDot(): string }).toDot();
+      const out = visitStandalone({ alpha: "A", beta: "B" });
       expect(out).toContain('[label="pair_0"]');
       expect(out).toContain('[label="pair_1"]');
       expect(out).toContain("alpha");
       expect(out).toContain("beta");
       expect(out).toContain("A");
       expect(out).toContain("B");
+    });
+
+    it("names a hash node Hash, not the JS ctor name", () => {
+      // Rails' Dot#visit labels the node `o.class.name` (dot.rb:253), which
+      // is "Hash" for a plain hash. JS's ctor name for an object literal is
+      // "Object" — the label follows Rails.
+      const out = visitStandalone({ alpha: "A" });
+      expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
+      expect(out).not.toContain("<f0>Object");
+    });
+
+    it("a record derived from a plain object routes to visit_Hash", () => {
+      // Rails' Visitor#visit walks object.class.ancestors (visitor.rb:36-41),
+      // so a Hash subclass reaches visit_Hash. Object.create over a plain
+      // prototype is the JS form of deriving a record from another record.
+      const derived: Record<string, unknown> = Object.create({ inherited: "nope" });
+      derived.alpha = "A";
+      const out = visitStandalone(derived);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("alpha");
+      expect(out).toContain("A");
+      // Object.entries ignores prototype-chain keys, so the inherited pair
+      // is not an edge — mirroring the own-pairs Rails' each would yield.
+      expect(out).not.toContain("inherited");
+    });
+
+    it("a null-prototype record routes to visit_Hash", () => {
+      const bare: Record<string, unknown> = Object.create(null);
+      bare.alpha = "A";
+      const out = visitStandalone(bare);
+      expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("alpha");
+    });
+
+    it("a record derived from a null-prototype record routes to visit_Hash", () => {
+      // The prototype here has no `constructor` at all, which must not be
+      // read as "some class other than Object" — both halves are records,
+      // so the derived value is a Hash like any other.
+      const base: Record<string, unknown> = Object.create(null);
+      base.inherited = "nope";
+      const derived: Record<string, unknown> = Object.create(base);
+      derived.alpha = "A";
+      const out = visitStandalone(derived);
+      expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("alpha");
+      expect(out).not.toContain("inherited");
+    });
+
+    it("a record inheriting valueBeforeTypeCast is a Hash, not an attribute", () => {
+      // The attribute arm is a class check (`instanceof ModelAttribute`), so
+      // it cannot swallow a record that merely carries the property — in
+      // Ruby such a value is a Hash and routes to visit_Hash (dot.rb:220).
+      const derived: Record<string, unknown> = Object.create({ valueBeforeTypeCast: 42 });
+      derived.alpha = "A";
+      const out = visitStandalone(derived);
+      expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("alpha");
+      expect(out).not.toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
+    });
+
+    it("a Set emits index-labeled edges like an Array", () => {
+      // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). A Set is not a
+      // Hash (its prototype's ctor is Set), so without a dedicated arm it
+      // would fall to the leaf and stringify instead of walking members.
+      const out = visitStandalone(new Set(["A", "B"]));
+      expect(out).toMatch(/\d+ \[label="<f0>Set"\];/);
+      expect(out).toContain('[label="0"]');
+      expect(out).toContain('[label="1"]');
+      expect(out).toContain("A");
+      expect(out).toContain("B");
+    });
+
+    it("a class instance is not a Hash and keeps its own class name", () => {
+      // Ruby's `class Config < Object` finds no visit_Object ancestor and so
+      // never reaches visit_Hash; the JS analogue is any class instance,
+      // whose prototype's constructor is the class rather than Object.
+      class Config {
+        alpha = "A";
+      }
+      const out = visitStandalone(new Config());
+      expect(out).toContain("<f0>Config");
+      expect(out).not.toContain('[label="pair_0"]');
     });
   });
 });
