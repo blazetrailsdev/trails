@@ -49,11 +49,6 @@ export class BinaryType extends ValueType<Uint8Array> {
     }
     return false;
   }
-
-  deserialize(value: unknown): Uint8Array | null {
-    if (value instanceof Data) return value.bytes;
-    return this.cast(value);
-  }
 }
 
 export class Data {
@@ -80,9 +75,5 @@ export class Data {
     return Array.from(this.bytes)
       .map((b) => b.toString(16).padStart(2, "0"))
       .join("");
-  }
-
-  byteSize(): number {
-    return this.bytes.length;
   }
 }
