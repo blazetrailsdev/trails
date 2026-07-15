@@ -170,14 +170,14 @@ export class Book extends Base {
     this.hasMany("subscribers", { through: "subscriptions" });
     this.hasOne("essay");
     this.aliasAttribute("title", "name");
-    this.enum("status", { proposed: 0, written: 1, published: 2 });
+    this.enum("status", ["proposed", "written", "published"]);
     this.enum("last_read", { unread: 0, reading: 2, read: 3, forgotten: null });
-    this.enum("nullable_status", { single: 0, married: 1 });
-    this.enum("language", { english: 0, spanish: 1, french: 2 }, { prefix: "in" });
-    this.enum("author_visibility", { visible: 0, invisible: 1 }, { prefix: true });
-    this.enum("illustrator_visibility", { visible: 0, invisible: 1 }, { prefix: true });
-    this.enum("font_size", { small: 0, medium: 1, large: 2 }, { prefix: "with", suffix: true });
-    this.enum("difficulty", { easy: 0, medium: 1, hard: 2 }, { suffix: "toRead" });
+    this.enum("nullable_status", ["single", "married"]);
+    this.enum("language", ["english", "spanish", "french"], { prefix: "in" });
+    this.enum("author_visibility", ["visible", "invisible"], { prefix: true });
+    this.enum("illustrator_visibility", ["visible", "invisible"], { prefix: true });
+    this.enum("font_size", ["small", "medium", "large"], { prefix: "with", suffix: true });
+    this.enum("difficulty", ["easy", "medium", "hard"], { suffix: "toRead" });
     this.enum("cover", { hard: "hard", soft: "soft" });
     this.enum("boolean_status", { enabled: true, disabled: false });
   }

@@ -39,7 +39,7 @@ export class BookDestroyAsync extends Base {
       foreignKey: "book_id",
     });
     this.hasOne("content", { dependent: "destroy" });
-    this.enum("status", { proposed: 0, written: 1, published: 2 });
+    this.enum("status", ["proposed", "written", "published"]);
   }
 }
 

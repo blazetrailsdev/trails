@@ -482,8 +482,8 @@ export class EnumMethods {
  */
 export function enumMethod(
   this: typeof Base,
-  attribute: string,
-  mapping: Record<string, EnumValue>,
+  name: string,
+  values: string[] | Record<string, EnumValue>,
   options?: {
     prefix?: boolean | string;
     suffix?: boolean | string;
@@ -493,7 +493,7 @@ export function enumMethod(
     default?: unknown;
   },
 ): void {
-  _enum.call(this, attribute, mapping, options);
+  _enum.call(this, name, values, options);
 }
 
 // Alias the Base.enum implementation under the Rails-idiomatic name so
