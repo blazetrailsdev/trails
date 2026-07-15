@@ -171,6 +171,22 @@ describe("IntegerTest", () => {
     expect(int8.isSerializable(-(2n ** 63n) - 1n)).toBe(false);
   });
 
+  it("serializable? casts before the range check, so nan and infinity are in range", () => {
+    // integer.rb:74-80 opens with `cast_value = cast(value)`; `cast_value` is
+    // `to_i rescue nil` (integer.rb:90), so NaN/±Infinity cast to nil and
+    // `in_range?(nil)` is `!value` => true (integer.rb:86). Reading the raw value
+    // instead would answer false.
+    const type = new Types.IntegerType();
+    expect(type.isSerializable(Infinity)).toBe(true);
+    expect(type.isSerializable(-Infinity)).toBe(true);
+    expect(type.isSerializable(NaN)).toBe(true);
+    // A non-numeric string is `to_i`-able to nil here (Rails: "abc".to_i == 0),
+    // and either way it is in range — not out of it.
+    expect(type.isSerializable("abc")).toBe(true);
+    // Genuinely out-of-range values still answer false.
+    expect(type.isSerializable(2 ** 40)).toBe(false);
+  });
+
   it("serialize_cast_value enforces range", () => {
     const values = [1, "123", 0, -5, null];
     for (const v of values) {

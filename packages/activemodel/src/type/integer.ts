@@ -48,26 +48,26 @@ export class IntegerType extends NumericValueType {
   }
 
   isSerializable(value: unknown): boolean {
-    if (value === null || value === undefined) return true;
-    // A BigInt is passed straight to the arbitrary-precision range check.
-    // Routing through `Number(value)` would collapse `2n**63n` and `2n**63n-1n`
-    // to the same float (9223372036854775808), so an exactly-2^63 value on an
-    // 8-byte column would wrongly test in-range — see `isInRange`.
-    if (typeof value === "bigint") return this.isInRange(value);
-    let num: number;
-    if (typeof value === "number") {
-      num = value;
-    } else {
-      // `Number(Symbol())` throws TypeError; catch so callers (e.g.
-      // Attribute.isSerializable) get `false` instead of an exception.
-      try {
-        num = Number(value);
-      } catch {
-        return false;
-      }
+    // Mirrors integer.rb:74-80 — `cast_value = cast(value)` then
+    // `in_range?(cast_value)`. The leading cast is load-bearing and must not be
+    // re-derived via `Number(value)`: `cast` routes a BigInt through
+    // `narrowBigInt`, keeping arbitrary precision, where `Number()` would
+    // collapse `2n**63n` and `2n**63n-1n` onto the same float and let an
+    // exactly-2^63 value test in-range on an 8-byte column (see `isInRange`).
+    // It also decides ±Infinity and NaN: `cast_value` is `to_i rescue nil`
+    // (integer.rb:90), so they cast to nil and `in_range?(nil)` is `!value` =>
+    // true. Casting here rather than trusting the caller keeps this predicate
+    // correct for a raw value, independent of whether the caller pre-cast.
+    let castValue: number | bigint | null;
+    try {
+      castValue = this.cast(value) as number | bigint | null;
+    } catch {
+      // The `rescue nil` in cast_value: a value that cannot be cast at all
+      // (e.g. a Symbol, whose `String()` throws) is nil in Rails, and
+      // `in_range?(nil)` is true.
+      return true;
     }
-    if (isNaN(num)) return false;
-    return this.isInRange(num);
+    return this.isInRange(castValue);
   }
 
   /**

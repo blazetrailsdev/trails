@@ -17,11 +17,16 @@ import { Between } from "./nodes/binary.js";
  *   `infinity?` / `unboundable?` / `open_ended?` — private helpers
  *
  * This file holds the SINGLE implementation of the three private helpers.
- * `Predications.isInfinity` / `isUnboundable` / `isOpenEnded` delegate here, as
- * `Predications#between` / `notBetween` and `Attribute#between` / `notBetween`
- * already do for the decision tree — Rails has one copy per Ruby file, and the
- * only other legitimate copy is the visitor's (to_sql.rb:905-907). Keep it that
- * way: a second copy is how `between` silently lost unboundable collapse before.
+ * `Predications.isInfinity` / `isUnboundable` delegate to `infinitySign` /
+ * `unboundableSign` here — Rails has one copy per Ruby file, and the only other
+ * legitimate copy is the visitor's (to_sql.rb:905-907). Keep it that way: a
+ * second copy is how `between` silently lost unboundable collapse before.
+ *
+ * `Predications.isOpenEnded` and the `between` / `notBetween` decision tree
+ * below instead compose in Rails' own shape, dispatching the predicates through
+ * the host (`self`) as predications.rb:38-51 and 255-257 do, so a host
+ * overriding one is honored. That composition is not a second implementation:
+ * the protocol logic still lives only in the helpers here.
  *
  * TS deviations (deliberate, called out in the audit):
  * - `infinitySign` and `unboundableSign` mirror Ruby's `infinity?` /
@@ -146,42 +151,53 @@ interface UnboundableLike {
   isUnboundable?: () => 1 | -1 | false;
 }
 
-// Mirrors Rails Predications#open_ended? (predications.rb:255-257) —
-// `value.nil? || infinity?(value) || unboundable?(value)`. A nil, ±Infinity, or
-// out-of-range (unboundable) bound counts as "no bound on this side".
+// The leading `value.nil?` of Rails' `open_ended?` (predications.rb:255) — a
+// real dispatch, not a null check: the node classes override `nil?` to report on
+// the *wrapped* value (`BindParam#nil?` bind_param.rb:23-25, `Casted#nil?` /
+// `Quoted#nil?` casted.rb:16,41). So `between(BindParam(nil), 3)` is `lteq(3)`
+// in Rails, not a Between over a nil bind — reading only `=== null` skips that.
 //
-// Ruby's leading `value.nil?` is a real dispatch: every Arel bound answers it,
-// and the node classes override it (`BindParam#nil?` bind_param.rb:23-25,
-// `Casted#nil?` / `Quoted#nil?` casted.rb:16,41) to report on the *wrapped*
-// value. So `between(BindParam(nil), 3)` is `lteq(3)` in Rails, not a Between
-// over a nil bind — reading only `=== null` here skipped that.
-export function isOpenEnded(value: unknown): boolean {
-  return isNilBound(value) || infinitySign(value) !== 0 || unboundableSign(value) !== 0;
-}
-
-// Mirrors Ruby's `value.nil?` for the shapes a bound can take: a bare
-// null/undefined, or a node exposing the port's `isNil()`. Ruby gets this from
-// Object#nil?, so there is no Rails method to map it onto.
+// Ruby gets `nil?` from Object, so there is no Rails method to map this onto; it
+// stays a helper here and `Predications.isOpenEnded` composes it.
 export function isNilBound(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   const v = value as { isNil?: () => boolean };
   return typeof v.isNil === "function" && v.isNil();
 }
 
+/**
+ * Rails' `between` / `not_between` call `unboundable?` / `open_ended?` /
+ * `infinity?` on **self** (predications.rb:38-51), so an including class that
+ * overrides one is honored — the same implicit-self dispatch `open_ended?` uses.
+ * Every host reaching here carries the three: the Predications mixin installs
+ * them by `include()`, and `Attribute` re-exposes them as protected (which is a
+ * compile-time visibility rule only, hence the widening).
+ */
+interface RangePredicates {
+  isInfinity(value: unknown): 1 | -1 | 0;
+  isUnboundable(value: unknown): 1 | -1 | 0;
+  isOpenEnded(value: unknown): boolean;
+}
+
+function selfOf(host: RangeHost): RangePredicates {
+  return host as unknown as RangePredicates;
+}
+
 export function betweenFromRange(host: RangeHost, range: RangeLike): Node {
-  if (unboundableSign(range.begin) === 1 || unboundableSign(range.end) === -1) {
+  const self = selfOf(host);
+  if (self.isUnboundable(range.begin) === 1 || self.isUnboundable(range.end) === -1) {
     return host.in([]);
   }
-  if (isOpenEnded(range.begin)) {
-    if (isOpenEnded(range.end)) {
-      if (infinitySign(range.begin) === 1 || infinitySign(range.end) === -1) {
+  if (self.isOpenEnded(range.begin)) {
+    if (self.isOpenEnded(range.end)) {
+      if (self.isInfinity(range.begin) === 1 || self.isInfinity(range.end) === -1) {
         return host.in([]);
       }
       return host.notIn([]);
     }
     return range.excludeEnd ? host.lt(range.end) : host.lteq(range.end);
   }
-  if (isOpenEnded(range.end)) {
+  if (self.isOpenEnded(range.end)) {
     return host.gteq(range.begin);
   }
   if (range.excludeEnd) {
@@ -194,19 +210,20 @@ export function betweenFromRange(host: RangeHost, range: RangeLike): Node {
 }
 
 export function notBetweenFromRange(host: RangeHost, range: RangeLike): Node {
-  if (unboundableSign(range.begin) === 1 || unboundableSign(range.end) === -1) {
+  const self = selfOf(host);
+  if (self.isUnboundable(range.begin) === 1 || self.isUnboundable(range.end) === -1) {
     return host.notIn([]);
   }
-  if (isOpenEnded(range.begin)) {
-    if (isOpenEnded(range.end)) {
-      if (infinitySign(range.begin) === 1 || infinitySign(range.end) === -1) {
+  if (self.isOpenEnded(range.begin)) {
+    if (self.isOpenEnded(range.end)) {
+      if (self.isInfinity(range.begin) === 1 || self.isInfinity(range.end) === -1) {
         return host.notIn([]);
       }
       return host.in([]);
     }
     return range.excludeEnd ? host.gteq(range.end) : host.gt(range.end);
   }
-  if (isOpenEnded(range.end)) {
+  if (self.isOpenEnded(range.end)) {
     return host.lt(range.begin);
   }
   const left = host.lt(range.begin);

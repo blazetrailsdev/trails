@@ -173,6 +173,33 @@ describe("Attribute private helpers (mirror Predications)", () => {
   });
 });
 
+describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () => {
+  // predications.rb:38-51 calls unboundable? / open_ended? / infinity? on self,
+  // exactly as open_ended? (255-257) calls infinity? / unboundable? on self — so
+  // an including class that overrides one is honored by the decision tree too.
+  class OverridingAttribute extends Nodes.Attribute {
+    protected override isInfinity(_value: unknown): 1 | -1 | 0 {
+      return 1;
+    }
+  }
+
+  it("between honors a host override of isInfinity", () => {
+    const attr = new OverridingAttribute(users, "id");
+    // Both bounds read as open-ended, and begin reports +Infinity -> in([]).
+    expect(attr.between({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.In);
+  });
+
+  it("notBetween honors a host override of isInfinity", () => {
+    const attr = new OverridingAttribute(users, "id");
+    expect(attr.notBetween({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.NotIn);
+  });
+
+  it("an un-overridden attribute is unaffected", () => {
+    const attr = users.attr("id");
+    expect(attr.between({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.Between);
+  });
+});
+
 describe("SelectManager#collapse (Rails-fidelity helper)", () => {
   // Mirrors Arel::SelectManager#collapse — compacts a list of exprs,
   // wraps bare strings as SqlLiteral, returns the single survivor or
