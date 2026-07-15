@@ -158,9 +158,7 @@ export class HasOneAssociation extends SingularAssociation {
       if (record) {
         this.setOwnerAttributes(record);
         this.setInverseInstance(record);
-        if (!save || typeof (record as any).save !== "function") return;
-        const saved = await (record as any).save();
-        if (!saved) {
+        if (save && !(await record.save())) {
           this.nullifyOwnerAttributes(record);
           if (displaced) this.setOwnerAttributes(displaced);
           throw new RecordNotSaved(
