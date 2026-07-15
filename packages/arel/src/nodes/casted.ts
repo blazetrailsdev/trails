@@ -81,13 +81,14 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
     //
     // The "structural so we don't need a runtime import" rationale this used to
     // carry is stale: arel already depends on @blazetrails/activemodel, which
-    // does not depend back (no cycle), and visitors/to-sql.ts already imports
-    // Attribute from it at runtime. Rails identifies it by class
-    // (casted.rb:50), so `instanceof` is the convergent shape; this check also
-    // disagrees with the other two in arel — to-sql's `isActiveModelAttribute`
-    // omits the `name` half, dot's tests `valueBeforeTypeCast` instead.
-    // Tracked by story `arel-am-attribute-predicates-diverge-across-sites` — a
-    // behaviour change (a duck-typed object stops binding), so not folded in.
+    // does not depend back (no cycle), and visitors/to-sql.ts + visitors/dot.ts
+    // already import Attribute from it at runtime. Rails identifies it by class
+    // (casted.rb:50), so `instanceof` is the convergent shape — #4880 already
+    // moved `Dot` to it. The two structural checks left in arel are this one and
+    // to-sql's `isActiveModelAttribute`, which omits the `name` half, so they
+    // disagree with each other as well as with Rails. Tracked by story
+    // `arel-am-attribute-predicates-diverge-across-sites` — a behaviour change
+    // (a duck-typed object stops binding), so not folded in.
     if (
       "valueForDatabase" in (other as Record<string, unknown>) &&
       "name" in (other as Record<string, unknown>)
