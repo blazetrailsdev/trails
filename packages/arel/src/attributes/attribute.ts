@@ -26,7 +26,13 @@ import { Sum, Max, Min, Avg } from "../nodes/function.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
 import { buildQuoted } from "../nodes/casted.js";
-import { parseRange, betweenFromRange, notBetweenFromRange } from "../predications-range.js";
+import {
+  parseRange,
+  betweenFromRange,
+  notBetweenFromRange,
+  type RangeHost,
+  type RangePredicates,
+} from "../predications-range.js";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
 import { Or } from "../nodes/or.js";
@@ -207,14 +213,25 @@ export class Attribute extends Node {
   between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
 
   between(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
-    return betweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
+    return betweenFromRange(this.asRangeHost(), parseRange(beginOrRange, end, excludeEnd));
   }
   notBetween(range: [unknown, unknown]): Node;
   notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
   notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
 
   notBetween(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
-    return notBetweenFromRange(this, parseRange(beginOrRange, end, excludeEnd));
+    return notBetweenFromRange(this.asRangeHost(), parseRange(beginOrRange, end, excludeEnd));
+  }
+
+  /**
+   * `between` / `notBetween` dispatch `infinity?` / `unboundable?` /
+   * `open_ended?` on self (predications.rb:38-51). This class has all three, but
+   * as `protected` — a compile-time visibility rule that keeps it from being
+   * assignable to the public `RangePredicates`. The runtime dispatch is real, so
+   * subclass overrides are honored.
+   */
+  private asRangeHost(): RangeHost & RangePredicates {
+    return this as unknown as RangeHost & RangePredicates;
   }
 
   // -- _any / _all variants --
@@ -334,23 +351,31 @@ export class Attribute extends Node {
     >(this, methodId, others, ...extras);
   }
 
-  protected isInfinity(value: unknown): boolean {
+  // infinity? / unboundable? / open_ended? reach Attribute through
+  // `include Arel::Predications` (attribute.rb:8) rather than being defined in
+  // attribute.rb, so api:compare maps them onto this file. They delegate to the
+  // Predications mixin, which in turn delegates to the single implementation in
+  // predications-range.ts — the same one `between` / `notBetween` above use, so
+  // routing a range through these can no longer diverge from the real decision
+  // tree the way the old `isUnboundable` stub silently did.
+
+  protected isInfinity(value: unknown): 1 | -1 | 0 {
     return Predications.isInfinity.call(this, value);
   }
 
-  protected isUnboundable(value: unknown): boolean {
+  protected isUnboundable(value: unknown): 1 | -1 | 0 {
     return Predications.isUnboundable.call(this, value);
   }
 
   protected isOpenEnded(value: unknown): boolean {
-    // Cast widens this' protected isInfinity/isUnboundable so they
-    // match Predications.isOpenEnded's `this` constraint, which
-    // requires them as public methods. The dispatch still goes through
-    // `this` at runtime, so subclass overrides are honored.
+    // Cast widens this' protected isInfinity/isUnboundable to the public shape
+    // Predications.isOpenEnded's `this` requires. Dispatch still goes through
+    // `this` at runtime, so subclass overrides are honored — as in Ruby, where
+    // open_ended? calls infinity? / unboundable? on self.
     return Predications.isOpenEnded.call(
       this as unknown as PredicationHost & {
-        isInfinity(value: unknown): boolean;
-        isUnboundable(value: unknown): boolean;
+        isInfinity(value: unknown): 1 | -1 | 0;
+        isUnboundable(value: unknown): 1 | -1 | 0;
       },
       value,
     );

@@ -6,7 +6,8 @@ import { Predications } from "./predications.js";
 // Arel::Predications' private API (grouping_any, grouping_all,
 // infinity?, unboundable?, open_ended?). Trails surfaces them on the
 // mixin object for Rails-fidelity / api:compare privates coverage;
-// these tests pin their behavior.
+// these tests pin their behavior. The three predicate helpers delegate to
+// the single implementation in predications-range.ts.
 
 const users = new Table("users");
 
@@ -43,50 +44,93 @@ describe("Predications.groupingAny / groupingAll", () => {
 });
 
 describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
-  // Build a minimal PredicationHost-shaped object with public
-  // isInfinity / isUnboundable so isOpenEnded's `this`-dispatch
-  // typechecks. Mirrors how the methods would be reachable on a
-  // class that included Predications via the runtime mixin.
+  // A PredicationHost carrying the mixin's own isInfinity / isUnboundable, as a
+  // class including Predications would — isOpenEnded dispatches through `this`.
   const host = {
     quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node,
-    isInfinity(this: unknown, v: unknown): boolean {
+    isInfinity(this: unknown, v: unknown): 1 | -1 | 0 {
       return Predications.isInfinity.call(this as never, v);
     },
-    isUnboundable(this: unknown, v: unknown): boolean {
+    isUnboundable(this: unknown, v: unknown): 1 | -1 | 0 {
       return Predications.isUnboundable.call(this as never, v);
     },
   };
+  const isInfinity = (v: unknown) => Predications.isInfinity.call(host, v);
+  const isUnboundable = (v: unknown) => Predications.isUnboundable.call(host, v);
+  const isOpenEnded = (v: unknown) => Predications.isOpenEnded.call(host, v);
 
-  it("isInfinity is true for ±Infinity, false otherwise", () => {
-    expect(host.isInfinity(Infinity)).toBe(true);
-    expect(host.isInfinity(-Infinity)).toBe(true);
-    expect(host.isInfinity(0)).toBe(false);
-    expect(host.isInfinity("x")).toBe(false);
+  it("isInfinity yields the sign for ±Infinity, 0 otherwise", () => {
+    // Mirrors `Float#infinite?` returning 1 / -1 / nil — the sign is what
+    // Predications#between reads to pick which side of the range collapses.
+    expect(isInfinity(Infinity)).toBe(1);
+    expect(isInfinity(-Infinity)).toBe(-1);
+    expect(isInfinity(0)).toBe(0);
+    expect(isInfinity("x")).toBe(0);
   });
 
-  it("isUnboundable is always false (no Ruby-style protocol in TS)", () => {
-    expect(host.isUnboundable(undefined)).toBe(false);
-    expect(host.isUnboundable(1)).toBe(false);
+  it("isInfinity duck-types a value exposing isInfinite()", () => {
+    expect(isInfinity(new Nodes.Quoted(-Infinity))).toBe(-1);
+    expect(isInfinity({ isInfinite: () => 1 as const })).toBe(1);
   });
 
-  it("isOpenEnded is true for null/undefined/Infinity, false otherwise", () => {
-    expect(Predications.isOpenEnded.call(host, null)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, undefined)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, Infinity)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, -Infinity)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, 0)).toBe(false);
-    expect(Predications.isOpenEnded.call(host, "x")).toBe(false);
+  it("isInfinity reaches a Quoted through its own infinite?, not a structural unwrap", () => {
+    // casted.rb:43-45 duck-types the wrapped value, so a Quoted around anything
+    // answering `infinite?` (e.g. a QueryAttribute) reports the sign. predications.rb:248-250
+    // is a plain dispatch — it does not know Quoted exists.
+    expect(isInfinity(new Nodes.Quoted({ isInfinite: () => 1 as const }))).toBe(1);
+    expect(isInfinity(new Nodes.Quoted({ isInfinite: () => -1 as const }))).toBe(-1);
+    expect(isInfinity(new Nodes.Quoted(3))).toBe(0);
   });
 
-  it("isOpenEnded dispatches through `this` so host overrides win", () => {
-    // Regression for the `this`-vs-direct-module-call concern: a host
-    // that overrides isInfinity to claim everything is infinite should
-    // see isOpenEnded honor that override.
-    const overridden = {
-      ...host,
-      isInfinity: () => true,
-    };
+  it("isInfinity does not unwrap Casted, which defines no infinite? in Rails", () => {
+    // casted.rb:5-35 — Casted has no `infinite?`, so open_ended?(Casted(INFINITY))
+    // is false in Rails and must stay false here.
+    expect(isInfinity(new Nodes.Casted(Infinity, users.attr("id")))).toBe(0);
+    expect(isOpenEnded(new Nodes.Casted(Infinity, users.attr("id")))).toBe(false);
+  });
+
+  it("isUnboundable duck-types the protocol and yields the sign", () => {
+    expect(isUnboundable({ isUnboundable: () => 1 as const })).toBe(1);
+    expect(isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
+    expect(isUnboundable({ isUnboundable: () => false as const })).toBe(0);
+  });
+
+  it("isUnboundable is 0 for values with no unboundable? — including ±Infinity", () => {
+    // Float has no `unboundable?` in Ruby, so a bare ±Infinity is open-ended
+    // via infinity?, NOT unboundable.
+    expect(isUnboundable(Infinity)).toBe(0);
+    expect(isUnboundable(undefined)).toBe(0);
+    expect(isUnboundable(1)).toBe(0);
+  });
+
+  it("isOpenEnded is true for null/undefined/Infinity/unboundable, false otherwise", () => {
+    expect(isOpenEnded(null)).toBe(true);
+    expect(isOpenEnded(undefined)).toBe(true);
+    expect(isOpenEnded(Infinity)).toBe(true);
+    expect(isOpenEnded(-Infinity)).toBe(true);
+    expect(isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
+    expect(isOpenEnded(0)).toBe(false);
+    expect(isOpenEnded("x")).toBe(false);
+  });
+
+  it("isOpenEnded dispatches infinity?/unboundable? through `this` so host overrides win", () => {
+    // predications.rb:255-257 calls both on self, so an including class that
+    // overrides either is honored.
+    const overridden = { ...host, isInfinity: () => 1 as const };
     expect(Predications.isOpenEnded.call(overridden, 42)).toBe(true);
+    expect(Predications.isOpenEnded.call(host, 42)).toBe(false);
+  });
+
+  it("isOpenEnded dispatches Ruby's leading `value.nil?` onto the node", () => {
+    // predications.rb:255-257 opens with `value.nil?`, which the node classes
+    // override to report on the wrapped value (bind_param.rb:23-25,
+    // casted.rb:16,41) — so a nil-wrapping bound is open-ended, and
+    // between(BindParam(nil), 3) is lteq(3) rather than a Between over a nil bind.
+    expect(isOpenEnded(new Nodes.BindParam(null))).toBe(true);
+    expect(isOpenEnded(new Nodes.Quoted(null))).toBe(true);
+    expect(isOpenEnded(new Nodes.Casted(null, users.attr("id")))).toBe(true);
+    expect(isOpenEnded(new Nodes.Quoted(3))).toBe(false);
+    expect(isOpenEnded(new Nodes.Casted(3, users.attr("id")))).toBe(false);
   });
 });
 
@@ -97,8 +141,8 @@ describe("Attribute private helpers (mirror Predications)", () => {
   type AttributePrivates = Nodes.Attribute & {
     groupingAny: (methodId: string, others: unknown[]) => Nodes.Grouping;
     groupingAll: (methodId: string, others: unknown[]) => Nodes.Grouping;
-    isInfinity: (value: unknown) => boolean;
-    isUnboundable: (value: unknown) => boolean;
+    isInfinity: (value: unknown) => 1 | -1 | 0;
+    isUnboundable: (value: unknown) => 1 | -1 | 0;
     isOpenEnded: (value: unknown) => boolean;
   };
 
@@ -110,12 +154,49 @@ describe("Attribute private helpers (mirror Predications)", () => {
 
   it("isInfinity / isUnboundable / isOpenEnded match Predications semantics", () => {
     const attr = users.attr("id") as AttributePrivates;
-    expect(attr.isInfinity(Infinity)).toBe(true);
-    expect(attr.isInfinity(0)).toBe(false);
-    expect(attr.isUnboundable(0)).toBe(false);
+    expect(attr.isInfinity(Infinity)).toBe(1);
+    expect(attr.isInfinity(-Infinity)).toBe(-1);
+    expect(attr.isInfinity(0)).toBe(0);
+    expect(attr.isUnboundable(0)).toBe(0);
     expect(attr.isOpenEnded(null)).toBe(true);
     expect(attr.isOpenEnded(Infinity)).toBe(true);
     expect(attr.isOpenEnded(0)).toBe(false);
+  });
+
+  it("isUnboundable duck-types the protocol rather than always returning false", () => {
+    // Regression for the stub these delegated to: it hardcoded `false`, so
+    // anything routing `between` through Attribute#isOpenEnded silently lost
+    // unboundable collapse (#4433). They now share the real implementation.
+    const attr = users.attr("id") as AttributePrivates;
+    expect(attr.isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
+    expect(attr.isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
+  });
+});
+
+describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () => {
+  // predications.rb:38-51 calls unboundable? / open_ended? / infinity? on self,
+  // exactly as open_ended? (255-257) calls infinity? / unboundable? on self — so
+  // an including class that overrides one is honored by the decision tree too.
+  class OverridingAttribute extends Nodes.Attribute {
+    protected override isInfinity(_value: unknown): 1 | -1 | 0 {
+      return 1;
+    }
+  }
+
+  it("between honors a host override of isInfinity", () => {
+    const attr = new OverridingAttribute(users, "id");
+    // Both bounds read as open-ended, and begin reports +Infinity -> in([]).
+    expect(attr.between({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.In);
+  });
+
+  it("notBetween honors a host override of isInfinity", () => {
+    const attr = new OverridingAttribute(users, "id");
+    expect(attr.notBetween({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.NotIn);
+  });
+
+  it("an un-overridden attribute is unaffected", () => {
+    const attr = users.attr("id");
+    expect(attr.between({ begin: 1, end: 2, excludeEnd: false })).toBeInstanceOf(Nodes.Between);
   });
 });
 

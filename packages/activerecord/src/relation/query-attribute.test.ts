@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, vi } from "vitest";
+import { BigIntegerType, IntegerType } from "@blazetrails/activemodel";
 import { QueryAttribute } from "./query-attribute.js";
 
 class StringType {
@@ -81,9 +82,12 @@ describe("QueryAttribute", () => {
     expect(new QueryAttribute("x", 0, stringType).isNil()).toBe(false);
   });
 
-  it("isInfinite returns true for Infinity/-Infinity", () => {
-    expect(new QueryAttribute("x", Infinity, intType).isInfinite()).toBe(true);
-    expect(new QueryAttribute("x", -Infinity, intType).isInfinite()).toBe(true);
+  it("isInfinite returns the sign for Infinity/-Infinity", () => {
+    // Mirrors query_attribute.rb:42-44, whose `infinity?` yields `Float#infinite?`
+    // — 1 / -1 / nil, not a boolean. Arel's between reads the sign to pick which
+    // side of the range collapses; a boolean would make -Infinity look positive.
+    expect(new QueryAttribute("x", Infinity, intType).isInfinite()).toBe(1);
+    expect(new QueryAttribute("x", -Infinity, intType).isInfinite()).toBe(-1);
     expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(false);
   });
 
@@ -93,17 +97,21 @@ describe("QueryAttribute", () => {
       serialize: (_v: unknown) => Infinity,
     };
     const attr = new QueryAttribute("x", "anything", expandingType);
-    expect(attr.isInfinite()).toBe(true);
+    expect(attr.isInfinite()).toBe(1);
   });
 
   it("isInfinite handles Ruby-style duck-typed `infinite()` (nil for finite, 1/-1 for infinite)", () => {
-    const finite = { infinite: () => null };
-    const positiveInf = { infinite: () => 1 };
-    const negativeInf = { infinite: () => -1 };
+    // Rails has ONE `respond_to?(:infinite?)` protocol (query_attribute.rb:53-55),
+    // which ports to `isInfinite()` — the spelling Quoted / BindParam /
+    // UnboundableBound / arel's infinitySign all use. Reading a second name here
+    // forked the protocol.
+    const finite = { isInfinite: () => false };
+    const positiveInf = { isInfinite: () => 1 };
+    const negativeInf = { isInfinite: () => -1 };
     const passthrough = { cast: (v: unknown) => v, serialize: (v: unknown) => v };
     expect(new QueryAttribute("x", finite, passthrough).isInfinite()).toBe(false);
-    expect(new QueryAttribute("x", positiveInf, passthrough).isInfinite()).toBe(true);
-    expect(new QueryAttribute("x", negativeInf, passthrough).isInfinite()).toBe(true);
+    expect(new QueryAttribute("x", positiveInf, passthrough).isInfinite()).toBe(1);
+    expect(new QueryAttribute("x", negativeInf, passthrough).isInfinite()).toBe(-1);
   });
 
   it("equals compares name, value, and type", () => {
@@ -124,5 +132,66 @@ describe("QueryAttribute", () => {
     const attr = new QueryAttribute("age", "25", intType);
     expect(attr.valueBeforeTypeCast).toBe("25");
     expect(attr.value).toBe(25);
+  });
+
+  it("isUnboundable reports the sign of `value <=> 0` for an out-of-range bound", () => {
+    // query_attribute.rb:45-51 — serializable? yields the cast value when it is
+    // out of range for the column type; the sign tells Arel which side collapses.
+    const int4 = new IntegerType({ limit: 4 });
+    expect(new QueryAttribute("id", 2 ** 40, int4).isUnboundable()).toBe(1);
+    expect(new QueryAttribute("id", -(2 ** 40), int4).isUnboundable()).toBe(-1);
+    expect(new QueryAttribute("id", 5, int4).isUnboundable()).toBe(false);
+
+    // The #4433 bignum path: a bigint column is Integer(limit: 8).
+    const int8 = new IntegerType({ limit: 8 });
+    expect(new QueryAttribute("id", 2n ** 63n, int8).isUnboundable()).toBe(1);
+    expect(new QueryAttribute("id", -(2n ** 63n) - 1n, int8).isUnboundable()).toBe(-1);
+    expect(new QueryAttribute("id", 2n ** 63n - 1n, int8).isUnboundable()).toBe(false);
+  });
+
+  it("isUnboundable is never true for :big_integer, whose max_value is INFINITY", () => {
+    // big_integer.rb:33 — in_range? is always true, so serializable? never
+    // yields and unboundable? stays nil however large the value.
+    const big = new BigIntegerType();
+    expect(new QueryAttribute("id", 2n ** 63n, big).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", -(2n ** 100n), big).isUnboundable()).toBe(false);
+    // ±Infinity too: cast_value is `to_i rescue nil` => nil, and in_range?(nil)
+    // is `!value` => true (integer.rb:86,90).
+    expect(new QueryAttribute("id", Infinity, big).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", -Infinity, big).isUnboundable()).toBe(false);
+  });
+
+  it("isUnboundable is false for ±Infinity — Rails casts it to nil, which is in range", () => {
+    // integer.rb:90 `value.to_i rescue nil` => nil for ±Infinity, so
+    // in_range?(nil) is true and unboundable? stays nil. The bound is still
+    // open-ended, but via infinity? (predications.rb:248) — not this predicate.
+    const int4 = new IntegerType({ limit: 4 });
+    expect(new QueryAttribute("id", Infinity, int4).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", -Infinity, int4).isUnboundable()).toBe(false);
+    // isInfinite reads value_before_type_cast, so it still reports the sign.
+    expect(new QueryAttribute("id", Infinity, int4).isInfinite()).toBe(1);
+    expect(new QueryAttribute("id", -Infinity, int4).isInfinite()).toBe(-1);
+  });
+
+  it("isUnboundable memoizes so the value is inspected exactly once", () => {
+    // query_attribute.rb:45-51 guards with `unless defined?(@_unboundable)`, so
+    // the check happens once however often the predicate is read — and both
+    // `between` and the visitor read it.
+    const int4 = new IntegerType({ limit: 4 });
+    const spy = vi.spyOn(int4, "isSerializable");
+
+    // The `false` result caches too — Rails assigns on both paths, so `defined?`
+    // is true either way.
+    const inRange = new QueryAttribute("id", 5, int4);
+    expect(inRange.isUnboundable()).toBe(false);
+    expect(inRange.isUnboundable()).toBe(false);
+    expect(inRange.isUnboundable()).toBe(false);
+    expect(spy).toHaveBeenCalledTimes(1);
+
+    spy.mockClear();
+    const outOfRange = new QueryAttribute("id", 2 ** 40, int4);
+    expect(outOfRange.isUnboundable()).toBe(1);
+    expect(outOfRange.isUnboundable()).toBe(1);
+    expect(spy).toHaveBeenCalledTimes(1);
   });
 });

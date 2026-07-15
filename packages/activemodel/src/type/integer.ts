@@ -48,26 +48,17 @@ export class IntegerType extends NumericValueType {
   }
 
   isSerializable(value: unknown): boolean {
-    if (value === null || value === undefined) return true;
-    // A BigInt is passed straight to the arbitrary-precision range check.
-    // Routing through `Number(value)` would collapse `2n**63n` and `2n**63n-1n`
-    // to the same float (9223372036854775808), so an exactly-2^63 value on an
-    // 8-byte column would wrongly test in-range — see `isInRange`.
-    if (typeof value === "bigint") return this.isInRange(value);
-    let num: number;
-    if (typeof value === "number") {
-      num = value;
-    } else {
-      // `Number(Symbol())` throws TypeError; catch so callers (e.g.
-      // Attribute.isSerializable) get `false` instead of an exception.
-      try {
-        num = Number(value);
-      } catch {
-        return false;
-      }
-    }
-    if (isNaN(num)) return false;
-    return this.isInRange(num);
+    // Mirrors integer.rb:74-80 — `cast_value = cast(value)` then
+    // `in_range?(cast_value)`. The leading cast is load-bearing and must not be
+    // re-derived via `Number(value)`: `cast` routes a BigInt through
+    // `narrowBigInt`, keeping arbitrary precision, where `Number()` would
+    // collapse `2n**63n` and `2n**63n-1n` onto the same float and let an
+    // exactly-2^63 value test in-range on an 8-byte column (see `isInRange`).
+    // It also decides ±Infinity, NaN and uncastable values: all are nil out of
+    // `castValue` (`to_i rescue nil`, integer.rb:90), and `in_range?(nil)` is
+    // `!value` => true. Casting here rather than trusting the caller keeps this
+    // predicate correct for a raw value, whether or not the caller pre-cast.
+    return this.isInRange(this.cast(value) as number | bigint | null);
   }
 
   /**
@@ -131,13 +122,29 @@ export class IntegerType extends NumericValueType {
    */
   protected castValue(value: unknown): number | null {
     if (typeof value === "number") {
-      if (isNaN(value)) return null;
+      // Mirrors integer.rb:90 — `value.to_i rescue nil`. Both NaN and ±Infinity
+      // raise FloatDomainError from Float#to_i, so Rails rescues them to nil;
+      // `isFinite` is exactly that domain. BigIntegerType#castValue already
+      // draws the same line.
+      if (!isFinite(value)) return null;
       return Math.trunc(value);
     }
     if (typeof value === "bigint") {
       return this.narrowBigInt(value);
     }
-    const parsed = parseInt(String(value), 10);
+    // The `rescue nil` of integer.rb:90 is scoped to the conversion itself, so
+    // `cast` answers nil — never raises — for a value with no numeric
+    // conversion. Ruby: `Object.new.to_i` raises NoMethodError (integer_test.rb:30-32
+    // asserts `assert_nil type.cast(::Object.new)`). Here: `String(value)` throws
+    // for an object with no `toString` (a null-prototype object, say). A Symbol is
+    // NOT that case — `String(sym)` returns "Symbol(x)", which parses to NaN => null.
+    let str: string;
+    try {
+      str = String(value);
+    } catch {
+      return null;
+    }
+    const parsed = parseInt(str, 10);
     return isNaN(parsed) ? null : parsed;
   }
 

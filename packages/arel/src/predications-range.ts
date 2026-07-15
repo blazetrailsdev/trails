@@ -1,5 +1,4 @@
 import { Node } from "./nodes/node.js";
-import { Quoted } from "./nodes/casted.js";
 import { And } from "./nodes/and.js";
 import { Or } from "./nodes/or.js";
 import { Grouping } from "./nodes/grouping.js";
@@ -17,18 +16,40 @@ import { Between } from "./nodes/binary.js";
  *   `not_between` body — Predications#not_between
  *   `infinity?` / `unboundable?` / `open_ended?` — private helpers
  *
+ * This file holds the SINGLE implementation of the three private helpers.
+ * `Predications.isInfinity` / `isUnboundable` delegate to `infinitySign` /
+ * `unboundableSign` here — Rails has one copy per Ruby file, and the only other
+ * legitimate copy is the visitor's (to_sql.rb:905-907). Keep it that way: a
+ * second copy is how `between` silently lost unboundable collapse before.
+ *
+ * `Predications.isOpenEnded` and the `between` / `notBetween` decision tree
+ * below instead compose in Rails' own shape, dispatching the predicates through
+ * the host (`self`) as predications.rb:38-51 and 255-257 do, so a host
+ * overriding one is honored. That composition is not a second implementation:
+ * the protocol logic still lives only in the helpers here.
+ *
  * TS deviations (deliberate, called out in the audit):
- * - `infinitySign` and `unboundableSign` are Trails' stand-ins for Ruby's
- *   `infinity?` / `unboundable?` value protocols, and they read *different*
- *   things — the two are not interchangeable:
+ * - `infinitySign` and `unboundableSign` mirror Ruby's `infinity?` /
+ *   `unboundable?` value protocols. Both are duck-typed and both yield the
+ *   *sign*, but they read *different* things — the two are not interchangeable:
  *   - `infinitySign` mirrors `infinity?` (predications.rb:248-250): bare
- *     `±Infinity`, a `Quoted` wrapper around it (`Quoted#infinite?`,
- *     casted.rb:43-45), or a bound exposing `isInfinite()`. It deliberately
- *     does NOT unwrap `Casted`, which defines no `infinite?` in Rails
- *     (casted.rb:5-35) — see the note at `infinitySign` before "fixing" that.
+ *     `±Infinity` (Ruby's `Float` responds to `infinite?`), or a bound exposing
+ *     `isInfinite()` — which is how a `Quoted` answers (casted.rb:43-45). A
+ *     `Casted` defines no `infinite?` in Rails (casted.rb:5-35), so it never
+ *     answers — see the note at `infinitySign` before "fixing" that.
  *   - `unboundableSign` mirrors `unboundable?` (predications.rb:252-253) and is
  *     purely duck-typed: only a bound exposing `isUnboundable()` answers it. A
  *     bare `±Infinity` is open-ended, NOT unboundable.
+ * - Two sentinel conventions, deliberately, both standing in for Ruby's
+ *   `1 | -1 | nil`. The HELPERS here (`infinitySign` / `unboundableSign`) return
+ *   `1 | -1 | 0` and callers test `!== 0`, because Ruby's `0` is truthy and so
+ *   could not double as "absent" — `0` is unreachable anyway (see the note on
+ *   `unboundableSign`). The VALUE PROTOCOL (`Quoted#isInfinite`,
+ *   `BindParam#isInfinite` / `#isUnboundable`, `QueryAttribute`,
+ *   `UnboundableBound`) returns `1 | -1 | false`, mirroring the shape of Ruby's
+ *   `respond_to?(:x) && value.x` — `false` is the `&&` short-circuit, `nil` the
+ *   predicate's own miss. Do not "unify" them: the helper's `0` means no bound
+ *   answered, the producer's `false` means this value has no opinion.
  * - The TS port accepts three input shapes (array, object, positional)
  *   instead of Ruby's single `Range`.
  */
@@ -37,6 +58,20 @@ export interface RangeLike {
   begin: unknown;
   end: unknown;
   excludeEnd: boolean;
+}
+
+/**
+ * The `self` half of Rails' `between` contract: `between` / `not_between`
+ * (predications.rb:38-51) and `open_ended?` (255-257) dispatch these on self, so
+ * an including class overriding one is honored. Kept separate from `RangeHost`
+ * because `Attribute` re-exposes them as `protected` — a compile-time visibility
+ * rule, so the class is not assignable to a public interface and its two call
+ * sites widen. Callers must supply them; the runtime dispatch is real.
+ */
+export interface RangePredicates {
+  isInfinity(value: unknown): 1 | -1 | 0;
+  isUnboundable(value: unknown): 1 | -1 | 0;
+  isOpenEnded(value: unknown): boolean;
 }
 
 export interface RangeHost extends Node {
@@ -72,34 +107,27 @@ export function parseRange(beginOrRange: unknown, end: unknown, excludeEnd?: boo
 // `value.respond_to?(:infinite?) && value.infinite?`, which yields the *sign*
 // because `Float#infinite?` returns `1 | -1 | nil`.
 //
-// Unwraps `Quoted` (whose `infinite?` lives at casted.rb:43-45) but deliberately
-// NOT `Casted`: Rails' `Casted` defines no `infinite?` (casted.rb:5-35), so
-// `open_ended?(Casted(INFINITY))` is false there and must be false here. Do not
-// "fix" this to unwrap Casted — it would silently change `between`.
+// A plain duck-type dispatch, like Rails: bare ±Infinity (Ruby's `Float`
+// responds to `infinite?`), or anything exposing `isInfinite()`. `Quoted` is
+// NOT special-cased — it answers through its own `isInfinite` (casted.rb:43-45)
+// like any other value, and structurally unwrapping it here would be a second
+// copy of that method. `Casted` defines no `infinite?` (casted.rb:5-35), so it
+// answers 0 and `open_ended?(Casted(INFINITY))` stays false.
 //
-// The `r === true` arm is NOT the same dead coercion removed from
-// `unboundableSign`: it compensates for a live producer. Rails'
-// `QueryAttribute#infinite?` (query_attribute.rb:42-44) returns
-// `infinity?(...)`, i.e. the sign; trails' returns a plain `boolean`
-// (`activerecord/src/relation/query-attribute.ts:89-94`), and `BindParam#isInfinite`
-// delegates to it (bind-param.ts:45-48) despite its `number | null` annotation.
-// Dropping the arm would stop detecting +Infinity binds; keeping it reports +1
-// for a -Infinity bind. Both are wrong — the root cause is the boolean return,
-// tracked in story `arel-predications-unboundable-duck-types-like-rails`. Latent
-// today: trails' RangeHandler passes cast values / UnboundableBound, never a
-// QueryAttribute, as a range bound.
+// Every trails producer returns the sign, matching Ruby: `Quoted#isInfinite`
+// (casted.ts), `BindParam#isInfinite` (bind-param.ts), `QueryAttribute#isInfinite`
+// (activerecord/src/relation/query-attribute.ts). Do not add a `true` arm back —
+// a boolean producer would report `+1` for a -Infinity bound.
 export function infinitySign(value: unknown): 1 | -1 | 0 {
   if (value === Infinity) return 1;
   if (value === -Infinity) return -1;
-  if (value instanceof Quoted) return infinitySign(value.value);
   if (
     value &&
     typeof value === "object" &&
     typeof (value as InfiniteLike).isInfinite === "function"
   ) {
     const r = (value as InfiniteLike).isInfinite!();
-    if (r === 1 || r === true) return 1;
-    if (r === -1) return -1;
+    if (r === 1 || r === -1) return r;
   }
   return 0;
 }
@@ -130,39 +158,42 @@ export function unboundableSign(value: unknown): 1 | -1 | 0 {
 }
 
 interface InfiniteLike {
-  isInfinite?: () => number | boolean | null;
+  isInfinite?: () => 1 | -1 | false;
 }
 
 interface UnboundableLike {
-  isUnboundable?: () => 1 | -1 | 0 | boolean;
+  isUnboundable?: () => 1 | -1 | false;
 }
 
-// Mirrors Rails Predications#open_ended? — `value.nil? || infinity?(value) ||
-// unboundable?(value)`. A null/undefined, ±Infinity, or out-of-range
-// (unboundable) bound counts as "no bound on this side".
-export function isOpenEnded(value: unknown): boolean {
-  return (
-    value === null ||
-    value === undefined ||
-    infinitySign(value) !== 0 ||
-    unboundableSign(value) !== 0
-  );
+// The leading `value.nil?` of Rails' `open_ended?` (predications.rb:255) — a
+// real dispatch, not a null check: the node classes override `nil?` to report on
+// the *wrapped* value (`BindParam#nil?` bind_param.rb:23-25, `Casted#nil?` /
+// `Quoted#nil?` casted.rb:16,41). So `between(BindParam(nil), 3)` is `lteq(3)`
+// in Rails, not a Between over a nil bind — reading only `=== null` skips that.
+//
+// Ruby gets `nil?` from Object, so there is no Rails method to map this onto; it
+// stays a helper here and `Predications.isOpenEnded` composes it.
+export function isNilBound(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  const v = value as { isNil?: () => boolean };
+  return typeof v.isNil === "function" && v.isNil();
 }
 
-export function betweenFromRange(host: RangeHost, range: RangeLike): Node {
-  if (unboundableSign(range.begin) === 1 || unboundableSign(range.end) === -1) {
+export function betweenFromRange(host: RangeHost & RangePredicates, range: RangeLike): Node {
+  const self = host;
+  if (self.isUnboundable(range.begin) === 1 || self.isUnboundable(range.end) === -1) {
     return host.in([]);
   }
-  if (isOpenEnded(range.begin)) {
-    if (isOpenEnded(range.end)) {
-      if (infinitySign(range.begin) === 1 || infinitySign(range.end) === -1) {
+  if (self.isOpenEnded(range.begin)) {
+    if (self.isOpenEnded(range.end)) {
+      if (self.isInfinity(range.begin) === 1 || self.isInfinity(range.end) === -1) {
         return host.in([]);
       }
       return host.notIn([]);
     }
     return range.excludeEnd ? host.lt(range.end) : host.lteq(range.end);
   }
-  if (isOpenEnded(range.end)) {
+  if (self.isOpenEnded(range.end)) {
     return host.gteq(range.begin);
   }
   if (range.excludeEnd) {
@@ -174,20 +205,21 @@ export function betweenFromRange(host: RangeHost, range: RangeLike): Node {
   return new Between(host, new And([host.quotedNode(range.begin), host.quotedNode(range.end)]));
 }
 
-export function notBetweenFromRange(host: RangeHost, range: RangeLike): Node {
-  if (unboundableSign(range.begin) === 1 || unboundableSign(range.end) === -1) {
+export function notBetweenFromRange(host: RangeHost & RangePredicates, range: RangeLike): Node {
+  const self = host;
+  if (self.isUnboundable(range.begin) === 1 || self.isUnboundable(range.end) === -1) {
     return host.notIn([]);
   }
-  if (isOpenEnded(range.begin)) {
-    if (isOpenEnded(range.end)) {
-      if (infinitySign(range.begin) === 1 || infinitySign(range.end) === -1) {
+  if (self.isOpenEnded(range.begin)) {
+    if (self.isOpenEnded(range.end)) {
+      if (self.isInfinity(range.begin) === 1 || self.isInfinity(range.end) === -1) {
         return host.notIn([]);
       }
       return host.in([]);
     }
     return range.excludeEnd ? host.gteq(range.end) : host.gt(range.end);
   }
-  if (isOpenEnded(range.end)) {
+  if (self.isOpenEnded(range.end)) {
     return host.lt(range.begin);
   }
   const left = host.lt(range.begin);

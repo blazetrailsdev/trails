@@ -42,9 +42,20 @@ export class BindParam extends Node {
     return typeof v?.isNil === "function" && v.isNil();
   }
 
-  isInfinite(): number | null {
-    const v = this.value as { isInfinite?: () => number | null } | null | undefined;
-    return typeof v?.isInfinite === "function" ? v.isInfinite() : null;
+  /**
+   * Mirrors: Arel::Nodes::BindParam#infinite? (bind_param.rb:33-35) —
+   * `value.respond_to?(:infinite?) && value.infinite?`, which yields the *sign*
+   * (Ruby's `Float#infinite?` returns `1 | -1 | nil`), not a boolean.
+   *
+   * A bare ±Infinity answers it too: `Float` responds to `infinite?`, so
+   * `BindParam(Float::INFINITY).infinite?` is `1` in Rails and the bound is
+   * open-ended. Checking only for a wrapped `isInfinite()` would miss that.
+   */
+  isInfinite(): 1 | -1 | false {
+    if (this.value === Infinity) return 1;
+    if (this.value === -Infinity) return -1;
+    const v = this.value as { isInfinite?: () => 1 | -1 | false } | null | undefined;
+    return typeof v?.isInfinite === "function" ? v.isInfinite() : false;
   }
 
   isUnboundable(): 1 | -1 | false {
