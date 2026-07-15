@@ -43003,13 +43003,6 @@
   {
     "package": "arel",
     "tsFile": "attributes/attribute.ts",
-    "rubyName": "quoted_array",
-    "call": "quoted_node",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
     "rubyName": "when",
     "call": "quoted_node",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
