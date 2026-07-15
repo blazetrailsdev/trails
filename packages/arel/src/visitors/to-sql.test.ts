@@ -82,7 +82,13 @@ describe("the to_sql visitor", () => {
   // from an IN / NOT IN list, mirroring Rails' `visit_Arel_Nodes_In`
   // `values.delete_if { |v| unboundable?(v) }`.
   describe("unboundable values in IN / NOT IN lists", () => {
-    const unboundable = { isUnboundable: () => 1 as const };
+    // Rails' PredicateBuilder wraps out-of-range bounds in a QueryAttribute,
+    // which `Nodes.build_quoted` passes through unwrapped (casted.rb:50-51 —
+    // the `when ..., ActiveModel::Attribute` arm returning `other`) so it
+    // answers `unboundable?` to the visitor directly (to_sql.rb:905-907).
+    // Trails' equivalent is a BindParam, whose `isUnboundable` delegates to its
+    // value (bind_param.rb:39-40). Only that shape short-circuits.
+    const unboundable = new Nodes.BindParam({ isUnboundable: () => 1 as const });
 
     it("drops an unboundable value from an IN list", () => {
       const sql = new Visitors.ToSql().compile(users.get("id").in([1, unboundable]));
@@ -1405,27 +1411,37 @@ describe("the to_sql visitor", () => {
     });
   });
 
-  describe("BindParam infinite short-circuit", () => {
-    const infinite = (sign: 1 | -1) => new Nodes.BindParam({ isInfinite: () => sign });
+  // `BindParam#unboundable?` (bind_param.rb:39-40) delegates to its value's
+  // `unboundable?`; the visitor never consults `infinite?` (bind_param.rb:35-37),
+  // which exists for `Predications#open_ended?` (predications.rb:248).
+  describe("BindParam unboundable short-circuit", () => {
+    const unboundable = (sign: 1 | -1) => new Nodes.BindParam({ isUnboundable: () => sign });
 
-    it("GreaterThan short-circuits to 1=0 for positive infinite", () => {
-      const node = new Nodes.GreaterThan(users.get("id"), infinite(1));
+    it("GreaterThan short-circuits to 1=0 for positive unboundable", () => {
+      const node = new Nodes.GreaterThan(users.get("id"), unboundable(1));
       expect(new Visitors.ToSql().compile(node)).toBe("1=0");
     });
 
-    it("GreaterThan short-circuits to 1=1 for negative infinite", () => {
-      const node = new Nodes.GreaterThan(users.get("id"), infinite(-1));
+    it("GreaterThan short-circuits to 1=1 for negative unboundable", () => {
+      const node = new Nodes.GreaterThan(users.get("id"), unboundable(-1));
       expect(new Visitors.ToSql().compile(node)).toBe("1=1");
     });
 
-    it("LessThan short-circuits to 1=1 for positive infinite", () => {
-      const node = new Nodes.LessThan(users.get("id"), infinite(1));
+    it("LessThan short-circuits to 1=1 for positive unboundable", () => {
+      const node = new Nodes.LessThan(users.get("id"), unboundable(1));
       expect(new Visitors.ToSql().compile(node)).toBe("1=1");
     });
 
-    it("LessThan short-circuits to 1=0 for negative infinite", () => {
-      const node = new Nodes.LessThan(users.get("id"), infinite(-1));
+    it("LessThan short-circuits to 1=0 for negative unboundable", () => {
+      const node = new Nodes.LessThan(users.get("id"), unboundable(-1));
       expect(new Visitors.ToSql().compile(node)).toBe("1=0");
+    });
+
+    it("an infinite-but-bounded BindParam does not short-circuit", () => {
+      // Infinity has no `unboundable?`, so the bind is bounded and renders as a
+      // placeholder rather than collapsing.
+      const node = new Nodes.GreaterThan(users.get("id"), new Nodes.BindParam(Infinity));
+      expect(new Visitors.ToSql().compile(node)).toBe('"users"."id" > ?');
     });
   });
 
@@ -1671,49 +1687,66 @@ describe("the to_sql visitor", () => {
       const tbl = new Table("users");
       const compile = (n: Nodes.Node) => new Visitors.ToSql().compile(n);
       const id = tbl.get("id");
+      // Rails' `unboundable?` is duck-typed (to_sql.rb:905-907) and only
+      // BindParam / QueryAttribute answer it. A raw `Float::INFINITY` — or a
+      // Quoted/Casted wrapping one — is *bounded* to the visitor, so it renders
+      // as a value instead of collapsing.
+      const unbounded = (sign: 1 | -1) => new Nodes.BindParam({ isUnboundable: () => sign });
 
-      it("Equality with +Infinity collapses to 1=0", () => {
-        expect(compile(id.eq(Infinity))).toBe("1=0");
+      it("Equality with an unboundable bind collapses to 1=0", () => {
+        expect(compile(id.eq(unbounded(1)))).toBe("1=0");
+        expect(compile(id.eq(unbounded(-1)))).toBe("1=0");
       });
-      it("Equality with -Infinity collapses to 1=0", () => {
-        expect(compile(id.eq(-Infinity))).toBe("1=0");
+      it("NotEqual with an unboundable bind collapses to 1=1", () => {
+        expect(compile(id.notEq(unbounded(1)))).toBe("1=1");
+        expect(compile(id.notEq(unbounded(-1)))).toBe("1=1");
       });
-      it("NotEqual with +Infinity collapses to 1=1", () => {
-        expect(compile(id.notEq(Infinity))).toBe("1=1");
+      it("GreaterThan +1 → 1=0; -1 → 1=1", () => {
+        expect(compile(id.gt(unbounded(1)))).toBe("1=0");
+        expect(compile(id.gt(unbounded(-1)))).toBe("1=1");
       });
-      it("NotEqual with -Infinity collapses to 1=1", () => {
-        expect(compile(id.notEq(-Infinity))).toBe("1=1");
+      it("GreaterThanOrEqual +1 → 1=0; -1 → 1=1", () => {
+        expect(compile(id.gteq(unbounded(1)))).toBe("1=0");
+        expect(compile(id.gteq(unbounded(-1)))).toBe("1=1");
       });
-      it("GreaterThan +Infinity → 1=0; -Infinity → 1=1", () => {
-        expect(compile(id.gt(Infinity))).toBe("1=0");
-        expect(compile(id.gt(-Infinity))).toBe("1=1");
+      it("LessThan +1 → 1=1; -1 → 1=0", () => {
+        expect(compile(id.lt(unbounded(1)))).toBe("1=1");
+        expect(compile(id.lt(unbounded(-1)))).toBe("1=0");
       });
-      it("GreaterThanOrEqual +Infinity → 1=0; -Infinity → 1=1", () => {
-        expect(compile(id.gteq(Infinity))).toBe("1=0");
-        expect(compile(id.gteq(-Infinity))).toBe("1=1");
-      });
-      it("LessThan +Infinity → 1=1; -Infinity → 1=0", () => {
-        expect(compile(id.lt(Infinity))).toBe("1=1");
-        expect(compile(id.lt(-Infinity))).toBe("1=0");
-      });
-      it("LessThanOrEqual +Infinity → 1=1; -Infinity → 1=0", () => {
-        expect(compile(id.lteq(Infinity))).toBe("1=1");
-        expect(compile(id.lteq(-Infinity))).toBe("1=0");
+      it("LessThanOrEqual +1 → 1=1; -1 → 1=0", () => {
+        expect(compile(id.lteq(unbounded(1)))).toBe("1=1");
+        expect(compile(id.lteq(unbounded(-1)))).toBe("1=0");
       });
       it("In filters unboundable values; all-unboundable collapses to 1=0", () => {
-        expect(compile(id.in([Infinity, -Infinity]))).toBe("1=0");
+        expect(compile(id.in([unbounded(1), unbounded(-1)]))).toBe("1=0");
       });
       it("In retains bounded values when mixed with unboundable", () => {
-        const sql = compile(id.in([1, Infinity, 2]));
-        expect(sql).toBe('"users"."id" IN (1, 2)');
+        expect(compile(id.in([1, unbounded(1), 2]))).toBe('"users"."id" IN (1, 2)');
       });
       it("NotIn filters unboundable values; all-unboundable collapses to 1=1", () => {
-        expect(compile(id.notIn([Infinity, -Infinity]))).toBe("1=1");
+        expect(compile(id.notIn([unbounded(1), unbounded(-1)]))).toBe("1=1");
       });
       it("NotIn retains bounded values when mixed with unboundable", () => {
-        const sql = compile(id.notIn([1, Infinity, 2]));
-        expect(sql).toBe('"users"."id" NOT IN (1, 2)');
+        expect(compile(id.notIn([1, unbounded(1), 2]))).toBe('"users"."id" NOT IN (1, 2)');
       });
+
+      it("a raw Float::INFINITY is bounded and renders as a value", () => {
+        // Rails: Float has no `unboundable?`, so `attr.eq(Float::INFINITY)`
+        // builds Casted(INFINITY) and renders `= Infinity` via `quote` →
+        // `when Numeric then value.to_s` (abstract/quoting.rb:82), which is what
+        // the AR adapter path emits. The connection-less default quoter
+        // string-quotes non-finite numbers (default-quoter.ts:48-52) because
+        // bare `Infinity` is not valid SQL in every dialect.
+        expect(compile(id.eq(Infinity))).toBe('"users"."id" = \'Infinity\'');
+        expect(compile(id.gt(-Infinity))).toBe('"users"."id" > \'-Infinity\'');
+        expect(compile(id.in([1, Infinity, 2]))).toBe('"users"."id" IN (1, \'Infinity\', 2)');
+      });
+
+      it("Quoted wrapping INFINITY is bounded too (Quoted has no unboundable?)", () => {
+        const eq = new Nodes.Equality(id, new Nodes.Quoted(Infinity));
+        expect(compile(eq)).toBe('"users"."id" = \'Infinity\'');
+      });
+
       it("bounded comparisons are unaffected", () => {
         expect(compile(id.gt(5))).toBe('"users"."id" > 5');
         expect(compile(id.lt(5))).toBe('"users"."id" < 5');
@@ -1726,13 +1759,6 @@ describe("the to_sql visitor", () => {
         expect(compile(id.eq(null))).toBe('"users"."id" IS NULL');
         expect(compile(id.notEq(null))).toBe('"users"."id" IS NOT NULL');
       });
-
-      it("short-circuits when wrapped directly in Nodes.Quoted (not via buildQuoted)", () => {
-        const eq = new Nodes.Equality(id, new Nodes.Quoted(Infinity));
-        expect(compile(eq)).toBe("1=0");
-        const gt = new Nodes.GreaterThan(id, new Nodes.Quoted(-Infinity));
-        expect(compile(gt)).toBe("1=1");
-      });
     });
 
     describe("unboundableSign protocol", () => {
@@ -1742,37 +1768,49 @@ describe("the to_sql visitor", () => {
       }
       const v = () => new Visitors.ToSql() as unknown as Internals;
 
-      it("returns +1 for +Infinity, -1 for -Infinity, 0 otherwise", () => {
-        expect(v().unboundableSign(Infinity)).toBe(1);
-        expect(v().unboundableSign(-Infinity)).toBe(-1);
+      it("returns 0 for values that do not respond to isUnboundable", () => {
+        // to_sql.rb:905 — `value.respond_to?(:unboundable?) && value.unboundable?`.
+        expect(v().unboundableSign(Infinity)).toBe(0);
+        expect(v().unboundableSign(-Infinity)).toBe(0);
         expect(v().unboundableSign(0)).toBe(0);
         expect(v().unboundableSign(null)).toBe(0);
         expect(v().unboundableSign(undefined)).toBe(0);
         expect(v().unboundableSign("foo")).toBe(0);
       });
 
-      it("unwraps Quoted via isInfinite()", () => {
-        expect(v().unboundableSign(new Nodes.Quoted(Infinity))).toBe(1);
-        expect(v().unboundableSign(new Nodes.Quoted(-Infinity))).toBe(-1);
-        expect(v().unboundableSign(new Nodes.Quoted(5))).toBe(0);
+      it("does not consult isInfinite(), which is a different predicate", () => {
+        // `infinite?` serves `Predications#open_ended?` (predications.rb:256-258);
+        // the visitor never calls it, and neither Quoted nor Casted defines
+        // `unboundable?`. It is defined on Quoted (casted.rb:43-45 — the Quoted
+        // class lives in casted.rb) and NOT on Casted (casted.rb:5-35), which is
+        // why Casted answers 0 below on both predicates.
+        expect(v().unboundableSign(new Nodes.Quoted(Infinity))).toBe(0);
+        expect(v().unboundableSign(new Nodes.Quoted(-Infinity))).toBe(0);
+        expect(v().unboundableSign({ isInfinite: () => 1 })).toBe(0);
+        const casted = new Nodes.Casted(Infinity, new Table("users").get("id"));
+        expect(v().unboundableSign(casted)).toBe(0);
       });
 
-      it("descends through nodes that expose .value (e.g. Casted)", () => {
-        const tbl = new Table("users");
-        const casted = new Nodes.Casted(Infinity, tbl.get("id"));
-        expect(v().unboundableSign(casted)).toBe(1);
+      it("BindParam delegates isUnboundable to its value (bind_param.rb:39-40)", () => {
+        expect(v().unboundableSign(new Nodes.BindParam({ isUnboundable: () => -1 }))).toBe(-1);
+        expect(v().unboundableSign(new Nodes.BindParam(Infinity))).toBe(0);
       });
 
       it("honours an isUnboundable() protocol returning a sign or boolean", () => {
+        // Rails `case`s on the sign (`when 1` / `when -1`, to_sql.rb:438-475),
+        // so only those two values collapse. Every producer returns
+        // `1 | -1 | false`: QueryAttribute yields `value <=> 0`
+        // (query_attribute.rb:46-51), BindParam delegates, and RangeHandler's
+        // UnboundableBound carries the sign.
         expect(v().unboundableSign({ isUnboundable: () => 1 })).toBe(1);
         expect(v().unboundableSign({ isUnboundable: () => -1 })).toBe(-1);
-        expect(v().unboundableSign({ isUnboundable: () => true })).toBe(1);
         expect(v().unboundableSign({ isUnboundable: () => false })).toBe(0);
       });
 
       it("isUnboundable is the truthy wrapper of unboundableSign", () => {
-        expect(v().isUnboundable(Infinity)).toBe(true);
-        expect(v().isUnboundable(-Infinity)).toBe(true);
+        expect(v().isUnboundable({ isUnboundable: () => 1 })).toBe(true);
+        expect(v().isUnboundable({ isUnboundable: () => -1 })).toBe(true);
+        expect(v().isUnboundable(Infinity)).toBe(false);
         expect(v().isUnboundable(5)).toBe(false);
         expect(v().isUnboundable(null)).toBe(false);
       });

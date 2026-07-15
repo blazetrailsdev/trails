@@ -28,7 +28,8 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other && typeof other === "object") {
     // Arel::Attributes::Attribute (duck-typed via symbol brand)
     if ((other as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true) return other as Node;
-    // ActiveModel::Attribute duck-type (Rails: casted.rb:55 `ActiveModel::Attribute`).
+    // ActiveModel::Attribute duck-type (Rails: casted.rb:50-51 — the
+    // `when ..., ActiveModel::Attribute` arm returning `other`).
     // Structural check so buildQuoted doesn't require a runtime import here.
     // valueForDatabase is a getter (not a method) on the TS port; check via 'in'.
     if (
