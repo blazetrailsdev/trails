@@ -98,7 +98,24 @@ describe("quote dispatches through quoted_binary", () => {
     );
   });
 
-  it("passes the unwrapped bytes to this.quotedBinary", () => {
+  it("passes the Type::Binary::Data itself to this.quotedBinary", () => {
+    // Rails: `when Type::Binary::Data then quoted_binary(value)` (rb:83) hands the
+    // wrapper to the override, which unwraps it (`value.to_s` / `value.hex`).
+    let received: unknown;
+    const host = {
+      quotedBinary: (value: unknown) => {
+        received = value;
+        return "";
+      },
+    };
+    const data = new BinaryData(new Uint8Array([0xde, 0xad]));
+    quote.call(host, data);
+    expect(received).toBe(data);
+  });
+
+  it("passes normalized bytes to this.quotedBinary for a raw byte view", () => {
+    // Trails-only affordance: a raw view has no Ruby analogue (Rails only ever
+    // sees Type::Binary::Data here), so it is normalized before dispatch.
     let received: unknown;
     const host = {
       quotedBinary: (value: unknown) => {
@@ -107,8 +124,9 @@ describe("quote dispatches through quoted_binary", () => {
       },
     };
     const bytes = new Uint8Array([0xde, 0xad]);
-    quote.call(host, new BinaryData(bytes));
-    expect(received).toBe(bytes);
+    quote.call(host, bytes);
+    expect(received).toBeInstanceOf(Uint8Array);
+    expect(received).toEqual(bytes);
   });
 
   it("falls back to the module quoted_binary helper without a host", () => {

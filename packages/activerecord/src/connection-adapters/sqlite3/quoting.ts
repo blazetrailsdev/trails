@@ -90,13 +90,14 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     return quoteString(value.description);
   }
   if (typeof value === "string") return quoteString(value);
-  // Raw byte views have no Rails counterpart (Rails only ever sees
-  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
-  // Self-dispatch so SQLite's `quotedBinary` override is honored, the same way
-  // the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
-  if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
-    return dispatchQuotedBinary(this, value);
-  }
+  // A *bare* `ArrayBuffer` has no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here). It survives because `quoteDefaultExpression`
+  // below hands one straight to `quote` for a binary column default, and the
+  // inherited abstract branch tests `ArrayBuffer.isView`, which is false for a
+  // bare buffer. Byte *views* need no branch here — they fall through to the
+  // abstract `isView` branch, which self-dispatches back to SQLite's
+  // `quotedBinary` just as this does.
+  if (value instanceof ArrayBuffer) return dispatchQuotedBinary(this, value);
   return abstractQuote.call(this, value);
 }
 

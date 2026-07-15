@@ -323,12 +323,16 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     if (casted === null || casted === undefined) return null;
     // Binary columns: convert each byte to the matching Latin-1 code point so
     // the encryptor receives a valid string rather than "0,1,2,..." (Array#toString).
-    const str =
-      casted instanceof Uint8Array
-        ? Buffer.from(casted).toString("latin1")
-        : typeof casted === "string"
-          ? casted
-          : String(casted);
+    // `BinaryType#serialize` yields a `BinaryData` (binary.rb:31) — its `toString`
+    // UTF-8-decodes and would replace every byte >= 0x80 with U+FFFD, so unwrap to
+    // bytes and decode latin1, which maps bytes 1:1.
+    const bytes =
+      casted instanceof BinaryData ? casted.bytes : casted instanceof Uint8Array ? casted : null;
+    const str = bytes
+      ? Buffer.from(bytes).toString("latin1")
+      : typeof casted === "string"
+        ? casted
+        : String(casted);
     const normalized = this.deterministic ? this._applyForcedEncoding(str) : str;
     const toEncrypt =
       this.scheme.downcase || this.scheme.ignoreCase ? normalized.toLowerCase() : normalized;
