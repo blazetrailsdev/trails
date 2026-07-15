@@ -502,10 +502,9 @@ export class Dot extends Visitor {
       } else if (object instanceof Node) {
         super.visit(object);
       } else if (this.isActiveModelAttribute(object)) {
-        // Mirrors Rails' `visit_ActiveModel_Attribute` (dot.rb:216). Kept after
-        // the Node branch — Trails' BindParam *also* exposes
-        // `valueBeforeTypeCast` via NodeExpression, and must keep routing to
-        // visitArelNodesBindParam (dot.rb:212-214).
+        // Mirrors Rails' `visit_ActiveModel_Attribute` (dot.rb:216), which
+        // Ruby reaches by class dispatch — including via the ancestor walk in
+        // visitor.rb:36-41, so every Attribute subclass lands here too.
         this.visitActiveModelAttribute(object);
       } else if (this.isPlainObject(object)) {
         this.visitHash(object as Record<string, unknown>);
