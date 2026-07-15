@@ -458,17 +458,17 @@ describe("TestDot", () => {
       expect(out).not.toContain("inherited");
     });
 
-    it("an inherited valueBeforeTypeCast takes the attribute arm, not the Hash arm", () => {
-      // Pins the duck-typed split: isActiveModelAttribute uses `in`, which
-      // reaches through the prototype chain, and visit() checks it before
-      // the Hash arm. Real ActiveModel::Attribute exposes
-      // valueBeforeTypeCast as a prototype getter (activemodel
-      // attribute.ts:60), so the check cannot be scoped to own keys.
-      const derived = Object.create({ valueBeforeTypeCast: 42 }) as object;
+    it("a record inheriting valueBeforeTypeCast is a Hash, not an attribute", () => {
+      // The attribute arm is a class check (`instanceof ModelAttribute`), so
+      // it cannot swallow a record that merely carries the property — in
+      // Ruby such a value is a Hash and routes to visit_Hash (dot.rb:220).
+      const derived: Record<string, unknown> = Object.create({ valueBeforeTypeCast: 42 });
+      derived.alpha = "A";
       const out = visitStandalone(derived);
-      expect(out).toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
-      expect(out).not.toContain('[label="pair_0"]');
-      expect(out).not.toContain("<f0>Hash");
+      expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("alpha");
+      expect(out).not.toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
     });
 
     it("a Set emits index-labeled edges like an Array", () => {

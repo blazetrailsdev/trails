@@ -688,10 +688,7 @@ export class Dot extends Visitor {
     if (typeof o === "symbol") return "Symbol";
     // boundary: legacy JS Date values stringify to Rails' `Time` class name.
     if (o instanceof Date) return "Time";
-    // Mirrors visit()'s arm ordering: an ActiveModel::Attribute-shaped
-    // value routes to visitActiveModelAttribute, not visitHash, so it
-    // keeps its own class name.
-    if (!this.isActiveModelAttribute(o) && this.isHash(o)) return "Hash";
+    if (this.isHash(o)) return "Hash";
     const ctor = (o as { constructor?: { name?: string } }).constructor;
     return ctor?.name ?? "Object";
   }
