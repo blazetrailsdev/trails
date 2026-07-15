@@ -16,9 +16,12 @@ const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
  * `sqlName` (the alias when aliased, else the real table name), keeping the
  * model's type caster attached.
  *
- * Mirrors `aliased_table_for` (alias_tracker.rb:58-70): Rails is handed
- * `klass.arel_table` and calls `#alias` on it, so the caster survives via
- * `TableAlias`'s delegation. trails cannot return a `TableAlias` here — the
+ * Mirrors `table_metadata.rb:43-44` — `arel_table = association_klass.arel_table`
+ * then `arel_table.alias(table_name) if arel_table.name != table_name`. (Not
+ * `aliased_table_for`: this does none of that method's alias-count bookkeeping,
+ * and its real port is `AliasTracker#aliasedTableFor` below.) Deriving from
+ * `klass.arel_table` and aliasing is what keeps the caster, via `TableAlias`'s
+ * delegation. trails cannot return a `TableAlias` here — the
  * JoinDependency plumbing that consumes these tables is typed on `Table` and
  * gates on `instanceof Table` (e.g. rebindTableReferences, join-dependency.ts),
  * which a `TableAlias` (a Binary node) silently fails — so an aliased table is
@@ -37,7 +40,7 @@ export function aliasedArelTableFor(
   // No klass (polymorphic): nothing to source a caster from.
   if (!base) return new Table(tableName, { as: effectiveName });
   // `base.name` is the real table. Rails aliases it to whatever name the join
-  // must answer to (alias_tracker.rb:64) and keeps the caster either way.
+  // must answer to (table_metadata.rb:44) and keeps the caster either way.
   if (sqlName === base.name) return base;
   return new Table(base.name, { as: sqlName, typeCaster: base.typeCaster, klass: base.klass });
 }

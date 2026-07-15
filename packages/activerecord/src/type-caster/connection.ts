@@ -1,4 +1,5 @@
-import { Type, ValueType } from "@blazetrails/activemodel";
+import type { Type } from "@blazetrails/activemodel";
+import { defaultValue } from "../type.js";
 
 /**
  * Casts attribute values for database operations using the connection's
@@ -22,31 +23,21 @@ export class Connection {
 
   typeForAttribute(attrName: string): Type {
     const column = this.resolveColumn(attrName);
-
-    if (column) {
-      const adapter = this._klass?.connection;
-      const type = adapter?.lookupCastTypeFromColumn?.(column);
-      if (type) return type;
-
-      const sqlType = (column as any).sqlType ?? (column as any).type;
-      if (sqlType && adapter?.lookupCastType) {
-        const castType = adapter.lookupCastType(sqlType);
-        if (castType) return castType;
-      }
-    }
-
-    return new ValueType();
+    const type = column
+      ? (this._klass?.connection?.lookupCastTypeFromColumn?.(column) as Type | undefined)
+      : undefined;
+    return type ?? defaultValue();
   }
 
   private resolveColumn(attrName: string): unknown | undefined {
-    // Only consult the schema cache when it's already populated — avoid
-    // triggering cache-miss paths that call async adapter methods.
-    const adapter = this._klass?.connection;
-    const schemaCache = adapter?.schemaCache;
-    // Gate on the same map we read (`_columnsHash` via getCachedColumnsHash),
-    // not `isCached` (`_columns`); getCachedColumnsHash is a sync map read and
-    // never triggers an async cache-miss path. Returns undefined when unwarmed.
-    const hash = schemaCache?.getCachedColumnsHash?.(this._tableName);
+    // Rails gates on `schema_cache.data_source_exists?(table_name)` before
+    // reading `columns_hash` (type_caster/connection.rb:17-18). trails'
+    // `dataSourceExists` is async (schema-cache.ts:211) and this method is sync,
+    // so the cached columns hash is the gate instead: a warmed entry implies the
+    // data source exists, and `getCachedColumnsHash` is a plain map read that
+    // never triggers the async cache-miss path. Converging the gate itself waits
+    // on the pool async/sync convergence (RFC 0023).
+    const hash = this._klass?.connection?.schemaCache?.getCachedColumnsHash?.(this._tableName);
     return hash?.[attrName];
   }
 }

@@ -8,6 +8,18 @@ import { Attribute as AMAttribute, StringType } from "@blazetrails/activemodel";
 const STRING_TYPE = new StringType();
 const fakePgCaster = { typeForAttribute: () => STRING_TYPE };
 
+// Mirrors Rails' `TypedNode` (homogeneous_in_test.rb:34-42): a named function
+// that also has a data type, so `HomogeneousIn#casted_values` reads `type_caster`
+// off a node that is not an Attribute.
+class TypedNode extends Nodes.NamedFunction {
+  readonly typeCaster: unknown;
+
+  constructor(name: string, expr: Nodes.Node[], type: unknown) {
+    super(name, expr, undefined);
+    this.typeCaster = type;
+  }
+}
+
 describe("Arel::Nodes::HomogeneousInTest", () => {
   const users = new Table("users", { typeCaster: fakePgCaster });
   it("in", () => {
@@ -17,10 +29,10 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
   });
 
   it("custom attribute node", () => {
-    const attr = new Nodes.Attribute(users, "id");
-    const node = attr.in([1, 2]);
-    const sql = new Visitors.ToSql().compile(node);
-    expect(sql).toContain('"users"."id" IN');
+    const node = new TypedNode("COALESCE", [users.get("nickname"), users.get("name")], STRING_TYPE);
+    const expr = new Nodes.HomogeneousIn(["Bobby", "Robert"], node, "in");
+    const sql = new Visitors.ToSql().compile(expr);
+    expect(sql).toBe('COALESCE("users"."nickname", "users"."name") IN (?, ?)');
   });
 
   describe("HomogeneousIn visitor", () => {
