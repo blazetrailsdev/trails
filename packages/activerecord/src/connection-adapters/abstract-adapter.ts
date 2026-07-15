@@ -2329,14 +2329,20 @@ export class AbstractAdapter implements Quoting {
     return arError;
   }
 
-  /** Mirrors: AbstractAdapter#log */
+  /**
+   * Mirrors: AbstractAdapter#log
+   *
+   * `block` receives the notification payload, mirroring Rails' `yield payload`.
+   * `raw_execute` threads it into `perform_query`, which reports back by
+   * mutating it (`row_count`, `statement_name`) before subscribers read it.
+   */
   async log<T>(
     sql: string,
     name: string | null | undefined = "SQL",
     binds: unknown[] = [],
     typeCastedBinds: unknown[] = [],
     isAsync = false,
-    block?: () => Promise<T>,
+    block?: (payload: Record<string, unknown>) => Promise<T>,
   ): Promise<T | void> {
     try {
       const tx = this.currentTransaction();

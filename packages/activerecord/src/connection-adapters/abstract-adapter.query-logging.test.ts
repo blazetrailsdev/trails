@@ -68,6 +68,20 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
       }
     });
 
+    it("yields the notification payload so the block can report row_count", async () => {
+      const a = new AbstractAdapter();
+      const events: any[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (e) => events.push(e));
+      try {
+        await a.log("SELECT 1", "SQL", [], [], false, async (payload) => {
+          payload.row_count = 7;
+        });
+        expect(events[0].payload.row_count).toBe(7);
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
+    });
+
     it("re-throws StatementInvalid with query attached", async () => {
       const a = new AbstractAdapter();
       const inner = new StatementInvalid("oops");

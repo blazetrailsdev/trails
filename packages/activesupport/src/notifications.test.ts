@@ -21,17 +21,22 @@ describe("SubscribeEventObjectsTest", () => {
   });
 
   it("subscribe to events where payload is changed during instrumentation", () => {
-    const captured: unknown[] = [];
-    Notifications.subscribe("foo", (e) => captured.push(e.payload));
-    Notifications.instrument("foo", { status: "pending" });
-    expect((captured[0] as any).status).toBe("pending");
+    const events: Event[] = [];
+    Notifications.subscribe("foo", (e) => events.push(e));
+    Notifications.instrument("foo", {}, (payload) => {
+      payload.my_key = "success!";
+    });
+    expect(events[0].payload.my_key).toBe("success!");
   });
 
   it("subscribe to events can handle nested hashes in the paylaod", () => {
     const events: Event[] = [];
     Notifications.subscribe("foo", (e) => events.push(e));
-    Notifications.instrument("foo", { nested: { key: "value" } });
-    expect((events[0].payload.nested as any).key).toBe("value");
+    Notifications.instrument("foo", { some_key: { key_one: "success!" } }, (payload) => {
+      (payload.some_key as Record<string, unknown>).key_two = "great_success!";
+    });
+    expect((events[0].payload.some_key as any).key_one).toBe("success!");
+    expect((events[0].payload.some_key as any).key_two).toBe("great_success!");
   });
 
   it("subscribe via top level api", () => {
@@ -258,8 +263,20 @@ describe("InstrumentationTest", () => {
   it("instrument yields the payload for further modification", () => {
     const events: Event[] = [];
     Notifications.subscribe("modify", (e) => events.push(e));
-    Notifications.instrument("modify", { original: true });
+    Notifications.instrument("modify", { original: true }, (payload) => {
+      payload.added = "later";
+    });
     expect(events[0].payload.original).toBe(true);
+    expect(events[0].payload.added).toBe("later");
+  });
+
+  it("instrumentAsync yields the payload for further modification", async () => {
+    const events: Event[] = [];
+    Notifications.subscribe("modify.async", (e) => events.push(e));
+    await Notifications.instrumentAsync("modify.async", { row_count: 0 }, async (payload) => {
+      payload.row_count = 3;
+    });
+    expect(events[0].payload.row_count).toBe(3);
   });
 
   it("instrumenter exposes its id", () => {
