@@ -56,7 +56,7 @@ export class Company extends AbstractCompany {
   static {
     this.sequenceName = "companies_nonstd_seq";
 
-    this.enum("status", { active: 0, suspended: 1 });
+    this.enum("status", ["active", "suspended"]);
 
     this.validatesPresenceOf("name");
 

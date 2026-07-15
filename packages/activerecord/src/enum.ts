@@ -483,7 +483,7 @@ export class EnumMethods {
 export function enumMethod(
   this: typeof Base,
   attribute: string,
-  mapping: Record<string, EnumValue>,
+  mapping: string[] | Record<string, EnumValue>,
   options?: {
     prefix?: boolean | string;
     suffix?: boolean | string;

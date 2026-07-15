@@ -46,13 +46,13 @@ export class Membership extends Base {
     // trails needs STI enabled explicitly; with the enum on the same column the
     // `type_condition` serializes each subclass' sti_name (its class name) to
     // the enum integer (e.g. SelectedMembership → 3).
-    this.enum("type", {
-      Membership: 0,
-      CurrentMembership: 1,
-      SuperMembership: 2,
-      SelectedMembership: 3,
-      TenantMembership: 4,
-    });
+    this.enum("type", [
+      "Membership",
+      "CurrentMembership",
+      "SuperMembership",
+      "SelectedMembership",
+      "TenantMembership",
+    ]);
     this.inheritanceColumn = "type";
     this.belongsTo("member");
     this.belongsTo("club");

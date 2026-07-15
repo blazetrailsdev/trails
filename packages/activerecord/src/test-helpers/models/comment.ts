@@ -108,7 +108,7 @@ export class Comment extends Base {
       counterCache: "children_count",
       inverseOf: "children",
     });
-    this.enum("label", { default: 0, child: 1 });
+    this.enum("label", ["default", "child"]);
   }
 
   static allAsMethod() {
