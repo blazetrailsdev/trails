@@ -347,7 +347,7 @@ describe("EnumTest", () => {
     class K extends Base {
       static _tableName = "books";
       static {
-        this.enum("status", ["proposed", "written"] as any, { validate: true });
+        this.enum("status", ["proposed", "written"], { validate: true });
       }
     }
 
@@ -368,7 +368,7 @@ describe("EnumTest", () => {
     class K extends Base {
       static _tableName = "books";
       static {
-        this.enum("status", ["proposed", "written"] as any, { validate: { allowNil: true } });
+        this.enum("status", ["proposed", "written"], { validate: { allowNil: true } });
       }
     }
 
@@ -513,7 +513,7 @@ describe("EnumTest", () => {
     class Klass extends Base {
       static _tableName = "books";
       static {
-        this.enum("status", ["proposed", "written", "published"] as any);
+        this.enum("status", ["proposed", "written", "published"]);
       }
     }
 
@@ -530,7 +530,7 @@ describe("EnumTest", () => {
     class Klass extends Base {
       static _tableName = "books";
       static {
-        this.enum("status", ["proposed", "written", "published"] as any);
+        this.enum("status", ["proposed", "written", "published"]);
       }
     }
 
@@ -565,8 +565,8 @@ describe("EnumTest", () => {
       class Klass extends Base {
         static _tableName = "books";
         static {
-          this.enum("status_1", ["id"] as any, { prefix: true });
-          this.enum("status_2", ["id"] as any, { suffix: true });
+          this.enum("status_1", ["id"], { prefix: true });
+          this.enum("status_2", ["id"], { suffix: true });
         }
       }
       void Klass;
@@ -582,7 +582,7 @@ describe("EnumTest", () => {
           return "do publish work...";
         }
         static {
-          this.enum("status", ["proposed", "written", "published"] as any);
+          this.enum("status", ["proposed", "written", "published"]);
         }
         writtenBang() {
           return "do written work...";
@@ -601,13 +601,13 @@ describe("EnumTest", () => {
     class Klass1 extends Base {
       static _tableName = "books";
       static {
-        this.enum("status", ["proposed", "written"] as any);
+        this.enum("status", ["proposed", "written"]);
       }
     }
     class Klass2 extends Base {
       static _tableName = "books";
       static {
-        this.enum("status", ["drafted", "uploaded"] as any);
+        this.enum("status", ["drafted", "uploaded"]);
       }
     }
 
@@ -624,7 +624,7 @@ describe("EnumTest", () => {
     class Subklass1 extends Book {}
     class Subklass2 extends Book {
       static {
-        this.enum("status", ["drafted", "uploaded"] as any);
+        this.enum("status", ["drafted", "uploaded"]);
       }
     }
 
@@ -656,8 +656,8 @@ describe("EnumTest", () => {
       static {
         this.attribute("status", "integer");
         this.attribute("last_read", "integer");
-        this.enum("status", ["value_1"] as any, { prefix: true });
-        this.enum("last_read", ["value_1"] as any, { prefix: true });
+        this.enum("status", ["value_1"], { prefix: true });
+        this.enum("last_read", ["value_1"], { prefix: true });
       }
     }
     const instance = new K();
@@ -671,8 +671,8 @@ describe("EnumTest", () => {
       static {
         this.attribute("status", "integer");
         this.attribute("last_read", "integer");
-        this.enum("status", ["value_1"] as any, { suffix: true });
-        this.enum("last_read", ["value_1"] as any, { suffix: true });
+        this.enum("status", ["value_1"], { suffix: true });
+        this.enum("last_read", ["value_1"], { suffix: true });
       }
     }
     const instance = new K();
@@ -686,7 +686,7 @@ describe("EnumTest", () => {
       static _tableName = "books";
       static {
         this.aliasAttribute("aliased_status", "status");
-        this.enum("aliased_status", ["proposed", "written", "published"] as any);
+        this.enum("aliased_status", ["proposed", "written", "published"]);
       }
     }
     registerModel(Klass);
@@ -708,7 +708,7 @@ describe("EnumTest", () => {
     class Klass extends Base {
       static _tableName = "books";
       static {
-        this.enum("aliased_status", ["proposed", "written", "published"] as any);
+        this.enum("aliased_status", ["proposed", "written", "published"]);
         this.aliasAttribute("aliased_status", "status");
       }
     }
@@ -738,7 +738,7 @@ describe("EnumTest", () => {
     class Klass extends Base {
       static _tableName = "books";
       static {
-        this.enum("nullable_status", ["single", "married"] as any);
+        this.enum("nullable_status", ["single", "married"]);
         this.aliasAttribute("nullable_status", "status");
       }
     }
@@ -761,7 +761,7 @@ describe("EnumTest", () => {
     class AbstractParent extends Base {
       static {
         this._abstractClass = true;
-        this.enum("typeless_genre", ["adventure", "comic"] as any);
+        this.enum("typeless_genre", ["adventure", "comic"]);
       }
     }
     class Concrete extends AbstractParent {
@@ -788,7 +788,7 @@ describe("EnumTest", () => {
     class AbstractParent extends Base {
       static {
         this._abstractClass = true;
-        this.enum("typeless_genre", ["adventure", "comic"] as any);
+        this.enum("typeless_genre", ["adventure", "comic"]);
       }
     }
     class Concrete extends AbstractParent {
@@ -877,7 +877,7 @@ describe("EnumTest", () => {
       static _tableName = "books";
       static {
         this.attribute("status", "integer", { default: 2 });
-        this.enum("status", ["proposed", "written", "published"] as any);
+        this.enum("status", ["proposed", "written", "published"]);
       }
     }
     expect((new K() as any).status).toBe("published");
@@ -887,7 +887,7 @@ describe("EnumTest", () => {
     class K extends Base {
       static _tableName = "books";
       static {
-        this.enum("status", ["proposed", "written", "published"] as any, {
+        this.enum("status", ["proposed", "written", "published"], {
           default: "published",
         });
       }
@@ -910,7 +910,7 @@ describe("EnumTest", () => {
       static _tableName = "books";
       static {
         this.attribute("status", "integer");
-        this.enum("status", ["proposed", "written"] as any, { scopes: false });
+        this.enum("status", ["proposed", "written"], { scopes: false });
       }
     }
     expect((K as any).proposed).toBeUndefined();
@@ -921,7 +921,7 @@ describe("EnumTest", () => {
       static _tableName = "books";
       static {
         this.attribute("status", "integer");
-        this.enum("status", ["proposed", "written"] as any, { instanceMethods: false });
+        this.enum("status", ["proposed", "written"], { instanceMethods: false });
       }
     }
     const instance = new K();
@@ -1065,7 +1065,7 @@ describe("EnumTest", () => {
   it("raises for attributes with undeclared type", () => {
     class Klass extends Book {
       static {
-        this.enum("typeless_genre", ["adventure", "comic"] as any);
+        this.enum("typeless_genre", ["adventure", "comic"]);
       }
     }
 
@@ -1077,7 +1077,7 @@ describe("EnumTest", () => {
     class Klass extends Book {
       static {
         this.attribute("my_genre", "integer");
-        this.enum("my_genre", ["adventure", "comic"] as any);
+        this.enum("my_genre", ["adventure", "comic"]);
       }
     }
 
