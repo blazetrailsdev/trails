@@ -1,3 +1,16 @@
+/**
+ * Trails-only unit coverage for the abstract quoting helpers — no Rails
+ * counterpart file. Rails has `quoting_test.rb` (ported as `quoting.test.ts`),
+ * but no `quoting_helpers_test.rb`, and the self-dispatch helpers exercised here
+ * (`dispatchQuotedBinary` / `dispatchQuotedDate` / `dispatchQuotedTime`) are a
+ * trails construct standing in for Ruby's `self.quoted_binary` sends. Nothing in
+ * this file is matched by `test:compare` — it lands in "extra (TS only)" — so the
+ * describe/it names here are ours to choose and are NOT bound by the
+ * never-reword-a-test-name rule, which exists to protect Rails-matched names.
+ *
+ * Renamed to `.trails.test.ts` (was `quoting-helpers.test.ts`) to make that
+ * self-evident; it is why reviewers kept having to re-derive it.
+ */
 import { describe, expect, it } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BinaryData } from "@blazetrails/activemodel";
@@ -37,7 +50,7 @@ describe("quotedDate", () => {
   });
 
   it("throws for unrecognised types", () => {
-    expect(() => quotedDate("2026-04-26" as any)).toThrow("quotedDate: cannot format");
+    expect(() => quotedDate("2026-04-26" as never)).toThrow("quotedDate: cannot format");
   });
 });
 
