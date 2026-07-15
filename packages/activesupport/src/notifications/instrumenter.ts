@@ -48,8 +48,8 @@ export class Event {
   }
 }
 
-// Rails' `rescue Exception` arm: [e.class.name, e.message] plus the raw error,
-// so subscribers can detect a failed event.
+// Rails' `rescue Exception` arm — subscribers (e.g. ExplainSubscriber) key off
+// these to detect a failed event.
 function _recordException(payload: EventPayload, e: unknown): void {
   const error = e as { constructor?: { name?: string }; message?: unknown };
   payload.exception = [error?.constructor?.name ?? "Error", String(error?.message ?? e)];
