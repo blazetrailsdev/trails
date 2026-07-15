@@ -17,6 +17,7 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 export { UnsupportedVisitError };
 
 import { defaultQuoter } from "./default-quoter.js";
+import { temporalTag } from "../temporal-tag.js";
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
@@ -70,14 +71,6 @@ function isPlainObject(v: unknown): boolean {
   if (typeof v !== "object" || v === null) return false;
   const proto = Object.getPrototypeOf(v);
   return proto === Object.prototype || proto === null;
-}
-
-// Temporal types carry a `Temporal.X` Symbol.toStringTag; matching on it keeps
-// the check structural rather than importing the namespace into arel.
-function temporalTag(v: unknown): string | null {
-  if (typeof v !== "object" || v === null) return null;
-  const tag = (v as Record<symbol, unknown>)[Symbol.toStringTag];
-  return typeof tag === "string" && tag.startsWith("Temporal.") ? tag : null;
 }
 
 // The analogue of Ruby's Date, which Rails aliases to `unsupported`
