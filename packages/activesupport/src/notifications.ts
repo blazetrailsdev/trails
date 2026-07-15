@@ -111,7 +111,7 @@ export class Notifications {
   static instrument<T>(
     name: string,
     payload?: EventPayload,
-    block?: () => T,
+    block?: (payload: EventPayload) => T,
   ): T extends undefined ? void : T {
     const current = this._eventStack();
     const event = this._buildEvent(name, payload, current);
@@ -129,7 +129,7 @@ export class Notifications {
     const inner = [...current, event];
     let result: T;
     try {
-      result = this._runWithStack(inner, block);
+      result = this._runWithStack(inner, () => block(event.payload));
     } finally {
       event.finish();
       this._notify(event);
@@ -139,11 +139,16 @@ export class Notifications {
 
   /**
    * instrumentAsync — like instrument but for async blocks.
+   *
+   * The block receives the event payload — the same object passed in, which
+   * subscribers read after the block returns. Mutating it (e.g. `row_count`)
+   * is how a caller reports back into the notification, mirroring Rails'
+   * `yield payload` in ActiveSupport::Notifications::Instrumenter#instrument.
    */
   static async instrumentAsync<T>(
     name: string,
     payload?: EventPayload,
-    block?: () => Promise<T>,
+    block?: (payload: EventPayload) => Promise<T>,
   ): Promise<T extends undefined ? void : T> {
     const current = this._eventStack();
     const event = this._buildEvent(name, payload, current);
@@ -161,7 +166,7 @@ export class Notifications {
     const inner = [...current, event];
     let result: T;
     try {
-      result = await this._runWithStack(inner, block);
+      result = await this._runWithStack(inner, () => block(event.payload));
     } finally {
       event.finish();
       this._notify(event);

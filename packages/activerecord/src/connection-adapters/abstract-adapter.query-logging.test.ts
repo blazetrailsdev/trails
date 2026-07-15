@@ -1,7 +1,9 @@
 import { describe, it, expect, vi } from "vitest";
 import { AbstractAdapter } from "./abstract-adapter.js";
 import { ActiveRecordError, StatementInvalid } from "../errors.js";
+import { Transaction } from "../transaction.js";
 import { Notifications } from "@blazetrails/activesupport";
+import type { EventPayload } from "@blazetrails/activesupport";
 import { Collectors } from "@blazetrails/arel";
 
 describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
@@ -66,6 +68,54 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
       } finally {
         Notifications.unsubscribe(sub);
       }
+    });
+
+    it("yields the notification payload so the block can report row_count", async () => {
+      const a = new AbstractAdapter();
+      const payloads: EventPayload[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (e) => payloads.push(e.payload));
+      try {
+        await a.log("SELECT 1", "SQL", [], [], false, async (payload) => {
+          payload.row_count = 7;
+        });
+        expect(payloads[0].row_count).toBe(7);
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
+    });
+
+    const logTransactionPayload = async (userTransaction: Transaction) => {
+      const a = new AbstractAdapter();
+      vi.spyOn(a, "currentTransaction").mockReturnValue({ userTransaction } as never);
+      const payloads: EventPayload[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (e) => payloads.push(e.payload));
+      try {
+        await a.log("SELECT 1", "SQL", [], [], false, async () => undefined);
+        return payloads[0].transaction;
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
+    };
+
+    it("reports an open transaction in the payload", async () => {
+      // A real Transaction wrapping a non-finalized internal transaction, so
+      // this exercises Transaction#isBlank rather than a hand-stubbed shape.
+      const openTx = new Transaction({ state: { finalized: false } } as never);
+      expect(await logTransactionPayload(openTx)).toBe(openTx);
+    });
+
+    // Rails' `user_transaction.presence` — Transaction aliases blank? to
+    // closed?, so a closed transaction is reported as nil, not as itself.
+    it("reports a closed transaction as null in the payload", async () => {
+      const finalizedTx = new Transaction({ state: { finalized: true } } as never);
+      expect(await logTransactionPayload(finalizedTx)).toBeNull();
+    });
+
+    // NullTransaction#userTransaction hands back NULL_TRANSACTION rather than
+    // null, so the no-transaction case only reads as "no transaction" because
+    // NULL_TRANSACTION wraps a null internal transaction and is therefore blank.
+    it("reports no transaction as null in the payload", async () => {
+      expect(await logTransactionPayload(Transaction.NULL_TRANSACTION)).toBeNull();
     });
 
     it("re-throws StatementInvalid with query attached", async () => {

@@ -22,6 +22,7 @@ import {
   type SQLWarning,
 } from "../errors.js";
 import { Notifications } from "@blazetrails/activesupport";
+import type { EventPayload } from "@blazetrails/activesupport";
 import { disablePreparedStatements } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
 import { SchemaCache, SchemaReflection, BoundSchemaReflection } from "./schema-cache.js";
@@ -2329,18 +2330,32 @@ export class AbstractAdapter implements Quoting {
     return arError;
   }
 
-  /** Mirrors: AbstractAdapter#log */
+  /**
+   * Mirrors: AbstractAdapter#log
+   *
+   * `block` receives the notification payload, mirroring Rails' `yield payload`.
+   * It is the same object subscribers read after the block returns, so a block
+   * reports back by mutating it — which is how Rails' `raw_execute` hands
+   * `notification_payload` to `perform_query` for `row_count`/`statement_name`.
+   *
+   * trails' `rawExecute` does not call `log` yet; wiring that up is part of
+   * `unify-execute-mutation-into-perform-query` (RFC 0023), which first needs
+   * `performQuery` on sqlite3/mysql2 (only PG assigns one today).
+   */
   async log<T>(
     sql: string,
     name: string | null | undefined = "SQL",
     binds: unknown[] = [],
     typeCastedBinds: unknown[] = [],
     isAsync = false,
-    block?: () => Promise<T>,
+    block?: (payload: EventPayload) => Promise<T>,
   ): Promise<T | void> {
     try {
-      const tx = this.currentTransaction();
-      const userTx = (tx as any).userTransaction ?? null;
+      // Rails: `current_transaction.user_transaction.presence`. Transaction
+      // aliases `blank?` to `closed?` (transaction.rb:122), so a closed
+      // transaction reports as nil rather than as itself.
+      const userTx = this.currentTransaction().userTransaction;
+      const presentTx = userTx.isBlank() ? null : userTx;
       return await Notifications.instrumentAsync(
         "sql.active_record",
         {
@@ -2350,7 +2365,7 @@ export class AbstractAdapter implements Quoting {
           type_casted_binds: typeCastedBinds,
           async: isAsync,
           connection: this,
-          transaction: userTx,
+          transaction: presentTx,
           row_count: 0,
         },
         block,
