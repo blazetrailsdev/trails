@@ -22,8 +22,8 @@ export class UnboundableBound {
     return this.sign;
   }
 
-  isInfinite(): null {
-    return null;
+  isInfinite(): false {
+    return false;
   }
 }
 

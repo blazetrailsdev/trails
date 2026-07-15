@@ -23,6 +23,9 @@ import {
   parseRange,
   betweenFromRange,
   notBetweenFromRange,
+  infinitySign,
+  unboundableSign,
+  isOpenEnded,
   type RangeHost,
 } from "./predications-range.js";
 
@@ -338,41 +341,31 @@ export const Predications = {
     return groupedAll(others.map(predicationDispatch(this, methodId, extras)));
   },
 
-  // Mirrors Arel::Predications#infinity? — in the TS port, true only
-  // for JavaScript +/-Infinity values. Ruby's `infinite?` protocol
-  // (which Rails also accepts) has no TS analog; if a future Trails
-  // wrapper type wants to surface infiniteness, this is the place to
-  // teach it. Used to decide whether to clamp a `between` bound to
-  // an open half-range.
-  isInfinity(this: PredicationHost, value: unknown): boolean {
-    return value === Infinity || value === -Infinity;
-  },
-
-  // Mirrors Arel::Predications#unboundable? — Rails-side, this catches
-  // values that can't be compared (e.g. an unboundable bind value).
-  // The TS port has no analog of Ruby's `unboundable?` protocol, so
-  // this returns false; kept for surface fidelity.
-  isUnboundable(this: PredicationHost, value: unknown): boolean {
+  // Mirrors Arel::Predications#infinity? (predications.rb:248-250) —
+  // `value.respond_to?(:infinite?) && value.infinite?`, which yields the sign
+  // because Ruby's `Float#infinite?` returns `1 | -1 | nil`. The decision tree
+  // in predications-range.ts reads the sign, so these three expose the same
+  // single implementation `between` / `notBetween` above already use rather
+  // than a second copy — Rails has exactly one per Ruby file.
+  isInfinity(this: PredicationHost, value: unknown): 1 | -1 | 0 {
     void this;
-    void value;
-    return false;
+    return infinitySign(value);
   },
 
-  // Mirrors Arel::Predications#open_ended? — null, infinite, or
-  // unboundable values are treated as "no bound on this side".
-  // Dispatches `isInfinity` / `isUnboundable` through `this` (rather
-  // than calling the Predications module directly) so host classes
-  // can override either check. Mirrors Ruby's method-lookup semantics
-  // for `infinity?` / `unboundable?`.
-  isOpenEnded(
-    this: PredicationHost & {
-      isInfinity(value: unknown): boolean;
-      isUnboundable(value: unknown): boolean;
-    },
-    value: unknown,
-  ): boolean {
-    return (
-      value === null || value === undefined || this.isInfinity(value) || this.isUnboundable(value)
-    );
+  // Mirrors Arel::Predications#unboundable? (predications.rb:252-253) —
+  // `value.respond_to?(:unboundable?) && value.unboundable?`. Duck-typed: a
+  // bound answers it by exposing `isUnboundable()` (a QueryAttribute bind, or
+  // the RangeHandler's out-of-range sentinel). A bare ±Infinity is open-ended,
+  // NOT unboundable — Float has no `unboundable?` in Ruby.
+  isUnboundable(this: PredicationHost, value: unknown): 1 | -1 | 0 {
+    void this;
+    return unboundableSign(value);
+  },
+
+  // Mirrors Arel::Predications#open_ended? (predications.rb:255-257) —
+  // `value.nil? || infinity?(value) || unboundable?(value)`.
+  isOpenEnded(this: PredicationHost, value: unknown): boolean {
+    void this;
+    return isOpenEnded(value);
   },
 };

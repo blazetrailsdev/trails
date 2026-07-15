@@ -81,9 +81,12 @@ describe("QueryAttribute", () => {
     expect(new QueryAttribute("x", 0, stringType).isNil()).toBe(false);
   });
 
-  it("isInfinite returns true for Infinity/-Infinity", () => {
-    expect(new QueryAttribute("x", Infinity, intType).isInfinite()).toBe(true);
-    expect(new QueryAttribute("x", -Infinity, intType).isInfinite()).toBe(true);
+  it("isInfinite returns the sign for Infinity/-Infinity", () => {
+    // Mirrors query_attribute.rb:42-44, whose `infinity?` yields `Float#infinite?`
+    // — 1 / -1 / nil, not a boolean. Arel's between reads the sign to pick which
+    // side of the range collapses; a boolean would make -Infinity look positive.
+    expect(new QueryAttribute("x", Infinity, intType).isInfinite()).toBe(1);
+    expect(new QueryAttribute("x", -Infinity, intType).isInfinite()).toBe(-1);
     expect(new QueryAttribute("x", 999, intType).isInfinite()).toBe(false);
   });
 
@@ -93,7 +96,7 @@ describe("QueryAttribute", () => {
       serialize: (_v: unknown) => Infinity,
     };
     const attr = new QueryAttribute("x", "anything", expandingType);
-    expect(attr.isInfinite()).toBe(true);
+    expect(attr.isInfinite()).toBe(1);
   });
 
   it("isInfinite handles Ruby-style duck-typed `infinite()` (nil for finite, 1/-1 for infinite)", () => {
@@ -102,8 +105,8 @@ describe("QueryAttribute", () => {
     const negativeInf = { infinite: () => -1 };
     const passthrough = { cast: (v: unknown) => v, serialize: (v: unknown) => v };
     expect(new QueryAttribute("x", finite, passthrough).isInfinite()).toBe(false);
-    expect(new QueryAttribute("x", positiveInf, passthrough).isInfinite()).toBe(true);
-    expect(new QueryAttribute("x", negativeInf, passthrough).isInfinite()).toBe(true);
+    expect(new QueryAttribute("x", positiveInf, passthrough).isInfinite()).toBe(1);
+    expect(new QueryAttribute("x", negativeInf, passthrough).isInfinite()).toBe(-1);
   });
 
   it("equals compares name, value, and type", () => {

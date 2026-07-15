@@ -42,9 +42,14 @@ export class BindParam extends Node {
     return typeof v?.isNil === "function" && v.isNil();
   }
 
-  isInfinite(): number | null {
-    const v = this.value as { isInfinite?: () => number | null } | null | undefined;
-    return typeof v?.isInfinite === "function" ? v.isInfinite() : null;
+  /**
+   * Mirrors: Arel::Nodes::BindParam#infinite? (bind_param.rb:33-35) —
+   * `value.respond_to?(:infinite?) && value.infinite?`, which yields the *sign*
+   * (Ruby's `Float#infinite?` returns `1 | -1 | nil`), not a boolean.
+   */
+  isInfinite(): 1 | -1 | false {
+    const v = this.value as { isInfinite?: () => 1 | -1 | false } | null | undefined;
+    return typeof v?.isInfinite === "function" ? v.isInfinite() : false;
   }
 
   isUnboundable(): 1 | -1 | false {

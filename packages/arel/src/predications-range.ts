@@ -17,10 +17,17 @@ import { Between } from "./nodes/binary.js";
  *   `not_between` body — Predications#not_between
  *   `infinity?` / `unboundable?` / `open_ended?` — private helpers
  *
+ * This file holds the SINGLE implementation of the three private helpers.
+ * `Predications.isInfinity` / `isUnboundable` / `isOpenEnded` delegate here, as
+ * `Predications#between` / `notBetween` and `Attribute#between` / `notBetween`
+ * already do for the decision tree — Rails has one copy per Ruby file, and the
+ * only other legitimate copy is the visitor's (to_sql.rb:905-907). Keep it that
+ * way: a second copy is how `between` silently lost unboundable collapse before.
+ *
  * TS deviations (deliberate, called out in the audit):
- * - `infinitySign` and `unboundableSign` are Trails' stand-ins for Ruby's
- *   `infinity?` / `unboundable?` value protocols, and they read *different*
- *   things — the two are not interchangeable:
+ * - `infinitySign` and `unboundableSign` mirror Ruby's `infinity?` /
+ *   `unboundable?` value protocols. Both are duck-typed and both yield the
+ *   *sign*, but they read *different* things — the two are not interchangeable:
  *   - `infinitySign` mirrors `infinity?` (predications.rb:248-250): bare
  *     `±Infinity`, a `Quoted` wrapper around it (`Quoted#infinite?`,
  *     casted.rb:43-45), or a bound exposing `isInfinite()`. It deliberately
@@ -77,17 +84,11 @@ export function parseRange(beginOrRange: unknown, end: unknown, excludeEnd?: boo
 // `open_ended?(Casted(INFINITY))` is false there and must be false here. Do not
 // "fix" this to unwrap Casted — it would silently change `between`.
 //
-// The `r === true` arm is NOT the same dead coercion removed from
-// `unboundableSign`: it compensates for a live producer. Rails'
-// `QueryAttribute#infinite?` (query_attribute.rb:42-44) returns
-// `infinity?(...)`, i.e. the sign; trails' returns a plain `boolean`
-// (`activerecord/src/relation/query-attribute.ts:89-94`), and `BindParam#isInfinite`
-// delegates to it (bind-param.ts:45-48) despite its `number | null` annotation.
-// Dropping the arm would stop detecting +Infinity binds; keeping it reports +1
-// for a -Infinity bind. Both are wrong — the root cause is the boolean return,
-// tracked in story `arel-predications-unboundable-duck-types-like-rails`. Latent
-// today: trails' RangeHandler passes cast values / UnboundableBound, never a
-// QueryAttribute, as a range bound.
+// Every trails producer of the protocol returns the sign, matching Ruby:
+// `Quoted#isInfinite` (casted.ts), `BindParam#isInfinite` (bind-param.ts), and
+// `QueryAttribute#isInfinite` (activerecord/src/relation/query-attribute.ts).
+// Do not add a `true` arm back — a boolean producer would report `+1` for a
+// -Infinity bound.
 export function infinitySign(value: unknown): 1 | -1 | 0 {
   if (value === Infinity) return 1;
   if (value === -Infinity) return -1;
@@ -98,8 +99,7 @@ export function infinitySign(value: unknown): 1 | -1 | 0 {
     typeof (value as InfiniteLike).isInfinite === "function"
   ) {
     const r = (value as InfiniteLike).isInfinite!();
-    if (r === 1 || r === true) return 1;
-    if (r === -1) return -1;
+    if (r === 1 || r === -1) return r;
   }
   return 0;
 }
@@ -130,11 +130,11 @@ export function unboundableSign(value: unknown): 1 | -1 | 0 {
 }
 
 interface InfiniteLike {
-  isInfinite?: () => number | boolean | null;
+  isInfinite?: () => 1 | -1 | false;
 }
 
 interface UnboundableLike {
-  isUnboundable?: () => 1 | -1 | 0 | boolean;
+  isUnboundable?: () => 1 | -1 | false;
 }
 
 // Mirrors Rails Predications#open_ended? — `value.nil? || infinity?(value) ||

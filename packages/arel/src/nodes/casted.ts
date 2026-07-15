@@ -128,10 +128,15 @@ export class Quoted extends Unary {
     return this.value === null || this.value === undefined;
   }
 
-  isInfinite(): number | null {
+  /**
+   * Mirrors: Arel::Nodes::Quoted#infinite? (casted.rb:43-45) — the sign, not a
+   * boolean. `Casted` deliberately defines no counterpart (casted.rb:5-35), so
+   * `open_ended?(Casted(INFINITY))` is false in Rails and must stay false here.
+   */
+  isInfinite(): 1 | -1 | false {
     if (this.value === Infinity) return 1;
     if (this.value === -Infinity) return -1;
-    return null;
+    return false;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

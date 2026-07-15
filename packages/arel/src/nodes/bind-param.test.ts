@@ -75,9 +75,11 @@ describe("BindParam", () => {
   });
 
   describe("isInfinite", () => {
-    it("returns null when value has no isInfinite", () => {
+    it("returns false when value has no isInfinite", () => {
+      // Mirrors bind_param.rb:33-35 — `value.respond_to?(:infinite?) &&
+      // value.infinite?` is false, not nil, for a value lacking the protocol.
       const bp = new Nodes.BindParam(42);
-      expect(bp.isInfinite()).toBeNull();
+      expect(bp.isInfinite()).toBe(false);
     });
 
     it("delegates to value.isInfinite when present — positive", () => {

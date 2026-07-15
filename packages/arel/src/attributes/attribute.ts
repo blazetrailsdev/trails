@@ -47,7 +47,7 @@ import { BitwiseNot } from "../nodes/unary-operation.js";
 import type { NodeOrValue } from "../nodes/binary.js";
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
-import { Predications, type PredicationHost } from "../predications.js";
+import { Predications } from "../predications.js";
 
 /**
  * Combines multiple nodes with OR, wrapped in a Grouping.
@@ -334,26 +334,24 @@ export class Attribute extends Node {
     >(this, methodId, others, ...extras);
   }
 
-  protected isInfinity(value: unknown): boolean {
+  // infinity? / unboundable? / open_ended? reach Attribute through
+  // `include Arel::Predications` (attribute.rb:8) rather than being defined in
+  // attribute.rb, so api:compare maps them onto this file. They delegate to the
+  // Predications mixin, which in turn delegates to the single implementation in
+  // predications-range.ts — the same one `between` / `notBetween` above use, so
+  // routing a range through these can no longer diverge from the real decision
+  // tree the way the old `isUnboundable` stub silently did.
+
+  protected isInfinity(value: unknown): 1 | -1 | 0 {
     return Predications.isInfinity.call(this, value);
   }
 
-  protected isUnboundable(value: unknown): boolean {
+  protected isUnboundable(value: unknown): 1 | -1 | 0 {
     return Predications.isUnboundable.call(this, value);
   }
 
   protected isOpenEnded(value: unknown): boolean {
-    // Cast widens this' protected isInfinity/isUnboundable so they
-    // match Predications.isOpenEnded's `this` constraint, which
-    // requires them as public methods. The dispatch still goes through
-    // `this` at runtime, so subclass overrides are honored.
-    return Predications.isOpenEnded.call(
-      this as unknown as PredicationHost & {
-        isInfinity(value: unknown): boolean;
-        isUnboundable(value: unknown): boolean;
-      },
-      value,
-    );
+    return Predications.isOpenEnded.call(this, value);
   }
 
   // -- Ordering --

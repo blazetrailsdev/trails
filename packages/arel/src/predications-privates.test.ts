@@ -6,7 +6,8 @@ import { Predications } from "./predications.js";
 // Arel::Predications' private API (grouping_any, grouping_all,
 // infinity?, unboundable?, open_ended?). Trails surfaces them on the
 // mixin object for Rails-fidelity / api:compare privates coverage;
-// these tests pin their behavior.
+// these tests pin their behavior. The three predicate helpers delegate to
+// the single implementation in predications-range.ts.
 
 const users = new Table("users");
 
@@ -43,50 +44,54 @@ describe("Predications.groupingAny / groupingAll", () => {
 });
 
 describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
-  // Build a minimal PredicationHost-shaped object with public
-  // isInfinity / isUnboundable so isOpenEnded's `this`-dispatch
-  // typechecks. Mirrors how the methods would be reachable on a
-  // class that included Predications via the runtime mixin.
-  const host = {
-    quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node,
-    isInfinity(this: unknown, v: unknown): boolean {
-      return Predications.isInfinity.call(this as never, v);
-    },
-    isUnboundable(this: unknown, v: unknown): boolean {
-      return Predications.isUnboundable.call(this as never, v);
-    },
-  };
+  const host = { quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node };
+  const isInfinity = (v: unknown) => Predications.isInfinity.call(host, v);
+  const isUnboundable = (v: unknown) => Predications.isUnboundable.call(host, v);
+  const isOpenEnded = (v: unknown) => Predications.isOpenEnded.call(host, v);
 
-  it("isInfinity is true for ±Infinity, false otherwise", () => {
-    expect(host.isInfinity(Infinity)).toBe(true);
-    expect(host.isInfinity(-Infinity)).toBe(true);
-    expect(host.isInfinity(0)).toBe(false);
-    expect(host.isInfinity("x")).toBe(false);
+  it("isInfinity yields the sign for ±Infinity, 0 otherwise", () => {
+    // Mirrors `Float#infinite?` returning 1 / -1 / nil — the sign is what
+    // Predications#between reads to pick which side of the range collapses.
+    expect(isInfinity(Infinity)).toBe(1);
+    expect(isInfinity(-Infinity)).toBe(-1);
+    expect(isInfinity(0)).toBe(0);
+    expect(isInfinity("x")).toBe(0);
   });
 
-  it("isUnboundable is always false (no Ruby-style protocol in TS)", () => {
-    expect(host.isUnboundable(undefined)).toBe(false);
-    expect(host.isUnboundable(1)).toBe(false);
+  it("isInfinity duck-types a value exposing isInfinite()", () => {
+    expect(isInfinity(new Nodes.Quoted(-Infinity))).toBe(-1);
+    expect(isInfinity({ isInfinite: () => 1 as const })).toBe(1);
   });
 
-  it("isOpenEnded is true for null/undefined/Infinity, false otherwise", () => {
-    expect(Predications.isOpenEnded.call(host, null)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, undefined)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, Infinity)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, -Infinity)).toBe(true);
-    expect(Predications.isOpenEnded.call(host, 0)).toBe(false);
-    expect(Predications.isOpenEnded.call(host, "x")).toBe(false);
+  it("isInfinity does not unwrap Casted, which defines no infinite? in Rails", () => {
+    // casted.rb:5-35 — Casted has no `infinite?`, so open_ended?(Casted(INFINITY))
+    // is false in Rails and must stay false here.
+    expect(isInfinity(new Nodes.Casted(Infinity, users.attr("id")))).toBe(0);
+    expect(isOpenEnded(new Nodes.Casted(Infinity, users.attr("id")))).toBe(false);
   });
 
-  it("isOpenEnded dispatches through `this` so host overrides win", () => {
-    // Regression for the `this`-vs-direct-module-call concern: a host
-    // that overrides isInfinity to claim everything is infinite should
-    // see isOpenEnded honor that override.
-    const overridden = {
-      ...host,
-      isInfinity: () => true,
-    };
-    expect(Predications.isOpenEnded.call(overridden, 42)).toBe(true);
+  it("isUnboundable duck-types the protocol and yields the sign", () => {
+    expect(isUnboundable({ isUnboundable: () => 1 as const })).toBe(1);
+    expect(isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
+    expect(isUnboundable({ isUnboundable: () => false as const })).toBe(0);
+  });
+
+  it("isUnboundable is 0 for values with no unboundable? — including ±Infinity", () => {
+    // Float has no `unboundable?` in Ruby, so a bare ±Infinity is open-ended
+    // via infinity?, NOT unboundable.
+    expect(isUnboundable(Infinity)).toBe(0);
+    expect(isUnboundable(undefined)).toBe(0);
+    expect(isUnboundable(1)).toBe(0);
+  });
+
+  it("isOpenEnded is true for null/undefined/Infinity/unboundable, false otherwise", () => {
+    expect(isOpenEnded(null)).toBe(true);
+    expect(isOpenEnded(undefined)).toBe(true);
+    expect(isOpenEnded(Infinity)).toBe(true);
+    expect(isOpenEnded(-Infinity)).toBe(true);
+    expect(isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
+    expect(isOpenEnded(0)).toBe(false);
+    expect(isOpenEnded("x")).toBe(false);
   });
 });
 
@@ -97,8 +102,8 @@ describe("Attribute private helpers (mirror Predications)", () => {
   type AttributePrivates = Nodes.Attribute & {
     groupingAny: (methodId: string, others: unknown[]) => Nodes.Grouping;
     groupingAll: (methodId: string, others: unknown[]) => Nodes.Grouping;
-    isInfinity: (value: unknown) => boolean;
-    isUnboundable: (value: unknown) => boolean;
+    isInfinity: (value: unknown) => 1 | -1 | 0;
+    isUnboundable: (value: unknown) => 1 | -1 | 0;
     isOpenEnded: (value: unknown) => boolean;
   };
 
@@ -110,12 +115,22 @@ describe("Attribute private helpers (mirror Predications)", () => {
 
   it("isInfinity / isUnboundable / isOpenEnded match Predications semantics", () => {
     const attr = users.attr("id") as AttributePrivates;
-    expect(attr.isInfinity(Infinity)).toBe(true);
-    expect(attr.isInfinity(0)).toBe(false);
-    expect(attr.isUnboundable(0)).toBe(false);
+    expect(attr.isInfinity(Infinity)).toBe(1);
+    expect(attr.isInfinity(-Infinity)).toBe(-1);
+    expect(attr.isInfinity(0)).toBe(0);
+    expect(attr.isUnboundable(0)).toBe(0);
     expect(attr.isOpenEnded(null)).toBe(true);
     expect(attr.isOpenEnded(Infinity)).toBe(true);
     expect(attr.isOpenEnded(0)).toBe(false);
+  });
+
+  it("isUnboundable duck-types the protocol rather than always returning false", () => {
+    // Regression for the stub these delegated to: it hardcoded `false`, so
+    // anything routing `between` through Attribute#isOpenEnded silently lost
+    // unboundable collapse (#4433). They now share the real implementation.
+    const attr = users.attr("id") as AttributePrivates;
+    expect(attr.isUnboundable({ isUnboundable: () => -1 as const })).toBe(-1);
+    expect(attr.isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
   });
 });
 

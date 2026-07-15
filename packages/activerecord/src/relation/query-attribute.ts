@@ -86,7 +86,14 @@ export class QueryAttribute extends Attribute {
     return forDatabase === null || forDatabase === undefined;
   }
 
-  isInfinite(): boolean {
+  /**
+   * Mirrors: ActiveRecord::Relation::QueryAttribute#infinite?
+   * (query_attribute.rb:42-44) — `infinity?(value_before_type_cast) ||
+   * serializable? && infinity?(value_for_database)`. Yields the *sign*, not a
+   * boolean, because Ruby's `Float#infinite?` returns `1 | -1 | nil`; Arel's
+   * `Predications#between` reads it to pick which side of a range collapses.
+   */
+  isInfinite(): 1 | -1 | false {
     return (
       isInfinity(this.valueBeforeTypeCast) ||
       (this.isSerializable() && isInfinity(this.valueForDatabase))
@@ -111,13 +118,20 @@ export class QueryAttribute extends Attribute {
 
 // private
 
-/** @internal */
-function isInfinity(value: unknown): boolean {
-  if (value === Infinity || value === -Infinity) return true;
+/**
+ * Mirrors: ActiveRecord::Relation::QueryAttribute#infinity? (query_attribute.rb:53-55)
+ * — `value.respond_to?(:infinite?) && value.infinite?`. Returns the sign rather
+ * than a boolean; see `isInfinite` above.
+ *
+ * @internal
+ */
+function isInfinity(value: unknown): 1 | -1 | false {
+  if (value === Infinity) return 1;
+  if (value === -Infinity) return -1;
   if (value === null || value === undefined) return false;
   const fn = (value as { infinite?: unknown }).infinite;
   if (typeof fn !== "function") return false;
   const result = (fn as () => unknown).call(value);
-  // Mirrors Ruby truthiness for duck-typed infinite() results: only nil/false are falsy.
-  return result != null && result !== false;
+  if (result === 1 || result === -1) return result;
+  return false;
 }
