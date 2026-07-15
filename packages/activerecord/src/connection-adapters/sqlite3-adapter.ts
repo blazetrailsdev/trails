@@ -531,7 +531,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       if (isWrite) await this._readBackChanges();
     } else {
       const result = await stmt.run(driverBinds);
-      this._lastAffectedRows = result.changes;
+      // Number(): a driver may hand back a bigint count, and this feeds both
+      // executeMutation's return value and payload.row_count.
+      this._lastAffectedRows = Number(result.changes ?? 0);
       this._lastInsertRowid = result.lastInsertRowid;
       rows = [];
     }
