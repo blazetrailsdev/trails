@@ -8,8 +8,6 @@ import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
-  quotedFalse as abstractQuotedFalse,
-  quotedTrue as abstractQuotedTrue,
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
@@ -47,11 +45,11 @@ export const quotingConfig = {
   raiseIntWiderThan64Bit: true,
 };
 
+// Rails' PostgreSQL::Quoting overrides none of the boolean literal methods —
+// it inherits "TRUE"/"FALSE" and bare true/false from abstract/quoting.rb:166-180.
+// That inheritance is why encode_array emits '{true}' rather than MySQL/SQLite's
+// '{1}'.
 export interface Quoting {
-  quotedTrue(): string;
-  unquotedTrue(): boolean;
-  quotedFalse(): string;
-  unquotedFalse(): boolean;
   quoteTableName(name: string): string;
   quoteColumnName(name: string): string;
   quoteString(value: string): string;
@@ -71,22 +69,6 @@ export interface DefaultExpressionColumn {
 
 export interface TypeMapLike {
   lookup(sqlType: string): { serialize?(value: unknown): unknown } | null;
-}
-
-export function quotedTrue(): string {
-  return abstractQuotedTrue();
-}
-
-export function unquotedTrue(): boolean {
-  return true;
-}
-
-export function quotedFalse(): string {
-  return abstractQuotedFalse();
-}
-
-export function unquotedFalse(): boolean {
-  return false;
 }
 
 export function quoteTableName(name: string): string {
