@@ -55,11 +55,16 @@ export function resolveValueForDatabase(value: unknown): unknown {
 // The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
 // Assignment visitors (to_sql.rb:110, 632). trails has no Arel-visible class
 // for it, so it is duck-typed on `valueForDatabase` — the same shape
-// `resolveValueForDatabase` accepts. Arel's own Casted/Quoted expose that
-// property too (casted.ts:70,108), but both call sites test `instanceof Node`
-// first, so this only ever sees non-Node values.
+// `resolveValueForDatabase` accepts.
+//
+// The `instanceof Node` exclusion is load-bearing: Arel's own Casted/Quoted
+// expose `valueForDatabase` too (casted.ts:70,108), and ValuesList's Rails
+// `case` (to_sql.rb:110) does NOT list them — without this they would take the
+// visit branch there instead of falling to `quote()`, which is where Rails
+// sends them. Assignment tests `instanceof Node` itself before calling this,
+// matching its own wider `case` (to_sql.rb:631).
 function isActiveModelAttribute(v: unknown): boolean {
-  return typeof v === "object" && v !== null && "valueForDatabase" in v;
+  return typeof v === "object" && v !== null && !(v instanceof Node) && "valueForDatabase" in v;
 }
 
 // The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
@@ -329,18 +334,23 @@ export class ToSql extends Visitor {
       collector.append("(");
       for (let j = 0; j < node.rows[i].length; j++) {
         if (j > 0) collector.append(", ");
-        // Mirrors Rails (to_sql.rb:106-114): a raw row entry is quoted
-        // directly and never dispatched through `visit`.
+        // Mirrors Rails' `case` exactly (to_sql.rb:106-114): only SqlLiteral,
+        // BindParam and ActiveModel::Attribute are visited; every other row
+        // entry is a raw value and is quoted directly, never dispatched
+        // through `visit`.
         //
-        // Rails' `case` lists SqlLiteral/BindParam/ActiveModel::Attribute; we
-        // visit any Node. The lists agree on every *raw* value, which is what
-        // this branch exists to decide. They differ only for other Arel nodes
-        // (Casted/Quoted), where Rails falls to `quote()` — and `quote()` has
-        // no node branch (to_sql.rb:867-870 → quoting.rb `else raise
-        // TypeError`), so Rails raises there. Visiting renders instead of
-        // emitting a garbage literal for a case no caller reaches.
+        // The list is deliberately narrower than Assignment's (which visits any
+        // Node, to_sql.rb:631). Rails' rows carry raw values — see
+        // `create_values_list([%w{ a b }, ...])`, insert_manager_test.rb:10 —
+        // so a Casted/Quoted row falls to `quote()`, which has no node branch
+        // (to_sql.rb:867-870 → quoting.rb:86 `else raise TypeError`) and
+        // raises. Keeping the list narrow preserves that.
         const value = node.rows[i][j];
-        if (value instanceof Node || isActiveModelAttribute(value)) {
+        if (
+          value instanceof Nodes.SqlLiteral ||
+          value instanceof Nodes.BindParam ||
+          isActiveModelAttribute(value)
+        ) {
           this.visit(value as Node, collector);
         } else {
           collector.append(this.quote(value));

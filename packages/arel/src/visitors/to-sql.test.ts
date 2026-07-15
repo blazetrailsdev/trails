@@ -1407,9 +1407,57 @@ describe("the to_sql visitor", () => {
   });
 
   it("works with lists", () => {
-    const node = new Nodes.ValuesList([[new Nodes.Quoted(1)], [new Nodes.Quoted(2)]]);
+    const node = new Nodes.ValuesList([[1], [2]]);
     const sql = new Visitors.ToSql().compile(node);
     expect(sql).toBe("VALUES (1), (2)");
+  });
+
+  describe("Nodes::ValuesList row dispatch", () => {
+    // Rails' `case` (to_sql.rb:106-114) visits only SqlLiteral/BindParam/
+    // ActiveModel::Attribute; everything else — including a Casted/Quoted —
+    // falls to `quote()`. Routing is asserted through a connection whose
+    // `quote` is distinguishable, so this pins which branch each row takes
+    // rather than just the rendered text.
+    const probe = {
+      quoteTableName: (n: string) => `"${n}"`,
+      quoteColumnName: (n: string) => `"${n}"`,
+      quoteString: (s: string) => s,
+      quote: (v: unknown) => `Q(${String(v)})`,
+      quotedBinary: (v: unknown) => `'${String(v)}'`,
+      quotedTrue: () => "TRUE",
+      quotedFalse: () => "FALSE",
+      unquotedTrue: () => true,
+      unquotedFalse: () => false,
+      sanitizeAsSqlComment: (v: string) => v,
+    } as unknown as Visitors.ArelConnection;
+
+    it("quotes a raw row value instead of visiting it", () => {
+      const sql = new Visitors.ToSql(probe).compile(new Nodes.ValuesList([[1, "a"]]));
+      expect(sql).toBe("VALUES (Q(1), Q(a))");
+    });
+
+    it("visits a SqlLiteral row without quoting it", () => {
+      const sql = new Visitors.ToSql(probe).compile(
+        new Nodes.ValuesList([[new Nodes.SqlLiteral("DEFAULT")]]),
+      );
+      expect(sql).toBe("VALUES (DEFAULT)");
+    });
+
+    it("sends a Quoted row to quote(), which is where Rails raises TypeError", () => {
+      // Rails: quote(Quoted) → to_sql.rb:867-870 → quoting.rb:86
+      // `else raise TypeError, "can't quote Arel::Nodes::Quoted"`. Trails'
+      // adapter quote does the same (abstract/quoting.ts:151), so a connection
+      // that raises proves the row reaches quote() rather than visit.
+      const raising = {
+        ...probe,
+        quote: (v: unknown) => {
+          throw new TypeError(`can't quote ${(v as object)?.constructor?.name}`);
+        },
+      } as unknown as Visitors.ArelConnection;
+      expect(() =>
+        new Visitors.ToSql(raising).compile(new Nodes.ValuesList([[new Nodes.Quoted(1)]])),
+      ).toThrow(/can't quote Quoted/);
+    });
   });
 
   describe("Nodes::BoundSqlLiteral", () => {

@@ -9,9 +9,12 @@ describe("InsertManagerTest", () => {
       const mgr = new InsertManager();
       mgr.into(users);
       mgr.ast.columns = [users.get("name"), users.get("age")];
+      // Rails' create_values_list carries RAW row values (`%w{ a b }`,
+      // insert_manager_test.rb:10); the visitor quotes them (to_sql.rb:112).
+      // A Quoted row would hit `quote()` and raise TypeError in Rails.
       mgr.values = new Nodes.ValuesList([
-        [new Nodes.Quoted("dean"), new Nodes.Quoted(30)],
-        [new Nodes.Quoted("sam"), new Nodes.Quoted(25)],
+        ["dean", 30],
+        ["sam", 25],
       ]);
       expect(mgr.toSql()).toBe(
         `INSERT INTO "users" ("name", "age") VALUES ('dean', 30), ('sam', 25)`,
@@ -169,9 +172,12 @@ describe("InsertManagerTest", () => {
       const mgr = new InsertManager();
       mgr.into(users);
       mgr.ast.columns = [users.get("name"), users.get("age")];
+      // Rails' create_values_list carries RAW row values (`%w{ a b }`,
+      // insert_manager_test.rb:10); the visitor quotes them (to_sql.rb:112).
+      // A Quoted row would hit `quote()` and raise TypeError in Rails.
       mgr.values = new Nodes.ValuesList([
-        [new Nodes.Quoted("dean"), new Nodes.Quoted(30)],
-        [new Nodes.Quoted("sam"), new Nodes.Quoted(25)],
+        ["dean", 30],
+        ["sam", 25],
       ]);
       expect(mgr.toSql()).toBe(
         `INSERT INTO "users" ("name", "age") VALUES ('dean', 30), ('sam', 25)`,
