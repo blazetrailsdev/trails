@@ -16,7 +16,7 @@
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { BigDecimal } from "@blazetrails/activesupport";
-import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import { Attribute as ModelAttribute, BinaryData } from "@blazetrails/activemodel";
 import { NotImplementedError } from "../../errors.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import {
@@ -32,15 +32,18 @@ import {
  * Threading `this` lets an adapter override (e.g. PostgreSQL's BC-aware
  * `quotedDate`) flow into the inherited `quote`. A host receiver is required —
  * every invocation goes through an adapter via `.call(this, value)`; a host
- * that omits `quotedDate` / `quotedTime` falls back to the module-level helpers.
+ * that omits `quotedDate` / `quotedTime` / `quotedBinary` falls back to the
+ * module-level helpers.
  */
 export interface QuotingDispatchHost {
+  /** @internal */
+  quote?(value: unknown): string;
   /** @internal */
   quotedDate?(value: TemporalDateLike): string;
   /** @internal */
   quotedTime?(value: Temporal.PlainTime | Temporal.PlainDateTime): string;
   /** @internal */
-  quotedBinary?(value: Uint8Array): string;
+  quotedBinary?(value: unknown): string;
   /** @internal */
   quoteColumnName?(name: string): string;
 }
@@ -118,19 +121,24 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // order is kept to mirror rb:81-82, not because TS depends on it.
   if (value instanceof BigDecimal) return value.toString("F");
   if (typeof value === "number" || typeof value === "bigint") return String(value);
-  // ArrayBuffer views have no Ruby analogue: they must be normalized to bytes
-  // rather than falling to the raise below. Sited at the position Rails gives
-  // binary dispatch (`when Type::Binary::Data then quoted_binary(value)`,
-  // abstract/quoting.rb:83 — after Numeric, before Time/Date) and
-  // self-dispatched so each adapter's quotedBinary applies.
+  // Rails: `when Type::Binary::Data then quoted_binary(value)` (rb:83) —
+  // self-dispatched so an adapter's `quoted_binary` override (PG's bytea escape,
+  // MySQL/SQLite's `x'..'` hex) is honored. Thread `this` to mirror that.
   //
-  // This is NOT the rb:83 port: that line's `Type::Binary::Data` branch is
-  // still missing here and re-implemented per-adapter (postgresql/quoting.ts,
-  // mysql/quoting.ts, sqlite3/quoting.ts), which also short-circuit Uint8Array
-  // to the module quotedBinary and so bypass this self-dispatch. Porting rb:83
-  // and collapsing those copies is story
-  // `abstract-quote-binary-data-self-dispatch` — behaviorally a no-op today
-  // (each override delegates to the same module function), hence deferred.
+  // Deviation: Rails passes the `Type::Binary::Data` itself and each override
+  // unwraps it (`value.to_s` / `value.hex`); we pass the unwrapped bytes, which
+  // is what lets the raw-view branch below share one dispatch path with it.
+  // Every trails `quotedBinary` therefore accepts the union — Data *and* raw
+  // views — so a Rails-shaped `quotedBinary(data)` call still works; only an
+  // override that assumed a `Data` arg (reading `.hex()` off it) would see bytes
+  // instead. The root cause is that `BinaryType#serialize` returns bare bytes
+  // rather than Rails' `Data.new(super)`; converging that is story
+  // `binary-type-serialize-returns-data-wrapper` (RFC 0023).
+  if (value instanceof BinaryData) return dispatchQuotedBinary(this, value.bytes);
+  // ArrayBuffer views have no Ruby analogue (#4868): Rails only ever sees
+  // `Type::Binary::Data` here, so they must be normalized to bytes rather than
+  // falling to the raise below. Kept at the rb:83 position and self-dispatched,
+  // so a view and a `BinaryData` take the same path to the adapter override.
   if (ArrayBuffer.isView(value)) {
     const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
     return dispatchQuotedBinary(this, bytes);
@@ -271,10 +279,13 @@ export function quoteDefaultExpression(
     );
   }
   if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
-  // `quote` requires a host receiver; thread our own (the adapter-free
-  // ABSTRACT_SCHEMA_QUOTER / mysql schema-quoter bind `this` to the quoter
-  // object, an empty QuotingDispatchHost that falls back to module helpers).
-  return ` DEFAULT ${quote.call(this || {}, value)}`;
+  // Rails: `quote(value)` (abstract/quoting.rb:162) — self-dispatched, so a host
+  // that overrides `quote` (the mysql schema-quoter binds the dialect's) gets its
+  // own dialect quoting, including the raw-view branches the abstract `quote`
+  // deliberately lacks. Falling straight to the module `quote` here would bypass
+  // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
+  // Hosts without a `quote` (ABSTRACT_SCHEMA_QUOTER) keep the module helper.
+  return ` DEFAULT ${dispatchQuote(this || {}, value)}`;
 }
 
 /**
@@ -328,6 +339,36 @@ export function unquotedFalse(): boolean {
 }
 
 /**
+ * Normalise every byte source `quotedBinary` may receive to a `Uint8Array`, or
+ * `null` if the value is not one. Rails' `quoted_binary` family takes a
+ * `Type::Binary::Data` and calls `value.to_s` / `value.hex`; trails' `quote`
+ * unwraps to bytes before dispatching, and the adapters' boundary branches pass
+ * raw views — so an implementation has to accept that union to be callable
+ * either way.
+ *
+ * The abstract, MySQL and SQLite `quotedBinary` route through this. PG's
+ * hand-rolls the unwrap instead and omits `ArrayBuffer` from its signature, so
+ * a direct `pgQuotedBinary(dataView)` raises where the other two hex it —
+ * unreachable via `quote` (which normalises views first) and via PG's own
+ * adapter override (which handles `ArrayBuffer` separately). Converging it is
+ * story `pg-quoted-binary-route-through-tobytes` (RFC 0023).
+ *
+ * @internal
+ */
+export function toBytes(value: unknown): Uint8Array | null {
+  if (value instanceof BinaryData) return value.bytes;
+  // `ArrayBuffer.isView` (#4868) rather than `instanceof Uint8Array`: it also
+  // catches a DataView or a non-byte typed array, and threading
+  // byteOffset/byteLength keeps a subarray view from reading its whole backing
+  // buffer. A bare ArrayBuffer is not a view, so it needs its own branch.
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
+  if (value instanceof ArrayBuffer) return new Uint8Array(value);
+  return null;
+}
+
+/**
  * Quote binary data for SQL.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quoted_binary
@@ -340,8 +381,16 @@ export function unquotedFalse(): boolean {
  * with a dialect binary literal; this is the abstract fallback.
  */
 export function quotedBinary(value: unknown): string {
-  if (ArrayBuffer.isView(value)) {
-    const bytes = new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  // Rails quotes `value.to_s`, which for `Type::Binary::Data` is a BINARY-encoded
+  // String — byte-exact. `String(value)` can't stand in for it: for a Uint8Array
+  // it yields "1,2,3", for an ArrayBuffer "[object ArrayBuffer]", and for a
+  // BinaryData it runs `toString()`, which UTF-8-decodes and silently replaces
+  // any invalid sequence with U+FFFD (0xde 0xad 0xbe 0xef → 3 lossy chars). So
+  // normalise every byte source and decode latin1, which maps bytes 1:1. Rails'
+  // signature takes the `Data` itself (rb:206), so accept it even though our
+  // `quote` unwraps first; `dispatchQuotedBinary` also receives raw views.
+  const bytes = toBytes(value);
+  if (bytes) {
     return `'${quoteString(Buffer.from(bytes).toString("latin1"))}'`;
   }
   return `'${quoteString(String(value))}'`;
@@ -405,9 +454,16 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
  * Self-dispatch binary quoting through the host, mirroring Rails' `quote`
  * calling `self.quoted_binary(value)` so an adapter override applies. Falls
  * back to the module-level helper when the host omits it.
+ *
+ * Takes `unknown` rather than `Uint8Array`: the rb:83 branch passes a
+ * `BinaryData`'s bytes, but SQLite's boundary branch dispatches a raw
+ * `ArrayBuffer`, and the abstract/MySQL/SQLite `quotedBinary` normalise through
+ * {@link toBytes} (PG's exception is noted there — it is unreachable from this
+ * dispatch, which only sees a raw `ArrayBuffer` from SQLite's branch, with a
+ * SQLite host).
  * @internal
  */
-export function dispatchQuotedBinary(host: QuotingDispatchHost, value: Uint8Array): string {
+export function dispatchQuotedBinary(host: QuotingDispatchHost, value: unknown): string {
   if (typeof host.quotedBinary === "function") {
     return host.quotedBinary(value);
   }
@@ -425,6 +481,19 @@ export function dispatchQuotedDate(host: QuotingDispatchHost, value: TemporalDat
     return host.quotedDate(value);
   }
   return quotedDate(value);
+}
+
+/**
+ * Dispatch through the host's `quote` override if it defines one, else the
+ * module-level helper. Mirrors Rails' bare `quote(value)` self-dispatch inside
+ * `quote_default_expression` (abstract/quoting.rb:162).
+ * @internal
+ */
+export function dispatchQuote(host: QuotingDispatchHost, value: unknown): string {
+  if (typeof host.quote === "function") {
+    return host.quote(value);
+  }
+  return quote.call(host, value);
 }
 
 /** @internal */

@@ -10,7 +10,7 @@
  * to preserve the exact emitted SQL.
  */
 
-import { quote, quoteIdentifier, quoteTableName } from "./quoting.js";
+import { quote, quoteIdentifier, quoteTableName, quotedBinary } from "./quoting.js";
 import { quoteDefaultExpression } from "../abstract/quoting.js";
 
 /** @internal Schema-quoter surface the MySQL visitor depends on. */
@@ -19,6 +19,7 @@ export interface MysqlSchemaQuoter {
   quoteTableName(name: string): string;
   quoteDefaultExpression(value: unknown, column?: unknown): string;
   quote(value: unknown): string;
+  quotedBinary(value: unknown): string;
 }
 
 /** @internal */
@@ -27,6 +28,12 @@ export function mysqlSchemaQuoter(host?: Partial<MysqlSchemaQuoter>): MysqlSchem
     quoteIdentifier: host?.quoteIdentifier?.bind(host) ?? quoteIdentifier,
     quoteTableName: host?.quoteTableName?.bind(host) ?? quoteTableName,
     quote: host?.quote?.bind(host) ?? quote,
+    // `quote` binary self-dispatches through its receiver, and both `quote` and
+    // the abstract `quoteDefaultExpression` are invoked as methods of this
+    // object — so it *is* the dispatch host and must carry `quotedBinary`, or
+    // binary falls through to the abstract byte-string form instead of MySQL's
+    // `x'..'` hex (mysql/quoting.rb:80).
+    quotedBinary: host?.quotedBinary?.bind(host) ?? quotedBinary,
     quoteDefaultExpression,
   };
 }

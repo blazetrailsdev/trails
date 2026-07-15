@@ -11,6 +11,8 @@
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
+  toBytes,
+  dispatchQuotedBinary,
   dispatchQuotedDate,
   dispatchQuotedTime,
   type QuotingDispatchHost,
@@ -71,11 +73,12 @@ export function quoteString(value: string): string {
  * `quotedTime`. A host receiver is required — every invocation routes through
  * an adapter via `.call(this, value)`.
  *
- * The boolean, symbol, string, and binary branches stay inline because our
- * abstract `quote` renders those through module-level helpers (TRUE/FALSE,
+ * The boolean, symbol, and string branches stay inline because our abstract
+ * `quote` renders those through module-level helpers (TRUE/FALSE,
  * backslash-escaping `quoteString`) rather than dispatching through `this`, so
- * delegating would lose SQLite's overrides (1/0, `''`-only escaping, `x'..'`
- * hex). These are exactly the quoting primitives SQLite3::Quoting overrides.
+ * delegating would lose SQLite's overrides (1/0, `''`-only escaping). These are
+ * exactly the quoting primitives SQLite3::Quoting overrides. Binary does
+ * dispatch through `this`, so `BinaryData` rides the inherited abstract branch.
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
@@ -87,10 +90,13 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     return quoteString(value.description);
   }
   if (typeof value === "string") return quoteString(value);
-  if (value instanceof Uint8Array || value instanceof ArrayBuffer) return quotedBinary(value);
-  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
-  // BinaryData wraps raw bytes from serialize() (e.g. encryption ciphertext for binary columns).
-  if (value instanceof BinaryData) return quotedBinary(value.bytes);
+  // Raw byte views have no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
+  // Self-dispatch so SQLite's `quotedBinary` override is honored, the same way
+  // the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
+  if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
+    return dispatchQuotedBinary(this, value);
+  }
   return abstractQuote.call(this, value);
 }
 
@@ -142,8 +148,18 @@ export function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): 
   return quotedDate(dt).replace(/^\d{4}-\d{2}-\d{2} /, "2000-01-01 ");
 }
 
-export function quotedBinary(value: Uint8Array | ArrayBuffer): string {
-  const bytes = value instanceof Uint8Array ? value : new Uint8Array(value);
+export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): string {
+  // Rails' signature is `quoted_binary(value)` taking the Type::Binary::Data
+  // itself (`value.hex`, sqlite3/quoting.rb:79). Accept it alongside the raw
+  // views our `quote` unwraps to, so the Rails-shaped call works too.
+  const bytes = toBytes(value);
+  if (!bytes) {
+    throw new TypeError(
+      `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, or BinaryData; got ${
+        value === null ? "null" : typeof value
+      }`,
+    );
+  }
   const hex = Array.from(bytes)
     .map((b) => b.toString(16).padStart(2, "0"))
     .join("");
@@ -162,8 +178,9 @@ export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: 
     return str;
   }
   // `quote` requires a host receiver; thread our own so date/time defaults reach
-  // SQLite's quotedDate / quotedTime overrides (the adapter binds `this`).
-  return quote.call(this || { quotedDate, quotedTime }, value);
+  // SQLite's quotedDate / quotedTime overrides and binary defaults reach its
+  // `x'..'` quotedBinary (the adapter binds `this`).
+  return quote.call(this || { quotedDate, quotedTime, quotedBinary }, value);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat = false): unknown {

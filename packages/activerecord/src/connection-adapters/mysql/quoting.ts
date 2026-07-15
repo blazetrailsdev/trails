@@ -19,6 +19,8 @@ import {
 } from "../abstract/sql-datetime.js";
 import {
   quote as abstractQuote,
+  toBytes,
+  dispatchQuotedBinary,
   dispatchQuotedDate,
   dispatchQuotedTime,
   type QuotingDispatchHost,
@@ -92,13 +94,29 @@ export function quoteString(value: string): string {
   return `'${value.replace(MYSQL_ESCAPE_RE, (ch) => MYSQL_ESCAPE_MAP[ch] ?? ch)}'`;
 }
 
-export function quotedBinary(value: Buffer | Uint8Array | string): string {
-  const hex = Buffer.isBuffer(value)
-    ? value.toString("hex")
-    : value instanceof Uint8Array
-      ? Buffer.from(value.buffer, value.byteOffset, value.byteLength).toString("hex")
-      : Buffer.from(value, "binary").toString("hex");
-  return `x'${hex}'`;
+/**
+ * Mirrors: MySQL::Quoting#quoted_binary (`x'#{value.hex}'`, mysql/quoting.rb:80).
+ * Rails' signature takes the `Type::Binary::Data` itself, so accept it alongside
+ * the raw views our `quote` unwraps to — a Rails-shaped call then works here too.
+ * Shares {@link toBytes} with the abstract and SQLite overrides, so those three
+ * accept the same union (PG's hand-rolls the unwrap — exception noted on
+ * `toBytes`). A latin1 `string` stays supported on top: Ruby's `Data#hex` reads
+ * a byte String, and callers here pass the JS stand-in for one. PG accepts one
+ * too; SQLite's override rejects it.
+ */
+export function quotedBinary(
+  value: Buffer | Uint8Array | ArrayBuffer | string | BinaryData,
+): string {
+  const bytes = toBytes(value);
+  if (bytes) {
+    return `x'${Buffer.from(bytes.buffer, bytes.byteOffset, bytes.byteLength).toString("hex")}'`;
+  }
+  if (typeof value === "string") return `x'${Buffer.from(value, "binary").toString("hex")}'`;
+  throw new TypeError(
+    `quotedBinary expects a Uint8Array, ArrayBuffer, Buffer, string, or BinaryData; got ${
+      value === null ? "null" : typeof value
+    }`,
+  );
 }
 
 /** @internal */
@@ -173,8 +191,8 @@ export function columnNameWithOrderMatcher(): RegExp {
  * `quote` runs the abstract `quote` and the MySQL-specific behaviour flows in
  * through the dispatched helpers (`quote_string`, `quoted_binary`,
  * `quoted_date`/`quoted_time`). We mirror that here: only the branches whose
- * dispatch the abstract `quote` doesn't thread through `this` (binary, symbols,
- * strings — plus the trails-only non-finite guard) stay inline; everything else
+ * dispatch the abstract `quote` doesn't thread through `this` (symbols, strings
+ * — plus the trails-only raw-bytes and non-finite guards) stay inline; the rest
  * delegates to {@link abstractQuote} with `this` threaded so the date/time
  * dispatch lands on MySQL's {@link quotedDate}. Booleans fall through to the
  * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
@@ -185,9 +203,12 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // throws "Unknown column 'Infinity'". Mirror PG's behavior and quote them as
   // strings; MySQL coerces or rejects at the column-type boundary.
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
-  if (value instanceof Buffer || value instanceof Uint8Array) return quotedBinary(value);
-  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
-  if (value instanceof BinaryData) return quotedBinary(value.bytes);
+  // Raw byte views have no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
+  // Self-dispatch so MySQL's `quotedBinary` override is honored, the same way
+  // the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
+  // `Buffer` needs no separate branch: it extends `Uint8Array`.
+  if (value instanceof Uint8Array) return dispatchQuotedBinary(this, value);
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");

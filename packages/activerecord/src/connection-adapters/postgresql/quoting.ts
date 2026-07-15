@@ -7,6 +7,7 @@
 import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote as abstractQuote,
+  dispatchQuotedBinary,
   quotedDate as abstractQuotedDate,
   quotedFalse as abstractQuotedFalse,
   quotedTrue as abstractQuotedTrue,
@@ -126,10 +127,12 @@ export function quoteSchemaName(schemaName: string): string {
 /**
  * Mirrors: PostgreSQL::Quoting#quoted_binary. Rails passes `value.to_s`
  * through escape_bytea so the result is always a string wrapped in SQL
- * quotes, never nil.
+ * quotes, never nil. Rails' signature takes the `Type::Binary::Data` itself
+ * (`postgresql/quoting.rb:152`), so accept it alongside the raw views our
+ * `quote` unwraps to — a Rails-shaped call then works here too.
  */
-export function quotedBinary(value: Buffer | Uint8Array | string): string {
-  return `'${escapeBytea(value)}'`;
+export function quotedBinary(value: Buffer | Uint8Array | string | BinaryData): string {
+  return `'${escapeBytea(value instanceof BinaryData ? value.bytes : value)}'`;
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
@@ -160,9 +163,11 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     if (quotingConfig.raiseIntWiderThan64Bit) checkIntegerRange(value);
     return String(value);
   }
-  if (value instanceof Uint8Array) return quotedBinary(value);
-  // Mirrors Rails abstract/quoting.rb: `when Type::Binary::Data then quoted_binary(value)`.
-  if (value instanceof BinaryData) return quotedBinary(value.bytes);
+  // Raw byte views have no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
+  // Self-dispatch so the adapter's `quotedBinary` override is honored, the same
+  // way the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
+  if (value instanceof Uint8Array) return dispatchQuotedBinary(this, value);
   if (typeof value === "string") return quoteString(value);
   // Thread `this` so the inherited date/time dispatch reaches PG's
   // BC-suffixing `quotedDate` (mirrors Rails' `super` call in PG#quote).
@@ -214,7 +219,11 @@ export function quoteDefaultExpression(
       serialized = castType.serialize(value);
     }
   }
-  return ` DEFAULT ${quote.call(this || {}, serialized)}`;
+  // `quote` requires a host receiver; thread our own so a receiver-less binary
+  // default reaches PG's bytea `quotedBinary` rather than the abstract
+  // byte-string fallback, and a date default reaches PG's BC-suffixing
+  // `quotedDate` (postgresql/quoting.rb:143) rather than the abstract format.
+  return ` DEFAULT ${quote.call(this || { quotedDate, quotedBinary }, serialized)}`;
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

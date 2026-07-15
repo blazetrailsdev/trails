@@ -94,6 +94,7 @@ import {
   FloatType,
   BooleanType,
   BinaryType,
+  BinaryData,
   DecimalType,
 } from "@blazetrails/activemodel";
 
@@ -1027,7 +1028,12 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   }
 
   quotedBinary(value: unknown): string {
-    return mysqlQuotedBinary(value as Buffer | Uint8Array | string);
+    // The standalone shares the `toBytes` byte union (Uint8Array/ArrayBuffer/
+    // Buffer/BinaryData) with the PG and SQLite overrides, so the Rails-shaped
+    // call (`quoted_binary(Type::Binary::Data)`, mysql/quoting.rb:80) works here
+    // and raises on a non-byte source rather than hexing garbage. The latin1
+    // `string` form on top is MySQL's own (PG accepts one too; SQLite rejects it).
+    return mysqlQuotedBinary(value as Buffer | Uint8Array | ArrayBuffer | string | BinaryData);
   }
 
   unquoteIdentifier(identifier: string | null | undefined): string | null {
