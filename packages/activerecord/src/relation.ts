@@ -1166,8 +1166,8 @@ export class Relation<T extends Base> {
     rel._orderClauses.push(orderNode);
 
     // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
-    // Attribute#in uses buildQuoted (no type-caster context); the values were already
-    // database-cast above via type_cast_for_database, matching Rails.
+    // The values were already database-cast above via type_cast_for_database, matching
+    // Rails — Attribute#in's own quoted_array cast is a no-op on already-cast values.
     if (filter) {
       const hasNull = normalized.includes(null);
       const nonNull = normalized.filter((v) => v !== null);

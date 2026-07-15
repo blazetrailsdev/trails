@@ -193,14 +193,14 @@ export class Attribute extends Node {
     if (!Array.isArray(values) && values && typeof values === "object" && "ast" in values) {
       return new In(this, (values as { ast: Node }).ast);
     }
-    return new In(this, values.map(buildQuoted) as unknown as Node);
+    return new In(this, this.quotedArray(values) as unknown as Node);
   }
 
   notIn(values: unknown[] | { ast: Node }): NotIn {
     if (!Array.isArray(values) && values && typeof values === "object" && "ast" in values) {
       return new NotIn(this, (values as { ast: Node }).ast);
     }
-    return new NotIn(this, values.map(buildQuoted) as unknown as Node);
+    return new NotIn(this, this.quotedArray(values) as unknown as Node);
   }
   between(range: [unknown, unknown]): Node;
   between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
