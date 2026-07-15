@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   Table,
   star,
@@ -262,6 +263,39 @@ describe("TestDot", () => {
       // visit_Array walks each member under an index-labeled edge.
       expect(out).toMatch(/-> \d+ \[label="0"\];/);
       expect(out).toMatch(/-> \d+ \[label="1"\];/);
+    });
+
+    it("raises TypeError on a class with no visitable ancestor (visitor.rb:39)", () => {
+      // Rails' Visitor#visit walks object.class.ancestors and raises
+      // `TypeError, "Cannot visit #{object.class}"` when none answers. Trails
+      // used to render such a value as a visitString leaf instead.
+      class Money {
+        toString(): string {
+          return "$5";
+        }
+      }
+      const v = new Visitors.Dot();
+      type Internals = { visit(o: unknown): void };
+      v.compile(new Nodes.SqlLiteral("seed"));
+      expect(() => (v as unknown as Internals).visit(new Money())).toThrow(
+        new TypeError("Cannot visit Money"),
+      );
+    });
+
+    it("Temporal values reach visit_Date / visit_Time instead of raising", () => {
+      // Temporal is this codebase's Time/Date analogue, so these have a
+      // visitable Rails ancestor and must not hit the TypeError arm.
+      const v = new Visitors.Dot();
+      type Internals = { visit(o: unknown): void; toDot(): string };
+      const iv = v as unknown as Internals;
+      v.compile(new Nodes.SqlLiteral("seed"));
+      iv.visit(Temporal.PlainDate.from("2024-01-02"));
+      iv.visit(Temporal.PlainDateTime.from("2024-01-02T03:04:05"));
+      iv.visit(Temporal.Instant.from("2024-01-02T03:04:05Z"));
+      const out = iv.toDot();
+      expect(out).toContain("<f0>Date|<f1>2024-01-02");
+      expect(out).toContain("<f0>DateTime|<f1>2024-01-02T03:04:05");
+      expect(out).toContain("<f0>Time|<f1>2024-01-02T03:04:05Z");
     });
 
     it("visitEdge throws on a typo'd field (Rails NoMethodError parity)", () => {
