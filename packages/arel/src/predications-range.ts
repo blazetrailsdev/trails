@@ -156,12 +156,13 @@ interface UnboundableLike {
 // value. So `between(BindParam(nil), 3)` is `lteq(3)` in Rails, not a Between
 // over a nil bind — reading only `=== null` here skipped that.
 export function isOpenEnded(value: unknown): boolean {
-  return isNil(value) || infinitySign(value) !== 0 || unboundableSign(value) !== 0;
+  return isNilBound(value) || infinitySign(value) !== 0 || unboundableSign(value) !== 0;
 }
 
 // Mirrors Ruby's `value.nil?` for the shapes a bound can take: a bare
-// null/undefined, or a node exposing the port's `isNil()`.
-function isNil(value: unknown): boolean {
+// null/undefined, or a node exposing the port's `isNil()`. Ruby gets this from
+// Object#nil?, so there is no Rails method to map it onto.
+export function isNilBound(value: unknown): boolean {
   if (value === null || value === undefined) return true;
   const v = value as { isNil?: () => boolean };
   return typeof v.isNil === "function" && v.isNil();

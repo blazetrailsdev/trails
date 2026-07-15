@@ -47,7 +47,7 @@ import { BitwiseNot } from "../nodes/unary-operation.js";
 import type { NodeOrValue } from "../nodes/binary.js";
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
-import { Predications } from "../predications.js";
+import { Predications, type PredicationHost } from "../predications.js";
 
 /**
  * Combines multiple nodes with OR, wrapped in a Grouping.
@@ -351,7 +351,17 @@ export class Attribute extends Node {
   }
 
   protected isOpenEnded(value: unknown): boolean {
-    return Predications.isOpenEnded.call(this, value);
+    // Cast widens this' protected isInfinity/isUnboundable to the public shape
+    // Predications.isOpenEnded's `this` requires. Dispatch still goes through
+    // `this` at runtime, so subclass overrides are honored — as in Ruby, where
+    // open_ended? calls infinity? / unboundable? on self.
+    return Predications.isOpenEnded.call(
+      this as unknown as PredicationHost & {
+        isInfinity(value: unknown): 1 | -1 | 0;
+        isUnboundable(value: unknown): 1 | -1 | 0;
+      },
+      value,
+    );
   }
 
   // -- Ordering --

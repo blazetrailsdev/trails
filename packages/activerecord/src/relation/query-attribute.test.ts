@@ -155,6 +155,22 @@ describe("QueryAttribute", () => {
     const big = new BigIntegerType();
     expect(new QueryAttribute("id", 2n ** 63n, big).isUnboundable()).toBe(false);
     expect(new QueryAttribute("id", -(2n ** 100n), big).isUnboundable()).toBe(false);
+    // ±Infinity too: cast_value is `to_i rescue nil` => nil, and in_range?(nil)
+    // is `!value` => true (integer.rb:86,90).
+    expect(new QueryAttribute("id", Infinity, big).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", -Infinity, big).isUnboundable()).toBe(false);
+  });
+
+  it("isUnboundable is false for ±Infinity — Rails casts it to nil, which is in range", () => {
+    // integer.rb:90 `value.to_i rescue nil` => nil for ±Infinity, so
+    // in_range?(nil) is true and unboundable? stays nil. The bound is still
+    // open-ended, but via infinity? (predications.rb:248) — not this predicate.
+    const int4 = new IntegerType({ limit: 4 });
+    expect(new QueryAttribute("id", Infinity, int4).isUnboundable()).toBe(false);
+    expect(new QueryAttribute("id", -Infinity, int4).isUnboundable()).toBe(false);
+    // isInfinite reads value_before_type_cast, so it still reports the sign.
+    expect(new QueryAttribute("id", Infinity, int4).isInfinite()).toBe(1);
+    expect(new QueryAttribute("id", -Infinity, int4).isInfinite()).toBe(-1);
   });
 
   it("isUnboundable memoizes so the value is inspected exactly once", () => {

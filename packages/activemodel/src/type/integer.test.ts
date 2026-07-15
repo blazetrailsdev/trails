@@ -35,9 +35,12 @@ describe("IntegerTest", () => {
   });
 
   it("casting nan and infinity", () => {
+    // Rails integer_test.rb:35-39 asserts nil for BOTH: `cast_value` is
+    // `value.to_i rescue nil` (integer.rb:90) and Float#to_i raises
+    // FloatDomainError for NaN and ±Infinity alike.
     expect(type.cast(NaN)).toBeNull();
-    expect(type.cast(Infinity)).toBe(Infinity);
-    expect(type.cast(-Infinity)).toBe(-Infinity);
+    expect(type.cast(Infinity)).toBeNull();
+    expect(type.cast(-Infinity)).toBeNull();
   });
 
   it("casting booleans for database", () => {

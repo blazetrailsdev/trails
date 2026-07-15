@@ -25,7 +25,7 @@ import {
   notBetweenFromRange,
   infinitySign,
   unboundableSign,
-  isOpenEnded,
+  isNilBound,
   type RangeHost,
 } from "./predications-range.js";
 
@@ -363,9 +363,20 @@ export const Predications = {
   },
 
   // Mirrors Arel::Predications#open_ended? (predications.rb:255-257) —
-  // `value.nil? || infinity?(value) || unboundable?(value)`.
-  isOpenEnded(this: PredicationHost, value: unknown): boolean {
-    void this;
-    return isOpenEnded(value);
+  // `value.nil? || infinity?(value) || unboundable?(value)`, composed here in
+  // Rails' own shape rather than delegating: Ruby dispatches `infinity?` /
+  // `unboundable?` through implicit self, so a host overriding either is
+  // honored. The protocol logic itself still lives in exactly one place —
+  // these call `isInfinity` / `isUnboundable` above, which delegate to
+  // predications-range.ts. `betweenFromRange` composes the same three helpers
+  // for the extracted `between` body.
+  isOpenEnded(
+    this: PredicationHost & {
+      isInfinity(value: unknown): 1 | -1 | 0;
+      isUnboundable(value: unknown): 1 | -1 | 0;
+    },
+    value: unknown,
+  ): boolean {
+    return isNilBound(value) || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== 0;
   },
 };

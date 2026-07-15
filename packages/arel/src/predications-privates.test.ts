@@ -44,7 +44,17 @@ describe("Predications.groupingAny / groupingAll", () => {
 });
 
 describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
-  const host = { quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node };
+  // A PredicationHost carrying the mixin's own isInfinity / isUnboundable, as a
+  // class including Predications would — isOpenEnded dispatches through `this`.
+  const host = {
+    quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node,
+    isInfinity(this: unknown, v: unknown): 1 | -1 | 0 {
+      return Predications.isInfinity.call(this as never, v);
+    },
+    isUnboundable(this: unknown, v: unknown): 1 | -1 | 0 {
+      return Predications.isUnboundable.call(this as never, v);
+    },
+  };
   const isInfinity = (v: unknown) => Predications.isInfinity.call(host, v);
   const isUnboundable = (v: unknown) => Predications.isUnboundable.call(host, v);
   const isOpenEnded = (v: unknown) => Predications.isOpenEnded.call(host, v);
@@ -101,6 +111,14 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
     expect(isOpenEnded({ isUnboundable: () => 1 as const })).toBe(true);
     expect(isOpenEnded(0)).toBe(false);
     expect(isOpenEnded("x")).toBe(false);
+  });
+
+  it("isOpenEnded dispatches infinity?/unboundable? through `this` so host overrides win", () => {
+    // predications.rb:255-257 calls both on self, so an including class that
+    // overrides either is honored.
+    const overridden = { ...host, isInfinity: () => 1 as const };
+    expect(Predications.isOpenEnded.call(overridden, 42)).toBe(true);
+    expect(Predications.isOpenEnded.call(host, 42)).toBe(false);
   });
 
   it("isOpenEnded dispatches Ruby's leading `value.nil?` onto the node", () => {

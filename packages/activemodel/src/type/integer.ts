@@ -131,7 +131,11 @@ export class IntegerType extends NumericValueType {
    */
   protected castValue(value: unknown): number | null {
     if (typeof value === "number") {
-      if (isNaN(value)) return null;
+      // Mirrors integer.rb:90 — `value.to_i rescue nil`. Both NaN and ±Infinity
+      // raise FloatDomainError from Float#to_i, so Rails rescues them to nil;
+      // `isFinite` is exactly that domain. BigIntegerType#castValue already
+      // draws the same line.
+      if (!isFinite(value)) return null;
       return Math.trunc(value);
     }
     if (typeof value === "bigint") {
