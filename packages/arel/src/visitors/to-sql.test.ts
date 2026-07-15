@@ -590,7 +590,7 @@ describe("the to_sql visitor", () => {
       it("dispatches a bare Temporal on its Rails analogue", () => {
         // Temporal is the Time analogue, so an Instant must reach visit_Time
         // (`alias :visit_Time :unsupported`, to_sql.rb:844) and a PlainDate
-        // visit_Date (to_sql.rb:837) — not the generic no-handler tail.
+        // visit_Date (to_sql.rb:836) — not the generic no-handler tail.
         // Temporal exposes no toISOString, so the tag is what routes them.
         const v = new Visitors.ToSql();
         const seen: string[] = [];
@@ -651,7 +651,7 @@ describe("the to_sql visitor", () => {
 
       it("dispatches a bare Temporal.PlainDateTime on visit_DateTime", () => {
         // PlainDateTime is the DateTime analogue (`alias :visit_DateTime
-        // :unsupported`, to_sql.rb:836), not the Time one.
+        // :unsupported`, to_sql.rb:837), not the Time one.
         const v = new Visitors.ToSql();
         const seen: string[] = [];
         const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
