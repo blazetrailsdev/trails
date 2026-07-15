@@ -623,6 +623,53 @@ describe("the to_sql visitor", () => {
         expect(seen).toEqual(["Time", "Date"]);
       });
 
+      it("does not dispatch a Temporal without a Rails analogue on visit_Time", () => {
+        // Duration/PlainYearMonth/PlainMonthDay have no visitable Rails
+        // ancestor: to_sql.rb defines no visit_ActiveSupport_Duration and
+        // ActiveSupport::Duration is a plain Object subclass, not a Numeric
+        // (duration.rb:14), so Rails finds no handler (visitor.rb:39). They
+        // must reach that same tail, not be mislabelled as a Ruby Time.
+        const v = new Visitors.ToSql();
+        const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
+        spy.visitTime = () => {
+          throw new Error("visit_Time must not be reached");
+        };
+        spy.visitDate = () => {
+          throw new Error("visit_Date must not be reached");
+        };
+        const attr = new Table("users").get("id");
+        for (const value of [
+          Temporal.Duration.from({ hours: 1 }),
+          Temporal.PlainYearMonth.from("2026-04"),
+          Temporal.PlainMonthDay.from("04-30"),
+        ]) {
+          expect(() =>
+            spy.compile(new Nodes.Equality(attr, value as unknown as Nodes.NodeOrValue)),
+          ).toThrow(Visitors.UnsupportedVisitError);
+        }
+      });
+
+      it("dispatches a bare Temporal.PlainDateTime on visit_DateTime", () => {
+        // PlainDateTime is the DateTime analogue (`alias :visit_DateTime
+        // :unsupported`, to_sql.rb:836), not the Time one.
+        const v = new Visitors.ToSql();
+        const seen: string[] = [];
+        const spy = Object.create(v) as Record<string, unknown> & { compile(n: unknown): string };
+        spy.visitDateTime = () => {
+          seen.push("DateTime");
+          throw new Visitors.UnsupportedVisitError("x");
+        };
+        expect(() =>
+          spy.compile(
+            new Nodes.Equality(
+              new Table("users").get("id"),
+              Temporal.PlainDateTime.from("2026-04-30T12:34:56") as unknown as Nodes.NodeOrValue,
+            ),
+          ),
+        ).toThrow(Visitors.UnsupportedVisitError);
+        expect(seen).toEqual(["DateTime"]);
+      });
+
       it("raises for a bare Temporal but still renders it wrapped", () => {
         // A bare Temporal raises; wrapped in Quoted it routes through quote()
         // (to_sql.rb:87-90) and still inlines, which is the only shape any AR
