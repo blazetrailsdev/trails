@@ -122,19 +122,30 @@ export class HasOneAssociation extends SingularAssociation {
     // transaction.
     const changed = !sameRecord(displaced, record) || record?.hasChangesToSave === true;
     this.replace(record);
-    if (changed && (this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
-      return this.persistImmediate(record, displaced);
+    if (changed) {
+      // Rails: `save &&= owner.persisted?` — a new owner does not gate the block
+      // itself, only the new record's save. The displaced record's removal still
+      // runs (in-memory nullify + `remove_inverse_instance`); `remove_target!`'s
+      // own `target.persisted? && owner.persisted?` gate skips its DB save.
+      const save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
+      return this.persistImmediate(record, displaced, save);
     }
   }
 
   /**
-   * The awaitable immediate-persist body for assignment to a *saved* owner —
-   * Rails' `HasOneAssociation#replace` transaction (has_one_association.rb:59-77):
-   * remove the displaced record, then re-derive the foreign key and save the new
-   * record. `replace` has already set the in-memory target/inverse.
+   * The awaitable immediate-persist body for `HasOneAssociation#replace`'s
+   * transaction (has_one_association.rb:64-77): remove the displaced record,
+   * then re-derive the foreign key and save the new record. `replace` has
+   * already set the in-memory target/inverse. `save` is Rails' post-`&&=` flag:
+   * false for a non-persisted owner, which both skips the transaction and gates
+   * the new record's save.
    */
-  private async persistImmediate(record: Base | null, displaced: Base | null): Promise<void> {
-    await transactionIf(this, true, async () => {
+  private async persistImmediate(
+    record: Base | null,
+    displaced: Base | null,
+    save: boolean,
+  ): Promise<void> {
+    await transactionIf(this, save, async () => {
       if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {
         const currentTarget = this.target;
         this.target = displaced;
@@ -144,9 +155,10 @@ export class HasOneAssociation extends SingularAssociation {
           this.target = currentTarget;
         }
       }
-      if (record && typeof (record as any).save === "function") {
+      if (record) {
         this.setOwnerAttributes(record);
         this.setInverseInstance(record);
+        if (!save || typeof (record as any).save !== "function") return;
         const saved = await (record as any).save();
         if (!saved) {
           this.nullifyOwnerAttributes(record);
