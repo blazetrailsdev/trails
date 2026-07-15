@@ -34,11 +34,8 @@ describe("PostgreSQL quoting", () => {
   it("inherits abstract boolean SQL literals", () => {
     // Rails PG overrides none of quoted_true/quoted_false/unquoted_true/
     // unquoted_false — it inherits "TRUE"/"FALSE" and bare true/false from
-    // active_record/connection_adapters/abstract/quoting.rb:166-180. Pin the
-    // inherited values through PG's own quote/typeCast rather than through
-    // re-exports, so the dispatch itself is what's under test: inheriting the
-    // abstract pair (not MySQL/SQLite's 1/0) is why encode_array emits
-    // '{true}'.
+    // abstract/quoting.rb:166-180. Inheriting that pair (not MySQL/SQLite's
+    // 1/0) is why encode_array emits '{true}'.
     expect(quote(true)).toBe("TRUE");
     expect(quote(false)).toBe("FALSE");
     expect(typeCast(true)).toBe(true);

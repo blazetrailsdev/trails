@@ -45,10 +45,9 @@ export const quotingConfig = {
   raiseIntWiderThan64Bit: true,
 };
 
-// Rails' PostgreSQL::Quoting overrides none of the boolean literal methods —
-// it inherits "TRUE"/"FALSE" and bare true/false from abstract/quoting.rb:166-180.
-// That inheritance is why encode_array emits '{true}' rather than MySQL/SQLite's
-// '{1}'.
+// No boolean-literal methods here: Rails' PostgreSQL::Quoting defines none,
+// inheriting the abstract pair (quoting.rb:166-180) — which is why encode_array
+// emits '{true}', not MySQL/SQLite's '{1}'. Don't re-add them.
 export interface Quoting {
   quoteTableName(name: string): string;
   quoteColumnName(name: string): string;
