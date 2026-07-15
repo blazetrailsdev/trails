@@ -3,6 +3,7 @@ import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { PlainString } from "../collectors/plain-string.js";
+import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -381,7 +382,8 @@ export class Dot extends Visitor {
     this.visitEdge(o, "value");
   }
 
-  protected visitActiveModelAttribute(o: { valueBeforeTypeCast?: unknown }): void {
+  /** Rails: `visit_ActiveModel_Attribute` (dot.rb:216). */
+  protected visitActiveModelAttribute(o: ModelAttribute): void {
     this.visitEdge(o, "valueBeforeTypeCast");
   }
 
@@ -501,11 +503,11 @@ export class Dot extends Visitor {
       } else if (object instanceof Node) {
         super.visit(object);
       } else if (this.isActiveModelAttribute(object)) {
-        // Mirrors Rails' `visit_ActiveModel_Attribute`. Checked after the
-        // Node branch — Trails' BindParam *also* exposes a
-        // `valueBeforeTypeCast` method via NodeExpression duck-typing, so
-        // we only fall here for non-Node value objects.
-        this.visitActiveModelAttribute(object as { valueBeforeTypeCast?: unknown });
+        // Mirrors Rails' `visit_ActiveModel_Attribute` (dot.rb:216). Kept after
+        // the Node branch — Trails' BindParam *also* exposes
+        // `valueBeforeTypeCast` via NodeExpression, and must keep routing to
+        // visitArelNodesBindParam (dot.rb:212-214).
+        this.visitActiveModelAttribute(object as ModelAttribute);
       } else if (this.isPlainObject(object)) {
         this.visitHash(object as Record<string, unknown>);
       } else {
@@ -614,9 +616,7 @@ export class Dot extends Visitor {
   }
 
   private isActiveModelAttribute(o: unknown): boolean {
-    return (
-      typeof o === "object" && o !== null && "valueBeforeTypeCast" in (o as Record<string, unknown>)
-    );
+    return o instanceof ModelAttribute;
   }
 
   private isPlainObject(o: unknown): boolean {

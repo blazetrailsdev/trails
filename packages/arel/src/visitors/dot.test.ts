@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Attribute as ModelAttribute, ValueType } from "@blazetrails/activemodel";
 import {
   Table,
   star,
@@ -365,15 +366,42 @@ describe("TestDot", () => {
       // Regression: Dot.visit used to call super.visit on any non-primitive
       // non-array non-plain-object value, throwing UnsupportedVisitError
       // on a class instance the dispatch table didn't know about.
-      const fakeAttribute = {
-        valueBeforeTypeCast: 42,
-      };
-      const bind = new Nodes.BindParam(fakeAttribute);
+      const attribute = ModelAttribute.fromDatabase("x", 42, new ValueType());
+      const bind = new Nodes.BindParam(attribute);
       const out = dot.compile(bind);
       expect(out).toContain("BindParam");
       // visitActiveModelAttribute walks valueBeforeTypeCast.
       expect(out).toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
       expect(out).toContain("42");
+    });
+
+    it("a non-Attribute object with valueBeforeTypeCast is not visited as an Attribute", () => {
+      // Rails reaches visit_ActiveModel_Attribute (dot.rb:216) by class
+      // dispatch, so a duck-typed value is a Hash there and routes to
+      // visit_Hash (dot.rb:220). It must still not raise.
+      const v = new Visitors.Dot();
+      type Internals = { visit(o: unknown): void };
+      v.compile(new Nodes.SqlLiteral("")); // initialize state
+      (v as unknown as Internals).visit({ valueBeforeTypeCast: 42 });
+      const out = (v as unknown as { toDot(): string }).toDot();
+      expect(out).not.toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("42");
+    });
+
+    it("an unknown class instance renders as a leaf rather than raising", () => {
+      // The original regression this file guards: Dot must not raise
+      // UnsupportedVisitError on a value class its dispatch table lacks.
+      class Money {
+        toString(): string {
+          return "$5";
+        }
+      }
+      const v = new Visitors.Dot();
+      type Internals = { visit(o: unknown): void };
+      v.compile(new Nodes.SqlLiteral("")); // initialize state
+      expect(() => (v as unknown as Internals).visit(new Money())).not.toThrow();
+      expect((v as unknown as { toDot(): string }).toDot()).toContain("$5");
     });
 
     it("visitHash preserves both key and value (Rails parity)", () => {
