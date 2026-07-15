@@ -666,6 +666,16 @@ export class PredicateBuilder {
   }
 
   resolveArelAttribute(tableName: string, columnName: string): Nodes.Attribute {
+    // Mirrors predicate_builder.rb:71-73 — routing through `associated_table`
+    // (rather than a bare `Arel::Table.new`) is what keeps the resulting table's
+    // type caster attached, since `Table#type_for_attribute` delegates bare.
+    // Rails' PredicateBuilder always holds a TableMetadata; trails' holds the
+    // raw Arel table plus the metadata as `_tableContext`, so fall back to a
+    // bare table when a caller built one without a context.
+    const ctx = this._tableContext as { associatedTable?: (n: string) => { arelTable: Table } };
+    if (typeof ctx?.associatedTable === "function") {
+      return ctx.associatedTable(tableName).arelTable.get(columnName);
+    }
     return new Table(tableName).get(columnName);
   }
 

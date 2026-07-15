@@ -1,9 +1,15 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes, Visitors } from "../index.js";
-import { Attribute as AMAttribute } from "@blazetrails/activemodel";
+import { Attribute as AMAttribute, StringType } from "@blazetrails/activemodel";
+
+// Mirrors Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50): a map that
+// converts any attribute name to a caster. Rails always builds this table with
+// a caster because `Table#type_for_attribute` delegates bare (table.rb:106-108).
+const STRING_TYPE = new StringType();
+const fakePgCaster = { typeForAttribute: () => STRING_TYPE };
 
 describe("Arel::Nodes::HomogeneousInTest", () => {
-  const users = new Table("users");
+  const users = new Table("users", { typeCaster: fakePgCaster });
   it("in", () => {
     const node = users.get("id").in([1, 2, 3]);
     const sql = new Visitors.ToSql().compile(node);

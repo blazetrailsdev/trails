@@ -2,7 +2,7 @@ import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
-import { AliasTracker } from "./alias-tracker.js";
+import { AliasTracker, aliasedArelTableFor } from "./alias-tracker.js";
 import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
@@ -666,7 +666,13 @@ export class AssociationScope {
     ) {
       return new ArelTable((aliased as { name: string }).name);
     }
-    return new ArelTable(name);
+    // A polymorphic reflection has no compile-time klass (`reflection.klass`
+    // raises), so it keeps the bare table — the concrete class is only known per
+    // row at runtime.
+    if ((reflection as { isPolymorphic?: () => boolean }).isPolymorphic?.()) {
+      return new ArelTable(name);
+    }
+    return aliasedArelTableFor(reflection.klass as never, name);
   }
 
   /**

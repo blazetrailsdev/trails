@@ -2883,7 +2883,7 @@ export async function loadHabtm(
     .project(joinArelTable.get(targetFk))
     .where(joinArelTable.get(ownerFk).eq(pkValue));
 
-  const targetArelTable = new ArelTable(targetModel.tableName);
+  const targetArelTable = targetModel.arelTable;
   const inNode = targetArelTable.get(targetPkCol).in(subquery);
 
   // Start from `klass.scope_for_association` so target-model default_scope

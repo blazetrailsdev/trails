@@ -32,7 +32,6 @@ import {
   raiseNotFoundAll,
   raiseNotFoundSingle,
 } from "../relation/finder-methods.js";
-import { Table as ArelTable } from "@blazetrails/arel";
 import type { Nodes } from "@blazetrails/arel";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { filterScopeForCreate } from "./association.js";
@@ -3693,8 +3692,8 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     )._reflectOnAssociation?.(this._assocName)?.sourceReflection;
 
     const throughAs = throughAssoc.options.as;
-    const throughTable = new ArelTable(throughModel.tableName);
-    const targetArelTable = new ArelTable(targetModel.tableName);
+    const throughTable = throughModel.arelTable;
+    const targetArelTable = targetModel.arelTable;
     // sourceRefl.belongsTo?.() returns true for belongs_to, false/undefined otherwise.
     const isBelongsToSource = sourceRefl == null || sourceRefl.belongsTo?.() !== false;
 

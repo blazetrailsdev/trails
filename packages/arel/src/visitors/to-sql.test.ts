@@ -11,7 +11,7 @@ import {
   Visitors,
   Collectors,
 } from "../index.js";
-import { Attribute as AMAttribute, ValueType } from "@blazetrails/activemodel";
+import { Attribute as AMAttribute, ValueType, StringType } from "@blazetrails/activemodel";
 
 describe("the to_sql visitor", () => {
   const users = new Table("users");
@@ -438,7 +438,13 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::HomogeneousIn", () => {
     it("is not preparable", () => {
-      const node = new Nodes.HomogeneousIn([1, 2, 3], users.get("id"), "in");
+      // HomogeneousIn#casted_values reaches Table#type_for_attribute, which
+      // delegates bare to the caster — so Rails builds this table with a caster
+      // too (`fake_pg_caster`, homogeneous_in_test.rb:44-50).
+      const castedUsers = new Table("users", {
+        typeCaster: { typeForAttribute: () => new StringType() },
+      });
+      const node = new Nodes.HomogeneousIn([1, 2, 3], castedUsers.get("id"), "in");
       const collector = new Collectors.SQLString();
       new Visitors.ToSql().compileWithCollector(node, collector);
       expect(collector.preparable).toBe(false);

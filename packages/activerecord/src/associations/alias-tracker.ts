@@ -11,6 +11,33 @@ import type { Quoting } from "../connection-adapters/abstract/quoting-interface.
 // abstract default directly (the free tableAliasLength now dispatches via `this`).
 const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
+/**
+ * Build the Arel table a join should use for `klass` under the SQL name
+ * `effectiveName`, keeping the model's type caster attached.
+ *
+ * Rails never constructs a bare `Arel::Table` for a join: `aliased_table_for`
+ * is handed `klass.arel_table` and calls `#alias` on it, so the resulting
+ * `TableAlias` delegates `type_for_attribute` back to the underlying table's
+ * caster (alias_tracker.rb:58-70, table.rb:106-108). trails encodes an aliased
+ * table as `Table(realName, { as: alias })` rather than a `TableAlias`, so the
+ * caster has to be carried across explicitly — otherwise `type_for_attribute`
+ * hits a nil caster the moment a join's ON clause contains a typed predicate
+ * (e.g. an STI type condition).
+ *
+ * @internal
+ */
+export function aliasedArelTableFor(
+  klass: { arelTable?: Table; tableName?: string } | null | undefined,
+  tableName: string,
+  effectiveName?: string,
+): Table {
+  const as = effectiveName && effectiveName !== tableName ? effectiveName : undefined;
+  const base = klass?.arelTable;
+  if (!base || base.name !== tableName) return new Table(tableName, { as });
+  if (as === undefined) return base;
+  return new Table(tableName, { as, typeCaster: base.typeCaster, klass: base.klass });
+}
+
 export class AliasTracker {
   readonly aliases: Map<string, number>;
   private _tableAliasLength: number;

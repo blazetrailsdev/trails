@@ -10,6 +10,16 @@ import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { ValueType } from "@blazetrails/activemodel";
+
+// Mirrors Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50): a caster that
+// maps any attribute name to a type. `Table#type_for_attribute` delegates bare
+// to the caster (table.rb:106-108), so a table driving a PredicateBuilder always
+// has one — Rails reaches these paths through `TableMetadata#arel_table`, which
+// is built from `klass.arel_table`. `ValueType` is the no-op type Rails uses as
+// `ActiveModel::Type.default_value`, so values round-trip unchanged.
+const fakePgCaster = { typeForAttribute: () => new ValueType() };
+const castedTable = (name: string): Table => new Table(name, { typeCaster: fakePgCaster });
 
 describe("PredicateBuilderTest", () => {
   // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
@@ -134,7 +144,7 @@ describe("PredicateBuilderTest", () => {
   });
 
   describe("buildFromHash", () => {
-    const table = new Table("posts");
+    const table = castedTable("posts");
     const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
 
     it("builds equality for scalars", () => {
@@ -249,7 +259,7 @@ describe("PredicateBuilderTest", () => {
   });
 
   describe("buildNegatedFromHash", () => {
-    const table = new Table("posts");
+    const table = castedTable("posts");
     const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
 
     it("builds IS NOT NULL for null values", () => {
@@ -309,7 +319,7 @@ describe("PredicateBuilderTest", () => {
 
   describe("QueryAttribute bind handling", () => {
     it("buildBindAttribute creates a QueryAttribute", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const qa = builder.buildBindAttribute("name", "alice");
       expect(qa.name).toBe("name");
@@ -317,7 +327,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("BasicObjectHandler routes through buildBindAttribute", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql();
@@ -327,7 +337,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("Substitute flows through as BindParam via QueryAttribute", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), new Substitute());
       const visitor = new Visitors.ToSql();
@@ -340,7 +350,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("compile inlines QueryAttribute values for display SQL", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql();
@@ -378,7 +388,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("expands where({authors: {name: 'Rails'}}) to \"authors\".\"name\" = 'Rails'", () => {
-      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const meta = new TableMetadata(PbTestPost as any, castedTable("posts"));
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -391,7 +401,7 @@ describe("PredicateBuilderTest", () => {
       // Rails table_metadata.rb associated_table aliases the resolved table to
       // the hash key whenever the names differ, so an association key that
       // differs from its table (writer -> authors) emits "writer"."name".
-      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const meta = new TableMetadata(PbTestPost as any, castedTable("posts"));
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -400,7 +410,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("negated form expands whereNot({authors: {name: 'Rails'}}) to NOT \"authors\".\"name\" = 'Rails'", () => {
-      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const meta = new TableMetadata(PbTestPost as any, castedTable("posts"));
       const builder = meta.predicateBuilder;
       const nodes = builder.buildNegatedFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -424,7 +434,7 @@ describe("PredicateBuilderTest", () => {
         }
       }
       try {
-        const meta = new TableMetadata(PbTestProduct as any, new Table("products"));
+        const meta = new TableMetadata(PbTestProduct as any, castedTable("products"));
         const builder = meta.predicateBuilder;
         const nodes = builder.buildFromHash({ price: { foo: "bar" } });
         const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
