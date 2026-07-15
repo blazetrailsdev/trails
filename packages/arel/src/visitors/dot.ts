@@ -506,7 +506,7 @@ export class Dot extends Visitor {
         // Ruby reaches by class dispatch — including via the ancestor walk in
         // visitor.rb:36-41, so every Attribute subclass lands here too.
         this.visitActiveModelAttribute(object);
-      } else if (this.isPlainObject(object)) {
+      } else if (this.isHash(object)) {
         this.visitHash(object as Record<string, unknown>);
       } else {
         // Unknown non-Node object — render as a leaf with its String form
@@ -618,7 +618,7 @@ export class Dot extends Visitor {
   }
 
   /**
-   * The trails analogue of "is a Hash, or a subclass of one".
+   * The trails analogue of Ruby's `o.is_a?(Hash)`.
    *
    * Rails' `Visitor#visit` (visitor.rb:36-41) walks `object.class.ancestors`
    * for a visitable class, so `class MyHash < Hash` reaches `visit_Hash`
@@ -639,7 +639,7 @@ export class Dot extends Visitor {
    * fields Rails' `each_with_index` over a Hash would yield for the
    * derived record's own pairs.
    */
-  private isPlainObject(o: unknown): boolean {
+  private isHash(o: unknown): boolean {
     if (!o || typeof o !== "object") return false;
     if (Array.isArray(o)) return false;
     // Node covers Table (which extends Node).
@@ -661,7 +661,7 @@ export class Dot extends Visitor {
    * Rails-style class names for primitives and nil values — `String`,
    * `Integer`, `Float`, `TrueClass`, `FalseClass`, `NilClass`, `Symbol`,
    * `Time` — so leaf nodes match Rails' shape. Values matching the Hash
-   * analogue (see isPlainObject) are named `Hash` rather than JS's ctor
+   * analogue (see isHash) are named `Hash` rather than JS's ctor
    * name `Object`: Rails labels a plain hash's node "Hash" (dot.rb:253),
    * and a record derived via `Object.create` has no class name of its own
    * the way an anonymous `Class.new(Hash)` doesn't in Ruby.
@@ -679,7 +679,7 @@ export class Dot extends Visitor {
     // Mirrors visit()'s arm ordering: an ActiveModel::Attribute-shaped
     // value routes to visitActiveModelAttribute, not visitHash, so it
     // keeps its own class name.
-    if (!this.isActiveModelAttribute(o) && this.isPlainObject(o)) return "Hash";
+    if (!this.isActiveModelAttribute(o) && this.isHash(o)) return "Hash";
     const ctor = (o as { constructor?: { name?: string } }).constructor;
     return ctor?.name ?? "Object";
   }
