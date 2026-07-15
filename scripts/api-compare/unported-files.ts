@@ -502,10 +502,18 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "No Node.js equivalent; JSON is the default column serialization format in Trails.",
   },
   {
-    testFile: "binary_test.rb",
+    // Scoped to activerecord's binary_test.rb: "cases/binary_test.rb" does not
+    // match activemodel's "cases/type/binary_test.rb" or arel's
+    // "cases/arel/nodes/binary_test.rb", both of which are ported and must stay
+    // in the accounting. Per-test rather than whole-file: `mixed encoding` and
+    // `unicode input casting` are ported in binary.test.ts.
+    testFile: "cases/binary_test.rb",
+    className: "BinaryTest",
+    tests: ["load save"],
     reason:
-      "Tests Marshal/YAML binary encoding of AR records. " +
-      "Ruby binary serialization formats have no Node.js equivalent.",
+      "test_load_save reads binary asset files (flowers.jpg, example.log, " +
+      "test.txt) from ASSETS_ROOT via File.read. Porting needs those asset " +
+      "fixtures plus filesystem reads, which this package's rules exclude.",
   },
   // --- globalid: Ruby pattern matching (`case ... in`) ---
   {

@@ -115,7 +115,6 @@
   "packages/activerecord/src/connection-adapters/abstract-adapter.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/connection-pool/queue.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/database-statements.test.ts",
-  "packages/activerecord/src/connection-adapters/abstract/quoting-helpers.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-creation.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-definitions.test.ts",
   "packages/activerecord/src/connection-adapters/abstract/schema-dumper.test.ts",

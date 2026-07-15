@@ -123,18 +123,10 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" || typeof value === "bigint") return String(value);
   // Rails: `when Type::Binary::Data then quoted_binary(value)` (rb:83) —
   // self-dispatched so an adapter's `quoted_binary` override (PG's bytea escape,
-  // MySQL/SQLite's `x'..'` hex) is honored. Thread `this` to mirror that.
-  //
-  // Deviation: Rails passes the `Type::Binary::Data` itself and each override
-  // unwraps it (`value.to_s` / `value.hex`); we pass the unwrapped bytes, which
-  // is what lets the raw-view branch below share one dispatch path with it.
-  // Every trails `quotedBinary` therefore accepts the union — Data *and* raw
-  // views — so a Rails-shaped `quotedBinary(data)` call still works; only an
-  // override that assumed a `Data` arg (reading `.hex()` off it) would see bytes
-  // instead. The root cause is that `BinaryType#serialize` returns bare bytes
-  // rather than Rails' `Data.new(super)`; converging that is story
-  // `binary-type-serialize-returns-data-wrapper` (RFC 0023).
-  if (value instanceof BinaryData) return dispatchQuotedBinary(this, value.bytes);
+  // MySQL/SQLite's `x'..'` hex) is honored. Thread `this` to mirror that. The
+  // `Data` is passed through unwrapped, as Rails does; each override unwraps it
+  // itself (`value.to_s` / `value.hex`).
+  if (value instanceof BinaryData) return dispatchQuotedBinary(this, value);
   // ArrayBuffer views have no Ruby analogue (#4868): Rails only ever sees
   // `Type::Binary::Data` here, so they must be normalized to bytes rather than
   // falling to the raise below. Kept at the rb:83 position and self-dispatched,
@@ -172,7 +164,14 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
  */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
+  // Rails: `when Symbol, ActiveSupport::Multibyte::Chars, Type::Binary::Data
+  // then value.to_s` (rb:96). For a `Data`, `to_s` is the BINARY-encoded String
+  // — the raw bytes — so our analogue is `.bytes`, NOT `toString()`, which
+  // UTF-8-decodes and would replace every byte >= 0x80 with U+FFFD (see
+  // {@link quotedBinary}). `BinaryType#serialize` emits a `Data`, so every bind
+  // path for a binary attribute lands here.
   if (typeof value === "symbol") return value.description ?? String(value);
+  if (value instanceof BinaryData) return value.bytes;
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();
   if (value === null || value === undefined) return value;
@@ -387,8 +386,8 @@ export function quotedBinary(value: unknown): string {
   // BinaryData it runs `toString()`, which UTF-8-decodes and silently replaces
   // any invalid sequence with U+FFFD (0xde 0xad 0xbe 0xef → 3 lossy chars). So
   // normalise every byte source and decode latin1, which maps bytes 1:1. Rails'
-  // signature takes the `Data` itself (rb:206), so accept it even though our
-  // `quote` unwraps first; `dispatchQuotedBinary` also receives raw views.
+  // signature takes the `Data` itself (rb:206), which is what `quote` passes;
+  // `dispatchQuotedBinary` also receives raw views from trails-only callers.
   const bytes = toBytes(value);
   if (bytes) {
     return `'${quoteString(Buffer.from(bytes).toString("latin1"))}'`;
@@ -455,9 +454,10 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
  * calling `self.quoted_binary(value)` so an adapter override applies. Falls
  * back to the module-level helper when the host omits it.
  *
- * Takes `unknown` rather than `Uint8Array`: the rb:83 branch passes a
- * `BinaryData`'s bytes, but SQLite's boundary branch dispatches a raw
- * `ArrayBuffer`, and the abstract/MySQL/SQLite `quotedBinary` normalise through
+ * Takes `unknown` rather than `BinaryData`: the rb:83 branch passes a
+ * `BinaryData`, but the abstract view branch passes normalized bytes and
+ * SQLite's bare-`ArrayBuffer` branch dispatches the buffer itself. The
+ * abstract/MySQL/SQLite `quotedBinary` normalise all three through
  * {@link toBytes} (PG's exception is noted there — it is unreachable from this
  * dispatch, which only sees a raw `ArrayBuffer` from SQLite's branch, with a
  * SQLite host).

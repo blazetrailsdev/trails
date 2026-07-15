@@ -90,13 +90,19 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     return quoteString(value.description);
   }
   if (typeof value === "string") return quoteString(value);
-  // Raw byte views have no Rails counterpart (Rails only ever sees
-  // `Type::Binary::Data` here) — trails callers pass them at the boundary.
-  // Self-dispatch so SQLite's `quotedBinary` override is honored, the same way
-  // the inherited abstract `quote` handles `BinaryData` (abstract/quoting.rb:83).
-  if (value instanceof Uint8Array || value instanceof ArrayBuffer) {
-    return dispatchQuotedBinary(this, value);
-  }
+  // A *bare* `ArrayBuffer` has no Rails counterpart (Rails only ever sees
+  // `Type::Binary::Data` here), and nothing in trails produces one — no internal
+  // caller reaches this. It is a boundary affordance: `quoteDefaultExpression`
+  // below forwards a caller-supplied migration default (`t.binary(col, { default
+  // })`) to `quote` untouched, so a JS caller can hand one in, and the inherited
+  // abstract branch would raise on it — `ArrayBuffer.isView` is false for a bare
+  // buffer. Exercised only by quoting.test.ts ("quotes a binary default through
+  // SQLite's quotedBinary").
+  //
+  // Byte *views* need no branch here: they fall through to the abstract `isView`
+  // branch, which self-dispatches back to SQLite's `quotedBinary` just as this
+  // does — which is why PG's equivalent branch is gone.
+  if (value instanceof ArrayBuffer) return dispatchQuotedBinary(this, value);
   return abstractQuote.call(this, value);
 }
 
@@ -237,6 +243,12 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
     throw new TypeError(
       "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
+  // Rails' SQLite `type_cast` falls through to `super` for anything it does not
+  // special-case, reaching the abstract `when ... Type::Binary::Data then
+  // value.to_s` (abstract/quoting.rb:96). This chain does not delegate, so the
+  // arm is inlined: `to_s` on a `Data` is the raw byte string, hence `.bytes`
+  // (never `toString()`, which UTF-8-decodes and mangles bytes >= 0x80).
+  if (value instanceof BinaryData) return value.bytes;
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
   throw new TypeError(`can't cast ${Object.prototype.toString.call(value)} to a SQLite3 type`);
 }

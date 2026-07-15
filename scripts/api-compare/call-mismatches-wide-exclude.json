@@ -11537,13 +11537,6 @@
   },
   {
     "package": "activemodel",
-    "tsFile": "type/binary.ts",
-    "rubyName": "serialize",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
     "tsFile": "type/boolean.ts",
     "rubyName": "cast_value",
     "call": "include?",
