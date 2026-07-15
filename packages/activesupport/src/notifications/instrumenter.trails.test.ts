@@ -34,11 +34,17 @@ describe("Instrumenter (trails)", () => {
   it("instrument names a thrown non-Error without a constructor", () => {
     const notifier = buildNotifier();
     const payload: Record<string, unknown> = {};
-    expect(() =>
+    // Asserting the thrown value itself, not just toThrow(): a falsy throw is
+    // exactly where "did it re-raise?" and "did it swallow?" look alike.
+    let thrown: unknown = "nothing was thrown";
+    try {
       new Instrumenter(notifier).instrument("crash", payload, () => {
         throw null;
-      }),
-    ).toThrow();
+      });
+    } catch (e) {
+      thrown = e;
+    }
+    expect(thrown).toBeNull();
     expect(payload.exception).toEqual(["Error", "null"]);
     expect(payload.exception_object).toBeNull();
   });
