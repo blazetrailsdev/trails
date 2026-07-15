@@ -16,8 +16,6 @@ import {
   quoteDefaultExpression,
   quotedBinary,
   quotedDate,
-  quotedFalse,
-  quotedTrue,
   quoteSchemaName,
   quoteTableNameForAssignment,
   typeCast as typeCastFn,
@@ -34,10 +32,20 @@ const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
 describe("PostgreSQL quoting", () => {
   it("inherits abstract boolean SQL literals", () => {
-    // Rails PG does not override quoted_true/quoted_false — it inherits
-    // "TRUE"/"FALSE" from active_record/connection_adapters/abstract/quoting.rb:166.
-    expect(quotedTrue()).toBe("TRUE");
-    expect(quotedFalse()).toBe("FALSE");
+    // Rails PG overrides none of quoted_true/quoted_false/unquoted_true/
+    // unquoted_false — it inherits "TRUE"/"FALSE" and bare true/false from
+    // abstract/quoting.rb:166-180. Inheriting that pair (not MySQL/SQLite's
+    // 1/0) is why encode_array emits '{true}'.
+    //
+    // These pin the values, not the dispatch: abstract/quoting.ts:112,175-176
+    // call the module-level quotedTrue/unquotedTrue, where Rails self-dispatches
+    // (quoting.rb:77-78, 98-99), so an override here would not be caught. That
+    // gap is the type-casted-binds-payload-self-dispatch story's to close.
+    expect(quote(true)).toBe("TRUE");
+    expect(quote(false)).toBe("FALSE");
+    expect(typeCast(true)).toBe(true);
+    expect(typeCast(false)).toBe(false);
+    expect(quote(new ArrayData(new OidArray(stringSubtype), [true, false]))).toBe("'{true,false}'");
   });
 
   it("type casts binary data to a Buffer for node-postgres bytea binding", () => {
