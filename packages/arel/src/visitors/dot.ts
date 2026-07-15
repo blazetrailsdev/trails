@@ -7,13 +7,23 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
-// Temporal types carry a `Temporal.X` Symbol.toStringTag; matching on it keeps
-// the check structural rather than importing the namespace into arel (same
-// approach as to-sql.ts).
-function temporalTag(v: unknown): string | null {
+/**
+ * The Ruby class a Temporal value stands in for, or `null` if `v` isn't one.
+ * Temporal is this codebase's Time/Date analogue, so these values have a
+ * visitable Rails ancestor (`visit_Date` / `visit_DateTime` / `visit_Time`,
+ * dot.rb:200-202) and must not fall through to `visit`'s TypeError.
+ *
+ * Matched on `Temporal.X`'s `Symbol.toStringTag` rather than `instanceof` so
+ * the check stays structural and the namespace stays out of arel's imports —
+ * the same approach to-sql.ts uses.
+ */
+function temporalClassName(v: unknown): "Date" | "DateTime" | "Time" | null {
   if (typeof v !== "object" || v === null) return null;
   const tag = (v as Record<symbol, unknown>)[Symbol.toStringTag];
-  return typeof tag === "string" && tag.startsWith("Temporal.") ? tag : null;
+  if (typeof tag !== "string" || !tag.startsWith("Temporal.")) return null;
+  if (tag === "Temporal.PlainDate") return "Date";
+  if (tag === "Temporal.PlainDateTime") return "DateTime";
+  return "Time";
 }
 
 function isAppendableCollector(c: unknown): c is AppendableCollector {
@@ -503,6 +513,7 @@ export class Dot extends Visitor {
       this.seen.set(seenKey, node);
     }
     this.nodes.push(node);
+    const temporalClass = temporalClassName(object);
     this.withNode(node, () => {
       if (this.isPrimitive(object)) {
         this.visitString(object);
@@ -512,8 +523,12 @@ export class Dot extends Visitor {
         // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). Without this
         // arm a Set reaches no handler and falls to the leaf below.
         this.visitSet(object);
-      } else if (temporalTag(object) !== null) {
-        this.visitTemporal(object);
+      } else if (temporalClass === "Date") {
+        this.visitDate(object);
+      } else if (temporalClass === "DateTime") {
+        this.visitDateTime(object);
+      } else if (temporalClass !== null) {
+        this.visitTime(object);
       } else if (object instanceof Node) {
         super.visit(object);
       } else if (this.isActiveModelAttribute(object)) {
@@ -613,24 +628,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "hints");
   }
 
-  /**
-   * Temporal is this codebase's Time/Date analogue, so a Temporal value has a
-   * visitable Rails ancestor (`visit_Date` / `visit_DateTime` / `visit_Time`)
-   * and must route there rather than falling through to the TypeError.
-   */
-  private visitTemporal(o: unknown): void {
-    switch (temporalTag(o)) {
-      case "Temporal.PlainDate":
-        this.visitDate(o);
-        break;
-      case "Temporal.PlainDateTime":
-        this.visitDateTime(o);
-        break;
-      default:
-        this.visitTime(o);
-    }
-  }
-
   private isPrimitive(o: unknown): boolean {
     if (o === null || o === undefined) return true;
     const t = typeof o;
@@ -716,16 +713,8 @@ export class Dot extends Visitor {
     if (typeof o === "symbol") return "Symbol";
     // boundary: legacy JS Date values stringify to Rails' `Time` class name.
     if (o instanceof Date) return "Time";
-    switch (temporalTag(o)) {
-      case null:
-        break;
-      case "Temporal.PlainDate":
-        return "Date";
-      case "Temporal.PlainDateTime":
-        return "DateTime";
-      default:
-        return "Time";
-    }
+    const temporalClass = temporalClassName(o);
+    if (temporalClass) return temporalClass;
     if (this.isHash(o)) return "Hash";
     const ctor = (o as { constructor?: { name?: string } }).constructor;
     return ctor?.name ?? "Object";
