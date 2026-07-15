@@ -41,7 +41,7 @@ export class Connection {
     // that as the sync, pool-backed `Base.schemaCache` (connection-handling.ts:576).
     // Read it off the klass, not the adapter — `connection.schemaCache` is not
     // guaranteed to be the same slot (model-schema.ts:731-755).
-    const schemaCache = this._klass?.schemaCache?.();
+    const schemaCache = this._klass?.schemaCache();
     // Rails then gates on `schema_cache.data_source_exists?(table_name)` before
     // reading `columns_hash`. trails' `dataSourceExists` is async
     // (schema-cache.ts:211) and this method is sync, so the cached columns hash is
