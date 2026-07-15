@@ -643,15 +643,15 @@ export class PredicateBuilder {
   resolveColumn(key: string): Nodes.Attribute {
     // A `"table.column"` key resolves through `resolveArelAttribute`, so the
     // table carries a caster. Rails reaches the same place from the other side:
-    // convert_dot_notation_to_hash rewrites the key to a nested hash whose
-    // table part goes through `associated_table` (predicate_builder.rb:71-73).
+    // convert_dot_notation_to_hash splits on `rindex(".")`
+    // (predicate_builder.rb:171) and routes the table part through
+    // `associated_table` — hence lastIndexOf, matching convertDotNotationToHash
+    // and references() rather than reading `a.b.c` as one column name.
     if (!key.includes('"')) {
-      const firstDot = key.indexOf(".");
-      if (firstDot !== -1 && key.indexOf(".", firstDot + 1) === -1) {
-        return this.resolveArelAttribute(key.slice(0, firstDot), key.slice(firstDot + 1));
-      }
+      const dot = key.lastIndexOf(".");
+      if (dot !== -1) return this.resolveArelAttribute(key.slice(0, dot), key.slice(dot + 1));
     }
-    return PredicateBuilder.resolveColumn(this.table, key);
+    return this.table.get(key);
   }
 
   registerHandler(
@@ -685,8 +685,15 @@ export class PredicateBuilder {
     // (with Rails' block, `lookup_table_klass_from_join_dependencies`) is what
     // resolves a table name that only exists as a join, and what keeps the
     // resulting table's type caster attached.
+    // `arelTable` is a TableAlias (a Binary node, not a Table) whenever
+    // associated_table had to alias to the hash key (table-metadata.ts:83-84,
+    // mirroring table_metadata.rb:44) — both answer `get`, neither is
+    // `instanceof Table`.
     const ctx = this._tableContext as {
-      associatedTable?: (n: string, f?: (name: string) => unknown) => { arelTable: Table };
+      associatedTable?: (
+        n: string,
+        f?: (name: string) => unknown,
+      ) => { arelTable: Table | Nodes.TableAlias };
     };
     if (typeof ctx?.associatedTable === "function") {
       return ctx.associatedTable(tableName, fallback).arelTable.get(columnName);
@@ -791,15 +798,6 @@ export class PredicateBuilder {
 
   references(): string[] {
     return [];
-  }
-
-  static resolveColumn(table: Table, key: string): Nodes.Attribute {
-    if (key.includes('"')) return table.get(key);
-    const firstDot = key.indexOf(".");
-    if (firstDot === -1) return table.get(key);
-    const secondDot = key.indexOf(".", firstDot + 1);
-    if (secondDot !== -1) return table.get(key);
-    return new Table(key.slice(0, firstDot)).get(key.slice(firstDot + 1));
   }
 
   private isRelation(value: unknown): boolean {

@@ -36592,13 +36592,6 @@
     "package": "activerecord",
     "tsFile": "relation/query-methods.ts",
     "rubyName": "arel_column_with_table",
-    "call": "lookup_table_klass_from_join_dependencies",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/query-methods.ts",
-    "rubyName": "arel_column_with_table",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

@@ -47,21 +47,7 @@ export class Connection {
     // not `isCached` (`_columns`); getCachedColumnsHash is a sync map read and
     // never triggers an async cache-miss path. Returns undefined when unwarmed.
     const hash = schemaCache?.getCachedColumnsHash?.(this._tableName);
-    const column = hash?.[attrName];
-    if (column) return column;
-
-    // Fallback: klass.columnsHash (works when schema cache isn't populated)
-    const columnsHash =
-      typeof this._klass?.columnsHash === "function"
-        ? this._klass.columnsHash()
-        : this._klass?.columnsHash;
-    if (columnsHash) {
-      return columnsHash instanceof globalThis.Map
-        ? columnsHash.get(attrName)
-        : columnsHash?.[attrName];
-    }
-
-    return undefined;
+    return hash?.[attrName];
   }
 }
 
