@@ -292,9 +292,12 @@ describe("InstrumentationTest", () => {
   });
 
   it("nested events can be instrumented", () => {
+    // Mirrors Rails' catch-all subscriber: `instrument` short-circuits on
+    // `notifier.listening?(name)`, so an unlistened inner event is never built
+    // and never becomes a child.
     let outerEvent!: Event;
-    Notifications.subscribe("outer", (e) => {
-      outerEvent = e;
+    Notifications.subscribe(null, (e) => {
+      if (e.name === "outer") outerEvent = e;
     });
     Notifications.instrument("outer", {}, () => {
       Notifications.instrument("inner", {});
@@ -549,6 +552,7 @@ describe("ActiveSupport::Notifications", () => {
       Notifications.subscribe("outer", (e) => {
         outerEvent = e;
       });
+      Notifications.subscribe("inner", () => {});
       Notifications.instrument("outer", {}, () => {
         Notifications.instrument("inner", {});
       });

@@ -481,8 +481,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         return rows;
       } catch (e: any) {
         const translated = this._translateException(e, sql, binds);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });
@@ -598,8 +596,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         return result.changes;
       } catch (e: any) {
         const translated = this._translateException(e, sql, binds);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });
@@ -725,8 +721,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           return 0;
         } catch (e: any) {
           const translated = this._translateException(e, sql, []);
-          payload.exception = translated;
-          payload.exception_object = translated;
           throw translated;
         }
       });
@@ -808,8 +802,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         return this.castResult(result);
       } catch (e: any) {
         const translated = this._translateException(e, processed, binds);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });

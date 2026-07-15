@@ -77,12 +77,14 @@ describe("InstrumenterTest", () => {
 
   it("record with exception", () => {
     const events: Event[] = [];
-    Notifications.subscribe("risky", (e) => events.push(e));
+    Notifications.subscribe("crash", (e) => events.push(e));
     expect(() =>
-      Notifications.instrument("risky", {}, () => {
-        throw new Error("boom");
+      Notifications.instrument("crash", {}, () => {
+        throw new Error("Oopsies");
       }),
-    ).toThrow("boom");
+    ).toThrow("Oopsies");
     expect(events).toHaveLength(1);
+    expect((events[0].payload.exception_object as Error).message).toBe("Oopsies");
+    expect(events[0].payload.exception).toEqual(["Error", "Oopsies"]);
   });
 });

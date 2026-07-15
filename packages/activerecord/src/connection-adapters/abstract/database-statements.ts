@@ -1392,10 +1392,6 @@ async function logSql<T>(
       }
       return result;
     } catch (e: any) {
-      // Rails' Instrumenter sets payload[:exception] and [:exception_object]
-      // so subscribers (e.g. ExplainSubscriber) can detect failed queries.
-      payload.exception = e;
-      payload.exception_object = e;
       // Mirrors AbstractAdapter#log's rescue: the driver error has already been
       // translated to a StatementInvalid by with_raw_connection (with sql:/binds:
       // nil), so we only attach the statement context here — set_query is a no-op

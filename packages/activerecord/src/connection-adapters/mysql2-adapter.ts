@@ -697,8 +697,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             : e instanceof ActiveRecordError
               ? e
               : await this._translateAndEnrich(e, driverSql, driverBinds);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });
@@ -972,8 +970,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             : e instanceof ActiveRecordError
               ? e
               : await this._translateAndEnrich(e, driverSql, driverBinds);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });
@@ -1029,8 +1025,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             : e instanceof ActiveRecordError
               ? e
               : await this._translateAndEnrich(e, driverSql, driverBinds);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });
@@ -1236,8 +1230,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
             e instanceof ActiveRecordError
               ? e
               : await this._translateAndEnrich(e, driverSql, driverBinds);
-          payload.exception = translated;
-          payload.exception_object = translated;
           throw translated;
         }
       });
