@@ -2352,7 +2352,11 @@ export class AbstractAdapter implements Quoting {
   ): Promise<T | void> {
     try {
       const tx = this.currentTransaction();
+      // Rails: `current_transaction.user_transaction.presence`. Transaction
+      // aliases `blank?` to `closed?` (transaction.rb:122), so a closed
+      // transaction reports as nil rather than as itself.
       const userTx = (tx as any).userTransaction ?? null;
+      const openTx = userTx?.isOpen?.() ? userTx : null;
       return await Notifications.instrumentAsync(
         "sql.active_record",
         {
@@ -2362,7 +2366,7 @@ export class AbstractAdapter implements Quoting {
           type_casted_binds: typeCastedBinds,
           async: isAsync,
           connection: this,
-          transaction: userTx,
+          transaction: openTx,
           row_count: 0,
         },
         block,

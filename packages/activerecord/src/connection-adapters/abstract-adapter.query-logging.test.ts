@@ -83,6 +83,39 @@ describe("AbstractAdapter query/logging infrastructure (PR 25b)", () => {
       }
     });
 
+    it("reports an open transaction in the payload", async () => {
+      const a = new AbstractAdapter();
+      const openTx = { isOpen: () => true };
+      vi.spyOn(a, "currentTransaction").mockReturnValue({
+        userTransaction: openTx,
+      } as never);
+      const payloads: EventPayload[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (e) => payloads.push(e.payload));
+      try {
+        await a.log("SELECT 1", "SQL", [], [], false, async () => undefined);
+        expect(payloads[0].transaction).toBe(openTx);
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
+    });
+
+    // Rails' `user_transaction.presence` — Transaction aliases blank? to
+    // closed?, so a closed transaction is reported as nil, not as itself.
+    it("reports a closed transaction as null in the payload", async () => {
+      const a = new AbstractAdapter();
+      vi.spyOn(a, "currentTransaction").mockReturnValue({
+        userTransaction: { isOpen: () => false },
+      } as never);
+      const payloads: EventPayload[] = [];
+      const sub = Notifications.subscribe("sql.active_record", (e) => payloads.push(e.payload));
+      try {
+        await a.log("SELECT 1", "SQL", [], [], false, async () => undefined);
+        expect(payloads[0].transaction).toBeNull();
+      } finally {
+        Notifications.unsubscribe(sub);
+      }
+    });
+
     it("re-throws StatementInvalid with query attached", async () => {
       const a = new AbstractAdapter();
       const inner = new StatementInvalid("oops");
