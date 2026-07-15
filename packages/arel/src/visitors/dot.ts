@@ -382,7 +382,6 @@ export class Dot extends Visitor {
     this.visitEdge(o, "value");
   }
 
-  /** Rails: `visit_ActiveModel_Attribute` (dot.rb:216). */
   protected visitActiveModelAttribute(o: ModelAttribute): void {
     this.visitEdge(o, "valueBeforeTypeCast");
   }
@@ -507,7 +506,7 @@ export class Dot extends Visitor {
         // the Node branch — Trails' BindParam *also* exposes
         // `valueBeforeTypeCast` via NodeExpression, and must keep routing to
         // visitArelNodesBindParam (dot.rb:212-214).
-        this.visitActiveModelAttribute(object as ModelAttribute);
+        this.visitActiveModelAttribute(object);
       } else if (this.isPlainObject(object)) {
         this.visitHash(object as Record<string, unknown>);
       } else {
@@ -615,7 +614,7 @@ export class Dot extends Visitor {
     );
   }
 
-  private isActiveModelAttribute(o: unknown): boolean {
+  private isActiveModelAttribute(o: unknown): o is ModelAttribute {
     return o instanceof ModelAttribute;
   }
 
