@@ -10,7 +10,7 @@ import {
   StatementPool as MysqlStatementPool,
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
-import { StringType, ImmutableStringType } from "@blazetrails/activemodel";
+import { StringType, ImmutableStringType, BinaryData } from "@blazetrails/activemodel";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -889,6 +889,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // `value_for_database` now yields cast Temporal values; convert to the SQL
       // wire string the mysql2 driver expects (matching Rails' type_casted_binds).
       v = temporalToBindString(v, "mysql");
+      // `BinaryType#serialize` yields a `Type::Binary::Data`, which the driver
+      // cannot bind — Rails' `type_cast` unwraps it to its byte string at
+      // abstract/quoting.rb:96. Unwrap here too: this path deliberately does not
+      // route through `typeCast` (see the doc comment above), so without this the
+      // wrapper reaches mysql2 and silently matches no rows.
+      if (v instanceof BinaryData) v = v.bytes;
       return v === true ? 1 : v === false ? 0 : v;
     });
   }

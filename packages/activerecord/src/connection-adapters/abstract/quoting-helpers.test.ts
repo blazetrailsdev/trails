@@ -157,6 +157,19 @@ describe("quote dispatches through quoted_binary", () => {
   });
 });
 
+describe("type_cast unwraps Type::Binary::Data", () => {
+  it("returns the raw bytes, not a lossy UTF-8 decode", () => {
+    // Rails: `when Symbol, ActiveSupport::Multibyte::Chars, Type::Binary::Data
+    // then value.to_s` (abstract/quoting.rb:96) — `to_s` on a Data is the
+    // BINARY-encoded String, so the analogue is `.bytes`. 0xde 0xad 0xbe 0xef is
+    // not valid UTF-8: a `toString()` port would yield U+FFFD replacements.
+    const bytes = new Uint8Array([0xde, 0xad, 0xbe, 0xef]);
+    const out = typeCast.call({}, new BinaryData(bytes));
+    expect(out).toBeInstanceOf(Uint8Array);
+    expect(out).toEqual(bytes);
+  });
+});
+
 describe("type_cast dispatches through quoted_date/quoted_time", () => {
   it("routes Date/Time values through this.quotedDate", () => {
     const host = { quotedDate: () => "DISPATCHED" };

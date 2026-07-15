@@ -38,6 +38,18 @@ export class BinaryType extends ValueType<Uint8Array> {
     return new Data(super.serialize(value));
   }
 
+  /**
+   * Mirrors: ActiveModel::Type::Binary#changed_in_place? (binary.rb:35-38)
+   *
+   *   old_value = deserialize(raw_old_value)
+   *   old_value != value
+   *
+   * Rails does not coerce `value`; it relies on Ruby's `!=`. JS cannot compare
+   * byte arrays with `!=`, so the bytes are walked, and `cast` supplies the
+   * `Uint8Array` that walk needs. It is identity in practice: the only callers
+   * (`Attribute#changedInPlace` / `#changedInPlaceFromDatabase`) pass
+   * `this.value`, which is already cast.
+   */
   isChangedInPlace(rawOldValue: unknown, newValue: unknown): boolean {
     const old = this.deserialize(rawOldValue);
     const cur = this.cast(newValue);
@@ -55,11 +67,20 @@ export class Data {
   readonly bytes: Uint8Array;
 
   /**
-   * Mirrors: Data#initialize (binary.rb:42-46) — `value.to_s`, then `.b` to
-   * force BINARY encoding. `Uint8Array` is our stand-in for Ruby's
-   * binary-encoded String, so byte sources pass through unchanged and
-   * everything else is coerced via `String(value)` (Ruby's `to_s`). Re-wrapping
-   * a `Data` is idempotent, mirroring `Data.new(data)` → `data.to_s`.
+   * Mirrors: Data#initialize (binary.rb:42-46) — `value = value.to_s`, then `.b`
+   * to force BINARY encoding. `Uint8Array` is our stand-in for Ruby's
+   * binary-encoded String, so byte sources pass through unchanged (as Ruby's
+   * `.b` on an already-BINARY String returns it unchanged) and everything else
+   * is coerced via `String(value)`, standing in for `to_s`.
+   *
+   * The `Data` arm is not idempotence sugar — it is precisely Ruby's `to_s`
+   * step. Ruby gets it free because `Data#to_s` returns the byte string, but
+   * JS's `String(data)` runs our `toString()`, which UTF-8-decodes: it turns
+   * `de ad be ef` into `de ad ef bf bd ef bf bd` (U+FFFD replacements). So the
+   * arm is what makes `new Data(data)` byte-preserving, matching Ruby.
+   *
+   * `Uint8Array` is stored by reference, so mutating the source array mutates
+   * this `Data` — the same aliasing Ruby has when `.b` returns self.
    */
   constructor(value: unknown) {
     if (value instanceof Data) this.bytes = value.bytes;

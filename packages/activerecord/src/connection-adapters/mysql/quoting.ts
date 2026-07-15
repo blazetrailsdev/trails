@@ -280,6 +280,12 @@ export function quotedDate(
  */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   if (typeof value === "symbol") return value.description ?? String(value);
+  // Rails' MySQL `type_cast` falls through to `super` for anything it does not
+  // special-case, reaching the abstract `when ... Type::Binary::Data then
+  // value.to_s` (abstract/quoting.rb:96). This chain does not delegate, so the
+  // arm is inlined: `to_s` on a `Data` is the raw byte string, hence `.bytes`
+  // (never `toString()`, which UTF-8-decodes and mangles bytes >= 0x80).
+  if (value instanceof BinaryData) return value.bytes;
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();
   if (value === null || value === undefined) return value;

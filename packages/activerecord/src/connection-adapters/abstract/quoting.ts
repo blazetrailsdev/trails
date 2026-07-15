@@ -164,7 +164,14 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#type_cast
  */
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
+  // Rails: `when Symbol, ActiveSupport::Multibyte::Chars, Type::Binary::Data
+  // then value.to_s` (rb:96). For a `Data`, `to_s` is the BINARY-encoded String
+  // — the raw bytes — so our analogue is `.bytes`, NOT `toString()`, which
+  // UTF-8-decodes and would replace every byte >= 0x80 with U+FFFD (see
+  // {@link quotedBinary}). `BinaryType#serialize` emits a `Data`, so every bind
+  // path for a binary attribute lands here.
   if (typeof value === "symbol") return value.description ?? String(value);
+  if (value instanceof BinaryData) return value.bytes;
   if (value === true) return unquotedTrue();
   if (value === false) return unquotedFalse();
   if (value === null || value === undefined) return value;

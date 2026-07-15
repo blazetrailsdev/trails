@@ -238,6 +238,12 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
     throw new TypeError(
       "typeCast: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
     );
+  // Rails' SQLite `type_cast` falls through to `super` for anything it does not
+  // special-case, reaching the abstract `when ... Type::Binary::Data then
+  // value.to_s` (abstract/quoting.rb:96). This chain does not delegate, so the
+  // arm is inlined: `to_s` on a `Data` is the raw byte string, hence `.bytes`
+  // (never `toString()`, which UTF-8-decodes and mangles bytes >= 0x80).
+  if (value instanceof BinaryData) return value.bytes;
   if (value instanceof Uint8Array || value instanceof ArrayBuffer) return value;
   throw new TypeError(`can't cast ${Object.prototype.toString.call(value)} to a SQLite3 type`);
 }
