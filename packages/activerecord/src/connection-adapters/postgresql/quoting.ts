@@ -2,6 +2,10 @@
  * PostgreSQL quoting — PostgreSQL-specific value and identifier quoting.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting
+ *
+ * No boolean-literal methods here: Rails' PostgreSQL::Quoting defines none
+ * either, inheriting the abstract pair (quoting.rb:166-180) — which is why
+ * encode_array emits '{true}', not MySQL/SQLite's '{1}'. Don't re-add them.
  */
 
 import { BinaryData } from "@blazetrails/activemodel";
@@ -44,10 +48,6 @@ const PG_INT64_MAX = BigInt("9223372036854775807");
 export const quotingConfig = {
   raiseIntWiderThan64Bit: true,
 };
-
-// This module defines no boolean-literal methods: Rails' PostgreSQL::Quoting
-// defines none either, inheriting the abstract pair (quoting.rb:166-180) — which
-// is why encode_array emits '{true}', not MySQL/SQLite's '{1}'. Don't re-add them.
 
 export interface BinaryBind {
   value: string;
