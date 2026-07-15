@@ -539,6 +539,12 @@ export class ToSql extends Visitor {
     // (FromUser / FromDatabase / QueryAttribute / ...), mirroring Ruby's
     // ancestors walk. The cast is required because the dispatch table is keyed
     // by Node ctors; dispatch only ever reads `object.constructor`.
+    //
+    // This is load-bearing, not a safety net: `visitArelNodesValuesList` ports
+    // Rails' `when ..., ActiveModel::Attribute` arm (to_sql.rb:110) by calling
+    // `visit(value)` on it. Without an entry here that call finds no dispatch
+    // target and raises UnsupportedVisitError, so an attribute in an INSERT
+    // values row cannot bind.
     reg(ModelAttribute as unknown as NodeCtor, "visitActiveModelAttribute");
     reg(Nodes.Fragments, "visitArelNodesFragments");
     // Functions
@@ -2088,15 +2094,16 @@ export class ToSql extends Visitor {
       // arrays both flow through here, joined by ", ".
       return this.visitArray(v, collector);
     }
-    // An ActiveModel::Attribute binds, it does not quote. Rails branches on it
-    // explicitly before dispatching in the two places a bare one shows up —
-    // `visit_Arel_Nodes_ValuesList` (to_sql.rb:108-113, the INSERT values row)
-    // and `visit_Arel_Nodes_Assignment` (to_sql.rb:631-637) — and everywhere
-    // else Ruby's class dispatch would route it to visit_ActiveModel_Attribute
-    // anyway. There is no Rails path on which a bare one is quoted, so this
-    // branch is convergent for every caller of this helper, not just those two.
-    if (v instanceof ModelAttribute) {
-      return this.visit(v as unknown as Node, collector);
+    // An ActiveModel::Attribute binds, it does not quote. Reached from
+    // `visitArelNodesAssignment`, which mirrors Rails' `case` (to_sql.rb:631)
+    // by testing `isActiveModelAttribute` and then handing the right here —
+    // so this branch is what makes that arm land on `visit_ActiveModel_Attribute`
+    // (to_sql.rb:756) rather than falling through to raw-value dispatch and
+    // raising. Uses the same predicate as the Assignment/ValuesList call sites
+    // on purpose: if the two disagreed, a value those sites accept would arrive
+    // here, miss, and raise instead of binding.
+    if (isActiveModelAttribute(v)) {
+      return this.visit(v as Node, collector);
     }
     if (v instanceof Node) {
       // Duck-type check to avoid circular dependency (SelectManager → ToSql → SelectManager)

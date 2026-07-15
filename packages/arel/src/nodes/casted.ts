@@ -54,14 +54,16 @@ import { BindParam } from "./bind-param.js";
  * We wrap rather than pass through because a bare ActiveModel::Attribute is
  * not a `Node`, and trails' AST is statically typed against `Node` — Ruby
  * duck-types its way past this, TS cannot without widening every node slot.
- * `ToSql#visitActiveModelAttribute` is still ported, and a bare attribute
- * arriving from a path that bypasses buildQuoted / Attribute#quotedNode
- * reaches it two ways, mirroring Rails' own two:
- * - via `visit` — dispatch-registered against the abstract base (to-sql.ts),
- *   the analogue of Ruby's name-derived dispatch + ancestors walk;
- * - via `visitNodeOrValue` — the explicit branch, the analogue of Rails'
- *   `when ... ActiveModel::Attribute` at to_sql.rb:109 (ValuesList) and
- *   to_sql.rb:632 (Assignment), which likewise pre-empt class dispatch.
+ * `ToSql#visitActiveModelAttribute` is still ported, and a bare attribute that
+ * bypasses buildQuoted / Attribute#quotedNode still reaches it. Both of Rails'
+ * own pre-emptive `when ... ActiveModel::Attribute` arms are ported and each
+ * gets there by its own route:
+ * - `visitArelNodesValuesList` (Rails to_sql.rb:110) calls `visit` on it,
+ *   which resolves via the ActiveModel::Attribute dispatch registration —
+ *   trails' analogue of Ruby's name-derived dispatch + ancestors walk;
+ * - `visitArelNodesAssignment` (Rails to_sql.rb:632) hands it to
+ *   `visitNodeOrValue`, which branches on it before raw-value dispatch.
+ * Both are load-bearing: drop either and that arm raises instead of binding.
  */
 export function buildQuoted(other: unknown, attribute?: unknown): Node {
   if (other instanceof Node) return other;
