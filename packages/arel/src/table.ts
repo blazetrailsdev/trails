@@ -12,6 +12,15 @@ export interface TableKlass {
   readonly _attributeAliases?: Record<string, string>;
 }
 
+/** Delegation target of `Table`'s type-cast methods (Rails' `TypeCaster::Map` /
+ *  `TypeCaster::Connection`). Rails' `type_caster` is duck-typed and the
+ *  delegators are bare, so the constructor still accepts anything and a caster
+ *  missing a member throws on call, as `NoMethodError` does in Ruby. */
+export interface TypeCaster {
+  typeCastForDatabase(attrName: string, value: unknown): unknown;
+  typeForAttribute(name: string): unknown;
+}
+
 /**
  * Table — represents a database table.
  *
@@ -152,25 +161,24 @@ export class Table extends Node {
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
-    if (
-      this.typeCaster &&
-      typeof (this.typeCaster as Record<string, unknown>).typeCastForDatabase === "function"
-    ) {
-      return (
-        this.typeCaster as { typeCastForDatabase: (n: string, v: unknown) => unknown }
-      ).typeCastForDatabase(attrName, value);
-    }
-    return value;
+    return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName, value);
   }
 
+  // DEVIATION: Rails delegates bare here too (`type_caster.type_for_attribute(name)`,
+  // table.rb:106-108), so a caster-less table raises NoMethodError. We cannot yet:
+  // unlike `type_cast_for_database` (only reached through `Casted#valueForDatabase`,
+  // which gates on `isAbleToTypeCast`), this is reached ungated via
+  // `Attribute#typeCaster` -> `HomogeneousIn#castedValues`. trails builds
+  // caster-less tables for join aliases (join-dependency, association-scope) where
+  // Rails aliases `klass.arel_table` and keeps the caster, so bare delegation
+  // breaks real join/STI queries. Removing this fallback is blocked on converging
+  // those construction sites onto `klass.arelTable`.
   typeForAttribute(name: string): unknown {
     if (
       this.typeCaster &&
       typeof (this.typeCaster as Record<string, unknown>).typeForAttribute === "function"
     ) {
-      return (this.typeCaster as { typeForAttribute: (n: string) => unknown }).typeForAttribute(
-        name,
-      );
+      return (this.typeCaster as TypeCaster).typeForAttribute(name);
     }
     return undefined;
   }

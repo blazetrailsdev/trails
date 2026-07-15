@@ -4,10 +4,19 @@ import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
 
+/** Structural view of `TableAlias#relation`.
+ *
+ *  Optionality here mirrors Rails' *guards*, not what the relation actually
+ *  responds to — a `SelectManager` relation has none of these three members.
+ *  `isAbleToTypeCast` is optional because table_alias.rb:26-28 guards it with
+ *  `respond_to?`; the other two are required because table_alias.rb:18-24
+ *  delegates to them bare, so a relation lacking them raises — Ruby's
+ *  `NoMethodError`. The cast makes this unenforced either way; it documents
+ *  which calls Rails protects. */
 interface TypeCastable {
   name?: string;
-  typeCastForDatabase?: (attrName: string, value: unknown) => unknown;
-  typeForAttribute?: (name: string) => unknown;
+  typeCastForDatabase(attrName: string, value: unknown): unknown;
+  typeForAttribute(name: string): unknown;
   isAbleToTypeCast?: () => boolean;
 }
 
@@ -29,22 +38,20 @@ export class TableAlias extends Binary {
   }
 
   get tableName(): string {
-    const rel = this.relation as TypeCastable;
+    const rel = this.relation as unknown as TypeCastable;
     return typeof rel?.name === "string" ? rel.name : this.nameString;
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
-    const rel = this.relation as TypeCastable;
-    return rel?.typeCastForDatabase ? rel.typeCastForDatabase(attrName, value) : value;
+    return (this.relation as unknown as TypeCastable).typeCastForDatabase(attrName, value);
   }
 
   typeForAttribute(name: string): unknown {
-    const rel = this.relation as TypeCastable;
-    return rel?.typeForAttribute ? rel.typeForAttribute(name) : undefined;
+    return (this.relation as unknown as TypeCastable).typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {
-    const rel = this.relation as TypeCastable;
+    const rel = this.relation as unknown as TypeCastable;
     return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
   }
 
