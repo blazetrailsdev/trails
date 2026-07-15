@@ -9,6 +9,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { Notifications } from "@blazetrails/activesupport";
 import type { NotificationEvent } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
+import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import "./test-helpers/canonical-model-index.js";
 
@@ -30,11 +31,11 @@ describe("Instrumentation exception payload (trails)", () => {
     const failed = payloads.filter((p) => p.exception_object !== undefined);
     expect(failed).toHaveLength(1);
     // Rails' arm records [class name, message] alongside the error itself.
-    expect(failed[0].exception).toEqual([
-      (failed[0].exception_object as Error).constructor.name,
-      (failed[0].exception_object as Error).message,
-    ]);
-    expect(failed[0].exception_object).toBeInstanceOf(Error);
+    const [className, message] = failed[0].exception as [string, string];
+    expect(className).toBe("StatementInvalid");
+    expect(message).toMatch(/definitely_not_a_table/);
+    expect(failed[0].exception_object).toBeInstanceOf(StatementInvalid);
+    expect((failed[0].exception_object as Error).message).toBe(message);
   });
 
   it("leaves exception keys unset on a successful query", async () => {

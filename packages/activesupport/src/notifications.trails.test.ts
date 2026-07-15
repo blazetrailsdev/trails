@@ -100,6 +100,28 @@ describe("Notifications (trails)", () => {
         }),
       ).rejects.toBe("bare string");
       expect(events[0].payload.exception_object).toBe("bare string");
+      // Ruby cannot raise a non-Exception, so there is no Rails analogue; name
+      // the class the way Rails would name it rather than leaking `typeof`.
+      expect(events[0].payload.exception).toEqual(["String", "bare string"]);
+    });
+
+    it("names a namespaced error by its Rails class name", async () => {
+      class ParamError extends Error {
+        constructor(message: string) {
+          super(message);
+          this.name = "ActionDispatch::ParamError";
+        }
+      }
+      const events: Event[] = [];
+      Notifications.subscribe("crash", (e) => events.push(e));
+      await expect(
+        Notifications.instrumentAsync("crash", {}, async () => {
+          throw new ParamError("bad param");
+        }),
+      ).rejects.toThrow("bad param");
+      // Rails' e.class.name is fully qualified; trails carries that on `name`,
+      // and it is what rescue_responses keys off (log_subscriber.rb:32).
+      expect(events[0].payload.exception).toEqual(["ActionDispatch::ParamError", "bad param"]);
     });
 
     it("leaves exception keys unset on success", async () => {
