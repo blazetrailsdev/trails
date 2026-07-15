@@ -499,6 +499,10 @@ export class Dot extends Visitor {
         this.visitString(object);
       } else if (Array.isArray(object)) {
         this.visitArray(object);
+      } else if (object instanceof Set) {
+        // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). Without this
+        // arm a Set reaches no handler and falls to the leaf below.
+        this.visitSet(object);
       } else if (object instanceof Node) {
         super.visit(object);
       } else if (this.isActiveModelAttribute(object)) {

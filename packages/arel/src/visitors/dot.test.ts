@@ -471,6 +471,18 @@ describe("TestDot", () => {
       expect(out).not.toContain("<f0>Hash");
     });
 
+    it("a Set emits index-labeled edges like an Array", () => {
+      // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). A Set is not a
+      // Hash (its prototype's ctor is Set), so without a dedicated arm it
+      // would fall to the leaf and stringify instead of walking members.
+      const out = visitStandalone(new Set(["A", "B"]));
+      expect(out).toMatch(/\d+ \[label="<f0>Set"\];/);
+      expect(out).toContain('[label="0"]');
+      expect(out).toContain('[label="1"]');
+      expect(out).toContain("A");
+      expect(out).toContain("B");
+    });
+
     it("a class instance is not a Hash and keeps its own class name", () => {
       // Ruby's `class Config < Object` finds no visit_Object ancestor and so
       // never reaches visit_Hash; the JS analogue is any class instance,
