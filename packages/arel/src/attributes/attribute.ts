@@ -25,7 +25,7 @@ import { Count } from "../nodes/count.js";
 import { Sum, Max, Min, Avg } from "../nodes/function.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
-import { Quoted, buildQuoted } from "../nodes/casted.js";
+import { buildQuoted } from "../nodes/casted.js";
 import { parseRange, betweenFromRange, notBetweenFromRange } from "../predications-range.js";
 import { Grouping } from "../nodes/grouping.js";
 import { And } from "../nodes/and.js";
