@@ -3878,7 +3878,7 @@ export class Base extends Model {
       );
     if (ctor.lockingEnabled) {
       if (lockWhereValue == null) {
-        um.where(table.get(lockCol).isNull());
+        um.where(table.get(lockCol).eq(null));
       } else {
         um.where(table.get(lockCol).eq(Number(lockWhereValue) || 0));
       }
@@ -4078,7 +4078,7 @@ export class Base extends Model {
             ? lockAttr.valueForDatabase
             : lockAttr.originalValueForDatabase();
           if (lockWhereValue == null) {
-            dm.where(table.get(lockCol).isNull());
+            dm.where(table.get(lockCol).eq(null));
           } else {
             dm.where(table.get(lockCol).eq(Number(lockWhereValue) || 0));
           }

@@ -13,7 +13,6 @@ import { Equality } from "./nodes/equality.js";
 import { Matches, DoesNotMatch } from "./nodes/matches.js";
 import { In } from "./nodes/in.js";
 import { Regexp as RegexpNode, NotRegexp } from "./nodes/regexp.js";
-import { Quoted } from "./nodes/casted.js";
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { And } from "./nodes/and.js";
 import { Or } from "./nodes/or.js";
@@ -223,13 +222,6 @@ export const Predications = {
       end: unknown,
       excludeEnd?: boolean,
     ): Node;
-  },
-
-  isNull(this: Node & PredicationHost): Equality {
-    return new Equality(this, new Quoted(null));
-  },
-  isNotNull(this: Node & PredicationHost): NotEqual {
-    return new NotEqual(this, new Quoted(null));
   },
 
   // -- _any / _all variants --

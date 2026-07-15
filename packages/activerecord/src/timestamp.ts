@@ -164,7 +164,7 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
 
   if (ctor.lockingEnabled) {
     if (rawDbVersion == null) {
-      um.where(table.get(lockCol).isNull());
+      um.where(table.get(lockCol).eq(null));
     } else {
       um.where(table.get(lockCol).eq(Number(rawDbVersion) || 0));
     }

@@ -1145,18 +1145,6 @@ describe("AttributeTest", () => {
     );
   });
 
-  it("isNull generates IS NULL", () => {
-    expect(users.project(star).where(users.get("name").isNull()).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."name" IS NULL',
-    );
-  });
-
-  it("isNotNull generates IS NOT NULL", () => {
-    expect(users.project(star).where(users.get("name").isNotNull()).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."name" IS NOT NULL',
-    );
-  });
-
   it("and combines with AND", () => {
     const cond = users.get("name").eq("dean").and(users.get("age").gt(21));
     expect(users.project(star).where(cond).toSql()).toBe(
