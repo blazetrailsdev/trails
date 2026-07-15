@@ -199,7 +199,12 @@ export class SchemaMigration {
     if (toInsert.length > 0) {
       const col = this.arelTable.get(this.primaryKey);
       const im = new InsertManager(this.arelTable);
-      const rows = toInsert.map((v) => [new Nodes.Quoted(v)]);
+      // Rows carry the version raw, as Rails' rows do — `create_version` passes
+      // it straight to `im.insert` (schema_migration.rb:21), and the ValuesList
+      // visitor quotes it (to_sql.rb:112). A Quoted wrap would fall to `quote()`,
+      // which raises TypeError on a node (abstract/quoting.ts:151), matching
+      // Rails (quoting.rb:86).
+      const rows = toInsert.map((v) => [v]);
       im.ast.columns = [col];
       im.values = im.createValuesList(rows);
       await this._adapter.executeMutation(this._adapter.toSql(im));
