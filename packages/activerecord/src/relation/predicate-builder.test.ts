@@ -23,7 +23,7 @@ import { ValueType } from "@blazetrails/activemodel";
 // Both members: #4888 converged `Table#typeCastForDatabase` to bare delegation
 // too, and a range bound reaches it through `Casted`. Mirrors TypeCaster::Map /
 // ::Connection, whose `type_cast_for_database` is `type_for_attribute(n).serialize(v)`
-// (type_caster/map.rb:15-17).
+// (type_caster/map.rb:10-13).
 const VALUE_TYPE = new ValueType();
 const fakePgCaster = {
   typeForAttribute: () => VALUE_TYPE,
