@@ -7,7 +7,7 @@
 import { describe, it, expect, afterEach } from "vitest";
 
 import { Notifications } from "@blazetrails/activesupport";
-import type { Event } from "@blazetrails/activesupport";
+import type { NotificationEvent } from "@blazetrails/activesupport";
 import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import "./test-helpers/canonical-model-index.js";
@@ -21,7 +21,7 @@ describe("Instrumentation exception payload (trails)", () => {
 
   it("sets exception and exception_object on a failed query", async () => {
     const payloads: Record<string, unknown>[] = [];
-    Notifications.subscribe("sql.active_record", (event: Event) => {
+    Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
       payloads.push(event.payload);
     });
 
@@ -39,7 +39,7 @@ describe("Instrumentation exception payload (trails)", () => {
 
   it("leaves exception keys unset on a successful query", async () => {
     const payloads: Record<string, unknown>[] = [];
-    Notifications.subscribe("sql.active_record", (event: Event) => {
+    Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
       payloads.push(event.payload);
     });
 
