@@ -10,6 +10,7 @@ import { AssociationQueryValue } from "./predicate-builder/association-query-val
 import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
+import { Connection as TypeCasterConnection } from "../type-caster/connection.js";
 
 interface BoundType {
   cast?(x: unknown): unknown;
@@ -640,6 +641,16 @@ export class PredicateBuilder {
   }
 
   resolveColumn(key: string): Nodes.Attribute {
+    // A `"table.column"` key resolves through `resolveArelAttribute`, so the
+    // table carries a caster. Rails reaches the same place from the other side:
+    // convert_dot_notation_to_hash rewrites the key to a nested hash whose
+    // table part goes through `associated_table` (predicate_builder.rb:71-73).
+    if (!key.includes('"')) {
+      const firstDot = key.indexOf(".");
+      if (firstDot !== -1 && key.indexOf(".", firstDot + 1) === -1) {
+        return this.resolveArelAttribute(key.slice(0, firstDot), key.slice(firstDot + 1));
+      }
+    }
     return PredicateBuilder.resolveColumn(this.table, key);
   }
 
@@ -665,18 +676,31 @@ export class PredicateBuilder {
     return new QueryAttribute(columnName, value, castType);
   }
 
-  resolveArelAttribute(tableName: string, columnName: string): Nodes.Attribute {
+  resolveArelAttribute(
+    tableName: string,
+    columnName: string,
+    fallback?: (name: string) => unknown,
+  ): Nodes.Attribute {
     // Mirrors predicate_builder.rb:71-73 — routing through `associated_table`
-    // (rather than a bare `Arel::Table.new`) is what keeps the resulting table's
-    // type caster attached, since `Table#type_for_attribute` delegates bare.
-    // Rails' PredicateBuilder always holds a TableMetadata; trails' holds the
-    // raw Arel table plus the metadata as `_tableContext`, so fall back to a
-    // bare table when a caller built one without a context.
-    const ctx = this._tableContext as { associatedTable?: (n: string) => { arelTable: Table } };
+    // (with Rails' block, `lookup_table_klass_from_join_dependencies`) is what
+    // resolves a table name that only exists as a join, and what keeps the
+    // resulting table's type caster attached.
+    const ctx = this._tableContext as {
+      associatedTable?: (n: string, f?: (name: string) => unknown) => { arelTable: Table };
+    };
     if (typeof ctx?.associatedTable === "function") {
-      return ctx.associatedTable(tableName).arelTable.get(columnName);
+      return ctx.associatedTable(tableName, fallback).arelTable.get(columnName);
     }
-    return new Table(tableName).get(columnName);
+    // Rails' PredicateBuilder always holds a TableMetadata, so `associated_table`
+    // is always reachable and never yields a caster-less table; trails' holds the
+    // raw Arel table plus the metadata as `_tableContext`, so a builder
+    // constructed without one lands here. Attach a caster the way the no-klass
+    // branch of associated_table does (table_metadata.rb:47-48) — with
+    // type_for_attribute delegating bare, a bare table would raise.
+    const klass = (this._tableContext as { klass?: unknown })?.klass ?? null;
+    return new Table(tableName, {
+      typeCaster: new TypeCasterConnection(klass as never, tableName),
+    }).get(columnName);
   }
 
   with(context: any): PredicateBuilder {

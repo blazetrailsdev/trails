@@ -2347,8 +2347,13 @@ export function arelColumnWithTable(
   }
   if (typeof columnName === "symbol" || !/\W/.test(colStr)) {
     const builder = (this as any).predicateBuilder;
+    // Rails passes `lookup_table_klass_from_join_dependencies` as the block
+    // (query_methods.rb:1982-1984), so a table name that only resolves through a
+    // join dependency still finds its model — and its type caster.
+    const block = (name: string) => lookupTableKlassFromJoinDependencies.call(this, name);
     return (
-      builder?.resolveArelAttribute?.(tableName, colStr) ?? new ArelTable(tableName).get(colStr)
+      builder?.resolveArelAttribute?.(tableName, colStr, block) ??
+      new ArelTable(tableName).get(colStr)
     );
   }
   const quotedTable = safeQuoteTableName(modelClass, tableName);

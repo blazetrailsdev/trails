@@ -12,12 +12,14 @@ import { Author } from "../test-helpers/models/author.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 import { ValueType } from "@blazetrails/activemodel";
 
-// Mirrors Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50): a caster that
-// maps any attribute name to a type. `Table#type_for_attribute` delegates bare
-// to the caster (table.rb:106-108), so a table driving a PredicateBuilder always
-// has one — Rails reaches these paths through `TableMetadata#arel_table`, which
-// is built from `klass.arel_table`. `ValueType` is the no-op type Rails uses as
-// `ActiveModel::Type.default_value`, so values round-trip unchanged.
+// Same shape as Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50) — a map
+// converting any attribute name to a caster — because `Table#type_for_attribute`
+// delegates bare (table.rb:106-108) and these tables are not canonical models
+// (`users` is in neither Rails' schema.rb nor TEST_SCHEMA). It yields `ValueType`
+// where Rails' yields `String`: Rails' Arel tests assert SQL shape only, whereas
+// these assert bound *values*, so they need the no-op type Rails reaches for as
+// `ActiveModel::Type.default_value`. A real column type would cast `{ id: 5 }` to
+// `"[object Object]"` and defeat the dereference assertions below.
 const fakePgCaster = { typeForAttribute: () => new ValueType() };
 const castedTable = (name: string): Table => new Table(name, { typeCaster: fakePgCaster });
 
@@ -388,7 +390,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("expands where({authors: {name: 'Rails'}}) to \"authors\".\"name\" = 'Rails'", () => {
-      const meta = new TableMetadata(PbTestPost as any, castedTable("posts"));
+      const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -401,7 +403,7 @@ describe("PredicateBuilderTest", () => {
       // Rails table_metadata.rb associated_table aliases the resolved table to
       // the hash key whenever the names differ, so an association key that
       // differs from its table (writer -> authors) emits "writer"."name".
-      const meta = new TableMetadata(PbTestPost as any, castedTable("posts"));
+      const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -410,7 +412,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("negated form expands whereNot({authors: {name: 'Rails'}}) to NOT \"authors\".\"name\" = 'Rails'", () => {
-      const meta = new TableMetadata(PbTestPost as any, castedTable("posts"));
+      const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildNegatedFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -434,7 +436,7 @@ describe("PredicateBuilderTest", () => {
         }
       }
       try {
-        const meta = new TableMetadata(PbTestProduct as any, castedTable("products"));
+        const meta = new TableMetadata(PbTestProduct as any, (PbTestProduct as any).arelTable);
         const builder = meta.predicateBuilder;
         const nodes = builder.buildFromHash({ price: { foo: "bar" } });
         const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");

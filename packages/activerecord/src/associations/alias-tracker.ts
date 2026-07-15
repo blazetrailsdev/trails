@@ -13,16 +13,17 @@ const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
 /**
  * Build the Arel table a join should use for `klass` under the SQL name
- * `effectiveName`, keeping the model's type caster attached.
+ * `sqlName` (the alias when aliased, else the real table name), keeping the
+ * model's type caster attached.
  *
- * Rails never constructs a bare `Arel::Table` for a join: `aliased_table_for`
- * is handed `klass.arel_table` and calls `#alias` on it, so the resulting
- * `TableAlias` delegates `type_for_attribute` back to the underlying table's
- * caster (alias_tracker.rb:58-70, table.rb:106-108). trails encodes an aliased
- * table as `Table(realName, { as: alias })` rather than a `TableAlias`, so the
- * caster has to be carried across explicitly — otherwise `type_for_attribute`
- * hits a nil caster the moment a join's ON clause contains a typed predicate
- * (e.g. an STI type condition).
+ * Mirrors `aliased_table_for` (alias_tracker.rb:58-70): Rails is handed
+ * `klass.arel_table` and calls `#alias` on it, so the caster survives via
+ * `TableAlias`'s delegation. trails cannot return a `TableAlias` here — the
+ * JoinDependency plumbing that consumes these tables is typed on `Table` and
+ * gates on `instanceof Table` (e.g. rebindTableReferences, join-dependency.ts),
+ * which a `TableAlias` (a Binary node) silently fails — so an aliased table is
+ * encoded as `Table(realName, { as })` and the caster is carried across by hand.
+ * Converging that encoding onto `TableAlias` is tracked separately.
  *
  * @internal
  */
@@ -31,11 +32,14 @@ export function aliasedArelTableFor(
   tableName: string,
   effectiveName?: string,
 ): Table {
-  const as = effectiveName && effectiveName !== tableName ? effectiveName : undefined;
+  const sqlName = effectiveName ?? tableName;
   const base = klass?.arelTable;
-  if (!base || base.name !== tableName) return new Table(tableName, { as });
-  if (as === undefined) return base;
-  return new Table(tableName, { as, typeCaster: base.typeCaster, klass: base.klass });
+  // No klass (polymorphic): nothing to source a caster from.
+  if (!base) return new Table(tableName, { as: effectiveName });
+  // `base.name` is the real table. Rails aliases it to whatever name the join
+  // must answer to (alias_tracker.rb:64) and keeps the caster either way.
+  if (sqlName === base.name) return base;
+  return new Table(base.name, { as: sqlName, typeCaster: base.typeCaster, klass: base.klass });
 }
 
 /**

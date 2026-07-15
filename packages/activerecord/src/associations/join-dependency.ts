@@ -797,7 +797,10 @@ export class JoinDependency {
 
     // r's children were built referencing r's old table name; re-point their ON
     // predicates to the merged (left) table so the emitted SQL is self-consistent.
-    const toTable = new Table(resolvedTable);
+    // Sourced off `baseKlass` (never raises, unlike `reflection.klass` on a
+    // polymorphic) so the rebound ON keeps its caster — these predicates can
+    // include an STI type condition.
+    const toTable = aliasedArelTableFor(r.baseKlass, r.baseKlass.tableName, resolvedTable);
     for (const child of r.children) {
       const arelJoin = child.arelJoin;
       if (!arelJoin) continue;
