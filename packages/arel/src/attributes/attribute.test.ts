@@ -1095,6 +1095,46 @@ describe("AttributeTest", () => {
       expect(table.isAbleToTypeCast()).toBe(true);
       expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" = (select 1)');
     });
+
+    it("type casts IN list elements through the attribute", () => {
+      const fakeCaster = {
+        typeCastForDatabase(attrName: string, value: unknown) {
+          return attrName === "id" ? Number(value) : value;
+        },
+      };
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const condition = table.get("id").in(["1", "2"]);
+
+      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" IN (1, 2)');
+    });
+
+    it("type casts NOT IN list elements through the attribute", () => {
+      const fakeCaster = {
+        typeCastForDatabase(attrName: string, value: unknown) {
+          return attrName === "id" ? Number(value) : value;
+        },
+      };
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const condition = table.get("id").notIn(["1", "2"]);
+
+      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" NOT IN (1, 2)');
+    });
+
+    it("builds Casted nodes so a null in an IN list casts through the column", () => {
+      const fakeCaster = {
+        typeCastForDatabase(_attrName: string, value: unknown) {
+          return value === null ? 0 : value;
+        },
+      };
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const attr = table.get("id");
+      const node = attr.in([null]);
+      const right = (node.right as unknown as Nodes.Node[])[0];
+
+      expect(right).toBeInstanceOf(Nodes.Casted);
+      expect((right as Nodes.Casted).attribute).toBe(attr);
+      expect(new Visitors.ToSql().compile(node)).toBe('"foo"."id" IN (0)');
+    });
   });
 
   it("notEq(null) generates IS NOT NULL", () => {

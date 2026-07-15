@@ -193,14 +193,14 @@ export class Attribute extends Node {
     if (!Array.isArray(values) && values && typeof values === "object" && "ast" in values) {
       return new In(this, (values as { ast: Node }).ast);
     }
-    return new In(this, values.map(buildQuoted) as unknown as Node);
+    return new In(this, this.quotedArray(values) as unknown as Node);
   }
 
   notIn(values: unknown[] | { ast: Node }): NotIn {
     if (!Array.isArray(values) && values && typeof values === "object" && "ast" in values) {
       return new NotIn(this, (values as { ast: Node }).ast);
     }
-    return new NotIn(this, values.map(buildQuoted) as unknown as Node);
+    return new NotIn(this, this.quotedArray(values) as unknown as Node);
   }
   between(range: [unknown, unknown]): Node;
   between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
@@ -570,12 +570,12 @@ export class Attribute extends Node {
    *
    * Mirrors: `OVER` support on Arel expressions.
    */
-  // Mirrors Arel::Predications#quoted_array → delegates to private
-  // `quoted_node`, which is `Nodes.build_quoted(other, self)` — passing
-  // self as the attribute argument so non-Node values become `Casted`
-  // (carrying the type-cast context) rather than bare `Quoted`.
+  // Mirrors Arel::Predications#quoted_array — `others.map { |v| quoted_node(v) }`
+  // (predications.rb:227-229). Delegates to `quotedNode` rather than calling
+  // `buildQuoted` directly: `quoted_node` is the hook subclasses override, so
+  // routing through it keeps every element on the same path as a scalar RHS.
   quotedArray(others: unknown[]): Node[] {
-    return others.map((v) => buildQuoted(v, this));
+    return others.map((v) => this.quotedNode(v));
   }
 
   over(window?: Window | NamedWindow | string | null): Over {

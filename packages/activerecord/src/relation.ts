@@ -1166,8 +1166,11 @@ export class Relation<T extends Base> {
     rel._orderClauses.push(orderNode);
 
     // Add WHERE col IN (values) filter — mirrors Rails' arel_column.in(values.compact).
-    // Attribute#in uses buildQuoted (no type-caster context); the values were already
-    // database-cast above via type_cast_for_database, matching Rails.
+    // The values were already database-cast above via type_cast_for_database, and `in`
+    // wraps each in Casted, which casts again on value_for_database. That double-cast is
+    // faithful because Rails does the identical one (query_methods.rb:724 then :735,
+    // casted.rb:19-20) — not because the second cast is inert; a non-idempotent
+    // serialize would run twice here exactly as it does in Rails.
     if (filter) {
       const hasNull = normalized.includes(null);
       const nonNull = normalized.filter((v) => v !== null);
