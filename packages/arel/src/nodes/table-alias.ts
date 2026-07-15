@@ -34,25 +34,30 @@ export class TableAlias extends Binary {
   }
 
   get tableName(): string {
-    const rel = this.relation as unknown as TypeCastable;
-    return typeof rel?.name === "string" ? rel.name : this.nameString;
+    const rel = this.rel;
+    return typeof rel.name === "string" ? rel.name : this.nameString;
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
-    return (this.relation as unknown as TypeCastable).typeCastForDatabase(attrName, value);
+    return this.rel.typeCastForDatabase(attrName, value);
   }
 
   typeForAttribute(name: string): unknown {
-    return (this.relation as unknown as TypeCastable).typeForAttribute(name);
+    return this.rel.typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {
-    const rel = this.relation as unknown as TypeCastable;
-    return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
+    const rel = this.rel;
+    return typeof rel.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
   }
 
   toCte(): Cte {
     return new Cte(this.nameString, this.relation);
+  }
+
+  /** `relation` is a `Node`; Ruby duck-types it instead. */
+  private get rel(): TypeCastable {
+    return this.relation as unknown as TypeCastable;
   }
 
   /** The alias as a bare string, unwrapping a `SqlLiteral` name. */
