@@ -16,7 +16,11 @@ import {
   Table,
   InsertManager,
 } from "@blazetrails/arel";
-import { Attribute as ModelAttribute, ActiveModelRangeError } from "@blazetrails/activemodel";
+import {
+  Attribute as ModelAttribute,
+  ActiveModelRangeError,
+  BinaryData,
+} from "@blazetrails/activemodel";
 import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
@@ -1345,6 +1349,14 @@ export function typeCastedBinds(binds: unknown[] | undefined): unknown[] {
     } else {
       v = b && typeof b === "object" && "value" in b ? b.value : b;
     }
+    // Rails' `type_cast` renders a `Type::Binary::Data` as its byte string
+    // (abstract/quoting.rb:96). This function does not route through `typeCast`
+    // — converging that is the wider `type_casted_binds` story, and doing it
+    // wholesale changes unrelated types (e.g. SQLite integer binds become
+    // BigInt) — so unwrap just the binary wrapper. Without it a subscriber sees
+    // the `Data` object and LogSubscriber renders "[object Object]" where Rails
+    // shows the bytes.
+    if (v instanceof BinaryData) v = v.bytes;
     return temporalToBindString(v);
   });
 }

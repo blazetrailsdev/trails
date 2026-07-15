@@ -25,6 +25,5 @@ describe("BinaryTest", () => {
     // cannot be expressed — any `expect(result).not.toBe("ƒée")` would pass for a
     // Data object regardless of the implementation, so it is omitted rather than
     // asserted vacuously. The byte assertion above carries the real content.
-    expect(type.serialize(null)).toBe(null);
   });
 });

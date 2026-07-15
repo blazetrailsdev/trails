@@ -889,11 +889,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       // `value_for_database` now yields cast Temporal values; convert to the SQL
       // wire string the mysql2 driver expects (matching Rails' type_casted_binds).
       v = temporalToBindString(v, "mysql");
-      // `BinaryType#serialize` yields a `Type::Binary::Data`, which the driver
-      // cannot bind — Rails' `type_cast` unwraps it to its byte string at
-      // abstract/quoting.rb:96. Unwrap here too: this path deliberately does not
-      // route through `typeCast` (see the doc comment above), so without this the
-      // wrapper reaches mysql2 and silently matches no rows.
+      // `BinaryType#serialize` yields a `Type::Binary::Data`; Rails' `type_cast`
+      // unwraps it to its byte string at abstract/quoting.rb:96. This path
+      // deliberately does not route through `typeCast` (see above), so unwrap
+      // here — otherwise the wrapper reaches mysql2, which binds it as a plain
+      // object and matches no rows (measured: 0 rows for a value that is
+      // present, i.e. a wrong answer rather than a raise).
+      //
+      // Unlike node-postgres (which needs a Buffer, hence PG's re-wrap in
+      // `postgresql/quoting.ts` typeCast), mysql2 binds a bare `Uint8Array` as a
+      // BLOB: verified with a non-Buffer `Uint8Array` round-tripping byte-exactly
+      // through a bound where clause, including 0x00 and bytes >= 0x80. This is
+      // also what the path received before `serialize` began wrapping.
       if (v instanceof BinaryData) v = v.bytes;
       return v === true ? 1 : v === false ? 0 : v;
     });
