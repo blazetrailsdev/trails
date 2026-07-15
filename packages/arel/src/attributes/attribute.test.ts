@@ -749,24 +749,6 @@ describe("AttributeTest", () => {
 
   describe("#not_in", () => {
     it("can be constructed with a subquery", () => {
-      const subquery = users.project(users.get("id"));
-      const node = users.get("id").in(subquery);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."id" IN (SELECT "users"."id" FROM "users")');
-    });
-
-    it("can be constructed with a list", () => {
-      const node = users.get("id").in([1, 2, 3]);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toBe('"users"."id" IN (1, 2, 3)');
-    });
-
-    it("can be constructed with a random object", () => {
-      const node = users.get("id").notIn(["random_thing"] as unknown[]);
-      expect(node).toBeInstanceOf(Nodes.NotIn);
-    });
-
-    it("can be constructed with a subquery", () => {
       const mgr = users.project(users.get("id"));
       const node = users.get("id").notIn(mgr);
       expect(node).toBeInstanceOf(Nodes.NotIn);
@@ -778,8 +760,11 @@ describe("AttributeTest", () => {
     });
 
     it("can be constructed with a random object", () => {
-      const node = users.get("id").notIn([42]);
-      expect(node).toBeInstanceOf(Nodes.NotIn);
+      const attribute = users.get("id");
+      const randomObject = {};
+      const node = attribute.notIn(randomObject);
+
+      expect(node).toEqual(new Nodes.NotIn(attribute, new Nodes.Casted(randomObject, attribute)));
     });
   });
 
@@ -792,18 +777,25 @@ describe("AttributeTest", () => {
 
     it("can be constructed with a subquery", () => {
       const mgr = users.project(users.get("id"));
-      const node = users.get("id").in(mgr);
-      expect(node).toBeInstanceOf(Nodes.In);
+      const attribute = users.get("id");
+      const node = attribute.in(mgr);
+
+      expect(node).toEqual(new Nodes.In(attribute, mgr.ast));
+      expect(visitor.compile(node)).toBe('"users"."id" IN (SELECT "users"."id" FROM "users")');
     });
 
     it("can be constructed with a list", () => {
       const node = users.get("id").in([1, 2, 3]);
       expect(node).toBeInstanceOf(Nodes.In);
+      expect(visitor.compile(node)).toBe('"users"."id" IN (1, 2, 3)');
     });
 
     it("can be constructed with a random object", () => {
-      const node = users.get("id").in([42]);
-      expect(node).toBeInstanceOf(Nodes.In);
+      const attribute = users.get("id");
+      const randomObject = {};
+      const node = attribute.in(randomObject);
+
+      expect(node).toEqual(new Nodes.In(attribute, new Nodes.Casted(randomObject, attribute)));
     });
   });
 
