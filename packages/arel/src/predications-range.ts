@@ -137,16 +137,25 @@ interface UnboundableLike {
   isUnboundable?: () => 1 | -1 | false;
 }
 
-// Mirrors Rails Predications#open_ended? — `value.nil? || infinity?(value) ||
-// unboundable?(value)`. A null/undefined, ±Infinity, or out-of-range
-// (unboundable) bound counts as "no bound on this side".
+// Mirrors Rails Predications#open_ended? (predications.rb:255-257) —
+// `value.nil? || infinity?(value) || unboundable?(value)`. A nil, ±Infinity, or
+// out-of-range (unboundable) bound counts as "no bound on this side".
+//
+// Ruby's leading `value.nil?` is a real dispatch: every Arel bound answers it,
+// and the node classes override it (`BindParam#nil?` bind_param.rb:23-25,
+// `Casted#nil?` / `Quoted#nil?` casted.rb:16,41) to report on the *wrapped*
+// value. So `between(BindParam(nil), 3)` is `lteq(3)` in Rails, not a Between
+// over a nil bind — reading only `=== null` here skipped that.
 export function isOpenEnded(value: unknown): boolean {
-  return (
-    value === null ||
-    value === undefined ||
-    infinitySign(value) !== 0 ||
-    unboundableSign(value) !== 0
-  );
+  return isNil(value) || infinitySign(value) !== 0 || unboundableSign(value) !== 0;
+}
+
+// Mirrors Ruby's `value.nil?` for the shapes a bound can take: a bare
+// null/undefined, or a node exposing the port's `isNil()`.
+function isNil(value: unknown): boolean {
+  if (value === null || value === undefined) return true;
+  const v = value as { isNil?: () => boolean };
+  return typeof v.isNil === "function" && v.isNil();
 }
 
 export function betweenFromRange(host: RangeHost, range: RangeLike): Node {

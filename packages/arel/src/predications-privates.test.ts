@@ -93,6 +93,18 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
     expect(isOpenEnded(0)).toBe(false);
     expect(isOpenEnded("x")).toBe(false);
   });
+
+  it("isOpenEnded dispatches Ruby's leading `value.nil?` onto the node", () => {
+    // predications.rb:255-257 opens with `value.nil?`, which the node classes
+    // override to report on the wrapped value (bind_param.rb:23-25,
+    // casted.rb:16,41) — so a nil-wrapping bound is open-ended, and
+    // between(BindParam(nil), 3) is lteq(3) rather than a Between over a nil bind.
+    expect(isOpenEnded(new Nodes.BindParam(null))).toBe(true);
+    expect(isOpenEnded(new Nodes.Quoted(null))).toBe(true);
+    expect(isOpenEnded(new Nodes.Casted(null, users.attr("id")))).toBe(true);
+    expect(isOpenEnded(new Nodes.Quoted(3))).toBe(false);
+    expect(isOpenEnded(new Nodes.Casted(3, users.attr("id")))).toBe(false);
+  });
 });
 
 describe("Attribute private helpers (mirror Predications)", () => {
