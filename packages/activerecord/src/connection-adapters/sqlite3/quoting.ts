@@ -91,12 +91,17 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   }
   if (typeof value === "string") return quoteString(value);
   // A *bare* `ArrayBuffer` has no Rails counterpart (Rails only ever sees
-  // `Type::Binary::Data` here). It survives because `quoteDefaultExpression`
-  // below hands one straight to `quote` for a binary column default, and the
-  // inherited abstract branch tests `ArrayBuffer.isView`, which is false for a
-  // bare buffer. Byte *views* need no branch here — they fall through to the
-  // abstract `isView` branch, which self-dispatches back to SQLite's
-  // `quotedBinary` just as this does.
+  // `Type::Binary::Data` here), and nothing in trails produces one — no internal
+  // caller reaches this. It is a boundary affordance: `quoteDefaultExpression`
+  // below forwards a caller-supplied migration default (`t.binary(col, { default
+  // })`) to `quote` untouched, so a JS caller can hand one in, and the inherited
+  // abstract branch would raise on it — `ArrayBuffer.isView` is false for a bare
+  // buffer. Exercised only by quoting.test.ts ("quotes a binary default through
+  // SQLite's quotedBinary").
+  //
+  // Byte *views* need no branch here: they fall through to the abstract `isView`
+  // branch, which self-dispatches back to SQLite's `quotedBinary` just as this
+  // does — which is why PG's equivalent branch is gone.
   if (value instanceof ArrayBuffer) return dispatchQuotedBinary(this, value);
   return abstractQuote.call(this, value);
 }

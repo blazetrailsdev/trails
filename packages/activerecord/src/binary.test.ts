@@ -29,13 +29,23 @@ describe("BinaryTest", () => {
   });
 
   it("unicode input casting", async () => {
-    // Ported from binary_test.rb:41-70. Rails interleaves two concerns here: the
+    // Ported from binary_test.rb:41-70. Rails interleaves two concerns: the
     // Integer-to-String casting of `name`, which ports directly, and assertions
-    // that `data`/`data_before_type_cast` carry `Encoding::BINARY` /
-    // `Encoding::UTF_8`. JS strings have no encoding attribute — a Uint8Array is
-    // *only* bytes — so the encoding assertions have no analogue and are the one
-    // half omitted. `name` is a restricted attribute in trails, hence
-    // readAttribute.
+    // that `data` / `data_before_type_cast` carry `Encoding::BINARY` /
+    // `Encoding::UTF_8`. JS has no String encoding attribute, so the encoding
+    // *labels* have no analogue. What `assert_equal Encoding::BINARY,
+    // binary.data.encoding` is asserting in Ruby terms — that the string input
+    // was cast to binary — does port: `data` must be the bytes of "text" at each
+    // phase, which is what `expectTextBytes` pins. The `_before_type_cast`
+    // encoding half stays out: Rails itself notes it is adapter-dependent after
+    // reload (PG returns the bytea_output form).
+    // `name` is a restricted attribute in trails, hence readAttribute.
+    const textBytes = new TextEncoder().encode("text");
+    const expectTextBytes = () => {
+      expect(binary.data).toBeInstanceOf(Uint8Array);
+      expect(new Uint8Array(binary.data)).toEqual(textBytes);
+    };
+
     const binary = Binary.new({ name: 123 as unknown as string, data: "text" });
 
     // Before saving, attribute methods return casted values, but their
@@ -43,19 +53,19 @@ describe("BinaryTest", () => {
     // conversion used for comparison.)
     expect(binary.readAttribute("name")).toBe("123");
     expect(binary.readAttributeBeforeTypeCast("name")).toBe(123);
+    expectTextBytes();
 
     await binary.saveBang();
 
     // After saving, casted values appear throughout.
     expect(binary.readAttribute("name")).toBe("123");
     expect(binary.readAttributeBeforeTypeCast("name")).toBe("123");
+    expectTextBytes();
 
     await binary.reload();
 
     expect(binary.readAttribute("name")).toBe("123");
     expect(binary.readAttributeBeforeTypeCast("name")).toBe("123");
-    // Rails also asserts data.encoding here, and notes data_before_type_cast is
-    // adapter-dependent after reload (PG returns the bytea_output form). Both are
-    // Ruby-encoding concerns with no JS counterpart.
+    expectTextBytes();
   });
 });
