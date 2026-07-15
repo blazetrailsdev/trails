@@ -71,6 +71,41 @@ function groupedAll(nodes: Node[]): Grouping {
 }
 
 /**
+ * Stands in for Rails' `when Arel::SelectManager` arm (predications.rb:65-74
+ * for `in`, 112-121 for `not_in`), duck-typed on the `ast` reader as
+ * `buildQuoted` matches managers (casted.ts:41-44) — a structural check keeps
+ * the runtime import out. The `instanceof Node` half matters: a bare
+ * `"ast" in value` also admits `{ ast: undefined }`, which would build
+ * `In(this, undefined)`.
+ */
+function isSelectManagerLike(value: unknown): value is { ast: Node } {
+  return (
+    typeof value === "object" && value !== null && (value as { ast?: unknown }).ast instanceof Node
+  );
+}
+
+/**
+ * Stands in for Rails' `when Enumerable` arm. Ruby's `Enumerable` covers Set,
+ * Hash and Range as well as Array, so matching only `Array.isArray` would drop
+ * a Set/Map/generator into the scalar arm and silently cast the container
+ * itself.
+ *
+ * Two deliberate edges:
+ * - JS strings are iterable, but Ruby's String is NOT Enumerable, so they must
+ *   reach `quoted_node`. `typeof value === "object"` excludes them.
+ * - A plain JS object is not iterable, so it reaches `quoted_node` — matching
+ *   `Object.new` at attribute_test.rb:747-757. Note this DIVERGES for a Ruby
+ *   Hash, which IS Enumerable: Rails' `in({a: 1})` takes the `quoted_array`
+ *   arm and expands to `[Casted([:a, 1], self)]`, where this casts the object
+ *   whole. Ruby's Hash maps to a JS Map (iterable, so it expands correctly);
+ *   an object literal is the closer analogue of `Object.new`, so the scalar
+ *   arm is the better of the two readings, not an exact one.
+ */
+function isEnumerable(value: unknown): value is Iterable<unknown> {
+  return typeof value === "object" && value !== null && Symbol.iterator in value;
+}
+
+/**
  * Attribute — represents a column on a table.
  *
  * Mirrors: Arel::Attributes::Attribute
@@ -195,18 +230,17 @@ export class Attribute extends Node {
     return new NotRegexp(this, this.quotedNode(pattern), caseSensitive);
   }
 
-  in(values: unknown[] | { ast: Node }): In {
-    if (!Array.isArray(values) && values && typeof values === "object" && "ast" in values) {
-      return new In(this, (values as { ast: Node }).ast);
-    }
-    return new In(this, this.quotedArray(values) as unknown as Node);
+  in(values: unknown): In {
+    if (isSelectManagerLike(values)) return new In(this, values.ast);
+    if (isEnumerable(values)) return new In(this, this.quotedArray([...values]) as unknown as Node);
+    return new In(this, this.quotedNode(values));
   }
 
-  notIn(values: unknown[] | { ast: Node }): NotIn {
-    if (!Array.isArray(values) && values && typeof values === "object" && "ast" in values) {
-      return new NotIn(this, (values as { ast: Node }).ast);
-    }
-    return new NotIn(this, this.quotedArray(values) as unknown as Node);
+  notIn(values: unknown): NotIn {
+    if (isSelectManagerLike(values)) return new NotIn(this, values.ast);
+    if (isEnumerable(values))
+      return new NotIn(this, this.quotedArray([...values]) as unknown as Node);
+    return new NotIn(this, this.quotedNode(values));
   }
   between(range: [unknown, unknown]): Node;
   between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
