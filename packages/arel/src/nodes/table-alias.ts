@@ -4,10 +4,15 @@ import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
 
+/** Structural view of `TableAlias#relation`. `typeCastForDatabase` /
+ *  `typeForAttribute` are required because Rails delegates to them bare
+ *  (table_alias.rb:18-24); `isAbleToTypeCast` stays optional because
+ *  table_alias.rb:26-28 is `respond_to?`-guarded — a relation may be a
+ *  `SelectManager`, which has no such method. */
 interface TypeCastable {
   name?: string;
-  typeCastForDatabase?: (attrName: string, value: unknown) => unknown;
-  typeForAttribute?: (name: string) => unknown;
+  typeCastForDatabase(attrName: string, value: unknown): unknown;
+  typeForAttribute(name: string): unknown;
   isAbleToTypeCast?: () => boolean;
 }
 
@@ -29,22 +34,20 @@ export class TableAlias extends Binary {
   }
 
   get tableName(): string {
-    const rel = this.relation as TypeCastable;
+    const rel = this.relation as unknown as TypeCastable;
     return typeof rel?.name === "string" ? rel.name : this.nameString;
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
-    const rel = this.relation as TypeCastable;
-    return rel?.typeCastForDatabase ? rel.typeCastForDatabase(attrName, value) : value;
+    return (this.relation as unknown as TypeCastable).typeCastForDatabase(attrName, value);
   }
 
   typeForAttribute(name: string): unknown {
-    const rel = this.relation as TypeCastable;
-    return rel?.typeForAttribute ? rel.typeForAttribute(name) : undefined;
+    return (this.relation as unknown as TypeCastable).typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {
-    const rel = this.relation as TypeCastable;
+    const rel = this.relation as unknown as TypeCastable;
     return typeof rel?.isAbleToTypeCast === "function" ? rel.isAbleToTypeCast() : false;
   }
 
