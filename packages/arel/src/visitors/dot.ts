@@ -650,8 +650,11 @@ export class Dot extends Visitor {
       proto = Object.getPrototypeOf(proto)
     ) {
       if (proto === Object.prototype) return true;
+      // A prototype with no `constructor` at all descends from
+      // Object.create(null) — still a record, so keep walking. Only a
+      // constructor naming some *other* class marks a class prototype.
       const ctor = (proto as { constructor?: unknown }).constructor;
-      if (ctor !== Object) return false;
+      if (ctor !== undefined && ctor !== Object) return false;
     }
     return true;
   }
@@ -660,11 +663,16 @@ export class Dot extends Visitor {
    * Rails: `o.class.name`. We use the JS ctor name for objects and emit
    * Rails-style class names for primitives and nil values — `String`,
    * `Integer`, `Float`, `TrueClass`, `FalseClass`, `NilClass`, `Symbol`,
-   * `Time` — so leaf nodes match Rails' shape. Values matching the Hash
-   * analogue (see isHash) are named `Hash` rather than JS's ctor
-   * name `Object`: Rails labels a plain hash's node "Hash" (dot.rb:253),
-   * and a record derived via `Object.create` has no class name of its own
-   * the way an anonymous `Class.new(Hash)` doesn't in Ruby.
+   * `Time` — so leaf nodes match Rails' shape.
+   *
+   * Values matching the Hash analogue (see isHash) are named `Hash` rather
+   * than JS's ctor name `Object`. Rails labels the node `o.class.name`
+   * (dot.rb:253), so a *named* Hash subclass would be "MyHash" — but no
+   * value reaching this arm can supply such a name: isHash admits only
+   * object literals, `Object.create(null)`, and records derived from those,
+   * every one of which reports a ctor name of `Object`. Class instances,
+   * the only objects with a distinct ctor name, are Ruby's `Config < Object`
+   * and never route here. So "Hash" is the whole of the analogue's range.
    */
   private classNameOf(o: unknown): string {
     if (o === null) return "NilClass";

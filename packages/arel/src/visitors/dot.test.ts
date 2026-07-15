@@ -443,6 +443,34 @@ describe("TestDot", () => {
       expect(out).toContain("alpha");
     });
 
+    it("a record derived from a null-prototype record routes to visit_Hash", () => {
+      // The prototype here has no `constructor` at all, which must not be
+      // read as "some class other than Object" — both halves are records,
+      // so the derived value is a Hash like any other.
+      const base: Record<string, unknown> = Object.create(null);
+      base.inherited = "nope";
+      const derived: Record<string, unknown> = Object.create(base);
+      derived.alpha = "A";
+      const out = visitStandalone(derived);
+      expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("alpha");
+      expect(out).not.toContain("inherited");
+    });
+
+    it("an inherited valueBeforeTypeCast takes the attribute arm, not the Hash arm", () => {
+      // Pins the duck-typed split: isActiveModelAttribute uses `in`, which
+      // reaches through the prototype chain, and visit() checks it before
+      // the Hash arm. Real ActiveModel::Attribute exposes
+      // valueBeforeTypeCast as a prototype getter (activemodel
+      // attribute.ts:60), so the check cannot be scoped to own keys.
+      const derived = Object.create({ valueBeforeTypeCast: 42 }) as object;
+      const out = visitStandalone(derived);
+      expect(out).toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
+      expect(out).not.toContain('[label="pair_0"]');
+      expect(out).not.toContain("<f0>Hash");
+    });
+
     it("a class instance is not a Hash and keeps its own class name", () => {
       // Ruby's `class Config < Object` finds no visit_Object ancestor and so
       // never reaches visit_Hash; the JS analogue is any class instance,
