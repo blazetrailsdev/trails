@@ -20,7 +20,15 @@ import { ValueType } from "@blazetrails/activemodel";
 // these assert bound *values*, so they need the no-op type Rails reaches for as
 // `ActiveModel::Type.default_value`. A real column type would cast `{ id: 5 }` to
 // `"[object Object]"` and defeat the dereference assertions below.
-const fakePgCaster = { typeForAttribute: () => new ValueType() };
+// Both members: #4888 converged `Table#typeCastForDatabase` to bare delegation
+// too, and a range bound reaches it through `Casted`. Mirrors TypeCaster::Map /
+// ::Connection, whose `type_cast_for_database` is `type_for_attribute(n).serialize(v)`
+// (type_caster/map.rb:15-17).
+const VALUE_TYPE = new ValueType();
+const fakePgCaster = {
+  typeForAttribute: () => VALUE_TYPE,
+  typeCastForDatabase: (_attrName: string, value: unknown) => VALUE_TYPE.serialize(value),
+};
 const castedTable = (name: string): Table => new Table(name, { typeCaster: fakePgCaster });
 
 describe("PredicateBuilderTest", () => {
