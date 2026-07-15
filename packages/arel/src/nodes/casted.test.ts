@@ -95,12 +95,15 @@ describe("Arel::Nodes.build_quoted", () => {
   });
 
   // KNOWN DEVIATION, not the target shape: casted.rb:50-51's `when` arm returns
-  // `other` UNWRAPPED, so Rails' AST holds the ActiveModel::Attribute itself.
-  // Tracked by story `arel-build-quoted-passes-model-attribute-unwrapped`
-  // (PR #4879), which owns the convergence. This test pins today's behaviour so
-  // that PR's change is visible in the diff — it does not ratify the wrap.
-  // Nothing here depends on the wrap: registering `visitActiveModelAttribute`
-  // (to-sql.ts, rb:756) means a bare Attribute is visitable on its own.
+  // `other` UNWRAPPED, so Rails' AST holds the ActiveModel::Attribute itself;
+  // trails wraps it in BindParam. Output SQL agrees (rb:756's `add_bind(o)` vs
+  // rb:760's `add_bind(o.value)` land the same payload), but the AST shape does
+  // not, for callers that inspect the node.
+  //
+  // Tracked by story `arel-build-quoted-passes-model-attribute-unwrapped`,
+  // which owns the convergence to Rails' unwrapped shape. This test pins
+  // today's shape so that change is visible in the diff — it records the
+  // deviation, it does not endorse it.
   it("wraps an ActiveModel::Attribute in BindParam", () => {
     const attr = AMAttribute.fromUser("age", 42, new ValueType());
     const node = buildQuoted(attr);
