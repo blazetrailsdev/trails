@@ -81,4 +81,20 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
       await expect(adapter.execute(`SELECT * FROM "pq"`)).resolves.toEqual([]);
     });
   });
+
+  it("dirties the current transaction for a write routed through execute", async () => {
+    // Dirtying hangs off the primitive rather than executeMutation, so a write
+    // reaching the connection through execute marks the transaction too.
+    await adapter.transaction(async () => {
+      await adapter.execute(`INSERT INTO "pq" ("nick") VALUES ('a')`);
+      expect(adapter.currentTransaction().isDirty()).toBe(true);
+    });
+  });
+
+  it("does not dirty the current transaction for a read", async () => {
+    await adapter.transaction(async () => {
+      await adapter.execute(`SELECT * FROM "pq"`);
+      expect(adapter.currentTransaction().isDirty()).toBe(false);
+    });
+  });
 });

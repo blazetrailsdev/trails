@@ -74,6 +74,7 @@ import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
   castResult as sqliteCastResult,
+  affectedRows as sqliteAffectedRows,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
@@ -290,7 +291,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   private _readonly: boolean;
   private _strict: boolean;
   private _preventWrites = false;
-  private _lastAffectedRows = 0;
+  /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
+  _lastAffectedRows = 0;
   private _lastInsertRowid: number | bigint = 0;
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
@@ -502,6 +504,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * on a non-row-returning statement, so DDL/INSERT/UPDATE/DELETE take
    * `.run()` and yield an empty result.
    *
+   * NOTE: `sqlite3/database-statements.ts` also exports a `performQuery`. That
+   * one is an unwired port written against better-sqlite3's native sync API
+   * (raw connection, spread binds), which is not the async driver abstraction
+   * this adapter talks to, so it cannot be called from here as-is. Converging
+   * the two is tracked separately; until then this is the live primitive and
+   * that one has no callers.
+   *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
    */
   private async _performQuery(
@@ -510,6 +519,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     notificationPayload: Record<string, unknown>,
   ): Promise<Record<string, unknown>[]> {
     const stmt = await this._cachedStatement(sql);
+    const isWrite = isWriteQuerySql(sql);
     let rows: Record<string, unknown>[];
     if (stmt.reader) {
       rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
@@ -518,13 +528,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       // handle (`raw_connection.changes`) after every statement; better-sqlite3
       // exposes no such property, so read it back through SQL rather than leave
       // `_lastAffectedRows` stale from an earlier write.
-      if (isWriteQuerySql(sql)) await this._readBackChanges();
+      if (isWrite) await this._readBackChanges();
     } else {
       const result = await stmt.run(driverBinds);
       this._lastAffectedRows = result.changes;
       this._lastInsertRowid = result.lastInsertRowid;
       rows = [];
     }
+    // Dirtying belongs to the primitive, not to one entry point: `execute` now
+    // runs writes too, and Rails dirties from with_raw_connection's ensure
+    // (abstract_adapter.rb:1046) rather than from a write-only path. This path
+    // doesn't route through withRawConnection — where trails already mirrors
+    // that ensure — so dirty here, gated on the statement being a write to
+    // leave read behavior as it is.
+    if (isWrite) this.dirtyCurrentTransaction();
     notificationPayload.row_count = rows.length;
     return rows;
   }
@@ -545,12 +562,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * Rows affected by the most recent write.
+   * Rows affected by the most recent write. Rails takes the statement result
+   * and ignores it, reading `@last_affected_rows` instead.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#affected_rows
    */
-  affectedRows(): number {
-    return this._lastAffectedRows;
+  affectedRows(result?: unknown): number {
+    return sqliteAffectedRows.call(this, result);
   }
 
   // A statement prepared outside the pool — Rails' non-`prepare` branch, which
@@ -649,7 +667,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
         await this._performQuery(sql, driverBinds, payload);
-        this.dirtyCurrentTransaction();
         // perform_query reports the returned-row count (0 for a write); this
         // path has always reported affected rows, and subscribers rely on it.
         payload.row_count = this._lastAffectedRows;
