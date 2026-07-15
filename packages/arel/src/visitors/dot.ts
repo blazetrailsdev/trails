@@ -382,7 +382,7 @@ export class Dot extends Visitor {
     this.visitEdge(o, "value");
   }
 
-  protected visitActiveModelAttribute(o: { valueBeforeTypeCast?: unknown }): void {
+  protected visitActiveModelAttribute(o: AMAttribute): void {
     this.visitEdge(o, "valueBeforeTypeCast");
   }
 
@@ -504,7 +504,7 @@ export class Dot extends Visitor {
       } else if (this.isActiveModelAttribute(object)) {
         // Mirrors Rails' `visit_ActiveModel_Attribute`, reached in Rails via
         // Visitor#visit's ancestor walk (`o.is_a?(ActiveModel::Attribute)`).
-        this.visitActiveModelAttribute(object as { valueBeforeTypeCast?: unknown });
+        this.visitActiveModelAttribute(object);
       } else if (this.isPlainObject(object)) {
         this.visitHash(object as Record<string, unknown>);
       } else {
@@ -612,7 +612,7 @@ export class Dot extends Visitor {
     );
   }
 
-  private isActiveModelAttribute(o: unknown): boolean {
+  private isActiveModelAttribute(o: unknown): o is AMAttribute {
     return o instanceof AMAttribute;
   }
 
