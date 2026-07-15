@@ -3,9 +3,11 @@
  * Temporal checks structural rather than pulling the namespace into arel's
  * runtime imports — arel has no activesupport dependency at runtime.
  *
- * Shared by the visitors so the tag-shape knowledge lives in one place; each
- * caller maps the tag to its own Rails analogue (to-sql dispatches on
- * supported-vs-unsupported, dot labels leaf nodes with a Ruby class name).
+ * Answers only "is this a Temporal value, and which one" — the tag-to-Rails-class
+ * mapping is `temporalClassName` below, which every caller shares. This stays
+ * separate because recognizing a Temporal and having a Ruby analogue are
+ * different questions: `Duration` answers here but not there, which is how
+ * to-sql keeps an unmapped Temporal out of its `toISOString` duck-type.
  *
  * @internal
  */
