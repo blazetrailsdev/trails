@@ -38,6 +38,22 @@ export function aliasedArelTableFor(
   return new Table(tableName, { as, typeCaster: base.typeCaster, klass: base.klass });
 }
 
+/**
+ * `aliasedArelTableFor` keyed off a reflection. A polymorphic reflection has no
+ * compile-time klass — `reflection.klass` raises (reflection.rb) — so it keeps a
+ * caster-less table; the concrete class is only known per row at runtime.
+ *
+ * @internal
+ */
+export function aliasedArelTableForReflection(
+  reflection: { klass?: unknown; isPolymorphic?: () => boolean } | null | undefined,
+  tableName: string,
+  effectiveName?: string,
+): Table {
+  const klass = reflection?.isPolymorphic?.() ? null : (reflection?.klass as never);
+  return aliasedArelTableFor(klass, tableName, effectiveName);
+}
+
 export class AliasTracker {
   readonly aliases: Map<string, number>;
   private _tableAliasLength: number;

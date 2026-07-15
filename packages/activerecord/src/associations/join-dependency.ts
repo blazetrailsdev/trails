@@ -26,7 +26,11 @@ import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
-import { AliasTracker, aliasedArelTableFor } from "./alias-tracker.js";
+import {
+  AliasTracker,
+  aliasedArelTableFor,
+  aliasedArelTableForReflection,
+} from "./alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
@@ -920,10 +924,10 @@ export class JoinDependency {
    */
   private _rebuildChildJoin(parent: JoinPart, child: JoinAssociation, newName: string): void {
     const tableName = child.tableName;
-    const aliased = aliasedArelTableFor(child.reflection.klass as never, tableName, newName);
+    const aliased = aliasedArelTableForReflection(child.reflection, tableName, newName);
     const foreignTable =
       (parent.arelTable as Table) ??
-      aliasedArelTableFor(child.reflection.klass as never, child.tableName);
+      aliasedArelTableForReflection(child.reflection, child.tableName);
     const joinAssoc = new JoinAssociation(child.reflection);
     const joins = joinAssoc.joinConstraints(
       foreignTable,
@@ -1007,7 +1011,7 @@ export class JoinDependency {
           return root ? cand : `${cand}_join`;
         });
         const effectiveName = alias ?? lookupName;
-        const aliased = aliasedArelTableFor(refl.klass as never, tableName, effectiveName);
+        const aliased = aliasedArelTableForReflection(refl, tableName, effectiveName);
         resolvedByIdx[idx] = { effectiveName, aliased };
         // Rails: `@joined_tables[chain] ||= [table, root] if OuterJoin`. Keyed
         // off the PARAMETER `join_type` so an eager OUTER-JOIN dependency folded
@@ -1658,7 +1662,7 @@ export class JoinDependency {
         const idx = chain.length - remaining.length;
         const entry = chainTables[idx];
         if (!entry)
-          return [aliasedArelTableFor(_refl.klass as never, (_refl.klass as any).tableName), false];
+          return [aliasedArelTableForReflection(_refl, (_refl.klass as any).tableName), false];
         return [entry.table, false];
       },
     );
