@@ -33,7 +33,6 @@ import {
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
-  ReadOnlyError,
   StatementInvalid,
   RecordNotUnique,
   InvalidForeignKey,
@@ -291,6 +290,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   private _readonly: boolean;
   private _strict: boolean;
   private _preventWrites = false;
+  private _lastAffectedRows = 0;
+  private _lastInsertRowid: number | bigint = 0;
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
@@ -445,10 +446,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * Execute a SELECT query and return rows. Wrapped in a
-   * `sql.active_record` instrumentation event — mirrors Rails'
-   * `AbstractAdapter#log`, so LogSubscriber / ExplainSubscriber /
-   * QueryCache / custom subscribers all observe the same query stream.
+   * Execute a statement and return its rows (empty for a statement that
+   * returns none, e.g. DDL). Wrapped in a `sql.active_record`
+   * instrumentation event — mirrors Rails' `AbstractAdapter#log`, so
+   * LogSubscriber / ExplainSubscriber / QueryCache / custom subscribers all
+   * observe the same query stream.
    */
   async execute(
     sql: string,
@@ -458,8 +460,31 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     sql = this.preprocessQuery(sql);
     await this.materializeTransactions();
 
+    const payload = this._notificationPayload(sql, binds, name);
+    // Type-cast binds to driver-compatible primitives. Phase 2 threads
+    // bind values through the visitor rather than inlining them, so the
+    // `execute` path now receives non-empty bind arrays where it received
+    // empty ones before.
+    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
+    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
+      try {
+        return await this._performQuery(sql, driverBinds, payload);
+      } catch (e: any) {
+        const translated = this._translateException(e, sql, binds);
+        throw translated;
+      }
+    });
+  }
+
+  // Mirrors the `notification_payload` Rails' raw_execute builds before
+  // dispatching to perform_query.
+  private _notificationPayload(
+    sql: string,
+    binds: unknown[],
+    name: string,
+  ): Record<string, unknown> {
     const txPublic = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
+    return {
       sql,
       name,
       binds,
@@ -468,22 +493,64 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
     };
-    // Type-cast binds to driver-compatible primitives. Phase 2 threads
-    // bind values through the visitor rather than inlining them, so the
-    // `execute` path now receives non-empty bind arrays where it received
-    // empty ones before.
-    const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
-    return Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      try {
-        const stmt = await this._cachedStatement(sql);
-        const rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-        payload.row_count = rows.length;
-        return rows;
-      } catch (e: any) {
-        const translated = this._translateException(e, sql, binds);
-        throw translated;
-      }
-    });
+  }
+
+  /**
+   * The single SQL primitive: run a statement and return its rows, branching
+   * on whether it returns any. `stmt.reader` is better-sqlite3's analogue of
+   * the `stmt.column_count.zero?` check Rails branches on — `.all()` throws
+   * on a non-row-returning statement, so DDL/INSERT/UPDATE/DELETE take
+   * `.run()` and yield an empty result.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
+   */
+  private async _performQuery(
+    sql: string,
+    driverBinds: SqliteBinds,
+    notificationPayload: Record<string, unknown>,
+  ): Promise<Record<string, unknown>[]> {
+    const stmt = await this._cachedStatement(sql);
+    let rows: Record<string, unknown>[];
+    if (stmt.reader) {
+      rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+      // A row-returning statement can still be a write (`INSERT ... RETURNING`),
+      // and `.all()` discards the affected-row count. Rails reads it from the
+      // handle (`raw_connection.changes`) after every statement; better-sqlite3
+      // exposes no such property, so read it back through SQL rather than leave
+      // `_lastAffectedRows` stale from an earlier write.
+      if (isWriteQuerySql(sql)) await this._readBackChanges();
+    } else {
+      const result = await stmt.run(driverBinds);
+      this._lastAffectedRows = result.changes;
+      this._lastInsertRowid = result.lastInsertRowid;
+      rows = [];
+    }
+    notificationPayload.row_count = rows.length;
+    return rows;
+  }
+
+  // Rails' `@last_affected_rows = raw_connection.changes`. `changes()` and
+  // `last_insert_rowid()` are handle-level and survive intervening reads, so
+  // this reports the last write even though it runs as a separate statement.
+  private async _readBackChanges(): Promise<void> {
+    const stmt = await this._cachedStatement(
+      "SELECT changes() AS changes, last_insert_rowid() AS last_insert_rowid",
+    );
+    const row = (await stmt.get([])) as
+      | { changes: number | bigint; last_insert_rowid: number | bigint }
+      | undefined;
+    if (!row) return;
+    this._lastAffectedRows = Number(row.changes);
+    this._lastInsertRowid = row.last_insert_rowid;
+  }
+
+  /**
+   * Rows affected by the most recent write.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#affected_rows
+   */
+  affectedRows(): number {
+    return this._lastAffectedRows;
   }
 
   // A statement prepared outside the pool — Rails' non-`prepare` branch, which
@@ -548,6 +615,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
+   * Folds `withPreventedWrites`' local flag into the inherited pool/replica
+   * check so the guard reaches every statement through preprocess_query's
+   * check_if_write_query, rather than only the executeMutation entry point.
+   */
+  override isPreventingWrites(): boolean {
+    return this._preventWrites || super.isPreventingWrites();
+  }
+
+  /**
    * Execute a block with writes prevented.
    */
   async withPreventedWrites<R>(fn: () => R | Promise<R>): Promise<R> {
@@ -564,36 +640,27 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * Wrapped in a `sql.active_record` notification — see `execute`.
    */
   async executeMutation(sql: string, binds: unknown[] = [], name: string = "SQL"): Promise<number> {
+    // preprocessQuery runs Rails' check_if_write_query, which raises
+    // ReadOnlyError while writes are prevented — see isPreventingWrites below.
     sql = this.preprocessQuery(sql);
     await this.materializeTransactions();
-    if (this._preventWrites) {
-      throw new ReadOnlyError("Write query attempted while in readonly mode: " + sql);
-    }
-    const txPublic = this.currentTransaction().userTransaction;
-    const payload: Record<string, unknown> = {
-      sql,
-      name,
-      binds,
-      type_casted_binds: typeCastedBinds(binds),
-      connection: this,
-      row_count: 0,
-      transaction: txPublic.isOpen() ? txPublic : null,
-    };
+    const payload = this._notificationPayload(sql, binds, name);
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        const stmt = await this._cachedStatement(sql);
-        const result = await stmt.run(driverBinds);
+        await this._performQuery(sql, driverBinds, payload);
         this.dirtyCurrentTransaction();
-        payload.row_count = typeof result.changes === "number" ? result.changes : 0;
+        // perform_query reports the returned-row count (0 for a write); this
+        // path has always reported affected rows, and subscribers rely on it.
+        payload.row_count = this._lastAffectedRows;
 
         // For INSERT, return the last inserted rowid
         if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-          return Number(result.lastInsertRowid);
+          return Number(this._lastInsertRowid);
         }
 
         // For UPDATE/DELETE, return affected rows
-        return result.changes;
+        return this.affectedRows();
       } catch (e: any) {
         const translated = this._translateException(e, sql, binds);
         throw translated;
