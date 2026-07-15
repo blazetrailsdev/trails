@@ -139,6 +139,19 @@ export class Attribute extends Node {
    */
   quotedNode(value: unknown): Node {
     return buildQuoted(value, this);
+||||||| parent of c47f4e3c2 (docs(arel): correct the wrap-site lockstep claim; file predicate convergence)
+    if (value instanceof Node) return value;
+    if (value === null || value === undefined) return new Quoted(null);
+    // ActiveModel::Attribute instances (QueryAttribute etc.) carry their
+    // own type + value. Wrap in BindParam so the visitor extracts them
+    // as binds rather than inlining via Casted. This mirrors the wrap in
+    // `Nodes.buildQuoted` and must move with it — both wrap-sites together,
+    // or the AST shape diverges by call path. See the equivalence proof in
+    // nodes/casted.ts for why the wrap is Rails-equivalent.
+    if (value instanceof ModelAttribute) {
+      return new BindParam(value);
+    }
+    return new Casted(value, this);
   }
 
   // -- Predicates --

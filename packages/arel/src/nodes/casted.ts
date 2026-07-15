@@ -72,8 +72,17 @@ export function buildQuoted(other: unknown, attribute?: unknown): Node {
     if ((other as Record<symbol, unknown>)[ATTRIBUTE_BRAND] === true) return other as Node;
     // ActiveModel::Attribute duck-type (Rails: casted.rb:50-51 — the
     // `when ..., ActiveModel::Attribute` arm returning `other`).
-    // Structural check so buildQuoted doesn't require a runtime import here.
     // valueForDatabase is a getter (not a method) on the TS port; check via 'in'.
+    //
+    // The "structural so we don't need a runtime import" rationale this used to
+    // carry is stale: arel already depends on @blazetrails/activemodel, which
+    // does not depend back (no cycle), and attributes/attribute.ts +
+    // visitors/to-sql.ts already import Attribute from it at runtime. Rails
+    // identifies it by class (casted.rb:50), so `instanceof` is the convergent
+    // shape; the structural check also disagrees with the other two arel
+    // predicates. Tracked by story
+    // `arel-am-attribute-predicates-diverge-across-sites` — a behaviour change
+    // (a duck-typed object stops binding), so not folded into #4879.
     if (
       "valueForDatabase" in (other as Record<string, unknown>) &&
       "name" in (other as Record<string, unknown>)
