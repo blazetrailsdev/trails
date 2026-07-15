@@ -1199,13 +1199,9 @@ export class ToSql extends Visitor {
     collector.append(" = ");
     // Mirrors Rails (to_sql.rb:630-641): a Node/Attribute right is visited; a
     // raw value is quoted directly rather than dispatched through `visit`.
-    if (node.right instanceof Node) {
-      this.visitNodeOrValue(node.right, collector);
-    } else if (isActiveModelAttribute(node.right)) {
-      // `visitNodeOrValue` is the raw-value path and has no class dispatch, so
-      // an ActiveModel::Attribute has to go through `visit` to reach
-      // `visitActiveModelAttribute` — which is what rb:634's `visit o.right`
-      // does for this arm.
+    // `instanceof Node` covers rb:631's `Arel::Attributes::Attribute` arm too —
+    // Arel's Attribute extends Node here (attributes/attribute.ts).
+    if (node.right instanceof Node || isActiveModelAttribute(node.right)) {
       this.visit(node.right as unknown as Node, collector);
     } else {
       collector.append(this.quote(node.right));
