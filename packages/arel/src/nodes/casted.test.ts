@@ -94,16 +94,28 @@ describe("Arel::Nodes.build_quoted", () => {
     expect((node as Nodes.Quoted).value).toBeNull();
   });
 
-  it("wraps duck-typed ActiveModel::Attribute in BindParam without requiring activemodel import", () => {
-    const duckAttr = { name: "age", valueForDatabase: 42 };
-    const node = buildQuoted(duckAttr);
+  // KNOWN DEVIATION, not the target shape: casted.rb:50-51's `when` arm returns
+  // `other` UNWRAPPED, so Rails' AST holds the ActiveModel::Attribute itself;
+  // trails wraps it in BindParam. Output SQL agrees (rb:756's `add_bind(o)` vs
+  // rb:760's `add_bind(o.value)` land the same payload), but the AST shape does
+  // not, for callers that inspect the node.
+  //
+  // Tracked by story `arel-build-quoted-passes-model-attribute-unwrapped`,
+  // which owns the convergence to Rails' unwrapped shape. This test pins
+  // today's shape so that change is visible in the diff — it records the
+  // deviation, it does not endorse it.
+  it("wraps an ActiveModel::Attribute in BindParam", () => {
+    const attr = AMAttribute.fromUser("age", 42, new ValueType());
+    const node = buildQuoted(attr);
     expect(node).toBeInstanceOf(Nodes.BindParam);
-    expect((node as Nodes.BindParam).value).toBe(duckAttr);
+    expect((node as Nodes.BindParam).value).toBe(attr);
   });
 
-  it("does not treat plain objects with only name as ActiveModel::Attribute", () => {
-    const node = buildQuoted({ name: "x" });
-    expect(node).toBeInstanceOf(Nodes.Quoted);
+  // Rails dispatches casted.rb:50's `when` arm on the class, so an object that
+  // merely looks like an ActiveModel::Attribute falls through to the `else`.
+  it("does not treat an ActiveModel::Attribute duck-type as one", () => {
+    expect(buildQuoted({ name: "age", valueForDatabase: 42 })).toBeInstanceOf(Nodes.Quoted);
+    expect(buildQuoted({ name: "x" })).toBeInstanceOf(Nodes.Quoted);
   });
 });
 

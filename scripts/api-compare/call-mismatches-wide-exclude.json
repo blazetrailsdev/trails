@@ -44298,13 +44298,6 @@
   {
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_Assignment",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_BoundSqlLiteral",
     "call": "add_bind",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
