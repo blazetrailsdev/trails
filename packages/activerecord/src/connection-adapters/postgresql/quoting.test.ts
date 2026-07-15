@@ -36,6 +36,11 @@ describe("PostgreSQL quoting", () => {
     // unquoted_false — it inherits "TRUE"/"FALSE" and bare true/false from
     // abstract/quoting.rb:166-180. Inheriting that pair (not MySQL/SQLite's
     // 1/0) is why encode_array emits '{true}'.
+    //
+    // These pin the values, not the dispatch: abstract/quoting.ts:112,175-176
+    // call the module-level quotedTrue/unquotedTrue, where Rails self-dispatches
+    // (quoting.rb:77-78, 98-99), so an override here would not be caught. That
+    // gap is the type-casted-binds-payload-self-dispatch story's to close.
     expect(quote(true)).toBe("TRUE");
     expect(quote(false)).toBe("FALSE");
     expect(typeCast(true)).toBe(true);
