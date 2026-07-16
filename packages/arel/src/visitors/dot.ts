@@ -4,34 +4,9 @@ import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
-import { temporalTag } from "../temporal-tag.js";
+import { temporalClassName } from "../temporal-tag.js";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
-
-/**
- * The Ruby class each Temporal type stands in for. Temporal is this codebase's
- * Time/Date analogue, so these values have a visitable Rails ancestor
- * (`visit_Date` / `visit_DateTime` / `visit_Time`, dot.rb:200-202) and must not
- * fall through to `visit`'s TypeError.
- *
- * Deliberately a whitelist, not a `startsWith("Temporal.")` catch-all: the
- * Temporal types absent here (`Duration`, `PlainYearMonth`, `PlainMonthDay`)
- * have NO visitable Rails ancestor — dot.rb defines no visitor for
- * `ActiveSupport::Duration`, which is a plain `Object` subclass rather than a
- * `Numeric` — so Rails raises on them at visitor.rb:39 and so must we.
- */
-const TEMPORAL_CLASS_NAMES: Readonly<Record<string, "Date" | "DateTime" | "Time">> = {
-  "Temporal.PlainDate": "Date",
-  "Temporal.PlainDateTime": "DateTime",
-  "Temporal.Instant": "Time",
-  "Temporal.ZonedDateTime": "Time",
-  "Temporal.PlainTime": "Time",
-};
-
-function temporalClassName(v: unknown): "Date" | "DateTime" | "Time" | null {
-  const tag = temporalTag(v);
-  return tag === null ? null : (TEMPORAL_CLASS_NAMES[tag] ?? null);
-}
 
 function isAppendableCollector(c: unknown): c is AppendableCollector {
   if (typeof c !== "object" || c === null) return false;
