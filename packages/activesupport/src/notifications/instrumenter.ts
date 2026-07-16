@@ -87,7 +87,7 @@ export interface NotificationHandle {
 
 export class Instrumenter {
   private _notifier: InstrumenterNotifier;
-  private _stack: Event[] = [];
+  private _stack: Handle[] = [];
   readonly id: string;
 
   constructor(notifier: InstrumenterNotifier) {
@@ -96,16 +96,19 @@ export class Instrumenter {
   }
 
   /**
-   * The block receives the payload — the same object passed in, which
-   * subscribers read after the block returns. Mutating it is how a caller
-   * reports back into the notification, mirroring Rails' `yield payload`.
+   * Mirrors ActiveSupport::Notifications::Instrumenter#instrument
+   * (instrumenter.rb:54-65): build a handle, start it, yield the raw payload
+   * (the rescue arm records the exception on it), then finish the handle in the
+   * `ensure`. Routing through `build_handle` is what lets a Fanout notifier's
+   * groups drive the event, rather than open-coding an Event/publish here.
    */
   instrument<T = void>(
     name: string,
     payload: EventPayload = {},
     fn?: (payload: EventPayload) => T,
   ): T {
-    const event = this._push(name, payload);
+    const handle = this.buildHandle(name, payload);
+    handle.start();
 
     try {
       if (fn) return fn(payload);
@@ -114,7 +117,7 @@ export class Instrumenter {
       _recordException(payload, e);
       throw e;
     } finally {
-      this._pop(event, payload);
+      handle.finish();
     }
   }
 
@@ -123,7 +126,8 @@ export class Instrumenter {
     payload: EventPayload = {},
     fn?: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
-    const event = this._push(name, payload);
+    const handle = this.buildHandle(name, payload);
+    handle.start();
 
     try {
       if (fn) return await fn(payload);
@@ -132,7 +136,7 @@ export class Instrumenter {
       _recordException(payload, e);
       throw e;
     } finally {
-      this._pop(event, payload);
+      handle.finish();
     }
   }
 
@@ -149,25 +153,9 @@ export class Instrumenter {
     if (this._notifier.buildHandle) {
       return this._notifier.buildHandle(name, this.id, payload);
     }
-    return new Handle(name, payload, this.id, this._notifier);
-  }
-
-  private _push(name: string, payload: EventPayload): Event {
-    const event = new Event(name, Temporal.Now.instant(), payload, this.id);
-    const parent = this._stack[this._stack.length - 1];
-    if (parent) parent.children.push(event);
-    this._stack.push(event);
-    return event;
-  }
-
-  private _pop(event: Event, payload: EventPayload): void {
-    this._stack.pop();
-    // Rails' EventObjectGroup#finish replaces the event's dup with the final
-    // payload object, so the block's mutations (and the rescue arm's, and any
-    // deletions) are reflected exactly.
-    event.payload = payload;
-    event.finish();
-    this._notifier.publish(event.name, event);
+    // The stack threads trails' (non-Rails) child-event nesting through the
+    // wrapped handles: each links its event under the one still open above it.
+    return new Handle(name, payload, this.id, this._notifier, this._stack);
   }
 }
 
@@ -185,6 +173,8 @@ export class Handle implements NotificationHandle {
     private _payload: EventPayload,
     private _transactionId: string,
     private _notifier: { publish(name: string, event: Event): void },
+    // Optional nesting stack for trails' child-event tracking (see Instrumenter).
+    private _stack?: Handle[],
   ) {}
 
   start(): void {
@@ -193,6 +183,11 @@ export class Handle implements NotificationHandle {
     }
     this._state = "started";
     this._event = new Event(this._name, Temporal.Now.instant(), this._payload, this._transactionId);
+    if (this._stack) {
+      const parent = this._stack[this._stack.length - 1];
+      if (parent?._event) parent._event.children.push(this._event);
+      this._stack.push(this);
+    }
   }
 
   finish(): void {
@@ -200,6 +195,7 @@ export class Handle implements NotificationHandle {
       throw new ArgumentError(`expected state to be "started" but was "${this._state}"`);
     }
     this._state = "finished";
+    if (this._stack) this._stack.pop();
     if (this._event) {
       // Replace the event's dup with the final payload object (mutations made
       // between start and finish, e.g. payload.outcome), as Rails'
