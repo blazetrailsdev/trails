@@ -14,6 +14,7 @@ import railsArelTosql from "./eslint/rails-arel-tosql.mjs";
 import railsDeprecatedJsdoc from "./eslint/rails-deprecated-jsdoc.mjs";
 import nieRequiresAnnotation from "./eslint/nie-requires-annotation.mjs";
 import noNativeDate from "./eslint/no-native-date.mjs";
+import noGetterCalledAsMethod from "./eslint/no-getter-called-as-method.mjs";
 import sqliteDriverAwait from "./eslint/sqlite-driver-await.mjs";
 import preferAwaitRelation from "./eslint/prefer-await-relation.mjs";
 import railsFileStructureMethodOrder from "./eslint/rails-file-structure-method-order.mjs";
@@ -150,6 +151,7 @@ export default defineConfig(
           "rails-arel-tosql": railsArelTosql,
           "rails-deprecated-jsdoc": railsDeprecatedJsdoc,
           "no-native-date": noNativeDate,
+          "no-getter-called-as-method": noGetterCalledAsMethod,
           "sqlite-driver-await": sqliteDriverAwait,
           "prefer-await-relation": preferAwaitRelation,
           "nie-requires-annotation": nieRequiresAnnotation,
@@ -218,6 +220,19 @@ export default defineConfig(
     ],
     rules: {
       "blazetrails/no-native-date": "error",
+    },
+  },
+
+  // ── no-getter-called-as-method ──
+  // `hasChangesToSave` is a getter on Model.prototype, but Ruby's
+  // uniform-access principle means a port transcribed from Rails'
+  // `record.has_changes_to_save?` naturally comes out as a call. `tsc` cannot
+  // catch it behind an `as any`, which is how six association call sites drifted
+  // (four dead `typeof … === "function"` gates, two raising `?.()`).
+  {
+    files: ["packages/*/src/**/*.ts"],
+    rules: {
+      "blazetrails/no-getter-called-as-method": "error",
     },
   },
 
