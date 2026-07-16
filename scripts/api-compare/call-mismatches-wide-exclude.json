@@ -42177,6 +42177,20 @@
   {
     "package": "activesupport",
     "tsFile": "notifications/fanout.ts",
+    "rubyName": "iterate_guarding_exceptions",
+    "call": "each",
+    "reason": "Idiomatic translation: Ruby `collection.each` is a TS `for...of` loop. Surfaced when the helper was exported for reuse by Notifications.buildHandle (#4906)."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "notifications/fanout.ts",
+    "rubyName": "iterate_guarding_exceptions",
+    "call": "first",
+    "reason": "Idiomatic translation: Ruby `exceptions.first` is TS index access `flat[0]`. Surfaced when the helper was exported for reuse by Notifications.buildHandle (#4906)."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "notifications/fanout.ts",
     "rubyName": "all_listeners_for",
     "call": "select",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
