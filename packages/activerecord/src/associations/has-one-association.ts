@@ -39,7 +39,7 @@ export class HasOneAssociation extends SingularAssociation {
   /**
    * Set when a deferred assignment displaces an *unloaded* has_one on a persisted
    * owner: at queue time the current target has not been materialized, so there
-   * is no in-memory `_displacedRecord` to remove — but a DB row keyed by the
+   * is no in-memory `_displacedRecords` entry to remove — but a DB row keyed by the
    * owner may still exist and must be removed (nullified, or per `:dependent`).
    * Rails loads the current target synchronously inside `replace`; the JS
    * property setter cannot `await`, so we defer the load to `removeDisplaced`,

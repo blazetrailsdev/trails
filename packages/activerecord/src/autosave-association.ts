@@ -531,7 +531,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // must NOT be inserted here — the through's own `persistReplace` reconciles
   // the existing DB row via `load_target` + `update`, and persisting it here
   // would duplicate that row. A plain `HasOneAssociation` never sets
-  // `_pendingReplace` itself (it converged onto `_displacedRecord` +
+  // `_pendingReplace` itself (it converged onto `_displacedRecords` +
   // `autosaveHasOne`), and the through association itself clears its marker
   // inside `persistThroughRecord` above, so a truthy marker on an instance with
   // no `persistThroughRecord` is unambiguously that suppression sentinel. Skip

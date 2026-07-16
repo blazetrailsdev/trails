@@ -349,8 +349,8 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     //
     // We also clear the suppression sentinel we set on the through proxy's
     // duck-typed `_pendingReplace`: the base `HasOneAssociation#reset` clears
-    // only `_displacedRecord` (it never declares `_pendingReplace`, having
-    // converged onto `_displacedRecord` + `autosaveHasOne`), so without this the
+    // only `_displacedRecords` (it never declares `_pendingReplace`, having
+    // converged onto `_displacedRecords` + `autosaveHasOne`), so without this the
     // sentinel would linger and permanently make `autosaveHasOne` skip the
     // proxy — silently dropping any *later* independent write to
     // `owner.currentMembership` on this same instance. Runs before the `!pending`
