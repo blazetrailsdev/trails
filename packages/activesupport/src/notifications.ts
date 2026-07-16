@@ -12,6 +12,26 @@ import { Event } from "./notifications/instrumenter.js";
 import type { EventPayload } from "./notifications/instrumenter.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
+/**
+ * Rails' `e.class.name`. trails carries the namespaced Rails name on `name`
+ * where it has been ported (`ActionDispatch::ParamError`, param-error.ts:28),
+ * which is what keys `rescue_responses` — so prefer it and fall back to the
+ * constructor, mirroring ExceptionWrapper's classNameOf (exception-wrapper.ts:75).
+ * Errors that never got a namespaced name (AR's, today) degrade to the bare one.
+ */
+function _classNameOf(e: unknown): string {
+  if (e === null || e === undefined) return "NilClass";
+  if (e instanceof Error) {
+    if (e.name && e.name !== "Error") return e.name;
+    const ctor = e.constructor?.name;
+    if (ctor && ctor !== "Error") return ctor;
+    return e.name || ctor || "Error";
+  }
+  // Ruby cannot `raise` a non-Exception, so this branch has no Rails analogue;
+  // name it the way Rails would name the object's class anyway.
+  return e.constructor?.name ?? typeof e;
+}
+
 export type NotificationSubscriber = {
   readonly pattern: string | RegExp | null;
   readonly callback: (event: Event) => void;
@@ -113,8 +133,14 @@ export class Notifications {
     payload?: EventPayload,
     block?: (payload: EventPayload) => T,
   ): T extends undefined ? void : T {
+    const resolved = payload ?? {};
+
+    if (!this._listening(name)) {
+      return (block ? block(resolved) : undefined) as any;
+    }
+
     const current = this._eventStack();
-    const event = this._buildEvent(name, payload, current);
+    const event = this._buildEvent(name, resolved, current);
 
     if (!block) {
       event.finish();
@@ -130,6 +156,9 @@ export class Notifications {
     let result: T;
     try {
       result = this._runWithStack(inner, () => block(event.payload));
+    } catch (e) {
+      this._recordException(event.payload, e);
+      throw e;
     } finally {
       event.finish();
       this._notify(event);
@@ -139,6 +168,10 @@ export class Notifications {
 
   /**
    * instrumentAsync — like instrument but for async blocks.
+   *
+   * Rails has no async analogue; this is a trails extension that mirrors
+   * `instrument` (listening? short-circuit, rescue arm, event stack) across an
+   * awaited block.
    *
    * The block receives the event payload — the same object passed in, which
    * subscribers read after the block returns. Mutating it (e.g. `row_count`)
@@ -150,8 +183,14 @@ export class Notifications {
     payload?: EventPayload,
     block?: (payload: EventPayload) => Promise<T>,
   ): Promise<T extends undefined ? void : T> {
+    const resolved = payload ?? {};
+
+    if (!this._listening(name)) {
+      return (block ? await block(resolved) : undefined) as any;
+    }
+
     const current = this._eventStack();
-    const event = this._buildEvent(name, payload, current);
+    const event = this._buildEvent(name, resolved, current);
 
     if (!block) {
       event.finish();
@@ -167,6 +206,9 @@ export class Notifications {
     let result: T;
     try {
       result = await this._runWithStack(inner, () => block(event.payload));
+    } catch (e) {
+      this._recordException(event.payload, e);
+      throw e;
     } finally {
       event.finish();
       this._notify(event);
@@ -220,6 +262,27 @@ export class Notifications {
   // -------------------------------------------------------------------------
   // Internal
   // -------------------------------------------------------------------------
+
+  /**
+   * Mirrors Fanout#listening? — true when any subscriber matches `name`.
+   * Rails' Notifications.instrument short-circuits on this, so an unlistened
+   * event pays for neither event construction nor publish.
+   */
+  private static _listening(name: string): boolean {
+    for (const sub of this._subscribers) {
+      if (this._matches(sub.pattern, name)) return true;
+    }
+    return false;
+  }
+
+  /**
+   * Mirrors the `rescue Exception` arm of Instrumenter#instrument: `exception`
+   * is the [class name, message] pair, `exception_object` the error itself.
+   */
+  private static _recordException(payload: EventPayload, e: unknown): void {
+    payload.exception = [_classNameOf(e), e instanceof Error ? e.message : String(e)];
+    payload.exception_object = e;
+  }
 
   private static _notify(event: Event, propagate = false): void {
     for (const sub of this._subscribers) {

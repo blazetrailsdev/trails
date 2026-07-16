@@ -1018,8 +1018,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           return r;
         } catch (e: any) {
           const translated = this._translateException(e, rewritten, bindArray);
-          payload.exception = translated;
-          payload.exception_object = translated;
           throw translated;
         }
       },
@@ -1641,8 +1639,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         return r;
       } catch (e: any) {
         const translated = this._translateException(e, rewritten, bindArray);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });
@@ -1752,8 +1748,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         });
       } catch (e: any) {
         const translated = this._translateException(e, rewritten, bindArray);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
     });
@@ -1872,8 +1866,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         });
       } catch (e: any) {
         const translated = this._translateException(e, pgSql, binds);
-        payload.exception = translated;
-        payload.exception_object = translated;
         throw translated;
       }
       // Mirrors Rails' raw_execute → verified!: the block completed a live
@@ -2186,21 +2178,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         // the retry/verify/reconnect loop.
         this.withRawConnection({ materializeTransactions: false, allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
-          try {
-            const runResult = await this._runQuery(client, runSql, bindArray, { rowMode: "array" });
-            const count = runResult.rowCount ?? runResult.rows.length;
-            payload.row_count = count;
-            return runResult;
-          } catch (e: any) {
-            // Rethrow raw: withRawConnection translates the driver error to an
-            // ActiveRecordError (with sql: null / binds: []), and the shared logSql
-            // rescue then attaches sql + binds via set_query — mirroring Rails'
-            // AbstractAdapter#log. Translating here would duplicate that and, on an
-            // already-translated error, re-wrap it as StatementInvalid.
-            payload.exception = e;
-            payload.exception_object = e;
-            throw e;
-          }
+          // Errors propagate raw: withRawConnection translates the driver error to
+          // an ActiveRecordError (with sql: null / binds: []), and the shared logSql
+          // rescue then attaches sql + binds via set_query — mirroring Rails'
+          // AbstractAdapter#log. Translating here would duplicate that and, on an
+          // already-translated error, re-wrap it as StatementInvalid.
+          const runResult = await this._runQuery(client, runSql, bindArray, { rowMode: "array" });
+          const count = runResult.rowCount ?? runResult.rows.length;
+          payload.row_count = count;
+          return runResult;
         }),
       );
       if (hasBinds) this._flushWarnings(runSql);
