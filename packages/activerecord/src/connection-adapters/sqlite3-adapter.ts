@@ -75,6 +75,7 @@ import {
   buildTruncateStatement as sqliteBuildTruncateStatement,
   castResult as sqliteCastResult,
   affectedRows as sqliteAffectedRows,
+  performQuery as sqlitePerformQuery,
 } from "./sqlite3/database-statements.js";
 import { Result } from "../result.js";
 import { isWriteQuerySql } from "./sql-classification.js";
@@ -293,7 +294,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   private _preventWrites = false;
   /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
   _lastAffectedRows = 0;
-  private _lastInsertRowid: number | bigint = 0;
+  _lastInsertRowid: number | bigint = 0;
   private _nativeTypeMap: TypeMap;
   private _memoryDatabase: boolean;
   private _filename: string;
@@ -498,96 +499,17 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * The single SQL primitive: run a statement and return its rows. Reads take
-   * `.all()`; every write (incl. `INSERT … RETURNING`) and transaction-control
-   * takes `.run()` for its atomic RunResult.
-   *
-   * Follows Rails' `perform_query` for the read/affected-rows contract, but
-   * DEVIATES on the branch axis and the RETURNING return: Rails branches on
-   * `stmt.column_count.zero?`, so `INSERT … RETURNING` (nonzero column count)
-   * comes back as `Result.new(columns, to_a)` with `row_count = 1`. Here it
-   * takes `.run()` and returns `[]` (`row_count = 0`) — deliberately, so the
-   * insert id / count come from the RunResult ATOMICALLY rather than a
-   * follow-up `last_insert_rowid()` read that races under concurrent writes.
-   * Nothing calls this expecting RETURNING rows: multi-column RETURNING
-   * read-back goes through `internalExecQuery` (`.all()`) and single-column
-   * through `executeMutation`'s rowid.
-   *
-   * NOTE: `sqlite3/database-statements.ts` also exports a `performQuery`. That
-   * one is an unwired port written against better-sqlite3's native sync API
-   * (raw connection, spread binds), which is not the async driver abstraction
-   * this adapter talks to, so it cannot be called from here as-is. Converging
-   * the two is tracked separately; until then this is the live primitive and
-   * that one has no callers.
+   * The single SQL primitive `execute` / `executeMutation` delegate to. The
+   * live implementation lives in the Rails-layout file
+   * `sqlite3/database-statements.ts` (`performQuery`) so api:compare's
+   * `perform_query` coverage points at reachable code; it is bound here with
+   * `this` as the adapter, whose `_cachedStatement` / `isWriteQuery` /
+   * `verifiedBang` / `dirtyCurrentTransaction` and `_last*` fields satisfy the
+   * `PerformQueryHost` interface.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
    */
-  private async _performQuery(
-    sql: string,
-    driverBinds: SqliteBinds,
-    notificationPayload: Record<string, unknown>,
-  ): Promise<{
-    rows: Record<string, unknown>[];
-    affectedRows: number;
-    insertRowid: number | bigint;
-  }> {
-    // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
-    // gated only on materialize_transactions — NOT on read/write, and it runs
-    // even when the query raises. execute/executeMutation (the only callers)
-    // both materialize unconditionally, so dirty in a finally regardless of
-    // outcome, mirroring this adapter's `exec`. `verified!` (below), by
-    // contrast, is on Rails' success path only.
-    try {
-      const stmt = await this._cachedStatement(sql);
-      // Dispatch through the virtual isWriteQuery — the same predicate
-      // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard
-      // and the affected-rows gate can never disagree.
-      const isWrite = this.isWriteQuery(sql);
-      let rows: Record<string, unknown>[];
-      // Default to the tracked counts so a non-write (BEGIN/COMMIT/read) returns
-      // the last write's values intact, as sqlite3_changes() does.
-      let affectedRows = this._lastAffectedRows;
-      let insertRowid = this._lastInsertRowid;
-      // Reads take `.all()` (rows); everything else — writes (incl.
-      // `INSERT … RETURNING`) and transaction-control — takes `.run()`, whose
-      // RunResult carries the affected-row count and insert rowid ATOMICALLY.
-      // Sourcing those from `.run()` (not a separate `SELECT changes()`) is
-      // essential under concurrency: `Promise.all` inserts interleave at await
-      // points, so a follow-up `last_insert_rowid()` read would report another
-      // statement's rowid. Gating on `!isWrite` also keeps a `SELECT`, which is
-      // reader=true, on the `.all()` path; a write is never misread as a reader
-      // because isWriteQuery classifies INSERT/UPDATE/DELETE/DDL as writes.
-      if (stmt.reader && !isWrite) {
-        rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-      } else {
-        const result = await stmt.run(driverBinds);
-        if (isWrite) {
-          // DDL takes this branch too and reports changes = 0 — a small
-          // deviation from Rails' sqlite3_changes(), which is preserved across
-          // DDL; matching it would need a handle read that isn't atomic under
-          // concurrency, and no caller reads affected_rows after a DDL (it is
-          // consumed right after its DML).
-          affectedRows = Number(result.changes ?? 0);
-          insertRowid = result.lastInsertRowid;
-        }
-        rows = [];
-      }
-      // Persist for the affected_rows() port / public accessor. The RETURNED
-      // locals — not these fields — are what executeMutation uses for its return
-      // value: reading `this._lastInsertRowid` back after the caller's await
-      // would race, since a concurrent write's _performQuery can overwrite it
-      // between this assignment and that read.
-      this._lastAffectedRows = affectedRows;
-      this._lastInsertRowid = insertRowid;
-      // Rails' perform_query: `verified!` after @last_affected_rows, success
-      // path only — a successful round-trip proves the connection is live.
-      this.verifiedBang();
-      notificationPayload.row_count = rows.length;
-      return { rows, affectedRows, insertRowid };
-    } finally {
-      this.dirtyCurrentTransaction();
-    }
-  }
+  private _performQuery = sqlitePerformQuery;
 
   /**
    * Rows affected by the most recent write. Rails takes the statement result
@@ -601,6 +523,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // the count as a local from _performQuery rather than re-reading the shared
   // field through this port, which would re-open the concurrent-write race. The
   // port ignores the arg either way (reads @last_affected_rows).
+  /** @internal */
   affectedRows(result?: unknown): number {
     return sqliteAffectedRows.call(this, result);
   }
@@ -614,7 +537,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     return stmt;
   }
 
-  private async _cachedStatement(sql: string): Promise<SqliteStatement> {
+  // Non-private (underscore-public) so the extracted `performQuery` in
+  // sqlite3/database-statements.ts can reach it through PerformQueryHost.
+  async _cachedStatement(sql: string): Promise<SqliteStatement> {
     await this.ensureConnected();
     // When preparedStatements is off, skip the pool and prepare per call —
     // matches Rails' `statement_pool` behavior gated on
