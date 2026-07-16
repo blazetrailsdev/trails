@@ -132,4 +132,41 @@ describe("Notifications (trails)", () => {
       expect(events[0].payload.exception_object).toBeUndefined();
     });
   });
+
+  // Mirrors ActiveSupport::Notifications.instrumenter.build_handle — the
+  // low-level primitive TransactionInstrumenter spans a transaction with.
+  describe("buildHandle", () => {
+    it("publishes one event spanning start→finish, off the mutated payload", () => {
+      const events: Event[] = [];
+      Notifications.subscribe("span", (e) => events.push(e));
+
+      const payload: Record<string, unknown> = { a: 1 };
+      const handle = Notifications.instrumenter.buildHandle("span", payload);
+      handle.start();
+      // Subscribers must see mutations made between start and finish.
+      payload.outcome = "done";
+      handle.finish();
+
+      expect(events).toHaveLength(1);
+      expect(events[0].name).toBe("span");
+      expect(events[0].payload.outcome).toBe("done");
+      expect(events[0].end).not.toBeNull();
+    });
+
+    it("skips building an event when nothing is listening", () => {
+      const handle = Notifications.buildHandle("unlistened", {});
+      expect(() => {
+        handle.start();
+        handle.finish();
+      }).not.toThrow();
+    });
+
+    it("raises when start/finish are called out of order", () => {
+      Notifications.subscribe("span", () => {});
+      const handle = Notifications.buildHandle("span", {});
+      expect(() => handle.finish()).toThrow(/expected state to be "started"/);
+      handle.start();
+      expect(() => handle.start()).toThrow(/expected state to be "initialized"/);
+    });
+  });
 });

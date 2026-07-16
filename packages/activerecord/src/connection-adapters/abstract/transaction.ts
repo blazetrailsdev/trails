@@ -9,11 +9,10 @@ import {
 } from "../../errors.js";
 import {
   Notifications,
-  NotificationEvent,
   getAsyncContext,
   type AsyncContext,
+  type NotificationHandle,
 } from "@blazetrails/activesupport";
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { beforeCommittedOnAllRecords } from "../../ar-config.js";
 
 /**
@@ -154,7 +153,7 @@ export class TransactionInstrumenter {
   private _started = false;
   private _basePayload: Record<string, unknown>;
   private _payload: Record<string, unknown> | null = null;
-  private _event: NotificationEvent | null = null;
+  private _handle: NotificationHandle | null = null;
 
   constructor(payload: Record<string, unknown> = {}) {
     this._basePayload = payload;
@@ -168,12 +167,15 @@ export class TransactionInstrumenter {
 
     Notifications.instrument("start_transaction.active_record", this._basePayload);
 
+    // Mirror Rails: a handle spans the transaction so the published event's
+    // duration covers start→finish, and the outcome mutated into the payload
+    // before finish reaches subscribers (transaction.rb:90-107).
     this._payload = { ...this._basePayload };
-    this._event = new NotificationEvent(
+    this._handle = Notifications.instrumenter.buildHandle(
       "transaction.active_record",
-      Temporal.Now.instant(),
       this._payload,
     );
+    this._handle.start();
   }
 
   finish(outcome: string): void {
@@ -185,16 +187,8 @@ export class TransactionInstrumenter {
     if (this._payload) {
       this._payload.outcome = outcome;
     }
-    if (this._event) {
-      this._event.finish();
-      // Publish with the finished event's payload including timing and outcome.
-      // Ideally we'd publish the Event instance directly (like Rails' handle.finish),
-      // but Notifications.publish creates a new Event. The payload carries the
-      // outcome; duration can be derived from the event's time/end if needed.
-      Notifications.publish("transaction.active_record", {
-        ...this._event.payload,
-        duration: this._event.duration,
-      });
+    if (this._handle) {
+      this._handle.finish();
     }
   }
 }

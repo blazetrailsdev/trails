@@ -2,6 +2,14 @@ import { Temporal } from "../temporal.js";
 
 export type EventPayload = Record<string, unknown>;
 
+// Rails' Fanout::Handle#ensure_state! raises ArgumentError (fanout.rb:263-267).
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
 let _txCounter = 0;
 function generateTransactionId(): string {
   return `tx-${Date.now()}-${(++_txCounter).toString(36)}`;
@@ -107,6 +115,16 @@ export class Instrumenter {
     }
   }
 
+  /**
+   * Mirrors ActiveSupport::Notifications::Instrumenter#build_handle
+   * (instrumenter.rb:78-80). Returns a handle that records the event's start at
+   * `#start` and publishes it at `#finish`, so a single event carries the span
+   * between the two calls. `#start`/`#finish` must each be called exactly once.
+   */
+  buildHandle(name: string, payload: EventPayload = {}): Handle {
+    return new Handle(name, payload, this.id, this._notifier);
+  }
+
   // Rails' #instrument never builds an Event — it hands the raw payload to a
   // Fanout handle, so subscribers see the block's mutations (that is how
   // payload[:exception] reaches them). trails routes it through an Event, which
@@ -125,6 +143,42 @@ export class Instrumenter {
     this._stack.pop();
     event.finish();
     this._notifier.publish(event.name, event);
+  }
+}
+
+/**
+ * Mirrors ActiveSupport::Notifications::Fanout::Handle — builds the Event at
+ * `#start` (so its start time is the real start of the work) and publishes it
+ * at `#finish`, off the payload held by reference.
+ */
+export class Handle {
+  private _state: "initialized" | "started" | "finished" = "initialized";
+  private _event: Event | null = null;
+
+  constructor(
+    private _name: string,
+    private _payload: EventPayload,
+    private _transactionId: string,
+    private _notifier: { publish(name: string, event: Event): void },
+  ) {}
+
+  start(): void {
+    if (this._state !== "initialized") {
+      throw new ArgumentError(`expected state to be "initialized" but was "${this._state}"`);
+    }
+    this._state = "started";
+    this._event = new Event(this._name, Temporal.Now.instant(), this._payload, this._transactionId);
+  }
+
+  finish(): void {
+    if (this._state !== "started") {
+      throw new ArgumentError(`expected state to be "started" but was "${this._state}"`);
+    }
+    this._state = "finished";
+    if (this._event) {
+      this._event.finish();
+      this._notifier.publish(this._event.name, this._event);
+    }
   }
 }
 

@@ -70,4 +70,27 @@ describe("Instrumenter (trails)", () => {
     expect(payload.exception).toEqual(["RangeError", "Oopsies"]);
     expect(payload.exception_object).toBeInstanceOf(RangeError);
   });
+
+  // build_handle is the low-level primitive TransactionInstrumenter spans a
+  // transaction with; it publishes one event carrying payload mutations made
+  // between start and finish.
+  it("buildHandle publishes one event spanning start→finish", () => {
+    const notifier = buildNotifier();
+    const payload: Record<string, unknown> = { a: 1 };
+    const handle = new Instrumenter(notifier).buildHandle("span", payload);
+    handle.start();
+    payload.outcome = "done";
+    handle.finish();
+    expect(notifier.finishes).toHaveLength(1);
+    expect(notifier.finishes[0].name).toBe("span");
+    expect(notifier.finishes[0].payload.outcome).toBe("done");
+    expect(notifier.finishes[0].end).not.toBeNull();
+  });
+
+  it("buildHandle raises when start/finish are called out of order", () => {
+    const handle = new Instrumenter(buildNotifier()).buildHandle("span", {});
+    expect(() => handle.finish()).toThrow(/expected state to be "started"/);
+    handle.start();
+    expect(() => handle.start()).toThrow(/expected state to be "initialized"/);
+  });
 });

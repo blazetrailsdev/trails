@@ -37,6 +37,35 @@ export type NotificationSubscriber = {
   readonly callback: (event: Event) => void;
 };
 
+// Rails' Fanout::Handle#ensure_state! raises ArgumentError (fanout.rb:263-267).
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
+/**
+ * Mirrors ActiveSupport::Notifications::Fanout::Handle — a low-level handle
+ * that spans an event across separate `start`/`finish` calls, so a single
+ * event carries the real duration of the work between them. `#start` and
+ * `#finish` must each be called exactly once.
+ */
+export interface NotificationHandle {
+  start(): void;
+  finish(): void;
+}
+
+/**
+ * Mirrors ActiveSupport::Notifications::Instrumenter — the object Rails reaches
+ * via `ActiveSupport::Notifications.instrumenter`. Here it delegates to the
+ * static `Notifications` hub rather than holding a thread-local notifier.
+ */
+export interface NotificationInstrumenter {
+  readonly id: string;
+  buildHandle(name: string, payload?: EventPayload): NotificationHandle;
+}
+
 type Subscriber = {
   pattern: string | RegExp | null;
   callback: (event: Event) => void;
@@ -49,6 +78,10 @@ type Subscriber = {
  */
 export class Notifications {
   private static _subscribers: Set<Subscriber> = new Set();
+
+  // Rails' Instrumenter#id is a per-instrumenter SecureRandom hex; the static
+  // hub has a single stable id, mirroring one thread-local instrumenter.
+  private static readonly _instrumenterId = `instr-${Math.random().toString(36).slice(2)}`;
 
   private static readonly _STACK_KEY = Symbol.for("as_notification_instrumenter");
 
@@ -224,6 +257,48 @@ export class Notifications {
     const event = this._buildEvent(name, payload);
     event.finish();
     this._notify(event, true);
+  }
+
+  /**
+   * buildHandle(name, payload) — mirrors
+   * `ActiveSupport::Notifications.instrumenter.build_handle`. The returned
+   * handle records the event's start at `#start` and finishes + publishes it at
+   * `#finish`, so `event.duration` covers the whole span (not just the publish
+   * call). The payload is held by reference: mutations made between `#start`
+   * and `#finish` (e.g. `payload.outcome = ...`) are visible to subscribers.
+   */
+  static buildHandle(name: string, payload: EventPayload = {}): NotificationHandle {
+    let state: "initialized" | "started" | "finished" = "initialized";
+    let event: Event | null = null;
+    return {
+      start: () => {
+        if (state !== "initialized") {
+          throw new ArgumentError(`expected state to be "initialized" but was "${state}"`);
+        }
+        state = "started";
+        if (this._listening(name)) {
+          event = this._buildEvent(name, payload);
+        }
+      },
+      finish: () => {
+        if (state !== "started") {
+          throw new ArgumentError(`expected state to be "started" but was "${state}"`);
+        }
+        state = "finished";
+        if (event) {
+          event.finish();
+          this._notify(event, true);
+        }
+      },
+    };
+  }
+
+  /** Mirrors `ActiveSupport::Notifications.instrumenter`. */
+  static get instrumenter(): NotificationInstrumenter {
+    return {
+      id: this._instrumenterId,
+      buildHandle: (name: string, payload?: EventPayload) => this.buildHandle(name, payload),
+    };
   }
 
   // -------------------------------------------------------------------------
