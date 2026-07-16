@@ -227,13 +227,7 @@ export class ThroughAssociation extends Association {
     const strategy = this._throughScopeStrategy();
     if (strategy !== "nested" && this._reflectionScope != null) {
       sourceScope = this._reflectionScope._clone();
-      if (strategy === "join" && this._throughQueryJoinsSource()) {
-        // The through query copied the FULL where_clause and eager-JOINed the
-        // source, so the source query re-applies NO predicates. When the through
-        // query could NOT join the source (a composite-PK non-HABTM through model
-        // bypasses the eager JoinDependency), fall through to keep the
-        // source-table predicates here instead — they never reached the through
-        // query (see `_buildThroughScope`).
+      if (strategy === "join") {
         sourceScope._whereClause = new WhereClause([]);
       } else {
         const throughTable = this._throughTableName();
@@ -537,6 +531,16 @@ export class ThroughAssociation extends Association {
    * — the composite-PK eager bypass that previously forced a plain
    * `leftOuterJoins` there is lifted (see `_isHabtmJoinModel`). `disable_joins`
    * and polymorphic `source_type` keep their own paths.
+   *
+   * This is a faithful `through_scope` port; the only residual deviation is
+   * orthogonal and lives in `Relation#_eagerLoadBypassesJoinDependency`: for a
+   * composite-PK, NON-HABTM through model, trails' eager path degrades to preload
+   * (Rails always JOINs), so the `includes!`/`references!` here would not
+   * actually JOIN and a copied source-table predicate would orphan. That case is
+   * unreachable in the canonical suite (no scoped source routes through such a
+   * model) and is tracked for convergence by story
+   * `close-composite-pk-through-eager-bypass-for-scoped-source` (RFC 0054) — the
+   * fix belongs in the eager JOIN builder, not in a non-Rails branch here.
    */
   private _buildThroughScope(): any {
     const throughRefl = this._throughReflection;
@@ -576,38 +580,7 @@ export class ThroughAssociation extends Association {
       // where_clause onto the through query and JOIN the source reflection so
       // every referenced column resolves in this single query.
       const sourceRefl = this._sourceReflection;
-      if (sourceRefl && !this._throughQueryJoinsSource()) {
-        // trails can't apply the eager JoinDependency for this through query (a
-        // composite-PK non-HABTM through model bypasses it, degrading to
-        // preload), so `includes!(source)` would NOT actually JOIN the source.
-        // Copying the FULL where_clause here would then orphan the source-table
-        // predicates onto an unjoined table. Instead copy ONLY the
-        // through-table-only predicates (to constrain the intermediate rows); the
-        // source-table predicates ride the recursive source stage (see
-        // `_getSourcePreloaders`, which keeps them for this case). Rails never
-        // reaches here — it always JOINs — so this is trails' faithful
-        // degradation of the same `through_scope` where-copy.
-        //
-        // Residual capability gap: a single predicate that references BOTH the
-        // through table AND the source table can't be resolved by either stage
-        // (the through query joins only the through table; the source query only
-        // the source table), so it stays on the source stage and errors — the
-        // same inherent limitation as the long-standing collection `twoStep`
-        // split, since no two-step decomposition can span two never-joined
-        // tables. The faithful fix is closing the composite-PK eager bypass so
-        // this whole branch collapses to Rails' single JOIN; tracked by story
-        // `close-composite-pk-through-eager-bypass-for-scoped-source` (RFC 0054).
-        // Unreachable in the canonical suite today (no scoped source routes
-        // through a composite-PK non-HABTM model).
-        const throughTable = this._throughTableName();
-        const throughOnly =
-          throughTable != null
-            ? whereClause.predicates.filter((p: any) => predicateIsThroughOnly(p, throughTable))
-            : [];
-        if (throughOnly.length > 0) {
-          scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...throughOnly]);
-        }
-      } else if (sourceRefl) {
+      if (sourceRefl) {
         // Mirror Rails' `through_scope` eager-load branch exactly for EVERY
         // source kind (to-one, collection, nested through).
         // Copy the FULL reflection-scope where_clause and `includes!(source)` +
@@ -694,32 +667,6 @@ export class ThroughAssociation extends Association {
     // cascade_strict_loading: a strict-loading preload scope propagates to the
     // through query so intermediate records inherit the constraint (rb:145).
     return this._cascadeStrictLoading(scope);
-  }
-
-  /**
-   * Whether the through query will ACTUALLY eager-JOIN the source reflection
-   * when `_buildThroughScope` issues `includes!(source)`/`references!`. It does
-   * unless trails' eager path bypasses the JoinDependency for the through model
-   * (`Relation#_eagerLoadBypassesJoinDependency`): a composite-PK base degrades
-   * to preload — EXCEPT the anonymous `HABTM_*` join model, whose composite PK is
-   * a delete-only affordance flagged `_isHabtmJoinModel`. Rails has no such
-   * bypass (it always JOINs), so this is false only for trails' capability gap:
-   * a composite-PK, non-HABTM through model. In that case the where-copy must
-   * degrade (see `_buildThroughScope` / `_getSourcePreloaders`) rather than
-   * orphan source-table predicates on an unjoined through query.
-   * @internal
-   */
-  private _throughQueryJoinsSource(): boolean {
-    const throughRefl = this._throughReflection;
-    if (!throughRefl) return false;
-    let throughKlass: typeof Base;
-    try {
-      throughKlass = throughRefl.klass;
-    } catch {
-      return false;
-    }
-    const pk = (throughKlass as any).primaryKey;
-    return !(Array.isArray(pk) && !(throughKlass as any)._isHabtmJoinModel);
   }
 
   /** @internal */
