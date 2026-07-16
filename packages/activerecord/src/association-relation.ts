@@ -62,10 +62,12 @@ export class AssociationRelation<T extends Base> extends Relation<T> {
 
   /**
    * The none-short-circuit chokepoint (see `Relation#_isEmptyRelation`): every
-   * query terminal (`toArray`/`exists`/`pluck`/`count`/the bounded finders)
-   * consults this before returning its empty result, so rebasing a stale
-   * new-owner `1=0` seed here covers all of them from one place. Reports the
-   * (possibly rebased) `_isNone`.
+   * query terminal (`toArray`/`exists`/`pluck`/`count`/the bounded finders) and
+   * the mutation terminals (`updateAll`/`deleteAll`, plus `touchAll`/
+   * `updateCounters` via their `updateAll` delegation) consult this before
+   * returning an empty result, so rebasing a stale new-owner `1=0` seed here
+   * covers all of them from one place. Reports the (possibly rebased)
+   * `_isNone`.
    */
   _isEmptyRelation(): boolean {
     this._maybeRebaseAssociationSeed();

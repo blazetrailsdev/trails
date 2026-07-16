@@ -23,6 +23,8 @@ import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Toy } from "../test-helpers/models/toy.js";
 import { Firm, Client } from "../test-helpers/models/company.js";
+import { Ship } from "../test-helpers/models/ship.js";
+import { ShipPart } from "../test-helpers/models/ship-part.js";
 
 // `authors`, `posts`, `cpkAuthors`, `cpkBooks`, `pets`, and `toys` are declared
 // fixture sets below, so their models (`Author`, `Post`, `CpkAuthor`, `CpkBook`,
@@ -781,6 +783,63 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
     expect(await rel.pluck("title")).toEqual(["match"]);
     expect(await rel.pick("title")).toBe("match");
     expect((await rel.find(match.id)).id).toBe(match.id);
+  });
+
+  it("resolves the persisted FK on updateAll/updateCounters after save", async () => {
+    // The mutation terminals carry their own none short-circuits, so they must
+    // consult the same `_isEmptyRelation()` chokepoint the read terminals do.
+    const author = new Author({ name: "New Owner Four" });
+    const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
+
+    await author.save();
+    const authorId = author.id as number;
+    const match = await Post.create({ title: "match", body: "1", author_id: authorId });
+    // A non-matching sibling proves the mutation (`where(title:)`) is still
+    // applied on top of the rebuilt scope, not dropped.
+    const other = await Post.create({ title: "other", body: "2", author_id: authorId });
+
+    expect(await rel.updateCounters({ tags_count: 1 })).toBe(1);
+    expect((await Post.find(match.id)).tags_count).toBe(1);
+    expect((await Post.find(other.id)).tags_count).toBe(0);
+
+    expect(await rel.updateAll({ body: "updated" })).toBe(1);
+    expect((await Post.find(match.id)).body).toBe("updated");
+    expect((await Post.find(other.id)).body).toBe("2");
+  });
+
+  it("resolves the persisted FK on deleteAll after save", async () => {
+    const author = new Author({ name: "New Owner Five" });
+    const rel = (association<Post>(author, "posts") as any).where({ title: "match" });
+
+    await author.save();
+    const authorId = author.id as number;
+    await Post.create({ title: "match", body: "1", author_id: authorId });
+    const other = await Post.create({ title: "other", body: "2", author_id: authorId });
+
+    expect(await rel.deleteAll()).toBe(1);
+    expect(await Post.where({ author_id: authorId }).pluck("id")).toEqual([other.id]);
+  });
+
+  // `posts` has no timestamps, so touchAll rides `ship.parts` (ship_parts has
+  // `updated_at`). touchAll routes through updateAll, but its OWN short-circuit
+  // runs first — so it needs the chokepoint independently.
+  it("resolves the persisted FK on touchAll after save", async () => {
+    const ship = new Ship({ name: "New Owner Six" });
+    const rel = (association<ShipPart>(ship, "parts") as any).where({ name: "mast" });
+
+    await ship.save();
+    const shipId = ship.id as number;
+    const stale = "2000-01-01T00:00:00Z";
+    const mast = await ShipPart.create({ name: "mast", ship_id: shipId, updated_at: stale });
+    const sail = await ShipPart.create({ name: "sail", ship_id: shipId, updated_at: stale });
+
+    expect(await rel.touchAll()).toBe(1);
+    // Assert each row absolutely, not just that the two differ: the matching
+    // part moved off the stale timestamp, and the non-matching sibling is
+    // untouched — proving the `where(...)` mutation still rides on top of the
+    // rebuilt scope, and that touchAll hit the RIGHT row.
+    expect(String((await ShipPart.find(mast.id)).updated_at)).not.toBe(stale);
+    expect(String((await ShipPart.find(sail.id)).updated_at)).toBe(stale);
   });
 });
 
