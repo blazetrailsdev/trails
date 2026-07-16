@@ -3111,15 +3111,21 @@ export class Relation<T extends Base> {
     // A composite-PK base IS eager-JOINable: `JoinDependency.instantiateFromRows`
     // dedups parents by the composite key. The one composite-PK path trails can't
     // emit is the limited-ids subquery (`_materializeLimitedIds` /
-    // `columns_for_distinct`), which projects the pk as a single column — so
-    // bypass a composite PK ONLY when a LIMIT/OFFSET forces that path. Every other
-    // composite-PK eager load (notably the through-preloader's own unlimited
-    // `includes(source).references(...)` query) applies the JoinDependency, so a
-    // scoped source through a composite-PK model JOINs like Rails. Rails always
-    // applies the JoinDependency; the LIMIT+composite gap is trails' remaining
-    // capability gap (tracked for convergence — see RFC 0054).
+    // `columns_for_distinct`), which projects the pk as a single column. Rails
+    // only takes that `distinct_relation_for_primary_key` path for a limit/offset
+    // over NON-limitable (collection) reflections (finder_methods.rb:463-488), so
+    // bypass a composite PK only in exactly that case — mirroring the narrower
+    // `hasLimit && jd hasMany` guard the eager execute path already applies. A
+    // composite-PK `includes(:belongs_to)` (limitable) with a limit still JOINs,
+    // as does the through-preloader's own unlimited `includes(source)` query, so
+    // a scoped source through a composite-PK model JOINs like Rails. The
+    // LIMIT+collection+composite gap is trails' remaining capability gap (tracked
+    // for convergence — see RFC 0054).
     const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
-    const compositePkBypass = Array.isArray(basePk) && hasLimitOrOffset;
+    const compositePkBypass =
+      Array.isArray(basePk) &&
+      hasLimitOrOffset &&
+      !this._applyJoinDependencyIsLimitable(this._deferredDistinctPkEagerSpecs());
     return compositePkBypass || this._ctes.length > 0 || !this._fromClause.isEmpty();
   }
 
