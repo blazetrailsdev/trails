@@ -49,10 +49,13 @@
     "parity:validate": "ajv compile -s scripts/parity/canonical/schema.schema.json -s scripts/parity/canonical/query.schema.json --spec=draft2020",
     "parity:schema": "pnpm tsx scripts/parity/run.ts --type=schema",
     "parity:query": "pnpm tsx scripts/parity/run.ts --type=query",
-    "vendor:fetch": "pnpm tsx vendor/fetch.ts"
+    "vendor:fetch": "pnpm tsx vendor/fetch.ts",
+    "codegen:generate": "pnpm tsx scripts/prism-codegen/generate.ts",
+    "codegen:from-ts": "pnpm tsx scripts/prism-codegen/from-ts.ts"
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@ruby/prism": "^1.9.0",
     "@sinonjs/fake-timers": "^15.3.2",
     "@types/better-sqlite3": "^7.6.13",
     "@types/pg": "^8.18.0",

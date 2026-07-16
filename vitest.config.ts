@@ -401,6 +401,7 @@ export default defineConfig({
             "scripts/tasks/*.test.ts",
             "scripts/test-compare/*.test.ts",
             "scripts/rails-find/*.test.ts",
+            "scripts/prism-codegen/*.test.ts",
             "eslint/*.test.mjs",
             "vendor/*.test.ts",
           ],
