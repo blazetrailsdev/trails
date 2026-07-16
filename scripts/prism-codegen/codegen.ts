@@ -22,7 +22,11 @@ class CoverageTally implements Coverage {
 export class Codegen implements Emitter {
   readonly coverage = new CoverageTally();
   inClass = false;
-  constructor(private readonly registry: Registry) {}
+  inAsyncMethod = false;
+  constructor(
+    private readonly registry: Registry,
+    readonly asyncMethods: ReadonlySet<string> = new Set(),
+  ) {}
 
   emit(node: PrismNode | null | undefined): string {
     if (!node || !node.constructor) return "";

@@ -49,6 +49,14 @@ export interface Emitter {
    * the repo's `this`-typed mixin pattern minus the TS types).
    */
   inClass: boolean;
+  /**
+   * Method names the hand-ported trails TS declares `async` (the source of
+   * truth for async — see async-source.ts). A `def` whose name is in this set
+   * is emitted `async`; calls to these names are `await`ed inside async bodies.
+   */
+  readonly asyncMethods: ReadonlySet<string>;
+  /** True while emitting the body of a method that was marked `async`. */
+  inAsyncMethod: boolean;
 }
 
 /** Per-kind tally of handled vs. passthrough node instances. */

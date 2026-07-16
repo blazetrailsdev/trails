@@ -5,6 +5,7 @@
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 import * as path from "node:path";
 import { generateFromSource } from "./index.js";
+import { asyncMethodsForRailsFile } from "./async-source.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { TARGET_FILES, rubyAbsPath } from "./files.js";
 import { rubyFileToTs } from "./naming.js";
@@ -20,7 +21,7 @@ async function main() {
 
   for (const f of TARGET_FILES) {
     const src = readFileSync(rubyAbsPath(f), "utf8");
-    const { code, coverage } = await generateFromSource(src);
+    const { code, coverage } = await generateFromSource(src, asyncMethodsForRailsFile(f.ruby));
     const outName = rubyFileToTs(f.ruby.replace(/^active_record\//, "")).replace(/\.ts$/, ".js");
     const outPath = path.join(OUT_DIR, outName);
     mkdirSync(path.dirname(outPath), { recursive: true });

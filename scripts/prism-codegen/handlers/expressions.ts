@@ -120,7 +120,10 @@ function emitCall(n: PrismNode, e: Emitter): string {
   const target = recv !== undefined ? `${recv}.${method}` : method;
   // A bare identifier with no args, no receiver, no parens is a local/attr read.
   if (recv === undefined && callArgs.length === 0 && !n.block && !hasParens(n)) return method;
-  return `${target}(${callArgs.join(", ")})`;
+  // Await calls to methods the trails port declares async — but only inside an
+  // async body, so we never emit a bare `await` in a sync function.
+  const awaitKw = e.inAsyncMethod && e.asyncMethods.has(method) ? "await " : "";
+  return `${awaitKw}${target}(${callArgs.join(", ")})`;
 }
 
 function hasParens(n: PrismNode): boolean {
