@@ -53,6 +53,20 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(adapter.affectedRows()).toBe(2);
   });
 
+  it("affectedRows survives a non-write statement in the run branch", async () => {
+    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
+    await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
+    await adapter.executeMutation(`BEGIN`);
+    expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
+    // sqlite3_changes() is not reset by COMMIT/DDL, so the last write's count
+    // survives them — assigning the per-statement `changes` here would clobber
+    // it to 0.
+    await adapter.executeMutation(`COMMIT`);
+    expect(adapter.affectedRows()).toBe(2);
+    await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
+    expect(adapter.affectedRows()).toBe(2);
+  });
+
   it("executeMutation returns the inserted id for INSERT ... RETURNING", async () => {
     // RETURNING makes the statement row-returning, so it takes the `.all()`
     // branch, which discards the RunResult the rowid would come from.

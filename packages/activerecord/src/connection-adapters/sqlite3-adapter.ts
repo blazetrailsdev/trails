@@ -519,31 +519,35 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     notificationPayload: Record<string, unknown>,
   ): Promise<Record<string, unknown>[]> {
     const stmt = await this._cachedStatement(sql);
-    const isWrite = isWriteQuerySql(sql);
+    // Dispatch through the virtual isWriteQuery — the same predicate
+    // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard,
+    // the dirty gate, and the affected-rows gate can never disagree.
+    const isWrite = this.isWriteQuery(sql);
+    // `.all()` throws on a non-row-returning statement (better-sqlite3), so
+    // readers take `.all()` and everything else `.run()`. `.run()`'s per-
+    // statement `changes` is NOT used: it is 0 for DDL, whereas Rails' source
+    // (`raw_connection.changes` = sqlite3_changes()) counts only DML and is
+    // preserved across DDL/COMMIT — see _readBackChanges.
     let rows: Record<string, unknown>[];
     if (stmt.reader) {
       rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-      // A row-returning statement can still be a write (`INSERT ... RETURNING`),
-      // and `.all()` discards the affected-row count. Rails reads it from the
-      // handle (`raw_connection.changes`) after every statement; better-sqlite3
-      // exposes no such property, so read it back through SQL rather than leave
-      // `_lastAffectedRows` stale from an earlier write.
-      if (isWrite) await this._readBackChanges();
     } else {
-      const result = await stmt.run(driverBinds);
-      // Number(): a driver may hand back a bigint count, and this feeds both
-      // executeMutation's return value and payload.row_count.
-      this._lastAffectedRows = Number(result.changes ?? 0);
-      this._lastInsertRowid = result.lastInsertRowid;
+      await stmt.run(driverBinds);
       rows = [];
     }
-    // Dirtying belongs to the primitive, not to one entry point: `execute` now
-    // runs writes too, and Rails dirties from with_raw_connection's ensure
-    // (abstract_adapter.rb:1046) rather than from a write-only path. This path
-    // doesn't route through withRawConnection — where trails already mirrors
-    // that ensure — so dirty here, gated on the statement being a write to
-    // leave read behavior as it is.
-    if (isWrite) this.dirtyCurrentTransaction();
+    if (isWrite) {
+      // Rails reads raw_connection.changes / last_insert_rowid from the handle
+      // after every statement; only a write advances them. Gated on isWrite so
+      // reads and transaction-control (BEGIN/COMMIT/…) leave the last write's
+      // counts intact, as sqlite3_changes() does.
+      await this._readBackChanges();
+      // Dirtying belongs to the primitive, not to one entry point: `execute`
+      // now runs writes too, and Rails dirties from with_raw_connection's
+      // ensure (abstract_adapter.rb:1046) rather than a write-only path. This
+      // path doesn't route through withRawConnection — where trails already
+      // mirrors that ensure — so dirty here.
+      this.dirtyCurrentTransaction();
+    }
     notificationPayload.row_count = rows.length;
     return rows;
   }
@@ -626,12 +630,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * Prevent or allow write operations.
+   * Prevent or allow write operations. Delegates to the predicate so this and
+   * `isPreventingWrites()` — both Rails `preventing_writes?` — cannot disagree:
+   * the getter would otherwise miss the pool/replica component.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#preventing_writes?
    */
   get preventingWrites(): boolean {
-    return this._preventWrites;
+    return this.isPreventingWrites();
   }
 
   /**
@@ -689,14 +695,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   /**
    * Mirrors Rails' abstract `exec_insert` → `sql_for_insert` → `internal_exec_query`
-   * for the multi-column RETURNING read-back. `executeMutation` runs INSERTs via
-   * better-sqlite3's `.run()`, which discards RETURNING rows, so a multi-column
-   * auto-populated-columns list (Rails `_create_record` zips every returning
-   * column) would come back with only the generated id. Route just that case
-   * through the row-returning `internalExecQuery` (`.all()`, bind-aware, and it
-   * materializes the transaction) and mark the transaction dirty as
-   * `executeMutation` would. Single-column / no-RETURNING inserts keep the
-   * `executeMutation` path (its `lastInsertRowid` yields the id).
+   * for the multi-column RETURNING read-back. `executeMutation` returns a single
+   * number (the id from `lastInsertRowid` / the changes readback), not the
+   * RETURNING row set, so a multi-column auto-populated-columns list (Rails
+   * `_create_record` zips every returning column) would come back with only the
+   * generated id. Route just that case through the row-returning
+   * `internalExecQuery` (`.all()`, bind-aware, and it materializes the
+   * transaction) and mark the transaction dirty as `executeMutation` would.
+   * Single-column / no-RETURNING inserts keep the `executeMutation` path.
    */
   override async execInsert(
     sql: string,
