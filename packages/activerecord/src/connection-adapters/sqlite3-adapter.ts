@@ -498,11 +498,20 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   /**
-   * The single SQL primitive: run a statement and return its rows, branching
-   * on whether it returns any. `stmt.reader` is better-sqlite3's analogue of
-   * the `stmt.column_count.zero?` check Rails branches on — `.all()` throws
-   * on a non-row-returning statement, so DDL/INSERT/UPDATE/DELETE take
-   * `.run()` and yield an empty result.
+   * The single SQL primitive: run a statement and return its rows. Reads take
+   * `.all()`; every write (incl. `INSERT … RETURNING`) and transaction-control
+   * takes `.run()` for its atomic RunResult.
+   *
+   * Follows Rails' `perform_query` for the read/affected-rows contract, but
+   * DEVIATES on the branch axis and the RETURNING return: Rails branches on
+   * `stmt.column_count.zero?`, so `INSERT … RETURNING` (nonzero column count)
+   * comes back as `Result.new(columns, to_a)` with `row_count = 1`. Here it
+   * takes `.run()` and returns `[]` (`row_count = 0`) — deliberately, so the
+   * insert id / count come from the RunResult ATOMICALLY rather than a
+   * follow-up `last_insert_rowid()` read that races under concurrent writes.
+   * Nothing calls this expecting RETURNING rows: multi-column RETURNING
+   * read-back goes through `internalExecQuery` (`.all()`) and single-column
+   * through `executeMutation`'s rowid.
    *
    * NOTE: `sqlite3/database-statements.ts` also exports a `performQuery`. That
    * one is an unwired port written against better-sqlite3's native sync API
