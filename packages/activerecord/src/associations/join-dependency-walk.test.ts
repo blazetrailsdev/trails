@@ -10,7 +10,7 @@ import { Base, registerModel } from "../index.js";
 import { clearReflectionsCache } from "../reflection.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { JoinDependency } from "./join-dependency.js";
-import { Nodes } from "@blazetrails/arel";
+import { Nodes, tableRealName, tableSqlName, type TableRef } from "@blazetrails/arel";
 
 describe("JoinDependency walk() deduplication", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
@@ -192,14 +192,14 @@ describe("JoinDependency walk() deduplication", () => {
     // The ON predicate must NOT reference "comments" for the parent side —
     // that's jd2's un-aliased name. It should reference jd1's alias (e.g. "t2").
     const jd1ReviewsJoin = joins.find((j) => {
-      const table = (j as Nodes.OuterJoin).left;
-      const alias = (table as any).tableAlias;
-      const name = (table as any).name;
-      return name === "comments" && alias && alias !== "comments";
+      const table = (j as Nodes.OuterJoin).left as TableRef;
+      const realName = tableRealName(table);
+      const alias = tableSqlName(table);
+      return realName === "comments" && alias !== "comments";
     }) as Nodes.OuterJoin | undefined;
     expect(jd1ReviewsJoin).toBeDefined();
 
-    const jd1ReviewsAlias = (jd1ReviewsJoin!.left as any).tableAlias;
+    const jd1ReviewsAlias = tableSqlName(jd1ReviewsJoin!.left as TableRef);
     expect(referencedTables).toContain(jd1ReviewsAlias);
     expect(referencedTables).toContain("likes");
     expect(referencedTables).not.toContain("comments");

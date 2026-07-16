@@ -33,11 +33,10 @@ export class Table extends Node {
   readonly name: string;
   readonly tableAlias: string | null;
   readonly klass?: TableKlass;
-  /** Rails: `private attr_reader :type_caster` (table.rb:115). Readable here so
-   *  an aliased copy of a table can inherit it — trails encodes an aliased table
-   *  as `Table(name, { as })` where Rails wraps in a caster-delegating TableAlias.
-   *  @internal */
-  readonly typeCaster: unknown;
+  /** Rails: `private attr_reader :type_caster` (table.rb:115). An aliased table
+   *  is a `TableAlias` wrapping this one and delegates its caster back here
+   *  (table_alias.rb:22-24), so no external reader is needed. */
+  private readonly typeCaster: unknown;
 
   constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
     super();

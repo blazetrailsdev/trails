@@ -13,7 +13,7 @@ import { Base, registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Associations } from "../associations.js";
 import { JoinDependency } from "./join-dependency.js";
-import { Nodes, Table } from "@blazetrails/arel";
+import { Nodes, Table, tableRealName, tableSqlName, type TableRef } from "@blazetrails/arel";
 
 describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
   // Ride the boot-laid canonical `Base.connection` (single-pool test model)
@@ -95,10 +95,10 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     // Rails names the collision `{plural_name}_{owner_table}` (root link, no _join).
     expect(node!.effectiveSqlName).toBe("jdt_comments_jdt_authors");
 
-    // Target aliased
-    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as Table;
-    expect(targetTable.name).toBe("jdt_comments");
-    expect(targetTable.tableAlias).toBe("jdt_comments_jdt_authors");
+    // Target aliased — Rails encodes this as a `TableAlias` over the real table.
+    const targetTable = (node!.arelJoin as Nodes.OuterJoin).left as TableRef;
+    expect(tableRealName(targetTable)).toBe("jdt_comments");
+    expect(tableSqlName(targetTable)).toBe("jdt_comments_jdt_authors");
 
     // Through still uses real name
     const throughNode = jd.nodes.find(
@@ -249,8 +249,8 @@ describe("JoinDependency#_addThroughAssociation real-table-name reuse", () => {
     // Lazily consume references; the free reference name renames the target.
     jd.joinConstraints([], (jd as any)._aliasTracker, ["jdtComments"]);
     expect(target.effectiveSqlName).toBe("jdtComments");
-    expect((target.arelTable as Table).name).toBe("jdt_comments");
-    expect((target.arelTable as Table).tableAlias).toBe("jdtComments");
+    expect(tableRealName(target.arelTable as TableRef)).toBe("jdt_comments");
+    expect(tableSqlName(target.arelTable as TableRef)).toBe("jdtComments");
 
     // The intermediate `_through_` link is internal and never reference-aliased.
     const throughNode = jd.nodes.find((n) => n.assocName.includes("_through_"))!;

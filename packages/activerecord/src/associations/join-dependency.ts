@@ -17,7 +17,7 @@ import {
   camelize as _camelize,
   singularize as _singularize,
 } from "@blazetrails/activesupport";
-import { Table, Nodes } from "@blazetrails/arel";
+import { Table, Nodes, tableSqlName, type TableRef } from "@blazetrails/arel";
 import { modelRegistry, isAssociationCached } from "../associations.js";
 import { _reflectOnAssociation } from "../reflection.js";
 import { getInheritanceColumn, isStiSubclass } from "../inheritance.js";
@@ -104,9 +104,9 @@ function getModelColumns(modelClass: any): string[] {
 export class Aliases {
   private _aliasCache: Map<JoinPart | null, Map<string, string>>;
   private _allColumns: AliasMap[];
-  private _tables: Array<{ node: JoinPart | null; table: Table; columns: AliasMap[] }>;
+  private _tables: Array<{ node: JoinPart | null; table: TableRef; columns: AliasMap[] }>;
 
-  constructor(tables: Array<{ node: JoinPart | null; table: Table; columns: AliasMap[] }>) {
+  constructor(tables: Array<{ node: JoinPart | null; table: TableRef; columns: AliasMap[] }>) {
     this._aliasCache = new Map();
     this._allColumns = [];
     this._tables = tables;
@@ -179,7 +179,7 @@ export class JoinDependency {
    */
   private _joinedTables: Map<
     string,
-    { aliased: Table; effectiveName: string; terminated: boolean }
+    { aliased: TableRef; effectiveName: string; terminated: boolean }
   > = new Map();
   constructor(baseModel: typeof Base, joinType?: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin) {
     this._baseModel = baseModel;
@@ -790,7 +790,7 @@ export class JoinDependency {
       resolvedTable = lEffective;
     } else {
       const lt = l.table;
-      resolvedTable = typeof lt === "string" ? lt : (lt.tableAlias ?? lt.name);
+      resolvedTable = typeof lt === "string" ? lt : tableSqlName(lt);
     }
     r.table = resolvedTable;
     if (originalTable === resolvedTable) return;
@@ -893,7 +893,7 @@ export class JoinDependency {
     // `walk`/`joinConstraints` still memoizes its shared chain tails.
     if (joinType === Nodes.OuterJoin && !this._joinedTables.has(chainKey)) {
       this._joinedTables.set(chainKey, {
-        aliased: child.arelTable as Table,
+        aliased: child.arelTable as TableRef,
         effectiveName: child.effectiveSqlName,
         terminated: true,
       });
@@ -929,7 +929,7 @@ export class JoinDependency {
     const tableName = child.tableName;
     const aliased = aliasedArelTableForReflection(child.reflection, tableName, newName);
     const foreignTable =
-      (parent.arelTable as Table) ??
+      (parent.arelTable as TableRef) ??
       aliasedArelTableForReflection(child.reflection, child.tableName);
     const joinAssoc = new JoinAssociation(child.reflection);
     const joins = joinAssoc.joinConstraints(
@@ -946,7 +946,7 @@ export class JoinDependency {
     // name): a name-rebind can't tell the two sides apart, so it is skipped (FK
     // already correct; a scoped self-join's scope predicate stays un-rebound — a
     // pre-existing limitation).
-    const parentEffName = foreignTable.tableAlias ?? foreignTable.name;
+    const parentEffName = tableSqlName(foreignTable);
     if (newName !== tableName && parentEffName !== tableName) {
       const on = (arelJoin as any).right as Nodes.On;
       if (on instanceof Nodes.On) {
@@ -981,10 +981,10 @@ export class JoinDependency {
     group.resolved = true;
     const chainLen = group.reflection.chain.length;
     const foreignTable =
-      (parent.arelTable as Table) ??
+      (parent.arelTable as TableRef) ??
       aliasedArelTableFor(group.chainTables[0].model as never, group.chainTables[0].tableName);
     const joinAssoc = new JoinAssociation(group.reflection);
-    const resolvedByIdx: Array<{ effectiveName: string; aliased: Table }> = new Array(chainLen);
+    const resolvedByIdx: Array<{ effectiveName: string; aliased: TableRef }> = new Array(chainLen);
     const joins = joinAssoc.joinConstraints(
       foreignTable,
       group.parentModel,
@@ -1160,7 +1160,7 @@ export class JoinDependency {
   private _addStiConstraintArel(
     predicate: Nodes.Node,
     model: typeof Base,
-    arelTable: Table,
+    arelTable: TableRef,
   ): Nodes.Node {
     const inheritanceCol = getInheritanceColumn(model);
     if (inheritanceCol && isStiSubclass(model)) {
@@ -1429,7 +1429,7 @@ export class JoinDependency {
       node: JoinPart,
       columns: string[],
       tableIndex: number,
-    ): { node: JoinPart; table: Table; columns: AliasMap[] } => ({
+    ): { node: JoinPart; table: TableRef; columns: AliasMap[] } => ({
       node,
       table: node.arelTable!,
       columns: columns.map((column, columnIndex) => ({
@@ -1633,7 +1633,7 @@ export class JoinDependency {
     // `ThroughJoinGroup` carries the chain metadata so emit resolves every link's
     // alias against the shared AliasTracker and rebuilds + redistributes the joins.
     const chainTables: Array<{
-      table: Table;
+      table: TableRef;
       tableName: string;
       tableIndex: number;
       tableAlias: string;
@@ -1767,7 +1767,7 @@ export interface ThroughJoinGroup {
 function rebindTableReferences(
   node: Nodes.Node,
   fromTableName: string,
-  toTable: Table,
+  toTable: TableRef,
 ): Nodes.Node {
   if (node instanceof Nodes.Attribute) {
     const rel = node.relation;
@@ -1779,7 +1779,10 @@ function rebindTableReferences(
     // query (bumping on collision), so an alias can never equal a sibling join's
     // real table name — and this rebind only walks one join's ON (its own table
     // plus its grandchildren), not the whole FROM list.
-    if (rel instanceof Table && (rel.tableAlias ?? rel.name) === fromTableName) {
+    if (
+      (rel instanceof Table || rel instanceof Nodes.TableAlias) &&
+      tableSqlName(rel) === fromTableName
+    ) {
       return toTable.get(node.name);
     }
     return node;
