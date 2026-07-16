@@ -3,7 +3,7 @@ import { generateFromSource } from "./index.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { Registry } from "./registry.js";
 import { tsToRubyFile } from "./naming.js";
-import { extractAsyncNames } from "./async-source.js";
+import { extractAsyncNames, asyncMethodsForRailsFile } from "./async-source.js";
 import type { Coverage } from "./types.js";
 
 describe("prism-codegen", () => {
@@ -133,6 +133,18 @@ describe("prism-codegen", () => {
     expect(names.has("count")).toBe(true); // wrapped ref
     expect(names.has("secondBang")).toBe(true); // alias chain
     expect(names.has("pluck")).toBe(false);
+  });
+
+  it("includes Relation-class async methods for the relation-family targets", () => {
+    // Rails' relation/*.rb modules are mixed into Relation; trails ports some
+    // methods (pluck/ids from calculations.rb) onto the Relation class in
+    // relation.ts, so the calculations target must consult relation.ts too.
+    const calc = asyncMethodsForRailsFile("active_record/relation/calculations.rb");
+    expect(calc.has("count")).toBe(true); // from calculations.ts map
+    expect(calc.has("pluck")).toBe(true); // from relation.ts (Relation#pluck)
+    expect(calc.has("ids")).toBe(true); // from relation.ts (Relation#ids)
+    // Scoped: a Model-side file does NOT inherit Relation's async surface.
+    expect(asyncMethodsForRailsFile("active_record/persistence.rb").has("pluck")).toBe(false);
   });
 
   it("rolls up per-file coverage tallies into one summary", () => {
