@@ -177,6 +177,10 @@ export class Notifications {
     const event = this._buildEvent(name, resolved, current);
 
     if (!block) {
+      // Rails goes through handle.start/finish even with no block, and
+      // EventObjectGroup#finish assigns the raw payload; do the same so
+      // subscribers get `event.payload === resolved`.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
       return undefined as any;
@@ -231,6 +235,8 @@ export class Notifications {
     const event = this._buildEvent(name, resolved, current);
 
     if (!block) {
+      // See instrument(): assign the raw payload so subscribers get identity.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
       return undefined as any;
@@ -261,7 +267,10 @@ export class Notifications {
    * Mirrors ActiveSupport::Notifications.publish.
    */
   static publish(name: string, payload?: EventPayload): void {
-    const event = this._buildEvent(name, payload);
+    const resolved = payload ?? {};
+    const event = this._buildEvent(name, resolved);
+    // Deliver the passed payload object itself, not Event#initialize's dup.
+    event.payload = resolved;
     event.finish();
     this._notify(event, true);
   }

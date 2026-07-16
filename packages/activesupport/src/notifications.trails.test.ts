@@ -231,5 +231,25 @@ describe("Notifications (trails)", () => {
 
       expect(events[0].payload).toBe(payload);
     });
+
+    it("publishes the same payload object with no block", () => {
+      const events: Event[] = [];
+      Notifications.subscribe("ident", (e) => events.push(e));
+
+      const payload = { a: 1 };
+      Notifications.instrument("ident", payload);
+
+      expect(events[0].payload).toBe(payload);
+    });
+
+    it("publish delivers the same payload object", () => {
+      const events: Event[] = [];
+      Notifications.subscribe("ident", (e) => events.push(e));
+
+      const payload = { a: 1 };
+      Notifications.publish("ident", payload);
+
+      expect(events[0].payload).toBe(payload);
+    });
   });
 });
