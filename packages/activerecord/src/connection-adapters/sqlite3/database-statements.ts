@@ -9,6 +9,7 @@
  */
 
 import { sql as arelSql } from "@blazetrails/arel";
+import type { SqliteBinds, SqliteStatement } from "../../sqlite-adapter.js";
 import { TransactionIsolationError } from "../../errors.js";
 import { Result } from "../../result.js";
 import { stripSqlComments } from "../sql-classification.js";
@@ -94,24 +95,6 @@ export async function resetIsolationLevel(
   }
 }
 
-// Minimal better-sqlite3 types used by the private helpers below.
-interface Sqlite3RunResult {
-  changes: number;
-  lastInsertRowid: number | bigint;
-}
-
-interface Sqlite3PreparedStatement {
-  readonly reader: boolean;
-  columns(): Array<{ name: string }>;
-  all(...params: unknown[]): Record<string, unknown>[];
-  run(...params: unknown[]): Sqlite3RunResult;
-}
-
-interface Sqlite3RawConnection {
-  prepare(sql: string): Sqlite3PreparedStatement;
-  exec(sql: string): void;
-}
-
 interface InternalBeginTransactionHost {
   executeMutation(sql: string): Promise<unknown>;
   queryValue(sql: string, name?: string): Promise<unknown>;
@@ -119,9 +102,18 @@ interface InternalBeginTransactionHost {
   _previousReadUncommitted?: unknown;
 }
 
+// The state performQuery reads/writes on the adapter. Mirrors the members
+// Rails' perform_query touches on the SQLite3Adapter instance: the statement
+// pool (via _cachedStatement), @last_affected_rows / last insert rowid, the
+// write-query predicate, and the verified!/dirty transaction bookkeeping that
+// with_raw_connection performs around the round-trip.
 interface PerformQueryHost {
-  _statements?: Map<string, Sqlite3PreparedStatement>;
-  _lastAffectedRows?: number;
+  _cachedStatement(sql: string): Promise<SqliteStatement>;
+  isWriteQuery(sql: string): boolean;
+  verifiedBang(): void;
+  dirtyCurrentTransaction(): void;
+  _lastAffectedRows: number;
+  _lastInsertRowid: number | bigint;
 }
 
 interface ExecuteBatchHost {
@@ -157,54 +149,97 @@ export async function internalBeginTransaction(
   }
 }
 
-/** @internal */
-export function performQuery(
+/**
+ * The single SQL primitive: run a statement and return its rows plus the
+ * atomic affected-rows / insert-rowid from the same RunResult. Reads take
+ * `.all()`; every write (incl. `INSERT … RETURNING`) and transaction-control
+ * takes `.run()`.
+ *
+ * Follows Rails' `perform_query` for the read/affected-rows contract, but
+ * DEVIATES on the branch axis and the RETURNING return: Rails branches on
+ * `stmt.column_count.zero?`, so `INSERT … RETURNING` (nonzero column count)
+ * comes back as `Result.new(columns, to_a)` with `row_count = 1`. Here it
+ * takes `.run()` and returns `[]` (`row_count = 0`) — deliberately, so the
+ * insert id / count come from the RunResult ATOMICALLY rather than a
+ * follow-up `last_insert_rowid()` read that races under concurrent writes.
+ * Nothing calls this expecting RETURNING rows: multi-column RETURNING
+ * read-back goes through `internalExecQuery` (`.all()`) and single-column
+ * through `executeMutation`'s rowid.
+ *
+ * This is the live primitive `execute` / `executeMutation` delegate to. It is
+ * written against the async `SqliteStatement` / `SqliteConnection` driver
+ * abstraction (array binds, promise-returning, multi-driver) rather than
+ * better-sqlite3's native sync API, so it is reachable from the adapter.
+ *
+ * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#perform_query
+ * @internal
+ */
+export async function performQuery(
   this: PerformQueryHost,
-  rawConnection: Sqlite3RawConnection,
   sql: string,
-  binds: unknown[],
-  typeCastedBinds: unknown[],
-  options: {
-    prepare?: boolean;
-    notificationPayload?: Record<string, unknown>;
-    batch?: boolean;
-  } = {},
-): Result {
-  const { prepare = false, notificationPayload, batch = false } = options;
-  let result: Result;
-
-  let lastChanges = 0;
-
-  if (batch) {
-    rawConnection.exec(sql);
-    result = Result.empty();
-  } else if (prepare) {
-    if (!this._statements) this._statements = new Map();
-    let stmt = this._statements.get(sql);
-    if (!stmt) {
-      stmt = rawConnection.prepare(sql);
-      this._statements.set(sql, stmt);
-    }
-    if (!stmt.reader) {
-      lastChanges = stmt.run(...typeCastedBinds).changes;
-      result = Result.empty();
+  driverBinds: SqliteBinds,
+  notificationPayload: Record<string, unknown>,
+): Promise<{
+  rows: Record<string, unknown>[];
+  affectedRows: number;
+  insertRowid: number | bigint;
+}> {
+  // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
+  // gated only on materialize_transactions — NOT on read/write, and it runs
+  // even when the query raises. execute/executeMutation (the only callers)
+  // both materialize unconditionally, so dirty in a finally regardless of
+  // outcome, mirroring this adapter's `exec`. `verified!` (below), by
+  // contrast, is on Rails' success path only.
+  try {
+    const stmt = await this._cachedStatement(sql);
+    // Dispatch through the virtual isWriteQuery — the same predicate
+    // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard
+    // and the affected-rows gate can never disagree.
+    const isWrite = this.isWriteQuery(sql);
+    let rows: Record<string, unknown>[];
+    // Default to the tracked counts so a non-write (BEGIN/COMMIT/read) returns
+    // the last write's values intact, as sqlite3_changes() does.
+    let affectedRows = this._lastAffectedRows;
+    let insertRowid = this._lastInsertRowid;
+    // Reads take `.all()` (rows); everything else — writes (incl.
+    // `INSERT … RETURNING`) and transaction-control — takes `.run()`, whose
+    // RunResult carries the affected-row count and insert rowid ATOMICALLY.
+    // Sourcing those from `.run()` (not a separate `SELECT changes()`) is
+    // essential under concurrency: `Promise.all` inserts interleave at await
+    // points, so a follow-up `last_insert_rowid()` read would report another
+    // statement's rowid. Gating on `!isWrite` also keeps a `SELECT`, which is
+    // reader=true, on the `.all()` path; a write is never misread as a reader
+    // because isWriteQuery classifies INSERT/UPDATE/DELETE/DDL as writes.
+    if (stmt.reader && !isWrite) {
+      rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
     } else {
-      result = Result.fromRowHashes(stmt.all(...typeCastedBinds));
+      const result = await stmt.run(driverBinds);
+      if (isWrite) {
+        // DDL takes this branch too and reports changes = 0 — a small
+        // deviation from Rails' sqlite3_changes(), which is preserved across
+        // DDL; matching it would need a handle read that isn't atomic under
+        // concurrency, and no caller reads affected_rows after a DDL (it is
+        // consumed right after its DML).
+        affectedRows = Number(result.changes ?? 0);
+        insertRowid = result.lastInsertRowid;
+      }
+      rows = [];
     }
-  } else {
-    const stmt = rawConnection.prepare(sql);
-    const hasBind = binds != null && binds.length > 0;
-    if (!stmt.reader) {
-      lastChanges = (hasBind ? stmt.run(...typeCastedBinds) : stmt.run()).changes;
-      result = Result.empty();
-    } else {
-      result = Result.fromRowHashes(hasBind ? stmt.all(...typeCastedBinds) : stmt.all());
-    }
+    // Persist for the affected_rows() port / public accessor. The RETURNED
+    // locals — not these fields — are what executeMutation uses for its return
+    // value: reading `this._lastInsertRowid` back after the caller's await
+    // would race, since a concurrent write's performQuery can overwrite it
+    // between this assignment and that read.
+    this._lastAffectedRows = affectedRows;
+    this._lastInsertRowid = insertRowid;
+    // Rails' perform_query: `verified!` after @last_affected_rows, success
+    // path only — a successful round-trip proves the connection is live.
+    this.verifiedBang();
+    notificationPayload.row_count = rows.length;
+    return { rows, affectedRows, insertRowid };
+  } finally {
+    this.dirtyCurrentTransaction();
   }
-
-  this._lastAffectedRows = lastChanges;
-  if (notificationPayload) notificationPayload["row_count"] = result.length;
-  return result;
 }
 
 /** @internal */
