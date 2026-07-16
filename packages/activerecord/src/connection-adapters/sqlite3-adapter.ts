@@ -595,10 +595,12 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#affected_rows
    */
-  // The arg is optional because this doubles as trails' public accessor for the
-  // tracked count (Rails' affected_rows(result) is framework-internal and always
-  // passed the result); the port ignores it either way. executeMutation passes
-  // the perform_query result to mirror Rails' call site.
+  // The arg is optional because this is only trails' public accessor for the
+  // tracked count now — Rails' framework-internal `affected_rows(result)` call
+  // site (exec_delete/exec_update) has no analogue here: executeMutation returns
+  // the count as a local from _performQuery rather than re-reading the shared
+  // field through this port, which would re-open the concurrent-write race. The
+  // port ignores the arg either way (reads @last_affected_rows).
   affectedRows(result?: unknown): number {
     return sqliteAffectedRows.call(this, result);
   }
