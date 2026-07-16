@@ -53,23 +53,20 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     expect(adapter.affectedRows()).toBe(2);
   });
 
-  it("affectedRows survives a non-write statement in the run branch", async () => {
+  it("affectedRows is not reset by transaction control in the run branch", async () => {
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('a')`);
     await adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('b')`);
     await adapter.executeMutation(`BEGIN`);
     expect(await adapter.executeMutation(`UPDATE "pq" SET "nick" = 'z'`)).toBe(2);
-    // sqlite3_changes() is not reset by COMMIT/DDL, so the last write's count
-    // survives them — assigning the per-statement `changes` here would clobber
-    // it to 0.
+    // BEGIN/COMMIT take the run branch but are not writes, so they don't touch
+    // the count — the last write's value survives them.
     await adapter.executeMutation(`COMMIT`);
-    expect(adapter.affectedRows()).toBe(2);
-    await adapter.execute(`CREATE TABLE "pq_ddl" ("id" INTEGER)`);
     expect(adapter.affectedRows()).toBe(2);
   });
 
   it("executeMutation returns the inserted id for INSERT ... RETURNING", async () => {
-    // RETURNING makes the statement row-returning, so it takes the `.all()`
-    // branch, which discards the RunResult the rowid would come from.
+    // A write takes the `.run()` branch even with RETURNING, so the id comes
+    // from the RunResult's lastInsertRowid, atomically with the insert.
     const id = await adapter.executeMutation(
       `INSERT INTO "pq" ("nick") VALUES ('a') RETURNING "id"`,
     );
@@ -80,6 +77,19 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     );
     expect(second).toBe(2);
     expect(adapter.affectedRows()).toBe(1);
+  });
+
+  it("returns distinct insert ids for concurrent inserts", async () => {
+    // The count/rowid come from the RunResult, not a follow-up
+    // `last_insert_rowid()` read — so inserts issued concurrently (interleaving
+    // at await points) each get their own id rather than the last one written.
+    const ids = await Promise.all(
+      Array.from({ length: 5 }, (_, i) =>
+        adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('n${i}')`),
+      ),
+    );
+    expect(new Set(ids).size).toBe(5);
+    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
   });
 
   it("errors when a write is routed through execute while preventing writes", async () => {

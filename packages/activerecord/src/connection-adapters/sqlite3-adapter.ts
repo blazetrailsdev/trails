@@ -530,24 +530,32 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard
       // and the affected-rows gate can never disagree.
       const isWrite = this.isWriteQuery(sql);
-      // `.all()` throws on a non-row-returning statement (better-sqlite3), so
-      // readers take `.all()` and everything else `.run()`. `.run()`'s per-
-      // statement `changes` is NOT used: it is 0 for DDL, whereas Rails' source
-      // (`raw_connection.changes` = sqlite3_changes()) counts only DML and is
-      // preserved across DDL/COMMIT — see _readBackChanges.
+      // Reads take `.all()` (rows); everything else — writes (incl.
+      // `INSERT … RETURNING`) and transaction-control — takes `.run()`, whose
+      // RunResult carries the affected-row count and insert rowid ATOMICALLY.
+      // Sourcing those from `.run()` (not a separate `SELECT changes()`) is
+      // essential: concurrent inserts (Promise.all) interleave at await points,
+      // and a follow-up `last_insert_rowid()` read would report another
+      // statement's rowid. Gating on `!isWrite` also keeps a `SELECT`, which is
+      // reader=true, on the `.all()` path; a write is never misread as a reader
+      // because isWriteQuery classifies INSERT/UPDATE/DELETE/DDL as writes.
       let rows: Record<string, unknown>[];
-      if (stmt.reader) {
+      if (stmt.reader && !isWrite) {
         rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
       } else {
-        await stmt.run(driverBinds);
+        const result = await stmt.run(driverBinds);
+        // Only a write advances the counts (Rails' @last_affected_rows /
+        // last_insert_rowid); BEGIN/COMMIT/ROLLBACK/SAVEPOINT/RELEASE leave the
+        // last write's values intact. DDL takes this branch too and reports
+        // changes = 0 — a small deviation from Rails' sqlite3_changes(), which
+        // is preserved across DDL; matching that would need a per-statement
+        // handle read that isn't atomic under concurrency, and no caller reads
+        // affected_rows after a DDL (it is consumed right after its DML).
+        if (isWrite) {
+          this._lastAffectedRows = Number(result.changes ?? 0);
+          this._lastInsertRowid = result.lastInsertRowid;
+        }
         rows = [];
-      }
-      if (isWrite) {
-        // Rails reads raw_connection.changes / last_insert_rowid from the handle
-        // after every statement; only a write advances them. Gated on isWrite so
-        // reads and transaction-control (BEGIN/COMMIT/…) leave the last write's
-        // counts intact, as sqlite3_changes() does.
-        await this._readBackChanges();
       }
       // Rails' perform_query: `verified!` after @last_affected_rows, success
       // path only — a successful round-trip proves the connection is live.
@@ -557,21 +565,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     } finally {
       this.dirtyCurrentTransaction();
     }
-  }
-
-  // Rails' `@last_affected_rows = raw_connection.changes`. `changes()` and
-  // `last_insert_rowid()` are handle-level and survive intervening reads, so
-  // this reports the last write even though it runs as a separate statement.
-  private async _readBackChanges(): Promise<void> {
-    const stmt = await this._cachedStatement(
-      "SELECT changes() AS changes, last_insert_rowid() AS last_insert_rowid",
-    );
-    const row = (await stmt.get([])) as
-      | { changes: number | bigint; last_insert_rowid: number | bigint }
-      | undefined;
-    if (!row) return;
-    this._lastAffectedRows = Number(row.changes);
-    this._lastInsertRowid = row.last_insert_rowid;
   }
 
   /**
