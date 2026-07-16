@@ -409,9 +409,7 @@ export class HasOneAssociation extends SingularAssociation {
     // here, while this insert's own FK-matching row does not exist yet: deferring
     // to the owner's save leaves `removeDisplaced`'s FK re-query choosing between
     // two matching rows, and the old row survives if it picks the new one.
-    if (this._displacedRecord || this._removeDisplacedFromDb) {
-      await this.removeDisplaced();
-    }
+    await this.removeDisplaced();
     return super._createRecord(attributes, shouldRaise, block);
   }
 
