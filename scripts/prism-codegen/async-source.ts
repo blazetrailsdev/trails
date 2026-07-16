@@ -34,14 +34,21 @@ const AR_LIB = path.dirname(AR_ROOT); // .../lib
 /** `def name` / `def self.name` in a Ruby source → camelCase method names. */
 const RUBY_DEF = /^\s*def\s+(?:self\.)?([A-Za-z_][\w]*[?!=]?)/gm;
 
-/** camelCase names of the methods `railsRelPath` itself defines. */
+/**
+ * camelCase names of the methods a Ruby source `def`s. Pure (string in, set
+ * out) so it's testable without a vendored checkout.
+ */
+export function rubyDefinedMethods(rubySource: string): Set<string> {
+  const defs = new Set<string>();
+  for (const m of rubySource.matchAll(RUBY_DEF)) defs.add(methodName(m[1]));
+  return defs;
+}
+
+/** File wrapper around {@link rubyDefinedMethods} for a vendored Rails path. */
 function railsDefinedMethods(railsRelPath: string): Set<string> {
   const abs = path.join(AR_LIB, railsRelPath);
-  const defs = new Set<string>();
-  if (!existsSync(abs)) return defs;
-  const src = readFileSync(abs, "utf8");
-  for (const m of src.matchAll(RUBY_DEF)) defs.add(methodName(m[1]));
-  return defs;
+  if (!existsSync(abs)) return new Set();
+  return rubyDefinedMethods(readFileSync(abs, "utf8"));
 }
 
 /** `async [function] name(` / `async name<` → the identifier. */
@@ -90,36 +97,48 @@ export function extractAsyncNames(src: string): Set<string> {
   return asyncNames;
 }
 
-function asyncNamesInFile(tsPath: string): Set<string> {
-  if (!existsSync(tsPath)) return new Set();
-  return extractAsyncNames(readFileSync(tsPath, "utf8"));
+function readFileOr(tsPath: string): string {
+  return existsSync(tsPath) ? readFileSync(tsPath, "utf8") : "";
+}
+
+/**
+ * Pure composer for the async name set. The direct `rubyFileToTs` twin's async
+ * surface is taken in full (its Rails-name maps are curated to this file's own
+ * methods). For the relation family, the `relation.ts` supplement is taken
+ * **only** for the async names this Rails file itself `def`s — so
+ * `Relation#pluck`/`#ids` (defined in calculations.rb, ported onto the Relation
+ * class) are picked up while generic Relation async names (`first`, `one?`) the
+ * file merely *calls* on Array receivers are excluded, which would otherwise
+ * make the receiver-blind `await` rule await unrelated same-named calls. Pure
+ * (all inputs are strings/sets) so it's testable without a vendored checkout.
+ */
+export function resolveAsyncNames(opts: {
+  twinTs: string;
+  relationTs?: string;
+  ownRubyDefs?: ReadonlySet<string>;
+}): Set<string> {
+  const names = extractAsyncNames(opts.twinTs);
+  if (opts.relationTs && opts.ownRubyDefs) {
+    for (const n of extractAsyncNames(opts.relationTs)) {
+      if (opts.ownRubyDefs.has(n)) names.add(n);
+    }
+  }
+  return names;
 }
 
 /**
  * Set of camelCase method names that are async in the trails port of
  * `railsRelPath` (e.g. `active_record/persistence.rb`). Empty when no ported
  * file exists yet — the tool then emits sync, which is the honest default.
- *
- * The direct `rubyFileToTs` twin is consulted in full (its async surface is
- * this file's own methods — the Rails-name maps are curated). Rails' relation
- * modules (`relation/*.rb`, and `relation.rb`) are mixed into `Relation`, and
- * trails ports some of their methods (`Relation#pluck`/`#ids`, defined in
- * calculations.rb) directly onto the `Relation` class in `relation.ts`. We
- * supplement from `relation.ts` for the relation family, but **only** the async
- * names this Rails file actually `def`s — so `pluck`/`ids` are picked up while
- * generic Relation async names (`first`, `one?`) that this file merely *calls*
- * on other receivers (Array helpers) are not swept in, which would otherwise
- * make the receiver-blind `await` rule await unrelated same-named calls.
+ * Reads files, then delegates the merge logic to {@link resolveAsyncNames}.
  */
 export function asyncMethodsForRailsFile(railsRelPath: string): Set<string> {
   const short = railsRelPath.replace(/^active_record\//, "");
-  const names = asyncNamesInFile(path.join(TRAILS_AR_SRC, rubyFileToTs(short)));
-
-  if (short.startsWith("relation/") || short === "relation.rb") {
-    const ownDefs = railsDefinedMethods(railsRelPath);
-    for (const n of asyncNamesInFile(path.join(TRAILS_AR_SRC, "relation.ts"))) {
-      if (ownDefs.has(n)) names.add(n);
-    }
-  }
-  return names;
+  const twinTs = readFileOr(path.join(TRAILS_AR_SRC, rubyFileToTs(short)));
+  const relationFamily = short.startsWith("relation/") || short === "relation.rb";
+  return resolveAsyncNames({
+    twinTs,
+    relationTs: relationFamily ? readFileOr(path.join(TRAILS_AR_SRC, "relation.ts")) : undefined,
+    ownRubyDefs: relationFamily ? railsDefinedMethods(railsRelPath) : undefined,
+  });
 }
