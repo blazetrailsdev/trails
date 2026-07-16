@@ -1,7 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { generateFromSource } from "./index.js";
-import { summarizeCoverage } from "./coverage.js";
+import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { Registry } from "./registry.js";
+import { tsToRubyFile } from "./naming.js";
+import type { Coverage } from "./types.js";
 
 describe("prism-codegen", () => {
   it("translates class/def shape and method-name conventions", async () => {
@@ -50,5 +52,29 @@ describe("prism-codegen", () => {
     expect(code).toContain('"hello"');
     expect(code).toContain('"sym"');
     expect(code).not.toContain("[object Object]");
+  });
+
+  it("inverts rubyFileToTs to resolve a trails .ts path to its Rails .rb", () => {
+    // Reuses the EXISTING api-compare mapping (no new mapping) — nested + top-level.
+    const candidates = ["active_record/persistence.rb", "active_record/relation/query_methods.rb"];
+    expect(tsToRubyFile("packages/activerecord/src/relation/query-methods.ts", candidates)).toBe(
+      "active_record/relation/query_methods.rb",
+    );
+    expect(tsToRubyFile("packages/activerecord/src/persistence.ts", candidates)).toBe(
+      "active_record/persistence.rb",
+    );
+    expect(tsToRubyFile("packages/activerecord/src/nope.ts", candidates)).toBeUndefined();
+  });
+
+  it("rolls up per-file coverage tallies into one summary", () => {
+    const mk = (handled: number, pass: number): Coverage => ({
+      record() {},
+      counts: new Map([["CallNode", { handled, passthrough: pass }]]),
+    });
+    const merged = mergeCoverages([mk(8, 2), mk(10, 0)]);
+    expect(merged.total).toBe(20);
+    expect(merged.handled).toBe(18);
+    expect(merged.passthrough).toBe(2);
+    expect(merged.handledPct).toBeCloseTo(90);
   });
 });
