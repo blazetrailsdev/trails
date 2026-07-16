@@ -2,47 +2,47 @@ import { describe, it, expect } from "vitest";
 import { Model } from "../index.js";
 
 describe("ConditionalValidationTest", () => {
-  it("if validation using block true", () => {
+  it("if validation using block true", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, if: () => true });
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("if validation using block false", () => {
+  it("if validation using block false", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, if: () => false });
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("unless validation using block true", () => {
+  it("unless validation using block true", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, unless: () => true });
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("unless validation using block false", () => {
+  it("unless validation using block false", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, unless: () => false });
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("validation using combining if true and unless true conditions", () => {
+  it("validation using combining if true and unless true conditions", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -50,10 +50,10 @@ describe("ConditionalValidationTest", () => {
       }
     }
     // unless returns true, so validation is skipped
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("validation using combining if true and unless false conditions", () => {
+  it("validation using combining if true and unless false conditions", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -61,10 +61,10 @@ describe("ConditionalValidationTest", () => {
       }
     }
     // both conditions met, validation runs
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("if validation using method true", () => {
+  it("if validation using method true", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -74,10 +74,10 @@ describe("ConditionalValidationTest", () => {
         return true;
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("if validation using method false", () => {
+  it("if validation using method false", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -87,10 +87,10 @@ describe("ConditionalValidationTest", () => {
         return false;
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("unless validation using method true", () => {
+  it("unless validation using method true", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -100,10 +100,10 @@ describe("ConditionalValidationTest", () => {
         return true;
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("unless validation using method false", () => {
+  it("unless validation using method false", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -113,20 +113,20 @@ describe("ConditionalValidationTest", () => {
         return false;
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("if validation using array of true methods", () => {
+  it("if validation using array of true methods", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, if: [() => true, () => true] });
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("if validation using array of true and false methods", () => {
+  it("if validation using array of true and false methods", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -134,10 +134,10 @@ describe("ConditionalValidationTest", () => {
       }
     }
     // One returns false, so validation is skipped
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("unless validation using array of false methods", () => {
+  it("unless validation using array of false methods", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -145,10 +145,10 @@ describe("ConditionalValidationTest", () => {
       }
     }
     // None return true, so validation runs
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("unless validation using array of true and false methods", () => {
+  it("unless validation using array of true and false methods", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -156,6 +156,6 @@ describe("ConditionalValidationTest", () => {
       }
     }
     // One returns true, so validation is skipped
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 });

@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Model } from "../index.js";
 
 describe("LengthValidationTest", () => {
-  it("optionally validates length of using within", () => {
+  it("optionally validates length of using within", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -10,23 +10,23 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ name: "ab" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     const p2 = new Person({ name: "abc" });
-    expect(p2.isValid()).toBe(true);
+    expect(await p2.isValid()).toBe(true);
   });
 
-  it("optionally validates length of using is", () => {
+  it("optionally validates length of using is", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { length: { is: 5 } });
       }
     }
-    expect(new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(new Person({ name: "bob" }).isValid()).toBe(false);
+    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
+    expect(await new Person({ name: "bob" }).isValid()).toBe(false);
   });
 
-  it("validates length of using minimum utf8", () => {
+  it("validates length of using minimum utf8", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -35,10 +35,10 @@ describe("LengthValidationTest", () => {
     }
     const p = new Person({ name: "\u{1F600}\u{1F600}\u{1F600}" });
     // Emoji are 2 code units each in JS, so length >= 3
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of using maximum utf8", () => {
+  it("validates length of using maximum utf8", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -46,31 +46,31 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ name: "ab" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of using within utf8", () => {
+  it("validates length of using within utf8", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { length: { in: [1, 5] } });
       }
     }
-    expect(new Person({ name: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ name: "abc" }).isValid()).toBe(true);
   });
 
-  it("validates length of for infinite maxima", () => {
+  it("validates length of for infinite maxima", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { length: { minimum: 1, maximum: Infinity } });
       }
     }
-    expect(new Person({ name: "a" }).isValid()).toBe(true);
-    expect(new Person({ name: "a".repeat(1000) }).isValid()).toBe(true);
+    expect(await new Person({ name: "a" }).isValid()).toBe(true);
+    expect(await new Person({ name: "a".repeat(1000) }).isValid()).toBe(true);
   });
 
-  it("validates length of using maximum should not allow nil when nil not allowed", () => {
+  it("validates length of using maximum should not allow nil when nil not allowed", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -78,10 +78,10 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person();
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
   });
 
-  it("validates length of using both minimum and maximum should not allow nil", () => {
+  it("validates length of using both minimum and maximum should not allow nil", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -89,32 +89,32 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person();
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
   });
 
-  it("validates length of using proc as maximum with model method", () => {
+  it("validates length of using proc as maximum with model method", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { length: { maximum: () => 5 } });
       }
     }
-    expect(new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(new Person({ name: "aliceb" }).isValid()).toBe(false);
+    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
+    expect(await new Person({ name: "aliceb" }).isValid()).toBe(false);
   });
 
-  it("validates length of using lambda as maximum", () => {
+  it("validates length of using lambda as maximum", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { length: { maximum: () => 10 } });
       }
     }
-    expect(new Person({ name: "short" }).isValid()).toBe(true);
-    expect(new Person({ name: "a".repeat(11) }).isValid()).toBe(false);
+    expect(await new Person({ name: "short" }).isValid()).toBe(true);
+    expect(await new Person({ name: "a".repeat(11) }).isValid()).toBe(false);
   });
 
-  it("validates length of using bignum", () => {
+  it("validates length of using bignum", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -122,10 +122,10 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "short" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of nasty params", () => {
+  it("validates length of nasty params", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -133,11 +133,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("optionally validates length of using within utf8", () => {
+  it("optionally validates length of using within utf8", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -145,10 +145,10 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "abc" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of using is utf8", () => {
+  it("validates length of using is utf8", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -156,10 +156,10 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "abcde" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of for ruby class", () => {
+  it("validates length of for ruby class", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -167,10 +167,10 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "ok" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of using maximum should not allow nil and empty string when blank not allowed", () => {
+  it("validates length of using maximum should not allow nil and empty string when blank not allowed", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -178,11 +178,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("validates length of using minimum 0 should not allow nil", () => {
+  it("validates length of using minimum 0 should not allow nil", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -190,11 +190,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("validates length of using is 0 should not allow nil", () => {
+  it("validates length of using is 0 should not allow nil", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -203,10 +203,10 @@ describe("LengthValidationTest", () => {
     }
     const p = new Person({});
     // null is skipped by length validator
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates with diff in option", () => {
+  it("validates with diff in option", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -214,10 +214,10 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "ok" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of using symbol as maximum", () => {
+  it("validates length of using symbol as maximum", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -225,67 +225,67 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "short" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates length of using minimum", () => {
+  it("validates length of using minimum", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { minimum: 5 } });
       }
     }
-    expect(new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcd" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcd" }).isValid()).toBe(false);
   });
 
-  it("validates length of using maximum", () => {
+  it("validates length of using maximum", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { maximum: 5 } });
       }
     }
-    expect(new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdef" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdef" }).isValid()).toBe(false);
   });
 
-  it("validates length of using maximum should allow nil", () => {
+  it("validates length of using maximum should allow nil", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { maximum: 5 } });
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("validates length of using within", () => {
+  it("validates length of using within", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { in: [3, 5] } });
       }
     }
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdef" }).isValid()).toBe(false);
+    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdef" }).isValid()).toBe(false);
   });
 
-  it("validates length of using is", () => {
+  it("validates length of using is", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { is: 4 } });
       }
     }
-    expect(new Person({ title: "abcd" }).isValid()).toBe(true);
-    expect(new Person({ title: "abc" }).isValid()).toBe(false);
-    expect(new Person({ title: "abcde" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abcd" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abcde" }).isValid()).toBe(false);
   });
 
-  it("validates length of custom errors for minimum with too short", () => {
+  it("validates length of custom errors for minimum with too short", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -293,11 +293,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "ab" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("title")).toContain("is way too short");
   });
 
-  it("validates length of custom errors for maximum with too long", () => {
+  it("validates length of custom errors for maximum with too long", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -305,11 +305,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "abcdefgh" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("title")).toContain("is way too long");
   });
 
-  it("validates length of custom errors for both too short and too long", () => {
+  it("validates length of custom errors for both too short and too long", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -319,15 +319,15 @@ describe("LengthValidationTest", () => {
       }
     }
     const short = new Person({ title: "ab" });
-    short.isValid();
+    await short.isValid();
     expect(short.errors.get("title")).toContain("short!");
 
     const long = new Person({ title: "abcdef" });
-    long.isValid();
+    await long.isValid();
     expect(long.errors.get("title")).toContain("long!");
   });
 
-  it("validates length of custom errors for is with wrong length", () => {
+  it("validates length of custom errors for is with wrong length", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -335,11 +335,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "abc" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("title")).toContain("wrong size!");
   });
 
-  it("validates length of using proc as maximum", () => {
+  it("validates length of using proc as maximum", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -347,60 +347,60 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
     const p2 = new Person({ name: "Alicia" });
-    expect(p2.isValid()).toBe(false);
+    expect(await p2.isValid()).toBe(false);
   });
 
-  it("validates length of with allow nil", () => {
+  it("validates length of with allow nil", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
         this.validatesLengthOf("title", { is: 5, allowNil: true });
       }
     }
-    expect(new Topic({ title: "ab" }).isValid()).toBe(false);
-    expect(new Topic({ title: "" }).isValid()).toBe(false);
-    expect(new Topic({ title: null }).isValid()).toBe(true);
-    expect(new Topic({ title: "abcde" }).isValid()).toBe(true);
+    expect(await new Topic({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Topic({ title: "" }).isValid()).toBe(false);
+    expect(await new Topic({ title: null }).isValid()).toBe(true);
+    expect(await new Topic({ title: "abcde" }).isValid()).toBe(true);
   });
 
-  it("validates length of with allow blank", () => {
+  it("validates length of with allow blank", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
         this.validatesLengthOf("title", { is: 5, allowBlank: true });
       }
     }
-    expect(new Topic({ title: "ab" }).isValid()).toBe(false);
-    expect(new Topic({ title: "" }).isValid()).toBe(true);
-    expect(new Topic({ title: null }).isValid()).toBe(true);
-    expect(new Topic({ title: "abcde" }).isValid()).toBe(true);
+    expect(await new Topic({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Topic({ title: "" }).isValid()).toBe(true);
+    expect(await new Topic({ title: null }).isValid()).toBe(true);
+    expect(await new Topic({ title: "abcde" }).isValid()).toBe(true);
   });
 
-  it("optionally validates length of using minimum", () => {
+  it("optionally validates length of using minimum", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { minimum: 2 } });
       }
     }
-    expect(new Person({ title: "ab" }).isValid()).toBe(true);
-    expect(new Person({ title: "a" }).isValid()).toBe(false);
+    expect(await new Person({ title: "ab" }).isValid()).toBe(true);
+    expect(await new Person({ title: "a" }).isValid()).toBe(false);
   });
 
-  it("optionally validates length of using maximum", () => {
+  it("optionally validates length of using maximum", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { maximum: 5 } });
       }
     }
-    expect(new Person({ title: "abcde" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdef" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abcde" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdef" }).isValid()).toBe(false);
   });
 
-  it("validates length of using within with exclusive range", () => {
+  it("validates length of using within with exclusive range", async () => {
     // TS doesn't have Ruby's exclusive range syntax, but we can simulate
     // by using minimum/maximum with appropriate bounds
     class Person extends Model {
@@ -410,24 +410,24 @@ describe("LengthValidationTest", () => {
         this.validates("title", { length: { minimum: 3, maximum: 4 } });
       }
     }
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcd" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcde" }).isValid()).toBe(false);
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcd" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcde" }).isValid()).toBe(false);
+    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
   });
 
-  it("validates length of using within with infinite ranges", () => {
+  it("validates length of using within with infinite ranges", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { minimum: 0, maximum: Infinity } });
       }
     }
-    expect(new Person({ title: "" }).isValid()).toBe(true);
-    expect(new Person({ title: "a".repeat(10000) }).isValid()).toBe(true);
+    expect(await new Person({ title: "" }).isValid()).toBe(true);
+    expect(await new Person({ title: "a".repeat(10000) }).isValid()).toBe(true);
   });
 
-  it("validates length of custom errors for minimum with message", () => {
+  it("validates length of custom errors for minimum with message", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -435,11 +435,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "ab" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("title")).toContain("is too short!");
   });
 
-  it("validates length of custom errors for maximum with message", () => {
+  it("validates length of custom errors for maximum with message", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -447,11 +447,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "abcde" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("title")).toContain("is too long!");
   });
 
-  it("validates length of custom errors for in", () => {
+  it("validates length of custom errors for in", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -459,14 +459,14 @@ describe("LengthValidationTest", () => {
       }
     }
     const short = new Person({ title: "ab" });
-    short.isValid();
+    await short.isValid();
     expect(short.errors.get("title")).toContain("short!");
     const long = new Person({ title: "abcdef" });
-    long.isValid();
+    await long.isValid();
     expect(long.errors.get("title")).toContain("long!");
   });
 
-  it("validates length of custom errors for is with message", () => {
+  it("validates length of custom errors for is with message", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -474,11 +474,11 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "abc" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("title")).toContain("wrong length!");
   });
 
-  it("validates length of for integer", () => {
+  it("validates length of for integer", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -486,11 +486,11 @@ describe("LengthValidationTest", () => {
       }
     }
     // Length is checked as string length
-    expect(new Person({ title: "12345" }).isValid()).toBe(true);
-    expect(new Person({ title: "1234" }).isValid()).toBe(false);
+    expect(await new Person({ title: "12345" }).isValid()).toBe(true);
+    expect(await new Person({ title: "1234" }).isValid()).toBe(false);
   });
 
-  it("validates length of with proc", () => {
+  it("validates length of with proc", async () => {
     // Rails length.rb:55 — `check_value = resolve_value(record, check_value)`.
     // A Proc receives the record and returns the limit per-instance.
     class Person extends Model {
@@ -502,37 +502,37 @@ describe("LengthValidationTest", () => {
         });
       }
     }
-    expect(new Person({ title: "abc", limit: 5 }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdef", limit: 5 }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc", limit: 5 }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdef", limit: 5 }).isValid()).toBe(false);
   });
 
-  it("accepts :in as a range object { begin, end }", () => {
+  it("accepts :in as a range object { begin, end }", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { in: { begin: 3, end: 10 } } });
       }
     }
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdefghij" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
+    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdefghij" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
   });
 
-  it("accepts :within as a range object { begin, end }", () => {
+  it("accepts :within as a range object { begin, end }", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { length: { within: { begin: 3, end: 10 } } });
       }
     }
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdefghij" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
+    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdefghij" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcdefghijk" }).isValid()).toBe(false);
   });
 
-  it("accepts :in as a range object with excludeEnd", () => {
+  it("accepts :in as a range object with excludeEnd", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -540,12 +540,12 @@ describe("LengthValidationTest", () => {
         this.validates("title", { length: { in: { begin: 3, end: 5, excludeEnd: true } } });
       }
     }
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcd" }).isValid()).toBe(true);
-    expect(new Person({ title: "abcde" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcd" }).isValid()).toBe(true);
+    expect(await new Person({ title: "abcde" }).isValid()).toBe(false);
   });
 
-  it("does not leak reserved keys into errors.add options (minimum/maximum path)", () => {
+  it("does not leak reserved keys into errors.add options (minimum/maximum path)", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -553,7 +553,7 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "ab" });
-    p.isValid();
+    await p.isValid();
     const err = p.errors.objects[0];
     expect(err).toBeDefined();
     expect(err.options).not.toHaveProperty("minimum");
@@ -565,7 +565,7 @@ describe("LengthValidationTest", () => {
     expect(err.options).toHaveProperty("count");
   });
 
-  it("does not leak reserved keys into errors.add options (is path)", () => {
+  it("does not leak reserved keys into errors.add options (is path)", async () => {
     // Rails RESERVED_OPTIONS omits :wrong_length intentionally, so wrongLength
     // does appear in error options — matching length.rb:13 behaviour.
     class Person extends Model {
@@ -575,7 +575,7 @@ describe("LengthValidationTest", () => {
       }
     }
     const p = new Person({ title: "abc" });
-    p.isValid();
+    await p.isValid();
     const err = p.errors.objects[0];
     expect(err).toBeDefined();
     expect(err.options).not.toHaveProperty("minimum");
@@ -587,7 +587,7 @@ describe("LengthValidationTest", () => {
     expect(err.options).toHaveProperty("count");
   });
 
-  it("allowBlank: false with only maximum forces minimum of 1", () => {
+  it("allowBlank: false with only maximum forces minimum of 1", async () => {
     // Mirrors length.rb:22-24: if allow_blank == false && minimum.nil? && is.nil? → minimum = 1
     class Person extends Model {
       static {
@@ -595,8 +595,8 @@ describe("LengthValidationTest", () => {
         this.validates("title", { length: { maximum: 10, allowBlank: false } });
       }
     }
-    expect(new Person({ title: "" }).isValid()).toBe(false);
-    expect(new Person({ title: "a" }).isValid()).toBe(true);
+    expect(await new Person({ title: "" }).isValid()).toBe(false);
+    expect(await new Person({ title: "a" }).isValid()).toBe(true);
   });
 
   it("throws at definition time when :in is not a tuple or range object", () => {
@@ -636,7 +636,7 @@ describe("LengthValidationTest", () => {
     }).toThrow(/minimum must be a non-negative Integer/);
   });
 
-  it("validates length of with symbol method name", () => {
+  it("validates length of with symbol method name", async () => {
     // Rails: a Symbol resolves via record.send(:method_name). In TS a
     // string option that names a method on the record is resolved the
     // same way (resolve-value.ts).
@@ -649,7 +649,7 @@ describe("LengthValidationTest", () => {
         return 3;
       }
     }
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
   });
 });

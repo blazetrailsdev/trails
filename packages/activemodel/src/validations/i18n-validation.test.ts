@@ -216,7 +216,7 @@ describe("I18nValidationTest", () => {
     expect(p.errors.fullMessages).toContain("First name can't be blank");
   });
 
-  it("validates_confirmation_of on generated message", () => {
+  it("validates_confirmation_of on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -225,11 +225,11 @@ describe("I18nValidationTest", () => {
     }
     const p = new Person({ title: "A" });
     p._attributes.set("titleConfirmation", "B");
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("titleConfirmation")[0]).toMatch(/doesn't match/);
   });
 
-  it("validates_acceptance_of on generated message", () => {
+  it("validates_acceptance_of on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("terms", "string");
@@ -237,11 +237,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ terms: "no" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("terms")).toContain("must be accepted");
   });
 
-  it("validates_presence_of on generated message", () => {
+  it("validates_presence_of on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -249,11 +249,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toContain("can't be blank");
   });
 
-  it("validates_length_of for :within on generated message when too short", () => {
+  it("validates_length_of for :within on generated message when too short", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -261,11 +261,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "ab" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")[0]).toMatch(/is too short/);
   });
 
-  it("validates_length_of for :too_long generated message", () => {
+  it("validates_length_of for :too_long generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -273,11 +273,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "toolong" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")[0]).toMatch(/is too long/);
   });
 
-  it("validates_length_of for :is on generated message", () => {
+  it("validates_length_of for :is on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -285,11 +285,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "ab" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")[0]).toMatch(/is the wrong length/);
   });
 
-  it("validates_format_of on generated message", () => {
+  it("validates_format_of on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("email", "string");
@@ -297,11 +297,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ email: "invalid" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("email")).toContain("is invalid");
   });
 
-  it("validates_inclusion_of on generated message", () => {
+  it("validates_inclusion_of on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("role", "string");
@@ -309,11 +309,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ role: "other" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("role")).toContain("is not included in the list");
   });
 
-  it("validates_inclusion_of using :within on generated message", () => {
+  it("validates_inclusion_of using :within on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("role", "string");
@@ -321,11 +321,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ role: "hacker" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("role")).toContain("is not included in the list");
   });
 
-  it("validates_exclusion_of generated message", () => {
+  it("validates_exclusion_of generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("username", "string");
@@ -333,11 +333,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ username: "admin" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("username")).toContain("is reserved");
   });
 
-  it("validates_exclusion_of using :within generated message", () => {
+  it("validates_exclusion_of using :within generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("username", "string");
@@ -345,11 +345,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ username: "root" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("username")).toContain("is reserved");
   });
 
-  it("validates_numericality_of generated message", () => {
+  it("validates_numericality_of generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("age", "string");
@@ -357,11 +357,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ age: "abc" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("age")).toContain("is not a number");
   });
 
-  it("validates_numericality_of for :only_integer on generated message", () => {
+  it("validates_numericality_of for :only_integer on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("age", "string");
@@ -369,11 +369,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ age: "1.5" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("age")).toContain("must be an integer");
   });
 
-  it("validates_numericality_of for :odd on generated message", () => {
+  it("validates_numericality_of for :odd on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("count", "string");
@@ -381,11 +381,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ count: "4" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("count")).toContain("must be odd");
   });
 
-  it("validates_numericality_of for :less_than on generated message", () => {
+  it("validates_numericality_of for :less_than on generated message", async () => {
     class Person extends Model {
       static {
         this.attribute("age", "string");
@@ -393,11 +393,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ age: "15" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("age")).toContain("must be less than 10");
   });
 
-  it("finds custom model key translation when", () => {
+  it("finds custom model key translation when", async () => {
     I18n.storeTranslations("en", {
       activemodel: {
         errors: {
@@ -420,11 +420,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toContain("is required");
   });
 
-  it("finds custom model key translation with interpolation when", () => {
+  it("finds custom model key translation with interpolation when", async () => {
     I18n.storeTranslations("en", {
       activemodel: {
         errors: {
@@ -447,11 +447,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "ab" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toContain("must be at least 5 chars");
   });
 
-  it("finds global default key translation when", () => {
+  it("finds global default key translation when", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -459,7 +459,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toContain("can't be blank");
   });
 
@@ -483,7 +483,7 @@ describe("I18nValidationTest", () => {
     expect(p.errors.get("name")).toContain("must not be empty");
   });
 
-  it("validates with message symbol must translate per attribute", () => {
+  it("validates with message symbol must translate per attribute", async () => {
     I18n.storeTranslations("en", {
       activemodel: {
         errors: {
@@ -506,11 +506,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toContain("name is required");
   });
 
-  it("validates with message symbol must translate per model", () => {
+  it("validates with message symbol must translate per model", async () => {
     I18n.storeTranslations("en", {
       activemodel: {
         errors: {
@@ -529,11 +529,11 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toContain("person field required");
   });
 
-  it("validates with message string", () => {
+  it("validates with message string", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -541,7 +541,7 @@ describe("I18nValidationTest", () => {
       }
     }
     const p = new Person({ name: "" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toContain("custom required");
   });
 });
