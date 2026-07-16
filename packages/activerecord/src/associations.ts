@@ -2677,6 +2677,17 @@ function createHabtmJoinModel(
   JoinModel._tableName = joinTableName;
   JoinModel.primaryKey = [ownerFk, targetFk];
 
+  // The composite PK above is a trails affordance (Rails' HABTM join model has
+  // no primary key) that only supports delete/destroy's PK-based WHERE. It must
+  // NOT force the composite-PK eager-load bypass in `_eagerLoadBypassesJoinDependency`:
+  // an `includes(<source belongsTo>).references(...)` on this join model is a
+  // plain single-column belongs_to JOIN the JoinDependency handles fine (parent
+  // dedup keys off the composite PK in `instantiateFromRows`). Marking it here
+  // lets the through-preloader's source join run as Rails' eager LEFT OUTER JOIN
+  // rather than degrading to preload (which would orphan a copied source-table
+  // predicate onto an unjoined table).
+  (JoinModel as { _isHabtmJoinModel?: boolean })._isHabtmJoinModel = true;
+
   // Carry the declaring model's Ruby module path onto the anonymous join model
   // so its source `belongsTo` resolves an unqualified target class name
   // (e.g. "Article") namespace-relative to the owner (→ "Publisher::Article").

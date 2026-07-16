@@ -2773,8 +2773,13 @@ export class Relation<T extends Base> {
       inverseMap.set(assoc.name, assoc.options?.inverseOf);
     }
 
+    const basePkCols = Array.isArray(basePk) ? basePk : [basePk];
     for (const parent of parents) {
-      const pk = parent.readAttribute(basePk);
+      // Key the same way `JoinDependency#_keyFor` seeds the associations map:
+      // a single-column PK keys on the bare value, a composite PK (e.g. an
+      // anonymous HABTM join model) on the null-joined tuple.
+      const pkVals = basePkCols.map((c) => parent.readAttribute(c));
+      const pk = pkVals.length === 1 ? pkVals[0] : pkVals.join(" ");
       const assocs = associations.get(pk);
       for (const node of jd.nodes) {
         // Skip intermediate through nodes and nested nodes (handled in instantiateFromRows).
@@ -3103,7 +3108,12 @@ export class Relation<T extends Base> {
    */
   private _eagerLoadBypassesJoinDependency(): boolean {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    return Array.isArray(basePk) || this._ctes.length > 0 || !this._fromClause.isEmpty();
+    // An anonymous HABTM join model carries a composite PK only as a delete/
+    // destroy affordance (Rails' join model has none); its eager source join is a
+    // plain single-column belongs_to the JoinDependency handles, so it does NOT
+    // take the composite-PK bypass — see `_isHabtmJoinModel` in associations.ts.
+    const compositePkBypass = Array.isArray(basePk) && !(this._modelClass as any)._isHabtmJoinModel;
+    return compositePkBypass || this._ctes.length > 0 || !this._fromClause.isEmpty();
   }
 
   /**
