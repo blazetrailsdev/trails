@@ -63,7 +63,6 @@ import {
   ensureProperType as _ensureProperType,
   narrowToProjectedColumns,
   defineDynamicSelectReaders,
-  writeDatabaseRow,
   subclassFromAttributesForNew,
 } from "./inheritance.js";
 import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
@@ -2978,13 +2977,14 @@ export class Base extends Model {
     // set's column type (when the adapter reported one) to cast them — mirrors
     // Rails' `instantiate(record, column_types)` slice in find_by_sql /
     // JoinDependency#instantiate.
-    writeDatabaseRow(
-      this as unknown as typeof Base,
-      record as unknown as Base,
-      row,
-      columnTypes,
-      overrideTypes,
-    );
+    for (const [key, value] of Object.entries(row)) {
+      const override = overrideTypes?.[key];
+      if (override) {
+        record._attributes.overrideFromDatabase(key, value, override);
+      } else {
+        record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
+      }
+    }
     // A SELECT that projects only a subset of columns yields a row with just
     // those keys, so hasAttribute() must reflect what was loaded rather than
     // the full schema. Mirrors Rails' attributes_builder narrowing (see

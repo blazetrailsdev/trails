@@ -554,48 +554,6 @@ export function findStiClass(baseClass: typeof Base, typeName: string): typeof B
 }
 
 /**
- * Write a database row into a freshly-allocated record's attribute set,
- * dropping ignored columns that a `SELECT *` (or raw `find_by_sql`) row can
- * carry. Rails builds `@attributes` from `columns_hash.except(*ignored_columns)`
- * (model_schema.rb), so a plain ignored column never enters the attribute set —
- * `@attributes.key?("<ignored>")` is false. `applyColumnsHash` already removes a
- * schema-sourced ignored column's definition, so an ignored key absent from
- * `_attributeDefinitions` is exactly a plain ignored column and is skipped here.
- * A column ignored yet still explicitly declared via `attribute()` (Rails'
- * `AttributedDeveloper`, which keeps `name` in `attribute_types`) survives in
- * `_attributeDefinitions`, so its value still loads and casts through the
- * declared type.
- *
- * @internal
- */
-export function writeDatabaseRow(
-  klass: typeof Base,
-  record: Base,
-  row: Record<string, unknown>,
-  columnTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-  overrideTypes?: Record<string, { deserialize(value: unknown): unknown }>,
-): void {
-  const ignored = new Set(
-    (klass as unknown as { _ignoredColumns?: string[] })._ignoredColumns ?? [],
-  );
-  const defs = (klass as unknown as { _attributeDefinitions: Map<string, unknown> })
-    ._attributeDefinitions;
-  const attrs = record._attributes as {
-    writeFromDatabase(key: string, value: unknown, type?: unknown): void;
-    overrideFromDatabase(key: string, value: unknown, type: unknown): void;
-  };
-  for (const [key, value] of Object.entries(row)) {
-    if (ignored.has(key) && !defs.has(key)) continue;
-    const override = overrideTypes?.[key];
-    if (override) {
-      attrs.overrideFromDatabase(key, value, override);
-    } else {
-      attrs.writeFromDatabase(key, value, columnTypes?.[key]);
-    }
-  }
-}
-
-/**
  * Narrow a freshly-hydrated record's attribute set to the columns actually
  * returned by the query, so `hasAttribute()` reflects a projected SELECT.
  *
@@ -629,6 +587,18 @@ export function narrowToProjectedColumns(
   const pkSet = new Set(Array.isArray(pk) ? pk : pk != null ? [pk] : []);
   const rowKeys = new Set(Object.keys(row));
   const narrowable = klass.columnNames().filter((c) => !pkSet.has(c) && !rowKeys.has(c));
+  // An ignored column is dropped from columnNames(), so a `new` record's seeded
+  // default for a still-declared-and-ignored attribute (Rails' AttributedDeveloper
+  // `name`) would otherwise survive narrowing as an initialized value. Rails
+  // leaves it uninitialized after a load that didn't project it — its
+  // `_default_attributes` entry is `Attribute.uninitialized`, so
+  // `@attributes.key?` is false. Uninitialize any ignored column the row did not
+  // carry so a narrowed reload matches; an ignored column present in a raw
+  // `SELECT *` row (in rowKeys) is untouched and keeps its loaded value.
+  const ignoredColumns = (klass as unknown as { _ignoredColumns?: string[] })._ignoredColumns ?? [];
+  for (const c of ignoredColumns) {
+    if (!pkSet.has(c) && !rowKeys.has(c)) narrowable.push(c);
+  }
   // Hot path: a full SELECT projects every column, so there is nothing to
   // narrow — skip the attribute-set scan entirely.
   if (narrowable.length === 0) return;
@@ -668,7 +638,6 @@ const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
  */
 export function defineDynamicSelectReaders(record: Base): void {
   const attrs = (record as any)._attributes as { keys(): Iterable<string> };
-  const klass = record.constructor as typeof Base;
   const rec = record as unknown as Record<string | symbol, unknown>;
   const installed = (rec[SELECT_ALIAS_READERS] as Set<string> | undefined) ?? new Set<string>();
   // Drop readers whose alias no longer appears in the fresh attribute set
@@ -682,26 +651,19 @@ export function defineDynamicSelectReaders(record: Base): void {
       }
     }
   }
-  // Hot path: every declared attribute (a real column, and also an ignored
-  // column still declared via `attribute()`) is a known attribute, so only keys
-  // absent from _attributeDefinitions can be bare select aliases. A full
-  // `SELECT *` load projects only declared columns, so this loop finds nothing to
-  // install and never walks the prototype chain — mirrors
-  // narrowToProjectedColumns' own full-projection early-out.
-  //
-  // Gating on _attributeDefinitions (not columnNames(), which drops ignored
-  // columns) is still required even though writeDatabaseRow now keeps plain
-  // ignored columns out of the attribute set: a column ignored yet still declared
-  // via `attribute()` (Rails' AttributedDeveloper) has no DB column and stays in
-  // the attribute set as its declared default, so it is present in
-  // `_attributeDefinitions` but absent from columnNames(). Gating on columnNames()
-  // would mistake it for a bare select alias and install an accessor for it —
-  // regressing base.test.ts's `"secret" in u` expectation.
-  const definedAttrs = (klass as unknown as { _attributeDefinitions: Map<string, unknown> })
-    ._attributeDefinitions;
+  // Install a reader for every loaded attribute key that has no accessor on the
+  // prototype chain. `attrs.keys()` is initialized-only (Rails' `key?` gate), so
+  // a full `SELECT *` of ordinary columns — all of which carry prototype
+  // accessors — finds nothing to install and never walks the chain past the
+  // hasProtoMember check. This covers Rails' method_missing reaching `key?` for
+  // BOTH a bare select alias and an ignored column whose value a raw `SELECT *`
+  // actually projected (`AttributedDeveloper#name` → "Developer: name"): Rails
+  // makes both respond via `attribute_missing`. narrowToProjectedColumns has
+  // already uninitialized any ignored column the row did not carry, so a narrowed
+  // reload leaves its declared-but-ignored default out of `keys()` and no reader
+  // is installed — matching Rails' `key?` being false for that uninitialized slot.
   const proto = Object.getPrototypeOf(record) as object;
   for (const name of attrs.keys()) {
-    if (definedAttrs.has(name)) continue;
     if (installed.has(name)) continue;
     if (Object.prototype.hasOwnProperty.call(record, name)) continue;
     // A non-column key can still resolve to a real method or an aliased
@@ -773,7 +735,14 @@ function directInstantiate(
   // decrypt and raw DB representations (e.g. an enum's integer `0`) are accepted
   // — mirrors the non-STI Base._instantiate path. Building via `new klass(row)`
   // instead ran every column through the user cast, which rejects raw DB values.
-  writeDatabaseRow(klass, record, row, columnTypes, overrideTypes);
+  for (const [key, value] of Object.entries(row)) {
+    const override = overrideTypes?.[key];
+    if (override) {
+      record._attributes.overrideFromDatabase(key, value, override);
+    } else {
+      record._attributes.writeFromDatabase(key, value, columnTypes?.[key]);
+    }
+  }
   narrowToProjectedColumns(klass, record, row, overrideTypes);
   defineDynamicSelectReaders(record);
   record._newRecord = false;
