@@ -376,6 +376,17 @@ describe("HasOneThroughAssociationsTest", () => {
     expect((await readHasOne(member, "club"))?.id).toBe(newClub.id);
   });
 
+  it("re-assigning the same target record on a persisted owner is a no-op", async () => {
+    const member = members("groucho");
+    const club = await readHasOne(member, "club");
+    const before = (await Membership.count()) as number;
+    (member.association("club") as any).writer(club);
+    await member.save();
+    await member.reload();
+    expect((await readHasOne(member, "club"))?.id).toBe(clubs("boring_club").id);
+    expect((await Membership.count()) as number).toBe(before);
+  });
+
   it("replacing target record deletes old association", async () => {
     const member = members("groucho");
     const before = (await Membership.count()) as number;

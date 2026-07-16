@@ -133,10 +133,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
    */
   override async insertRecord(record: Base, validate = true, raise = false): Promise<boolean> {
     ensureNotNested(this);
-    const needsTargetSave =
-      record.isNewRecord() ||
-      (typeof (record as any).hasChangesToSave === "function" &&
-        (record as any).hasChangesToSave());
+    const needsTargetSave = record.isNewRecord() || record.hasChangesToSave;
     if (needsTargetSave) {
       const saved = await super.insertRecord(record, validate, raise);
       if (!saved) return false;
@@ -591,12 +588,7 @@ async function saveThroughRecord(
   try {
     const joinRecord = buildThroughRecord(assoc, record);
     if (!joinRecord) return true;
-    const isUnsaved =
-      joinRecord.isNewRecord() ||
-      (typeof (joinRecord as any).hasChangesToSave === "function"
-        ? (joinRecord as any).hasChangesToSave()
-        : true);
-    if (!isUnsaved) return true;
+    if (!joinRecord.changed) return true;
     const saved = await (joinRecord as any).save({ validate });
     if (!saved) {
       if (raise) raiseValidationError(joinRecord);
