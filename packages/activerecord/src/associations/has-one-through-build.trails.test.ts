@@ -64,4 +64,26 @@ describe("HasOneThroughBuildTrails", () => {
     expect(built.isNewRecord()).toBe(true);
     expect(member.association("club").target).toBe(built);
   });
+
+  it("buildClub then save reconciles the existing join row without duplicating it", async () => {
+    const member = members("groucho");
+    // Scope the join-row count to this member — a shared parallel DB races a
+    // global CurrentMembership.count against concurrent fixture reloads.
+    const joinCount = async (): Promise<number> =>
+      (await CurrentMembership.where({ member_id: member.id }).count()) as number;
+    const before = await joinCount();
+
+    const newClub = await (
+      member as unknown as { buildClub(attrs: Record<string, unknown>): Promise<Club> }
+    ).buildClub({ name: "Brand New Club" });
+    await member.save();
+
+    // Rails' create_through_record `update`s the loaded join row rather than
+    // inserting a second one — the count is unchanged and the through now
+    // points at the freshly-persisted club.
+    expect(await joinCount()).toBe(before);
+    expect(newClub.isPersisted()).toBe(true);
+    await member.association("club").reload();
+    expect((member.association("club").target as Club | null)?.id).toBe(newClub.id);
+  });
 });
