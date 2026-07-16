@@ -161,6 +161,22 @@ describe("Notifications (trails)", () => {
       }).not.toThrow();
     });
 
+    it("snapshots the subscribers at build time, not at finish", () => {
+      // Rails' Fanout::Handle captures groups_for(name) in initialize
+      // (fanout.rb:230): a subscriber added after build_handle sees nothing.
+      const early: Event[] = [];
+      const late: Event[] = [];
+      Notifications.subscribe("span", (e) => early.push(e));
+
+      const handle = Notifications.buildHandle("span", {});
+      handle.start();
+      Notifications.subscribe("span", (e) => late.push(e));
+      handle.finish();
+
+      expect(early).toHaveLength(1);
+      expect(late).toHaveLength(0);
+    });
+
     it("raises when start/finish are called out of order", () => {
       Notifications.subscribe("span", () => {});
       const handle = Notifications.buildHandle("span", {});

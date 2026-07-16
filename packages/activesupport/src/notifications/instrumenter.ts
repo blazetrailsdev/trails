@@ -64,12 +64,28 @@ function _recordException(payload: EventPayload, e: unknown): void {
   payload.exception_object = e;
 }
 
+/**
+ * The notifier an Instrumenter publishes through. A full notifier (Fanout)
+ * additionally exposes `buildHandle`, which snapshots the listener groups;
+ * a legacy publish-only notifier does not, and gets wrapped (see below).
+ */
+export interface InstrumenterNotifier {
+  publish(name: string, event: Event): void;
+  buildHandle?(name: string, id: unknown, payload: EventPayload): NotificationHandle;
+}
+
+/** The low-level start/finish handle returned by `buildHandle`. */
+export interface NotificationHandle {
+  start(): void;
+  finish(): void;
+}
+
 export class Instrumenter {
-  private _notifier: { publish(name: string, event: Event): void };
+  private _notifier: InstrumenterNotifier;
   private _stack: Event[] = [];
   readonly id: string;
 
-  constructor(notifier: { publish(name: string, event: Event): void }) {
+  constructor(notifier: InstrumenterNotifier) {
     this._notifier = notifier;
     this.id = generateTransactionId();
   }
@@ -117,11 +133,17 @@ export class Instrumenter {
 
   /**
    * Mirrors ActiveSupport::Notifications::Instrumenter#build_handle
-   * (instrumenter.rb:78-80). Returns a handle that records the event's start at
-   * `#start` and publishes it at `#finish`, so a single event carries the span
-   * between the two calls. `#start`/`#finish` must each be called exactly once.
+   * (instrumenter.rb:78-80): `@notifier.build_handle(name, @id, payload)`. A
+   * full notifier (Fanout) builds the handle itself, snapshotting its listener
+   * groups (fanout.rb:230, :322-324); a legacy publish-only notifier has no
+   * `build_handle`, so — like Rails' `LegacyHandle::Wrapper` (instrumenter.rb:
+   * 13-15, 20-47) — we wrap it in a Handle that builds the Event at start and
+   * publishes it at finish. `#start`/`#finish` must each be called exactly once.
    */
-  buildHandle(name: string, payload: EventPayload = {}): Handle {
+  buildHandle(name: string, payload: EventPayload = {}): NotificationHandle {
+    if (this._notifier.buildHandle) {
+      return this._notifier.buildHandle(name, this.id, payload);
+    }
     return new Handle(name, payload, this.id, this._notifier);
   }
 
@@ -151,7 +173,7 @@ export class Instrumenter {
  * `#start` (so its start time is the real start of the work) and publishes it
  * at `#finish`, off the payload held by reference.
  */
-export class Handle {
+export class Handle implements NotificationHandle {
   private _state: "initialized" | "started" | "finished" = "initialized";
   private _event: Event | null = null;
 

@@ -268,6 +268,13 @@ export class Notifications {
    * and `#finish` (e.g. `payload.outcome = ...`) are visible to subscribers.
    */
   static buildHandle(name: string, payload: EventPayload = {}): NotificationHandle {
+    // Rails' Fanout::Handle snapshots the matching listener groups at build
+    // time — `notifier.groups_for(name)` in Handle#initialize (fanout.rb:230)
+    // — and starts/finishes those same groups. Subscribers added or removed
+    // after this call therefore don't change what the handle publishes, so we
+    // capture the matching subscribers here rather than reading them live at
+    // finish.
+    const groups = [...this._subscribers].filter((sub) => this._matches(sub.pattern, name));
     let state: "initialized" | "started" | "finished" = "initialized";
     let event: Event | null = null;
     return {
@@ -276,7 +283,7 @@ export class Notifications {
           throw new ArgumentError(`expected state to be "initialized" but was "${state}"`);
         }
         state = "started";
-        if (this._listening(name)) {
+        if (groups.length > 0) {
           event = this._buildEvent(name, payload);
         }
       },
@@ -287,7 +294,8 @@ export class Notifications {
         state = "finished";
         if (event) {
           event.finish();
-          this._notify(event, true);
+          // Propagate subscriber errors (like publish), over the snapshot.
+          for (const sub of groups) sub.callback(event);
         }
       },
     };

@@ -93,4 +93,23 @@ describe("Instrumenter (trails)", () => {
     handle.start();
     expect(() => handle.start()).toThrow(/expected state to be "initialized"/);
   });
+
+  // Rails' Instrumenter#build_handle delegates to the notifier when it can build
+  // handles (instrumenter.rb:78-80), only falling back to the LegacyHandle
+  // wrapper for publish-only notifiers (instrumenter.rb:13-15).
+  it("buildHandle delegates to a notifier that can build handles", () => {
+    const delegated = { start() {}, finish() {} };
+    const calls: Array<[string, unknown]> = [];
+    const notifier = {
+      publish() {},
+      buildHandle(name: string, id: unknown) {
+        calls.push([name, id]);
+        return delegated;
+      },
+    };
+    const instrumenter = new Instrumenter(notifier);
+    const handle = instrumenter.buildHandle("span", {});
+    expect(handle).toBe(delegated);
+    expect(calls).toEqual([["span", instrumenter.id]]);
+  });
 });
