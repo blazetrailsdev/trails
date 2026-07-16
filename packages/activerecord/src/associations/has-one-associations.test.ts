@@ -590,6 +590,37 @@ describe("HasOneAssociationsTest", () => {
     expect(built.isPersisted()).toBe(false);
   });
 
+  // Trails deviation guard (no Rails counterpart, RFC 0005-activerecord-gaps
+  // story has-one-unloaded-target-create-missing-remove-target): follow-up to
+  // the loaded-target guards above. Here the target is *never* materialized — a
+  // bare `createAccount` on a freshly-found owner. Rails' `set_new_record` ->
+  // `replace(record, false)` runs `load_target` AFTER the new row is saved and
+  // removes `.first` of the two FK-matching rows. That singular load is an
+  // *unordered* `LIMIT 1` (`Association#find_target` -> `scope.to_a` then
+  // `Array#first`), so which row it detaches is order-undefined in Rails; we
+  // replicate the same post-save load faithfully (via `detachUnloadedPriorRow`)
+  // rather than inventing a deterministic order. On the sqlite test adapter the
+  // unordered `LIMIT 1` returns the lowest-rowid OLD row, so it is detached here.
+  it("create over an unloaded target nullifies the prior account", async () => {
+    const company = (await Company.create({ name: "UnloadedNullifyCo" })) as any;
+    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
+    const found = (await Company.find(company.id)) as any;
+    const created = await found.createAccount({ credit_limit: 70 });
+    expect((await Account.find(original.id)).firm_id).toBeNull();
+    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
+    expect((await readHasOne(found, "account")).id).toBe(created.id);
+  });
+
+  it("create over an unloaded target destroys the prior dependent account", async () => {
+    const firm = (await Firm.create({ name: "UnloadedDestroyFirm" })) as any;
+    const original = await Account.create({ firm_id: Number(firm.id), credit_limit: 50 });
+    const found = (await Firm.find(firm.id)) as any;
+    const created = await found.createAccount({ credit_limit: 70 });
+    await expect(Account.find(original.id)).rejects.toThrow(RecordNotFound);
+    expect(await Account.where({ firm_id: Number(firm.id) }).count()).toBe(1);
+    expect((await readHasOne(found, "account")).id).toBe(created.id);
+  });
+
   it("create when parent is new raises", async () => {
     const firm = new Firm();
     let error: unknown;

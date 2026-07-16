@@ -411,18 +411,30 @@ export class HasOneAssociation extends SingularAssociation {
     // `load_target` returns the already-cached target, so when the caller has
     // loaded it (`readHasOne` / preload), that OLD record is the one removed. Our
     // `replace`/`setNewRecord` are sync and cannot `await` that removal, so we run
-    // it here. Capture the loaded target BEFORE `super._createRecord`, which
+    // it here. Capture the displaced target BEFORE `super._createRecord`, which
     // builds the new record first — an invalid build (e.g. an inexistent foreign
     // key) must raise before any removal runs, exactly as Rails' `build_record`
-    // raises before `set_new_record`. An unloaded target is left to the property-
-    // setter displacement path (`queueWrite` flags), matching Rails' behaviour of
-    // only removing what `load_target` surfaces.
+    // raises before `set_new_record`.
     const displaced = this.loaded ? this.target : null;
+    const wasLoaded = this.loaded;
     const record = await super._createRecord(attributes, shouldRaise, block);
     // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
     // now the freshly created record; detach the displaced (previously attached)
     // one, matching `remove_target!` inside Rails' `replace`.
     await this.detachDisplacedTarget(displaced, record);
+    // When the target was never materialized, mirror Rails' `set_new_record` ->
+    // `replace(record, false)`, whose `load_target` runs AFTER
+    // `super._create_record` has saved the new row and removes `.first` of the
+    // now two FK-matching rows. Rails' singular load is an *unordered* `LIMIT 1`
+    // (`Association#find_target` -> `scope.to_a` then `Array#first`; our
+    // `doAsyncFindTarget` -> `loadHasOne` mirrors it with `take()`), so which row
+    // it returns is order-undefined — sometimes the OLD row (then removed),
+    // sometimes the freshly-created one (then nothing is detached). We reproduce
+    // that behaviour faithfully rather than inventing a deterministic order: run
+    // the same post-save load and detach the surfaced row only when it isn't the
+    // record just created. The build error still raises first, since
+    // `super._createRecord` has already run.
+    if (!wasLoaded && record) await this.detachUnloadedPriorRow(record);
     return record;
   }
 
@@ -451,6 +463,36 @@ export class HasOneAssociation extends SingularAssociation {
     this.target = displaced;
     await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
     this.target = replacement;
+  }
+
+  /**
+   * Detach the prior DB row after a `create#{name}` over an *unloaded* target —
+   * the analog of the `remove_target!` Rails runs inside
+   * `HasOneAssociation#replace` when `set_new_record`'s `load_target` (evaluated
+   * AFTER the new child is saved) surfaces the previously associated row. The new
+   * record is already `super._createRecord`-persisted and cached as the target,
+   * so we clear the cache and re-issue the (unordered `LIMIT 1`) load to see what
+   * Rails' `load_target` would — then detach it per `:dependent` only if it isn't
+   * the freshly-created record. Restores the cached new target around the query,
+   * matching Rails' `self.target = record` after `replace`'s block.
+   *
+   * @internal
+   */
+  private async detachUnloadedPriorRow(record: Base): Promise<void> {
+    const savedTarget = this.target;
+    const savedLoaded = this.loaded;
+    this.target = null;
+    this.loaded = false;
+    let found: Base | null = null;
+    try {
+      found = await this.doAsyncFindTarget();
+    } finally {
+      this.target = savedTarget;
+      this.loaded = savedLoaded;
+    }
+    if (found && !sameRecord(found, record)) {
+      await this.detachDisplacedTarget(found, record);
+    }
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
