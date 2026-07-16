@@ -401,13 +401,15 @@ export class HasOneAssociation extends SingularAssociation {
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, replacement)) return;
-    const currentTarget = this.target;
+    // Mirror Rails' `HasOneAssociation#replace`, where `self.target = record` runs
+    // only after the transaction block: if `remove_target!` raises (e.g. a failed
+    // nullify save, which restores the old record's owner attributes before
+    // raising — has_one_association.rb:102-108), the cached target stays the OLD
+    // record. So point the target at `displaced` across the removal and only
+    // promote the `replacement` on success — a throw leaves `displaced` cached.
     this.target = displaced;
-    try {
-      await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-    } finally {
-      this.target = currentTarget;
-    }
+    await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+    this.target = replacement;
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
