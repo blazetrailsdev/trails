@@ -1193,6 +1193,7 @@ export class JoinDependency {
   ): {
     parents: any[];
     associations: Map<unknown, Map<string, any[]>>;
+    parentKeys: Map<any, unknown>;
   } {
     const joinRoot = this._joinRoot;
     const aliases = this.aliases();
@@ -1236,7 +1237,18 @@ export class JoinDependency {
     }
 
     const parentList = [...parents.values()];
-    return { parents: parentList, associations: this._collectAssociations(parents) };
+    // Reverse index: each parent record → the RAW aliased dedup key it was
+    // stored under (the same `_keyFor` key `_collectAssociations` uses). The
+    // eager inverse-cache loop must look `associations` up by this raw key, not
+    // by re-reading the instantiated record's (deserialized) PK, which can
+    // diverge from the raw row value on adapters that deserialize PK columns.
+    const parentKeys = new Map<any, unknown>();
+    for (const [key, parent] of parents) parentKeys.set(parent, key);
+    return {
+      parents: parentList,
+      associations: this._collectAssociations(parents),
+      parentKeys,
+    };
   }
 
   /**

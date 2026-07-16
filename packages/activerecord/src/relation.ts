@@ -2756,7 +2756,7 @@ export class Relation<T extends Base> {
       record_count: rows.length,
       class_name: this._modelClass.baseClass.name,
     };
-    const { parents, associations } = Notifications.instrument(
+    const { parents, associations, parentKeys } = Notifications.instrument(
       "instantiation.active_record",
       eagerPayload,
       () =>
@@ -2773,13 +2773,13 @@ export class Relation<T extends Base> {
       inverseMap.set(assoc.name, assoc.options?.inverseOf);
     }
 
-    const basePkCols = Array.isArray(basePk) ? basePk : [basePk];
     for (const parent of parents) {
-      // Key the same way `JoinDependency#_keyFor` seeds the associations map:
-      // a single-column PK keys on the bare value, a composite PK (e.g. an
-      // anonymous HABTM join model) on the null-joined tuple.
-      const pkVals = basePkCols.map((c) => parent.readAttribute(c));
-      const pk = pkVals.length === 1 ? pkVals[0] : pkVals.join(" ");
+      // Look `associations` up by the SAME raw aliased key `instantiateFromRows`
+      // stored the parent under — not by re-reading the instantiated record's
+      // PK, which is deserialized and can diverge from the raw row value (e.g.
+      // bigint / composite HABTM keys), missing the lookup and skipping inverse
+      // caching.
+      const pk = parentKeys.get(parent);
       const assocs = associations.get(pk);
       for (const node of jd.nodes) {
         // Skip intermediate through nodes and nested nodes (handled in instantiateFromRows).

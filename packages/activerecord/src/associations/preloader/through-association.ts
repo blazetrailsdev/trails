@@ -227,7 +227,13 @@ export class ThroughAssociation extends Association {
     const strategy = this._throughScopeStrategy();
     if (strategy !== "nested" && this._reflectionScope != null) {
       sourceScope = this._reflectionScope._clone();
-      if (strategy === "join") {
+      if (strategy === "join" && this._throughQueryJoinsSource()) {
+        // The through query copied the FULL where_clause and eager-JOINed the
+        // source, so the source query re-applies NO predicates. When the through
+        // query could NOT join the source (a composite-PK non-HABTM through model
+        // bypasses the eager JoinDependency), fall through to keep the
+        // source-table predicates here instead — they never reached the through
+        // query (see `_buildThroughScope`).
         sourceScope._whereClause = new WhereClause([]);
       } else {
         const throughTable = this._throughTableName();
@@ -570,7 +576,26 @@ export class ThroughAssociation extends Association {
       // where_clause onto the through query and JOIN the source reflection so
       // every referenced column resolves in this single query.
       const sourceRefl = this._sourceReflection;
-      if (sourceRefl) {
+      if (sourceRefl && !this._throughQueryJoinsSource()) {
+        // trails can't apply the eager JoinDependency for this through query (a
+        // composite-PK non-HABTM through model bypasses it, degrading to
+        // preload), so `includes!(source)` would NOT actually JOIN the source.
+        // Copying the FULL where_clause here would then orphan the source-table
+        // predicates onto an unjoined table. Instead copy ONLY the
+        // through-table-only predicates (to constrain the intermediate rows); the
+        // source-table predicates ride the recursive source stage (see
+        // `_getSourcePreloaders`, which keeps them for this case). Rails never
+        // reaches here — it always JOINs — so this is trails' faithful
+        // degradation of the same `through_scope` where-copy.
+        const throughTable = this._throughTableName();
+        const throughOnly =
+          throughTable != null
+            ? whereClause.predicates.filter((p: any) => predicateIsThroughOnly(p, throughTable))
+            : [];
+        if (throughOnly.length > 0) {
+          scope._whereClause = new WhereClause([...scope._whereClause.predicates, ...throughOnly]);
+        }
+      } else if (sourceRefl) {
         // Mirror Rails' `through_scope` eager-load branch exactly for EVERY
         // source kind (to-one, collection, nested through).
         // Copy the FULL reflection-scope where_clause and `includes!(source)` +
@@ -658,6 +683,32 @@ export class ThroughAssociation extends Association {
     // cascade_strict_loading: a strict-loading preload scope propagates to the
     // through query so intermediate records inherit the constraint (rb:145).
     return this._cascadeStrictLoading(scope);
+  }
+
+  /**
+   * Whether the through query will ACTUALLY eager-JOIN the source reflection
+   * when `_buildThroughScope` issues `includes!(source)`/`references!`. It does
+   * unless trails' eager path bypasses the JoinDependency for the through model
+   * (`Relation#_eagerLoadBypassesJoinDependency`): a composite-PK base degrades
+   * to preload — EXCEPT the anonymous `HABTM_*` join model, whose composite PK is
+   * a delete-only affordance flagged `_isHabtmJoinModel`. Rails has no such
+   * bypass (it always JOINs), so this is false only for trails' capability gap:
+   * a composite-PK, non-HABTM through model. In that case the where-copy must
+   * degrade (see `_buildThroughScope` / `_getSourcePreloaders`) rather than
+   * orphan source-table predicates on an unjoined through query.
+   * @internal
+   */
+  private _throughQueryJoinsSource(): boolean {
+    const throughRefl = this._throughReflection;
+    if (!throughRefl) return false;
+    let throughKlass: typeof Base;
+    try {
+      throughKlass = throughRefl.klass;
+    } catch {
+      return false;
+    }
+    const pk = (throughKlass as any).primaryKey;
+    return !(Array.isArray(pk) && !(throughKlass as any)._isHabtmJoinModel);
   }
 
   /** @internal */
