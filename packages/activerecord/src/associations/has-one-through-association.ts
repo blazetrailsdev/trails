@@ -145,7 +145,7 @@ export class HasOneThroughAssociation extends HasOneAssociation {
       // loads the through proxy and destroys it when present — matching Rails'
       // create_through_record(nil) which calls through_proxy.load_target first.
       const mightNeedDelete = record === null && !this.isLoaded();
-      if (assigningAnother || mightNeedDelete || (record as any)?.hasChangesToSave?.()) {
+      if (assigningAnother || mightNeedDelete || record?.hasChangesToSave === true) {
         if (save) {
           if (this._pendingReplace) {
             const wasAssignedAnother = !sameRecord(

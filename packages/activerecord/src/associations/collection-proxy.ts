@@ -4160,10 +4160,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         // New record still unsaved — push()'s save() returned false
         throw new RecordInvalid(record as unknown as object);
       }
-      if (
-        typeof (record as any).hasChangesToSave === "function" &&
-        (record as any).hasChangesToSave()
-      ) {
+      if (record.hasChangesToSave) {
         // Persisted record still has unsaved changes after push() — raise without retrying
         throw new RecordInvalid(record as unknown as object);
       }

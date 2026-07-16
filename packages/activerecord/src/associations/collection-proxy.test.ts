@@ -7,7 +7,7 @@
 
 import { describe, it, expect } from "vitest";
 import { throwAbort } from "@blazetrails/activesupport";
-import { Base, association, registerModel, RecordNotFound } from "../index.js";
+import { Base, association, registerModel, RecordInvalid, RecordNotFound } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 // Opt this file into the canonical-model autoload index (Zeitwerk analog):
 // `Comment`, `Tagging`, `Tag`, and `Owner` — association targets with no
@@ -22,7 +22,7 @@ import { Tag } from "../test-helpers/models/tag.js";
 import { CpkAuthor, CpkBook } from "../test-helpers/models/cpk.js";
 import { Pet } from "../test-helpers/models/pet.js";
 import { Toy } from "../test-helpers/models/toy.js";
-import { Firm } from "../test-helpers/models/company.js";
+import { Firm, Client } from "../test-helpers/models/company.js";
 
 // `authors`, `posts`, `cpkAuthors`, `cpkBooks`, `pets`, and `toys` are declared
 // fixture sets below, so their models (`Author`, `Post`, `CpkAuthor`, `CpkBook`,
@@ -823,5 +823,24 @@ describe("CollectionProxy#find — in-memory not-found message fidelity", () => 
         ),
       );
     }
+  });
+});
+
+// `appendBang` is a trails-only bang variant of `push` (Rails' `<<` delegates to
+// the non-raising `concat`). Its "record is persisted but still dirty" arm read
+// `hasChangesToSave` — a getter — through a `typeof … === "function"` guard,
+// which is always `"boolean"`, so the arm never fired and a failed save was
+// swallowed. Company validates presence of `name`, so blanking it makes `save`
+// return false and leaves the persisted record dirty.
+describe("CollectionProxy#appendBang — persisted record left dirty by a failed save", () => {
+  const { companies } = fixtures(["companies", "accounts"]);
+
+  it("raises RecordInvalid when a persisted record still has unsaved changes after push", async () => {
+    const firm = await Firm.find(companies("first_firm").id);
+    const client = await Client.find(companies("second_client").id);
+    client.writeAttribute("name", "");
+    expect(client.isNewRecord()).toBe(false);
+
+    await expect((firm as any).clients.appendBang(client)).rejects.toBeInstanceOf(RecordInvalid);
   });
 });

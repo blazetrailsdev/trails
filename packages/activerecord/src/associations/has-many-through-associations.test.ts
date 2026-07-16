@@ -620,6 +620,20 @@ describe("HasManyThroughAssociationsTest", () => {
     expect((result as any[]).map((r: any) => r.id)).toContain(person.id);
   });
 
+  it("associating a persisted record with unsaved changes saves those changes", async () => {
+    // Rails' insert_record gate is `record.new_record? || record.has_changes_to_save?`
+    // (has_many_through_association.rb:27) — the second arm saves a persisted-but-dirty
+    // target before the join row is written.
+    const post = await Post.find(posts("thinking").id);
+    const person = await Person.find(people("michael").id);
+    person.writeAttribute("first_name", "Bongo");
+
+    await (post as any).association("people").concat([person]);
+
+    await person.reload();
+    expect(person.readAttribute("first_name")).toBe("Bongo");
+  });
+
   it("associate existing record twice should add to target twice", async () => {
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("david").id);

@@ -120,10 +120,7 @@ export class HasOneAssociation extends SingularAssociation {
     // gate: only touch the DB when the assignment actually changes something, so
     // a no-op re-assignment (e.g. `writer(null)` with no target) opens no
     // transaction.
-    const changed =
-      !sameRecord(displaced, record) ||
-      (typeof (record as any)?.hasChangesToSave === "function" &&
-        (record as any).hasChangesToSave());
+    const changed = !sameRecord(displaced, record) || record?.hasChangesToSave === true;
     this.replace(record);
     if (changed && (this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       return this.persistImmediate(record, displaced);
@@ -332,7 +329,7 @@ export class HasOneAssociation extends SingularAssociation {
   protected override replace(record: Base | null, _save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const assigningAnother = !sameRecord(this.target, record);
-    if (assigningAnother || (record as any)?.hasChangesToSave) {
+    if (assigningAnother || record?.hasChangesToSave === true) {
       if (record) {
         // Set the foreign key (from the owner's — possibly still-nil — primary
         // key) and inverse in memory. Persistence is Rails'

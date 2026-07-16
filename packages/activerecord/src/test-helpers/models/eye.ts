@@ -20,11 +20,11 @@ export class Eye extends Base {
     });
     this.afterUpdate(function (this: Eye) {
       if ((this as any).iris)
-        this.afterUpdateCallbacksStack.push((this as any).iris.hasChangesToSave());
+        this.afterUpdateCallbacksStack.push((this as any).iris.hasChangesToSave);
     });
     this.afterSave(function (this: Eye) {
       if ((this as any).iris)
-        this.afterSaveCallbacksStack.push((this as any).iris.hasChangesToSave());
+        this.afterSaveCallbacksStack.push((this as any).iris.hasChangesToSave);
     });
 
     this.hasOne("iris");
@@ -35,11 +35,11 @@ export class Eye extends Base {
     });
     this.afterUpdate(function (this: Eye) {
       if ((this as any).iris)
-        this.afterUpdateCallbacksStack.push((this as any).iris.hasChangesToSave());
+        this.afterUpdateCallbacksStack.push((this as any).iris.hasChangesToSave);
     });
     this.afterSave(function (this: Eye) {
       if ((this as any).iris)
-        this.afterSaveCallbacksStack.push((this as any).iris.hasChangesToSave());
+        this.afterSaveCallbacksStack.push((this as any).iris.hasChangesToSave);
     });
 
     this.hasOne("irisWithReadOnlyForeignKey", {
