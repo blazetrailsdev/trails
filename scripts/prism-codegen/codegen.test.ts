@@ -3,7 +3,7 @@ import { generateFromSource } from "./index.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { Registry } from "./registry.js";
 import { tsToRubyFile } from "./naming.js";
-import { extractAsyncNames, asyncMethodsForRailsFile } from "./async-source.js";
+import { extractAsyncNames, resolveAsyncNames, rubyDefinedMethods } from "./async-source.js";
 import type { Coverage } from "./types.js";
 
 describe("prism-codegen", () => {
@@ -135,21 +135,37 @@ describe("prism-codegen", () => {
     expect(names.has("pluck")).toBe(false);
   });
 
-  it("includes Relation-class async methods for the relation-family targets", () => {
-    // Rails' relation/*.rb modules are mixed into Relation; trails ports some
-    // methods (pluck/ids from calculations.rb) onto the Relation class in
-    // relation.ts, so the calculations target must consult relation.ts too.
-    const calc = asyncMethodsForRailsFile("active_record/relation/calculations.rb");
-    expect(calc.has("count")).toBe(true); // from calculations.ts map
-    expect(calc.has("pluck")).toBe(true); // from relation.ts (Relation#pluck)
-    expect(calc.has("ids")).toBe(true); // from relation.ts (Relation#ids)
-    // Supplement is scoped to methods calculations.rb DEFINES — generic Relation
-    // async names it merely calls on Array receivers (`first`, `one?`) must NOT
-    // be swept in, or the receiver-blind await would await Array helpers.
-    expect(calc.has("first")).toBe(false);
-    expect(calc.has("isOne")).toBe(false);
-    // Scoped: a Model-side file does NOT inherit Relation's async surface.
-    expect(asyncMethodsForRailsFile("active_record/persistence.rb").has("pluck")).toBe(false);
+  it("scopes the relation.ts supplement to the file's own Rails defs", () => {
+    // Hermetic — inject the sources instead of reading vendor/rails. Mirrors the
+    // real shape: calculations.ts exposes count via its map; relation.ts hosts
+    // async pluck/ids AND async first (Relation#first) plus a generic isOne.
+    const twinTs = `export const Calculations = { count: inQueryConnection(performCount) };
+      export async function performCount() {}`;
+    const relationTs = `class Relation {
+      async pluck() {}
+      async ids() {}
+      async first() {}
+      async isOne() {}
+    }`;
+    // calculations.rb defines pluck/ids/count but NOT first/one? (those are
+    // Array helpers it merely calls / live in finder_methods).
+    const ownRubyDefs = rubyDefinedMethods(`
+      def count; end
+      def pluck; end
+      def ids; end
+    `);
+    const names = resolveAsyncNames({ twinTs, relationTs, ownRubyDefs });
+    expect(names.has("count")).toBe(true); // twin map
+    expect(names.has("pluck")).toBe(true); // relation.ts ∩ own defs
+    expect(names.has("ids")).toBe(true); // relation.ts ∩ own defs
+    expect(names.has("first")).toBe(false); // relation async but not a calc def
+    expect(names.has("isOne")).toBe(false);
+  });
+
+  it("omits the relation supplement when no defs are provided (Model-side files)", () => {
+    const names = resolveAsyncNames({ twinTs: `export async function save() {}` });
+    expect(names.has("save")).toBe(true);
+    expect(names.has("pluck")).toBe(false);
   });
 
   it("rolls up per-file coverage tallies into one summary", () => {
