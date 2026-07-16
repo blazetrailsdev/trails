@@ -10,6 +10,7 @@
 import { Temporal } from "./temporal.js";
 import { Event } from "./notifications/instrumenter.js";
 import type { EventPayload } from "./notifications/instrumenter.js";
+import { iterateGuardingExceptions } from "./notifications/fanout.js";
 import { IsolatedExecutionState } from "./isolated-execution-state.js";
 
 /**
@@ -293,9 +294,13 @@ export class Notifications {
         }
         state = "finished";
         if (event) {
-          event.finish();
-          // Propagate subscriber errors (like publish), over the snapshot.
-          for (const sub of groups) sub.callback(event);
+          const finished = event;
+          finished.finish();
+          // Rails' Handle#finish_with_values runs every group under
+          // iterate_guarding_exceptions (fanout.rb:20-39, :253-259): one bad
+          // subscriber must not suppress the rest; errors aggregate and re-raise
+          // after all have run.
+          iterateGuardingExceptions(groups, (sub) => sub.callback(finished));
         }
       },
     };

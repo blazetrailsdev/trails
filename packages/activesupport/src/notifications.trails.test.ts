@@ -177,6 +177,24 @@ describe("Notifications (trails)", () => {
       expect(late).toHaveLength(0);
     });
 
+    it("runs every snapshot subscriber even when one throws, then re-raises", () => {
+      // Rails' Handle#finish_with_values guards each group
+      // (iterate_guarding_exceptions, fanout.rb:20-39): a throwing subscriber
+      // must not stop the ones after it.
+      const ran: string[] = [];
+      Notifications.subscribe("span", () => ran.push("a"));
+      Notifications.subscribe("span", () => {
+        ran.push("b");
+        throw new Error("boom");
+      });
+      Notifications.subscribe("span", () => ran.push("c"));
+
+      const handle = Notifications.buildHandle("span", {});
+      handle.start();
+      expect(() => handle.finish()).toThrow("boom");
+      expect(ran).toEqual(["a", "b", "c"]);
+    });
+
     it("raises when start/finish are called out of order", () => {
       Notifications.subscribe("span", () => {});
       const handle = Notifications.buildHandle("span", {});
