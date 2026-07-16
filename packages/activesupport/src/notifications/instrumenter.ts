@@ -35,7 +35,11 @@ export class Event {
     this.name = name;
     this.time = start;
     this.end = null;
-    this.payload = payload;
+    // Rails' Event#initialize does `@payload = payload.dup` (a shallow copy).
+    // The event holds a snapshot; sites that mutate the source payload after
+    // construction (the rescue arm, an outcome set before finish) re-sync it
+    // onto this copy before publishing — as Fanout's EventObjectGroup does.
+    this.payload = { ...payload };
     this.transactionId = transactionId ?? generateTransactionId();
     this.children = [];
   }
@@ -109,7 +113,7 @@ export class Instrumenter {
       _recordException(payload, e);
       throw e;
     } finally {
-      this._pop(event);
+      this._pop(event, payload);
     }
   }
 
@@ -127,7 +131,7 @@ export class Instrumenter {
       _recordException(payload, e);
       throw e;
     } finally {
-      this._pop(event);
+      this._pop(event, payload);
     }
   }
 
@@ -147,12 +151,6 @@ export class Instrumenter {
     return new Handle(name, payload, this.id, this._notifier);
   }
 
-  // Rails' #instrument never builds an Event — it hands the raw payload to a
-  // Fanout handle, so subscribers see the block's mutations (that is how
-  // payload[:exception] reaches them). trails routes it through an Event, which
-  // works only because Event holds the payload by reference. Rails' Event#dups
-  // it (instrumenter.rb:105); converging that dup without first moving this path
-  // off Event would silently hide the exception keys from subscribers.
   private _push(name: string, payload: EventPayload): Event {
     const event = new Event(name, Temporal.Now.instant(), payload, this.id);
     const parent = this._stack[this._stack.length - 1];
@@ -161,8 +159,12 @@ export class Instrumenter {
     return event;
   }
 
-  private _pop(event: Event): void {
+  private _pop(event: Event, payload: EventPayload): void {
     this._stack.pop();
+    // Event#initialize dup'd the payload at _push; re-sync the block's and the
+    // rescue arm's mutations onto that copy before publishing, as Rails' Fanout
+    // EventObjectGroup does at finish.
+    Object.assign(event.payload, payload);
     event.finish();
     this._notifier.publish(event.name, event);
   }
@@ -171,7 +173,7 @@ export class Instrumenter {
 /**
  * Mirrors ActiveSupport::Notifications::Fanout::Handle — builds the Event at
  * `#start` (so its start time is the real start of the work) and publishes it
- * at `#finish`, off the payload held by reference.
+ * at `#finish`, re-syncing any payload mutations made in between.
  */
 export class Handle implements NotificationHandle {
   private _state: "initialized" | "started" | "finished" = "initialized";
@@ -198,6 +200,10 @@ export class Handle implements NotificationHandle {
     }
     this._state = "finished";
     if (this._event) {
+      // Event#initialize dup'd the payload at #start; re-sync mutations made
+      // between start and finish (e.g. payload.outcome) onto that copy before
+      // publishing, as Rails' Fanout EventObjectGroup does.
+      Object.assign(this._event.payload, this._payload);
       this._event.finish();
       this._notifier.publish(this._event.name, this._event);
     }

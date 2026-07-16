@@ -189,11 +189,15 @@ export class Notifications {
     const inner = [...current, event];
     let result: T;
     try {
-      result = this._runWithStack(inner, () => block(event.payload));
+      result = this._runWithStack(inner, () => block(resolved));
     } catch (e) {
-      this._recordException(event.payload, e);
+      this._recordException(resolved, e);
       throw e;
     } finally {
+      // Event#initialize dup'd the payload; re-sync the block's mutations (and
+      // the rescue arm's) onto that copy before publishing, as Rails' Fanout
+      // EventObjectGroup does. The block mutates the raw payload it was yielded.
+      Object.assign(event.payload, resolved);
       event.finish();
       this._notify(event);
     }
@@ -239,11 +243,14 @@ export class Notifications {
     const inner = [...current, event];
     let result: T;
     try {
-      result = await this._runWithStack(inner, () => block(event.payload));
+      result = await this._runWithStack(inner, () => block(resolved));
     } catch (e) {
-      this._recordException(event.payload, e);
+      this._recordException(resolved, e);
       throw e;
     } finally {
+      // See instrument(): re-sync the raw payload's mutations onto the event's
+      // dup before publishing.
+      Object.assign(event.payload, resolved);
       event.finish();
       this._notify(event);
     }
@@ -265,8 +272,8 @@ export class Notifications {
    * `ActiveSupport::Notifications.instrumenter.build_handle`. The returned
    * handle records the event's start at `#start` and finishes + publishes it at
    * `#finish`, so `event.duration` covers the whole span (not just the publish
-   * call). The payload is held by reference: mutations made between `#start`
-   * and `#finish` (e.g. `payload.outcome = ...`) are visible to subscribers.
+   * call). Mutations made between `#start` and `#finish` (e.g.
+   * `payload.outcome = ...`) are re-synced onto the event before publishing.
    */
   static buildHandle(name: string, payload: EventPayload = {}): NotificationHandle {
     // Rails' Fanout::Handle snapshots the matching listener groups at build
@@ -295,6 +302,9 @@ export class Notifications {
         state = "finished";
         if (event) {
           const finished = event;
+          // Event#initialize dup'd the payload; re-sync mutations made between
+          // start and finish onto that copy before delivering.
+          Object.assign(finished.payload, payload);
           finished.finish();
           // Rails' Handle#finish_with_values runs every group under
           // iterate_guarding_exceptions (fanout.rb:20-39, :253-259): one bad
