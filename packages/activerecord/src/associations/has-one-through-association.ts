@@ -95,6 +95,21 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * `HasOneAssociation#setNewRecord` queues the displaced target onto
+   * `_displacedRecords` for the owner's next `save()` to remove — the deferred
+   * counterpart of the `detachDisplacedTarget` opt-out above, and wrong for a
+   * through for the same reason: Rails' `HasOneThroughAssociation#replace`
+   * (has_one_through_association.rb:9-13) has no `remove_target!`, so the sync
+   * `assoc.build` path (reached from the `build#{name}` accessor) must not queue
+   * the end record for a direct-FK nullify it doesn't own. Restore the bare base
+   * `replace(record, false)`, which for a through routes to its own `replace` and
+   * leaves displacement to `createThroughRecord`.
+   */
+  protected override setNewRecord(record: Base): void {
+    this.replace(record, false);
+  }
+
+  /**
    * The deferred (non-awaitable) property-setter / mass-assignment path. The
    * base `queueWrite` records a displaced record for the direct-FK autosave to
    * remove, but a through routes displacement through the join model

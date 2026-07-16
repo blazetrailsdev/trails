@@ -430,34 +430,75 @@ export class HasOneAssociation extends SingularAssociation {
     // it here. Capture the loaded target BEFORE `super._createRecord`, which
     // builds the new record first — an invalid build (e.g. an inexistent foreign
     // key) must raise before any removal runs, exactly as Rails' `build_record`
-    // raises before `set_new_record`. An unloaded target is left to the property-
-    // setter displacement path (`queueWrite` flags), matching Rails' behaviour of
-    // only removing what `load_target` surfaces.
+    // raises before `set_new_record`.
+    //
+    // When the target was never materialized, Rails' `load_target` (:62) still
+    // surfaces and removes the existing DB row, so sample `needsLoad` here
+    // (`replace`/`setNewRecord` flip `loaded` via `loadedBang`) and let
+    // `detachDisplacedTarget` issue the find *after* `super` — after, because the
+    // find must not precede `build_record`'s `UnknownAttributeError` for a bogus
+    // reflection `foreign_key`.
     const displaced = this.loaded ? this.target : null;
+    const needsLoad = displaced === null && this.findTargetNeeded();
     const record = await super._createRecord(attributes, shouldRaise, block);
     // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
     // now the freshly created record; detach the displaced (previously attached)
     // one, matching `remove_target!` inside Rails' `replace`.
-    await this.detachDisplacedTarget(displaced, record);
+    await this.detachDisplacedTarget(displaced, record, needsLoad);
     return record;
   }
 
   /**
    * Detach the record displaced by a `create#{name}` / `build#{name}` over an
-   * already-**loaded** has_one target — the awaitable analog of the
-   * `remove_target!` Rails runs inside `HasOneAssociation#replace`
-   * (has_one_association.rb:69) whenever another record is assigned. Nullifies
-   * the displaced record's foreign key (or destroys/deletes it per
-   * `:dependent`). Our sync `replace`/`setNewRecord` cannot `await` that removal,
-   * so the async create/build accessors run it here after materializing the
-   * replacement. A no-op unless a *different*, non-destroyed record was loaded.
+   * existing has_one target — the awaitable analog of the `remove_target!` Rails
+   * runs inside `HasOneAssociation#replace` (has_one_association.rb:69) whenever
+   * another record is assigned. Nullifies the displaced record's foreign key (or
+   * destroys/deletes it per `:dependent`). Our sync `replace`/`setNewRecord`
+   * cannot `await` that removal, so the async create/build accessors run it here
+   * after materializing the replacement.
+   *
+   * `displaced` is the target the caller had loaded, if any. When it is null but
+   * `needsLoad` is set — a `create#{name}` on a freshly-found owner whose target
+   * was never materialized — Rails' `load_target` (:62) would still surface and
+   * remove the existing DB row, so query for it now (after `super`, per the note
+   * in `_createRecord`). The new record is already persisted, so the un-ordered
+   * `LIMIT 1` may return either row; a `sameRecord(found, replacement)` match
+   * reproduces Rails' two-row outcome (find the new row → `assigning_another_
+   * record` false → `remove_target!` skipped). A no-op unless a *different*,
+   * non-destroyed record is in play.
    *
    * @internal
    */
-  async detachDisplacedTarget(displaced: Base | null, replacement: Base | null): Promise<void> {
+  async detachDisplacedTarget(
+    displaced: Base | null,
+    replacement: Base | null,
+    needsLoad = false,
+  ): Promise<void> {
+    if (!displaced && needsLoad) {
+      const savedTarget = this.target;
+      const savedLoaded = this.loaded;
+      this.target = null;
+      this.loaded = false;
+      try {
+        displaced = await this.doAsyncFindTarget();
+      } finally {
+        this.target = savedTarget;
+        this.loaded = savedLoaded;
+      }
+      if (displaced && sameRecord(displaced, replacement)) displaced = null;
+    }
     if (!displaced) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     if (sameRecord(displaced, replacement)) return;
+    // `setNewRecord` (reached via `super._createRecord` / `assoc.build`) already
+    // queued this same record onto `_displacedRecords` for the owner's next
+    // `save()`. We remove it here and now, so drop the queued duplicate — else
+    // `autosaveHasOne` → `removeDisplaced` would run `removeOne` on it a second
+    // time (a redundant nullify UPDATE, or a re-entrant `:destroy` on a frozen
+    // record via `preloadDestroyInverseBelongsTo`). The sync `assoc.build` path,
+    // which never reaches `detachDisplacedTarget`, keeps relying on that queue.
+    const queuedIdx = this._displacedRecords.findIndex((r) => sameRecord(r, displaced));
+    if (queuedIdx !== -1) this._displacedRecords.splice(queuedIdx, 1);
     // Mirror Rails' `HasOneAssociation#replace`, where `self.target = record` runs
     // only after the transaction block: if `remove_target!` raises (e.g. a failed
     // nullify save, which restores the old record's owner attributes before
@@ -544,25 +585,42 @@ export class HasOneAssociation extends SingularAssociation {
    * over an existing target still nullifies the displaced record's foreign key
    * and clears its inverse. We run that in-memory half here and hand the
    * displaced record to `removeDisplaced` (the owner's `autosaveHasOne`) for the
-   * DB half — `build` is synchronous and cannot await a save. Only a *persisted*
-   * displaced record has a row to remove, so a transient in-memory target is not
-   * queued (matching `queueWrite`).
+   * DB half — `build` is synchronous and cannot await a save.
+   *
+   * The queue gate is branch-dependent, because `owner.persisted?` appears in
+   * exactly one place in `remove_target!` — the else branch's save at `:108`:
+   *
+   *   - else / `:nullify` / `:destroyAsync` / `:restrict*` queue only when
+   *     `target.persisted? && owner.persisted?` (the two `:108` conjuncts,
+   *     evaluated at *replace* time). Deferring re-reads them at *save* time, by
+   *     which point a new-record owner has become persisted — queueing would
+   *     write a nullification Rails never performs (it nullifies the FK in memory
+   *     inline and never saves the displaced row).
+   *   - `:delete` / `:destroy` queue unconditionally: `:delete` runs even on an
+   *     unpersisted target (:97-98) and `:destroy` re-checks `target.persisted?`
+   *     in `removeOne` (:99-103); neither consults the owner.
    */
   protected override setNewRecord(record: Base): void {
     const displaced = this.target;
     const assigningAnother = !sameRecord(displaced, record);
     this.replace(record, false);
     if (!displaced || !assigningAnother) return;
-    if ((displaced as { isPersisted?: () => boolean }).isPersisted?.() !== true) return;
     if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
     const dependent = (this.reflection.options.dependent as string) ?? "";
-    if (dependent !== "delete" && dependent !== "destroy") {
-      // `remove_target!`'s else branch (:104-106) is synchronous in Rails; only
-      // its `target.save` (:108) needs an await, so do the memory half now.
-      this.nullifyOwnerAttributes(displaced);
-      this.removeInverseInstance(displaced);
+    if (dependent === "delete" || dependent === "destroy") {
+      this._displacedRecords.push(displaced);
+      return;
     }
-    this._displacedRecords.push(displaced);
+    // `remove_target!`'s else branch (:104-106) is synchronous in Rails; only
+    // its `target.save` (:108) needs an await, so do the memory half now.
+    this.nullifyOwnerAttributes(displaced);
+    this.removeInverseInstance(displaced);
+    if (
+      displaced.isPersisted() &&
+      (this.owner as { isPersisted?: () => boolean }).isPersisted?.()
+    ) {
+      this._displacedRecords.push(displaced);
+    }
   }
 
   private nullifyOwnerAttributes(record: Base): void {
