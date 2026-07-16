@@ -184,10 +184,13 @@ computes at runtime:
    For the relation family (`relation/*.rb`, `relation.rb`) it also reads
    `relation.ts`, since Rails mixes those modules into `Relation` and trails
    ports some methods (`pluck`/`ids`, defined in calculations.rb) directly onto
-   the `Relation` class — so those come out async too. Remaining limits: (a)
-   files with no port yet fall back to sync, and (b) `await` placement is
-   file-local — a call to an async method defined in a _different_ file is not
-   awaited.
+   the `Relation` class — but the `relation.ts` supplement is intersected with
+   the method names the Rails file itself `def`s, so generic Relation async
+   names the file merely _calls_ on other receivers (`Array#first`, `#one?`) are
+   not swept in (the `await` rule is receiver-blind, so an unscoped union would
+   await unrelated same-named calls). Remaining limits: (a) files with no port
+   yet fall back to sync, and (b) `await` placement is file-local — a call to an
+   async method defined in a _different_ file is not awaited.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
 5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,

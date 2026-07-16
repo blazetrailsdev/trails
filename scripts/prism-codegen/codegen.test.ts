@@ -143,6 +143,11 @@ describe("prism-codegen", () => {
     expect(calc.has("count")).toBe(true); // from calculations.ts map
     expect(calc.has("pluck")).toBe(true); // from relation.ts (Relation#pluck)
     expect(calc.has("ids")).toBe(true); // from relation.ts (Relation#ids)
+    // Supplement is scoped to methods calculations.rb DEFINES — generic Relation
+    // async names it merely calls on Array receivers (`first`, `one?`) must NOT
+    // be swept in, or the receiver-blind await would await Array helpers.
+    expect(calc.has("first")).toBe(false);
+    expect(calc.has("isOne")).toBe(false);
     // Scoped: a Model-side file does NOT inherit Relation's async surface.
     expect(asyncMethodsForRailsFile("active_record/persistence.rb").has("pluck")).toBe(false);
   });
