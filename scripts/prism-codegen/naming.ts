@@ -18,12 +18,21 @@ export function methodName(rubyName: string): string {
 }
 
 /**
- * Invert `rubyFileToTs`: given a trails `.ts` path (relative to a package lib
- * root), find the Rails `.rb` file that maps to it. We reuse the forward map
- * rather than build a new one — scan the Rails tree and match. The caller
- * supplies the candidate Rails files.
+ * Invert `rubyFileToTs`: given a trails `.ts` path, find the Rails `.rb` file
+ * that maps to it. We reuse the forward map rather than build a new one — map
+ * each candidate `.rb` and match. The trails path may carry the full
+ * `active_record/…` prefix or (as real trails files do) drop it, so we compare
+ * against both the full and the `active_record/`-stripped mapping and accept a
+ * suffix match. The caller supplies the candidate Rails files.
  */
-export function tsToRubyFile(tsRelPath: string, rubyCandidates: string[]): string | undefined {
-  const normalized = tsRelPath.replace(/\\/g, "/");
-  return rubyCandidates.find((rb) => rubyFileToTs(rb) === normalized);
+export function tsToRubyFile(tsPath: string, rubyCandidates: string[]): string | undefined {
+  const tail = tsPath
+    .replace(/\\/g, "/")
+    .replace(/^.*?\/src\//, "")
+    .replace(/^activerecord\//, "");
+  return rubyCandidates.find((rb) => {
+    const full = rubyFileToTs(rb); // active-record/relation/query-methods.ts
+    const short = rubyFileToTs(rb.replace(/^active_record\//, "")); // relation/query-methods.ts
+    return full === tail || short === tail || full.endsWith(tail) || short.endsWith(tail);
+  });
 }

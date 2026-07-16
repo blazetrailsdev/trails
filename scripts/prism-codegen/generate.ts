@@ -15,6 +15,7 @@ const OUT_DIR = "scripts/prism-codegen/out";
 async function main() {
   mkdirSync(OUT_DIR, { recursive: true });
   const covs: Coverage[] = [];
+  const deepCovs: Coverage[] = [];
   const rows: string[] = [];
 
   for (const f of TARGET_FILES) {
@@ -25,20 +26,24 @@ async function main() {
     mkdirSync(path.dirname(outPath), { recursive: true });
     writeFileSync(outPath, code);
     covs.push(coverage);
+    if (f.deepDrill) deepCovs.push(coverage);
 
     const s = summarizeCoverage(coverage);
     const top = s.topPassthrough
       .slice(0, 3)
       .map((p) => `${p.kind}:${p.count}`)
       .join(", ");
+    // Tag: [t]/[p] tractability, with `*` marking a deepest-drill target.
+    const tag = `${f.tractability[0]}${f.deepDrill ? "*" : " "}`;
     rows.push(
       `  ${f.ruby.replace(/^active_record\//, "").padEnd(34)} ` +
         `${pct(s.handledPct)}  nodes=${String(s.total).padStart(5)}  ` +
-        `[${f.tractability[0]}] top-todo: ${top}`,
+        `[${tag}] top-todo: ${top}`,
     );
   }
 
   const rollup = mergeCoverages(covs);
+  const deep = mergeCoverages(deepCovs);
   console.log(`\nPrism → JS codegen coverage (handled = node instances with a real handler)\n`);
   console.log(`  ${"file".padEnd(34)} handled  nodes         passthrough leaders`);
   console.log("  " + "-".repeat(90));
@@ -52,6 +57,16 @@ async function main() {
   for (const p of rollup.topPassthrough.slice(0, 12)) {
     console.log(`    ${p.kind.padEnd(30)} ${p.count}`);
   }
+
+  // Verdict line — cites the numbers, not vibes (the [t*] deep-drill targets are
+  // the honest ceiling of what deterministic codegen reaches on tractable input).
+  console.log(
+    `\n  VERDICT: ${rollup.handledPct.toFixed(1)}% of ${rollup.total} AST node ` +
+      `instances handled (${rollup.passthrough} passthrough). ` +
+      `Deep-drill tractable targets: ${deep.handledPct.toFixed(1)}% of ${deep.total}. ` +
+      `\n  Node-handler coverage != semantic correctness — see ` +
+      `docs/infrastructure/prism-codegen-spike.md (Honest limits).`,
+  );
   console.log(`\n  Output written to ${OUT_DIR}/ (gitignored).\n`);
 }
 

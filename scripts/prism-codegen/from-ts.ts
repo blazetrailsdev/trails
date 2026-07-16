@@ -10,34 +10,23 @@ import { readFileSync, readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { generateFromSource } from "./index.js";
 import { summarizeCoverage } from "./coverage.js";
-import { rubyFileToTs } from "./naming.js";
+import { tsToRubyFile } from "./naming.js";
 
 const AR_LIB = "vendor/rails/activerecord/lib";
 const AR_ROOT = path.join(AR_LIB, "active_record");
 
-function allRubyFiles(dir: string): string[] {
+/** Every Rails .rb under active_record/, as paths relative to the lib root. */
+function railsCandidates(): string[] {
   const out: string[] = [];
-  for (const e of readdirSync(dir)) {
-    const full = path.join(dir, e);
-    if (statSync(full).isDirectory()) out.push(...allRubyFiles(full));
-    else if (e.endsWith(".rb")) out.push(full);
-  }
-  return out;
-}
-
-/** Find the Rails .rb whose rubyFileToTs output matches the tail of `tsPath`. */
-function resolveRuby(tsPath: string): string | undefined {
-  const tsTail = tsPath.replace(/\\/g, "/").replace(/^.*?\/src\//, "");
-  const norm = tsTail.startsWith("active_record/") ? tsTail : tsTail.replace(/^activerecord\//, "");
-  for (const rb of allRubyFiles(AR_ROOT)) {
-    const rel = path.relative(AR_LIB, rb); // active_record/....rb
-    const mappedFull = rubyFileToTs(rel); // active-record/....ts
-    const mappedShort = rubyFileToTs(rel.replace(/^active_record\//, ""));
-    if (mappedFull.endsWith(norm) || mappedShort.endsWith(norm) || mappedShort === tsTail) {
-      return rb;
+  const walk = (dir: string) => {
+    for (const e of readdirSync(dir)) {
+      const full = path.join(dir, e);
+      if (statSync(full).isDirectory()) walk(full);
+      else if (e.endsWith(".rb")) out.push(path.relative(AR_LIB, full));
     }
-  }
-  return undefined;
+  };
+  walk(AR_ROOT);
+  return out;
 }
 
 async function main() {
@@ -46,11 +35,12 @@ async function main() {
     console.error("usage: pnpm codegen:from-ts <path/to/trails/file.ts>");
     process.exit(2);
   }
-  const rb = resolveRuby(tsPath);
-  if (!rb) {
+  const rel = tsToRubyFile(tsPath, railsCandidates());
+  if (!rel) {
     console.error(`Could not resolve a Rails .rb for ${tsPath} via rubyFileToTs.`);
     process.exit(1);
   }
+  const rb = path.join(AR_LIB, rel);
   const { code, coverage } = await generateFromSource(readFileSync(rb, "utf8"));
   const s = summarizeCoverage(coverage);
   process.stderr.write(

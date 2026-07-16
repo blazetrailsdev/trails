@@ -89,21 +89,26 @@ exported free functions (the mixin-as-function runtime shape, TS types dropped);
 Emitted by `pnpm codegen:generate`. "Handled" = AST node instances that hit a
 real handler; "passthrough" = instances that fell to the marked TODO.
 
-```
+```text
 file                               handled   nodes    tag
 base.rb                            100.0%      136    pathological
 relation.rb                         99.8%     1694    pathological
-persistence.rb                      99.6%     1045    tractable
+persistence.rb                      99.6%     1045    tractable*
 associations.rb                     99.3%      276    pathological
 relation/query_methods.rb           99.8%     2654    pathological
 core.rb                             99.8%     1142    pathological
-relation/finder_methods.rb         100.0%      833    tractable
-relation/calculations.rb            99.6%     1093    tractable
+relation/finder_methods.rb         100.0%      833    tractable*
+relation/calculations.rb            99.6%     1093    tractable*
 inheritance.rb                      99.8%      405    pathological
 model_schema.rb                    100.0%      526    pathological
 ------------------------------------------------------------------
 ROLLUP (all 10)                     99.8%     9804    handled=9782 passthrough=22
+DEEP-DRILL (tractable*, 3 files)    99.7%     2971    handled=2963 passthrough=8
 ```
+
+`tractable*` marks the three deepest-drill targets (chosen by tractability): the
+verdict rests on these, where deterministic codegen shows its ceiling on
+ordinary method-body input — not on the macro-DSL files it drowns in.
 
 Dominant passthrough kinds (rollup, self-prioritizing the next handlers to
 build): `RequiredParameterNode` (8, block/lambda param contexts),
