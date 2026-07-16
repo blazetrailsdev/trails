@@ -1,7 +1,19 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Notifications } from "../notifications.js";
-import { Event } from "./instrumenter.js";
+import { Event, Instrumenter } from "./instrumenter.js";
 import { Temporal } from "../temporal.js";
+
+// Rails' TestNotifier collects the start/finish calls; trails' notifier surface
+// is a single publish, so `finishes` collects the published events.
+const buildNotifier = () => {
+  const finishes: Event[] = [];
+  return {
+    finishes,
+    publish(_name: string, event: Event) {
+      finishes.push(event);
+    },
+  };
+};
 
 describe("InstrumenterTest", () => {
   afterEach(() => {
@@ -9,32 +21,28 @@ describe("InstrumenterTest", () => {
   });
 
   it("instrument", () => {
-    let fired = false;
-    Notifications.subscribe("foo.bar", () => {
-      fired = true;
+    const notifier = buildNotifier();
+    let called = false;
+    new Instrumenter(notifier).instrument("foo", { foo: {} }, () => {
+      called = true;
     });
-    Notifications.instrument("foo.bar", {});
-    expect(fired).toBe(true);
+    expect(called).toBe(true);
   });
 
   it("instrument yields the payload for further modification", () => {
-    let received: Record<string, unknown> = {};
-    Notifications.subscribe("foo", (e) => {
-      received = e.payload;
-    });
-    Notifications.instrument("foo", { key: "original" }, (payload) => {
-      payload.added = "modified";
-    });
-    expect(received.key).toBe("original");
-    expect(received.added).toBe("modified");
+    const notifier = buildNotifier();
+    const result = new Instrumenter(notifier).instrument("awesome", {}, (p) => (p.result = 1 + 1));
+    expect(result).toBe(2);
+    expect(notifier.finishes).toHaveLength(1);
+    expect(notifier.finishes[0].name).toBe("awesome");
+    expect(notifier.finishes[0].payload).toEqual({ result: 2 });
   });
 
   it("instrument works without a block", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("foo", (e) => events.push(e));
-    Notifications.instrument("foo", { x: 1 });
-    expect(events).toHaveLength(1);
-    expect(events[0].end).toBeInstanceOf(Temporal.Instant);
+    const notifier = buildNotifier();
+    new Instrumenter(notifier).instrument("no.block", { foo: {} });
+    expect(notifier.finishes).toHaveLength(1);
+    expect(notifier.finishes[0].name).toBe("no.block");
   });
 
   it("start", () => {

@@ -48,6 +48,14 @@ export class Event {
   }
 }
 
+// Rails' `rescue Exception` arm — subscribers (e.g. ExplainSubscriber) key off
+// these to detect a failed event.
+function _recordException(payload: EventPayload, e: unknown): void {
+  const error = e as { constructor?: { name?: string }; message?: unknown };
+  payload.exception = [error?.constructor?.name ?? "Error", String(error?.message ?? e)];
+  payload.exception_object = e;
+}
+
 export class Instrumenter {
   private _notifier: { publish(name: string, event: Event): void };
   private _stack: Event[] = [];
@@ -58,58 +66,65 @@ export class Instrumenter {
     this.id = generateTransactionId();
   }
 
+  /**
+   * The block receives the payload — the same object passed in, which
+   * subscribers read after the block returns. Mutating it is how a caller
+   * reports back into the notification, mirroring Rails' `yield payload`.
+   */
   instrument<T = void>(
     name: string,
-    payloadOrFn?: EventPayload | ((event: Event) => T),
-    fn?: (event: Event) => T,
+    payload: EventPayload = {},
+    fn?: (payload: EventPayload) => T,
   ): T {
-    let payload: EventPayload = {};
-    let callback = fn;
-    if (typeof payloadOrFn === "function") {
-      callback = payloadOrFn;
-    } else if (payloadOrFn) {
-      payload = payloadOrFn;
-    }
-    const event = new Event(name, Temporal.Now.instant(), payload, this.id);
-    const parent = this._stack[this._stack.length - 1];
-    if (parent) parent.children.push(event);
-    this._stack.push(event);
+    const event = this._push(name, payload);
 
     try {
-      if (callback) return callback(event);
+      if (fn) return fn(payload);
       return undefined as unknown as T;
+    } catch (e) {
+      _recordException(payload, e);
+      throw e;
     } finally {
-      this._stack.pop();
-      event.finish();
-      this._notifier.publish(name, event);
+      this._pop(event);
     }
   }
 
   async instrumentAsync<T = void>(
     name: string,
-    payloadOrFn?: EventPayload | ((event: Event) => Promise<T>),
-    fn?: (event: Event) => Promise<T>,
+    payload: EventPayload = {},
+    fn?: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
-    let payload: EventPayload = {};
-    let callback = fn;
-    if (typeof payloadOrFn === "function") {
-      callback = payloadOrFn;
-    } else if (payloadOrFn) {
-      payload = payloadOrFn;
+    const event = this._push(name, payload);
+
+    try {
+      if (fn) return await fn(payload);
+      return undefined as unknown as T;
+    } catch (e) {
+      _recordException(payload, e);
+      throw e;
+    } finally {
+      this._pop(event);
     }
+  }
+
+  // Rails' #instrument never builds an Event — it hands the raw payload to a
+  // Fanout handle, so subscribers see the block's mutations (that is how
+  // payload[:exception] reaches them). trails routes it through an Event, which
+  // works only because Event holds the payload by reference. Rails' Event#dups
+  // it (instrumenter.rb:105); converging that dup without first moving this path
+  // off Event would silently hide the exception keys from subscribers.
+  private _push(name: string, payload: EventPayload): Event {
     const event = new Event(name, Temporal.Now.instant(), payload, this.id);
     const parent = this._stack[this._stack.length - 1];
     if (parent) parent.children.push(event);
     this._stack.push(event);
+    return event;
+  }
 
-    try {
-      if (callback) return await callback(event);
-      return undefined as unknown as T;
-    } finally {
-      this._stack.pop();
-      event.finish();
-      this._notifier.publish(name, event);
-    }
+  private _pop(event: Event): void {
+    this._stack.pop();
+    event.finish();
+    this._notifier.publish(event.name, event);
   }
 }
 

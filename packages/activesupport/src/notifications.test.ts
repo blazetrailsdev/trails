@@ -609,13 +609,17 @@ describe("Instrumenter", () => {
   });
 
   it("tracks children for nested instrumentation", () => {
-    const notifier = { publish() {} };
+    const published: Event[] = [];
+    const notifier = {
+      publish(_name: string, event: Event) {
+        published.push(event);
+      },
+    };
     const inst = new Instrumenter(notifier);
-    let parentEvent: Event | undefined;
-    inst.instrument("parent", {}, (parent) => {
-      parentEvent = parent;
+    inst.instrument("parent", {}, () => {
       inst.instrument("child", {});
     });
+    const parentEvent = published.find((e) => e.name === "parent");
     expect(parentEvent!.children).toHaveLength(1);
     expect(parentEvent!.children[0].name).toBe("child");
   });
