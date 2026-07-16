@@ -173,6 +173,19 @@ export class HasOneAssociation extends SingularAssociation {
       // point of assignment, so run the pending remove now — while `record` is
       // still unsaved, the re-query resolves to the stale row unambiguously.
       if (this._removeDisplacedFromDb || this._displacedRecords.length > 0) {
+        // Reverting to a record already queued for removal cancels *its* removal
+        // (`owner.account = other; writer(original)`) — Rails' `replace` removes
+        // only the current `target`, never the record being assigned, and
+        // `queueWrite` mirrors the same same-record cancellation (:103-106). Drop
+        // the reverted record from the queue before draining so the flush does
+        // not nullify/destroy the very record `persistImmediate` is about to save.
+        // The `_removeDisplacedFromDb` path needs no equivalent guard: its
+        // re-query already skips a reverted DB row via `!sameRecord(found,
+        // savedTarget)` (savedTarget is the just-replaced `record`).
+        if (record) {
+          const idx = this._displacedRecords.findIndex((r) => sameRecord(record, r));
+          if (idx !== -1) this._displacedRecords.splice(idx, 1);
+        }
         await this.removeDisplaced();
       }
       if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {

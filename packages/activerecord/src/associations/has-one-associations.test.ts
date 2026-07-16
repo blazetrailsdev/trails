@@ -625,6 +625,21 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(b.id);
   });
 
+  // Revert path: a sync `firm.account = other` queues `original` for removal,
+  // then `writer(original)` reassigns it. Rails' `replace` removes only the
+  // current target, never the record being assigned, and `queueWrite` mirrors
+  // that same-record cancellation (:103-106); the writer's deferred-flush must
+  // do the same, or it would destroy `original` right before persisting it.
+  it("writer reverting to a queued displaced record cancels its removal", async () => {
+    const firm = (await Firm.find(1)) as any;
+    const original = await readHasOne(firm, "account");
+    const originalId = original.id;
+    firm.account = new Account({ credit_limit: 60 });
+    await firm.association("account").writer(original);
+    expect((await readHasOne(firm, "account")).id).toBe(originalId);
+    expect((await Account.find(originalId)).firm_id).toBe(Number(firm.id));
+  });
+
   it("create when parent is new raises", async () => {
     const firm = new Firm();
     let error: unknown;
