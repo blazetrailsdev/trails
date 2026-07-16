@@ -363,7 +363,38 @@ export class HasOneAssociation extends SingularAssociation {
     if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
     }
-    return super._createRecord(attributes, shouldRaise, block);
+    // Mirror Rails' `HasOneAssociation#replace` (has_one_association.rb:59-69),
+    // which `set_new_record` reaches via `replace(record, false)`: `remove_target!`
+    // detaches the currently associated record (FK nullified / destroyed per
+    // `:dependent`) whenever another record is being assigned. `replace`'s leading
+    // `load_target` returns the already-cached target, so when the caller has
+    // loaded it (`readHasOne` / preload), that OLD record is the one removed. Our
+    // `replace`/`setNewRecord` are sync and cannot `await` that removal, so we run
+    // it here. Capture the loaded target BEFORE `super._createRecord`, which
+    // builds the new record first — an invalid build (e.g. an inexistent foreign
+    // key) must raise before any removal runs, exactly as Rails' `build_record`
+    // raises before `set_new_record`. An unloaded target is left to the property-
+    // setter displacement path (`queueWrite` flags), matching Rails' behaviour of
+    // only removing what `load_target` surfaces.
+    const displaced = this.loaded ? this.target : null;
+    const record = await super._createRecord(attributes, shouldRaise, block);
+    // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
+    // now the freshly created record. Only the displaced (previously attached)
+    // record needs detaching, and only when the assignment actually changes it.
+    if (
+      displaced &&
+      !(displaced as { isDestroyed?: () => boolean }).isDestroyed?.() &&
+      !sameRecord(displaced, record)
+    ) {
+      const currentTarget = this.target;
+      this.target = displaced;
+      try {
+        await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+      } finally {
+        this.target = currentTarget;
+      }
+    }
+    return record;
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
