@@ -172,12 +172,17 @@ computes at runtime:
    different declaration surface.
 3. **Async is read from the port, not the Ruby.** Ruby has no `async`, so the
    tool cannot infer it from the source. Instead it treats the hand-ported
-   trails TS as the **source of truth**: for each Rails file it scrapes the set
-   of `async`-declared methods from the matching `.ts` (via `rubyFileToTs`) and
-   marks the generated `def` `async` iff its twin is (see `async-source.ts`),
-   awaiting calls to those names inside async bodies. This is faithful where a
-   port exists; its limits are (a) files with no port yet fall back to sync, and
-   (b) `await` placement is file-local — a call to an async method defined in a
+   trails TS as the **source of truth**: for each Rails file it collects the
+   async method-name set from the matching `.ts` (via `rubyFileToTs`) and marks
+   the generated `def` `async` iff its twin is (see `async-source.ts`), awaiting
+   calls to those names inside async bodies. The collector resolves both async
+   declarations _and_ the Rails-name method maps the mixins install
+   (`export const FinderMethods = { find: performFind }`,
+   `{ count: inQueryConnection(performCount) }`, and alias chains) via a
+   fixpoint over references — so `find`/`findBy`/`take`/`count`/`sum` come out
+   async even though their impls are the differently-named `perform*` functions.
+   Remaining limits: (a) files with no port yet fall back to sync, and (b)
+   `await` placement is file-local — a call to an async method defined in a
    _different_ file is not awaited.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.

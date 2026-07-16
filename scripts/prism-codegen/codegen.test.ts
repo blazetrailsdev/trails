@@ -3,6 +3,7 @@ import { generateFromSource } from "./index.js";
 import { summarizeCoverage, mergeCoverages } from "./coverage.js";
 import { Registry } from "./registry.js";
 import { tsToRubyFile } from "./naming.js";
+import { extractAsyncNames } from "./async-source.js";
 import type { Coverage } from "./types.js";
 
 describe("prism-codegen", () => {
@@ -108,6 +109,30 @@ describe("prism-codegen", () => {
     );
     expect(code).toContain("export function syncReader(");
     expect(code).not.toContain("await save");
+  });
+
+  it("resolves async through Rails-name method maps, wrappers, and alias chains", () => {
+    // Mirrors the trails FinderMethods/Calculations shape: async impls exposed
+    // under Rails-facing keys, some wrapped, some via a const alias chain.
+    const names = extractAsyncNames(`
+      export async function performFind(this: R): Promise<any> {}
+      export async function performCount(this: R): Promise<any> {}
+      export const performSecondBang = bangFinder(performSecond);
+      export async function performSecond(this: R): Promise<any> {}
+      function inQueryConnection(fn) { return fn; }
+      export const FinderMethods = {
+        find: performFind,
+        secondBang: performSecondBang,
+      };
+      export const Calculations = {
+        count: inQueryConnection(performCount),
+      };
+      export function pluck() {} // sync — must NOT be marked async
+    `);
+    expect(names.has("find")).toBe(true); // bare ref
+    expect(names.has("count")).toBe(true); // wrapped ref
+    expect(names.has("secondBang")).toBe(true); // alias chain
+    expect(names.has("pluck")).toBe(false);
   });
 
   it("rolls up per-file coverage tallies into one summary", () => {
