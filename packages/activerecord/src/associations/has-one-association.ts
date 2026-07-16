@@ -404,11 +404,11 @@ export class HasOneAssociation extends SingularAssociation {
     if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       throw new RecordNotSaved("You cannot call create unless the parent is saved", this.owner);
     }
-    // A displacement queued by the sync property setter is still pending: Rails'
-    // `replace` would already have removed the old record before `create_#{name}`
-    // ran. Flush it here, while this insert's own FK-matching row does not exist
-    // yet — deferring to the owner's save would leave `removeDisplaced`'s FK
-    // re-query picking between two matching rows, and the old row could survive.
+    // Rails' `replace` has already removed the displaced record by the time
+    // `create_#{name}` runs; our sync property setter can only queue it. Flush it
+    // here, while this insert's own FK-matching row does not exist yet: deferring
+    // to the owner's save leaves `removeDisplaced`'s FK re-query choosing between
+    // two matching rows, and the old row survives if it picks the new one.
     if (this._displacedRecord || this._removeDisplacedFromDb) {
       await this.removeDisplaced();
     }

@@ -19,8 +19,7 @@ import { Company } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 
-// The generated `create#{name}` accessor is not surfaced on the model's declared
-// type, so name its shape here rather than casting the record to `any`.
+// The generated `create#{name}` accessor is not on the model's declared type.
 interface CreatesAccount {
   createAccount(attributes: Record<string, unknown>): Promise<Account | null>;
 }
@@ -37,8 +36,8 @@ describe("has_one unloaded displacement followed by create", () => {
     const reloaded = await Company.find(company.id);
     reloaded.account = Account.new({ credit_limit: 60 });
 
-    const createAccount = (reloaded as Company & CreatesAccount).createAccount;
-    const created = (await createAccount.call(reloaded, { credit_limit: 70 })) as Account;
+    const owner = reloaded as Company & CreatesAccount;
+    const created = (await owner.createAccount({ credit_limit: 70 })) as Account;
 
     // Rails has already detached the old account by the time `create_account`
     // returns. Asserting here — before the owner's save — pins the ordering
