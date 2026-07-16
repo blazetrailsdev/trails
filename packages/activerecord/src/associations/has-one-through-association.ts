@@ -57,6 +57,44 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
+   * Mirrors Rails' `HasOneThroughAssociation#create_through_record`, which
+   * loads the *through* proxy (`through_proxy.load_target`,
+   * has_one_through_association.rb:15-19) — NOT the target join. The base
+   * `HasOneAssociation` loads its own target for `build#{name}`, which for a
+   * through would issue a `clubs` SELECT Rails never runs while skipping the
+   * `memberships` SELECT it does. Override so the `build#{name}` accessor's
+   * pre-build load (gated by the inherited `needsTargetLoadForBuild`) reads
+   * the through proxy, then `constructThroughRecordInMemory` reconciles
+   * against the now-loaded join row (update-existing / build-when-absent),
+   * exactly as Rails' `create_through_record` does.
+   *
+   * @internal
+   */
+  override loadTargetForBuild(): Promise<unknown> {
+    const throughProxy = throughAssociation(this) as {
+      loadTarget?: () => unknown;
+    } | null;
+    return Promise.resolve(throughProxy?.loadTarget?.());
+  }
+
+  /**
+   * Rails' `HasOneThroughAssociation#replace` (has_one_through_association.rb:9-13)
+   * has NO `remove_target!` — displacing a through target is handled entirely by
+   * `create_through_record` mutating the join row (update / destroy), never by
+   * nullifying or destroying the *target* record's own foreign key (a through
+   * target has no FK back to the owner). The base `HasOneAssociation` runs
+   * `remove_target!` on the displaced target; inheriting that would wrongly
+   * nullify/destroy the previously-associated end record. Override to a no-op so
+   * the `build#{name}` / `create#{name}` accessors leave displacement to the
+   * through's own `createThroughRecord` / `persistReplace`.
+   *
+   * @internal
+   */
+  override async detachDisplacedTarget(): Promise<void> {
+    // no-op — see JSDoc
+  }
+
+  /**
    * The deferred (non-awaitable) property-setter / mass-assignment path. The
    * base `queueWrite` records a displaced record for the direct-FK autosave to
    * remove, but a through routes displacement through the join model

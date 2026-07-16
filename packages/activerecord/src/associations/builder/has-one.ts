@@ -68,7 +68,14 @@ export class HasOne extends SingularAssociation {
           typeof assoc.needsTargetLoadForBuild === "function" &&
           assoc.needsTargetLoadForBuild()
         ) {
-          return assoc.loadTarget().then((displaced: unknown) => {
+          // `loadTargetForBuild` loads the direct-FK target for a plain has_one
+          // (the record `remove_target!` will detach), but a has_one_through
+          // overrides it to load the *through* proxy — Rails' has_one_through
+          // `replace` runs no `load_target`/`remove_target!` on the target; its
+          // `create_through_record` loads the through instead. The through's
+          // `detachDisplacedTarget` is a no-op, so the proxy passed as
+          // `displaced` here is inert.
+          return assoc.loadTargetForBuild().then((displaced: unknown) => {
             const record = assoc.build(...args);
             return assoc.detachDisplacedTarget(displaced, record).then(() => record);
           });

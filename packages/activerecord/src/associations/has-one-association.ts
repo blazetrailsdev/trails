@@ -367,6 +367,22 @@ export class HasOneAssociation extends SingularAssociation {
     return this.findTargetNeeded();
   }
 
+  /**
+   * The load the `build#{name}` accessor awaits before constructing the new
+   * record. A direct-FK has_one loads its own target — Rails'
+   * `set_new_record` → `replace(record, false)` runs `load_target`
+   * (has_one_association.rb:59). A has_one_through overrides this: Rails'
+   * `HasOneThroughAssociation#replace` has NO `load_target`; its
+   * `create_through_record` loads the *through* proxy instead
+   * (has_one_through_association.rb:15-19), so the through must issue the
+   * join-model SELECT here, never a target SELECT.
+   *
+   * @internal
+   */
+  loadTargetForBuild(): Promise<unknown> {
+    return this.loadTarget();
+  }
+
   protected override replace(record: Base | null, _save = true): void {
     if (record) (this as any).raiseOnTypeMismatchBang(record);
     const assigningAnother = !sameRecord(this.target, record);
