@@ -66,6 +66,50 @@ describe("prism-codegen", () => {
     expect(tsToRubyFile("packages/activerecord/src/nope.ts", candidates)).toBeUndefined();
   });
 
+  it("emits Ruby case-equality order (matcher === subject), not the reverse", async () => {
+    // Ruby `case scope; when Symbol` is `Symbol === scope`; a plain `scope ===
+    // Symbol` never matches a class/range/regex matcher. Must be caseEq(M, s).
+    const { code } = await generateFromSource(`
+      case scope
+      when Symbol then a
+      when Array, Hash then b
+      end
+    `);
+    expect(code).toContain("caseEq(Symbol, scope)");
+    expect(code).toContain("caseEq(Array, scope) || caseEq(Hash, scope)");
+    expect(code).not.toContain("scope === Symbol");
+  });
+
+  it("marks methods async from the trails source of truth and awaits async calls", async () => {
+    // `save`/`persist` are async per the port; `name` is not. Await only the
+    // async-named calls, and only inside the async body.
+    const asyncSet = new Set(["save", "persist"]);
+    const { code } = await generateFromSource(
+      `
+      module M
+        def save; self.persist(1); log; end
+        def name; @name; end
+      end
+    `,
+      asyncSet,
+    );
+    expect(code).toContain("export async function save(");
+    expect(code).toContain("await this.persist(1)"); // async call awaited
+    expect(code).toContain("export function name("); // not async
+    expect(code).not.toContain("await this.log"); // log not in async set
+  });
+
+  it("never awaits async-named calls inside a sync method", async () => {
+    const { code } = await generateFromSource(
+      `module M
+        def sync_reader; save; end
+      end`,
+      new Set(["save"]),
+    );
+    expect(code).toContain("export function syncReader(");
+    expect(code).not.toContain("await save");
+  });
+
   it("rolls up per-file coverage tallies into one summary", () => {
     const mk = (handled: number, pass: number): Coverage => ({
       record() {},

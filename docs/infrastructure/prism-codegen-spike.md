@@ -148,8 +148,10 @@ and method scaffolding, imports, parameter lists (positional / optional-default
 / `*rest` → `...rest` / keyword → destructured object / `&block`), control flow
 (`if`/`unless`/`case` → `if/else` chains, `begin/rescue` → `try/catch`), string
 interpolation → template literals, operator-method calls → infix, compound and
-logical assignment, blocks → arrow functions, `super` → `super(...arguments)`.
-The tractable files produce genuinely readable, structurally faithful JS.
+logical assignment, blocks → arrow functions, `super` → `super(...arguments)`,
+`case/when` → `caseEq(matcher, subject)` chains (Ruby `#===` order), and
+`async`/`await` lifted from the trails port (source of truth, not inferred). The
+tractable files produce genuinely readable, structurally faithful JS.
 
 **Gaps** (see [Honest limits](#honest-limits)).
 
@@ -168,10 +170,15 @@ computes at runtime:
    macro _shape_ survives; the _mechanism_ does not. `has_many :posts` becomes
    `hasMany("posts")` — right name, but the repo realizes associations through a
    different declaration surface.
-3. **No async inference.** The repo makes many ported methods `async`/`await`
-   (DB round-trips). Determining which Ruby method _should_ be async needs
-   whole-program knowledge the AST lacks, so the tool emits sync bodies. This is
-   a systematic, known divergence.
+3. **Async is read from the port, not the Ruby.** Ruby has no `async`, so the
+   tool cannot infer it from the source. Instead it treats the hand-ported
+   trails TS as the **source of truth**: for each Rails file it scrapes the set
+   of `async`-declared methods from the matching `.ts` (via `rubyFileToTs`) and
+   marks the generated `def` `async` iff its twin is (see `async-source.ts`),
+   awaiting calls to those names inside async bodies. This is faithful where a
+   port exists; its limits are (a) files with no port yet fall back to sync, and
+   (b) `await` placement is file-local — a call to an async method defined in a
+   _different_ file is not awaited.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
 5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,
@@ -179,8 +186,8 @@ computes at runtime:
 
 The correct framing: this is a **first-draft scaffolder** that eliminates the
 mechanical 60–70% of a port (shape, signatures, control flow) and leaves the
-semantic 30–40% (receiver resolution, async, macro wiring, stdlib) to a human —
-not an automated porter.
+semantic 30–40% (receiver resolution, cross-file async, macro wiring, stdlib) to
+a human — not an automated porter.
 
 ## Productionization roadmap
 
@@ -189,8 +196,10 @@ data (biggest correctness gaps first, not biggest node buckets):
 
 1. **Receiver resolution pass** — a scope/symbol table so bare calls resolve to
    `this.x()` vs. a local. Highest correctness leverage.
-2. **Async inference** — seed from a known-async method manifest (the api-compare
-   surface already knows which trails methods are async) and propagate.
+2. **Async cross-file propagation** — the file-local source-of-truth scrape
+   (`async-source.ts`) already marks `def`s async from their trails twin and
+   awaits same-file async calls; extend it to a whole-program async manifest so
+   calls into async methods defined in _other_ files are awaited too.
 3. **Macro-DSL handlers** — translate `include`/`extend`/`has_many`/`validates`
    into the repo's actual mixin + declaration wiring instead of bare calls.
 4. **Stdlib idiom mapping** — a Ruby-core → JS/trails-runtime shim table

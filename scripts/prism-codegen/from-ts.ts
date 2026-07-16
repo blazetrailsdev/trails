@@ -9,11 +9,15 @@
 import { readFileSync, readdirSync, statSync } from "node:fs";
 import * as path from "node:path";
 import { generateFromSource } from "./index.js";
+import { asyncMethodsForRailsFile } from "./async-source.js";
 import { summarizeCoverage } from "./coverage.js";
 import { tsToRubyFile } from "./naming.js";
+import { resolvePath } from "../../vendor/sources.js";
 
-const AR_LIB = "vendor/rails/activerecord/lib";
-const AR_ROOT = path.join(AR_LIB, "active_record");
+// Vendored-source location via the single source of truth (vendor/sources.ts),
+// not a parallel hard-coded path — same contract api-compare uses.
+const AR_ROOT = resolvePath("activerecord"); // .../active_record
+const AR_LIB = path.dirname(AR_ROOT); // .../lib
 
 /** Every Rails .rb under active_record/, as paths relative to the lib root. */
 function railsCandidates(): string[] {
@@ -41,7 +45,10 @@ async function main() {
     process.exit(1);
   }
   const rb = path.join(AR_LIB, rel);
-  const { code, coverage } = await generateFromSource(readFileSync(rb, "utf8"));
+  const { code, coverage } = await generateFromSource(
+    readFileSync(rb, "utf8"),
+    asyncMethodsForRailsFile(rel),
+  );
   const s = summarizeCoverage(coverage);
   process.stderr.write(
     `// source: ${rb}\n// handler coverage: ${s.handledPct.toFixed(1)}% ` +

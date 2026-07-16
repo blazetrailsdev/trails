@@ -43,15 +43,23 @@ function emitDef(n: PrismNode, e: Emitter): string {
   const isStatic = n.receiver != null && (n.receiver as PrismNode).constructor.name === "SelfNode";
   const name = n.name === "initialize" ? "constructor" : methodName(String(n.name));
   const params = emitParams(n.parameters as PrismNode | undefined, e);
+  // Async comes from the trails port (source of truth), never a constructor.
+  const isAsync = name !== "constructor" && e.asyncMethods.has(name);
+
+  const prevAsync = e.inAsyncMethod;
+  e.inAsyncMethod = isAsync;
   const body = e.emitBody((n.body as PrismNode) ?? null);
+  e.inAsyncMethod = prevAsync;
+
   const block = body ? `{\n${e.indent(body)}\n}` : `{}`;
+  const asyncKw = isAsync ? "async " : "";
 
   if (e.inClass) {
     const prefix = isStatic ? "static " : "";
-    return `${prefix}${name}(${params}) ${block}`;
+    return `${prefix}${asyncKw}${name}(${params}) ${block}`;
   }
   // Module-level: exported free function (mixin runtime shape).
-  return `export function ${name}(${params}) ${block}`;
+  return `export ${asyncKw}function ${name}(${params}) ${block}`;
 }
 
 /**

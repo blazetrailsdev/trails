@@ -82,7 +82,15 @@ function emitCase(n: PrismNode, e: Emitter): string {
   const branches: string[] = [];
   for (let i = 0; i < conds.length; i++) {
     const w = conds[i];
-    const tests = ((w.conditions as PrismNode[]) ?? []).map((c) => `${subject} === ${e.emit(c)}`);
+    // Ruby `case s; when M` evaluates `M === s` (case-equality on the matcher:
+    // class membership, range include, regex match, ==), NOT `s === M`. A plain
+    // JS `===` reverses that for class/range/regex matchers (`when Symbol`,
+    // `when Array, Hash`), so emit a `caseEq(matcher, subject)` runtime helper
+    // that mirrors Ruby's `#===`. A subject-less `case; when cond` keeps the
+    // bare boolean condition.
+    const tests = ((w.conditions as PrismNode[]) ?? []).map((c) =>
+      subject ? `caseEq(${e.emit(c)}, ${subject})` : e.emit(c),
+    );
     const body = e.emitBody((w.statements as PrismNode) ?? null);
     const kw = i === 0 ? "if" : "else if";
     branches.push(`${kw} (${tests.join(" || ")}) {\n${e.indent(body)}\n}`);
