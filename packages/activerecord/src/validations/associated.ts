@@ -34,8 +34,16 @@ export class AssociatedValidator extends EachValidator {
     const context = recordValidationContextForAssociation(record);
     const values = Array.isArray(value) ? value : value != null ? [value] : [];
 
-    const results = await Promise.all(values.map((assoc: any) => isValidObject(assoc, context)));
-    if (results.some((valid) => !valid)) {
+    // Rails `Array(value).reject { |r| valid_object?(r, context) }`
+    // (associated.rb:6-10) runs sequentially: `valid?` clears errors and
+    // swaps the validation context around each run, so concurrent validation
+    // would race on a repeated/shared associated record and reorder
+    // callbacks. Await each in order to preserve that observable behavior.
+    let anyInvalid = false;
+    for (const assoc of values) {
+      if (!(await isValidObject(assoc, context))) anyInvalid = true;
+    }
+    if (anyInvalid) {
       const { attributes: _, ...errorOpts } = this.options;
       record.errors.add(attribute, "invalid", { ...errorOpts, value });
     }
