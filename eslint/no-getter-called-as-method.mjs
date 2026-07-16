@@ -24,12 +24,16 @@
  *   - `x.hasChangesToSave()` and `x.hasChangesToSave?.()`
  *   - `typeof x.hasChangesToSave === "function"` (and `!==`)
  *
+ * `changed` (`ActiveModel::Dirty#changed?`, model.ts:1943) is the same shape
+ * with the same footgun, and `find_from_target?` is one of its call sites, so it
+ * is defaulted on too — there are no `.changed()` callers to grandfather.
+ *
  * Configure with `[{ getters: ["..."] }]`; defaults to the getters that have
  * actually been miscalled. Read the getter instead: `x.hasChangesToSave`, or
  * `x?.hasChangesToSave === true` when the receiver may be nil.
  */
 
-const DEFAULT_GETTERS = ["hasChangesToSave"];
+const DEFAULT_GETTERS = ["hasChangesToSave", "changed"];
 
 /** @type {import("eslint").Rule.RuleModule} */
 const rule = {

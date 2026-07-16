@@ -17,6 +17,8 @@ tester.run("no-getter-called-as-method", rule, {
     "const dirty = (record as any).hasChangesToSave;",
     // A same-named getter on an unrelated receiver still reads fine.
     "if (joinRecord.hasChangesToSave) save();",
+    // Correct reads of the second default getter.
+    "if (r.isNewRecord() || r.changed) load();",
     // Not a configured getter.
     "record.isNewRecord();",
     "if (typeof record.save === 'function') record.save();",
@@ -25,7 +27,7 @@ tester.run("no-getter-called-as-method", rule, {
     // A `typeof` guard against something other than "function" is not the
     // dead-gate shape this rule targets.
     "if (typeof record.hasChangesToSave === 'boolean') save();",
-    // Non-default getter list leaves the default name alone.
+    // An explicit getter list narrows the defaults rather than adding to them.
     { code: "record.hasChangesToSave();", options: [{ getters: ["changed"] }] },
   ],
   invalid: [
@@ -55,11 +57,14 @@ tester.run("no-getter-called-as-method", rule, {
       code: "if (typeof record.hasChangesToSave !== 'function') save();",
       errors: [{ messageId: "typeofGuard" }],
     },
-    // Configurable: an extra getter name is flagged when opted in.
+    // `changed` is on by default — the same uniform-access footgun.
     {
       code: "if (r.changed()) save();",
-      options: [{ getters: ["changed"] }],
       errors: [{ messageId: "called", data: { name: "changed" } }],
+    },
+    {
+      code: 'if (typeof r.changed === "function" && r.changed()) save();',
+      errors: [{ messageId: "typeofGuard" }, { messageId: "called" }],
     },
   ],
 });
