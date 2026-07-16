@@ -203,4 +203,53 @@ describe("Notifications (trails)", () => {
       expect(() => handle.start()).toThrow(/expected state to be "initialized"/);
     });
   });
+
+  // Rails' EventObjectGroup#finish assigns `@event.payload = payload` after
+  // Event#initialize dup'd it (fanout.rb:166-178), so the published event
+  // reflects the final payload object exactly — including keys the block deleted.
+  describe("payload is replaced at finish, not merged", () => {
+    it("reflects a key the block deleted", () => {
+      const events: Event[] = [];
+      Notifications.subscribe("del", (e) => events.push(e));
+
+      Notifications.instrument("del", { stale: true }, (payload) => {
+        delete payload.stale;
+      });
+
+      expect(events).toHaveLength(1);
+      expect("stale" in events[0].payload).toBe(false);
+    });
+
+    it("publishes the same payload object the block was yielded", () => {
+      const events: Event[] = [];
+      Notifications.subscribe("ident", (e) => events.push(e));
+
+      const payload = { a: 1 };
+      Notifications.instrument("ident", payload, (yielded) => {
+        expect(yielded).toBe(payload);
+      });
+
+      expect(events[0].payload).toBe(payload);
+    });
+
+    it("publishes the same payload object with no block", () => {
+      const events: Event[] = [];
+      Notifications.subscribe("ident", (e) => events.push(e));
+
+      const payload = { a: 1 };
+      Notifications.instrument("ident", payload);
+
+      expect(events[0].payload).toBe(payload);
+    });
+
+    it("publish delivers the same payload object", () => {
+      const events: Event[] = [];
+      Notifications.subscribe("ident", (e) => events.push(e));
+
+      const payload = { a: 1 };
+      Notifications.publish("ident", payload);
+
+      expect(events[0].payload).toBe(payload);
+    });
+  });
 });

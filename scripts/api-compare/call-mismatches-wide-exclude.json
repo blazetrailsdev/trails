@@ -42330,13 +42330,6 @@
   },
   {
     "package": "activesupport",
-    "tsFile": "notifications/instrumenter.ts",
-    "rubyName": "instrument",
-    "call": "build_handle",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
     "tsFile": "number-helper/number-to-currency-converter.ts",
     "rubyName": "convert",
     "call": "to_s",

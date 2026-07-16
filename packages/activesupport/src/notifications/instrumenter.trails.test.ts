@@ -112,4 +112,30 @@ describe("Instrumenter (trails)", () => {
     expect(handle).toBe(delegated);
     expect(calls).toEqual([["span", instrumenter.id]]);
   });
+
+  it("instrument routes through the notifier's build_handle", () => {
+    // Rails' #instrument is build_handle → start → yield → finish
+    // (instrumenter.rb:54-65), so a notifier that builds handles drives the
+    // event through them rather than a separate publish path.
+    const order: string[] = [];
+    const notifier = {
+      publish() {
+        order.push("publish");
+      },
+      buildHandle(_name: string, _id: unknown) {
+        return {
+          start() {
+            order.push("start");
+          },
+          finish() {
+            order.push("finish");
+          },
+        };
+      },
+    };
+    new Instrumenter(notifier).instrument("span", {}, () => {
+      order.push("block");
+    });
+    expect(order).toEqual(["start", "block", "finish"]);
+  });
 });

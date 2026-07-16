@@ -22,7 +22,9 @@ export class Event {
   readonly name: string;
   readonly time: Temporal.Instant;
   end: Temporal.Instant | null;
-  readonly payload: EventPayload;
+  // Writable, mirroring Rails' `attr_accessor :payload`: the event is built with
+  // a dup, then finish replaces it with the final payload object (below).
+  payload: EventPayload;
   readonly transactionId: string;
   readonly children: Event[];
 
@@ -35,7 +37,10 @@ export class Event {
     this.name = name;
     this.time = start;
     this.end = null;
-    this.payload = payload;
+    // Rails' Event#initialize does `@payload = payload.dup` (a shallow copy):
+    // the event holds a snapshot until finish replaces it with the final
+    // payload object (Fanout's EventObjectGroup#finish: `@event.payload = payload`).
+    this.payload = { ...payload };
     this.transactionId = transactionId ?? generateTransactionId();
     this.children = [];
   }
@@ -82,7 +87,7 @@ export interface NotificationHandle {
 
 export class Instrumenter {
   private _notifier: InstrumenterNotifier;
-  private _stack: Event[] = [];
+  private _stack: Handle[] = [];
   readonly id: string;
 
   constructor(notifier: InstrumenterNotifier) {
@@ -91,16 +96,19 @@ export class Instrumenter {
   }
 
   /**
-   * The block receives the payload — the same object passed in, which
-   * subscribers read after the block returns. Mutating it is how a caller
-   * reports back into the notification, mirroring Rails' `yield payload`.
+   * Mirrors ActiveSupport::Notifications::Instrumenter#instrument
+   * (instrumenter.rb:54-65): build a handle, start it, yield the raw payload
+   * (the rescue arm records the exception on it), then finish the handle in the
+   * `ensure`. Routing through `build_handle` is what lets a Fanout notifier's
+   * groups drive the event, rather than open-coding an Event/publish here.
    */
   instrument<T = void>(
     name: string,
     payload: EventPayload = {},
     fn?: (payload: EventPayload) => T,
   ): T {
-    const event = this._push(name, payload);
+    const handle = this.buildHandle(name, payload);
+    handle.start();
 
     try {
       if (fn) return fn(payload);
@@ -109,7 +117,7 @@ export class Instrumenter {
       _recordException(payload, e);
       throw e;
     } finally {
-      this._pop(event);
+      handle.finish();
     }
   }
 
@@ -118,7 +126,8 @@ export class Instrumenter {
     payload: EventPayload = {},
     fn?: (payload: EventPayload) => Promise<T>,
   ): Promise<T> {
-    const event = this._push(name, payload);
+    const handle = this.buildHandle(name, payload);
+    handle.start();
 
     try {
       if (fn) return await fn(payload);
@@ -127,7 +136,7 @@ export class Instrumenter {
       _recordException(payload, e);
       throw e;
     } finally {
-      this._pop(event);
+      handle.finish();
     }
   }
 
@@ -144,34 +153,16 @@ export class Instrumenter {
     if (this._notifier.buildHandle) {
       return this._notifier.buildHandle(name, this.id, payload);
     }
-    return new Handle(name, payload, this.id, this._notifier);
-  }
-
-  // Rails' #instrument never builds an Event — it hands the raw payload to a
-  // Fanout handle, so subscribers see the block's mutations (that is how
-  // payload[:exception] reaches them). trails routes it through an Event, which
-  // works only because Event holds the payload by reference. Rails' Event#dups
-  // it (instrumenter.rb:105); converging that dup without first moving this path
-  // off Event would silently hide the exception keys from subscribers.
-  private _push(name: string, payload: EventPayload): Event {
-    const event = new Event(name, Temporal.Now.instant(), payload, this.id);
-    const parent = this._stack[this._stack.length - 1];
-    if (parent) parent.children.push(event);
-    this._stack.push(event);
-    return event;
-  }
-
-  private _pop(event: Event): void {
-    this._stack.pop();
-    event.finish();
-    this._notifier.publish(event.name, event);
+    // The stack threads trails' (non-Rails) child-event nesting through the
+    // wrapped handles: each links its event under the one still open above it.
+    return new Handle(name, payload, this.id, this._notifier, this._stack);
   }
 }
 
 /**
  * Mirrors ActiveSupport::Notifications::Fanout::Handle — builds the Event at
  * `#start` (so its start time is the real start of the work) and publishes it
- * at `#finish`, off the payload held by reference.
+ * at `#finish`, replacing the event's payload with the final object first.
  */
 export class Handle implements NotificationHandle {
   private _state: "initialized" | "started" | "finished" = "initialized";
@@ -182,6 +173,8 @@ export class Handle implements NotificationHandle {
     private _payload: EventPayload,
     private _transactionId: string,
     private _notifier: { publish(name: string, event: Event): void },
+    // Optional nesting stack for trails' child-event tracking (see Instrumenter).
+    private _stack?: Handle[],
   ) {}
 
   start(): void {
@@ -190,6 +183,11 @@ export class Handle implements NotificationHandle {
     }
     this._state = "started";
     this._event = new Event(this._name, Temporal.Now.instant(), this._payload, this._transactionId);
+    if (this._stack) {
+      const parent = this._stack[this._stack.length - 1];
+      if (parent?._event) parent._event.children.push(this._event);
+      this._stack.push(this);
+    }
   }
 
   finish(): void {
@@ -197,7 +195,12 @@ export class Handle implements NotificationHandle {
       throw new ArgumentError(`expected state to be "started" but was "${this._state}"`);
     }
     this._state = "finished";
+    if (this._stack) this._stack.pop();
     if (this._event) {
+      // Replace the event's dup with the final payload object (mutations made
+      // between start and finish, e.g. payload.outcome), as Rails'
+      // EventObjectGroup#finish does.
+      this._event.payload = this._payload;
       this._event.finish();
       this._notifier.publish(this._event.name, this._event);
     }

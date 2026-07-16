@@ -177,6 +177,10 @@ export class Notifications {
     const event = this._buildEvent(name, resolved, current);
 
     if (!block) {
+      // Rails goes through handle.start/finish even with no block, and
+      // EventObjectGroup#finish assigns the raw payload; do the same so
+      // subscribers get `event.payload === resolved`.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
       return undefined as any;
@@ -189,11 +193,15 @@ export class Notifications {
     const inner = [...current, event];
     let result: T;
     try {
-      result = this._runWithStack(inner, () => block(event.payload));
+      result = this._runWithStack(inner, () => block(resolved));
     } catch (e) {
-      this._recordException(event.payload, e);
+      this._recordException(resolved, e);
       throw e;
     } finally {
+      // Replace the event's dup with the final payload object (the raw payload
+      // the block was yielded and mutated), as Rails' EventObjectGroup#finish
+      // does — reflecting the block's mutations, the rescue arm, and deletions.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
     }
@@ -227,6 +235,8 @@ export class Notifications {
     const event = this._buildEvent(name, resolved, current);
 
     if (!block) {
+      // See instrument(): assign the raw payload so subscribers get identity.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
       return undefined as any;
@@ -239,11 +249,13 @@ export class Notifications {
     const inner = [...current, event];
     let result: T;
     try {
-      result = await this._runWithStack(inner, () => block(event.payload));
+      result = await this._runWithStack(inner, () => block(resolved));
     } catch (e) {
-      this._recordException(event.payload, e);
+      this._recordException(resolved, e);
       throw e;
     } finally {
+      // See instrument(): replace the event's dup with the final payload object.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
     }
@@ -255,7 +267,10 @@ export class Notifications {
    * Mirrors ActiveSupport::Notifications.publish.
    */
   static publish(name: string, payload?: EventPayload): void {
-    const event = this._buildEvent(name, payload);
+    const resolved = payload ?? {};
+    const event = this._buildEvent(name, resolved);
+    // Deliver the passed payload object itself, not Event#initialize's dup.
+    event.payload = resolved;
     event.finish();
     this._notify(event, true);
   }
@@ -265,8 +280,8 @@ export class Notifications {
    * `ActiveSupport::Notifications.instrumenter.build_handle`. The returned
    * handle records the event's start at `#start` and finishes + publishes it at
    * `#finish`, so `event.duration` covers the whole span (not just the publish
-   * call). The payload is held by reference: mutations made between `#start`
-   * and `#finish` (e.g. `payload.outcome = ...`) are visible to subscribers.
+   * call). Mutations made between `#start` and `#finish` (e.g.
+   * `payload.outcome = ...`) are re-synced onto the event before publishing.
    */
   static buildHandle(name: string, payload: EventPayload = {}): NotificationHandle {
     // Rails' Fanout::Handle snapshots the matching listener groups at build
@@ -295,6 +310,9 @@ export class Notifications {
         state = "finished";
         if (event) {
           const finished = event;
+          // Replace the event's dup with the final payload object (mutations
+          // made between start and finish), as Rails' EventObjectGroup#finish does.
+          finished.payload = payload;
           finished.finish();
           // Rails' Handle#finish_with_values runs every group under
           // iterate_guarding_exceptions (fanout.rb:20-39, :253-259): one bad
