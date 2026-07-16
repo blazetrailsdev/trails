@@ -284,3 +284,45 @@ describe("BasicsTest (trails)", () => {
     expect(exists).toBe(true);
   });
 });
+
+// Rails removes ignored columns from `columns_hash` entirely, so their values
+// never enter `@attributes` even when a raw `SELECT *` / find_by_sql row carries
+// them (model_schema.rb `columns_hash.except(*ignored_columns)`). trails now
+// mirrors this in writeDatabaseRow: a plain ignored column absent from
+// `_attributeDefinitions` is dropped on load, while a column ignored yet still
+// declared via `attribute()` (Rails' AttributedDeveloper) survives and casts.
+describe("ignored columns absent from the instance attribute set (trails)", () => {
+  fixtures([]);
+
+  it("a plain ignored column loaded via SELECT * never enters the attribute set", async () => {
+    class Topic extends Base {
+      static tableName = "topics";
+      static {
+        this.ignoredColumns = ["author_name"];
+      }
+    }
+    await Base.connection.execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
+    const [topic] = await Topic.findBySql("SELECT * FROM topics");
+    const keys = [
+      ...(topic as unknown as { _attributes: { keys(): Iterable<string> } })._attributes.keys(),
+    ];
+    expect(keys).not.toContain("author_name");
+    expect(
+      (topic as unknown as { readAttribute(n: string): unknown }).readAttribute("author_name"),
+    ).toBeNull();
+    expect("author_name" in topic).toBe(false);
+  });
+
+  it("an ignored column still declared via attribute() loads and casts on SELECT *", async () => {
+    const { AttributedDeveloper } = await import("./test-helpers/models/developer.js");
+    const dev = await AttributedDeveloper.create();
+    await dev.updateColumn("name", "name");
+    const loaded = await AttributedDeveloper.where({ id: dev.id }).select("*").first();
+    // `name` is ignored yet declared via `attribute()`, so writeDatabaseRow keeps
+    // it in the attribute set and it casts through DeveloperName (unlike a plain
+    // ignored column, which is dropped).
+    expect((loaded as unknown as { readAttribute(n: string): unknown }).readAttribute("name")).toBe(
+      "Developer: name",
+    );
+  });
+});
