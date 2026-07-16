@@ -72,20 +72,12 @@ export class HasOneAssociation extends SingularAssociation {
     const displaced = this.target;
     this.replace(record);
     if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) return;
-    // Reverting to a record already queued for removal cancels *just its*
-    // removal (`owner.x = other; owner.x = original`) — remove only the reverted
-    // record from the pending set, leaving any other displacements intact.
-    if (record) {
-      const idx = this._displacedRecords.findIndex((r) => sameRecord(record, r));
-      if (idx !== -1) {
-        this._displacedRecords.splice(idx, 1);
-        return;
-      }
-    }
-    // Only a *persisted* displaced record has a row/foreign key to nullify. A
-    // transient in-memory target has none and must not be queued — but it also
-    // must not clobber earlier persisted displacements, which the ordered
-    // collection preserves regardless.
+    // Rails `HasOneAssociation#replace` runs `remove_target!` on the current
+    // `target` for *every* assigning-another replacement (has_one_association.rb
+    // :64-84, :69) before `self.target = record`, so the record this assignment
+    // displaces must be queued regardless of whether the assignment also reverts
+    // an earlier displacement. Only a *persisted* displaced record has a
+    // row/foreign key to nullify; a transient in-memory target has none.
     if (
       displaced &&
       (displaced as { isPersisted?: () => boolean }).isPersisted?.() &&
@@ -101,6 +93,16 @@ export class HasOneAssociation extends SingularAssociation {
       // `:dependent` — the `else` branch nullifies the old FK even with no
       // `:dependent`. We defer that load to `removeDisplaced` at the owner's save.
       this._removeDisplacedFromDb = true;
+    }
+    // Reverting to a record already queued for removal cancels *just its*
+    // removal (`owner.x = other; owner.x = original`) — the now-target record no
+    // longer needs its FK nullified. This runs after the queue above so it only
+    // cancels the reverted record, never the one this same assignment displaced
+    // (which the push guard guarantees is a different record). Leaves every other
+    // pending displacement intact.
+    if (record) {
+      const idx = this._displacedRecords.findIndex((r) => sameRecord(record, r));
+      if (idx !== -1) this._displacedRecords.splice(idx, 1);
     }
   }
 

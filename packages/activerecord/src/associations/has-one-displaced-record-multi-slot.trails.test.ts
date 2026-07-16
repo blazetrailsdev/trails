@@ -70,4 +70,22 @@ describe("HasOneDisplacedRecordMultiSlot", () => {
     expect((await Ship.find(a.id)).pirate_id).toBe(Number(pirate.id));
     expect((await Ship.find(b.id)).pirate_id).toBeNull();
   });
+
+  it("reverting cancels only the re-assigned record, still removing what the revert displaces", async () => {
+    const pirate = await Pirate.create({ catchphrase: "Arrr" });
+    const a = await Ship.create({ name: "A", pirate_id: pirate.id });
+    await pirate.loadHasOne("ship");
+    const b = await Ship.create({ name: "B", pirate_id: pirate.id });
+    const c = await Ship.create({ name: "C", pirate_id: pirate.id });
+
+    pirate.ship = b; // displaces the persisted A
+    pirate.ship = c; // displaces b
+    pirate.ship = b; // reverts to b (cancels b's removal) but displaces c
+    await pirate.save();
+
+    // A and c both displaced and never reverted → nullified. b is the target.
+    expect((await Ship.find(a.id)).pirate_id).toBeNull();
+    expect((await Ship.find(c.id)).pirate_id).toBeNull();
+    expect((await Ship.find(b.id)).pirate_id).toBe(Number(pirate.id));
+  });
 });
