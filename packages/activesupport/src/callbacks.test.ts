@@ -187,14 +187,17 @@ describe("Callbacks", () => {
     // Rails' CallbackObject#around(caller) { ... yield ... } compiles to
     // CallTemplate::ObjectCall and dispatches `object.send(method, target, &block)` —
     // the receiver is the object, the record is the first positional arg, and the
-    // continuation is the block. trails' setCallback resolves a CallbackObject to a
-    // plain around function, so drive invokeAround with an ObjectCall template
-    // directly to cover the object-dispatch threading (record first, block last).
+    // continuation is the block. The method name is the callback's scope-join; with
+    // the default CallbackChain scope of [:kind] that is `around` (not `around_save`
+    // — the [:kind, :name] custom-scope shape), matching Rails' test_around_object.
+    // trails' setCallback resolves a CallbackObject to a plain around function, so
+    // drive invokeAround with an ObjectCall template directly to cover the
+    // object-dispatch threading (record first, block last).
     it("test_around_object", () => {
       const record: string[] = [];
       const caller = {};
       const obj = {
-        aroundSave(this: unknown, arg: object, next: () => unknown) {
+        around(this: unknown, arg: object, next: () => unknown) {
           record.push("around before");
           expect(this).toBe(obj);
           expect(arg).toBe(caller);
@@ -203,7 +206,7 @@ describe("Callbacks", () => {
           return v;
         },
       };
-      const seq = new CallbackSequence(null, new CallTemplate.ObjectCall(obj, "aroundSave"), null);
+      const seq = new CallbackSequence(null, new CallTemplate.ObjectCall(obj, "around"), null);
 
       const result = seq.invokeAround({ target: caller, halted: false, value: undefined }, () => {
         record.push("yielded");
