@@ -575,6 +575,21 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(created.id);
   });
 
+  // Same root cause on the build path: `set_new_record` → `replace(record, false)`
+  // still runs `remove_target!` on the loaded target (has_one_association.rb:69),
+  // whose else-branch nullifies+saves the old row even though the new record is
+  // unsaved. Our sync `build` can't await, so the `build#{name}` accessor returns
+  // a Promise for the loaded-target case and detaches the prior row.
+  it("build over a loaded target nullifies the prior account", async () => {
+    const company = (await Company.create({ name: "BuildCo" })) as any;
+    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
+    const found = (await Company.find(company.id)) as any;
+    await readHasOne(found, "account");
+    const built = await found.buildAccount({ credit_limit: 70 });
+    expect((await Account.find(original.id)).firm_id).toBeNull();
+    expect(built.isPersisted()).toBe(false);
+  });
+
   it("create when parent is new raises", async () => {
     const firm = new Firm();
     let error: unknown;

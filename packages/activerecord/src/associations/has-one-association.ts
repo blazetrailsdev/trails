@@ -379,22 +379,35 @@ export class HasOneAssociation extends SingularAssociation {
     const displaced = this.loaded ? this.target : null;
     const record = await super._createRecord(attributes, shouldRaise, block);
     // `super._createRecord` ran `setNewRecord` → `replace`, so `this.target` is
-    // now the freshly created record. Only the displaced (previously attached)
-    // record needs detaching, and only when the assignment actually changes it.
-    if (
-      displaced &&
-      !(displaced as { isDestroyed?: () => boolean }).isDestroyed?.() &&
-      !sameRecord(displaced, record)
-    ) {
-      const currentTarget = this.target;
-      this.target = displaced;
-      try {
-        await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-      } finally {
-        this.target = currentTarget;
-      }
-    }
+    // now the freshly created record; detach the displaced (previously attached)
+    // one, matching `remove_target!` inside Rails' `replace`.
+    await this.detachDisplacedTarget(displaced, record);
     return record;
+  }
+
+  /**
+   * Detach the record displaced by a `create#{name}` / `build#{name}` over an
+   * already-**loaded** has_one target — the awaitable analog of the
+   * `remove_target!` Rails runs inside `HasOneAssociation#replace`
+   * (has_one_association.rb:69) whenever another record is assigned. Nullifies
+   * the displaced record's foreign key (or destroys/deletes it per
+   * `:dependent`). Our sync `replace`/`setNewRecord` cannot `await` that removal,
+   * so the async create/build accessors run it here after materializing the
+   * replacement. A no-op unless a *different*, non-destroyed record was loaded.
+   *
+   * @internal
+   */
+  async detachDisplacedTarget(displaced: Base | null, replacement: Base | null): Promise<void> {
+    if (!displaced) return;
+    if ((displaced as { isDestroyed?: () => boolean }).isDestroyed?.()) return;
+    if (sameRecord(displaced, replacement)) return;
+    const currentTarget = this.target;
+    this.target = displaced;
+    try {
+      await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
+    } finally {
+      this.target = currentTarget;
+    }
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {

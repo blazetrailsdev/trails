@@ -68,9 +68,24 @@ export class HasOne extends SingularAssociation {
           typeof assoc.needsTargetLoadForBuild === "function" &&
           assoc.needsTargetLoadForBuild()
         ) {
-          return assoc.loadTarget().then(() => assoc.build(...args));
+          return assoc.loadTarget().then((displaced: unknown) => {
+            const record = assoc.build(...args);
+            return assoc.detachDisplacedTarget(displaced, record).then(() => record);
+          });
         }
-        return assoc.build(...args);
+        // The target may already be loaded (so `needsTargetLoadForBuild` is
+        // false): Rails' `set_new_record` → `replace` still runs `remove_target!`
+        // on it, detaching the prior record (FK nullified / destroyed per
+        // `:dependent`). That removal needs an `await`, so return a Promise for
+        // the loaded-target case only — a new-record / no-target build keeps its
+        // synchronous return (the shape the STI-build tests assert).
+        const displaced =
+          typeof assoc.isLoaded === "function" && assoc.isLoaded() ? assoc.target : null;
+        const record = assoc.build(...args);
+        if (displaced && typeof assoc.detachDisplacedTarget === "function") {
+          return assoc.detachDisplacedTarget(displaced, record).then(() => record);
+        }
+        return record;
       },
       writable: true,
       configurable: true,
