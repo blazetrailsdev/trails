@@ -59,7 +59,7 @@ describe("AssociationValidationTest", () => {
       content: "non-empty",
     }) as Reply;
 
-    expect(t.isValid()).toBe(false);
+    expect(await t.isValid()).toBe(false);
     expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
     expect(r.errors.count).toBe(1); // make sure all associated objects have been validated
     expect(r2.errors.count).toBe(0);
@@ -67,7 +67,7 @@ describe("AssociationValidationTest", () => {
     expect(r4.errors.count).toBe(0);
     r.writeAttribute("content", "non-empty");
     r3.writeAttribute("content", "non-empty");
-    expect(t.isValid()).toBe(true);
+    expect(await t.isValid()).toBe(true);
   });
 
   it("validates associated one", async () => {
@@ -78,13 +78,13 @@ describe("AssociationValidationTest", () => {
     const r = new Reply({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
     seedAssociationCache(r, "topic", topic);
-    expect(r.isValid()).toBe(false);
+    expect(await r.isValid()).toBe(false);
     expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
     topic.writeAttribute("content", "non-empty");
-    expect(r.isValid()).toBe(true);
+    expect(await r.isValid()).toBe(true);
   });
 
-  it("validates associated with multiple attributes and array forms", () => {
+  it("validates associated with multiple attributes and array forms", async () => {
     // Rails' `validates_associated(*attr_names)` arity: `_merge_attributes`
     // flattens nested arrays and supports several association names in one call.
     Topic.validatesAssociated(["replies"], "openReplies");
@@ -92,29 +92,29 @@ describe("AssociationValidationTest", () => {
     const t = new Topic();
     seedAssociationCache(t, "replies", [invalid]);
     seedAssociationCache(t, "openReplies", [invalid]);
-    expect(t.isValid()).toBe(false);
+    expect(await t.isValid()).toBe(false);
     expect(t.errors.messagesFor("replies").length).toBeGreaterThan(0);
     expect(t.errors.messagesFor("openReplies").length).toBeGreaterThan(0);
   });
 
-  it("validates associated marked for destruction", () => {
+  it("validates associated marked for destruction", async () => {
     Topic.validatesAssociated("replies");
     Reply.validatesPresenceOf("content");
     const t = new Topic();
     const reply = association(t, "replies").build() as Reply;
-    expect(t.isInvalid()).toBe(true);
+    expect(await t.isInvalid()).toBe(true);
     reply.markForDestruction();
-    expect(t.isValid()).toBe(true);
+    expect(await t.isValid()).toBe(true);
   });
 
-  it("validates associated without marked for destruction", () => {
+  it("validates associated without marked for destruction", async () => {
     // Rails defines an anonymous class whose `valid?` is always true and stubs
     // `t.replies` to return `[reply.new]`; we seed the same shape into the cache.
     const reply = { isValid: () => true };
     Topic.validatesAssociated("replies");
     const t = new Topic();
     seedAssociationCache(t, "replies", [reply]);
-    expect(t.isValid()).toBe(true);
+    expect(await t.isValid()).toBe(true);
   });
 
   it("validates associated with custom message using quotes", async () => {
@@ -125,7 +125,7 @@ describe("AssociationValidationTest", () => {
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
     seedAssociationCache(r, "topic", topic);
-    expect(r.isValid()).toBe(false);
+    expect(await r.isValid()).toBe(false);
     expect(r.errors.messagesFor("topic")).toEqual([
       "This string contains 'single' and \"double\" quotes",
     ]);
@@ -134,20 +134,20 @@ describe("AssociationValidationTest", () => {
   it("validates associated missing", async () => {
     Reply.validatesPresenceOf("topic");
     const r = await Reply.create({ title: "A reply", content: "with content!" });
-    expect(r.isValid()).toBe(false);
+    expect(await r.isValid()).toBe(false);
     expect(r.errors.messagesFor("topic").length).toBeGreaterThan(0);
 
     seedAssociationCache(r, "topic", await Topic.first());
-    expect(r.isValid()).toBe(true);
+    expect(await r.isValid()).toBe(true);
   });
 
   it("validates presence of belongs to association  parent is new record", async () => {
     // Note that Interest and Human have the :inverse_of option set
-    await repairValidations(Interest, () => {
+    await repairValidations(Interest, async () => {
       Interest.validatesPresenceOf("human");
       const human = new Human({ name: "John" });
       const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
-      expect(interest.isValid()).toBe(true);
+      expect(await interest.isValid()).toBe(true);
     });
   });
 
@@ -156,7 +156,7 @@ describe("AssociationValidationTest", () => {
       Interest.validatesPresenceOf("human");
       const human = await Human.createBang({ name: "John" });
       const interest = association(human, "interests").build({ topic: "Airplanes" }) as Interest;
-      expect(interest.isValid()).toBe(true);
+      expect(await interest.isValid()).toBe(true);
     });
   });
 
@@ -166,8 +166,8 @@ describe("AssociationValidationTest", () => {
     const r = await Reply.create({ title: "A reply", content: "with content!" });
     const topic = await Topic.create({ title: "uhohuhoh" });
     seedAssociationCache(r, "topic", topic);
-    expect(r.isValid()).toBe(true);
-    expect(r.isValid("custom")).toBe(false);
+    expect(await r.isValid()).toBe(true);
+    expect(await r.isValid("custom")).toBe(false);
     expect(r.errors.messagesFor("topic")).toEqual(["is invalid"]);
   });
 
@@ -181,7 +181,7 @@ describe("AssociationValidationTest", () => {
     // NOTE: Does not pass along :create context from reply to Topic validation.
     seedAssociationCache(r, "topic", t);
 
-    expect(t.isValid()).toBe(true);
-    expect(r.isValid()).toBe(true);
+    expect(await t.isValid()).toBe(true);
+    expect(await r.isValid()).toBe(true);
   });
 });

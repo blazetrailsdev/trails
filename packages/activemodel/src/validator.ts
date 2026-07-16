@@ -91,7 +91,7 @@ export abstract class Validator<TBase extends object = object> {
     return (this.constructor as typeof Validator).kind;
   }
 
-  abstract validate(_record: ValidatableRecord<TBase>): void;
+  abstract validate(_record: ValidatableRecord<TBase>): void | Promise<void>;
 }
 
 /**
@@ -115,17 +115,21 @@ export class EachValidator<TBase extends object = object> extends Validator<TBas
     this.checkValidity();
   }
 
-  validate(record: ValidatableRecord<TBase>): void {
+  async validate(record: ValidatableRecord<TBase>): Promise<void> {
     for (const attribute of this.attributes) {
       let value = this.readAttributeForValidation(record, attribute);
       if (value == null && this.options.allowNil === true) continue;
       if (isBlank(value) && this.options.allowBlank === true) continue;
       value = this.prepareValueForValidation(value, record, attribute);
-      this.validateEach(record, attribute, value);
+      await this.validateEach(record, attribute, value);
     }
   }
 
-  validateEach(_record: ValidatableRecord<TBase>, _attribute: string, _value: unknown): void {
+  validateEach(
+    _record: ValidatableRecord<TBase>,
+    _attribute: string,
+    _value: unknown,
+  ): void | Promise<void> {
     // @nie disposition=keep-as-strategy-hook rails=activemodel/lib/active_model/validator.rb:162 cluster=activemodel-validator
     throw new NotImplementedError(
       "Subclasses must implement validateEach(record, attribute, value)",

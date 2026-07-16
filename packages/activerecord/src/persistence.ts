@@ -761,7 +761,7 @@ interface SaveRecord {
   readAttribute(name: string): unknown;
   _readAttribute(name: string): unknown;
   errors: { any: boolean };
-  isValid(context?: ValidationContextArg): boolean;
+  isValid(context?: ValidationContextArg): Promise<boolean>;
   constructor: {
     name: string;
     _attributeDefinitions: Map<string, unknown>;
@@ -827,7 +827,7 @@ export async function save<T extends SaveRecord>(
   self._beforeValidationSideEffects = [];
   let validationsPassed: boolean;
   try {
-    validationsPassed = performValidations.call(this, options);
+    validationsPassed = await performValidations.call(this, options);
   } finally {
     // Clear even if a validation callback throws, so a later standalone
     // `valid?` on this instance still fires the belongs_to default.

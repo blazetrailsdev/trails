@@ -25,83 +25,83 @@ function createUserClass(opts: { validations?: boolean } = {}) {
 }
 
 describe("SecurePasswordTest", () => {
-  it("automatically include ActiveModel::Validations when validations are enabled", () => {
+  it("automatically include ActiveModel::Validations when validations are enabled", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
     expect(u.errors.get("password")).toContain("can't be blank");
   });
 
-  it("don't include ActiveModel::Validations when validations are disabled", () => {
+  it("don't include ActiveModel::Validations when validations are disabled", async () => {
     const User = createUserClass({ validations: false });
     const u = new User({ name: "test" });
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     expect(u.errors.count).toBe(0);
   });
 
-  it("create a new user with validations and valid password/confirmation", () => {
+  it("create a new user with validations and valid password/confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).passwordConfirmation = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("create a new user with validation and a spaces only password", () => {
+  it("create a new user with validation and a spaces only password", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = " ".repeat(72);
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("create a new user with validation and a blank password", () => {
+  it("create a new user with validation and a blank password", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("create a new user with validation and a nil password", () => {
+  it("create a new user with validation and a nil password", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("create a new user with validation and password length greater than 72 characters", () => {
+  it("create a new user with validation and password length greater than 72 characters", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "a".repeat(73);
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("create a new user with validation and password byte size greater than 72 bytes", () => {
+  it("create a new user with validation and password byte size greater than 72 bytes", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "\u{1F600}".repeat(19); // 4 bytes each = 76 bytes, 19 chars
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("create a new user with validation and a blank password confirmation", () => {
+  it("create a new user with validation and a blank password confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).passwordConfirmation = "";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("create a new user with validation and a nil password confirmation", () => {
+  it("create a new user with validation and a nil password confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("create a new user with validation and an incorrect password confirmation", () => {
+  it("create a new user with validation and an incorrect password confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).passwordConfirmation = "wrong";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
   it("resetting password to nil clears the password cache", () => {
@@ -113,20 +113,20 @@ describe("SecurePasswordTest", () => {
     expect(u.readAttribute("password_digest")).toBe(null);
   });
 
-  it("update an existing user with validation and no change in password", () => {
+  it("update an existing user with validation and no change in password", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     expect(u.readAttribute("password_digest")).not.toBe(null);
   });
 
-  it("update an existing user with validations and valid password/confirmation", () => {
+  it("update an existing user with validations and valid password/confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "newsecret";
     (u as any).passwordConfirmation = "newsecret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
   it("updating an existing user with validation and a blank password", () => {
@@ -136,11 +136,11 @@ describe("SecurePasswordTest", () => {
     expect(u.readAttribute("password_digest")).toBe("$2a$04$existing");
   });
 
-  it("updating an existing user with validation and a spaces only password", () => {
+  it("updating an existing user with validation and a spaces only password", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = " ".repeat(72);
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
   it("updating an existing user with validation and a blank password and password_confirmation", () => {
@@ -159,34 +159,34 @@ describe("SecurePasswordTest", () => {
     expect(u.readAttribute("password_digest")).toBe(null);
   });
 
-  it("updating an existing user with validation and password length greater than 72", () => {
+  it("updating an existing user with validation and password length greater than 72", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "a".repeat(73);
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("updating an existing user with validation and a blank password confirmation", () => {
+  it("updating an existing user with validation and a blank password confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).passwordConfirmation = "";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("updating an existing user with validation and a nil password confirmation", () => {
+  it("updating an existing user with validation and a nil password confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("updating an existing user with validation and an incorrect password confirmation", () => {
+  it("updating an existing user with validation and an incorrect password confirmation", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).passwordConfirmation = "wrong";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
   it("updating an existing user with validation and a correct password challenge", () => {
@@ -225,18 +225,18 @@ describe("SecurePasswordTest", () => {
     expect((u as any).authenticate("secret")).toBe(u);
   });
 
-  it("updating an existing user with validation and a blank password digest", () => {
+  it("updating an existing user with validation and a blank password digest", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     u.writeAttribute("password_digest", "");
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("updating an existing user with validation and a nil password digest", () => {
+  it("updating an existing user with validation and a nil password digest", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     u.writeAttribute("password_digest", null);
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
   it("setting a blank password should not change an existing password", () => {
@@ -361,104 +361,104 @@ describe("SecurePasswordTest", () => {
     expect((u as any).authenticate("secret")).toBe(u);
   });
 
-  it("password_challenge validates against existing digest", () => {
+  it("password_challenge validates against existing digest", async () => {
     const User = createUserClass();
     // Simulate a DB-loaded record: digest is in attributes at snapshot time.
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
     const digest = builder.readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     (u as any).passwordChallenge = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("password_challenge rejects wrong current password", () => {
+  it("password_challenge rejects wrong current password", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     (u as any).passwordChallenge = "wrong";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
     expect(u.errors.get("passwordChallenge")).toContain("is invalid");
   });
 
-  it("password_challenge validates against existing digest before allowing changes", () => {
+  it("password_challenge validates against existing digest before allowing changes", async () => {
     const User = createUserClass();
     // Simulate a DB-loaded record with an existing digest as baseline.
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
     const digest = builder.readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     (u as any).password = "newpassword";
     (u as any).passwordChallenge = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     expect((u as any).authenticate("newpassword")).toBe(u);
     expect((u as any).authenticate("secret")).toBe(false);
   });
 
-  it("password_challenge rejects wrong challenge during password change", () => {
+  it("password_challenge rejects wrong challenge during password change", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     (u as any).password = "newpassword";
     (u as any).passwordChallenge = "wrongold";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
     expect(u.errors.get("passwordChallenge")).toContain("is invalid");
   });
 
-  it("password_challenge is not validated when nil", () => {
+  it("password_challenge is not validated when nil", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "secret";
     (u as any).passwordChallenge = null;
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("password_challenge fails against wrong db-loaded digest", () => {
+  it("password_challenge fails against wrong db-loaded digest", async () => {
     const User = createUserClass();
     const builder = new User({ name: "test" });
     (builder as any).password = "secret";
     const digest = builder.readAttribute("password_digest");
     const u = new User({ name: "test", password_digest: digest });
     (u as any).passwordChallenge = "wrong";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
     expect(u.errors.get("passwordChallenge")).toContain("is invalid");
   });
 
-  it("password_challenge fails when no prior digest exists", () => {
+  it("password_challenge fails when no prior digest exists", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     // No password set — password_digest baseline is null.
     (u as any).passwordChallenge = "anything";
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
     expect(u.errors.get("passwordChallenge")).toContain("is invalid");
   });
 
-  it("password too long emits passwordTooLong error type", () => {
+  it("password too long emits passwordTooLong error type", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "a".repeat(73);
-    u.isValid();
+    await u.isValid();
     expect(u.errors.where("password", "passwordTooLong").length).toBeGreaterThan(0);
   });
 
-  it("password too long resolves to locale entry", () => {
+  it("password too long resolves to locale entry", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     (u as any).password = "a".repeat(73);
-    u.isValid();
+    await u.isValid();
     const msgs = u.errors.fullMessages;
     expect(msgs.some((m) => m.includes("is too long"))).toBe(true);
   });
 
-  it("whitespace-only password digest treated as blank", () => {
+  it("whitespace-only password digest treated as blank", async () => {
     const User = createUserClass();
     const u = new User({ name: "test" });
     u.writeAttribute("password_digest", "   ");
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
     expect(u.errors.get("password")).toContain("can't be blank");
   });
 

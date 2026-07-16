@@ -64,7 +64,7 @@ describe("CallbacksTest", () => {
     ]);
   });
 
-  it("only selects which types of callbacks should be created from an array list", () => {
+  it("only selects which types of callbacks should be created from an array list", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -78,19 +78,19 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    p.isValid();
+    await p.isValid();
     expect(log).toContain("before");
     expect(log).toContain("after");
   });
 
-  it("no callbacks should be created", () => {
+  it("no callbacks should be created", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
       }
     }
     const p = new Person({ name: "test" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
   it("after_create callbacks with both callbacks declared in different lines", async () => {
@@ -200,7 +200,7 @@ describe("CallbacksTest", () => {
     expect(order).toEqual(["create", "first_after", "second_after"]);
   });
 
-  it("the callback chain is not halted when around or after callbacks return false", () => {
+  it("the callback chain is not halted when around or after callbacks return false", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -215,11 +215,11 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    p.isValid();
+    await p.isValid();
     expect(log).toEqual(["after1", "after2"]);
   });
 
-  it("the :if option array should not be mutated by an after callback", () => {
+  it("the :if option array should not be mutated by an after callback", async () => {
     const conditions = { if: (_r: any) => true };
     class Person extends Model {
       static {
@@ -228,11 +228,11 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    p.isValid();
+    await p.isValid();
     expect(typeof conditions.if).toBe("function");
   });
 
-  it("the callback chain is not halted when a before callback returns false)", () => {
+  it("the callback chain is not halted when a before callback returns false)", async () => {
     const log: string[] = [];
     class MyModel extends Model {
       static {
@@ -246,7 +246,7 @@ describe("CallbacksTest", () => {
       }
     }
     const m = new MyModel({ name: "test" });
-    m.isValid();
+    await m.isValid();
     expect(log).toContain("before");
     expect(log).toContain("after");
   });
@@ -273,7 +273,7 @@ describe("CallbacksTest", () => {
     expect((Task as any).aroundExecute).toBeUndefined();
   });
 
-  it("class-based callback object with before method", () => {
+  it("class-based callback object with before method", async () => {
     const log: string[] = [];
     const auditor = {
       beforeValidation(record: any) {
@@ -287,11 +287,11 @@ describe("CallbacksTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    p.isValid();
+    await p.isValid();
     expect(log).toContain("auditing Alice");
   });
 
-  it("class-based callback object with snake_case method", () => {
+  it("class-based callback object with snake_case method", async () => {
     // camelCase only — method name is beforeValidation (not before_validation)
     const log: string[] = [];
     const auditor = {
@@ -305,7 +305,7 @@ describe("CallbacksTest", () => {
         this.beforeValidation(auditor);
       }
     }
-    new Person({ name: "test" }).isValid();
+    await new Person({ name: "test" }).isValid();
     expect(log).toContain("camelCase called");
   });
 
@@ -625,14 +625,6 @@ describe("unified sync/async runner", () => {
     expect(log).toEqual(["b1", "b2", "block", "a1"]);
   });
 
-  it("strict: 'sync' throws when a before callback returns a Promise", () => {
-    const proto = Object.create(null);
-    _registerCallbackOnProto(proto, "before", "validation", async () => {});
-    expect(() => runAllCallbacks(proto, "validation", {}, () => {}, { strict: "sync" })).toThrow(
-      /Async callback on sync chain "validation"/,
-    );
-  });
-
   it("strict: 'sync' throws when an after callback returns a Promise", () => {
     const proto = Object.create(null);
     _registerCallbackOnProto(proto, "after", "initialize", async () => {});
@@ -641,20 +633,27 @@ describe("unified sync/async runner", () => {
     );
   });
 
-  it("async validator function registered via Model.validate is caught at runtime", () => {
+  it("async validator function registered via Model.validate runs and awaits", async () => {
+    const seen: string[] = [];
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.validate(async (_r: any) => {
+        this.validate(async (r: any) => {
           await Promise.resolve();
+          seen.push(r.name);
+          r.errors.add("name", "is remote-invalid");
         });
       }
     }
     const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow(/Async callback on sync chain "validate"/);
+    const result = p.isValid();
+    expect(result).toBeInstanceOf(Promise);
+    expect(await result).toBe(false);
+    expect(seen).toEqual(["test"]);
+    expect(p.errors.get("name")).toEqual(["is remote-invalid"]);
   });
 
-  it("async validator method registered via Model.validate is caught at runtime", () => {
+  it("async validator method registered via Model.validate runs and awaits", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -662,16 +661,19 @@ describe("unified sync/async runner", () => {
       }
       async checkRemote() {
         await Promise.resolve();
+        this.errors.add("name", "failed remote check");
       }
     }
     const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow(/Async callback on sync chain "validate"/);
+    expect(await p.isValid()).toBe(false);
+    expect(p.errors.get("name")).toEqual(["failed remote check"]);
   });
 
-  it("async validator registered via validatesWith is caught at runtime", () => {
+  it("async validator registered via validatesWith runs and awaits", async () => {
     class AsyncValidator {
-      async validate(_record: unknown): Promise<void> {
+      async validate(record: any): Promise<void> {
         await Promise.resolve();
+        record.errors.add("name", "async validatesWith");
       }
     }
     class Person extends Model {
@@ -681,7 +683,32 @@ describe("unified sync/async runner", () => {
       }
     }
     const p = new Person({ name: "test" });
-    expect(() => p.isValid()).toThrow(/Async callback on sync chain "validate"/);
+    expect(await p.isValid()).toBe(false);
+    expect(p.errors.get("name")).toEqual(["async validatesWith"]);
+  });
+
+  it("an async before_validation callback that halts is awaited", async () => {
+    const order: string[] = [];
+    class Person extends Model {
+      static {
+        this.attribute("name", "string");
+        this.beforeValidation(async () => {
+          await Promise.resolve();
+          order.push("before");
+          throwAbort();
+        });
+        this.validate(() => {
+          order.push("validate");
+        });
+      }
+    }
+    const p = new Person({ name: "test" });
+    const result = p.isValid();
+    expect(result).toBeInstanceOf(Promise);
+    // Halted before-validation aborts the chain, so isValid() is false and the
+    // validate callback never runs.
+    expect(await result).toBe(false);
+    expect(order).toEqual(["before"]);
   });
 
   it("strict: 'sync' allows fully-sync chains", () => {
@@ -760,7 +787,7 @@ describe("Callbacks", () => {
     expect(order).not.toContain("after");
   });
 
-  it("before_validation halting prevents validations from running", () => {
+  it("before_validation halting prevents validations from running", async () => {
     class NoValidate extends Model {
       static {
         this.attribute("name", "string");
@@ -769,7 +796,7 @@ describe("Callbacks", () => {
       }
     }
     const n = new NoValidate();
-    expect(n.isValid()).toBe(false);
+    expect(await n.isValid()).toBe(false);
     expect(n.errors.count).toBe(0); // validations never ran
   });
 
@@ -798,7 +825,7 @@ describe("Callbacks", () => {
 });
 
 describe("Callbacks (extended)", () => {
-  it("afterValidation runs after validation", () => {
+  it("afterValidation runs after validation", async () => {
     const order: string[] = [];
     class Validated extends Model {
       static {
@@ -810,11 +837,11 @@ describe("Callbacks (extended)", () => {
       }
     }
     const v = new Validated({ name: "dean" });
-    v.isValid();
+    await v.isValid();
     expect(order).toContain("after_validation");
   });
 
-  it("afterValidation runs even when invalid", () => {
+  it("afterValidation runs even when invalid", async () => {
     const order: string[] = [];
     class Validated extends Model {
       static {
@@ -826,7 +853,7 @@ describe("Callbacks (extended)", () => {
       }
     }
     const v = new Validated();
-    v.isValid();
+    await v.isValid();
     expect(order).toContain("after_validation");
   });
 
@@ -881,7 +908,7 @@ describe("Callbacks (extended)", () => {
     expect(parentOrder).not.toContain("child");
   });
 
-  it("custom validate with method name string", () => {
+  it("custom validate with method name string", async () => {
     class WithMethod extends Model {
       static {
         this.attribute("value", "integer");
@@ -893,15 +920,15 @@ describe("Callbacks (extended)", () => {
         }
       }
     }
-    expect(new WithMethod({ value: 1 }).isValid()).toBe(true);
+    expect(await new WithMethod({ value: 1 }).isValid()).toBe(true);
     const w = new WithMethod({ value: 0 });
-    expect(w.isValid()).toBe(false);
+    expect(await w.isValid()).toBe(false);
     expect(w.errors.get("value")).toContain("cannot be zero");
   });
 });
 
 describe("afterCommit / afterRollback callbacks", () => {
-  it("registers afterCommit callback", () => {
+  it("registers afterCommit callback", async () => {
     class Order extends Model {
       static {
         this.attribute("total", "integer");
@@ -909,17 +936,17 @@ describe("afterCommit / afterRollback callbacks", () => {
       }
     }
     // Should not throw
-    expect(new Order({ total: 1 }).isValid()).toBe(true);
+    expect(await new Order({ total: 1 }).isValid()).toBe(true);
   });
 
-  it("registers afterRollback callback", () => {
+  it("registers afterRollback callback", async () => {
     class Order extends Model {
       static {
         this.attribute("total", "integer");
         this.afterRollback(() => {});
       }
     }
-    expect(new Order({ total: 1 }).isValid()).toBe(true);
+    expect(await new Order({ total: 1 }).isValid()).toBe(true);
   });
 });
 describe("defineModelCallbacks()", () => {
@@ -983,7 +1010,7 @@ describe("callbacks with prepend option", () => {
 });
 
 describe("withOptions()", () => {
-  it("applies common validation options to all validates calls", () => {
+  it("applies common validation options to all validates calls", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -999,8 +1026,8 @@ describe("withOptions()", () => {
 
     // Validations only run with "create" context, not without
     const user = new User();
-    expect(user.isValid()).toBe(true);
-    expect(user.isValid("create")).toBe(false);
+    expect(await user.isValid()).toBe(true);
+    expect(await user.isValid("create")).toBe(false);
     expect(user.errors.on("name")).toContain("can't be blank");
     expect(user.errors.on("email")).toContain("can't be blank");
   });

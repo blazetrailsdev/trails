@@ -450,10 +450,7 @@ export class Before {
     if (!isThenable(cbResult)) return env;
     if (opts?.strict === "sync") {
       swallowRejection(cbResult);
-      throw new Error(
-        `Async callback on sync chain "${chainName}" — before returned a Promise. ` +
-          `Validations are synchronous; move async work to a beforeSave/afterSave callback.`,
-      );
+      throw new Error(`Async callback on sync chain "${chainName}" — before returned a Promise`);
     }
     return Promise.resolve(cbResult).then(
       () => env,

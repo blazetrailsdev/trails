@@ -783,9 +783,9 @@ describe("PersistenceTest", () => {
     expect(epochMs(topic.updated_at)).toBeGreaterThan(epochMs(previouslyUpdatedAt));
   });
 
-  it("becomes includes errors", () => {
+  it("becomes includes errors", async () => {
     const company = new Company({ name: null });
-    expect(company.isValid()).toBe(false);
+    expect(await company.isValid()).toBe(false);
     const originalErrors = company.errors;
     const client = company.becomes(Client);
     expect(client.errors.attributeNames).toEqual(originalErrors.attributeNames);

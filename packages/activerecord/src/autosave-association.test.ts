@@ -377,7 +377,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const validatedIds: unknown[] = [];
     for (const p of parrots) {
       const origIsValid = p.isValid.bind(p);
-      (p as { isValid: (ctx?: unknown) => boolean }).isValid = (ctx?: unknown) => {
+      (p as { isValid: (ctx?: unknown) => Promise<boolean> }).isValid = (ctx?: unknown) => {
         validatedIds.push(p.id);
         return origIsValid(ctx as never);
       };
@@ -418,7 +418,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     await proxy.push(parrot);
     parrot.name = "";
     cacheAssoc(pirate, "parrots", [parrot]);
-    expect(pirate.isValid()).toBe(false);
+    expect(await pirate.isValid()).toBe(false);
   });
   it("should be invalid on habtm when any record in the association chain is invalid and was changed with autosave", async () => {
     const { Pirate, Parrot } = makePirateParrot();
@@ -440,7 +440,7 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     // Parrot is persisted and unchanged; autosave validation should only consider
     // associated records that have actually been changed
     cacheAssoc(pirate, "parrots", [parrot]);
-    expect(pirate.isValid()).toBe(true);
+    expect(await pirate.isValid()).toBe(true);
   });
   it("a child marked for destruction should not be destroyed twice while saving habtm", async () => {
     const { Pirate } = makePirateParrot();
@@ -1041,11 +1041,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     registerModel("PAccount", PAccount);
 
     const firm = new PFirm({ name: "GlobalMegaCorp" });
-    expect(firm.isValid()).toBe(true);
+    expect(await firm.isValid()).toBe(true);
 
     const account = new PAccount({});
     cacheAssoc(firm, "pAccount", account);
-    expect(account.isValid()).toBe(false);
+    expect(await account.isValid()).toBe(false);
 
     const saved = await firm.save();
     expect(saved).toBe(true);
@@ -2611,29 +2611,29 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     });
     return { Parent, Child };
   }
-  it("errors should be indexed when global flag is set", () => {
+  it("errors should be indexed when global flag is set", async () => {
     const old = indexNestedAttributeErrors;
     setIndexNestedAttributeErrors(true);
     try {
       const { Parent, Child } = makeIndexedHasMany();
       const parent = new Parent({ name: "p" });
       cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
-      expect(parent.isValid()).toBe(false);
+      expect(await parent.isValid()).toBe(false);
       expect(parent.errors.where("children[1].name")).toHaveLength(1);
       expect(parent.errors.where("children.name")).toHaveLength(0);
     } finally {
       setIndexNestedAttributeErrors(old);
     }
   });
-  it("errors details should be indexed when passed as array", () => {
+  it("errors details should be indexed when passed as array", async () => {
     const { Parent, Child } = makeIndexedHasMany({ indexErrors: true });
     const parent = new Parent({ name: "p" });
     cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
-    expect(parent.isValid()).toBe(false);
+    expect(await parent.isValid()).toBe(false);
     expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
     expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
   });
-  it("errors details with error on base should be indexed when passed as array", () => {
+  it("errors details with error on base should be indexed when passed as array", async () => {
     class P extends Base {
       declare name: string | null;
       declare kids: AssociationProxy<C>;
@@ -2655,7 +2655,7 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
         this.attribute("favorite", "boolean");
         this.attribute("p_id", "integer");
       }
-      override isValid(): boolean {
+      override async isValid(): Promise<boolean> {
         this.errors.clear();
         if (!(this as any).favorite) this.errors.add("base", "should be favorite");
         return this.errors.empty;
@@ -2665,10 +2665,10 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
     registerModel("BaseErrC", C);
     const parent = new P({ name: "p" });
     cacheAssoc(parent, "kids", [new C({ favorite: true }), new C({ favorite: false })]);
-    expect(parent.isValid()).toBe(false);
+    expect(await parent.isValid()).toBe(false);
     expect(parent.errors.details.get("kids[1].base")?.length ?? 0).toBeGreaterThan(0);
   });
-  it("indexed errors should be properly translated", () => {
+  it("indexed errors should be properly translated", async () => {
     const oldCustomize = ModelError.i18nCustomizeFullMessage;
     ModelError.i18nCustomizeFullMessage = true;
     I18n.storeTranslations("en", {
@@ -2717,16 +2717,16 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       const p = new Person({});
       cacheAssoc(p, "references", [refValid, refInvalid]);
 
-      expect(refValid.isValid()).toBe(true);
-      expect(refInvalid.isValid()).toBe(false);
-      expect(p.isValid()).toBe(false);
+      expect(await refValid.isValid()).toBe(true);
+      expect(await refInvalid.isValid()).toBe(false);
+      expect(await p.isValid()).toBe(false);
       expect(p.errors.fullMessages).toEqual(["should be favorite", "can't be blank"]);
     } finally {
       ModelError.i18nCustomizeFullMessage = oldCustomize;
       I18n.reset();
     }
   });
-  it("indexed errors on base attribute should be properly translated", () => {
+  it("indexed errors on base attribute should be properly translated", async () => {
     I18n.storeTranslations("en", {
       activerecord: {
         attributes: {
@@ -2768,13 +2768,13 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       });
 
       const p = new Person({});
-      expect(p.isValid()).toBe(false);
+      expect(await p.isValid()).toBe(false);
       expect(p.errors.fullMessages).toEqual(["Super reference can't be blank"]);
 
       const refInvalid = new Reference({ favorite: false });
       cacheAssoc(p, "reference", refInvalid);
-      expect(refInvalid.isValid()).toBe(false);
-      expect(p.isValid()).toBe(false);
+      expect(await refInvalid.isValid()).toBe(false);
+      expect(await p.isValid()).toBe(false);
       expect(p.errors.fullMessages).toEqual([
         " should be favorite",
         "Reference job can't be blank",
@@ -2783,14 +2783,14 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
       I18n.reset();
     }
   });
-  it("errors details should be indexed when global flag is set", () => {
+  it("errors details should be indexed when global flag is set", async () => {
     const old = indexNestedAttributeErrors;
     setIndexNestedAttributeErrors(true);
     try {
       const { Parent, Child } = makeIndexedHasMany();
       const parent = new Parent({ name: "p" });
       cacheAssoc(parent, "children", [new Child({ name: "ok" }), new Child({ name: "" })]);
-      expect(parent.isValid()).toBe(false);
+      expect(await parent.isValid()).toBe(false);
       expect(parent.errors.details.get("children[1].name")?.length ?? 0).toBeGreaterThan(0);
       expect(parent.errors.details.get("children.name") ?? []).toHaveLength(0);
     } finally {
@@ -3404,7 +3404,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     expect(saveCount).toBe(1);
   });
 
-  it("cyclic autosaves do not add multiple validations", () => {
+  it("cyclic autosaves do not add multiple validations", async () => {
     // ShipWithoutNestedAttributes: has_many :prisoners (no autosave), two presence validators.
     // Prisoner: belongs_to :ship (autosave: true). Cyclic: prisoner.valid? calls ship.valid? again.
     // _ensureNoDuplicateErrors (after_validation) deduplicates to exactly 1 error for :name.
@@ -3448,7 +3448,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     cacheAssoc(ship, "prisoners", [prisoner]);
     cacheAssoc(prisoner, "ship", ship);
 
-    expect(ship.isValid()).toBe(false);
+    expect(await ship.isValid()).toBe(false);
     expect(ship.errors.where("name")).toHaveLength(1);
   });
 });
@@ -3608,7 +3608,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     const parent = await VmParent.create({ name: "P" });
     const child = new VmChild({ name: "" });
     cacheAssoc(parent, "vmChildren", [child]);
-    expect(parent.isValid()).toBe(false);
+    expect(await parent.isValid()).toBe(false);
   });
 
   it("should generate validation methods for has_one associations with :validate => true", async () => {
@@ -3643,7 +3643,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     const parent = await VoParent.create({ name: "P" });
     const child = new VoChild({ name: "" });
     cacheAssoc(parent, "voChild", child);
-    expect(parent.isValid()).toBe(false);
+    expect(await parent.isValid()).toBe(false);
   });
 
   it("should not generate validation methods for has_one associations without :validate => true", async () => {
@@ -3678,7 +3678,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     const parent = await NvParent.create({ name: "P" });
     const child = new NvChild({ name: "" });
     cacheAssoc(parent, "nvChild", child);
-    expect(parent.isValid()).toBe(true);
+    expect(await parent.isValid()).toBe(true);
   });
 
   it("should generate validation methods for belongs_to associations with :validate => true", async () => {
@@ -3713,7 +3713,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     const child = await BvChild.create({ name: "ok" });
     const owner = new BvOwner({ name: "" });
     cacheAssoc(child, "bvOwner", owner);
-    expect(child.isValid()).toBe(false);
+    expect(await child.isValid()).toBe(false);
   });
 
   it("should not generate validation methods for belongs_to associations without :validate => true", async () => {
@@ -3748,7 +3748,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     const child = await NbChild.create({ name: "ok" });
     const owner = new NbOwner({ name: "" });
     cacheAssoc(child, "nbOwner", owner);
-    expect(child.isValid()).toBe(true);
+    expect(await child.isValid()).toBe(true);
   });
 
   it("should generate validation methods for HABTM associations with :validate => true", async () => {
@@ -3782,7 +3782,7 @@ describe("TestAutosaveAssociationValidationMethodsGeneration", () => {
     const parent = await HvParent.create({ catchphrase: "P" });
     const tag = new HvTag({ name: "" });
     cacheAssoc(parent, "hvTags", [tag]);
-    expect(parent.isValid()).toBe(false);
+    expect(await parent.isValid()).toBe(false);
   });
 });
 
@@ -4118,8 +4118,8 @@ describe("TestAutosaveAssociationValidationsOnAHasManyAssociation", () => {
       }
     }
     const p = new Post({});
-    expect(p.isValid("create")).toBe(false);
-    expect(p.isValid("update")).toBe(true);
+    expect(await p.isValid("create")).toBe(false);
+    expect(await p.isValid("update")).toBe(true);
   });
 });
 
@@ -4215,8 +4215,8 @@ describe("TestAutosaveAssociationValidationsOnABelongsToAssociation", () => {
       }
     }
     const p = new Post({});
-    expect(p.isValid("create")).toBe(false);
-    expect(p.isValid("update")).toBe(true);
+    expect(await p.isValid("create")).toBe(false);
+    expect(await p.isValid("update")).toBe(true);
   });
 });
 

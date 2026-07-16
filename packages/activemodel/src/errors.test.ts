@@ -219,7 +219,7 @@ describe("ErrorsTest", () => {
     expect(errors.count).toBe(1);
   });
 
-  it("adding errors using conditionals with Person#validate!", () => {
+  it("adding errors using conditionals with Person#validate!", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -227,7 +227,7 @@ describe("ErrorsTest", () => {
       }
     }
     const p = new Person();
-    expect(() => p.validateBang()).toThrow(/Validation failed/);
+    await expect(p.validateBang()).rejects.toThrow(/Validation failed/);
   });
 
   it("full_message uses default format", () => {

@@ -118,7 +118,7 @@ export function contextForValidation(this: ContextForValidationHost): Validation
  */
 export interface Validations {
   errors: Errors;
-  isValid(context?: string | string[] | ValidationContext | null): boolean;
+  isValid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
   /**
    * Run validations and return whether the record is valid.
    * Mirrors Rails `alias_method :validate, :valid?`
@@ -127,18 +127,18 @@ export interface Validations {
    * `valid?([:create, :publish])` so a validator with `on: :publish`
    * fires alongside the usual `:create` context.
    */
-  validate(context?: string | string[] | ValidationContext | null): boolean;
+  validate(context?: string | string[] | ValidationContext | null): Promise<boolean>;
   /**
    * Opposite of `isValid`. Mirrors Rails `def invalid?(context = nil)`
    * (activemodel/lib/active_model/validations.rb:408-410).
    */
-  isInvalid(context?: string | string[] | ValidationContext | null): boolean;
+  isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean>;
   /**
    * Run validations; return `true` or raise `ValidationError`. Mirrors Rails
    * `def validate!(context = nil); valid?(context) || raise_validation_error; end`
    * (activemodel/lib/active_model/validations.rb:417-419) — never returns false.
    */
-  validateBang(context?: string | string[] | ValidationContext | null): true;
+  validateBang(context?: string | string[] | ValidationContext | null): Promise<true>;
   /**
    * The active validation context — a single symbol, an array of
    * symbols, or `null`. Mirrors Rails `validations.rb:454-456` where
@@ -301,8 +301,8 @@ export interface ValidationsContextHost {
  *
  * @internal Rails-private helper.
  */
-export function runValidationsBang(this: RunValidationsHost): boolean {
-  this._runValidateCallbacks();
+export async function runValidationsBang(this: RunValidationsHost): Promise<boolean> {
+  await this._runValidateCallbacks();
   return this.errors.empty;
 }
 
@@ -332,7 +332,7 @@ export function raiseValidationError<TBase extends object = object>(this: {
  */
 export interface RunValidationsHost<TBase extends object = object> {
   errors: Errors<TBase>;
-  _runValidateCallbacks(): void;
+  _runValidateCallbacks(): void | Promise<void>;
 }
 
 /**

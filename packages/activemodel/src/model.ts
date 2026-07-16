@@ -1825,7 +1825,7 @@ export class Model {
    *
    * @internal Rails-private helper.
    */
-  runValidationsBang(): boolean {
+  runValidationsBang(): Promise<boolean> {
     return validationsRunValidationsBang.call(this);
   }
 
@@ -1839,7 +1839,7 @@ export class Model {
     return validationsRaiseValidationError.call(this);
   }
 
-  isValid(context?: string | string[] | ValidationContext | null): boolean {
+  async isValid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
     this.errors.clear();
     const ctor = this.constructor as typeof Model;
     // Rails `valid?(context = nil)` (validations.rb:361-368) always
@@ -1863,15 +1863,9 @@ export class Model {
     this._validationContext = normalized;
 
     try {
-      const completed = runAllCallbacks(
-        ctor.prototype,
-        "validation",
-        this,
-        () => {
-          this.runValidationsBang();
-        },
-        { strict: "sync" },
-      );
+      const completed = await runAllCallbacks(ctor.prototype, "validation", this, async () => {
+        await this.runValidationsBang();
+      });
       if (!completed) return false;
       return this.errors.empty;
     } finally {
@@ -1880,11 +1874,9 @@ export class Model {
   }
 
   /** @internal */
-  _runValidateCallbacks(): void {
+  async _runValidateCallbacks(): Promise<void> {
     const ctor = this.constructor as typeof Model;
-    // strict:"sync" guarantees synchronous completion (async callbacks throw),
-    // so the returned Promise is already settled — void the sync-strict result.
-    void runBeforeCallbacksOnProto(ctor.prototype, "validate", this, { strict: "sync" });
+    await runBeforeCallbacksOnProto(ctor.prototype, "validate", this);
   }
 
   /**
@@ -1893,7 +1885,7 @@ export class Model {
    * Mirrors Rails `alias_method :validate, :valid?`
    * (activemodel/lib/active_model/validations.rb:370).
    */
-  validate(context?: string | string[] | ValidationContext | null): boolean {
+  validate(context?: string | string[] | ValidationContext | null): Promise<boolean> {
     return this.isValid(context);
   }
 
@@ -1903,8 +1895,8 @@ export class Model {
    * Mirrors Rails `def invalid?(context = nil); !valid?(context); end`
    * (activemodel/lib/active_model/validations.rb:408-410).
    */
-  isInvalid(context?: string | string[] | ValidationContext | null): boolean {
-    return !this.isValid(context);
+  async isInvalid(context?: string | string[] | ValidationContext | null): Promise<boolean> {
+    return !(await this.isValid(context));
   }
 
   /**
@@ -2555,8 +2547,8 @@ export class Model {
    * Mirrors Rails `def validate!(context = nil); valid?(context) || raise_validation_error; end`
    * (activemodel/lib/active_model/validations.rb:417-419).
    */
-  validateBang(context?: string | string[] | ValidationContext | null): true {
-    if (!this.isValid(context)) {
+  async validateBang(context?: string | string[] | ValidationContext | null): Promise<true> {
+    if (!(await this.isValid(context))) {
       this.raiseValidationError();
     }
     return true;
