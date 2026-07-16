@@ -162,6 +162,19 @@ export class HasOneAssociation extends SingularAssociation {
     save: boolean,
   ): Promise<void> {
     await transactionIf(this, save, async () => {
+      // Flush any displacement queued by an earlier deferred (property-setter)
+      // assignment to this same association before the new record is persisted.
+      // A prior `owner.child = a` on an *unloaded* has_one set
+      // `_removeDisplacedFromDb` (queueWrite, :95) but could not `await` the
+      // remove; if we persist `record` first, `removeDisplaced`'s FK re-query
+      // (:218) would match both the stale DB row and the freshly-saved `record`
+      // and pick whichever the DB yields first, leaving removal to depend on row
+      // order. Rails removes the displaced record inline inside `replace` at the
+      // point of assignment, so run the pending remove now — while `record` is
+      // still unsaved, the re-query resolves to the stale row unambiguously.
+      if (this._removeDisplacedFromDb || this._displacedRecords.length > 0) {
+        await this.removeDisplaced();
+      }
       if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {
         const currentTarget = this.target;
         this.target = displaced;

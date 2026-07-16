@@ -590,6 +590,37 @@ describe("HasOneAssociationsTest", () => {
     expect(built.isPersisted()).toBe(false);
   });
 
+  // Trails deviation guard (no Rails counterpart, RFC 0005-activerecord-gaps
+  // story has-one-unloaded-displacement-writer-window): a deferred
+  // `owner.account = a` on an *unloaded* has_one (the sync property setter runs
+  // `queueWrite`, which sets `_removeDisplacedFromDb` and calls `loadedBang`) is
+  // followed by the awaitable `writer(b)`. `writeImmediate` skips its leading
+  // `load_target` (the setter already loaded the slot), so the stale DB row is
+  // only removable via the deferred flag — `persistImmediate` must flush it
+  // before persisting `b`, or the owner's later `save` re-queries and picks
+  // whichever FK-matching row the DB yields first. Rails removes the displaced
+  // record inline inside `replace`, so assert the prior row is detached the
+  // moment `writer` returns, BEFORE the owner's save.
+  it("writer over an unloaded displaced target nullifies the prior account", async () => {
+    const company = (await Company.create({ name: "WriterCo" })) as any;
+    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
+    const found = (await Company.find(company.id)) as any;
+    expect(found.association("account").isLoaded()).toBe(false);
+    found.account = new Account({ credit_limit: 60 });
+    await found.association("account").writer(new Account({ credit_limit: 70 }));
+    expect((await Account.find(original.id)).firm_id).toBeNull();
+    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
+  });
+
+  it("writer over an unloaded displaced target destroys the prior dependent account", async () => {
+    const firm = (await Firm.find(1)) as any;
+    const originalId = ((await Account.where({ firm_id: 1 }).first()) as any).id;
+    expect(firm.association("account").isLoaded()).toBe(false);
+    firm.account = new Account({ credit_limit: 60 });
+    await firm.association("account").writer(new Account({ credit_limit: 70 }));
+    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
+  });
+
   it("create when parent is new raises", async () => {
     const firm = new Firm();
     let error: unknown;
