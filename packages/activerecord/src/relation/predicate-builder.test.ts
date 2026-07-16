@@ -10,6 +10,26 @@ import { Topic } from "../test-helpers/models/topic.js";
 import { Reply } from "../test-helpers/models/reply.js";
 import { Author } from "../test-helpers/models/author.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+import { ValueType } from "@blazetrails/activemodel";
+
+// Same shape as Rails' `fake_pg_caster` (homogeneous_in_test.rb:44-50) — a map
+// converting any attribute name to a caster — because `Table#type_for_attribute`
+// delegates bare (table.rb:106-108) and these tables are not canonical models
+// (`users` is in neither Rails' schema.rb nor TEST_SCHEMA). It yields `ValueType`
+// where Rails' yields `String`: Rails' Arel tests assert SQL shape only, whereas
+// these assert bound *values*, so they need the no-op type Rails reaches for as
+// `ActiveModel::Type.default_value`. A real column type would cast `{ id: 5 }` to
+// `"[object Object]"` and defeat the dereference assertions below.
+// Both members: #4888 converged `Table#typeCastForDatabase` to bare delegation
+// too, and a range bound reaches it through `Casted`. Mirrors TypeCaster::Map /
+// ::Connection, whose `type_cast_for_database` is `type_for_attribute(n).serialize(v)`
+// (type_caster/map.rb:10-13).
+const VALUE_TYPE = new ValueType();
+const fakePgCaster = {
+  typeForAttribute: () => VALUE_TYPE,
+  typeCastForDatabase: (_attrName: string, value: unknown) => VALUE_TYPE.serialize(value),
+};
+const castedTable = (name: string): Table => new Table(name, { typeCaster: fakePgCaster });
 
 describe("PredicateBuilderTest", () => {
   // Rails setup: Topic.predicate_builder.register_handler(Regexp, proc { |col, val| col ~ val.source })
@@ -134,7 +154,7 @@ describe("PredicateBuilderTest", () => {
   });
 
   describe("buildFromHash", () => {
-    const table = new Table("posts");
+    const table = castedTable("posts");
     const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
 
     it("builds equality for scalars", () => {
@@ -249,7 +269,7 @@ describe("PredicateBuilderTest", () => {
   });
 
   describe("buildNegatedFromHash", () => {
-    const table = new Table("posts");
+    const table = castedTable("posts");
     const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
 
     it("builds IS NOT NULL for null values", () => {
@@ -309,7 +329,7 @@ describe("PredicateBuilderTest", () => {
 
   describe("QueryAttribute bind handling", () => {
     it("buildBindAttribute creates a QueryAttribute", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const qa = builder.buildBindAttribute("name", "alice");
       expect(qa.name).toBe("name");
@@ -317,7 +337,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("BasicObjectHandler routes through buildBindAttribute", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql();
@@ -327,7 +347,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("Substitute flows through as BindParam via QueryAttribute", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), new Substitute());
       const visitor = new Visitors.ToSql();
@@ -340,7 +360,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("compile inlines QueryAttribute values for display SQL", () => {
-      const table = new Table("users");
+      const table = castedTable("users");
       const builder = new PredicateBuilder(table);
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql();
@@ -378,7 +398,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("expands where({authors: {name: 'Rails'}}) to \"authors\".\"name\" = 'Rails'", () => {
-      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -391,7 +411,7 @@ describe("PredicateBuilderTest", () => {
       // Rails table_metadata.rb associated_table aliases the resolved table to
       // the hash key whenever the names differ, so an association key that
       // differs from its table (writer -> authors) emits "writer"."name".
-      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -400,7 +420,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("negated form expands whereNot({authors: {name: 'Rails'}}) to NOT \"authors\".\"name\" = 'Rails'", () => {
-      const meta = new TableMetadata(PbTestPost as any, new Table("posts"));
+      const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildNegatedFromHash({ authors: { name: "Rails" } });
       const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
@@ -424,7 +444,7 @@ describe("PredicateBuilderTest", () => {
         }
       }
       try {
-        const meta = new TableMetadata(PbTestProduct as any, new Table("products"));
+        const meta = new TableMetadata(PbTestProduct as any, (PbTestProduct as any).arelTable);
         const builder = meta.predicateBuilder;
         const nodes = builder.buildFromHash({ price: { foo: "bar" } });
         const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");

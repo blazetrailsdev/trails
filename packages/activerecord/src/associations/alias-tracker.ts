@@ -11,6 +11,56 @@ import type { Quoting } from "../connection-adapters/abstract/quoting-interface.
 // abstract default directly (the free tableAliasLength now dispatches via `this`).
 const DEFAULT_TABLE_ALIAS_LENGTH = maxIdentifierLength();
 
+/**
+ * Build the Arel table a join should use for `klass` under the SQL name
+ * `sqlName` (the alias when aliased, else the real table name), keeping the
+ * model's type caster attached.
+ *
+ * Mirrors `table_metadata.rb:43-44` — `arel_table = association_klass.arel_table`
+ * then `arel_table.alias(table_name) if arel_table.name != table_name`. (Not
+ * `aliased_table_for`: this does none of that method's alias-count bookkeeping,
+ * and its real port is `AliasTracker#aliasedTableFor` below.) Deriving from
+ * `klass.arel_table` and aliasing is what keeps the caster, via `TableAlias`'s
+ * delegation. trails cannot return a `TableAlias` here — the
+ * JoinDependency plumbing that consumes these tables is typed on `Table` and
+ * gates on `instanceof Table` (e.g. rebindTableReferences, join-dependency.ts),
+ * which a `TableAlias` (a Binary node) silently fails — so an aliased table is
+ * encoded as `Table(realName, { as })` and the caster is carried across by hand.
+ * Converging that encoding onto `TableAlias` is tracked separately.
+ *
+ * @internal
+ */
+export function aliasedArelTableFor(
+  klass: { arelTable?: Table; tableName?: string } | null | undefined,
+  tableName: string,
+  effectiveName?: string,
+): Table {
+  const sqlName = effectiveName ?? tableName;
+  const base = klass?.arelTable;
+  // No klass (polymorphic): nothing to source a caster from.
+  if (!base) return new Table(tableName, { as: effectiveName });
+  // `base.name` is the real table. Rails aliases it to whatever name the join
+  // must answer to (table_metadata.rb:44) and keeps the caster either way.
+  if (sqlName === base.name) return base;
+  return new Table(base.name, { as: sqlName, typeCaster: base.typeCaster, klass: base.klass });
+}
+
+/**
+ * `aliasedArelTableFor` keyed off a reflection. A polymorphic reflection has no
+ * compile-time klass — `reflection.klass` raises (reflection.rb) — so it keeps a
+ * caster-less table; the concrete class is only known per row at runtime.
+ *
+ * @internal
+ */
+export function aliasedArelTableForReflection(
+  reflection: { klass?: unknown; isPolymorphic?: () => boolean } | null | undefined,
+  tableName: string,
+  effectiveName?: string,
+): Table {
+  const klass = reflection?.isPolymorphic?.() ? null : (reflection?.klass as never);
+  return aliasedArelTableFor(klass, tableName, effectiveName);
+}
+
 export class AliasTracker {
   readonly aliases: Map<string, number>;
   private _tableAliasLength: number;

@@ -12,7 +12,7 @@ import type { Base } from "../../base.js";
 import { Table, Nodes } from "@blazetrails/arel";
 import type { AbstractReflection } from "../../reflection.js";
 import { JoinPart } from "./join-part.js";
-import type { AliasTracker } from "../alias-tracker.js";
+import { aliasedArelTableForReflection, type AliasTracker } from "../alias-tracker.js";
 
 type JoinType = typeof Nodes.InnerJoin | typeof Nodes.OuterJoin;
 type TableResolver = (
@@ -56,7 +56,7 @@ export class JoinAssociation extends JoinPart {
   }
 
   set table(value: string) {
-    this._table = new Table(this.reflection.tableName, { as: value });
+    this._table = aliasedArelTableForReflection(this.reflection, this.reflection.tableName, value);
     if (!this.tables.some((t) => (t.tableAlias ?? t.name) === value)) {
       this.tables.push(this._table);
     }
@@ -105,7 +105,7 @@ export class JoinAssociation extends JoinPart {
       if (resolveTable) {
         [table, terminated] = resolveTable(refl, reflectionChain.slice(index));
       } else {
-        table = new Table(refl.tableName);
+        table = aliasedArelTableForReflection(refl, refl.tableName);
       }
 
       if (!this._table) this._table = table;

@@ -2,7 +2,7 @@ import { Table as ArelTable, Nodes } from "@blazetrails/arel";
 import { TableMetadata } from "../table-metadata.js";
 import type { Base } from "../base.js";
 import type { AssociationReflection, AbstractReflection } from "../reflection.js";
-import { AliasTracker } from "./alias-tracker.js";
+import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js";
 import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
@@ -658,15 +658,21 @@ export class AssociationScope {
   ): ArelTable | Nodes.TableAlias {
     const aliased = (reflection as ReflectionProxy).aliasedTable;
     if (aliased instanceof ArelTable || aliased instanceof Nodes.TableAlias) return aliased;
-    if (typeof aliased === "string" && aliased) return new ArelTable(aliased);
+    // A string / duck-typed `aliasedTable` names the alias only. Rails' tracker
+    // hands back `arel_table.alias(name)` (alias_tracker.rb:64), so the aliased
+    // table keeps the model's caster — resolve it through the reflection rather
+    // than minting a bare table under the alias name.
+    if (typeof aliased === "string" && aliased) {
+      return aliasedArelTableForReflection(reflection, name, aliased);
+    }
     if (
       aliased &&
       typeof aliased === "object" &&
       typeof (aliased as { name?: unknown }).name === "string"
     ) {
-      return new ArelTable((aliased as { name: string }).name);
+      return aliasedArelTableForReflection(reflection, name, (aliased as { name: string }).name);
     }
-    return new ArelTable(name);
+    return aliasedArelTableForReflection(reflection, name);
   }
 
   /**

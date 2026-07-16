@@ -26,7 +26,11 @@ import { JoinAssociation } from "./join-dependency/join-association.js";
 import { JoinPart } from "./join-dependency/join-part.js";
 import { AssociationNotFoundError, EagerLoadPolymorphicError } from "./errors.js";
 import { ConfigurationError, ConnectionNotDefined } from "../errors.js";
-import { AliasTracker } from "./alias-tracker.js";
+import {
+  AliasTracker,
+  aliasedArelTableFor,
+  aliasedArelTableForReflection,
+} from "./alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
@@ -391,8 +395,12 @@ export class JoinDependency {
       targetTable!,
       (this._aliasTracker.aliases.get(targetTable!) ?? 0) + 1,
     );
-    const targetArelTable = new Table(targetTable!);
-    const sourceArelTable = new Table(sourceAlias);
+    const targetArelTable = aliasedArelTableFor(targetModel as never, targetTable!);
+    const sourceArelTable = aliasedArelTableFor(
+      modelClass as never,
+      modelClass.tableName,
+      sourceAlias,
+    );
 
     // A has_many/has_one join keys off the target's foreign key against the
     // source's primary key — the target model's own primary key is never used
@@ -789,7 +797,10 @@ export class JoinDependency {
 
     // r's children were built referencing r's old table name; re-point their ON
     // predicates to the merged (left) table so the emitted SQL is self-consistent.
-    const toTable = new Table(resolvedTable);
+    // Sourced off `baseKlass` (never raises, unlike `reflection.klass` on a
+    // polymorphic) so the rebound ON keeps its caster — these predicates can
+    // include an STI type condition.
+    const toTable = aliasedArelTableFor(r.baseKlass, r.baseKlass.tableName, resolvedTable);
     for (const child of r.children) {
       const arelJoin = child.arelJoin;
       if (!arelJoin) continue;
@@ -916,9 +927,10 @@ export class JoinDependency {
    */
   private _rebuildChildJoin(parent: JoinPart, child: JoinAssociation, newName: string): void {
     const tableName = child.tableName;
-    const aliased =
-      newName === tableName ? new Table(tableName) : new Table(tableName, { as: newName });
-    const foreignTable = (parent.arelTable as Table) ?? new Table(child.tableName);
+    const aliased = aliasedArelTableForReflection(child.reflection, tableName, newName);
+    const foreignTable =
+      (parent.arelTable as Table) ??
+      aliasedArelTableForReflection(child.reflection, child.tableName);
     const joinAssoc = new JoinAssociation(child.reflection);
     const joins = joinAssoc.joinConstraints(
       foreignTable,
@@ -968,7 +980,9 @@ export class JoinDependency {
     if (group.resolved) return;
     group.resolved = true;
     const chainLen = group.reflection.chain.length;
-    const foreignTable = (parent.arelTable as Table) ?? new Table(group.chainTables[0].tableName);
+    const foreignTable =
+      (parent.arelTable as Table) ??
+      aliasedArelTableFor(group.chainTables[0].model as never, group.chainTables[0].tableName);
     const joinAssoc = new JoinAssociation(group.reflection);
     const resolvedByIdx: Array<{ effectiveName: string; aliased: Table }> = new Array(chainLen);
     const joins = joinAssoc.joinConstraints(
@@ -1000,10 +1014,7 @@ export class JoinDependency {
           return root ? cand : `${cand}_join`;
         });
         const effectiveName = alias ?? lookupName;
-        const aliased =
-          effectiveName === tableName
-            ? new Table(tableName)
-            : new Table(tableName, { as: effectiveName });
+        const aliased = aliasedArelTableForReflection(refl, tableName, effectiveName);
         resolvedByIdx[idx] = { effectiveName, aliased };
         // Rails: `@joined_tables[chain] ||= [table, root] if OuterJoin`. Keyed
         // off the PARAMETER `join_type` so an eager OUTER-JOIN dependency folded
@@ -1611,7 +1622,7 @@ export class JoinDependency {
     if (!chain || chain.length < 2) return null;
 
     const joinAssoc = new JoinAssociation(reflection);
-    const sourceArelTable = new Table(sourceAlias);
+    const sourceArelTable = aliasedArelTableFor(modelClass, modelClass.tableName, sourceAlias);
     const parentTableName = modelClass.tableName;
 
     // Pre-allocate table indices and resolve REAL tables for each chain entry
@@ -1637,7 +1648,7 @@ export class JoinDependency {
       const model = refl.klass as typeof Base;
       const tableName = (model as any).tableName;
       chainTables.push({
-        table: new Table(tableName),
+        table: aliasedArelTableFor(model as never, tableName),
         tableName,
         tableIndex: startIndex + i,
         tableAlias: `t${startIndex + i}`,
@@ -1653,7 +1664,8 @@ export class JoinDependency {
       (_refl, remaining) => {
         const idx = chain.length - remaining.length;
         const entry = chainTables[idx];
-        if (!entry) return [new Table((_refl.klass as any).tableName), false];
+        if (!entry)
+          return [aliasedArelTableForReflection(_refl, (_refl.klass as any).tableName), false];
         return [entry.table, false];
       },
     );

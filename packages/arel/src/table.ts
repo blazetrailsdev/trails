@@ -33,7 +33,11 @@ export class Table extends Node {
   readonly name: string;
   readonly tableAlias: string | null;
   readonly klass?: TableKlass;
-  private typeCaster: unknown;
+  /** Rails: `private attr_reader :type_caster` (table.rb:115). Readable here so
+   *  an aliased copy of a table can inherit it — trails encodes an aliased table
+   *  as `Table(name, { as })` where Rails wraps in a caster-delegating TableAlias.
+   *  @internal */
+  readonly typeCaster: unknown;
 
   constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
     super();
@@ -164,23 +168,8 @@ export class Table extends Node {
     return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName, value);
   }
 
-  // DEVIATION: Rails delegates bare here too (`type_caster.type_for_attribute(name)`,
-  // table.rb:106-108), so a caster-less table raises NoMethodError. We cannot yet:
-  // unlike `type_cast_for_database` (only reached through `Casted#valueForDatabase`,
-  // which gates on `isAbleToTypeCast`), this is reached ungated via
-  // `Attribute#typeCaster` -> `HomogeneousIn#castedValues`. trails builds
-  // caster-less tables for join aliases (join-dependency, association-scope) where
-  // Rails aliases `klass.arel_table` and keeps the caster, so bare delegation
-  // breaks real join/STI queries. Removing this fallback is blocked on converging
-  // those construction sites onto `klass.arelTable`.
   typeForAttribute(name: string): unknown {
-    if (
-      this.typeCaster &&
-      typeof (this.typeCaster as Record<string, unknown>).typeForAttribute === "function"
-    ) {
-      return (this.typeCaster as TypeCaster).typeForAttribute(name);
-    }
-    return undefined;
+    return (this.typeCaster as TypeCaster).typeForAttribute(name);
   }
 
   isAbleToTypeCast(): boolean {

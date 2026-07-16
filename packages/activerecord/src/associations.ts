@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import type { Relation } from "./relation.js";
 import { Table as ArelTable } from "@blazetrails/arel";
+import { Connection as TypeCasterConnection } from "./type-caster/connection.js";
 import { SpellChecker } from "@blazetrails/did-you-mean";
 import type { CollectionProxy, AssociationProxy } from "./associations/collection-proxy.js";
 import { _CollectionProxyCtor } from "./associations/collection-proxy-slot.js";
@@ -2878,12 +2879,18 @@ export async function loadHabtm(
   }
 
   // Use Arel subquery: SELECT target_fk FROM join_table WHERE owner_fk = ?
-  const joinArelTable = new ArelTable(joinTable);
+  // The HABTM join table has no model, so its caster comes from the connection
+  // — the same shape as the no-klass branch of `associated_table`
+  // (table_metadata.rb:47-48). `.get(ownerFk).eq(pkValue)` builds a `Casted`,
+  // which reaches the table's caster.
+  const joinArelTable = new ArelTable(joinTable, {
+    typeCaster: new TypeCasterConnection(ctor as never, joinTable),
+  });
   const subquery = joinArelTable
     .project(joinArelTable.get(targetFk))
     .where(joinArelTable.get(ownerFk).eq(pkValue));
 
-  const targetArelTable = new ArelTable(targetModel.tableName);
+  const targetArelTable = targetModel.arelTable;
   const inNode = targetArelTable.get(targetPkCol).in(subquery);
 
   // Start from `klass.scope_for_association` so target-model default_scope
