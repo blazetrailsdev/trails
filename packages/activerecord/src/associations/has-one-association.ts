@@ -117,24 +117,39 @@ export class HasOneAssociation extends SingularAssociation {
     if (!this.loaded) await this.loadTarget();
     const displaced = this.target;
     // Mirror Rails `replace`'s `assigning_another_record || has_changes_to_save?`
-    // gate: only touch the DB when the assignment actually changes something, so
-    // a no-op re-assignment (e.g. `writer(null)` with no target) opens no
-    // transaction.
+    // gate (:64-65): only touch the DB when the assignment actually changes
+    // something, so a no-op re-assignment (e.g. `writer(null)` with no target)
+    // opens no transaction. `hasChangesToSave` is a getter, read (not called)
+    // per #4900. The `?.` stands in for Rails' `return target unless
+    // load_target || record` (:62): with both sides nil `sameRecord` is true
+    // and this short-circuits to undefined, which is falsy — exactly where
+    // Rails would have returned.
     const changed = !sameRecord(displaced, record) || record?.hasChangesToSave === true;
     this.replace(record);
-    if (changed && (this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
-      return this.persistImmediate(record, displaced);
+    if (changed) {
+      // Rails: `save &&= owner.persisted?` (:66) — a new owner does not gate the
+      // block itself, only `transaction_if` (:68) and `record.save` (:75).
+      // `remove_target!` (:69) runs regardless; its own
+      // `target.persisted? && owner.persisted?` gate (:108) skips the DB save.
+      const save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
+      return this.persistImmediate(record, displaced, save);
     }
   }
 
   /**
-   * The awaitable immediate-persist body for assignment to a *saved* owner —
-   * Rails' `HasOneAssociation#replace` transaction (has_one_association.rb:59-77):
-   * remove the displaced record, then re-derive the foreign key and save the new
-   * record. `replace` has already set the in-memory target/inverse.
+   * The awaitable immediate-persist body for `HasOneAssociation#replace`'s
+   * transaction (has_one_association.rb:68-81): remove the displaced record
+   * (:69), then re-derive the foreign key and save the new record (:71-80).
+   * `replace` has already set the in-memory target/inverse. `save` is Rails'
+   * post-`&&=` flag (:66): false for a non-persisted owner, which both skips
+   * the transaction (:68) and gates the new record's save (:75).
    */
-  private async persistImmediate(record: Base | null, displaced: Base | null): Promise<void> {
-    await transactionIf(this, true, async () => {
+  private async persistImmediate(
+    record: Base | null,
+    displaced: Base | null,
+    save: boolean,
+  ): Promise<void> {
+    await transactionIf(this, save, async () => {
       if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {
         const currentTarget = this.target;
         this.target = displaced;
@@ -144,11 +159,10 @@ export class HasOneAssociation extends SingularAssociation {
           this.target = currentTarget;
         }
       }
-      if (record && typeof (record as any).save === "function") {
+      if (record) {
         this.setOwnerAttributes(record);
         this.setInverseInstance(record);
-        const saved = await (record as any).save();
-        if (!saved) {
+        if (save && !(await record.save())) {
           this.nullifyOwnerAttributes(record);
           if (displaced) this.setOwnerAttributes(displaced);
           throw new RecordNotSaved(
