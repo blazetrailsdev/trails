@@ -501,7 +501,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // `!child` bail so assigning nil (`owner.account = null`) still removes it.
   if (
     typeof inst?.removeDisplaced === "function" &&
-    (inst?._displacedRecord || inst?._removeDisplacedFromDb)
+    ((inst?._displacedRecords?.length ?? 0) > 0 || inst?._removeDisplacedFromDb)
   ) {
     await inst.removeDisplaced();
   }
