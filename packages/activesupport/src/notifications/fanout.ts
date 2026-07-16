@@ -15,7 +15,7 @@ export class InstrumentationSubscriberError extends Error {
 }
 
 /** @internal */
-function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => void): void {
+export function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => void): T[] {
   let exceptions: Error[] | null = null;
 
   for (const item of collection) {
@@ -36,6 +36,9 @@ function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => void): v
     }
     throw new InstrumentationSubscriberError(flat);
   }
+
+  // Rails' iterate_guarding_exceptions returns the collection (fanout.rb:41).
+  return collection;
 }
 
 type EventedListener = {
