@@ -548,6 +548,48 @@ describe("HasOneAssociationsTest", () => {
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
+  // Trails deviation guard (no Rails counterpart, RFC 0005-activerecord-gaps
+  // story has-one-loaded-target-create-missing-remove-target): Rails runs
+  // `remove_target!` inside `HasOneAssociation#replace` (has_one_association.rb:69)
+  // whenever another record is assigned — including the `create#{name}` path via
+  // `set_new_record`. Our sync `replace`/`setNewRecord` cannot `await` that
+  // removal, so `_createRecord` runs it. Load the target explicitly first (no
+  // property-setter assignment, so no displacement flag is set) and assert the
+  // prior row is detached the moment `createAccount` returns.
+  it("create over a loaded target nullifies the prior account", async () => {
+    const company = (await Company.create({ name: "NewCo" })) as any;
+    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
+    const found = (await Company.find(company.id)) as any;
+    await readHasOne(found, "account");
+    const created = await found.createAccount({ credit_limit: 70 });
+    expect((await Account.find(original.id)).firm_id).toBeNull();
+    expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
+    expect((await readHasOne(found, "account")).id).toBe(created.id);
+  });
+
+  it("create over a loaded target destroys the prior dependent account", async () => {
+    const firm = companies("first_firm") as any;
+    const originalId = (await readHasOne(firm, "account")).id;
+    const created = await firm.createAccount({ credit_limit: 70 });
+    await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
+    expect((await readHasOne(firm, "account")).id).toBe(created.id);
+  });
+
+  // Same root cause on the build path: `set_new_record` → `replace(record, false)`
+  // still runs `remove_target!` on the loaded target (has_one_association.rb:69),
+  // whose else-branch nullifies+saves the old row even though the new record is
+  // unsaved. Our sync `build` can't await, so the `build#{name}` accessor returns
+  // a Promise for the loaded-target case and detaches the prior row.
+  it("build over a loaded target nullifies the prior account", async () => {
+    const company = (await Company.create({ name: "BuildCo" })) as any;
+    const original = await Account.create({ firm_id: Number(company.id), credit_limit: 50 });
+    const found = (await Company.find(company.id)) as any;
+    await readHasOne(found, "account");
+    const built = await found.buildAccount({ credit_limit: 70 });
+    expect((await Account.find(original.id)).firm_id).toBeNull();
+    expect(built.isPersisted()).toBe(false);
+  });
+
   it("create when parent is new raises", async () => {
     const firm = new Firm();
     let error: unknown;
