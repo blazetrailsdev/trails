@@ -82,14 +82,23 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
   it("returns distinct insert ids for concurrent inserts", async () => {
     // The count/rowid come from the RunResult, not a follow-up
     // `last_insert_rowid()` read — so inserts issued concurrently (interleaving
-    // at await points) each get their own id rather than the last one written.
+    // at await points) each get their own id. The id is returned from
+    // _performQuery as a local rather than re-read from the shared
+    // this._lastInsertRowid, which a concurrent insert would overwrite before
+    // the post-await continuation reads it. NOTE: a race is timing-dependent —
+    // bare inserts interleave too little to reproduce it reliably here (the
+    // regression that motivated this reached CI through model `.create`, whose
+    // callbacks add denser interleaving; HasManyThroughAssociationsTest "should
+    // respect table alias" is the reliable guard). This is a smoke test of the
+    // happy path.
+    const n = 25;
     const ids = await Promise.all(
-      Array.from({ length: 5 }, (_, i) =>
+      Array.from({ length: n }, (_, i) =>
         adapter.executeMutation(`INSERT INTO "pq" ("nick") VALUES ('n${i}')`),
       ),
     );
-    expect(new Set(ids).size).toBe(5);
-    expect([...ids].sort((a, b) => a - b)).toEqual([1, 2, 3, 4, 5]);
+    expect(new Set(ids).size).toBe(n);
+    expect([...ids].sort((a, b) => a - b)).toEqual(Array.from({ length: n }, (_, i) => i + 1));
   });
 
   it("errors when a write is routed through execute while preventing writes", async () => {

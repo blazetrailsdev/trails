@@ -470,7 +470,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        return await this._performQuery(sql, driverBinds, payload);
+        return (await this._performQuery(sql, driverBinds, payload)).rows;
       } catch (e: any) {
         const translated = this._translateException(e, sql, binds);
         throw translated;
@@ -526,7 +526,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     sql: string,
     driverBinds: SqliteBinds,
     notificationPayload: Record<string, unknown>,
-  ): Promise<Record<string, unknown>[]> {
+  ): Promise<{
+    rows: Record<string, unknown>[];
+    affectedRows: number;
+    insertRowid: number | bigint;
+  }> {
     // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
     // gated only on materialize_transactions — NOT on read/write, and it runs
     // even when the query raises. execute/executeMutation (the only callers)
@@ -539,38 +543,47 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard
       // and the affected-rows gate can never disagree.
       const isWrite = this.isWriteQuery(sql);
+      let rows: Record<string, unknown>[];
+      // Default to the tracked counts so a non-write (BEGIN/COMMIT/read) returns
+      // the last write's values intact, as sqlite3_changes() does.
+      let affectedRows = this._lastAffectedRows;
+      let insertRowid = this._lastInsertRowid;
       // Reads take `.all()` (rows); everything else — writes (incl.
       // `INSERT … RETURNING`) and transaction-control — takes `.run()`, whose
       // RunResult carries the affected-row count and insert rowid ATOMICALLY.
       // Sourcing those from `.run()` (not a separate `SELECT changes()`) is
-      // essential: concurrent inserts (Promise.all) interleave at await points,
-      // and a follow-up `last_insert_rowid()` read would report another
+      // essential under concurrency: `Promise.all` inserts interleave at await
+      // points, so a follow-up `last_insert_rowid()` read would report another
       // statement's rowid. Gating on `!isWrite` also keeps a `SELECT`, which is
       // reader=true, on the `.all()` path; a write is never misread as a reader
       // because isWriteQuery classifies INSERT/UPDATE/DELETE/DDL as writes.
-      let rows: Record<string, unknown>[];
       if (stmt.reader && !isWrite) {
         rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
       } else {
         const result = await stmt.run(driverBinds);
-        // Only a write advances the counts (Rails' @last_affected_rows /
-        // last_insert_rowid); BEGIN/COMMIT/ROLLBACK/SAVEPOINT/RELEASE leave the
-        // last write's values intact. DDL takes this branch too and reports
-        // changes = 0 — a small deviation from Rails' sqlite3_changes(), which
-        // is preserved across DDL; matching that would need a per-statement
-        // handle read that isn't atomic under concurrency, and no caller reads
-        // affected_rows after a DDL (it is consumed right after its DML).
         if (isWrite) {
-          this._lastAffectedRows = Number(result.changes ?? 0);
-          this._lastInsertRowid = result.lastInsertRowid;
+          // DDL takes this branch too and reports changes = 0 — a small
+          // deviation from Rails' sqlite3_changes(), which is preserved across
+          // DDL; matching it would need a handle read that isn't atomic under
+          // concurrency, and no caller reads affected_rows after a DDL (it is
+          // consumed right after its DML).
+          affectedRows = Number(result.changes ?? 0);
+          insertRowid = result.lastInsertRowid;
         }
         rows = [];
       }
+      // Persist for the affected_rows() port / public accessor. The RETURNED
+      // locals — not these fields — are what executeMutation uses for its return
+      // value: reading `this._lastInsertRowid` back after the caller's await
+      // would race, since a concurrent write's _performQuery can overwrite it
+      // between this assignment and that read.
+      this._lastAffectedRows = affectedRows;
+      this._lastInsertRowid = insertRowid;
       // Rails' perform_query: `verified!` after @last_affected_rows, success
       // path only — a successful round-trip proves the connection is live.
       this.verifiedBang();
       notificationPayload.row_count = rows.length;
-      return rows;
+      return { rows, affectedRows, insertRowid };
     } finally {
       this.dirtyCurrentTransaction();
     }
@@ -687,18 +700,21 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        const result = await this._performQuery(sql, driverBinds, payload);
+        // Use the values RETURNED by _performQuery, not this._last* — those
+        // fields are shared and a concurrent write can overwrite them before
+        // this post-await continuation reads them (the Promise.all insert race).
+        const { affectedRows, insertRowid } = await this._performQuery(sql, driverBinds, payload);
         // perform_query reports the returned-row count (0 for a write); this
         // path has always reported affected rows, and subscribers rely on it.
-        payload.row_count = this._lastAffectedRows;
+        payload.row_count = affectedRows;
 
         // For INSERT, return the last inserted rowid
         if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-          return Number(this._lastInsertRowid);
+          return Number(insertRowid);
         }
 
         // For UPDATE/DELETE, return affected rows
-        return this.affectedRows(result);
+        return affectedRows;
       } catch (e: any) {
         const translated = this._translateException(e, sql, binds);
         throw translated;
