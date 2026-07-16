@@ -42,7 +42,7 @@ import {
   DrinkDesignerWithPolymorphicTouchChef,
   DrinkDesignerWithPolymorphicDependentNullifyChef,
 } from "../test-helpers/models/drink-designer.js";
-import { Pirate } from "../test-helpers/models/pirate.js";
+import { Pirate, DestructivePirate } from "../test-helpers/models/pirate.js";
 import { Ship } from "../test-helpers/models/ship.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
@@ -144,7 +144,7 @@ class SpecialBulb extends Base {
 // HasOneAssociationsTest — mirrors has_one_associations_test.rb
 // ==========================================================================
 describe("HasOneAssociationsTest", () => {
-  const { companies, accounts, pirates } = fixtures([
+  const { companies, accounts, pirates, ships } = fixtures([
     "companies",
     "accounts",
     "developers",
@@ -161,6 +161,7 @@ describe("HasOneAssociationsTest", () => {
     registerModel(Car);
     registerModel(Bulb);
     registerModel(Pirate);
+    registerModel(DestructivePirate);
     registerModel(Ship);
     registerModel(Author);
     registerModel(Post);
@@ -820,26 +821,91 @@ describe("HasOneAssociationsTest", () => {
     expect(newAccount.firm_name).toBe("Account");
   });
 
-  it.skip("creation failure replaces existing without dependent option", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): pirate.create_ship validation-failure replacement — gap.
+  it("creation failure replaces existing without dependent option", async () => {
+    const pirate = pirates("blackbeard") as any;
+    const origShip = await readHasOne(pirate, "ship");
+
+    expect(origShip.isEqual(ships("black_pearl"))).toBe(true);
+    const newShip = await pirate.createShip();
+    expect(newShip.isEqual(ships("black_pearl"))).toBe(false);
+    expect((await readHasOne(pirate, "ship")).isEqual(newShip)).toBe(true);
+    expect(newShip.isNewRecord()).toBe(true);
+    expect(newShip.isInvalid()).toBe(true);
+    expect(origShip.pirate_id).toBeNull();
+    expect(origShip.changed).toBe(false); // check it was saved
   });
 
-  it.skip("creation failure replaces existing with dependent option", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): becomes(DestructivePirate) + dependent replacement — gap.
+  it("creation failure replaces existing with dependent option", async () => {
+    const pirate = (pirates("blackbeard") as any).becomes(DestructivePirate);
+    const origShip = await readHasOne(pirate, "dependentShip");
+
+    const newShip = await pirate.createDependentShip();
+    expect(newShip.isNewRecord()).toBe(true);
+    expect(newShip.isInvalid()).toBe(true);
+    expect(origShip.isDestroyed()).toBe(true);
   });
 
-  it.skip("creation failure due to new record should raise error", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): the RecordNotSaved is raised correctly, but the failed has_one
-    // assignment leaves the invalid Ship cached as the target instead of
-    // resetting `pirate.ship` to nil — post-failure target reset is a gap.
+  it("creation failure due to new record should raise error", async () => {
+    const pirate = pirates("redbeard") as any;
+    const newShip = new Ship();
+
+    // Rails: `pirate.ship = new_ship`. The JS property setter cannot `await` a
+    // persist, so the Rails-faithful immediate-persist path is reached through
+    // the awaitable writer (see "assignment before child saved").
+    let error: any;
+    try {
+      await pirate.association("ship").writer(newShip);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotSaved);
+    expect(error.message).toBe("Failed to save the new associated ship.");
+    expect(error.record).toBe(newShip);
+    expect(await readHasOne(pirate, "ship")).toBeNull();
+    expect(newShip.pirate_id).toBeNull();
   });
 
-  it.skip("replacement failure due to existing record should raise error", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): replacement-failure error path on existing record — gap.
+  it("replacement failure due to existing record should raise error", async () => {
+    const pirate = pirates("blackbeard") as any;
+    const currentShip = await readHasOne(pirate, "ship");
+    currentShip.name = null;
+
+    expect(currentShip.isValid()).toBe(false);
+    let error: any;
+    try {
+      await pirate.association("ship").writer(ships("interceptor"));
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotSaved);
+
+    expect((await readHasOne(pirate, "ship")).isEqual(ships("black_pearl"))).toBe(true);
+    expect((await readHasOne(pirate, "ship")).pirate_id).toBe(pirate.id);
+    expect(error.message).toBe(
+      "Failed to remove the existing associated ship. " +
+        "The record failed to save after its foreign key was set to nil.",
+    );
+    expect(error.record).toBe(currentShip);
   });
 
-  it.skip("replacement failure due to new record should raise error", () => {
-    // BLOCKED (tracked: d2-has-one-remaining-gaps): replacement-failure error path on new record — gap.
+  it("replacement failure due to new record should raise error", async () => {
+    const pirate = pirates("blackbeard") as any;
+    const newShip = new Ship();
+
+    let error: any;
+    try {
+      await pirate.association("ship").writer(newShip);
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeInstanceOf(RecordNotSaved);
+
+    expect(error.message).toBe("Failed to save the new associated ship.");
+    expect(error.record).toBe(newShip);
+    expect((await readHasOne(pirate, "ship")).isEqual(ships("black_pearl"))).toBe(true);
+    expect((await readHasOne(pirate, "ship")).pirate_id).toBe(pirate.id);
+    expect((await ships("black_pearl").reload()).pirate_id).toBe(pirate.id);
+    expect(newShip.pirate_id).toBeNull();
   });
 
   it("association keys bypass attribute protection", async () => {
