@@ -211,7 +211,9 @@ export class EventObjectGroup extends BaseGroup {
 
   finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
     if (this.event) {
-      Object.assign(this.event.payload, payload);
+      // Rails' EventObjectGroup#finish: `@event.payload = payload` — replace the
+      // dup with the final object so deletions are reflected (fanout.rb:166-178).
+      this.event.payload = payload;
       this.event.finish();
       iterateGuardingExceptions(this.listeners, (l) => l(this.event!));
     }

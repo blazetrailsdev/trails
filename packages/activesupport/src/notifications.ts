@@ -194,10 +194,10 @@ export class Notifications {
       this._recordException(resolved, e);
       throw e;
     } finally {
-      // Event#initialize dup'd the payload; re-sync the block's mutations (and
-      // the rescue arm's) onto that copy before publishing, as Rails' Fanout
-      // EventObjectGroup does. The block mutates the raw payload it was yielded.
-      Object.assign(event.payload, resolved);
+      // Replace the event's dup with the final payload object (the raw payload
+      // the block was yielded and mutated), as Rails' EventObjectGroup#finish
+      // does — reflecting the block's mutations, the rescue arm, and deletions.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
     }
@@ -248,9 +248,8 @@ export class Notifications {
       this._recordException(resolved, e);
       throw e;
     } finally {
-      // See instrument(): re-sync the raw payload's mutations onto the event's
-      // dup before publishing.
-      Object.assign(event.payload, resolved);
+      // See instrument(): replace the event's dup with the final payload object.
+      event.payload = resolved;
       event.finish();
       this._notify(event);
     }
@@ -302,9 +301,9 @@ export class Notifications {
         state = "finished";
         if (event) {
           const finished = event;
-          // Event#initialize dup'd the payload; re-sync mutations made between
-          // start and finish onto that copy before delivering.
-          Object.assign(finished.payload, payload);
+          // Replace the event's dup with the final payload object (mutations
+          // made between start and finish), as Rails' EventObjectGroup#finish does.
+          finished.payload = payload;
           finished.finish();
           // Rails' Handle#finish_with_values runs every group under
           // iterate_guarding_exceptions (fanout.rb:20-39, :253-259): one bad

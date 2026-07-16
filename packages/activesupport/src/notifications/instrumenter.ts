@@ -22,7 +22,9 @@ export class Event {
   readonly name: string;
   readonly time: Temporal.Instant;
   end: Temporal.Instant | null;
-  readonly payload: EventPayload;
+  // Writable, mirroring Rails' `attr_accessor :payload`: the event is built with
+  // a dup, then finish replaces it with the final payload object (below).
+  payload: EventPayload;
   readonly transactionId: string;
   readonly children: Event[];
 
@@ -35,10 +37,9 @@ export class Event {
     this.name = name;
     this.time = start;
     this.end = null;
-    // Rails' Event#initialize does `@payload = payload.dup` (a shallow copy).
-    // The event holds a snapshot; sites that mutate the source payload after
-    // construction (the rescue arm, an outcome set before finish) re-sync it
-    // onto this copy before publishing — as Fanout's EventObjectGroup does.
+    // Rails' Event#initialize does `@payload = payload.dup` (a shallow copy):
+    // the event holds a snapshot until finish replaces it with the final
+    // payload object (Fanout's EventObjectGroup#finish: `@event.payload = payload`).
     this.payload = { ...payload };
     this.transactionId = transactionId ?? generateTransactionId();
     this.children = [];
@@ -161,10 +162,10 @@ export class Instrumenter {
 
   private _pop(event: Event, payload: EventPayload): void {
     this._stack.pop();
-    // Event#initialize dup'd the payload at _push; re-sync the block's and the
-    // rescue arm's mutations onto that copy before publishing, as Rails' Fanout
-    // EventObjectGroup does at finish.
-    Object.assign(event.payload, payload);
+    // Rails' EventObjectGroup#finish replaces the event's dup with the final
+    // payload object, so the block's mutations (and the rescue arm's, and any
+    // deletions) are reflected exactly.
+    event.payload = payload;
     event.finish();
     this._notifier.publish(event.name, event);
   }
@@ -173,7 +174,7 @@ export class Instrumenter {
 /**
  * Mirrors ActiveSupport::Notifications::Fanout::Handle — builds the Event at
  * `#start` (so its start time is the real start of the work) and publishes it
- * at `#finish`, re-syncing any payload mutations made in between.
+ * at `#finish`, replacing the event's payload with the final object first.
  */
 export class Handle implements NotificationHandle {
   private _state: "initialized" | "started" | "finished" = "initialized";
@@ -200,10 +201,10 @@ export class Handle implements NotificationHandle {
     }
     this._state = "finished";
     if (this._event) {
-      // Event#initialize dup'd the payload at #start; re-sync mutations made
-      // between start and finish (e.g. payload.outcome) onto that copy before
-      // publishing, as Rails' Fanout EventObjectGroup does.
-      Object.assign(this._event.payload, this._payload);
+      // Replace the event's dup with the final payload object (mutations made
+      // between start and finish, e.g. payload.outcome), as Rails'
+      // EventObjectGroup#finish does.
+      this._event.payload = this._payload;
       this._event.finish();
       this._notifier.publish(this._event.name, this._event);
     }
