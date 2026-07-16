@@ -181,9 +181,13 @@ computes at runtime:
    `{ count: inQueryConnection(performCount) }`, and alias chains) via a
    fixpoint over references — so `find`/`findBy`/`take`/`count`/`sum` come out
    async even though their impls are the differently-named `perform*` functions.
-   Remaining limits: (a) files with no port yet fall back to sync, and (b)
-   `await` placement is file-local — a call to an async method defined in a
-   _different_ file is not awaited.
+   For the relation family (`relation/*.rb`, `relation.rb`) it also reads
+   `relation.ts`, since Rails mixes those modules into `Relation` and trails
+   ports some methods (`pluck`/`ids`, defined in calculations.rb) directly onto
+   the `Relation` class — so those come out async too. Remaining limits: (a)
+   files with no port yet fall back to sync, and (b) `await` placement is
+   file-local — a call to an async method defined in a _different_ file is not
+   awaited.
 4. **Ruby stdlib idioms pass through untranslated.** `attributes.collect { }`,
    `arr.first`, `Array(x)`, `raise` — emitted verbatim; no runtime shim.
 5. **Metaprogramming is opaque.** `define_method`, `method_missing`, `send`,
