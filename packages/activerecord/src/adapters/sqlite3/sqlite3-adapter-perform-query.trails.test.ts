@@ -105,10 +105,24 @@ describeIfSqlite("SQLite3AdapterPerformQueryTest (trails)", () => {
     });
   });
 
-  it("does not dirty the current transaction for a read", async () => {
+  it("dirties the current transaction for a read too", async () => {
+    // Rails dirties in with_raw_connection's ensure gated on
+    // materialize_transactions, NOT on write — so a plain SELECT in an open
+    // transaction dirties it just like a write does.
     await adapter.transaction(async () => {
       await adapter.execute(`SELECT * FROM "pq"`);
-      expect(adapter.currentTransaction().isDirty()).toBe(false);
+      expect(adapter.currentTransaction().isDirty()).toBe(true);
+    });
+  });
+
+  it("dirties the current transaction even when the statement raises", async () => {
+    // The dirty runs in the primitive's finally, mirroring Rails' ensure — a
+    // failed write still leaves the transaction dirty.
+    await adapter.transaction(async () => {
+      await expect(
+        adapter.execute(`INSERT INTO "no_such_table" ("x") VALUES (1)`),
+      ).rejects.toThrow();
+      expect(adapter.currentTransaction().isDirty()).toBe(true);
     });
   });
 });

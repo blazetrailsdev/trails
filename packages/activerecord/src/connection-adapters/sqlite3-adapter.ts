@@ -518,38 +518,45 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     driverBinds: SqliteBinds,
     notificationPayload: Record<string, unknown>,
   ): Promise<Record<string, unknown>[]> {
-    const stmt = await this._cachedStatement(sql);
-    // Dispatch through the virtual isWriteQuery — the same predicate
-    // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard,
-    // the dirty gate, and the affected-rows gate can never disagree.
-    const isWrite = this.isWriteQuery(sql);
-    // `.all()` throws on a non-row-returning statement (better-sqlite3), so
-    // readers take `.all()` and everything else `.run()`. `.run()`'s per-
-    // statement `changes` is NOT used: it is 0 for DDL, whereas Rails' source
-    // (`raw_connection.changes` = sqlite3_changes()) counts only DML and is
-    // preserved across DDL/COMMIT — see _readBackChanges.
-    let rows: Record<string, unknown>[];
-    if (stmt.reader) {
-      rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
-    } else {
-      await stmt.run(driverBinds);
-      rows = [];
-    }
-    if (isWrite) {
-      // Rails reads raw_connection.changes / last_insert_rowid from the handle
-      // after every statement; only a write advances them. Gated on isWrite so
-      // reads and transaction-control (BEGIN/COMMIT/…) leave the last write's
-      // counts intact, as sqlite3_changes() does.
-      await this._readBackChanges();
-      // Dirtying belongs to the primitive, not to one entry point: `execute`
-      // now runs writes too, and Rails dirties from with_raw_connection's
-      // ensure (abstract_adapter.rb:1046) rather than a write-only path. This
-      // path doesn't route through withRawConnection — where trails already
-      // mirrors that ensure — so dirty here.
+    // Rails dirties in with_raw_connection's ensure (abstract_adapter.rb:1046),
+    // gated only on materialize_transactions — NOT on read/write, and it runs
+    // even when the query raises. execute/executeMutation (the only callers)
+    // both materialize unconditionally, so dirty in a finally regardless of
+    // outcome, mirroring this adapter's `exec`. `verified!` (below), by
+    // contrast, is on Rails' success path only.
+    try {
+      const stmt = await this._cachedStatement(sql);
+      // Dispatch through the virtual isWriteQuery — the same predicate
+      // check_if_write_query uses (abstract-adapter.ts) — so the readonly guard
+      // and the affected-rows gate can never disagree.
+      const isWrite = this.isWriteQuery(sql);
+      // `.all()` throws on a non-row-returning statement (better-sqlite3), so
+      // readers take `.all()` and everything else `.run()`. `.run()`'s per-
+      // statement `changes` is NOT used: it is 0 for DDL, whereas Rails' source
+      // (`raw_connection.changes` = sqlite3_changes()) counts only DML and is
+      // preserved across DDL/COMMIT — see _readBackChanges.
+      let rows: Record<string, unknown>[];
+      if (stmt.reader) {
+        rows = (await stmt.all(driverBinds)) as Record<string, unknown>[];
+      } else {
+        await stmt.run(driverBinds);
+        rows = [];
+      }
+      if (isWrite) {
+        // Rails reads raw_connection.changes / last_insert_rowid from the handle
+        // after every statement; only a write advances them. Gated on isWrite so
+        // reads and transaction-control (BEGIN/COMMIT/…) leave the last write's
+        // counts intact, as sqlite3_changes() does.
+        await this._readBackChanges();
+      }
+      // Rails' perform_query: `verified!` after @last_affected_rows, success
+      // path only — a successful round-trip proves the connection is live.
+      this.verifiedBang();
+      notificationPayload.row_count = rows.length;
+      return rows;
+    } finally {
       this.dirtyCurrentTransaction();
     }
-    notificationPayload.row_count = rows.length;
-    return rows;
   }
 
   // Rails' `@last_affected_rows = raw_connection.changes`. `changes()` and
@@ -573,6 +580,10 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::DatabaseStatements#affected_rows
    */
+  // The arg is optional because this doubles as trails' public accessor for the
+  // tracked count (Rails' affected_rows(result) is framework-internal and always
+  // passed the result); the port ignores it either way. executeMutation passes
+  // the perform_query result to mirror Rails' call site.
   affectedRows(result?: unknown): number {
     return sqliteAffectedRows.call(this, result);
   }
@@ -674,7 +685,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        await this._performQuery(sql, driverBinds, payload);
+        const result = await this._performQuery(sql, driverBinds, payload);
         // perform_query reports the returned-row count (0 for a write); this
         // path has always reported affected rows, and subscribers rely on it.
         payload.row_count = this._lastAffectedRows;
@@ -685,7 +696,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         }
 
         // For UPDATE/DELETE, return affected rows
-        return this.affectedRows();
+        return this.affectedRows(result);
       } catch (e: any) {
         const translated = this._translateException(e, sql, binds);
         throw translated;
