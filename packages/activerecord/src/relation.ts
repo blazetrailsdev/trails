@@ -3108,11 +3108,18 @@ export class Relation<T extends Base> {
    */
   private _eagerLoadBypassesJoinDependency(): boolean {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    // An anonymous HABTM join model carries a composite PK only as a delete/
-    // destroy affordance (Rails' join model has none); its eager source join is a
-    // plain single-column belongs_to the JoinDependency handles, so it does NOT
-    // take the composite-PK bypass — see `_isHabtmJoinModel` in associations.ts.
-    const compositePkBypass = Array.isArray(basePk) && !(this._modelClass as any)._isHabtmJoinModel;
+    // A composite-PK base IS eager-JOINable: `JoinDependency.instantiateFromRows`
+    // dedups parents by the composite key. The one composite-PK path trails can't
+    // emit is the limited-ids subquery (`_materializeLimitedIds` /
+    // `columns_for_distinct`), which projects the pk as a single column — so
+    // bypass a composite PK ONLY when a LIMIT/OFFSET forces that path. Every other
+    // composite-PK eager load (notably the through-preloader's own unlimited
+    // `includes(source).references(...)` query) applies the JoinDependency, so a
+    // scoped source through a composite-PK model JOINs like Rails. Rails always
+    // applies the JoinDependency; the LIMIT+composite gap is trails' remaining
+    // capability gap (tracked for convergence — see RFC 0054).
+    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+    const compositePkBypass = Array.isArray(basePk) && hasLimitOrOffset;
     return compositePkBypass || this._ctes.length > 0 || !this._fromClause.isEmpty();
   }
 

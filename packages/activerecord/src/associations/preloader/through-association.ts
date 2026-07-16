@@ -527,20 +527,13 @@ export class ThroughAssociation extends Association {
    * resolves in ONE query with no per-predicate table attribution. The
    * JoinDependency instantiates distinct parents by primary key, so a to-many
    * source no longer fans the middle records out, and a to-one source (e.g. a
-   * HABTM's belongs_to on the anonymous `HABTM_*` join model) joins the same way
-   * — the composite-PK eager bypass that previously forced a plain
-   * `leftOuterJoins` there is lifted (see `_isHabtmJoinModel`). `disable_joins`
-   * and polymorphic `source_type` keep their own paths.
-   *
-   * This is a faithful `through_scope` port; the only residual deviation is
-   * orthogonal and lives in `Relation#_eagerLoadBypassesJoinDependency`: for a
-   * composite-PK, NON-HABTM through model, trails' eager path degrades to preload
-   * (Rails always JOINs), so the `includes!`/`references!` here would not
-   * actually JOIN and a copied source-table predicate would orphan. That case is
-   * unreachable in the canonical suite (no scoped source routes through such a
-   * model) and is tracked for convergence by story
-   * `close-composite-pk-through-eager-bypass-for-scoped-source` (RFC 0054) — the
-   * fix belongs in the eager JOIN builder, not in a non-Rails branch here.
+   * HABTM's belongs_to on the anonymous `HABTM_*` join model) joins the same way.
+   * The through query carries no LIMIT/OFFSET, so its composite-PK base
+   * (HABTM join model, or a real composite-PK through model) applies the eager
+   * JoinDependency — `Relation#_eagerLoadBypassesJoinDependency` bypasses a
+   * composite PK only on the LIMIT+collection `_materializeLimitedIds` path,
+   * which this query never takes. `disable_joins` and polymorphic `source_type`
+   * keep their own paths.
    */
   private _buildThroughScope(): any {
     const throughRefl = this._throughReflection;
