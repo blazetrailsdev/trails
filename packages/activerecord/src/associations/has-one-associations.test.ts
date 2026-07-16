@@ -607,9 +607,11 @@ describe("HasOneAssociationsTest", () => {
     const found = (await Company.find(company.id)) as any;
     expect(found.association("account").isLoaded()).toBe(false);
     found.account = new Account({ credit_limit: 60 });
-    await found.association("account").writer(new Account({ credit_limit: 70 }));
+    const b = new Account({ credit_limit: 70 });
+    await found.association("account").writer(b);
     expect((await Account.find(original.id)).firm_id).toBeNull();
     expect(await Account.where({ firm_id: Number(company.id) }).count()).toBe(1);
+    expect((await readHasOne(found, "account")).id).toBe(b.id);
   });
 
   it("writer over an unloaded displaced target destroys the prior dependent account", async () => {
@@ -617,8 +619,10 @@ describe("HasOneAssociationsTest", () => {
     const originalId = ((await Account.where({ firm_id: 1 }).first()) as any).id;
     expect(firm.association("account").isLoaded()).toBe(false);
     firm.account = new Account({ credit_limit: 60 });
-    await firm.association("account").writer(new Account({ credit_limit: 70 }));
+    const b = new Account({ credit_limit: 70 });
+    await firm.association("account").writer(b);
     await expect(Account.find(originalId)).rejects.toThrow(RecordNotFound);
+    expect((await readHasOne(firm, "account")).id).toBe(b.id);
   });
 
   it("create when parent is new raises", async () => {
