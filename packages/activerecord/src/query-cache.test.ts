@@ -33,10 +33,11 @@ function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> 
   // Resolve the pool list lazily on each run/complete so pools established
   // after the middleware is built (the multi-role `connected_to(role: :reading)`
   // tests) are included, mirroring Rails' `connection_pool_list(:all)`.
-  // (Rails threads run's enabled-pool result into complete so a disabled pool
-  // is never touched on complete; installExecutorHooks returns run's
-  // enabled-target list and threads it into complete for the same reason —
-  // mirroring the executor's per-execution hook_state.)
+  // (Rails threads run's return — the whole not-already-enabled receiver — into
+  // complete via the executor's per-execution hook_state, so complete acts on
+  // exactly the list this execution's run observed rather than re-resolving it;
+  // installExecutorHooks returns that list from run and threads it into
+  // complete for the same reason.)
   QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, () =>
     Base.connectionHandler.connectionPoolList("all"),
   );

@@ -124,10 +124,13 @@ describe("cacheNotificationInfo payload (trails)", () => {
 });
 
 // Covers the run→complete pool threading (0023-surfaced-deviations:
-// query-cache-run-returns-enabled-pools-for-complete). Rails' `QueryCache.run`
-// returns the pools it enabled and the executor threads that exact list into
-// `complete(pools)`, so a pool skipped by `run` is never touched by `complete`.
-describe("run returns enabled targets for complete (trails)", () => {
+// query-cache-run-returns-enabled-pools-for-complete). Ruby's `Array#each`
+// returns its receiver, so Rails' `QueryCache.run` returns the whole
+// `reject(&:query_cache_enabled)` array — config-disabled pools included — and
+// the executor threads that exact list into `complete(pools)`. The point of
+// the fix is that `complete` acts on the list *run* observed, not one it
+// re-resolves independently.
+describe("run returns not-already-enabled targets for complete (trails)", () => {
   class FakeTarget {
     queryCacheEnabled = false;
     disabled: boolean;
@@ -153,7 +156,7 @@ describe("run returns enabled targets for complete (trails)", () => {
     }
   }
 
-  it("run returns only the targets it enabled", () => {
+  it("run returns the not-already-enabled targets without enabling config-disabled ones", () => {
     const enabled = new FakeTarget();
     const configDisabled = new FakeTarget(true);
     const alreadyEnabled = new FakeTarget();
@@ -161,13 +164,16 @@ describe("run returns enabled targets for complete (trails)", () => {
 
     const result = QueryCache.run([enabled, configDisabled, alreadyEnabled]);
 
-    expect(result).toEqual([enabled]);
+    // Mirrors Rails' `reject(&:query_cache_enabled)` receiver: the already
+    // enabled pool is dropped, the config-disabled pool stays in the returned
+    // list (it is `next`-skipped, not rejected) but is never enabled.
+    expect(result).toEqual([enabled, configDisabled]);
     expect(enabled.enabledCount).toBe(1);
     expect(configDisabled.enabledCount).toBe(0);
     expect(alreadyEnabled.enabledCount).toBe(0);
   });
 
-  it("complete only disables/clears the pools run enabled", () => {
+  it("complete disables/clears every target run returned, config-disabled included", () => {
     const enabled = new FakeTarget();
     const configDisabled = new FakeTarget(true);
     let hook: {
@@ -182,10 +188,13 @@ describe("run returns enabled targets for complete (trails)", () => {
     const state = hook!.run();
     hook!.complete(state);
 
+    // Rails threads run's whole receiver into complete, so disable!/clear run
+    // on the config-disabled pool too — inert (it was never enabled) but a
+    // faithful mirror of query_cache.rb:44-49.
     expect(enabled.disabledCount).toBe(1);
     expect(enabled.clearedCount).toBe(1);
-    expect(configDisabled.disabledCount).toBe(0);
-    expect(configDisabled.clearedCount).toBe(0);
+    expect(configDisabled.disabledCount).toBe(1);
+    expect(configDisabled.clearedCount).toBe(1);
   });
 
   it("threads each execution's own run result to its complete", () => {
