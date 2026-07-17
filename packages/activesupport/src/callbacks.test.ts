@@ -2026,6 +2026,26 @@ describe("CallbackObject dispatch", () => {
     expect(target.log).toEqual(["my-obj"]);
   });
 
+  it("around object method reads object state via this", () => {
+    // Rails dispatches the around ObjectCall as `receiver.send(method, target, &block)`,
+    // binding `self` to the callback object. A JS member invocation
+    // (`receiver[method](...)`) binds `this === receiver` the same way, so a
+    // method-style around can read its own object state.
+    const target = { log: [] as string[] };
+    defineCallbacks(target, "save");
+    const obj = {
+      label: "around-obj",
+      around(t: typeof target, next: () => void) {
+        t.log.push(`${this.label}-pre`);
+        next();
+        t.log.push(`${this.label}-post`);
+      },
+    };
+    setCallback(target, "save", "around", obj);
+    runCallbacks(target, "save", () => target.log.push("body"));
+    expect(target.log).toEqual(["around-obj-pre", "body", "around-obj-post"]);
+  });
+
   it("mixed chain: function + object + function all run", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
