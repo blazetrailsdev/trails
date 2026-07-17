@@ -435,12 +435,25 @@ describe("UniquenessValidationTest", () => {
 
   it("validate uniqueness of with multiple attributes and array forms", async () => {
     // Rails' `validates_uniqueness_of(*attr_names)` arity: `_merge_attributes`
-    // flattens nested arrays and registers a deferred check per attribute, so a
-    // single call can guard several columns. (A string-column variant of the
-    // multi-attr form used by Rails' test_validate_case_insensitive_uniqueness;
-    // the integer `:parent_id` case-insensitive column that test also covers is
-    // asserted directly in "validate case insensitive uniqueness".)
+    // flattens nested arrays into one validator whose EachValidator loop guards
+    // each column, so a single call can guard several columns. (A string-column
+    // variant of the multi-attr form used by Rails'
+    // test_validate_case_insensitive_uniqueness; the integer `:parent_id`
+    // case-insensitive column that test also covers is asserted directly in
+    // "validate case insensitive uniqueness".)
     Topic.validatesUniquenessOf(["title"], "author_name");
+
+    // Rails registers ONE UniquenessValidator owning both attributes
+    // (validates_with UniquenessValidator, _merge_attributes(...)), so it
+    // de-dups to a single instance rather than one per attribute.
+    const uniqValidators = Topic.validators().filter(
+      (v) => (v as { kind?: string }).kind === "uniqueness",
+    );
+    expect(uniqValidators).toHaveLength(1);
+    expect((uniqValidators[0] as { attributes: readonly string[] }).attributes).toEqual([
+      "title",
+      "author_name",
+    ]);
 
     // Fixture topics(:first): title "The First Topic", author_name "David".
     const collideTitle = new Topic({ title: "The First Topic", author_name: "Someone Else" });

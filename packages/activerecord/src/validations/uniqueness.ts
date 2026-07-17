@@ -73,21 +73,17 @@ export function validatesUniqueness(
 }
 
 /**
- * Register deferred uniqueness validations for one or more attributes,
- * delegating through `_mergeAttributes` so multiple / nested-array attr lists
- * (Rails' `*attr_names` arity) and the trailing options hash are normalized the
- * same way as the other `validates_*_of` helpers.
+ * Register a uniqueness validation for one or more attributes, delegating
+ * through `_mergeAttributes` so multiple / nested-array attr lists (Rails'
+ * `*attr_names` arity) and the trailing options hash are normalized the same
+ * way as the other `validates_*_of` helpers.
  *
  * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
- * (activerecord/lib/active_record/validations/uniqueness.rb:291-292).
- *
- * TRACKED DEVIATION (structural, behavior-preserving) — Rails registers a single
- * `validates_with UniquenessValidator, _merge_attributes(attr_names)`: one
- * validator instance owns the flattened `attributes` list. trails fans the
- * merged names into one `validatesWith(UniquenessValidator, { attributes: [a] })`
- * call each. `EachValidator#validate` loops `attributes.each` either way, so a
- * per-attribute registration produces the same per-attribute `validateEach`
- * calls (same count, same options, same errors) as Rails' single-validator loop.
+ * (activerecord/lib/active_record/validations/uniqueness.rb:291-292) —
+ * `validates_with UniquenessValidator, _merge_attributes(attr_names)`. Like
+ * Rails, this registers a SINGLE `UniquenessValidator` owning the flattened
+ * `attributes` list (its `EachValidator#validate` loops `attributes.each`), so
+ * `validators` de-dups to one instance rather than one per attribute.
  */
 export function validatesUniquenessOf(
   this: {
@@ -96,10 +92,12 @@ export function validatesUniquenessOf(
   },
   ...attrNames: unknown[]
 ): void {
-  const { attributes, ...options } = this._mergeAttributes(attrNames);
-  for (const attribute of attributes as string[]) {
-    validatesUniqueness.call(this, attribute, options);
-  }
+  const merged = this._mergeAttributes(attrNames);
+  // Validate options eagerly to match Rails' ArgumentError at declaration time
+  // (the constructor validates too, but validatesWith reaches it only after
+  // bucketing).
+  validateScopeOption(merged.scope);
+  this.validatesWith(UniquenessValidator, { ...merged, class: this });
 }
 
 export class UniquenessValidator extends EachValidator {
