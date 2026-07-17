@@ -2756,7 +2756,7 @@ export class Relation<T extends Base> {
       record_count: rows.length,
       class_name: this._modelClass.baseClass.name,
     };
-    const { parents, associations } = Notifications.instrument(
+    const { parents, associations, parentKeys } = Notifications.instrument(
       "instantiation.active_record",
       eagerPayload,
       () =>
@@ -2774,7 +2774,12 @@ export class Relation<T extends Base> {
     }
 
     for (const parent of parents) {
-      const pk = parent.readAttribute(basePk);
+      // Look `associations` up by the SAME raw aliased key `instantiateFromRows`
+      // stored the parent under — not by re-reading the instantiated record's
+      // PK, which is deserialized and can diverge from the raw row value (e.g.
+      // bigint / composite HABTM keys), missing the lookup and skipping inverse
+      // caching.
+      const pk = parentKeys.get(parent);
       const assocs = associations.get(pk);
       for (const node of jd.nodes) {
         // Skip intermediate through nodes and nested nodes (handled in instantiateFromRows).
@@ -3103,7 +3108,25 @@ export class Relation<T extends Base> {
    */
   private _eagerLoadBypassesJoinDependency(): boolean {
     const basePk = (this._modelClass as any).primaryKey ?? "id";
-    return Array.isArray(basePk) || this._ctes.length > 0 || !this._fromClause.isEmpty();
+    // A composite-PK base IS eager-JOINable: `JoinDependency.instantiateFromRows`
+    // dedups parents by the composite key. The one composite-PK path trails can't
+    // emit is the limited-ids subquery (`_materializeLimitedIds` /
+    // `columns_for_distinct`), which projects the pk as a single column. Rails
+    // only takes that `distinct_relation_for_primary_key` path for a limit/offset
+    // over NON-limitable (collection) reflections (finder_methods.rb:463-488), so
+    // bypass a composite PK only in exactly that case — mirroring the narrower
+    // `hasLimit && jd hasMany` guard the eager execute path already applies. A
+    // composite-PK `includes(:belongs_to)` (limitable) with a limit still JOINs,
+    // as does the through-preloader's own unlimited `includes(source)` query, so
+    // a scoped source through a composite-PK model JOINs like Rails. The
+    // LIMIT+collection+composite gap is trails' remaining capability gap (tracked
+    // for convergence — see RFC 0054).
+    const hasLimitOrOffset = this._limitValue !== null || this._offsetValue !== null;
+    const compositePkBypass =
+      Array.isArray(basePk) &&
+      hasLimitOrOffset &&
+      !this._applyJoinDependencyIsLimitable(this._deferredDistinctPkEagerSpecs());
+    return compositePkBypass || this._ctes.length > 0 || !this._fromClause.isEmpty();
   }
 
   /**

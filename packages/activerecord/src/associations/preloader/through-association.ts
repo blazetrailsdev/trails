@@ -518,20 +518,22 @@ export class ThroughAssociation extends Association {
    * `Preloader::ThroughAssociation#through_scope`
    * (vendor/rails/activerecord/lib/active_record/associations/preloader/through_association.rb:104-146).
    *
-   * For a to-one, non-through source this is Rails' single-query strategy: the
-   * whole reflection-scope `where_clause` is copied onto the through query and
-   * the source reflection is JOINed (Rails `includes!`/`references!`, a LEFT
-   * OUTER JOIN), so every column — through-table, source-table, or a
-   * scope-joined nested table — resolves in ONE query with no per-predicate
-   * table attribution.
-   *
-   * A collection (has_many) source or a nested (through) source can't be JOINed
-   * without fanning the through rows out (trails collects raw rows; Rails' eager
-   * JoinDependency dedups by PK), so those keep the two-step: only the
-   * reflection scope's through-table predicates are copied here (to constrain
-   * the intermediate rows), and the source / sub-chain predicates and order ride
-   * the recursive source-preloader stage (see `_getSourcePreloaders`).
-   * `disable_joins` and polymorphic `source_type` keep their own paths.
+   * When the reflection scope carries a where-clause, EVERY source kind (to-one
+   * belongs_to/has_one, collection has_many, or nested through) takes the SAME
+   * Rails-faithful branch: the whole reflection-scope `where_clause` is copied
+   * onto the through query and the source reflection is eager-loaded via
+   * `includes!`/`references!` (a LEFT OUTER JOIN through the JoinDependency), so
+   * every column — through-table, source-table, or a scope-joined nested table —
+   * resolves in ONE query with no per-predicate table attribution. The
+   * JoinDependency instantiates distinct parents by primary key, so a to-many
+   * source no longer fans the middle records out, and a to-one source (e.g. a
+   * HABTM's belongs_to on the anonymous `HABTM_*` join model) joins the same way.
+   * The through query carries no LIMIT/OFFSET, so its composite-PK base
+   * (HABTM join model, or a real composite-PK through model) applies the eager
+   * JoinDependency — `Relation#_eagerLoadBypassesJoinDependency` bypasses a
+   * composite PK only on the LIMIT+collection `_materializeLimitedIds` path,
+   * which this query never takes. `disable_joins` and polymorphic `source_type`
+   * keep their own paths.
    */
   private _buildThroughScope(): any {
     const throughRefl = this._throughReflection;
@@ -571,73 +573,9 @@ export class ThroughAssociation extends Association {
       // where_clause onto the through query and JOIN the source reflection so
       // every referenced column resolves in this single query.
       const sourceRefl = this._sourceReflection;
-      const strategy = this._throughScopeStrategy();
-      if (sourceRefl && strategy === "join") {
-        scope._whereClause = new WhereClause([
-          ...scope._whereClause.predicates,
-          ...whereClause.predicates,
-        ]);
-        const sourceName = sourceRefl.name;
-        const nestedJoins: any[] = reflScope?._namedInnerJoins ?? [];
-        const nestedLeftOuter: any[] = reflScope?._leftOuterJoinsValues ?? [];
-        // Raw string / Arel-node joins the reflection scope carries in its own
-        // `_joinValues` bucket (`.joins("INNER JOIN …")` or `.joins(<Arel node>)`).
-        // Rails passes the scope's FULL `joins_values` — symbols AND raw strings
-        // / Arel nodes — to `joins!(source_reflection.name => joins)`
-        // (rb:132-134). `JoinDependency.walk_tree` symbolizes a raw string into a
-        // bogus association name and `find_reflection` raises
-        // `ActiveRecord::ConfigurationError` — real Rails raises on preload here,
-        // it does not silently carry the raw join. Nesting it under the source
-        // reflection name makes trails' join builder raise the same error.
-        // Read from the FLATTENED `reflection_scope` (`join_scopes.inject(&:merge!)`,
-        // preloader/association.rb:290): Rails nests the whole flattened
-        // `values[:joins]` — sub-chain raw joins included — so a raw join
-        // declared on a deeper link in a nested chain raises here too.
-        const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
-
-        // Rails `includes!(source_reflection.name => values[:includes])` (bare
-        // when the scope has no `.includes`) + `references!(...)` promotes to a
-        // LEFT OUTER JOIN of the source reflection and its nested includes
-        // (rb:120-124). trails carries the scope's explicit `.includes`
-        // (`_includesAssociations`) the same way — nested under the source
-        // reflection — so a has_one-through scope like
-        // `includes(:category).where(categories: { … })` joins `categories` on
-        // this through query and the predicate resolves. `.left_joins(source =>
-        // nested)` (`_leftOuterJoinsValues`) is carried likewise. Carried
-        // unconditionally here: `_throughScopeStrategy` already diverted the only
-        // unsafe case (a collection target whose scope reaches a to-many nested
-        // table) to the two-step, so nothing copied here references an unjoined
-        // table.
-        const nestedIncludes: any[] = reflScope?._includesAssociations ?? [];
-        const nestedOuter = [...nestedLeftOuter, ...nestedIncludes];
-        if (nestedOuter.length > 0) {
-          scope = scope.leftOuterJoins({ [sourceName]: nestedOuter });
-        } else {
-          scope = scope.leftOuterJoins(sourceName);
-        }
-
-        // joins!(source_reflection.name => joins): symbol-association joins are
-        // carried as an inner join; raw string / Arel joins raise as above.
-        if (nestedRawJoinValues.length > 0) {
-          scope = scope.joins({ [sourceName]: [...nestedRawJoinValues] });
-        }
-        if (nestedJoins.length > 0) {
-          scope = scope.joins({ [sourceName]: nestedJoins });
-        }
-
-        // Rails carries `order` only when `scope.eager_loading?` (rb:140). In
-        // this branch Rails always `includes!(source)` + `references!(...)`, so
-        // `eager_loading?` is true whenever the branch runs — our source join
-        // above is the analogue, so carry the order unconditionally here.
-        const orderClauses: any[] = reflScope?._orderClauses ?? [];
-        const rawOrderClauses: string[] = reflScope?._rawOrderClauses ?? [];
-        if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
-          scope._orderClauses = [...scope._orderClauses, ...orderClauses];
-          scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
-        }
-      } else if (sourceRefl) {
-        // Collection source/target ("twoStep") or nested through source
-        // ("nested"): mirror Rails' `through_scope` eager-load branch exactly.
+      if (sourceRefl) {
+        // Mirror Rails' `through_scope` eager-load branch exactly for EVERY
+        // source kind (to-one, collection, nested through).
         // Copy the FULL reflection-scope where_clause and `includes!(source)` +
         // `references!(source.table_name)`, promoting the source reflection to a
         // LEFT OUTER JOIN eager-load on this through query. Unlike a bare
@@ -681,12 +619,28 @@ export class ThroughAssociation extends Association {
           scope = scope.references(sourceRefl.klass.tableName);
         }
 
-        // joins!(source => joins) / left_outer_joins!(source => …) (rb:132-137).
+        // joins!(source_reflection.name => joins) (rb:132-134): Rails applies the
+        // whole flattened `values[:joins]` bucket ONCE, nested under the source
+        // reflection name. trails splits that bucket into `_namedInnerJoins`
+        // (symbol association joins) and `_joinValues` (raw string / Arel-node
+        // joins), so their UNION is Rails' single `values[:joins]` — applied here
+        // exactly once. A raw string / Arel join anywhere in the FLATTENED chain
+        // scope raises `ConfigurationError` in Rails (`JoinDependency` rejects the
+        // bogus association name symbolized from the raw string), regardless of
+        // the collection/nested strategy — nesting it under the source reflection
+        // name makes trails' join builder raise identically. This branch is
+        // already gated on the flattened `where_clause` being non-empty (the same
+        // `elsif !reflection_scope.where_clause.empty?` gate, rb:117), so matching
+        // Rails means raising here too — a raw join declared only on a deeper
+        // sub-chain link is NOT deferred to its own recursive stage (verified
+        // against a live Rails nested-through repro).
         const nestedRawJoinValues: any[] = reflScope?._joinValues ?? [];
         const nestedJoins: any[] = reflScope?._namedInnerJoins ?? [];
         if (nestedRawJoinValues.length > 0 || nestedJoins.length > 0) {
           scope = scope.joins({ [sourceName]: [...nestedRawJoinValues, ...nestedJoins] });
         }
+
+        // left_outer_joins!(source_reflection.name => left_outer_joins) (rb:136-137).
         const nestedLeftOuter: any[] = reflScope?._leftOuterJoinsValues ?? [];
         if (nestedLeftOuter.length > 0) {
           scope = scope.leftOuterJoins({ [sourceName]: nestedLeftOuter });
@@ -699,23 +653,6 @@ export class ThroughAssociation extends Association {
         if (orderClauses.length > 0 || rawOrderClauses.length > 0) {
           scope._orderClauses = [...scope._orderClauses, ...orderClauses];
           scope._rawOrderClauses = [...scope._rawOrderClauses, ...rawOrderClauses];
-        }
-
-        // A raw string / Arel-node join anywhere in the FLATTENED chain scope
-        // (`.joins("INNER JOIN …")`, held in `_joinValues`) raises
-        // `ConfigurationError` in Rails regardless of the collection/nested
-        // strategy — `through_scope` passes the whole flattened `values[:joins]`
-        // to `joins!(source_reflection.name => joins)` (rb:132-134) and
-        // `JoinDependency` rejects the bogus association name. This branch is
-        // already gated on the flattened `where_clause` being non-empty (the
-        // same `elsif !reflection_scope.where_clause.empty?` gate, rb:117), so
-        // matching Rails means raising here too — a raw join declared only on a
-        // deeper sub-chain link is NOT deferred to its own recursive stage
-        // (verified against a live Rails nested-through repro). Nest it under the
-        // source reflection name so trails' join builder raises identically.
-        const rawJoinValues: any[] = reflScope?._joinValues ?? [];
-        if (rawJoinValues.length > 0) {
-          scope = scope.joins({ [sourceRefl.name]: [...rawJoinValues] });
         }
       }
     }
