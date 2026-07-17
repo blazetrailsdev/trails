@@ -98,6 +98,23 @@ describe("Serialized#isChanged", () => {
     expect(type.isChanged({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(false);
   });
 
+  it("compares nested value objects by their own equality, not JSON canonicalization", () => {
+    // Ruby's Hash#==/Array#== compare each element with its own ==, so a value
+    // object nested inside a serialized Hash gets the same dispatch a top-level
+    // one does. Two equal Dates at the same key are unchanged; unequal changed.
+    expect(type.isChanged({ at: new Date(100) }, { at: new Date(100) })).toBe(false);
+    expect(type.isChanged({ at: new Date(100) }, { at: new Date(200) })).toBe(true);
+    // A nested explicit `equals` honors cross-class value equality.
+    class Instant {
+      constructor(readonly ms: number) {}
+      equals(other: unknown) {
+        return other instanceof Date ? this.ms === other.getTime() : false;
+      }
+    }
+    expect(type.isChanged({ at: new Instant(100) }, { at: new Date(100) })).toBe(false);
+    expect(type.isChanged([new Instant(100)], [new Date(200)])).toBe(true);
+  });
+
   it("falls back to reference equality for identity-== object_class instances", () => {
     class Custom {}
     const oldValue = new Custom();
