@@ -21,10 +21,28 @@ import { ThroughAssociation } from "./preloader/through-association.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Tag } from "../test-helpers/models/tag.js";
+import { Tagging } from "../test-helpers/models/tagging.js";
 
 registerModel(Author);
 registerModel(Post);
 registerModel(Comment);
+registerModel(Tag);
+registerModel(Tagging);
+
+// A polymorphic `source_type` has_many-through (`Tag → taggings → taggable`,
+// filtered to `Post`) whose reflection scope adds a source-table (`posts.title`)
+// predicate. Rails' `through_scope` applies ONLY the `source_type` filter here
+// and does NOT copy the reflection where_clause onto the through query
+// (through_association.rb:115-116), then passes the full built scope to
+// `source_preloaders` — so the source-table predicate must be kept at the
+// source stage, not emptied.
+(Tag as any).hasMany("welcomeTaggedPosts", {
+  through: "taggings",
+  source: "taggable",
+  sourceType: "Post",
+  scope: (rel: any) => rel.where("posts.title = 'Welcome to the weblog'"),
+});
 
 // Add a scope-annotated through association to Author for this test suite.
 // Author → posts → comments, but with an SQL annotation on the scope.
@@ -82,7 +100,14 @@ registerModel(Comment);
 });
 
 describe("Preloader::ThroughAssociation#through_scope", () => {
-  const { authors, posts } = fixtures(["authors", "authorAddresses", "posts", "comments"]);
+  const { authors, posts, tags } = fixtures([
+    "authors",
+    "authorAddresses",
+    "posts",
+    "comments",
+    "tags",
+    "taggings",
+  ]);
 
   function throughLoader(owners: Author[], name: string, scope?: any): ThroughAssociation {
     const loaders = new Preloader({
@@ -149,6 +174,36 @@ describe("Preloader::ThroughAssociation#through_scope", () => {
     const sql = scope.toSql();
     expect(sql).toContain("posts.title");
     expect(sql).toMatch(/JOIN .*comments/);
+  });
+
+  it("resolves a mixed through+source predicate in one query when preloading", async () => {
+    // A predicate referencing BOTH the through table (`posts`) and the source
+    // table (`comments`) in one node — the case the old per-predicate two-step
+    // classification could not resolve (neither single query had both tables).
+    // The single source-join branch copies the full where_clause and JOINs the
+    // source, so both tables are present and the whole predicate resolves in one
+    // query end-to-end — the preload returns the welcome post's comments (matched
+    // via `posts.title`), never raising `no such column`.
+    const david = authors("david");
+    const [row] = await Author.where({ id: david.id }).preload("commentsWithMixedCondition");
+    const bodies = ((row.association("commentsWithMixedCondition").target ?? []) as any[])
+      .map((c) => c._readAttribute("body"))
+      .sort();
+    expect(bodies).toEqual(["Thank you again for the welcome", "Thank you for the welcome"].sort());
+  });
+
+  it("keeps a source-table condition at the source stage for a source_type through", async () => {
+    // The `source_type` branch of `through_scope` does NOT copy the reflection
+    // where_clause onto the through query, so the source (posts) is genuinely
+    // queried at the source stage and must keep the reflection scope's
+    // `posts.title` predicate. Tag "general" tags two posts; the scoped
+    // association must return only the matching one.
+    const general = tags("general");
+    const [row] = await Tag.where({ id: general.id }).preload("welcomeTaggedPosts");
+    const titles = ((row.association("welcomeTaggedPosts").target ?? []) as any[])
+      .map((p) => p._readAttribute("title"))
+      .sort();
+    expect(titles).toEqual(["Welcome to the weblog"]);
   });
 
   it("cascades strict loading from the preload scope onto the through query", async () => {
