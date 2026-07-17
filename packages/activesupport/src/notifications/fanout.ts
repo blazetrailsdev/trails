@@ -357,14 +357,27 @@ export class Fanout {
 
   /**
    * Routes an already-built Event to matching subscribers — Rails'
-   * `Fanout#publish_event` (fanout.rb:293-295): run every event-object listener
-   * under `iterate_guarding_exceptions` (run all, then re-raise/aggregate).
-   * `Notifications` only ever registers event-object subscribers (its public API
-   * always yields the Event), so those are the ones fed here.
+   * `Fanout#publish_event` (fanout.rb:293-295): run every matching listener under
+   * `iterate_guarding_exceptions` (run all, then re-raise/aggregate). Each kind
+   * consumes the event as its subscriber class' `publish_event` does (fanout.rb:
+   * 396-441): event-object gets the Event; timed/monotonic convert to the 5-arg
+   * `(name, start, finish, id, payload)` form off the event's own times; evented
+   * listeners have no `publish_event` path, so they're skipped.
    */
   publishEvent(event: Event): void {
-    const listeners = this.allListenersFor(event.name).filter((s) => s.kind === "event_object");
-    iterateGuardingExceptions(listeners, (s) => (s.delegate as EventObjectCallback)(event));
+    iterateGuardingExceptions(this.allListenersFor(event.name), (s) => {
+      if (s.kind === "event_object") {
+        (s.delegate as EventObjectCallback)(event);
+      } else if (s.kind === "timed" || s.kind === "monotonic") {
+        (s.delegate as TimedCallback)(
+          event.name,
+          event.time,
+          event.end ?? event.time,
+          event.transactionId,
+          event.payload,
+        );
+      }
+    });
   }
 
   /** Drop every subscriber and reset cached state. Used by unsubscribeAll. */

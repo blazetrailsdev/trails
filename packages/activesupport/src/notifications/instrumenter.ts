@@ -70,16 +70,16 @@ export class Event {
  * Errors that never got a namespaced name (AR's, today) degrade to the bare one.
  */
 function _classNameOf(e: unknown): string {
-  if (e === null || e === undefined) return "NilClass";
   if (e instanceof Error) {
     if (e.name && e.name !== "Error") return e.name;
     const ctor = e.constructor?.name;
     if (ctor && ctor !== "Error") return ctor;
     return e.name || ctor || "Error";
   }
-  // Ruby cannot `raise` a non-Exception, so this branch has no Rails analogue;
-  // name it the way Rails would name the object's class anyway.
-  return (e as { constructor?: { name?: string } })?.constructor?.name ?? typeof e;
+  // JS can throw a non-Error; Ruby cannot, so there's no `e.class.name` analogue.
+  // Use the value's constructor name where it has one ("bare string" -> String),
+  // and fall back to "Error" for the constructor-less throws (null/undefined).
+  return (e as { constructor?: { name?: string } })?.constructor?.name ?? "Error";
 }
 
 // Rails' `rescue Exception` arm — subscribers (e.g. ExplainSubscriber) key off
