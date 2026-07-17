@@ -816,18 +816,29 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  quoteDefaultExpression(value: unknown, _column?: unknown): string {
+  quoteDefaultExpression(value: unknown, column?: unknown): string {
     if (value === undefined) return "";
     if (typeof value === "function") {
       const result = (value as () => unknown)();
-      if (typeof result === "string") return ` DEFAULT ${result}`;
-      if (isSqlLiteral(result)) return ` DEFAULT ${result.value}`;
+      if (typeof result === "string") return result;
+      if (isSqlLiteral(result)) return result.value;
       throw new TypeError(
         "quoteDefaultExpression expected function default to return a string or SqlLiteral",
       );
     }
-    if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
-    return ` DEFAULT ${this.quote(value)}`;
+    if (isSqlLiteral(value)) return value.value;
+    // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
+    // (abstract/quoting.rb:161) before quoting. Returns a bare literal — the
+    // ` DEFAULT ` keyword is owned by the caller (add_column_options!).
+    let serialized: unknown = value;
+    const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
+    if (sqlType) {
+      const castType = this.lookupCastTypeFromColumn({ sqlType }) as {
+        serialize?(v: unknown): unknown;
+      };
+      if (typeof castType?.serialize === "function") serialized = castType.serialize(value);
+    }
+    return this.quote(serialized);
   }
 
   quotedTrue(): string {

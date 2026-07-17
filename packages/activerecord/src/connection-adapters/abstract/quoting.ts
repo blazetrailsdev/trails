@@ -259,32 +259,49 @@ export function quoteTableNameForAssignment(table: string, attr: string): string
  * - A function: `() => "CURRENT_TIMESTAMP"` (mirrors Rails `-> { "CURRENT_TIMESTAMP" }`)
  * - An Arel SqlLiteral: `new SqlLiteral("CURRENT_TIMESTAMP")` (mirrors `Arel.sql(...)`)
  *
- * All other values are quoted as literals via `quote()`.
+ * Non-Proc values are serialized through the column's cast type before quoting
+ * (rb:161 `lookup_cast_type(column.sql_type).serialize(value)`), then quoted via
+ * `quote()`. The returned literal is **bare** — the ` DEFAULT ` keyword is owned
+ * by the caller (`add_column_options!`, `schema_creation.rb:150`), matching Rails.
  *
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#quote_default_expression
  */
 export function quoteDefaultExpression(
-  this: QuotingDispatchHost | void,
+  this: (QuotingDispatchHost & QuotingHost) | void,
   value: unknown,
-  _column?: unknown,
+  column?: { sqlType?: string | null } | null,
 ): string {
   if (value === undefined) return "";
   if (typeof value === "function") {
     const result = (value as () => unknown)();
-    if (typeof result === "string") return ` DEFAULT ${result}`;
-    if (isSqlLiteral(result)) return ` DEFAULT ${result.value}`;
+    if (typeof result === "string") return result;
+    if (isSqlLiteral(result)) return result.value;
     throw new TypeError(
       "quoteDefaultExpression expected function default to return a string or SqlLiteral",
     );
   }
-  if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
+  if (isSqlLiteral(value)) return value.value;
+  // Rails: `value = lookup_cast_type(column.sql_type).serialize(value)`
+  // (abstract/quoting.rb:161). Serialize only when the host exposes a cast type
+  // with a `serialize` — the adapter-free fallback (ABSTRACT_SCHEMA_QUOTER) and
+  // the mysql schema-quoter have no `lookupCastType`, so `lookupCastTypeFromColumn`
+  // returns the raw sqlType string and the value passes through unserialized.
+  let serialized: unknown = value;
+  if (column != null) {
+    const castType = lookupCastTypeFromColumn.call(this || undefined, {
+      sqlType: column.sqlType ?? null,
+    }) as { serialize?(v: unknown): unknown } | null;
+    if (castType && typeof castType.serialize === "function") {
+      serialized = castType.serialize(value);
+    }
+  }
   // Rails: `quote(value)` (abstract/quoting.rb:162) — self-dispatched, so a host
   // that overrides `quote` (the mysql schema-quoter binds the dialect's) gets its
   // own dialect quoting, including the raw-view branches the abstract `quote`
   // deliberately lacks. Falling straight to the module `quote` here would bypass
   // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
   // Hosts without a `quote` (ABSTRACT_SCHEMA_QUOTER) keep the module helper.
-  return ` DEFAULT ${dispatchQuote(this || {}, value)}`;
+  return dispatchQuote(this || {}, serialized);
 }
 
 /**

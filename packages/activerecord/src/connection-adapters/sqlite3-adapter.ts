@@ -1039,7 +1039,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
           "quoteDefaultExpression expected function default to return a string or SqlLiteral",
         );
       }
-      return /^\w+\(.*\)$/.test(str) ? ` DEFAULT (${str})` : ` DEFAULT ${str}`;
+      return /^\w+\(.*\)$/.test(str) ? `(${str})` : str;
     }
     const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
     return super.quoteDefaultExpression(this.serializeDefaultForColumn(value, sqlType), column);

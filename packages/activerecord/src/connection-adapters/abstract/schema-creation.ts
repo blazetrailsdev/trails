@@ -259,7 +259,7 @@ export class SchemaCreation {
         parts.push(`ALTER COLUMN ${col} DROP DEFAULT`);
       } else {
         parts.push(
-          `ALTER COLUMN ${col} SET${this.adapter.quoteDefaultExpression(change.defaultValue)}`,
+          `ALTER COLUMN ${col} SET DEFAULT ${this.adapter.quoteDefaultExpression(change.defaultValue)}`,
         );
       }
     }
@@ -346,10 +346,12 @@ export class SchemaCreation {
 
   addColumnOptions(sql: string, options: ColumnOptions): string {
     if (this.optionsIncludeDefault(options)) {
-      sql += this.adapter.quoteDefaultExpression(
+      // Rails: `sql << " DEFAULT #{quote_default_expression(...)}"`
+      // (schema_creation.rb:150) — the keyword lives here, not in the quoter.
+      sql += ` DEFAULT ${this.adapter.quoteDefaultExpression(
         options.default,
         (options as Record<string, unknown>)["column"],
-      );
+      )}`;
     }
     if (options.null === false) {
       sql += " NOT NULL";
@@ -371,7 +373,10 @@ export class SchemaCreation {
    * from `{ default: nil, null: false }`.
    */
   protected optionsIncludeDefault(options: ColumnOptions): boolean {
-    if (!("default" in options)) return false;
+    // `undefined` is trails' marker for an absent default (Rails has only
+    // `nil`); treat it as not-included so the ` DEFAULT ` keyword — now owned by
+    // this caller rather than the quoter — is not emitted with an empty literal.
+    if (!("default" in options) || options.default === undefined) return false;
     return !(options.null === false && options.default === null);
   }
 

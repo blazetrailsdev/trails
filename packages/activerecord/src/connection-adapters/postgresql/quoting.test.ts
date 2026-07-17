@@ -109,7 +109,7 @@ describe("PostgreSQL quoting", () => {
       },
     };
 
-    expect(quoteDefaultExpression(41, column, typeMap)).toBe(" DEFAULT 42");
+    expect(quoteDefaultExpression(41, column, typeMap)).toBe("42");
   });
 
   it("quotes a binary default through PG's quotedBinary", () => {
@@ -117,17 +117,15 @@ describe("PostgreSQL quoting", () => {
     // not the abstract byte-string fallback. Cover both shapes that reach here —
     // the raw Uint8Array trails' BinaryType#serialize actually returns, and the
     // BinaryData Rails' Binary#serialize returns (activemodel/.../binary.rb:31).
-    expect(quoteDefaultExpression(new Uint8Array([0x1f, 0x8b]))).toBe(" DEFAULT '\\x1f8b'");
-    expect(quoteDefaultExpression(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe(
-      " DEFAULT '\\x1f8b'",
-    );
+    expect(quoteDefaultExpression(new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
+    expect(quoteDefaultExpression(new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe("'\\x1f8b'");
   });
 
   it("quotes a BC date default through PG's quotedDate", () => {
     // Receiver-less: the fallback host must reach PG's BC-suffixing quotedDate
     // (postgresql/quoting.rb:143), not the abstract formatter which drops " BC".
     expect(quoteDefaultExpression(Temporal.PlainDate.from("-000043-03-15"))).toBe(
-      " DEFAULT '0044-03-15 BC'",
+      "'0044-03-15 BC'",
     );
   });
 
@@ -137,7 +135,7 @@ describe("PostgreSQL quoting", () => {
     // `array` must be present: the serialize branch is gated on `"array" in column`.
     const column = { sqlType: "bytea", array: false };
     const typeMap = { lookup: () => new BinaryType() };
-    expect(quoteDefaultExpression("ab", column, typeMap)).toBe(" DEFAULT '\\x6162'");
+    expect(quoteDefaultExpression("ab", column, typeMap)).toBe("'\\x6162'");
   });
 
   it("serializes array defaults via fallback OidArray when type map misses", () => {
@@ -147,8 +145,8 @@ describe("PostgreSQL quoting", () => {
         return null;
       },
     };
-    expect(quoteDefaultExpression([], column, nullTypeMap)).toBe(" DEFAULT '{}'");
-    expect(quoteDefaultExpression(["a", "b"], column, nullTypeMap)).toBe(" DEFAULT '{a,b}'");
+    expect(quoteDefaultExpression([], column, nullTypeMap)).toBe("'{}'");
+    expect(quoteDefaultExpression(["a", "b"], column, nullTypeMap)).toBe("'{a,b}'");
   });
 
   it("does not apply array fallback when column.array is false", () => {
@@ -159,7 +157,7 @@ describe("PostgreSQL quoting", () => {
       },
     };
     // A plain string value should still round-trip normally
-    expect(quoteDefaultExpression("hello", column, nullTypeMap)).toBe(" DEFAULT 'hello'");
+    expect(quoteDefaultExpression("hello", column, nullTypeMap)).toBe("'hello'");
   });
 
   it("serializes array defaults through the type map", () => {
@@ -171,7 +169,7 @@ describe("PostgreSQL quoting", () => {
       },
     };
 
-    expect(quoteDefaultExpression(["a", "b"], column, typeMap)).toBe(" DEFAULT '{a,b}'");
+    expect(quoteDefaultExpression(["a", "b"], column, typeMap)).toBe("'{a,b}'");
   });
 
   it("serializes array defaults via an element subtype (per-element coercion)", () => {
@@ -186,7 +184,7 @@ describe("PostgreSQL quoting", () => {
         return { cast: (v: unknown) => v, serialize: (v: unknown) => Number(v) + 100 };
       },
     };
-    expect(quoteDefaultExpression([1, 2, 3], column, typeMap)).toBe(" DEFAULT '{101,102,103}'");
+    expect(quoteDefaultExpression([1, 2, 3], column, typeMap)).toBe("'{101,102,103}'");
   });
 
   it("passes raw array-literal string defaults through without scalar coercion", () => {
@@ -201,8 +199,8 @@ describe("PostgreSQL quoting", () => {
         return { serialize: (v: unknown) => Number(v) };
       },
     };
-    expect(quoteDefaultExpression("{}", column, typeMap)).toBe(" DEFAULT '{}'");
-    expect(quoteDefaultExpression("{1,2,3}", column, typeMap)).toBe(" DEFAULT '{1,2,3}'");
+    expect(quoteDefaultExpression("{}", column, typeMap)).toBe("'{}'");
+    expect(quoteDefaultExpression("{1,2,3}", column, typeMap)).toBe("'{1,2,3}'");
   });
 
   it("supports nested function calls up to 2 levels deep", () => {
