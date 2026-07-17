@@ -395,29 +395,27 @@ export class BelongsTo extends SingularAssociation {
 
       model.validatesPresenceOf(name, { message: "required", if: condition });
 
-      // The sync presence check above only fires when the FK is blank (Rails'
+      // The presence check above only fires when the FK is blank (Rails'
       // observable "must exist" for an unset association). When the FK IS
       // populated, Rails still reads the association — loading the target — and
-      // fails "must exist" if the row no longer exists. trails validations are
-      // synchronous and cannot load, so that case is deferred to the async
-      // validation pass (Base#_runAsyncValidations), which runs after the sync
-      // chain and is skipped on `save(validate: false)` just like Rails' valid?.
-      // It is gated by the same `railsRuns` condition so the false-config branch
-      // doesn't reload an already-persisted, unchanged FK (belongs_to_associations_test.rb
-      // "skips parent presence check if parent has not changed").
-      const klass = model as { _asyncValidations?: Array<unknown> };
-      if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
-        klass._asyncValidations = [...(klass._asyncValidations ?? [])];
-      }
-      (klass._asyncValidations as Array<unknown>).push({
-        attribute: name,
-        options: {
-          belongsToExistence: true,
-          message: "required",
-          if: (record: any) => railsRuns(record) && foreignKeyPresent(record),
+      // fails "must exist" if the row no longer exists. Now that the validation
+      // chain is async (RFC 0063), that case runs as a normal validator that
+      // loads the target inline in `valid?`. It is gated by the same `railsRuns`
+      // condition so the false-config branch doesn't reload an already-persisted,
+      // unchanged FK (belongs_to_associations_test.rb "skips parent presence
+      // check if parent has not changed").
+      model.validate(
+        async (record: any) => {
+          let target: unknown = null;
+          if (typeof record.association === "function") {
+            target = await record.association(name).loadTarget();
+          }
+          if (target == null) {
+            record.errors.add(name, "blank", { message: "required" });
+          }
         },
-        declaringClass: model,
-      });
+        { if: (record: any) => railsRuns(record) && foreignKeyPresent(record) },
+      );
     }
   }
 

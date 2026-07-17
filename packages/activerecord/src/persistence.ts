@@ -834,9 +834,6 @@ export async function save<T extends SaveRecord>(
     self._belongsToDefaultsApplied = false;
   }
   if (!validationsPassed) return false;
-  if (options?.validate !== false) {
-    if (!(await self._runAsyncValidations())) return false;
-  }
   // Mirrors ActiveRecord::Persistence#create_or_update: readonly raises first,
   // then `return false if destroyed?`. `save` returns false (it does not raise)
   // for a destroyed record; `save!` turns that false into

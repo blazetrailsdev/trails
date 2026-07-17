@@ -125,34 +125,13 @@ export function _setSuperIsValid(fn: (context?: ValidationContextArg) => Promise
  * :update for persisted). Sets _validationContext for the duration
  * matching Rails' with_validation_context.
  *
- * TRACKED DEVIATION (pending convergence) — uniqueness is NOT run here.
- * Rails' `valid?` runs the full validation chain, including the DB-backed
- * `UniquenessValidator`, because Ruby's DB I/O is synchronous: `valid?`
- * issues the `SELECT 1 ... WHERE attr = ?` inline and returns `false` on a
- * collision. trails keeps the validation chain synchronous (`isValid`
- * returns a `boolean`, never a `Promise`) by design, so uniqueness — which
- * needs a DB round-trip — is registered into the deferred `_asyncValidations`
- * registry (see {@link validatesUniqueness}) and drained only at save time by
- * `Base#_runAsyncValidations` (awaited from persistence). Consequence:
- * `record.isValid()` can return `true` and then `save()`/`saveBang()` still
- * fail on a uniqueness collision.
- *
- * Convergence to Rails' observable `valid?` semantics would require an async
- * validation chain (`isValid` returning a `Promise`), which is barred by the
- * ratified sync-only-validations architecture: `isValid`/`valid?` return a
- * `boolean`, JS has no synchronous DB I/O, and an async `isValid` would ripple
- * through every synchronous caller. This deviation is therefore NOT a wontfix:
- * it is blocked-on-architecture, gated on that sync-only decision being
- * revisited (the same governing constraint behind the `async`-callback-on-sync
- * guard in `@blazetrails/activesupport`'s `callbacks.ts`). A standalone
- * convergence story is intentionally omitted because the only fix — making the
- * validation chain async — is the very thing that decision forbids; it would be
- * a no-op until/unless the architecture itself changes. If sync-only is ever
- * reconsidered, this and `async-validations-honor-validation-context` (the
- * sibling deviation on the same deferred path) become schedulable together.
- * Note Rails' own `valid?` uniqueness check is a TOCTOU race (the pre-check
- * and the INSERT aren't atomic), so the save-time-only behavior here is closer
- * to the concurrency-safe pattern — but it still diverges observably.
+ * Since the validation chain is async (RFC 0063), the DB-backed
+ * `UniquenessValidator` runs inline here like any other validator: `isValid`
+ * awaits the validate callback chain, which issues the
+ * `SELECT 1 ... WHERE attr = ?` existence check and populates `errors` on a
+ * collision — matching Rails' `valid?` (before any save). Uniqueness also
+ * honors the active validation context (`on: :create` etc.) because it now
+ * flows through the context-threaded callback chain.
  */
 export async function isValid(
   this: ValidationsHost,
@@ -330,11 +309,9 @@ export function validates(
   if (arRules.uniqueness) {
     const opts = arRules.uniqueness === true ? {} : (arRules.uniqueness as Record<string, unknown>);
     delete arRules.uniqueness;
-    // Uniqueness needs a DB round-trip, so it routes to the deferred
-    // _asyncValidations registry via validatesUniqueness rather than the
-    // synchronous validatesWith chain (matching Rails' UniquenessValidator).
-    // _runAsyncValidations honors the forwarded on/if/unless/strict guards, so
-    // they pass through unmodified.
+    // Uniqueness registers a UniquenessValidator via validatesUniqueness (which
+    // routes to validatesWith); its async validateEach runs the existence check
+    // inline in the async validation chain, honoring on/if/unless/strict.
     const { attributes: _attributes, ...uniqOpts } = buildOpts(opts) as Record<string, unknown>;
     validatesUniqueness.call(
       this,
