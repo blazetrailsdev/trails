@@ -709,8 +709,17 @@ export function _enum(
     // `instance_methods: false` must not raise on a predicate-name collision it
     // will never generate.
     if (instanceMethodsEnabled) {
-      if (definedNames.has(predicateName)) raiseConflictError.call(this, attribute, predicateName);
-      if (definedNames.has(bangName)) raiseConflictError.call(this, attribute, bangName);
+      // `definedNames` models Rails' `_enum_methods_module`: every
+      // `define_enum_methods` call within a single `_enum` defines into that one
+      // module, so an intra-enum collision (a later label reusing an earlier
+      // label's predicate/bang — including its friendly alias) hits
+      // `method_defined_within?(method_name, _enum_methods_module, Module)` and
+      // reports `source: "another enum"` (enum.rb:302-310, 388-395), not the
+      // default "Active Record".
+      if (definedNames.has(predicateName))
+        raiseConflictError.call(this, attribute, predicateName, { source: "another enum" });
+      if (definedNames.has(bangName))
+        raiseConflictError.call(this, attribute, bangName, { source: "another enum" });
       definedNames.add(predicateName);
       definedNames.add(bangName);
       // Instance value methods (predicate/bang) only conflict with *dangerous*
@@ -752,9 +761,12 @@ export function _enum(
         // already-defined method within the *same* enum (enum.rb:273-275,
         // 302-310, 381-384). Mirror the main-label branch: check and record
         // `fp`/`friendlyBang` in `definedNames` so one label's friendly alias
-        // colliding with a sibling label's generated predicate/bang raises.
-        if (definedNames.has(fp)) raiseConflictError.call(this, attribute, fp);
-        if (definedNames.has(friendlyBang)) raiseConflictError.call(this, attribute, friendlyBang);
+        // colliding with a sibling label's generated predicate/bang raises with
+        // `source: "another enum"` (module membership, per the main-label note).
+        if (definedNames.has(fp))
+          raiseConflictError.call(this, attribute, fp, { source: "another enum" });
+        if (definedNames.has(friendlyBang))
+          raiseConflictError.call(this, attribute, friendlyBang, { source: "another enum" });
         definedNames.add(fp);
         definedNames.add(friendlyBang);
         if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);

@@ -68,7 +68,9 @@ describe("Enum name conflict detection", () => {
   // label's friendly alias and a sibling label's generated predicate/bang.
   // The camelCase friendly-alias surface is trails-specific: `"api-key"`
   // camelizes to `apiKey` → `isApiKey`, which also is `api_key`'s main
-  // predicate, defining `isApiKey` twice.
+  // predicate, defining `isApiKey` twice. Because both share the one
+  // `_enum_methods_module`, Rails reports `source: "another enum"`
+  // (enum.rb:302-310, 388-395), not the default "Active Record".
   it("raises when a friendly alias collides with a sibling label within one enum", () => {
     expect(() => {
       class Klass extends Base {
@@ -77,8 +79,7 @@ describe("Enum name conflict detection", () => {
           this.enum("status", { "api-key": 0, api_key: 1 });
         }
       }
-      new Klass();
-    }).toThrow(/already defined/);
+    }).toThrow(/already defined by another enum/);
   });
 
   // Rails runs the `?`/`!` `detect_enum_conflict!` calls *only* inside
