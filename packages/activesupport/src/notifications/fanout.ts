@@ -42,6 +42,14 @@ export function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => v
   return collection;
 }
 
+// Rails' Fanout::Handle#ensure_state! raises ArgumentError (fanout.rb:263-267).
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
+}
+
 type EventedListener = {
   start(name: string, id: unknown, payload: Record<string, unknown>): void;
   finish(name: string, id: unknown, payload: Record<string, unknown>): void;
@@ -253,7 +261,7 @@ export class Handle {
 
   start(): void {
     if (this.state !== "initialized") {
-      throw new Error(`expected state to be "initialized" but was "${this.state}"`);
+      throw new ArgumentError(`expected state to be "initialized" but was "${this.state}"`);
     }
     this.state = "started";
     iterateGuardingExceptions(this.groups, (g) => g.start(this._name, this._id, this._payload));
@@ -265,7 +273,7 @@ export class Handle {
 
   finishWithValues(name: string, id: unknown, payload: Record<string, unknown>): void {
     if (this.state !== "started") {
-      throw new Error(`expected state to be "started" but was "${this.state}"`);
+      throw new ArgumentError(`expected state to be "started" but was "${this.state}"`);
     }
     this.state = "finished";
     iterateGuardingExceptions(this.groups, (g) => g.finish(name, id, payload));
@@ -361,21 +369,26 @@ export class Fanout {
    * `iterate_guarding_exceptions` (run all, then re-raise/aggregate). Each kind
    * consumes the event as its subscriber class' `publish_event` does (fanout.rb:
    * 396-441): event-object gets the Event; timed/monotonic convert to the 5-arg
-   * `(name, start, finish, id, payload)` form off the event's own times; evented
-   * listeners have no `publish_event` path, so they're skipped.
+   * `(name, start, finish, id, payload)` form off the event's own times; an
+   * evented delegate delegates to its own `publishEvent`/`publish` if it has one
+   * (fanout.rb:396-401), and a plain start/finish-only listener no-ops.
    */
   publishEvent(event: Event): void {
+    const asTimed = (delegate: TimedCallback) =>
+      delegate(event.name, event.time, event.end ?? event.time, event.transactionId, event.payload);
+
     iterateGuardingExceptions(this.allListenersFor(event.name), (s) => {
       if (s.kind === "event_object") {
         (s.delegate as EventObjectCallback)(event);
       } else if (s.kind === "timed" || s.kind === "monotonic") {
-        (s.delegate as TimedCallback)(
-          event.name,
-          event.time,
-          event.end ?? event.time,
-          event.transactionId,
-          event.payload,
-        );
+        asTimed(s.delegate as TimedCallback);
+      } else {
+        const d = s.delegate as EventedListener & {
+          publishEvent?: (event: Event) => void;
+          publish?: TimedCallback;
+        };
+        if (typeof d.publishEvent === "function") d.publishEvent(event);
+        else if (typeof d.publish === "function") asTimed(d.publish);
       }
     });
   }
