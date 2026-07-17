@@ -374,21 +374,24 @@ export class Fanout {
    * (fanout.rb:396-401), and a plain start/finish-only listener no-ops.
    */
   publishEvent(event: Event): void {
-    const asTimed = (delegate: TimedCallback) =>
-      delegate(event.name, event.time, event.end ?? event.time, event.transactionId, event.payload);
+    const start = event.time;
+    const finish = event.end ?? event.time;
+    const { name, transactionId: id, payload } = event;
 
-    iterateGuardingExceptions(this.allListenersFor(event.name), (s) => {
+    iterateGuardingExceptions(this.allListenersFor(name), (s) => {
       if (s.kind === "event_object") {
         (s.delegate as EventObjectCallback)(event);
       } else if (s.kind === "timed" || s.kind === "monotonic") {
-        asTimed(s.delegate as TimedCallback);
+        (s.delegate as TimedCallback)(name, start, finish, id, payload);
       } else {
         const d = s.delegate as EventedListener & {
           publishEvent?: (event: Event) => void;
           publish?: TimedCallback;
         };
+        // Call the method on its own receiver, as Rails' `@delegate.publish`
+        // does — an evented object's publish may read instance state.
         if (typeof d.publishEvent === "function") d.publishEvent(event);
-        else if (typeof d.publish === "function") asTimed(d.publish);
+        else if (typeof d.publish === "function") d.publish(name, start, finish, id, payload);
       }
     });
   }
