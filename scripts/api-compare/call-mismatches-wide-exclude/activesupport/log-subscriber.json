@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "silenced?",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "subscribe_log_level",
+    "call": "fetch",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "log-subscriber.ts",
+    "rubyName": "subscribe_log_level",
+    "call": "merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

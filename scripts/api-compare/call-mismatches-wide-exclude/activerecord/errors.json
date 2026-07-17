@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "errors.ts",
+    "rubyName": "set_query",
+    "call": "call",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "errors.ts",
+    "rubyName": "set_query",
+    "call": "new",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  }
+]

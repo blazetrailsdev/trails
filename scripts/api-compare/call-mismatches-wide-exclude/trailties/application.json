@@ -1,0 +1,65 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "deep_merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "deep_symbolize_keys",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "exist?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "parse",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "require",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "config_for",
+    "call": "update",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "encrypted",
+    "call": "join",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "application.ts",
+    "rubyName": "encrypted",
+    "call": "root",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

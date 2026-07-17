@@ -1,0 +1,65 @@
+[
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "build_subselect",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "build_subselect",
+    "call": "sql",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "visit_Arel_Nodes_Concat",
+    "call": "visit",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "visit_Arel_Nodes_IsDistinctFrom",
+    "call": "visit_Arel_Nodes_IsNotDistinctFrom",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "visit_Arel_Nodes_IsNotDistinctFrom",
+    "call": "visit",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "visit_Arel_Nodes_NotRegexp",
+    "call": "infix_value",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "visit_Arel_Nodes_Regexp",
+    "call": "infix_value",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "visit_Arel_Nodes_SelectCore",
+    "call": "sql",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/mysql.ts",
+    "rubyName": "visit_Arel_Nodes_SelectStatement",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

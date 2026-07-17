@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/config.ts",
+    "rubyName": "add_previous_scheme",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

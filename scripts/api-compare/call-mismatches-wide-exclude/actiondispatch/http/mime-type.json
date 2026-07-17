@@ -1,0 +1,149 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "fetch",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "find_item_by_name",
+    "call": "index",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "html?",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "initialize",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "lookup",
+    "call": "key?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "lookup_by_extension",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "match?",
+    "call": "any?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "match?",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "match?",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "parse",
+    "call": "blank?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "parse",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "parse",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "parse",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "parse_data_with_trailing_star",
+    "call": "match?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "ref",
+    "call": "to_s",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "register",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "register",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "register",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "register_alias",
+    "call": "register",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "to_str",
+    "call": "to_s",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-type.ts",
+    "rubyName": "valid_symbols?",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

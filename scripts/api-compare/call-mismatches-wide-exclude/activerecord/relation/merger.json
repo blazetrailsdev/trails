@@ -1,0 +1,303 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_clauses",
+    "call": "from_clause",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_clauses",
+    "call": "having_clause",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_clauses",
+    "call": "relation",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "construct_join_dependency",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "joins!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "model",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "partition",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_joins",
+    "call": "relation",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_multi_values",
+    "call": "any?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_multi_values",
+    "call": "extending!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_multi_values",
+    "call": "extensions",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_multi_values",
+    "call": "order!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_multi_values",
+    "call": "relation",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_multi_values",
+    "call": "reorder!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_multi_values",
+    "call": "reordering_value",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "construct_join_dependency",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "left_outer_joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "left_outer_joins!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "model",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "partition",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_outer_joins",
+    "call": "relation",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "empty?",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "find",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "includes_values",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "includes!",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "model",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "preload_values",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "preload!",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "reflect_on_all_associations",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_preloads",
+    "call": "relation",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_select_values",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_select_values",
+    "call": "model",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_select_values",
+    "call": "relation",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_select_values",
+    "call": "select_values",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_single_values",
+    "call": "blank?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_single_values",
+    "call": "create_with_value",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_single_values",
+    "call": "merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "merge_single_values",
+    "call": "relation",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "replace_from_clause?",
+    "call": "from_clause",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/merger.ts",
+    "rubyName": "replace_from_clause?",
+    "call": "model",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

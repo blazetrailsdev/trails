@@ -1,0 +1,51 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "accepts_html?",
+    "call": "best_q_match",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "call",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "pretty",
+    "call": "chomp",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "pretty",
+    "call": "compact",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "pretty",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "pretty",
+    "call": "path_info",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "show-exceptions.ts",
+    "rubyName": "pretty",
+    "call": "script_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

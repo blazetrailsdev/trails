@@ -1,0 +1,37 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation.ts",
+    "rubyName": "allow",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation.ts",
+    "rubyName": "initialize",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation.ts",
+    "rubyName": "silence",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation.ts",
+    "rubyName": "warn",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "deprecation.ts",
+    "rubyName": "warn",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,37 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "query-parser.ts",
+    "rubyName": "check_query_string",
+    "call": "count",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "query-parser.ts",
+    "rubyName": "params_hash_has_key?",
+    "call": "key?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "query-parser.ts",
+    "rubyName": "params_hash_has_key?",
+    "call": "match?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "query-parser.ts",
+    "rubyName": "parse_nested_query",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "query-parser.ts",
+    "rubyName": "parse_query",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

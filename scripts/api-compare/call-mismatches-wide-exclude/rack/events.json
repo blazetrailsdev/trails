@@ -1,0 +1,16 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "events.ts",
+    "rubyName": "call",
+    "call": "make_request",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "events.ts",
+    "rubyName": "call",
+    "call": "make_response",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

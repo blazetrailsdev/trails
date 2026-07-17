@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "notifications.ts",
+    "rubyName": "instrument",
+    "call": "listening?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/authentication/authentication-generator.ts",
+    "rubyName": "configure_authentication_routes",
+    "call": "route",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

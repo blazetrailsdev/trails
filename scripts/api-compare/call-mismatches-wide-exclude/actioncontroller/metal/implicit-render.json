@@ -1,0 +1,58 @@
+[
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "formats",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "join",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "request",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "default_render",
+    "call": "variant",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "method_for_action",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/implicit-render.ts",
+    "rubyName": "send_action",
+    "call": "default_render",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

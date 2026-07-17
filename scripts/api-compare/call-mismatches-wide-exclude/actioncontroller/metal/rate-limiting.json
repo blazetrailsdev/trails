@@ -1,0 +1,16 @@
+[
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/rate-limiting.ts",
+    "rubyName": "rate_limiting",
+    "call": "compact",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/rate-limiting.ts",
+    "rubyName": "rate_limiting",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

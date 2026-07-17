@@ -1,0 +1,72 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "execute_batch",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "execute_batch",
+    "call": "raw_execute",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "multi_statements_enabled?",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "perform_query",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "perform_query",
+    "call": "multi_statements_enabled?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "perform_query",
+    "call": "prepare",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "perform_query",
+    "call": "size",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "select_all",
+    "call": "collect?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "select_all",
+    "call": "prepared_statements",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql2/database-statements.ts",
+    "rubyName": "select_all",
+    "call": "unprepared_statement",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

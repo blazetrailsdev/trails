@@ -1,0 +1,37 @@
+[
+  {
+    "package": "arel",
+    "tsFile": "visitors/dot.ts",
+    "rubyName": "edge",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/dot.ts",
+    "rubyName": "quote",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/dot.ts",
+    "rubyName": "visit",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/dot.ts",
+    "rubyName": "visit_String",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "visitors/dot.ts",
+    "rubyName": "with_node",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

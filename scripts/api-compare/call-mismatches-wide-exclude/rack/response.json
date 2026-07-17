@@ -1,0 +1,100 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "add_header",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "buffered_body!",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "buffered_body!",
+    "call": "compact",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "buffered_body!",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "buffered_body!",
+    "call": "sum",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "buffered_body!",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "delete_header",
+    "call": "delete",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "each",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "has_header?",
+    "call": "key?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "initialize",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "initialize",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "initialize",
+    "call": "to_str",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "write",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "response.ts",
+    "rubyName": "write",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

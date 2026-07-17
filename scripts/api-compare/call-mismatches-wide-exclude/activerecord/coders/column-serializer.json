@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "coders/column-serializer.ts",
+    "rubyName": "check_arity_of_constructor",
+    "call": "load",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

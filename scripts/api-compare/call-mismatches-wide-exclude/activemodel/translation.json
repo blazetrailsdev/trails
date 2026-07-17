@@ -1,0 +1,51 @@
+[
+  {
+    "package": "activemodel",
+    "tsFile": "translation.ts",
+    "rubyName": "human_attribute_name",
+    "call": "fetch",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "translation.ts",
+    "rubyName": "human_attribute_name",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "translation.ts",
+    "rubyName": "human_attribute_name",
+    "call": "present?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "translation.ts",
+    "rubyName": "human_attribute_name",
+    "call": "raise_on_missing_translations",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "translation.ts",
+    "rubyName": "human_attribute_name",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "translation.ts",
+    "rubyName": "human_attribute_name",
+    "call": "translate",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "translation.ts",
+    "rubyName": "lookup_ancestors",
+    "call": "select",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

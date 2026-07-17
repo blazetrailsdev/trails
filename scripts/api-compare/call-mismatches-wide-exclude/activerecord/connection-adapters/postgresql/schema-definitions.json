@@ -1,0 +1,44 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
+    "rubyName": "defined_for?",
+    "call": "all?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
+    "rubyName": "defined_for?",
+    "call": "slice",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
+    "rubyName": "defined_for?",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
+    "rubyName": "export_name_on_schema_dump?",
+    "call": "match?",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
+    "rubyName": "new_exclusion_constraint_definition",
+    "call": "exclusion_constraint_options",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/schema-definitions.ts",
+    "rubyName": "new_unique_constraint_definition",
+    "call": "unique_constraint_options",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

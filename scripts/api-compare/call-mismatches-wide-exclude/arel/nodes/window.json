@@ -1,0 +1,58 @@
+[
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "order",
+    "call": "concat",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "order",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "order",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "order",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "partition",
+    "call": "concat",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "partition",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "partition",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "nodes/window.ts",
+    "rubyName": "partition",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

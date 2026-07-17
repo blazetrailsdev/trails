@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activemodel",
+    "tsFile": "validations/comparability.ts",
+    "rubyName": "error_options",
+    "call": "except",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "validations/comparability.ts",
+    "rubyName": "error_options",
+    "call": "merge!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

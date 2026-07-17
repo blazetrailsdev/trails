@@ -1,0 +1,170 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "charset",
+    "call": "connection",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "collation",
+    "call": "connection",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "create",
+    "call": "create_database",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "create",
+    "call": "merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "drop",
+    "call": "drop_database",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "psql_env",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "public_schema_config",
+    "call": "merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "purge",
+    "call": "clear_active_connections!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "purge",
+    "call": "connection_handler",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "remove_sql_header_comments",
+    "call": "blank?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "remove_sql_header_comments",
+    "call": "open",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "remove_sql_header_comments",
+    "call": "path",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "run_cmd",
+    "call": "run_cmd_error",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "any?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "blank?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "concat",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "connection",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "data_sources",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "flat_map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "open",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "select",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_dump",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "tasks/postgresql-database-tasks.ts",
+    "rubyName": "structure_load",
+    "call": "concat",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

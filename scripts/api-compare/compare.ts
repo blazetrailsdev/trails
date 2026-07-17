@@ -41,7 +41,8 @@
  * variant: the calls check admits every ported call name except `super`
  * (WIDE_SIGNIFICANT_CALLS) instead of the narrow SIGNIFICANT_CALLS allowlist,
  * and the artifact is written to output/call-mismatches-wide.json — a SEPARATE
- * file gated by lint-call-mismatches-wide.ts against call-mismatches-wide-exclude.json,
+ * file gated by lint-call-mismatches-wide.ts against the split
+ * call-mismatches-wide-exclude/ baseline directory (one file per source),
  * so the narrow 0044 artifact and gate above are left untouched.
  *
  * Source-hash pinning (RFC 0025): every name-matched pair's normalized Rails
@@ -138,7 +139,7 @@ const SIGNIFICANT_CALLS = new Set([
 // `API_COMPARE_WIDE_CALLS=1`, this swaps the narrow allowlist for a membership
 // predicate so `checkCalls` flags every name-matched omission, writing a
 // SEPARATE artifact (call-mismatches-wide.json) gated by its own ratcheting
-// baseline (call-mismatches-wide-exclude.json + lint-call-mismatches-wide.ts).
+// baseline (the split call-mismatches-wide-exclude/ dir + lint-call-mismatches-wide.ts).
 // The narrow 0044 gate and SIGNIFICANT_CALLS are untouched. The wide population
 // is ~72% Enumerable/Object/accessor noise (bucket c) plus confirmed equivalents
 // (bucket b); the baseline seeds large and shrinks as the per-cluster convergence

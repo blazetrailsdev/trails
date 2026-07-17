@@ -1,0 +1,142 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "accept",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "accept",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "column_options",
+    "call": "merge",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_AddCheckConstraint",
+    "call": "accept",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_AddForeignKey",
+    "call": "accept",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_AlterTable",
+    "call": "accept",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_AlterTable",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_ColumnDefinition",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_CreateIndexDefinition",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_DropConstraint",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_ForeignKeyDefinition",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_PrimaryKeyDefinition",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "accept",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "concat",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "exclusion_constraints",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "index_in_create",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "indexes",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "present?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "primary_keys",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/abstract/schema-creation.ts",
+    "rubyName": "visit_TableDefinition",
+    "call": "unique_constraints",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "number-helper/rounding-helper.ts",
+    "rubyName": "round",
+    "call": "fetch",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/before-type-cast.ts",
+    "rubyName": "read_attribute_before_type_cast",
+    "call": "attribute_aliases",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/before-type-cast.ts",
+    "rubyName": "read_attribute_before_type_cast",
+    "call": "attribute_before_type_cast",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/before-type-cast.ts",
+    "rubyName": "read_attribute_before_type_cast",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/before-type-cast.ts",
+    "rubyName": "read_attribute_for_database",
+    "call": "attribute_aliases",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/before-type-cast.ts",
+    "rubyName": "read_attribute_for_database",
+    "call": "attribute_for_database",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "attribute-methods/before-type-cast.ts",
+    "rubyName": "read_attribute_for_database",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

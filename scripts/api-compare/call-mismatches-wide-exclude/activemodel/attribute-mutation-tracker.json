@@ -1,0 +1,30 @@
+[
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-mutation-tracker.ts",
+    "rubyName": "any_changes?",
+    "call": "any?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-mutation-tracker.ts",
+    "rubyName": "attribute_changed?",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-mutation-tracker.ts",
+    "rubyName": "changed_attribute_names",
+    "call": "select",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "attribute-mutation-tracker.ts",
+    "rubyName": "changes",
+    "call": "merge!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

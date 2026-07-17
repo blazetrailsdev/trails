@@ -1,0 +1,30 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "flows.ts",
+    "rubyName": "get",
+    "call": "key?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "flows.ts",
+    "rubyName": "get",
+    "call": "yield",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "flows.ts",
+    "rubyName": "set",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "flows.ts",
+    "rubyName": "set",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

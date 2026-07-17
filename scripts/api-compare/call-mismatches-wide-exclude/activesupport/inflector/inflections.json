@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "inflector/inflections.ts",
+    "rubyName": "human",
+    "call": "prepend",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "inflector/inflections.ts",
+    "rubyName": "plural",
+    "call": "prepend",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "inflector/inflections.ts",
+    "rubyName": "singular",
+    "call": "prepend",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

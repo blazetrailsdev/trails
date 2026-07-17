@@ -1,0 +1,16 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/resource/resource-generator.ts",
+    "rubyName": "initialize",
+    "call": "options",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/resource/resource-generator.ts",
+    "rubyName": "initialize",
+    "call": "pluralize",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

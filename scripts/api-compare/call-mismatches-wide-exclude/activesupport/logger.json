@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activesupport",
+    "tsFile": "logger.ts",
+    "rubyName": "log_at",
+    "call": "local_level",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activesupport",
+    "tsFile": "logger.ts",
+    "rubyName": "silence",
+    "call": "log_at",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

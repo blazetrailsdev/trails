@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "type-caster/map.ts",
+    "rubyName": "type_for_attribute",
+    "call": "klass",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

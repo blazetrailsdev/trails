@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/key-generator.ts",
+    "rubyName": "derive_key_from",
+    "call": "hash_digest_class",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/key-generator.ts",
+    "rubyName": "generate_random_hex_key",
+    "call": "generate_random_key",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "encryption/key-generator.ts",
+    "rubyName": "generate_random_hex_key",
+    "call": "unpack",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

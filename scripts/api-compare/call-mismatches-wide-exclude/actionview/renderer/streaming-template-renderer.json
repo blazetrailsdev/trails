@@ -1,0 +1,30 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "renderer/streaming-template-renderer.ts",
+    "rubyName": "delayed_render",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/streaming-template-renderer.ts",
+    "rubyName": "delayed_render",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/streaming-template-renderer.ts",
+    "rubyName": "delayed_render",
+    "call": "safe_concat",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/streaming-template-renderer.ts",
+    "rubyName": "delayed_render",
+    "call": "set",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

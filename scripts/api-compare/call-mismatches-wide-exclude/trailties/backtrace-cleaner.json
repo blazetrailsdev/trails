@@ -1,0 +1,30 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "backtrace-cleaner.ts",
+    "rubyName": "initialize",
+    "call": "from",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "backtrace-cleaner.ts",
+    "rubyName": "initialize",
+    "call": "match?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "backtrace-cleaner.ts",
+    "rubyName": "initialize",
+    "call": "root",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "backtrace-cleaner.ts",
+    "rubyName": "initialize",
+    "call": "size",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

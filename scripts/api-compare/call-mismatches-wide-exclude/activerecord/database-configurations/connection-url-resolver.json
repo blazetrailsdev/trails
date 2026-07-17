@@ -1,0 +1,65 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "database_from_path",
+    "call": "path",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "initialize",
+    "call": "blank?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "initialize",
+    "call": "parse",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "initialize",
+    "call": "query",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "initialize",
+    "call": "split",
+    "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "query_hash",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "query_hash",
+    "call": "symbolize_keys",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "raw_config",
+    "call": "merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "database-configurations/connection-url-resolver.ts",
+    "rubyName": "raw_config",
+    "call": "reverse_merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

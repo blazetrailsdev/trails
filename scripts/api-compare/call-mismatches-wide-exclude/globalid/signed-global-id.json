@@ -1,0 +1,58 @@
+[
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "initialize",
+    "call": "pick_expiration",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "initialize",
+    "call": "pick_purpose",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "initialize",
+    "call": "pick_verifier",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "parse",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "pick_purpose",
+    "call": "fetch",
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "pick_verifier",
+    "call": "fetch",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "raise_if_expired",
+    "call": "iso8601",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "signed-global-id.ts",
+    "rubyName": "verify_with_verifier_validated_metadata",
+    "call": "verify",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,44 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "associations/alias-tracker.ts",
+    "rubyName": "create",
+    "call": "empty?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/alias-tracker.ts",
+    "rubyName": "create",
+    "call": "initial_count_for",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/alias-tracker.ts",
+    "rubyName": "create",
+    "call": "with_connection",
+    "reason": "Rails' create wraps `pool.with_connection { |c| new(c.table_alias_length, ...) }` (alias_tracker.rb:10-24). trails' withConnection is async while create is synchronous, so create resolves the connection's tableAliasLength directly instead. Threading the connection through the sync tracker-construction sites is tracked by story thread-connection-table-alias-length-into-tracker-construction (RFC 0051)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/alias-tracker.ts",
+    "rubyName": "initial_count_for",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/alias-tracker.ts",
+    "rubyName": "initial_count_for",
+    "call": "size",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/alias-tracker.ts",
+    "rubyName": "initial_count_for",
+    "call": "sum",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

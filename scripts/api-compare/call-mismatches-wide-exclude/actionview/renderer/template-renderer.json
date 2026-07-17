@@ -1,0 +1,93 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "determine_template",
+    "call": "absolute?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "determine_template",
+    "call": "exist?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "determine_template",
+    "call": "find_template",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "determine_template",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "determine_template",
+    "call": "handler_for_extension",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "determine_template",
+    "call": "key?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "render_template",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "render_with_layout",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "render_with_layout",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "resolve_layout",
+    "call": "call",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "resolve_layout",
+    "call": "find_template",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "resolve_layout",
+    "call": "merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "renderer/template-renderer.ts",
+    "rubyName": "resolve_layout",
+    "call": "template_exists?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

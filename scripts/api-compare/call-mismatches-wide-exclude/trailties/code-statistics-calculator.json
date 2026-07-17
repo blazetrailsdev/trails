@@ -1,0 +1,16 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "code-statistics-calculator.ts",
+    "rubyName": "add_by_file_path",
+    "call": "open",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "code-statistics-calculator.ts",
+    "rubyName": "file_type",
+    "call": "extname",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

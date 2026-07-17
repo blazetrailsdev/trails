@@ -1,0 +1,9 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "callbacks.ts",
+    "rubyName": "_update_record",
+    "call": "record_update_timestamps",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

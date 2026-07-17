@@ -1,0 +1,9 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/encrypted-file/encrypted-file-generator.ts",
+    "rubyName": "add_encrypted_file_silently",
+    "call": "exist?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]
