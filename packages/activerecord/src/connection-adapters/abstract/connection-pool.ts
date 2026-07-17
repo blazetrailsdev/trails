@@ -1468,17 +1468,17 @@ export class ConnectionPool implements ReapablePool {
  * public config type also accepts the documented "enabled"/"disabled"/
  * "unlimited" strings, which Rails would never see as raw values. Normalize
  * them so a pool configured with `queryCache: "disabled"` actually disables
- * storage instead of falling through to DEFAULT_MAX_SIZE. `"unlimited"` maps
- * to `Infinity` — a max size the Store never reaches, so it never evicts. That
- * mirrors Rails `query_cache: "unlimited"`, which (matching no `0/false/
- * Integer/nil` case) falls through to a `nil` (unbounded) max size.
+ * storage instead of falling through to DEFAULT_MAX_SIZE. `"unlimited"` passes
+ * through as-is: Rails' initializer case-matches it against no `0/false/Integer/
+ * nil` branch and falls through to a `nil` (unbounded) max size, and unlike
+ * `false` it does NOT mark the pool disabled (`db_config.query_cache == false`).
  */
-function normalizeQueryCacheConfig(raw: unknown): number | false | null | undefined {
-  if (raw === "disabled" || raw === false || raw === 0) return false;
-  if (raw === "unlimited") return Number.POSITIVE_INFINITY;
-  if (raw === "enabled" || raw === true || raw == null) return raw as null | undefined;
+function normalizeQueryCacheConfig(raw: unknown): number | false | null | "unlimited" {
+  if (raw === "disabled" || raw === false) return false;
+  if (raw === "unlimited") return "unlimited";
+  if (raw === "enabled" || raw === true || raw == null) return null;
   if (typeof raw === "number") return raw;
-  return undefined;
+  return null;
 }
 
 function isTransactionAware(conn: DatabaseAdapter): conn is TransactionAwareConnection {
