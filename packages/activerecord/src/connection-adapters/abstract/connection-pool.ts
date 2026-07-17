@@ -252,6 +252,15 @@ export class ExecutorHooks {
     ExecutorHooks._getConnectionHandler = resolver;
   }
 
+  /**
+   * Resolves the current connection handler (lazily wired from `Base` in
+   * index.ts to avoid a module-level cycle), or `null` before it is wired.
+   * @internal
+   */
+  static connectionHandler(): ConnectionHandlerLike | null {
+    return ExecutorHooks._getConnectionHandler?.() ?? null;
+  }
+
   static run(): void {
     // noop — matches Rails
   }
