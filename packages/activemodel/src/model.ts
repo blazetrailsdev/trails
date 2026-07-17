@@ -622,19 +622,12 @@ export class Model {
 
     if (rules.acceptance) {
       const opts = rules.acceptance === true ? {} : (rules.acceptance as Record<string, unknown>);
-      if (!this._attributeDefinitions.has(attribute)) {
-        this.attribute(attribute, "string", { virtual: true });
-      }
       validatorSpecs.push({ klass: AcceptanceValidator, opts });
     }
 
     if (rules.confirmation) {
       const opts =
         rules.confirmation === true ? {} : (rules.confirmation as Record<string, unknown>);
-      const confirmationAttr = `${attribute}Confirmation`;
-      if (!this._attributeDefinitions.has(confirmationAttr)) {
-        this.attribute(confirmationAttr, "string", { virtual: true });
-      }
       validatorSpecs.push({ klass: ConfirmationValidator, opts });
     }
 
@@ -759,7 +752,25 @@ export class Model {
         options: Record<string, unknown>,
       ): ValidatorBase | { validate(record: ValidatableRecord): void };
     }>) {
-      const validator = new klass(rest);
+      // Rails `validates_with` sets `options[:class] = self` before calling
+      // `klass.new(options.dup)` (with.rb:88-94), passing the FULL options hash —
+      // condition keys (`if`/`unless`/`on`), `strict`, and custom keys — plus
+      // `:class`; only `Validator#initialize` strips `:class` from its frozen
+      // `options` (validator.rb:107-110; our Validator base does the same),
+      // leaving every standard key visible in `validator.options`.
+      // `with_validation_test.rb:80` pins this: `validates_with(v, if: :cond,
+      // foo: :bar)` calls `new` with `{ foo: :bar, if: :cond, class: Topic }`.
+      // The extracted `ifOpt`/`unlessOpt`/`onOpt`/`isStrict` are used only to
+      // wire the callback (conditions + strict wrapper), NOT withheld from the
+      // validator. Passing `strict` through does not double-raise: a validator
+      // that forwards its options to `errors.add` raises there first
+      // (filteredErrorOptions keeps `strict`; errors.ts:249), matching Rails;
+      // the `isStrict` wrapper below only fires for validators that add errors
+      // without forwarding `strict`, so exactly one raise happens either way.
+      // `options[:class]` lets Acceptance / Confirmation call `setupBang` (Rails
+      // `setup!`), materializing their virtual accessors on the prototype so the
+      // constructor's setter-dispatch mass-assignment (RFC 0046) honors them.
+      const validator = new klass({ ...options, class: this });
       if (!(validator instanceof EachValidator)) {
         if (typeof (validator as ValidatorCheckable).checkValidity === "function") {
           (validator as ValidatorCheckable).checkValidity!();
@@ -898,38 +909,26 @@ export class Model {
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_acceptance_of
    *   validates_with AcceptanceValidator, _merge_attributes(attr_names)
    *
-   * Rails' AcceptanceValidator#initialize calls `setup!(options[:class])` to
-   * lazily materialize the virtual acceptance accessors. trails' constructor
-   * mass-assigns through `writeAttribute` (not prototype setters), so the
-   * accessor must be a real declared attribute — mirroring the `validates`
-   * DSL path (model.ts `if (rules.acceptance)`).
+   * `validatesWith` injects the host class and invokes the validator's
+   * `setupBang` (Rails' `setup!(options[:class])`), which materializes the
+   * virtual acceptance accessors on the prototype; the constructor's
+   * setter-dispatch mass-assignment honors them.
    */
   static validatesAcceptanceOf(...attrNames: unknown[]): void {
-    const options = this._mergeAttributes(attrNames);
-    for (const attr of options.attributes as string[]) {
-      if (!this._attributeDefinitions.has(attr)) this.attribute(attr, "string", { virtual: true });
-    }
-    this.validatesWith(AcceptanceValidator, options);
+    this.validatesWith(AcceptanceValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_confirmation_of
    *   validates_with ConfirmationValidator, _merge_attributes(attr_names)
    *
-   * As with acceptance, Rails' ConfirmationValidator#initialize → `setup!`
-   * defines the `${attr}_confirmation` accessors; trails declares them as
-   * real virtual attributes so the constructor's `writeAttribute` path
-   * accepts them (mirrors the `validates` DSL `if (rules.confirmation)`).
+   * As with acceptance, `validatesWith` invokes the validator's `setupBang`
+   * (Rails' `setup!`), which defines the `${attr}Confirmation` accessors on
+   * the prototype; the constructor's setter-dispatch mass-assignment accepts
+   * them.
    */
   static validatesConfirmationOf(...attrNames: unknown[]): void {
-    const options = this._mergeAttributes(attrNames);
-    for (const attr of options.attributes as string[]) {
-      const confirmationAttr = `${attr}Confirmation`;
-      if (!this._attributeDefinitions.has(confirmationAttr)) {
-        this.attribute(confirmationAttr, "string", { virtual: true });
-      }
-    }
-    this.validatesWith(ConfirmationValidator, options);
+    this.validatesWith(ConfirmationValidator, this._mergeAttributes(attrNames));
   }
 
   /**

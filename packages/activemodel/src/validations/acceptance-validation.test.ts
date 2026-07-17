@@ -152,10 +152,15 @@ describe("AcceptanceValidationTest", () => {
         this.validates("terms", { acceptance: true });
       }
     }
-    expect(Agreement._attributeDefinitions.has("terms")).toBe(true);
+    // setup! installs a prototype accessor (Rails attr_reader/attr_writer),
+    // not a declared attribute definition.
+    expect(Object.getOwnPropertyDescriptor(Agreement.prototype, "terms")?.set).toBeTypeOf(
+      "function",
+    );
     const a = new Agreement({ terms: "1" });
     expect(await a.isValid()).toBe(true);
-    expect(a.readAttribute("terms")).toBe("1");
+    // The value lives in the accessor slot (attr_accessor), not @attributes.
+    expect((a as unknown as { terms: unknown }).terms).toBe("1");
   });
 
   it("setup! virtual attribute excluded from attributeNames and serialization", () => {

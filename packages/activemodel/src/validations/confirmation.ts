@@ -12,6 +12,23 @@ export class ConfirmationValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare isConfirmationValueEqual: typeof isConfirmationValueEqual;
 
+  /**
+   * Mirrors: confirmation.rb:6-9
+   *   def initialize(options)
+   *     super({ case_sensitive: true }.merge!(options))
+   *     setup!(options[:class])
+   *   end
+   *
+   * The `case_sensitive` default is applied lazily in `isConfirmationValueEqual`
+   * (so it survives an explicit `undefined`), so the constructor's remaining job
+   * is calling `setupBang(options.class)` — the host class threaded through by
+   * `validatesWith`.
+   */
+  constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
+    super(options);
+    this.setupBang(options.class);
+  }
+
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const confirmationAttr = `${attribute}Confirmation`;
     const rec = record as unknown as Record<string, unknown>;

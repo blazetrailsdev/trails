@@ -81,6 +81,23 @@ export class AcceptanceValidator extends EachValidator {
   /** @internal Rails-private helper. */
   declare isAcceptableOption: typeof isAcceptableOption;
 
+  /**
+   * Mirrors: acceptance.rb:6-9
+   *   def initialize(options)
+   *     super({ allow_nil: true, accept: ["1", true] }.merge!(options))
+   *     setup!(options[:class])
+   *   end
+   *
+   * The `allow_nil` / `accept` defaults are applied lazily in `validateEach`
+   * and `isAcceptableOption` (so they survive an explicit `undefined`), so the
+   * constructor's remaining job is calling `setupBang(options.class)` — the
+   * host class threaded through by `validatesWith`.
+   */
+  constructor(options: Record<string, unknown> & { attributes?: string | string[] }) {
+    super(options);
+    this.setupBang(options.class);
+  }
+
   validateEach(record: ValidatableRecord, attribute: string, value: unknown): void {
     const allowNil = this.options.allowNil ?? true;
     if (allowNil && (value === null || value === undefined)) return;

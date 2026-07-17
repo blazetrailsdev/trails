@@ -123,7 +123,11 @@ describe("ConfirmationValidationTest", () => {
         this.validates("email", { confirmation: true });
       }
     }
-    expect(Person._attributeDefinitions.has("emailConfirmation")).toBe(true);
+    // setup! installs a prototype accessor (Rails attr_reader/attr_writer),
+    // not a declared attribute definition.
+    expect(Object.getOwnPropertyDescriptor(Person.prototype, "emailConfirmation")?.set).toBeTypeOf(
+      "function",
+    );
     const p = new Person({ email: "a@b.com", emailConfirmation: "x@y.com" });
     expect(await p.isValid()).toBe(false);
     expect(p.errors.get("emailConfirmation")).toContain("doesn't match Email");
