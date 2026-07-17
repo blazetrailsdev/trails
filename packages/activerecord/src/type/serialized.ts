@@ -146,6 +146,9 @@ function unwrapHash(value: unknown): unknown {
 }
 
 /**
+ * Whether a value is a hash-like plain object — the same `Object.prototype` /
+ * null-prototype shape `normalize` treats as an order-insensitive Hash.
+ *
  * @internal
  */
 function isPlainObject(value: unknown): value is Record<string, unknown> {
