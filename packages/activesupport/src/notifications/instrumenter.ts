@@ -1,4 +1,5 @@
 import { Temporal } from "../temporal.js";
+import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export type EventPayload = Record<string, unknown>;
 
@@ -61,11 +62,30 @@ export class Event {
   }
 }
 
+/**
+ * Rails' `e.class.name`. trails carries the namespaced Rails name on `name`
+ * where it has been ported (`ActionDispatch::ParamError`, param-error.ts:28),
+ * which is what keys `rescue_responses` — so prefer it and fall back to the
+ * constructor, mirroring ExceptionWrapper's classNameOf (exception-wrapper.ts:75).
+ * Errors that never got a namespaced name (AR's, today) degrade to the bare one.
+ */
+function _classNameOf(e: unknown): string {
+  if (e === null || e === undefined) return "NilClass";
+  if (e instanceof Error) {
+    if (e.name && e.name !== "Error") return e.name;
+    const ctor = e.constructor?.name;
+    if (ctor && ctor !== "Error") return ctor;
+    return e.name || ctor || "Error";
+  }
+  // Ruby cannot `raise` a non-Exception, so this branch has no Rails analogue;
+  // name it the way Rails would name the object's class anyway.
+  return (e as { constructor?: { name?: string } })?.constructor?.name ?? typeof e;
+}
+
 // Rails' `rescue Exception` arm — subscribers (e.g. ExplainSubscriber) key off
 // these to detect a failed event.
 function _recordException(payload: EventPayload, e: unknown): void {
-  const error = e as { constructor?: { name?: string }; message?: unknown };
-  payload.exception = [error?.constructor?.name ?? "Error", String(error?.message ?? e)];
+  payload.exception = [_classNameOf(e), e instanceof Error ? e.message : String(e)];
   payload.exception_object = e;
 }
 
@@ -75,7 +95,9 @@ function _recordException(payload: EventPayload, e: unknown): void {
  * a legacy publish-only notifier does not, and gets wrapped (see below).
  */
 export interface InstrumenterNotifier {
-  publish(name: string, event: Event): void;
+  // A full notifier (Fanout) drives events through `buildHandle`; a legacy
+  // publish-only notifier provides `publish` and gets wrapped. One is required.
+  publish?(name: string, event: Event): void;
   buildHandle?(name: string, id: unknown, payload: EventPayload): NotificationHandle;
 }
 
@@ -83,11 +105,18 @@ export interface InstrumenterNotifier {
 export interface NotificationHandle {
   start(): void;
   finish(): void;
+  /** The Event this handle built (if any) — used to thread child-event nesting. */
+  readonly event?: Event | null;
 }
 
 export class Instrumenter {
   private _notifier: InstrumenterNotifier;
-  private _stack: Handle[] = [];
+  // trails' (non-Rails) child-event nesting stack. Rails keeps no such stack on
+  // the Instrumenter; trails threads `Event#children` here. It lives in
+  // AsyncContext (per-instance key), so concurrent `instrumentAsync` calls
+  // racing under `Promise.all` fork their own view and can't pop each other's
+  // entries — an instance array would interleave and collapse the nesting.
+  private readonly _stackKey = Symbol("as_notification_instrumenter_stack");
   readonly id: string;
 
   constructor(notifier: InstrumenterNotifier) {
@@ -95,12 +124,18 @@ export class Instrumenter {
     this.id = generateTransactionId();
   }
 
+  private _stack(): Event[] {
+    return IsolatedExecutionState.fetch<Event[]>(this._stackKey, () => []);
+  }
+
   /**
    * Mirrors ActiveSupport::Notifications::Instrumenter#instrument
    * (instrumenter.rb:54-65): build a handle, start it, yield the raw payload
    * (the rescue arm records the exception on it), then finish the handle in the
    * `ensure`. Routing through `build_handle` is what lets a Fanout notifier's
-   * groups drive the event, rather than open-coding an Event/publish here.
+   * groups drive the event, rather than open-coding an Event/publish here. The
+   * handle's event is linked under the enclosing one and pushed for the block's
+   * duration, so nested instruments become children.
    */
   instrument<T = void>(
     name: string,
@@ -109,10 +144,12 @@ export class Instrumenter {
   ): T {
     const handle = this.buildHandle(name, payload);
     handle.start();
+    const inner = this._nest(handle.event ?? null);
 
     try {
-      if (fn) return fn(payload);
-      return undefined as unknown as T;
+      return IsolatedExecutionState.scope(this._stackKey, inner, () =>
+        fn ? fn(payload) : (undefined as unknown as T),
+      );
     } catch (e) {
       _recordException(payload, e);
       throw e;
@@ -128,16 +165,29 @@ export class Instrumenter {
   ): Promise<T> {
     const handle = this.buildHandle(name, payload);
     handle.start();
+    const inner = this._nest(handle.event ?? null);
 
     try {
-      if (fn) return await fn(payload);
-      return undefined as unknown as T;
+      return await IsolatedExecutionState.scope(this._stackKey, inner, () =>
+        fn ? fn(payload) : Promise.resolve(undefined as unknown as T),
+      );
     } catch (e) {
       _recordException(payload, e);
       throw e;
     } finally {
       handle.finish();
     }
+  }
+
+  // Link `event` under the currently-open one and return the stack the block
+  // should run in (with `event` pushed). A handle with no event-object group
+  // (nothing listening) leaves the stack unchanged.
+  private _nest(event: Event | null): Event[] {
+    const stack = this._stack();
+    if (!event) return stack;
+    const parent = stack[stack.length - 1];
+    if (parent) parent.children.push(event);
+    return [...stack, event];
   }
 
   /**
@@ -153,9 +203,14 @@ export class Instrumenter {
     if (this._notifier.buildHandle) {
       return this._notifier.buildHandle(name, this.id, payload);
     }
-    // The stack threads trails' (non-Rails) child-event nesting through the
-    // wrapped handles: each links its event under the one still open above it.
-    return new Handle(name, payload, this.id, this._notifier, this._stack);
+    return new Handle(
+      name,
+      payload,
+      this.id,
+      this._notifier as InstrumenterNotifier & {
+        publish(name: string, event: Event): void;
+      },
+    );
   }
 }
 
@@ -173,9 +228,12 @@ export class Handle implements NotificationHandle {
     private _payload: EventPayload,
     private _transactionId: string,
     private _notifier: { publish(name: string, event: Event): void },
-    // Optional nesting stack for trails' child-event tracking (see Instrumenter).
-    private _stack?: Handle[],
   ) {}
+
+  /** The Event built at #start — the Instrumenter threads nesting through it. */
+  get event(): Event | null {
+    return this._event;
+  }
 
   start(): void {
     if (this._state !== "initialized") {
@@ -183,11 +241,6 @@ export class Handle implements NotificationHandle {
     }
     this._state = "started";
     this._event = new Event(this._name, Temporal.Now.instant(), this._payload, this._transactionId);
-    if (this._stack) {
-      const parent = this._stack[this._stack.length - 1];
-      if (parent?._event) parent._event.children.push(this._event);
-      this._stack.push(this);
-    }
   }
 
   finish(): void {
@@ -195,7 +248,6 @@ export class Handle implements NotificationHandle {
       throw new ArgumentError(`expected state to be "started" but was "${this._state}"`);
     }
     this._state = "finished";
-    if (this._stack) this._stack.pop();
     if (this._event) {
       // Replace the event's dup with the final payload object (mutations made
       // between start and finish, e.g. payload.outcome), as Rails'

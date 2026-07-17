@@ -1,5 +1,6 @@
 import { Temporal } from "../temporal.js";
 import { Event } from "./instrumenter.js";
+import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export class InstrumentationSubscriberError extends Error {
   readonly exceptions: Error[];
@@ -101,7 +102,7 @@ function wrapMatcher(pattern: string | RegExp | null): Matcher {
 
 type SubscriberKind = "evented" | "timed" | "monotonic" | "event_object";
 
-interface Subscriber {
+export interface Subscriber {
   readonly matcher: Matcher;
   readonly kind: SubscriberKind;
   readonly delegate: EventedListener | TimedCallback | EventObjectCallback;
@@ -200,22 +201,27 @@ export class MonotonicTimedGroup extends BaseTimeGroup {
 }
 
 export class EventObjectGroup extends BaseGroup {
-  private event: Event | null = null;
+  private _event: Event | null = null;
   constructor(private listeners: EventObjectCallback[]) {
     super();
   }
 
+  /** The Event built at #start — trails threads child-event nesting through it. */
+  get event(): Event | null {
+    return this._event;
+  }
+
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
-    this.event = new Event(name, Temporal.Now.instant(), payload, String(id));
+    this._event = new Event(name, Temporal.Now.instant(), payload, String(id));
   }
 
   finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
-    if (this.event) {
+    if (this._event) {
       // Rails' EventObjectGroup#finish: `@event.payload = payload` — replace the
       // dup with the final object so deletions are reflected (fanout.rb:166-178).
-      this.event.payload = payload;
-      this.event.finish();
-      iterateGuardingExceptions(this.listeners, (l) => l(this.event!));
+      this._event.payload = payload;
+      this._event.finish();
+      iterateGuardingExceptions(this.listeners, (l) => l(this._event!));
     }
   }
 }
@@ -232,6 +238,17 @@ export class Handle {
     this._name = name;
     this._id = id;
     this._payload = payload;
+  }
+
+  /**
+   * The Event this handle's event-object group built at #start (if any), so a
+   * caller can thread trails' child-event nesting across nested handles.
+   */
+  get event(): Event | null {
+    for (const g of this.groups) {
+      if (g instanceof EventObjectGroup) return g.event;
+    }
+    return null;
   }
 
   start(): void {
@@ -261,7 +278,16 @@ export class Fanout {
   private stringSubscribers = new Map<string, Subscriber[]>();
   private otherSubscribers: Subscriber[] = [];
   private listenersCache = new Map<string, Subscriber[]>();
-  private handleStack: FanoutHandle[] = [];
+
+  // Rails keeps the evented start/finish handle stack in
+  // `IsolatedExecutionState[:_fanout_handle_stack]` (fanout.rb:277), so
+  // concurrent tasks don't share one stack. The key is per-Fanout so separate
+  // notifiers can't collide.
+  private readonly _handleStackKey = Symbol("as_fanout_handle_stack");
+
+  private handleStack(): FanoutHandle[] {
+    return IsolatedExecutionState.fetch<FanoutHandle[]>(this._handleStackKey, () => []);
+  }
 
   subscribe(
     pattern: string | RegExp | null,
@@ -313,12 +339,12 @@ export class Fanout {
 
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     const handle = this.buildHandle(name, id, payload);
-    this.handleStack.push(handle);
+    this.handleStack().push(handle);
     handle.start();
   }
 
   finish(name: string, id: unknown, payload: Record<string, unknown>): void {
-    const handle = this.handleStack.pop();
+    const handle = this.handleStack().pop();
     if (handle) {
       handle.finishWithValues(name, id, payload);
     }
@@ -327,6 +353,25 @@ export class Fanout {
   buildHandle(name: string, id: unknown, payload: Record<string, unknown>): Handle {
     const groups = this.groupsFor(name);
     return new FanoutHandle(groups, name, id, payload);
+  }
+
+  /**
+   * Routes an already-built Event to matching subscribers — Rails'
+   * `Fanout#publish_event` (fanout.rb:293-295): run every event-object listener
+   * under `iterate_guarding_exceptions` (run all, then re-raise/aggregate).
+   * `Notifications` only ever registers event-object subscribers (its public API
+   * always yields the Event), so those are the ones fed here.
+   */
+  publishEvent(event: Event): void {
+    const listeners = this.allListenersFor(event.name).filter((s) => s.kind === "event_object");
+    iterateGuardingExceptions(listeners, (s) => (s.delegate as EventObjectCallback)(event));
+  }
+
+  /** Drop every subscriber and reset cached state. Used by unsubscribeAll. */
+  clear(): void {
+    this.stringSubscribers.clear();
+    this.otherSubscribers.length = 0;
+    this.listenersCache.clear();
   }
 
   private allListenersFor(name: string): Subscriber[] {
