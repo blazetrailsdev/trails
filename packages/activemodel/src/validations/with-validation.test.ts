@@ -260,9 +260,13 @@ describe("ValidatesWithTest", () => {
   });
 
   it("passes all configuration options to the validator class", async () => {
+    // Mirrors with_validation_test.rb:80-88: the full options hash (including
+    // condition keys) plus `class: self` reaches the validator constructor.
+    let capturedOpts: Record<string, unknown> | undefined;
     class MinLenValidator {
       min: number;
       constructor(opts: any = {}) {
+        capturedOpts = opts;
         this.min = opts.minimum ?? 0;
       }
       validate(record: any) {
@@ -275,9 +279,18 @@ describe("ValidatesWithTest", () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
-        this.validatesWith(MinLenValidator, { minimum: 5 });
+        this.validatesWith(MinLenValidator, { minimum: 5, if: "conditionIsTrue", foo: "bar" });
+      }
+      conditionIsTrue(): boolean {
+        return true;
       }
     }
+    expect(capturedOpts).toEqual({
+      minimum: 5,
+      if: "conditionIsTrue",
+      foo: "bar",
+      class: Person,
+    });
     expect(await new Person({ name: "ab" }).isValid()).toBe(false);
     expect(await new Person({ name: "abcde" }).isValid()).toBe(true);
   });

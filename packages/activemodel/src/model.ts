@@ -753,14 +753,23 @@ export class Model {
       ): ValidatorBase | { validate(record: ValidatableRecord): void };
     }>) {
       // Rails `validates_with` sets `options[:class] = self` before calling
-      // `klass.new(options.dup)` (with.rb:88-94), so a validator constructor can
-      // read the host class via `options[:class]` — the documented setup path
-      // (validator.rb:86-94). `Validator#initialize` then excludes `:class` from
-      // its frozen `options` (validator.rb:107-110; our Validator base does the
-      // same). Acceptance / Confirmation use it to call `setupBang` (Rails
-      // `setup!`), materializing their virtual accessors on the prototype so the
+      // `klass.new(options.dup)` (with.rb:88-94), passing the FULL options hash —
+      // including condition keys like `if`/`unless`/`on` — plus `:class`; only
+      // `Validator#initialize` strips `:class` from its frozen `options`
+      // (validator.rb:107-110; our Validator base does the same), leaving the
+      // standard keys visible in `validator.options`. `with_validation_test.rb:80`
+      // pins this: `validates_with(v, if: :cond, foo: :bar)` calls `new` with
+      // `{ foo: :bar, if: :cond, class: Topic }`. The extracted condition keys
+      // (`ifOpt`/`unlessOpt`/`onOpt`) are used only to build callback conditions,
+      // not withheld from the validator. `strict` is the one key kept out: trails
+      // implements strict via the `isStrict` callback wrapper below, and
+      // forwarding it would also arm `errors.add`'s strict-raise
+      // (filteredErrorOptions keeps `strict`), double-firing. `options[:class]`
+      // lets Acceptance / Confirmation call `setupBang` (Rails `setup!`),
+      // materializing their virtual accessors on the prototype so the
       // constructor's setter-dispatch mass-assignment (RFC 0046) honors them.
-      const validator = new klass({ ...rest, class: this });
+      const { strict: _strictHandledByWrapper, ...optionsForConstructor } = options;
+      const validator = new klass({ ...optionsForConstructor, class: this });
       if (!(validator instanceof EachValidator)) {
         if (typeof (validator as ValidatorCheckable).checkValidity === "function") {
           (validator as ValidatorCheckable).checkValidity!();
