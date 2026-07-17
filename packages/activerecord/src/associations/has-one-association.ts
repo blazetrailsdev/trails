@@ -123,6 +123,12 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   private async writeImmediate(record: Base | null): Promise<void> {
+    // Rails' `replace` raises on a class mismatch as its very first statement,
+    // before `load_target` (has_one_association.rb:60). The persist path below no
+    // longer routes through `replace` up front (the target is committed only
+    // after the transaction succeeds), so hoist the check here — a saved owner
+    // must reject `writer(someOtherModel)` before any DB I/O.
+    if (record) (this as any).raiseOnTypeMismatchBang(record);
     // Mirror Rails `replace`'s leading `load_target`: materialize the currently
     // associated record (possibly a DB row on a freshly-found owner) so it can
     // be nullified/removed, rather than silently orphaning it.
@@ -137,7 +143,6 @@ export class HasOneAssociation extends SingularAssociation {
     // and this short-circuits to undefined, which is falsy — exactly where
     // Rails would have returned.
     const changed = !sameRecord(displaced, record) || record?.hasChangesToSave === true;
-    this.replace(record);
     if (changed) {
       // Rails: `save &&= owner.persisted?` (:66) — a new owner does not gate the
       // block itself, only `transaction_if` (:68) and `record.save` (:75).
@@ -146,15 +151,22 @@ export class HasOneAssociation extends SingularAssociation {
       const save = (this.owner as { isPersisted?: () => boolean }).isPersisted?.() === true;
       return this.persistImmediate(record, displaced, save);
     }
+    this.replace(record);
   }
 
   /**
    * The awaitable immediate-persist body for `HasOneAssociation#replace`'s
-   * transaction (has_one_association.rb:68-81): remove the displaced record
-   * (:69), then re-derive the foreign key and save the new record (:71-80).
-   * `replace` has already set the in-memory target/inverse. `save` is Rails'
-   * post-`&&=` flag (:66): false for a non-persisted owner, which both skips
-   * the transaction (:68) and gates the new record's save (:75).
+   * transaction (has_one_association.rb:68-84): remove the displaced record
+   * (:69), then re-derive the foreign key and save the new record (:71-80), and
+   * promote the new target only after the transaction commits. `save` is Rails'
+   * post-`&&=` flag (:66): false for a non-persisted owner, which both skips the
+   * transaction (:68) and gates the new record's save (:75).
+   *
+   * `this.target` is left as `displaced` throughout — writeImmediate has not
+   * called `replace` — so a throw anywhere in the block (a failed `remove_target!`
+   * nullify, or the `RecordNotSaved` on a failed save) leaves the OLD record
+   * cached, exactly as Rails reaches `self.target = record` (:84) only after the
+   * block. Same target-on-failure invariant as `detachDisplacedTarget`.
    */
   private async persistImmediate(
     record: Base | null,
@@ -162,14 +174,9 @@ export class HasOneAssociation extends SingularAssociation {
     save: boolean,
   ): Promise<void> {
     await transactionIf(this, save, async () => {
+      // `this.target` is still `displaced`, so `removeTargetBang` removes it.
       if (displaced && !(displaced as any).isDestroyed?.() && !sameRecord(displaced, record)) {
-        const currentTarget = this.target;
-        this.target = displaced;
-        try {
-          await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-        } finally {
-          this.target = currentTarget;
-        }
+        await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
       }
       if (record) {
         this.setOwnerAttributes(record);
@@ -184,6 +191,11 @@ export class HasOneAssociation extends SingularAssociation {
         }
       }
     });
+    // Transaction committed: promote the new record to the target (Rails'
+    // `self.target = record`, :84). `replace` re-applies the FK/inverse (a no-op
+    // repeat of the in-transaction work) and, for `record === null`, clears the
+    // inverse on the now-removed displaced record.
+    this.replace(record);
   }
 
   /**
