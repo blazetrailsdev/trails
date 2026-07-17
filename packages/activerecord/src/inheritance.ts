@@ -587,6 +587,18 @@ export function narrowToProjectedColumns(
   const pkSet = new Set(Array.isArray(pk) ? pk : pk != null ? [pk] : []);
   const rowKeys = new Set(Object.keys(row));
   const narrowable = klass.columnNames().filter((c) => !pkSet.has(c) && !rowKeys.has(c));
+  // An ignored column is dropped from columnNames(), so a `new` record's seeded
+  // default for a still-declared-and-ignored attribute (Rails' AttributedDeveloper
+  // `name`) would otherwise survive narrowing as an initialized value. Rails
+  // leaves it uninitialized after a load that didn't project it — its
+  // `_default_attributes` entry is `Attribute.uninitialized`, so
+  // `@attributes.key?` is false. Uninitialize any ignored column the row did not
+  // carry so a narrowed reload matches; an ignored column present in a raw
+  // `SELECT *` row (in rowKeys) is untouched and keeps its loaded value.
+  const ignoredColumns = (klass as unknown as { _ignoredColumns?: string[] })._ignoredColumns ?? [];
+  for (const c of ignoredColumns) {
+    if (!pkSet.has(c) && !rowKeys.has(c)) narrowable.push(c);
+  }
   // Hot path: a full SELECT projects every column, so there is nothing to
   // narrow — skip the attribute-set scan entirely.
   if (narrowable.length === 0) return;
@@ -626,7 +638,6 @@ const SELECT_ALIAS_READERS = Symbol.for("activerecord.selectAliasReaders");
  */
 export function defineDynamicSelectReaders(record: Base): void {
   const attrs = (record as any)._attributes as { keys(): Iterable<string> };
-  const klass = record.constructor as typeof Base;
   const rec = record as unknown as Record<string | symbol, unknown>;
   const installed = (rec[SELECT_ALIAS_READERS] as Set<string> | undefined) ?? new Set<string>();
   // Drop readers whose alias no longer appears in the fresh attribute set
@@ -640,19 +651,19 @@ export function defineDynamicSelectReaders(record: Base): void {
       }
     }
   }
-  // Hot path: every declared attribute (a real column, and also an ignored
-  // column) is a known attribute, so only keys absent from _attributeDefinitions
-  // can be bare select aliases. A full `SELECT *` load projects only declared
-  // columns, so this loop finds nothing to install and never walks the prototype
-  // chain — mirrors narrowToProjectedColumns' own full-projection early-out.
-  // Gating on _attributeDefinitions (not columnNames(), which drops ignored
-  // columns) keeps an ignored column — declared but accessor-less — from being
-  // mistaken for a select alias.
-  const definedAttrs = (klass as unknown as { _attributeDefinitions: Map<string, unknown> })
-    ._attributeDefinitions;
+  // Install a reader for every loaded attribute key that has no accessor on the
+  // prototype chain. `attrs.keys()` is initialized-only (Rails' `key?` gate), so
+  // a full `SELECT *` of ordinary columns — all of which carry prototype
+  // accessors — finds nothing to install and never walks the chain past the
+  // hasProtoMember check. This covers Rails' method_missing reaching `key?` for
+  // BOTH a bare select alias and an ignored column whose value a raw `SELECT *`
+  // actually projected (`AttributedDeveloper#name` → "Developer: name"): Rails
+  // makes both respond via `attribute_missing`. narrowToProjectedColumns has
+  // already uninitialized any ignored column the row did not carry, so a narrowed
+  // reload leaves its declared-but-ignored default out of `keys()` and no reader
+  // is installed — matching Rails' `key?` being false for that uninitialized slot.
   const proto = Object.getPrototypeOf(record) as object;
   for (const name of attrs.keys()) {
-    if (definedAttrs.has(name)) continue;
     if (installed.has(name)) continue;
     if (Object.prototype.hasOwnProperty.call(record, name)) continue;
     // A non-column key can still resolve to a real method or an aliased

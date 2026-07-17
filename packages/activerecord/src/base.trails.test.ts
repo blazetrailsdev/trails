@@ -284,3 +284,73 @@ describe("BasicsTest (trails)", () => {
     expect(exists).toBe(true);
   });
 });
+
+// Rails removes ignored columns only from schema/default `attribute_types`
+// (`columns_hash.except(*ignored_columns)`), NOT from a raw result row: a
+// `SELECT *` that projects an ignored column still lands it in `@attributes`
+// (LazyAttributeSet keys off `values`), so `read_attribute` returns it and
+// `method_missing` responds to the accessor (`@attributes.key?` → true).
+// A load that does not project the column leaves its slot uninitialized, so
+// `key?` is false. These guard the trails analogs (dynamic reader install +
+// narrow-to-uninitialized) against regressing to a schema-membership gate.
+describe("ignored columns follow Rails' value-keyed attribute set (trails)", () => {
+  fixtures([]);
+
+  it("a plain ignored column projected by a raw SELECT * is readable and responds", async () => {
+    class Topic extends Base {
+      static tableName = "topics";
+      static {
+        this.ignoredColumns = ["author_name"];
+      }
+    }
+    await Base.connection.execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
+    const [topic] = await Topic.findBySql("SELECT * FROM topics");
+    // Rails: values-keyed @attributes ⇒ read_attribute returns it, and
+    // method_missing responds (the trails dynamic reader).
+    expect(
+      (topic as unknown as { readAttribute(n: string): unknown }).readAttribute("author_name"),
+    ).toBe("bob");
+    expect((topic as unknown as Record<string, unknown>).author_name).toBe("bob");
+    expect("author_name" in topic).toBe(true);
+  });
+
+  it("an ignored column not projected by the query leaves an uninitialized slot", async () => {
+    class Topic extends Base {
+      static tableName = "topics";
+      static {
+        this.ignoredColumns = ["author_name"];
+      }
+    }
+    await Base.connection.execute("INSERT INTO topics (title, author_name) VALUES ('hi', 'bob')");
+    // The default select drops ignored columns, so the row never carries it —
+    // Rails' key? is false and no accessor responds.
+    const topic = (await Topic.first())!;
+    expect("author_name" in topic).toBe(false);
+    expect([
+      ...(topic as unknown as { _attributes: { keys(): Iterable<string> } })._attributes.keys(),
+    ]).not.toContain("author_name");
+  });
+
+  it("an ignored column still declared via attribute() casts and responds on SELECT *", async () => {
+    const { AttributedDeveloper } = await import("./test-helpers/models/developer.js");
+    const dev = await AttributedDeveloper.create();
+    await dev.updateColumn("name", "name");
+    const loaded = await AttributedDeveloper.where({ id: dev.id }).select("*").first();
+    // Rails asserts `loaded.name == "Developer: name"` (base_test.rb): the
+    // projected value casts through DeveloperName and the accessor responds.
+    expect((loaded as unknown as Record<string, unknown>).name).toBe("Developer: name");
+    expect((loaded as unknown as { readAttribute(n: string): unknown }).readAttribute("name")).toBe(
+      "Developer: name",
+    );
+  });
+
+  it("a declared-then-ignored column not projected does not respond after reload", async () => {
+    const { AttributedDeveloper } = await import("./test-helpers/models/developer.js");
+    const dev = await AttributedDeveloper.create();
+    await dev.updateColumn("name", "name");
+    await dev.reload();
+    // reload's default select omits the ignored column, so its declared slot
+    // narrows to uninitialized — Rails' key? is false, no accessor responds.
+    expect("name" in dev).toBe(false);
+  });
+});
