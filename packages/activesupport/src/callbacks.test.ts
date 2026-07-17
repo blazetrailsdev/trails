@@ -2002,6 +2002,16 @@ describe("CallbackObject dispatch", () => {
     expect(target.log).toEqual(["before-save-obj"]);
   });
 
+  it("missing scoped method raises when the chain runs", () => {
+    // Rails ObjectCall dispatches `receiver.send(method, target)`, which raises
+    // NoMethodError when the scoped method is absent — no silent no-op. Default
+    // scope calls `before`, so an object providing only `beforeSave` has no match.
+    const target = { log: [] as string[] };
+    defineCallbacks(target, "save");
+    setCallback(target, "save", "before", { beforeSave: () => {} });
+    expect(() => runCallbacks(target, "save")).toThrow(/before/);
+  });
+
   it("object method called with correct this binding", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");

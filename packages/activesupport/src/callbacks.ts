@@ -191,38 +191,32 @@ export class ObjectCall implements CallTemplate {
     return [this.target ?? target, block, this.methodName, target];
   }
 
+  // Rails ObjectCall#make_lambda: `(@override_target || target).send(@method_name, target)`
+  // — `send` binds `self` to the receiver and raises NoMethodError when the scoped
+  // method is absent. Dispatch directly (no optional chaining) so a missing method
+  // throws rather than silently no-opping.
+  private send(receiver: Record<string, unknown>, target: object): unknown {
+    const method = receiver[this.methodName];
+    if (typeof method !== "function") {
+      throw new TypeError(
+        `undefined method '${this.methodName}' for callback object (kind/scope mismatch)`,
+      );
+    }
+    return (method as (this: unknown, arg: object) => unknown).call(receiver, target);
+  }
+
   makeLambda(): (target: object, value: unknown) => unknown {
     const ot = this.target;
-    const m = this.methodName;
-    // Rails ObjectCall#make_lambda: `(@override_target || target).send(@method_name, target)`
-    // — `send` binds `self` to the receiver, so call with `this` = receiver.
-    return (target: object) => {
-      const receiver = (ot ?? target) as Record<string, unknown>;
-      return (receiver[m] as ((this: unknown, arg: object) => unknown) | undefined)?.call(
-        receiver,
-        target,
-      );
-    };
+    return (target: object) => this.send((ot ?? target) as Record<string, unknown>, target);
   }
 
   invertedLambda(): (target: object, value: unknown) => boolean {
     const ot = this.target;
-    const m = this.methodName;
-    return (target: object) => {
-      const receiver = (ot ?? target) as Record<string, unknown>;
-      return !(receiver[m] as ((this: unknown, arg: object) => unknown) | undefined)?.call(
-        receiver,
-        target,
-      );
-    };
+    return (target: object) => !this.send((ot ?? target) as Record<string, unknown>, target);
   }
 
   make(instance: object, _value: unknown): unknown {
-    const t = (this.target ?? instance) as Record<string, unknown>;
-    return (t[this.methodName] as ((this: unknown, arg: object) => unknown) | undefined)?.call(
-      t,
-      instance,
-    );
+    return this.send((this.target ?? instance) as Record<string, unknown>, instance);
   }
 }
 
@@ -1535,6 +1529,7 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
     // A hook invoked every time a before callback is halted. Overridable in
     // implementors (Rails: ActiveSupport::Callbacks#halted_callback_hook) to
     // provide better debugging/logging. Default is a no-op.
+    /** @internal */
     haltedCallbackHook(_filter: unknown, _name: string): void {}
   }
 
