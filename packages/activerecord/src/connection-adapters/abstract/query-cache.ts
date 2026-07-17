@@ -184,22 +184,26 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
   // Mixed in from the QueryCache module below. Dispatched through `this` (not
   // the module-level functions) so a per-connection override is honored, as in
   // Rails' `def connection.cache_notification_info`.
+  /** @internal */
   cacheNotificationInfo(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
   ): Record<string, unknown>;
+  /** @internal */
   cacheNotificationInfoResult(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
     result: Record<string, unknown>[],
   ): Record<string, unknown>;
+  /** @internal */
   lookupSqlCache(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
   ): Record<string, unknown>[] | undefined;
+  /** @internal */
   cacheSql(
     sql: string,
     name: string | null | undefined,
@@ -560,25 +564,31 @@ function withWriteDirtyDepth(host: QueryCacheHost, original: () => unknown): unk
  * Rails' `dirties_query_cache` decorator calls (query_cache.rb:24). A write
  * under one role (`:writing`) must invalidate the caches of the current
  * thread's *other* pools (`:reading`) too, so a subsequent read there does not
- * return a stale row. Falls back to clearing the writing connection's own Store
- * before the handler is wired (module bootstrap / standalone connections).
+ * return a stale row.
+ *
+ * Clear every handler pool's per-thread Store, then the host's own Store if it
+ * was not one of them: a standalone / NullPool adapter (`abstract-adapter.ts`)
+ * owns a local Store that `eachConnectionPool` never enumerates, so clearing
+ * only the handler pools would leave its own cached reads stale after a write.
+ * Dedup by Store identity so the writing connection — whose `_queryCache` IS
+ * its pool's per-thread Store — is cleared exactly once, preserving the
+ * `times: 1` collapse.
  * @internal
  */
 function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
-  const handler = ExecutorHooks.connectionHandler();
-  if (!handler) {
-    host._queryCache?.clear();
-    return;
-  }
   // Mirror `each_connection_pool { pool.clear_query_cache }`: clear the pool's
   // per-thread Store directly, NOT `pool.active_connection.clear_query_cache`.
   // A pool whose connection is currently checked in still holds this thread's
   // cached rows in its registry (they survive checkin, keyed by execution
   // context), so a re-read after checkout would hit stale results unless the
   // Store itself is cleared here.
-  handler.eachConnectionPool(null, (pool) => {
-    (pool as unknown as QueryCachePool).clearQueryCache?.();
+  const cleared = new Set<Store>();
+  ExecutorHooks.connectionHandler()?.eachConnectionPool(null, (pool) => {
+    const p = pool as unknown as QueryCachePool & { queryCache?: Store };
+    p.clearQueryCache?.();
+    if (p.queryCache) cleared.add(p.queryCache);
   });
+  if (host._queryCache && !cleared.has(host._queryCache)) host._queryCache.clear();
 }
 
 /** @internal Reassign each named prototype slot to a cache-dirtying wrapper. */
