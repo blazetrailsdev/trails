@@ -1481,20 +1481,28 @@ describe("UsingObjectTest", () => {
       u.record.push("yielded");
     });
 
-  it("test_before_object", () => {
+  it("before object", () => {
     const u = usingObjectBefore();
     save(u);
     expect(u.record).toEqual(["before", "yielded"]);
   });
-  it("test_around_object", () => {
+  it("around object", () => {
     const u = usingObjectAround();
     save(u);
     expect(u.record).toEqual(["around before", "yielded", "around after"]);
   });
-  it("test_customized_object", () => {
+  it("customized object", () => {
     const u = customScopeObject();
     save(u);
     expect(u.record).toEqual(["before save", "yielded"]);
+  });
+  it("block result is returned", () => {
+    const target = { result: "" };
+    defineCallbacks(target, "save");
+    runCallbacks(target, "save", () => {
+      target.result = "done";
+    });
+    expect(target.result).toBe("done");
   });
 });
 
