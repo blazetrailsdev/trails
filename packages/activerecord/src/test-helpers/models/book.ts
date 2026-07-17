@@ -138,7 +138,7 @@ export class Book extends Base {
   declare illustrator_visibility: "visible" | "invisible" | null;
   declare isbn: string;
   declare language: "english" | "spanish" | "french" | null;
-  declare last_read: "unread" | "reading" | "read" | "forgotten" | null;
+  declare last_read: "unread" | "reading" | "read" | "forgotten";
   declare name: string;
   declare nullable_status: "single" | "married" | null;
   declare original_name: string;

@@ -65,7 +65,7 @@ export class Comment extends Base {
   declare comments: number;
   declare deleted_at: Temporal.Instant | Temporal.PlainDateTime;
   declare developer_id: number;
-  declare label: number | null;
+  declare label: "default" | "child" | null;
   declare origin_id: number;
   declare origin_type: string;
   declare parent_id: number;
