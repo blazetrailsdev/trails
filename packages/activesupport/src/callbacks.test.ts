@@ -7,7 +7,6 @@ import {
   runCallbacks,
   CallbacksMixin,
   CallTemplate,
-  CallbackSequence,
   throwAbort,
 } from "./callbacks.js";
 
@@ -182,39 +181,6 @@ describe("Callbacks", () => {
       expect(target.history).toEqual(["tweedle dum pre", "running", "tweedle dum post"]);
       // next() surfaces the block's return (Rails' `yield` inside the around).
       expect(target.result).toBe("running");
-    });
-
-    // Rails' CallbackObject#around(caller) { ... yield ... } compiles to
-    // CallTemplate::ObjectCall and dispatches `object.send(method, target, &block)` —
-    // the receiver is the object, the record is the first positional arg, and the
-    // continuation is the block. The method name is the callback's scope-join; with
-    // the default CallbackChain scope of [:kind] that is `around` (not `around_save`
-    // — the [:kind, :name] custom-scope shape), matching Rails' test_around_object.
-    // trails' setCallback resolves a CallbackObject to a plain around function, so
-    // drive invokeAround with an ObjectCall template directly to cover the
-    // object-dispatch threading (record first, block last).
-    it("test_around_object", () => {
-      const record: string[] = [];
-      const caller = {};
-      const obj = {
-        around(this: unknown, arg: object, next: () => unknown) {
-          record.push("around before");
-          expect(this).toBe(obj);
-          expect(arg).toBe(caller);
-          const v = next();
-          record.push("around after");
-          return v;
-        },
-      };
-      const seq = new CallbackSequence(null, new CallTemplate.ObjectCall(obj, "around"), null);
-
-      const result = seq.invokeAround({ target: caller, halted: false, value: undefined }, () => {
-        record.push("yielded");
-        return "block-result";
-      });
-
-      expect(record).toEqual(["around before", "yielded", "around after"]);
-      expect(result).toBe("block-result");
     });
   });
 
@@ -1475,55 +1441,60 @@ describe("RunSpecificCallbackTest", () => {
 });
 
 describe("UsingObjectTest", () => {
-  it("save", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const callbackObj = { before: (t: any) => t.log.push("obj-before") };
-    setCallback(target, "save", "before", (t: any) => callbackObj.before(t));
-    runCallbacks(target, "save");
-    expect(target.log).toContain("obj-before");
+  // Rails' CallbackObject (callbacks_test.rb:707): the method dispatched depends
+  // on the chain scope. Default scope [:kind] calls `before`/`around`;
+  // scope [:kind, :name] calls `beforeSave`.
+  const callbackObject = () => ({
+    before(caller: { record: string[] }): void {
+      caller.record.push("before");
+    },
+    beforeSave(caller: { record: string[] }): void {
+      caller.record.push("before save");
+    },
+    around(caller: { record: string[] }, next: () => unknown): void {
+      caller.record.push("around before");
+      next();
+      caller.record.push("around after");
+    },
   });
-  it("before object", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const obj = { before: (t: any) => t.log.push("before-obj") };
-    setCallback(target, "save", "before", (t: any) => obj.before(t));
-    runCallbacks(target, "save");
-    expect(target.log).toContain("before-obj");
-  });
-  it("around object", () => {
-    const target = { log: [] as string[] };
-    defineCallbacks(target, "save");
-    const obj = {
-      around: (t: any, next: () => void) => {
-        t.log.push("around-pre");
-        next();
-        t.log.push("around-post");
-      },
-    };
-    setCallback(target, "save", "around", (t: any, next: () => void) => obj.around(t, next));
-    runCallbacks(target, "save", () => target.log.push("body"));
-    expect(target.log).toEqual(["around-pre", "body", "around-post"]);
-  });
-  it("customized object", () => {
-    const target = { log: [] as string[], custom: true };
-    defineCallbacks(target, "save");
-    const obj = {
-      before: (t: any) => {
-        if (t.custom) t.log.push("custom");
-      },
-    };
-    setCallback(target, "save", "before", (t: any) => obj.before(t));
-    runCallbacks(target, "save");
-    expect(target.log).toContain("custom");
-  });
-  it("block result is returned", () => {
-    const target = { result: "" };
-    defineCallbacks(target, "save");
-    runCallbacks(target, "save", () => {
-      target.result = "done";
+
+  const usingObjectBefore = () => {
+    const u = { record: [] as string[] };
+    defineCallbacks(u, "save");
+    setCallback(u, "save", "before", callbackObject());
+    return u;
+  };
+  const usingObjectAround = () => {
+    const u = { record: [] as string[] };
+    defineCallbacks(u, "save");
+    setCallback(u, "save", "around", callbackObject());
+    return u;
+  };
+  const customScopeObject = () => {
+    const u = { record: [] as string[] };
+    defineCallbacks(u, "save", { scope: ["kind", "name"] });
+    setCallback(u, "save", "before", callbackObject());
+    return u;
+  };
+  const save = (u: { record: string[] }) =>
+    runCallbacks(u, "save", () => {
+      u.record.push("yielded");
     });
-    expect(target.result).toBe("done");
+
+  it("test_before_object", () => {
+    const u = usingObjectBefore();
+    save(u);
+    expect(u.record).toEqual(["before", "yielded"]);
+  });
+  it("test_around_object", () => {
+    const u = usingObjectAround();
+    save(u);
+    expect(u.record).toEqual(["around before", "yielded", "around after"]);
+  });
+  it("test_customized_object", () => {
+    const u = customScopeObject();
+    save(u);
+    expect(u.record).toEqual(["before save", "yielded"]);
   });
 });
 
@@ -1981,29 +1952,29 @@ describe("Callbacks — async propagation", () => {
 });
 
 describe("CallbackObject dispatch", () => {
-  it("before — calls beforeSave on the object", () => {
+  it("before — calls the object's before method", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
-    const obj = { beforeSave: (t: typeof target) => t.log.push("before-obj") };
+    const obj = { before: (t: typeof target) => t.log.push("before-obj") };
     setCallback(target, "save", "before", obj);
     runCallbacks(target, "save");
     expect(target.log).toEqual(["before-obj"]);
   });
 
-  it("after — calls afterSave on the object", () => {
+  it("after — calls the object's after method", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
-    const obj = { afterSave: (t: typeof target) => t.log.push("after-obj") };
+    const obj = { after: (t: typeof target) => t.log.push("after-obj") };
     setCallback(target, "save", "after", obj);
     runCallbacks(target, "save");
     expect(target.log).toEqual(["after-obj"]);
   });
 
-  it("around — calls aroundSave with target and proceed", () => {
+  it("around — calls the object's around method with target and proceed", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
     const obj = {
-      aroundSave: (t: typeof target, next: () => void) => {
+      around: (t: typeof target, next: () => void) => {
         t.log.push("around-pre");
         next();
         t.log.push("around-post");
@@ -2014,11 +1985,13 @@ describe("CallbackObject dispatch", () => {
     expect(target.log).toEqual(["around-pre", "body", "around-post"]);
   });
 
-  it("missing method throws at registration time", () => {
-    const target = {};
-    defineCallbacks(target, "save");
-    const obj = { afterSave: () => {} };
-    expect(() => setCallback(target, "save", "before", obj)).toThrow(/beforeSave/);
+  it("custom scope dispatches the kind+name method", () => {
+    const target = { log: [] as string[] };
+    defineCallbacks(target, "save", { scope: ["kind", "name"] });
+    const obj = { beforeSave: (t: typeof target) => t.log.push("before-save-obj") };
+    setCallback(target, "save", "before", obj);
+    runCallbacks(target, "save");
+    expect(target.log).toEqual(["before-save-obj"]);
   });
 
   it("object method called with correct this binding", () => {
@@ -2026,7 +1999,7 @@ describe("CallbackObject dispatch", () => {
     defineCallbacks(target, "save");
     const obj = {
       label: "my-obj",
-      beforeSave(t: typeof target) {
+      before(t: typeof target) {
         t.log.push(this.label);
       },
     };
@@ -2039,7 +2012,7 @@ describe("CallbackObject dispatch", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
     setCallback(target, "save", "before", (t: typeof target) => t.log.push("fn1"));
-    setCallback(target, "save", "before", { beforeSave: (t: typeof target) => t.log.push("obj") });
+    setCallback(target, "save", "before", { before: (t: typeof target) => t.log.push("obj") });
     setCallback(target, "save", "before", (t: typeof target) => t.log.push("fn2"));
     runCallbacks(target, "save");
     expect(target.log).toEqual(["fn1", "obj", "fn2"]);
@@ -2049,7 +2022,7 @@ describe("CallbackObject dispatch", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
     const obj = {
-      beforeSave: async (t: typeof target) => {
+      before: async (t: typeof target) => {
         await Promise.resolve();
         t.log.push("async-obj");
       },
@@ -2065,7 +2038,7 @@ describe("CallbackObject dispatch", () => {
     class Model extends CallbacksMixin() {}
     Model.defineCallbacks("save");
     const log: string[] = [];
-    Model.beforeCallback("save", { beforeSave: () => log.push("mixin-obj") });
+    Model.beforeCallback("save", { before: () => log.push("mixin-obj") });
     const inst = new Model();
     (inst as any).runCallbacks("save");
     expect(log).toEqual(["mixin-obj"]);
@@ -2075,7 +2048,7 @@ describe("CallbackObject dispatch", () => {
     class Model extends CallbacksMixin() {}
     Model.defineCallbacks("save");
     const log: string[] = [];
-    Model.afterCallback("save", { afterSave: () => log.push("after-mixin") });
+    Model.afterCallback("save", { after: () => log.push("after-mixin") });
     const inst = new Model();
     (inst as any).runCallbacks("save");
     expect(log).toEqual(["after-mixin"]);
@@ -2084,7 +2057,7 @@ describe("CallbackObject dispatch", () => {
   it("skipCallback removes object-form callback by original reference", () => {
     const target = { log: [] as string[] };
     defineCallbacks(target, "save");
-    const obj = { beforeSave: (t: typeof target) => t.log.push("obj") };
+    const obj = { before: (t: typeof target) => t.log.push("obj") };
     setCallback(target, "save", "before", obj);
     setCallback(target, "save", "before", (t: typeof target) => t.log.push("fn"));
     skipCallback(target, "save", "before", obj);
@@ -2095,7 +2068,7 @@ describe("CallbackObject dispatch", () => {
   it("skipCallback matches object by reference after chain inheritance clone", () => {
     const parent = { log: [] as string[] };
     defineCallbacks(parent, "save");
-    const obj = { beforeSave: (t: typeof parent) => t.log.push("obj") };
+    const obj = { before: (t: typeof parent) => t.log.push("obj") };
     setCallback(parent, "save", "before", obj);
 
     // simulate inheritance: getCallbackChains copies the chain when a child prototype is used
@@ -2110,7 +2083,7 @@ describe("CallbackObject dispatch", () => {
     Model.defineCallbacks("save");
     const log: string[] = [];
     Model.aroundCallback("save", {
-      aroundSave: (_: unknown, next: () => void) => {
+      around: (_: unknown, next: () => void) => {
         log.push("pre");
         next();
         log.push("post");

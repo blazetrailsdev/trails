@@ -72,47 +72,24 @@ export type AnyCallback<T extends object = object> =
   | AroundCallback<T>;
 
 /**
- * Object form for callbacks. Mirrors activemodel's object-callback dispatch.
- * The object must implement a method named after the kind and event:
- * `beforeSave`, `afterSave`, or `aroundSave` for an event named `"save"`.
+ * Object form for callbacks. Mirrors Rails' object-callback dispatch: the object
+ * compiles to a {@link ObjectCall} CallTemplate whose method name is the
+ * callback's `currentScopes().join` (camelCased). With the default chain scope
+ * `[:kind]` the object must implement the bare kind method — `before`, `after`,
+ * or `around`; with `scope: ["kind", "name"]` it implements `beforeSave`,
+ * `afterSave`, or `aroundSave` for an event named `"save"`.
  *
  * @example
  * ```ts
  * const logger = {
- *   beforeSave(record: MyModel) { console.log("saving", record); },
- *   afterSave(record: MyModel)  { console.log("saved",  record); },
+ *   before(record: MyModel) { console.log("saving", record); },
+ *   after(record: MyModel)  { console.log("saved",  record); },
  * };
  * setCallback(target, "save", "before", logger);
  * setCallback(target, "save", "after",  logger);
  * ```
  */
 export type CallbackObject = { [key: string]: unknown };
-
-/**
- * Resolves an object-form callback to a plain function, matching the Rails
- * activemodel `resolveCallback` dispatch. Throws if the required method
- * (e.g. `beforeSave` for kind=before, name=save) is absent.
- * @internal
- */
-function resolveCallbackObject<T extends object>(
-  obj: CallbackObject,
-  kind: CallbackKind,
-  name: string,
-): AnyCallback<T> {
-  const camelName = name.charAt(0).toUpperCase() + name.slice(1);
-  const methodName = `${kind}${camelName}`;
-  const method = obj[methodName] as ((...args: any[]) => unknown) | undefined;
-  if (typeof method !== "function") {
-    throw new Error(
-      `Callback object must implement ${methodName} (for kind="${kind}", name="${name}")`,
-    );
-  }
-  if (kind === "around") {
-    return ((target: T, proceed: () => void | Promise<void>) =>
-      method.call(obj, target, proceed)) as AroundCallback<T>;
-  }
-  return ((target: T) => method.call(obj, target)) as BeforeCallback<T> | AfterCallback<T>;
-}
 
 export interface RunCallbacksOptions {
   /** If "sync", throw when any callback or block returns a Promise. */
@@ -217,9 +194,14 @@ export class ObjectCall implements CallTemplate {
   makeLambda(): (target: object, value: unknown) => unknown {
     const ot = this.target;
     const m = this.methodName;
+    // Rails ObjectCall#make_lambda: `(@override_target || target).send(@method_name, target)`
+    // — `send` binds `self` to the receiver, so call with `this` = receiver.
     return (target: object) => {
       const receiver = (ot ?? target) as Record<string, unknown>;
-      return (receiver[m] as ((arg: object) => unknown) | undefined)?.(target);
+      return (receiver[m] as ((this: unknown, arg: object) => unknown) | undefined)?.call(
+        receiver,
+        target,
+      );
     };
   }
 
@@ -228,7 +210,10 @@ export class ObjectCall implements CallTemplate {
     const m = this.methodName;
     return (target: object) => {
       const receiver = (ot ?? target) as Record<string, unknown>;
-      return !(receiver[m] as ((arg: object) => unknown) | undefined)?.(target);
+      return !(receiver[m] as ((this: unknown, arg: object) => unknown) | undefined)?.call(
+        receiver,
+        target,
+      );
     };
   }
 
@@ -364,14 +349,14 @@ export class Before {
   readonly userCallback: (target: object, value: unknown) => unknown;
   readonly userConditions: Array<(target: object, value: unknown) => boolean>;
   readonly terminator: ((target: object, fn: () => unknown) => boolean) | false | undefined;
-  readonly filter: AnyCallback | string | symbol;
+  readonly filter: AnyCallback | string | symbol | CallbackObject;
   readonly name: string;
 
   constructor(
     userCallback: (target: object, value: unknown) => unknown,
     userConditions: Array<(target: object, value: unknown) => boolean>,
     chainConfig: { terminator?: ((target: object, fn: () => unknown) => boolean) | false },
-    filter: AnyCallback | string | symbol = "",
+    filter: AnyCallback | string | symbol | CallbackObject = "",
     name: string = "",
   ) {
     this.userCallback = userCallback;
@@ -584,7 +569,7 @@ export class Around {
 export class Callback {
   kind: CallbackKind;
   name: string;
-  readonly filter: AnyCallback | string | symbol;
+  readonly filter: AnyCallback | string | symbol | CallbackObject;
   readonly options: CallbackOptions;
   readonly chainConfig: DefineCallbacksOptions;
   /** Preserved when registered via a CallbackObject so skipCallback can match by original reference. */
@@ -594,7 +579,7 @@ export class Callback {
 
   constructor(
     name: string,
-    filter: AnyCallback | string | symbol,
+    filter: AnyCallback | string | symbol | CallbackObject,
     kind: CallbackKind,
     options: CallbackOptions = {},
     chainConfig: DefineCallbacksOptions = {},
@@ -695,6 +680,12 @@ export class Callback {
       throw new Error(
         `Passing string to define a callback is not supported: ${String(this.filter)}`,
       );
+    } else if (typeof this.filter === "object" && this.filter !== null) {
+      // Rails CallTemplate.build: an object filter compiles to
+      // ObjectCall.new(filter, current_scopes.join("_").to_sym) — the dispatched
+      // method is the callback's scope-join, so the default `[:kind]` scope calls
+      // `around`/`before`/`after` and `scope: [:kind, :name]` calls `aroundSave`.
+      callTemplate = new ObjectCall(this.filter, this.objectCallMethodName());
     } else {
       callTemplate = new MethodCall(this.filter as PropertyKey);
     }
@@ -722,6 +713,16 @@ export class Callback {
     return scope.map((s) =>
       s === "kind" ? String(this.kind) : String((this as Record<string, unknown>)[s]),
     );
+  }
+
+  /**
+   * The object-callback method name — Rails' `current_scopes.join("_").to_sym`,
+   * camelCased for TS. Default scope `[:kind]` → `around`/`before`/`after`;
+   * `scope: [:kind, :name]` → `aroundSave`/`beforeSave`.
+   */
+  private objectCallMethodName(): string {
+    const [head, ...rest] = this.currentScopes();
+    return head + rest.map((s) => s.charAt(0).toUpperCase() + s.slice(1)).join("");
   }
 }
 
@@ -1339,11 +1340,12 @@ export namespace Callbacks {
     if (!chain) {
       throw new Error(`No callback chain "${name}" defined. Call defineCallbacks first.`);
     }
+    // Rails hands the callback object straight to Callback.build, which compiles
+    // it to an ObjectCall honouring the chain scope — no function-wrapping.
     const isObj = typeof callback === "object" && callback !== null;
-    const resolved = isObj ? resolveCallbackObject<T>(callback, kind, name) : callback;
     const entry = new Callback(
       name,
-      resolved as AnyCallback,
+      callback as AnyCallback | CallbackObject,
       kind,
       options as CallbackOptions,
       chain.config,
