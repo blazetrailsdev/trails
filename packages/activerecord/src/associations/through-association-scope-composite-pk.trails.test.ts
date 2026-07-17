@@ -30,14 +30,17 @@ registerModel([CpkOrder, CpkOrderTag, CpkTag]);
 
 // A MIXED predicate referencing both the through table (`cpk_order_tags`) and
 // the source table (`cpk_tags`) in one node, on a scoped source through the
-// composite-PK `Cpk::OrderTag`. `cpk_order_tags.attached_reason` is NULL in the
-// fixtures, so the predicate reduces to `cpk_tags.name = 'Loyal customer'`.
+// composite-PK `Cpk::OrderTag`. BOTH halves must resolve for the query to parse:
+// `cpk_order_tags.order_id` lives on the through table, `cpk_tags.name` on the
+// source table. If the composite-PK bypass orphaned this onto the source-only
+// preload stage (which never joins `cpk_order_tags`), the through-table column
+// would raise `no such column`. `order_1` is tagged both `Loyal customer` and
+// `Digital product`; the source-table half narrows the result to the latter.
 CpkOrder.hasMany("tagsWithMixedCondition", {
   className: "CpkTag",
   through: "orderTags",
   source: "tag",
-  scope: (rel) =>
-    rel.where("cpk_order_tags.attached_reason = 'x' OR cpk_tags.name = 'Loyal customer'"),
+  scope: (rel) => rel.where("cpk_order_tags.order_id > 0 AND cpk_tags.name = 'Digital product'"),
 });
 
 interface ThroughScopeProbe {
@@ -62,10 +65,11 @@ describe("Preloader::ThroughAssociation#through_scope composite-PK through", () 
     const order = cpkOrders("cpk_groceries_order_1");
     const loader = throughLoader([order], "tagsWithMixedCondition");
     const sql = (loader as unknown as ThroughScopeProbe)._buildThroughScope().toSql();
-    // Both the through-table and source-table columns are referenced in one
-    // predicate, and the source is eager-JOINed so both resolve in one query.
-    expect(sql).toContain("cpk_order_tags");
-    expect(sql).toContain("cpk_tags");
+    // The whole mixed predicate rides the through query (both column references
+    // are the verbatim raw-SQL string, adapter-quoting-independent), and the
+    // source is eager-JOINed so `cpk_tags.name` resolves alongside it — one query.
+    expect(sql).toContain("cpk_order_tags.order_id > 0");
+    expect(sql).toContain("cpk_tags.name = 'Digital product'");
     expect(sql).toMatch(/JOIN .*cpk_tags/);
   });
 
@@ -76,6 +80,8 @@ describe("Preloader::ThroughAssociation#through_scope composite-PK through", () 
       id: order.readAttribute("id"),
     }).preload("tagsWithMixedCondition");
     const tags = (row.association("tagsWithMixedCondition").target ?? []) as CpkTag[];
-    expect(tags.map((t) => t.name)).toEqual(["Loyal customer"]);
+    // Both predicate halves resolved in one JOINed query: the through-table half
+    // did not raise, and the source-table half narrowed order_1's two tags to one.
+    expect(tags.map((t) => t.name)).toEqual(["Digital product"]);
   });
 });
