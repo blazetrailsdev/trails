@@ -201,6 +201,28 @@ mechanical 60–70% of a port (shape, signatures, control flow) and leaves the
 semantic 30–40% (receiver resolution, cross-file async, macro wiring, stdlib) to
 a human — not an automated porter.
 
+## What the diff-vs-port highlights
+
+A **manual** comparison of each generated file against its trails counterpart
+(method-name overlap, then classifying every non-overlapping symbol). This is
+hand-run analysis, not a checked-in report — the reproducible version is the
+guard story (item 7). For the 10 targets, every generated Rails-named symbol
+absent from the port fell into one of these buckets, none of them a new
+untracked deviation:
+
+| bucket                   | examples                                                                                                | status                                 |
+| ------------------------ | ------------------------------------------------------------------------------------------------------- | -------------------------------------- |
+| Tracked API deviation    | `async_count`/`async_pluck`/`async_sum` family (trails uses an `{ async: true }` path)                  | in `call-mismatches-wide-exclude.json` |
+| Tracked scoped-skip      | `build_count_subquery`, `perform_calculation` (realized inline)                                         | `SCOPED_SKIP` in `conventions.ts`      |
+| Confirmed-equivalent     | `_create_record` (ported in `callbacks.ts`/`dirty.ts`, not `persistence.ts`)                            | `call-mismatches-exclude.json`         |
+| Ruby object-protocol     | `encode_with`, `init_with`, `to_ary`, `initialize_dup`                                                  | `SKIP` in `conventions.ts`             |
+| Generator false positive | `isExists`/`isAbstractClass` (port uses `exists`/`abstractClass`); cross-file symbols read as "missing" | not a deviation — generator artifact   |
+
+The takeaway is not the (unverified) "zero residual" number but the _shape_:
+the diff independently re-derives entries the deviation catalog already records,
+which is why item 7 proposes formalizing it as a guard rather than trusting the
+manual pass.
+
 ## Productionization roadmap
 
 Pursue only if the scaffolding value justifies it. Sequenced by the coverage
@@ -226,12 +248,16 @@ data (biggest correctness gaps first, not biggest node buckets):
    against the trails port, **filtered by the deviation catalog**
    (`SKIP` / `SCOPED_SKIP` / the api-compare exclude lists) and by the
    generator's own known false-positive sources. Anything left is a candidate
-   untracked deviation to converge. Across the 10 most-central files that
-   residual is currently empty (every diff resolves to a catalogued exception or
-   a generator artifact — see below), so the guard would act as a regression
+   untracked deviation to converge, so the guard would act as a regression
    tripwire: a _newly_ ported file that silently renamed, inlined, or dropped a
-   Rails method — without a catalog entry — would light up. Prerequisites are
-   the two false-positive suppressors: (a) predicate-candidate ambiguity
+   Rails method — without a catalog entry — would light up. A **manual** spot
+   check of the 10 targets (not yet a reproducible command — that is the story's
+   deliverable) found every diff resolving to either a catalogued exception or a
+   generator artifact; see the worked table under
+   [What the diff-vs-port highlights](#what-the-diff-vs-port-highlights). That
+   result is unverified until the guard exists, so treat it as a hypothesis the
+   guard must confirm, not an established fact. Prerequisites are the two
+   false-positive suppressors: (a) predicate-candidate ambiguity
    (`exists?` → `["isExists","exists"]`; the generator picks the first, the port
    may pick either), and (b) file-scoped symbol lookup (a method ported into a
    _different_ file than its Rails home reads as "missing").
