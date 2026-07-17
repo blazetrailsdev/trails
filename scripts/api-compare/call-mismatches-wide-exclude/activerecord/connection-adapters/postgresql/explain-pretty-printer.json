@@ -1,0 +1,23 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/explain-pretty-printer.ts",
+    "rubyName": "pp",
+    "call": "columns",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/explain-pretty-printer.ts",
+    "rubyName": "pp",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/postgresql/explain-pretty-printer.ts",
+    "rubyName": "pp",
+    "call": "rows",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

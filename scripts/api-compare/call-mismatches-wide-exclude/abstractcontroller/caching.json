@@ -1,0 +1,212 @@
+[
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "cache",
+    "call": "expand_cache_key",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "combined_fragment_cache_key",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "combined_fragment_cache_key",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "combined_fragment_cache_key",
+    "call": "url_for",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "expire_fragment",
+    "call": "cache_configured?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "expire_fragment",
+    "call": "cache_store",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "expire_fragment",
+    "call": "combined_fragment_cache_key",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "expire_fragment",
+    "call": "delete",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "expire_fragment",
+    "call": "delete_matched",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "expire_fragment",
+    "call": "instrument_fragment_cache",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "fragment_exist?",
+    "call": "cache_configured?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "fragment_exist?",
+    "call": "cache_store",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "fragment_exist?",
+    "call": "combined_fragment_cache_key",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "fragment_exist?",
+    "call": "exist?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "fragment_exist?",
+    "call": "instrument_fragment_cache",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "instrument_fragment_cache",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "instrument_fragment_cache",
+    "call": "instrument_payload",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "read_fragment",
+    "call": "cache_configured?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "read_fragment",
+    "call": "cache_store",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "read_fragment",
+    "call": "combined_fragment_cache_key",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "read_fragment",
+    "call": "html_safe",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "read_fragment",
+    "call": "instrument_fragment_cache",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "read_fragment",
+    "call": "read",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "view_cache_dependencies",
+    "call": "filter_map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "write_fragment",
+    "call": "cache_configured?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "write_fragment",
+    "call": "cache_store",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "write_fragment",
+    "call": "combined_fragment_cache_key",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "write_fragment",
+    "call": "instrument_fragment_cache",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "write_fragment",
+    "call": "to_str",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "caching.ts",
+    "rubyName": "write_fragment",
+    "call": "write",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

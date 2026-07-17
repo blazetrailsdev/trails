@@ -1,0 +1,37 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "trailtie/configuration.ts",
+    "rubyName": "after_initialize",
+    "call": "on_load",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "trailtie/configuration.ts",
+    "rubyName": "after_routes_loaded",
+    "call": "on_load",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "trailtie/configuration.ts",
+    "rubyName": "before_configuration",
+    "call": "on_load",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "trailtie/configuration.ts",
+    "rubyName": "before_eager_load",
+    "call": "on_load",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "trailtie/configuration.ts",
+    "rubyName": "before_initialize",
+    "call": "on_load",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

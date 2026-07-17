@@ -1,0 +1,58 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "delegate_number_helper_method",
+    "call": "delete",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "delegate_number_helper_method",
+    "call": "symbolize_keys",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "escape_units",
+    "call": "html_escape",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "escape_units",
+    "call": "transform_values",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "escape_unsafe_options",
+    "call": "html_escape",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "escape_unsafe_options",
+    "call": "html_safe?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "number_to_phone",
+    "call": "delete",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/number-helper.ts",
+    "rubyName": "number_to_phone",
+    "call": "symbolize_keys",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "package": "globalid",
+    "tsFile": "identification.ts",
+    "rubyName": "to_gid_param",
+    "call": "to_global_id",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "globalid",
+    "tsFile": "identification.ts",
+    "rubyName": "to_sgid_param",
+    "call": "to_signed_global_id",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

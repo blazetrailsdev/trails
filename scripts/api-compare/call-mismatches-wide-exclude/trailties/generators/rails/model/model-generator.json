@@ -1,0 +1,51 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/model/model-generator.ts",
+    "rubyName": "initialize",
+    "call": "inflection_impossible?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/model/model-generator.ts",
+    "rubyName": "initialize",
+    "call": "options",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/model/model-generator.ts",
+    "rubyName": "initialize",
+    "call": "pluralize",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/model/model-generator.ts",
+    "rubyName": "initialize",
+    "call": "replace",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/model/model-generator.ts",
+    "rubyName": "initialize",
+    "call": "say",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/model/model-generator.ts",
+    "rubyName": "initialize",
+    "call": "singularize",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/model/model-generator.ts",
+    "rubyName": "initialize",
+    "call": "underscore",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

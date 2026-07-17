@@ -1,0 +1,30 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "validations/uniqueness.ts",
+    "rubyName": "initialize",
+    "call": "all?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "validations/uniqueness.ts",
+    "rubyName": "validate_each",
+    "call": "except",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "validations/uniqueness.ts",
+    "rubyName": "validate_each",
+    "call": "id_in_database",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "validations/uniqueness.ts",
+    "rubyName": "validate_each",
+    "call": "not",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/callbacks.ts",
+    "rubyName": "after",
+    "call": "set_callback",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "middleware/callbacks.ts",
+    "rubyName": "before",
+    "call": "set_callback",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

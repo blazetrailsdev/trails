@@ -1,0 +1,23 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "auth/abstract/request.ts",
+    "rubyName": "authorization_key",
+    "call": "has_key?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "auth/abstract/request.ts",
+    "rubyName": "params",
+    "call": "last",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "auth/abstract/request.ts",
+    "rubyName": "scheme",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

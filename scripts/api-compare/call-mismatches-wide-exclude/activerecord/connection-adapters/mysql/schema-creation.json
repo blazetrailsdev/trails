@@ -1,0 +1,58 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "add_column_options!",
+    "call": "match?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "add_column_position!",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "index_in_create",
+    "call": "accept",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "index_in_create",
+    "call": "add_index_options",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "visit_ChangeColumnDefaultDefinition",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "visit_ChangeColumnDefinition",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "visit_IndexDefinition",
+    "call": "quote_column_name",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-adapters/mysql/schema-creation.ts",
+    "rubyName": "visit_IndexDefinition",
+    "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/permissions-policy.ts",
+    "rubyName": "permissions_policy",
+    "call": "request",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

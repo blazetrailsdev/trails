@@ -1,0 +1,16 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "media-type.ts",
+    "rubyName": "params",
+    "call": "strip_doublequotes",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "media-type.ts",
+    "rubyName": "type",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

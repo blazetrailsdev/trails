@@ -1,0 +1,30 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "middleware/database-selector/resolver.ts",
+    "rubyName": "read_from_primary",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "middleware/database-selector/resolver.ts",
+    "rubyName": "read_from_replica",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "middleware/database-selector/resolver.ts",
+    "rubyName": "reading_request?",
+    "call": "get?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "middleware/database-selector/resolver.ts",
+    "rubyName": "write_to_primary",
+    "call": "instrument",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

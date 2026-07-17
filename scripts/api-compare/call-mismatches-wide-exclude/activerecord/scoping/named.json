@@ -1,0 +1,37 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "scoping/named.ts",
+    "rubyName": "default_extensions",
+    "call": "build_default_scope",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "scoping/named.ts",
+    "rubyName": "scope",
+    "call": "define_method",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "scoping/named.ts",
+    "rubyName": "scope",
+    "call": "extending",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "scoping/named.ts",
+    "rubyName": "scope",
+    "call": "generate_relation_method",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "scoping/named.ts",
+    "rubyName": "scope",
+    "call": "method_defined_within?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

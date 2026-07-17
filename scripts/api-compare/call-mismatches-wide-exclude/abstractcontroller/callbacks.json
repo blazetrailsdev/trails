@@ -1,0 +1,44 @@
+[
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "rubyName": "_insert_callbacks",
+    "call": "delete",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "rubyName": "_insert_callbacks",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "rubyName": "_normalize_callback_option",
+    "call": "delete",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "rubyName": "match?",
+    "call": "first",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "rubyName": "match?",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "abstractcontroller",
+    "tsFile": "callbacks.ts",
+    "rubyName": "process_action",
+    "call": "run_callbacks",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

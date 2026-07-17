@@ -1,0 +1,100 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "any?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "compact",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "delete",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "exist?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "flatten",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "load_file",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "merge",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_compose_yaml",
+    "call": "write",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_database_config",
+    "call": "template",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_dockerfile",
+    "call": "exist?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "edit_dockerfile",
+    "call": "gsub_file",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "initialize",
+    "call": "include?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "generators/rails/db/system/change/change-generator.ts",
+    "rubyName": "initialize",
+    "call": "options",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

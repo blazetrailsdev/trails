@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "template-path.ts",
+    "rubyName": "parse",
+    "call": "from",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

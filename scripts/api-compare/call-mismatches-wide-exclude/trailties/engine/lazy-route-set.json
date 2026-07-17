@@ -1,0 +1,37 @@
+[
+  {
+    "package": "trailties",
+    "tsFile": "engine/lazy-route-set.ts",
+    "rubyName": "draw",
+    "call": "application",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "engine/lazy-route-set.ts",
+    "rubyName": "generate_extras",
+    "call": "application",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "engine/lazy-route-set.ts",
+    "rubyName": "generate_url_helpers",
+    "call": "prepend",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "engine/lazy-route-set.ts",
+    "rubyName": "recognize_path",
+    "call": "application",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "trailties",
+    "tsFile": "engine/lazy-route-set.ts",
+    "rubyName": "recognize_path_with_request",
+    "call": "application",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

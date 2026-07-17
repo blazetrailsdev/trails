@@ -1,0 +1,30 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "helpers/sanitize-helper.ts",
+    "rubyName": "sanitize",
+    "call": "safe_list_sanitizer",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/sanitize-helper.ts",
+    "rubyName": "sanitize_css",
+    "call": "safe_list_sanitizer",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/sanitize-helper.ts",
+    "rubyName": "strip_links",
+    "call": "link_sanitizer",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/sanitize-helper.ts",
+    "rubyName": "strip_tags",
+    "call": "full_sanitizer",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

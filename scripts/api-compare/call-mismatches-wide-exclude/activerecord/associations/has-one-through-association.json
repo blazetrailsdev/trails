@@ -1,0 +1,135 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "all?",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "belongs_to?",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "foreign_key",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "owner",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "foreign_key_present?",
+    "call": "through_reflection",
+    "reason": "Equivalent: foreignKeyPresent() delegates to ThroughAssociation#foreign_key_present? via the throughForeignKeyPresent mixin helper (through-association.ts), same delegation pattern as replace/stale_state/target_scope on this class."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "replace",
+    "call": "create_through_record",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "belongs_to?",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "filter_map",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "foreign_key",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "owner",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "presence",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "stale_state",
+    "call": "through_reflection",
+    "reason": "Rails ThroughAssociation#stale_state calls these; TS mirrors them in staleStateImpl (through-association.ts) which HasOneThroughAssociation#staleState delegates to (same pattern as HasManyThroughAssociation)."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "target_scope",
+    "call": "drop",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "target_scope",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "target_scope",
+    "call": "except",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "target_scope",
+    "call": "klass",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "target_scope",
+    "call": "merge!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "target_scope",
+    "call": "reflection",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "associations/has-one-through-association.ts",
+    "rubyName": "target_scope",
+    "call": "scope_for_association",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

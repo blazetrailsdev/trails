@@ -1,0 +1,16 @@
+[
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-attribute.ts",
+    "rubyName": "initialize",
+    "call": "deep_dup",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/query-attribute.ts",
+    "rubyName": "initialize",
+    "call": "mutable?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

@@ -1,0 +1,16 @@
+[
+  {
+    "package": "actionview",
+    "tsFile": "helpers/date-helper.ts",
+    "rubyName": "distance_of_time_in_words",
+    "call": "count",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actionview",
+    "tsFile": "helpers/date-helper.ts",
+    "rubyName": "distance_of_time_in_words",
+    "call": "div",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

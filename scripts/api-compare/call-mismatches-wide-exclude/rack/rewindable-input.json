@@ -1,0 +1,16 @@
+[
+  {
+    "package": "rack",
+    "tsFile": "rewindable-input.ts",
+    "rubyName": "make_rewindable",
+    "call": "new",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "rack",
+    "tsFile": "rewindable-input.ts",
+    "rubyName": "make_rewindable",
+    "call": "write",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]

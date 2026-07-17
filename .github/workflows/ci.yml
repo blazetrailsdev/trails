@@ -1215,7 +1215,7 @@ jobs:
         # ported names except `super`). Distinct file from the narrow run above.
         run: pnpm exec tsx scripts/api-compare/compare.ts --wide-calls
       - name: Wide call-mismatches ratchet
-        # Gates the RFC 0047 wide artifact against call-mismatches-wide-exclude.json.
+        # Gates the RFC 0047 wide artifact against the split call-mismatches-wide-exclude/ baseline dir.
         # Fails on a new wide mismatch or a stale baseline entry; reseed with
         # `pnpm tsx scripts/api-compare/lint-call-mismatches-wide.ts --write`.
         run: pnpm exec tsx scripts/api-compare/lint-call-mismatches-wide.ts

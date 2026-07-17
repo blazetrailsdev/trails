@@ -1,0 +1,9 @@
+[
+  {
+    "package": "actiondispatch",
+    "tsFile": "system-test-case.ts",
+    "rubyName": "start_application",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  }
+]
