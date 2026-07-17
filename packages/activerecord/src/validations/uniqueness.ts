@@ -393,21 +393,13 @@ async function buildRelation(
   const typeObj =
     typeof klass.typeForAttribute === "function" ? klass.typeForAttribute(attribute) : null;
 
-  // Serialized columns (`serialize :content`) store the coder-dumped form, so
-  // the comparison must bind the serialized value — Rails produces it via the
-  // attribute type during `bind_attribute` and still flows it through
-  // `default_uniqueness_comparison`. The decorated (coder-wrapping) type lives
-  // on `attributeTypes()` (the base.ts `typeForAttribute` override returns the
-  // undecorated cast type), and on an STI subclass it is inherited via the
-  // replayed pending decorators. We serialize the value here and fall through to
-  // the comparison path below (rather than short-circuiting), so a serialized
-  // column with `case_sensitive:` still picks the right SQL comparison.
-  const decorated = klass.attributeTypes?.()?.[attribute] as
-    | { coder?: unknown; serialize?: (v: unknown) => unknown }
-    | undefined;
-  if (decorated?.coder && typeof decorated.serialize === "function") {
-    value = decorated.serialize(value);
-  }
+  // Serialized columns (`serialize :content`) store the coder-dumped form, but
+  // the value is NOT serialized here: the bind path below runs it through the
+  // attribute's (decorated, coder-wrapping) type, which the arel table resolves
+  // via `typeForAttribute` — so `buildBindAttribute` / `where` already emit the
+  // coder-dumped form. Serializing here too would double-dump (`"x\n"` →
+  // `"x\n\n"`) and never match the stored row. Mirrors Rails' `build_relation`,
+  // which hands the raw value to `bind_attribute` and lets the type serialize.
 
   // When the attribute supports unencrypted data alongside encrypted values, the
   // patched Relation#where (ExtendedDeterministicQueries) must receive a hash-style
