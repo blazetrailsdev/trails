@@ -752,17 +752,15 @@ export class Model {
         options: Record<string, unknown>,
       ): ValidatorBase | { validate(record: ValidatableRecord): void };
     }>) {
-      const validator = new klass(rest);
-      // Rails passes `options[:class] = self` to `validates_with`, so the
-      // validator's `initialize` can call `setup!(options[:class])` to lazily
-      // materialize its virtual accessors (Acceptance / Confirmation). trails
-      // exposes that as a separate `setupBang` method; invoke it here with the
-      // host class so the accessors land on the prototype and the constructor's
-      // setter-dispatch mass-assignment (RFC 0046) honors them.
-      const maybeSetup = (validator as { setupBang?: (klass: unknown) => void }).setupBang;
-      if (typeof maybeSetup === "function") {
-        maybeSetup.call(validator, this);
-      }
+      // Rails `validates_with` sets `options[:class] = self` before calling
+      // `klass.new(options.dup)` (with.rb:88-94), so a validator constructor can
+      // read the host class via `options[:class]` — the documented setup path
+      // (validator.rb:86-94). `Validator#initialize` then excludes `:class` from
+      // its frozen `options` (validator.rb:107-110; our Validator base does the
+      // same). Acceptance / Confirmation use it to call `setupBang` (Rails
+      // `setup!`), materializing their virtual accessors on the prototype so the
+      // constructor's setter-dispatch mass-assignment (RFC 0046) honors them.
+      const validator = new klass({ ...rest, class: this });
       if (!(validator instanceof EachValidator)) {
         if (typeof (validator as ValidatorCheckable).checkValidity === "function") {
           (validator as ValidatorCheckable).checkValidity!();
