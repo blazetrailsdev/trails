@@ -175,10 +175,10 @@ export class UniquenessValidator extends EachValidator {
 
     const errorOpts: Record<string, unknown> = { value };
     if (opts?.message != null) errorOpts.message = opts.message;
-    // NOTE: `strict` currently never reaches here — validatesWith strips it and
-    // handles strict via its own (sync-only) wrapper, which does not raise for
-    // async validators. Tracked by the async-strict-validators-raise story
-    // (RFC 0063); Rails passes strict straight through to errors.add.
+    // `strict` does not arrive in options — validatesWith strips it and enforces
+    // it via its own wrapper (now async-aware, so it raises StrictValidationFailed
+    // for this async validator too). This line stays for parity with any caller
+    // that constructs the validator directly with a strict option.
     if (opts?.strict != null) errorOpts.strict = opts.strict;
 
     let [relation] = await buildRelation(modelClass, attribute, mapped, this.options);

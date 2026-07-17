@@ -6,6 +6,7 @@
  * `async-validations-honor-validation-context`).
  */
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { StrictValidationFailed } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -54,5 +55,21 @@ describe("UniquenessValidationContextTest", () => {
     persisted.writeAttribute("title", "upd-unique");
     expect(await persisted.isValid("update")).toBe(false);
     expect(persisted.errors.get("title")).toEqual(["has already been taken"]);
+  });
+
+  it("strict: true raises StrictValidationFailed on a uniqueness collision", async () => {
+    // Rails leaves :strict in the validator options and forwards it to
+    // errors.add, which raises. In trails, validatesWith's (async-aware) strict
+    // wrapper awaits this DB-backed validator and raises StrictValidationFailed
+    // when it flags a collision.
+    Topic.validatesUniqueness("title", { strict: true });
+
+    await Topic.createBang({ title: "strict-dup" });
+
+    const dup = new Topic({ title: "strict-dup" });
+    await expect(dup.isValid()).rejects.toThrow(StrictValidationFailed);
+
+    const unique = new Topic({ title: "strict-unique" });
+    expect(await unique.isValid()).toBe(true);
   });
 });
