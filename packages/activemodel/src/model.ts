@@ -754,22 +754,23 @@ export class Model {
     }>) {
       // Rails `validates_with` sets `options[:class] = self` before calling
       // `klass.new(options.dup)` (with.rb:88-94), passing the FULL options hash —
-      // including condition keys like `if`/`unless`/`on` — plus `:class`; only
-      // `Validator#initialize` strips `:class` from its frozen `options`
-      // (validator.rb:107-110; our Validator base does the same), leaving the
-      // standard keys visible in `validator.options`. `with_validation_test.rb:80`
-      // pins this: `validates_with(v, if: :cond, foo: :bar)` calls `new` with
-      // `{ foo: :bar, if: :cond, class: Topic }`. The extracted condition keys
-      // (`ifOpt`/`unlessOpt`/`onOpt`) are used only to build callback conditions,
-      // not withheld from the validator. `strict` is the one key kept out: trails
-      // implements strict via the `isStrict` callback wrapper below, and
-      // forwarding it would also arm `errors.add`'s strict-raise
-      // (filteredErrorOptions keeps `strict`), double-firing. `options[:class]`
-      // lets Acceptance / Confirmation call `setupBang` (Rails `setup!`),
-      // materializing their virtual accessors on the prototype so the
+      // condition keys (`if`/`unless`/`on`), `strict`, and custom keys — plus
+      // `:class`; only `Validator#initialize` strips `:class` from its frozen
+      // `options` (validator.rb:107-110; our Validator base does the same),
+      // leaving every standard key visible in `validator.options`.
+      // `with_validation_test.rb:80` pins this: `validates_with(v, if: :cond,
+      // foo: :bar)` calls `new` with `{ foo: :bar, if: :cond, class: Topic }`.
+      // The extracted `ifOpt`/`unlessOpt`/`onOpt`/`isStrict` are used only to
+      // wire the callback (conditions + strict wrapper), NOT withheld from the
+      // validator. Passing `strict` through does not double-raise: a validator
+      // that forwards its options to `errors.add` raises there first
+      // (filteredErrorOptions keeps `strict`; errors.ts:249), matching Rails;
+      // the `isStrict` wrapper below only fires for validators that add errors
+      // without forwarding `strict`, so exactly one raise happens either way.
+      // `options[:class]` lets Acceptance / Confirmation call `setupBang` (Rails
+      // `setup!`), materializing their virtual accessors on the prototype so the
       // constructor's setter-dispatch mass-assignment (RFC 0046) honors them.
-      const { strict: _strictHandledByWrapper, ...optionsForConstructor } = options;
-      const validator = new klass({ ...optionsForConstructor, class: this });
+      const validator = new klass({ ...options, class: this });
       if (!(validator instanceof EachValidator)) {
         if (typeof (validator as ValidatorCheckable).checkValidity === "function") {
           (validator as ValidatorCheckable).checkValidity!();
