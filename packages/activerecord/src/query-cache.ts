@@ -84,18 +84,25 @@ export class QueryCache {
 
   /**
    * Enable query cache on all provided pools/adapters, skipping those whose
-   * cache is already enabled or disabled by configuration.
+   * cache is already enabled or disabled by configuration. Returns the targets
+   * it actually enabled so `complete` can be threaded exactly those — a pool
+   * skipped by `run` (already enabled, or `query_cache: false`) is therefore
+   * never disabled/cleared by `complete`.
    * Called at the start of a request/execution context.
    *
    * Mirrors: ActiveRecord::QueryCache.run
    * (`each_connection_pool.reject(&:query_cache_enabled).each { next if
-   * pool.db_config&.query_cache == false; pool.enable_query_cache! }`)
+   * pool.db_config&.query_cache == false; pool.enable_query_cache! }`), whose
+   * return value the executor threads into `complete(pools)`.
    */
-  static run(targets: QueryCacheRunTarget[]): void {
+  static run<T extends QueryCacheRunTarget>(targets: T[]): T[] {
+    const enabled: T[] = [];
     for (const target of targets) {
       if (target.queryCacheEnabled || target.queryCacheDisabled) continue;
       target.enableQueryCacheBang();
+      enabled.push(target);
     }
+    return enabled;
   }
 
   /**
@@ -127,13 +134,19 @@ export class QueryCache {
     if (!executor) return;
     const resolve = typeof targets === "function" ? targets : () => targets;
 
-    // Mirrors Rails' ExecutorHooks module with static run/complete
+    // Mirrors Rails' ExecutorHooks module with static run/complete. Rails'
+    // executor threads `run`'s return value into `complete(pools)` as its
+    // state; we carry the enabled-target list across the two static calls so
+    // `complete` only touches the pools `run` enabled (never a config-disabled
+    // pool `run` skipped).
     class ExecutorHooks {
+      static enabledTargets: (QueryCacheRunTarget & QueryCacheCompleteTarget)[] = [];
       static run() {
-        QueryCache.run(resolve());
+        ExecutorHooks.enabledTargets = QueryCache.run(resolve());
       }
       static complete() {
-        QueryCache.complete(resolve());
+        QueryCache.complete(ExecutorHooks.enabledTargets);
+        ExecutorHooks.enabledTargets = [];
       }
     }
 

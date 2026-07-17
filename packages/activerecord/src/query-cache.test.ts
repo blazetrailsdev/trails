@@ -31,8 +31,8 @@ function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> 
   // after the middleware is built (the multi-role `connected_to(role: :reading)`
   // tests) are included, mirroring Rails' `connection_pool_list(:all)`.
   // (Rails threads run's enabled-pool result into complete so a disabled pool
-  // is never touched on complete; trails re-resolves the full list — tracked by
-  // 0023-surfaced-deviations: query-cache-run-returns-enabled-pools-for-complete.)
+  // is never touched on complete; installExecutorHooks carries run's
+  // enabled-target list into complete for the same reason.)
   QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, () =>
     Base.connectionHandler.connectionPoolList("all"),
   );

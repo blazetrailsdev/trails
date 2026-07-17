@@ -10,6 +10,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
+import { QueryCache } from "./query-cache.js";
 
 registerModel(Task as never);
 
@@ -119,5 +120,68 @@ describe("cacheNotificationInfo payload (trails)", () => {
     const cached = payloads.filter((p) => p.cached);
     expect(cached.length).toBe(1);
     expect(cached[0].name).toBeUndefined();
+  });
+});
+
+// Covers the run→complete pool threading (0023-surfaced-deviations:
+// query-cache-run-returns-enabled-pools-for-complete). Rails' `QueryCache.run`
+// returns the pools it enabled and the executor threads that exact list into
+// `complete(pools)`, so a pool skipped by `run` is never touched by `complete`.
+describe("run returns enabled targets for complete (trails)", () => {
+  class FakeTarget {
+    queryCacheEnabled = false;
+    disabled: boolean;
+    enabledCount = 0;
+    disabledCount = 0;
+    clearedCount = 0;
+    constructor(disabledByConfig = false) {
+      this.disabled = disabledByConfig;
+    }
+    get queryCacheDisabled(): boolean {
+      return this.disabled;
+    }
+    enableQueryCacheBang(): void {
+      this.enabledCount++;
+      this.queryCacheEnabled = true;
+    }
+    disableQueryCacheBang(): void {
+      this.disabledCount++;
+      this.queryCacheEnabled = false;
+    }
+    clearQueryCache(): void {
+      this.clearedCount++;
+    }
+  }
+
+  it("run returns only the targets it enabled", () => {
+    const enabled = new FakeTarget();
+    const configDisabled = new FakeTarget(true);
+    const alreadyEnabled = new FakeTarget();
+    alreadyEnabled.queryCacheEnabled = true;
+
+    const result = QueryCache.run([enabled, configDisabled, alreadyEnabled]);
+
+    expect(result).toEqual([enabled]);
+    expect(enabled.enabledCount).toBe(1);
+    expect(configDisabled.enabledCount).toBe(0);
+    expect(alreadyEnabled.enabledCount).toBe(0);
+  });
+
+  it("complete only disables/clears the pools run enabled", () => {
+    const enabled = new FakeTarget();
+    const configDisabled = new FakeTarget(true);
+    let hook: { run(): void; complete(): void } | null = null;
+    QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, () => [
+      enabled,
+      configDisabled,
+    ]);
+
+    hook!.run();
+    hook!.complete();
+
+    expect(enabled.disabledCount).toBe(1);
+    expect(enabled.clearedCount).toBe(1);
+    expect(configDisabled.disabledCount).toBe(0);
+    expect(configDisabled.clearedCount).toBe(0);
   });
 });
