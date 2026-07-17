@@ -60,11 +60,11 @@ describe("quoteDefaultExpression", () => {
     expect(quoteDefaultExpression(undefined)).toBe("");
   });
 
-  it("returns bare NULL for null", () => {
+  it("returns DEFAULT NULL for null", () => {
     expect(quoteDefaultExpression(null)).toBe("NULL");
   });
 
-  it("returns bare TRUE/FALSE for booleans", () => {
+  it("returns DEFAULT TRUE/FALSE for booleans", () => {
     expect(quoteDefaultExpression(true)).toBe("TRUE");
     expect(quoteDefaultExpression(false)).toBe("FALSE");
   });
