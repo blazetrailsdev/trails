@@ -93,10 +93,11 @@ function canonicalKey(value: unknown): string {
  * JSON payloads do not carry raw control characters — so a real string can
  * never masquerade as an encoded `undefined`/`NaN`.
  *
- * Residual limitation: two distinct `NaN` values canonicalize identically and
- * so compare equal here, whereas Ruby's `Float::NAN == Float::NAN` is false.
- * This only surfaces for in-memory reassignment (JSON coders cannot carry a
- * `NaN` across a DB round-trip) and is pinned by a test in the sibling suite.
+ * Note: `canonicalKey` is a _deterministic_ string, so two distinct `NaN`
+ * values canonicalize identically. That is fine for default detection (a coder
+ * default never contains `NaN`), but change detection needs Ruby's non-reflexive
+ * `Float::NAN == Float::NAN == false`; `isChanged` therefore compares Hash
+ * values structurally via {@link valuesEqual} rather than by canonical key.
  *
  * @internal
  */
@@ -125,6 +126,102 @@ function normalize(value: unknown): unknown {
     sorted[key] = normalize((value as Record<string, unknown>)[key]);
   }
   return sorted;
+}
+
+/**
+ * Unwraps `toHash()`-bearing objects (HashWithIndifferentAccess) so the wrapped
+ * contents — not the Map-backed internal shape — drive comparison.
+ *
+ * @internal
+ */
+function unwrapHash(value: unknown): unknown {
+  while (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { toHash?: unknown }).toHash === "function"
+  ) {
+    value = (value as { toHash(): unknown }).toHash();
+  }
+  return value;
+}
+
+/**
+ * Whether a value is a hash-like plain object — the same `Object.prototype` /
+ * null-prototype shape `normalize` treats as an order-insensitive Hash.
+ *
+ * @internal
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Ruby value equality (`old_value == new_value`) as `Type::Value#changed?`
+ * relies on it, dispatched by the operand's kind:
+ *
+ * - Collections (Array/Hash) compare structurally and order-insensitively via
+ *   {@link collectionsEqual}, recursing back through this function so each
+ *   element is compared by its own `==` — matching Ruby's `Hash#==`/`Array#==`.
+ * - A value that defines an explicit `equals` (our convention for Ruby `==`,
+ *   e.g. ActiveSupport::TimeWithZone) dispatches to it.
+ * - A value object with a primitive `valueOf` (e.g. Date) compares by that
+ *   primitive, but only against its own kind (shared constructor), mirroring a
+ *   Ruby value type's `==` that only compares against its own class.
+ * - Everything else falls back to `===`, so leaf primitives use identity and a
+ *   `NaN` is never equal to itself — matching Ruby's non-reflexive
+ *   `Float::NAN == Float::NAN == false` (a deterministic canonical key cannot
+ *   express that).
+ *
+ * @internal
+ */
+function valuesEqual(a: unknown, b: unknown): boolean {
+  if (a === b) return true;
+  if (isValueComparable(a) && isValueComparable(b)) return collectionsEqual(a, b);
+  // Rails' `a == b` calls the *left* operand's `==`, so dispatch on `a` only.
+  if (hasEquals(a)) return a.equals(b);
+  if (
+    hasValueEquality(a) &&
+    hasValueEquality(b) &&
+    (a as object).constructor === (b as object).constructor
+  ) {
+    return Object.is(
+      (a as { valueOf(): unknown }).valueOf(),
+      (b as { valueOf(): unknown }).valueOf(),
+    );
+  }
+  return false;
+}
+
+/**
+ * Structural, order-insensitive deep equality for Array/Hash values, unwrapping
+ * `toHash()`-bearing objects (HashWithIndifferentAccess) and comparing each
+ * element through {@link valuesEqual} so nested value objects get the same
+ * equality dispatch as top-level ones.
+ *
+ * @internal
+ */
+function collectionsEqual(aRaw: unknown, bRaw: unknown): boolean {
+  const a = unwrapHash(aRaw);
+  const b = unwrapHash(bRaw);
+  const aArr = Array.isArray(a);
+  const bArr = Array.isArray(b);
+  if (aArr || bArr) {
+    if (!aArr || !bArr || a.length !== b.length) return false;
+    return a.every((v, i) => valuesEqual(v, b[i]));
+  }
+  const aObj = isPlainObject(a);
+  const bObj = isPlainObject(b);
+  if (aObj || bObj) {
+    if (!aObj || !bObj) return false;
+    const ak = Object.keys(a).sort();
+    const bk = Object.keys(b).sort();
+    if (ak.length !== bk.length || ak.some((k, i) => k !== bk[i])) return false;
+    return ak.every((k) => valuesEqual(a[k], b[k]));
+  }
+  // An HWIA whose toHash() unwrapped to a non-collection: compare as values.
+  return valuesEqual(a, b);
 }
 
 export interface Coder {
@@ -206,51 +303,23 @@ export class Serialized extends ValueType {
   // structurally-equal deserialized collections (e.g. the `[]` Array default
   // an explicit `nil` assignment casts to vs. the record's original `[]`) are
   // not a change. JS `!==` is reference equality and would flag them as
-  // changed, marking `Topic.new(content: nil)` dirty. Restore Ruby's value
-  // semantics for the value-comparable defaults (Array/Hash), matching the
-  // same distinction `isValueComparable`/`canonicalKey` already draw for
-  // `default_value?`. Sharing that scope is deliberate: a coder whose `load`
-  // returns a non-Array/Hash value with its own value-based `==` (e.g.
-  // Date/Time) is compared through `hasValueEquality` below. `canonicalKey`
-  // sorts object keys, so two content-equal hashes built in a different
-  // insertion order compare equal, matching Ruby's order-insensitive `Hash#==`.
+  // changed, marking `Topic.new(content: nil)` dirty. `valuesEqual` restores
+  // Ruby's `old_value == new_value` — order-insensitive `Hash#==`/`Array#==`
+  // that recurses into each element's own `==`, explicit `equals` dispatch for
+  // value-== objects, primitive `valueOf` comparison for value types like Date,
+  // and `===` on leaf primitives so a `NaN` is never equal to itself (Ruby's
+  // non-reflexive `Float::NAN == Float::NAN == false`). The try/catch guards
+  // against a pathological cyclic value: report changed rather than throw.
   override isChanged(
     oldValue: unknown,
     newValue: unknown,
     _newValueBeforeTypeCast?: unknown,
   ): boolean {
-    if (oldValue === newValue) return false;
-    if (isValueComparable(oldValue) && isValueComparable(newValue)) {
-      try {
-        return canonicalKey(oldValue) !== canonicalKey(newValue);
-      } catch {
-        return true;
-      }
+    try {
+      return !valuesEqual(oldValue, newValue);
+    } catch {
+      return true;
     }
-    // A coder whose `load` returns a value-== object mirrors Ruby's
-    // `old_value != new_value` dispatching to that object's own `==`. When the
-    // value defines an explicit `equals` (our convention for Ruby `==`, e.g.
-    // ActiveSupport::TimeWithZone whose `<=>`/`==` compares by UTC instant
-    // across Date/Time-like kinds), dispatch to it so cross-class time-like
-    // equality is honored. Rails' `old_value != new_value` calls the *left*
-    // operand's `==`, so dispatch on `oldValue` only — never `newValue`.
-    if (hasEquals(oldValue)) return !oldValue.equals(newValue);
-    // Otherwise a value object without an explicit `==` but with a primitive
-    // `valueOf` (e.g. Date) compares by that primitive. A Ruby value type's
-    // `==` only compares against its own kind, so require a shared constructor:
-    // two unrelated classes that happen to yield the same primitive are not
-    // equal, matching Ruby.
-    if (
-      hasValueEquality(oldValue) &&
-      hasValueEquality(newValue) &&
-      (oldValue as object).constructor === (newValue as object).constructor
-    ) {
-      return !Object.is(
-        (oldValue as { valueOf(): unknown }).valueOf(),
-        (newValue as { valueOf(): unknown }).valueOf(),
-      );
-    }
-    return true;
   }
 
   override isChangedInPlace(rawOldValue: unknown, value: unknown): boolean {
