@@ -72,8 +72,18 @@ const BASELINE_DIR = path.join(
 );
 
 // Relative baseline path (under BASELINE_DIR) for an entry, mirroring its
-// source tree: <package>/<tsFile with .ts→.json>.
-function relPathFor(k: CallMismatchKey): string {
+// source tree: <package>/<tsFile with .ts→.json>. Every artifact tsFile ends in
+// `.ts`; guard anyway, because a path that kept a non-`.json` extension would be
+// written but then skipped by the `.json` glob on reload — a silent round-trip
+// data loss rather than a loud failure.
+export function relPathFor(k: CallMismatchKey): string {
+  if (!k.tsFile.endsWith(".ts")) {
+    throw new Error(
+      `wide call-mismatches baseline: tsFile ${JSON.stringify(k.tsFile)} does not end in ` +
+        `".ts" (package ${k.package}); the split baseline maps <tsFile .ts→.json> and ` +
+        "cannot place a non-.ts source.",
+    );
+  }
   return path.join(k.package, k.tsFile.replace(/\.ts$/, ".json"));
 }
 // Gates the full-surface wide artifact only — privates are advisory-only
@@ -107,43 +117,45 @@ async function listJsonFiles(dir: string): Promise<string[]> {
   return out;
 }
 
-// Concatenate every per-file baseline array under BASELINE_DIR into one merged,
+// Concatenate every per-file baseline array under `dir` into one merged,
 // deterministically-sorted list. Duplicate-key and partial-scope guards then
 // run across the merged set exactly as they did against the monolith.
-async function loadBaseline(): Promise<ExcludeEntry[]> {
-  const files = (await listJsonFiles(BASELINE_DIR)).sort();
+export async function loadSplitBaseline(dir: string): Promise<ExcludeEntry[]> {
+  const files = (await listJsonFiles(dir)).sort();
   const merged: ExcludeEntry[] = [];
   for (const f of files) merged.push(...(await readJson<ExcludeEntry[]>(f)));
   return sortKeys(merged);
 }
 
-// Repartition the reseeded baseline back across the split files. Writes one
-// sorted array per (package, tsFile), creating parent dirs and brand-new files
-// for newly-flagged sources; deletes any pre-existing baseline file whose
-// entries all converged to zero (never leaving a `[]`), then prunes parent
-// directories emptied by those deletions. A post-reseed git diff therefore
-// reflects only real baseline changes.
-async function writeSplitBaseline(entries: ExcludeEntry[]): Promise<void> {
+async function loadBaseline(): Promise<ExcludeEntry[]> {
+  return loadSplitBaseline(BASELINE_DIR);
+}
+
+// Repartition the reseeded baseline back across the split files under `dir`.
+// Writes one sorted array per (package, tsFile), creating parent dirs and
+// brand-new files for newly-flagged sources; deletes any pre-existing baseline
+// file whose entries all converged to zero (never leaving a `[]`), then prunes
+// parent directories emptied by those deletions. A post-reseed git diff
+// therefore reflects only real baseline changes.
+export async function writeSplitBaseline(entries: ExcludeEntry[], dir: string): Promise<void> {
   const byFile = new Map<string, ExcludeEntry[]>();
   for (const e of entries) {
     const rel = relPathFor(e);
     (byFile.get(rel) ?? byFile.set(rel, []).get(rel)!).push(e);
   }
 
-  const existing = new Set(
-    (await listJsonFiles(BASELINE_DIR)).map((f) => path.relative(BASELINE_DIR, f)),
-  );
+  const existing = new Set((await listJsonFiles(dir)).map((f) => path.relative(dir, f)));
 
   for (const [rel, arr] of byFile) {
-    const dest = path.join(BASELINE_DIR, rel);
+    const dest = path.join(dir, rel);
     await fs.mkdir(path.dirname(dest), { recursive: true });
     await fs.writeFile(dest, JSON.stringify(sortKeys(arr), null, 2) + "\n");
     existing.delete(rel);
   }
 
   // Whatever remains in `existing` no longer has any entries — delete it.
-  for (const rel of existing) await fs.rm(path.join(BASELINE_DIR, rel));
-  await pruneEmptyDirs(BASELINE_DIR);
+  for (const rel of existing) await fs.rm(path.join(dir, rel));
+  await pruneEmptyDirs(dir);
 }
 
 // Recursively remove empty subdirectories under `dir` (keeps `dir` itself).
@@ -218,7 +230,7 @@ async function main(write: boolean): Promise<number> {
 
   if (write) {
     const next = reseed(current, baseline, DEFAULT_REASON);
-    await writeSplitBaseline(next);
+    await writeSplitBaseline(next, BASELINE_DIR);
     console.log(
       `Wrote ${path.relative(ROOT_DIR, BASELINE_DIR)}/: ${next.length} baselined wide call mismatches`,
     );
