@@ -1025,10 +1025,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // a Proc default that reads as a function call (`\A\w+\(.*\)\z`) is wrapped in
   // parentheses for SQLite DDL (`DEFAULT (ABS(RANDOM()))`); any other Proc result
   // (bare keyword expressions like CURRENT_TIMESTAMP, or an already-parenthesized
-  // expression) is emitted verbatim. Non-Proc values fall through to the abstract
-  // form. The Proc is invoked exactly once (Rails calls `value.call` once), so a
-  // proc with side effects is not double-evaluated. In Rails `SqlLiteral < String`,
-  // so a SqlLiteral result runs through the same `match?` regex — unwrap to its
+  // expression) is emitted verbatim. Non-Proc values fall through to `super`,
+  // which serializes through the column's cast type (abstract/quoting.rb:161) —
+  // so a structured `json` default (`default: {}`) is JSON-encoded to `{}` there,
+  // not pre-serialized here (which would double-encode via `super`'s serialize).
+  // The Proc is invoked exactly once (Rails calls `value.call` once), so a proc
+  // with side effects is not double-evaluated. In Rails `SqlLiteral < String`, so
+  // a SqlLiteral result runs through the same `match?` regex — unwrap to its
   // string and apply the same paren-wrap branch rather than special-casing it.
   override quoteDefaultExpression(value: unknown, column?: unknown): string {
     if (typeof value === "function") {
@@ -1041,8 +1044,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       }
       return /^\w+\(.*\)$/.test(str) ? `(${str})` : str;
     }
-    const sqlType = (column as { sqlType?: string | null } | undefined)?.sqlType;
-    return super.quoteDefaultExpression(this.serializeDefaultForColumn(value, sqlType), column);
+    return super.quoteDefaultExpression(value, column);
   }
 
   // Rails' abstract quote_default_expression serializes the value through the
