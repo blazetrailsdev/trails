@@ -1465,19 +1465,20 @@ export class ConnectionPool implements ReapablePool {
 /**
  * Map `DatabaseConfig#queryCache` to the shape ConnectionPoolConfiguration
  * expects. Rails' initializer case-matches on `0/false/Integer/nil`; trails'
- * public config type also accepts the documented "enabled"/"disabled"/
- * "unlimited" strings, which Rails would never see as raw values. Normalize
- * them so a pool configured with `queryCache: "disabled"` actually disables
- * storage instead of falling through to DEFAULT_MAX_SIZE. `"unlimited"` passes
- * through as-is: Rails' initializer case-matches it against no `0/false/Integer/
- * nil` branch and falls through to a `nil` (unbounded) max size, and unlike
- * `false` it does NOT mark the pool disabled (`db_config.query_cache == false`).
+ * public config type additionally documents the "enabled"/"disabled" string
+ * aliases, which Rails would never see as raw values. Only those two are
+ * translated ("disabled" → `false`, "enabled" → the `nil`/default branch);
+ * every other string is passed through untouched. Rails' `case
+ * db_config&.query_cache` has NO String branch, so any surviving string (e.g.
+ * `"unlimited"`, or a URL like `?query_cache=42` that stays the string `"42"`)
+ * falls through to a `nil` (unbounded) max size — NOT DEFAULT_SIZE — and, unlike
+ * `false`, does NOT mark the pool disabled (`db_config.query_cache == false`).
  */
-function normalizeQueryCacheConfig(raw: unknown): number | false | null | "unlimited" {
+function normalizeQueryCacheConfig(raw: unknown): number | false | null | string {
   if (raw === "disabled" || raw === false) return false;
-  if (raw === "unlimited") return "unlimited";
   if (raw === "enabled" || raw === true || raw == null) return null;
   if (typeof raw === "number") return raw;
+  if (typeof raw === "string") return raw;
   return null;
 }
 

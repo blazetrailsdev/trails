@@ -224,14 +224,19 @@ export class ConnectionPoolConfiguration {
   private _queryCacheVersion = { value: 0 };
   private _pinnedCount = 0;
 
-  constructor(queryCacheConfig?: number | false | null | "unlimited") {
+  constructor(queryCacheConfig?: number | false | null | string) {
     // Mirrors Rails' `@query_cache_max_size = case db_config&.query_cache`
     // (`query_cache.rb:120-129`): `0`/`false` → nil, an Integer → itself, `nil`
-    // → DEFAULT_SIZE, and any other value (e.g. the "unlimited" string) falls
-    // through the case to nil (unbounded). A nil max size is NOT what marks a
-    // pool disabled — that gate is `db_config&.query_cache == false`.
+    // → DEFAULT_SIZE, and — since the case has no String branch — any string
+    // (e.g. "unlimited", or a `?query_cache=42` URL that stays the string "42")
+    // falls through to nil (unbounded). A nil max size is NOT what marks a pool
+    // disabled — that gate is `db_config&.query_cache == false`.
     this._queryCacheDisabled = queryCacheConfig === false;
-    if (queryCacheConfig === 0 || queryCacheConfig === false || queryCacheConfig === "unlimited") {
+    if (
+      queryCacheConfig === 0 ||
+      queryCacheConfig === false ||
+      typeof queryCacheConfig === "string"
+    ) {
       this._queryCacheMaxSize = null;
     } else if (typeof queryCacheConfig === "number") {
       this._queryCacheMaxSize = queryCacheConfig;
