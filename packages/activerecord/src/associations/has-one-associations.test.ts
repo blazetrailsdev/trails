@@ -1019,12 +1019,12 @@ describe("HasOneAssociationsTest", () => {
     });
   });
 
-  it.skip("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", () => {
-    // BLOCKED (tracked: d2-has-one-touch-polymorphic-inverse-cache): touch: is
-    // honored, but the parent's after_create touch loads its child through the
-    // polymorphic association rather than the cached in-memory inverse, adding
-    // one extra SELECT (7 vs Rails' 6). Needs polymorphic inverse-set on assign
-    // plus after_create_commit reset_negative_cache.
+  it("polymorphic has one with touch option on create wont cache association so fetching after transaction commit works", async () => {
+    await assertQueriesCount(6, false, async () => {
+      const chef = await Chef.create({ employable: new DrinkDesignerWithPolymorphicTouchChef() });
+      const employable = await chef.association("employable").loadTarget();
+      expect((await readHasOne(employable, "chef")).id).toBe(chef.id);
+    });
   });
 
   it("polymorphic has one with touch option on update will touch record by fetching from database if needed", async () => {
