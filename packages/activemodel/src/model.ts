@@ -622,19 +622,12 @@ export class Model {
 
     if (rules.acceptance) {
       const opts = rules.acceptance === true ? {} : (rules.acceptance as Record<string, unknown>);
-      if (!this._attributeDefinitions.has(attribute)) {
-        this.attribute(attribute, "string", { virtual: true });
-      }
       validatorSpecs.push({ klass: AcceptanceValidator, opts });
     }
 
     if (rules.confirmation) {
       const opts =
         rules.confirmation === true ? {} : (rules.confirmation as Record<string, unknown>);
-      const confirmationAttr = `${attribute}Confirmation`;
-      if (!this._attributeDefinitions.has(confirmationAttr)) {
-        this.attribute(confirmationAttr, "string", { virtual: true });
-      }
       validatorSpecs.push({ klass: ConfirmationValidator, opts });
     }
 
@@ -760,6 +753,16 @@ export class Model {
       ): ValidatorBase | { validate(record: ValidatableRecord): void };
     }>) {
       const validator = new klass(rest);
+      // Rails passes `options[:class] = self` to `validates_with`, so the
+      // validator's `initialize` can call `setup!(options[:class])` to lazily
+      // materialize its virtual accessors (Acceptance / Confirmation). trails
+      // exposes that as a separate `setupBang` method; invoke it here with the
+      // host class so the accessors land on the prototype and the constructor's
+      // setter-dispatch mass-assignment (RFC 0046) honors them.
+      const maybeSetup = (validator as { setupBang?: (klass: unknown) => void }).setupBang;
+      if (typeof maybeSetup === "function") {
+        maybeSetup.call(validator, this);
+      }
       if (!(validator instanceof EachValidator)) {
         if (typeof (validator as ValidatorCheckable).checkValidity === "function") {
           (validator as ValidatorCheckable).checkValidity!();
@@ -898,38 +901,26 @@ export class Model {
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_acceptance_of
    *   validates_with AcceptanceValidator, _merge_attributes(attr_names)
    *
-   * Rails' AcceptanceValidator#initialize calls `setup!(options[:class])` to
-   * lazily materialize the virtual acceptance accessors. trails' constructor
-   * mass-assigns through `writeAttribute` (not prototype setters), so the
-   * accessor must be a real declared attribute — mirroring the `validates`
-   * DSL path (model.ts `if (rules.acceptance)`).
+   * `validatesWith` injects the host class and invokes the validator's
+   * `setupBang` (Rails' `setup!(options[:class])`), which materializes the
+   * virtual acceptance accessors on the prototype; the constructor's
+   * setter-dispatch mass-assignment honors them.
    */
   static validatesAcceptanceOf(...attrNames: unknown[]): void {
-    const options = this._mergeAttributes(attrNames);
-    for (const attr of options.attributes as string[]) {
-      if (!this._attributeDefinitions.has(attr)) this.attribute(attr, "string", { virtual: true });
-    }
-    this.validatesWith(AcceptanceValidator, options);
+    this.validatesWith(AcceptanceValidator, this._mergeAttributes(attrNames));
   }
 
   /**
    * Mirrors: ActiveModel::Validations::HelperMethods.validates_confirmation_of
    *   validates_with ConfirmationValidator, _merge_attributes(attr_names)
    *
-   * As with acceptance, Rails' ConfirmationValidator#initialize → `setup!`
-   * defines the `${attr}_confirmation` accessors; trails declares them as
-   * real virtual attributes so the constructor's `writeAttribute` path
-   * accepts them (mirrors the `validates` DSL `if (rules.confirmation)`).
+   * As with acceptance, `validatesWith` invokes the validator's `setupBang`
+   * (Rails' `setup!`), which defines the `${attr}Confirmation` accessors on
+   * the prototype; the constructor's setter-dispatch mass-assignment accepts
+   * them.
    */
   static validatesConfirmationOf(...attrNames: unknown[]): void {
-    const options = this._mergeAttributes(attrNames);
-    for (const attr of options.attributes as string[]) {
-      const confirmationAttr = `${attr}Confirmation`;
-      if (!this._attributeDefinitions.has(confirmationAttr)) {
-        this.attribute(confirmationAttr, "string", { virtual: true });
-      }
-    }
-    this.validatesWith(ConfirmationValidator, options);
+    this.validatesWith(ConfirmationValidator, this._mergeAttributes(attrNames));
   }
 
   /**
