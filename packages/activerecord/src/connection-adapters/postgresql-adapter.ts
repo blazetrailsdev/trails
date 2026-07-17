@@ -4186,10 +4186,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   override quotedBinary(value: unknown): string {
     // Rails passes the `Type::Binary::Data` itself; our `quote` unwraps to bytes
-    // before dispatching, so accept both and this stays callable Rails-shaped.
-    if (value instanceof BinaryData || value instanceof Uint8Array) return pgQuotedBinary(value);
-    if (value instanceof ArrayBuffer) return pgQuotedBinary(new Uint8Array(value));
-    if (typeof value === "string") return pgQuotedBinary(value);
+    // before dispatching. Rails has a single quoted_binary with no adapter-layer
+    // narrowing (postgresql/quoting.rb:152), so delegate the whole union
+    // pgQuotedBinary's toBytes accepts — any ArrayBuffer view, a bare
+    // ArrayBuffer, BinaryData, or a latin1 string — rather than re-narrowing.
+    if (
+      value instanceof BinaryData ||
+      ArrayBuffer.isView(value) ||
+      value instanceof ArrayBuffer ||
+      typeof value === "string"
+    ) {
+      return pgQuotedBinary(value);
+    }
     throw new TypeError(
       `quotedBinary expects Uint8Array, ArrayBuffer, Buffer, string, or BinaryData; got ${
         value === null ? "null" : typeof value
