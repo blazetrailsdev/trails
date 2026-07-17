@@ -345,12 +345,8 @@ export function unquotedFalse(): boolean {
  * raw views — so an implementation has to accept that union to be callable
  * either way.
  *
- * The abstract, MySQL and SQLite `quotedBinary` route through this. PG's
- * hand-rolls the unwrap instead and omits `ArrayBuffer` from its signature, so
- * a direct `pgQuotedBinary(dataView)` raises where the other two hex it —
- * unreachable via `quote` (which normalises views first) and via PG's own
- * adapter override (which handles `ArrayBuffer` separately). Converging it is
- * story `pg-quoted-binary-route-through-tobytes` (RFC 0023).
+ * The abstract, MySQL, SQLite and PostgreSQL `quotedBinary` all route through
+ * this, so every adapter accepts the same union.
  *
  * @internal
  */
@@ -457,10 +453,8 @@ export function isSqlLiteral(value: unknown): value is { value: string } {
  * Takes `unknown` rather than `BinaryData`: the rb:83 branch passes a
  * `BinaryData`, but the abstract view branch passes normalized bytes and
  * SQLite's bare-`ArrayBuffer` branch dispatches the buffer itself. The
- * abstract/MySQL/SQLite `quotedBinary` normalise all three through
- * {@link toBytes} (PG's exception is noted there — it is unreachable from this
- * dispatch, which only sees a raw `ArrayBuffer` from SQLite's branch, with a
- * SQLite host).
+ * abstract/MySQL/SQLite/PostgreSQL `quotedBinary` all normalise these through
+ * {@link toBytes}.
  * @internal
  */
 export function dispatchQuotedBinary(host: QuotingDispatchHost, value: unknown): string {
