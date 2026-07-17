@@ -711,12 +711,26 @@ describeIfPg("PostgreSQLAdapter", () => {
       const pid = (pidRows[0] as { pid: number }).pid;
       // Terminate this backend from a separate connection. After the single
       // persistent client's backend is gone, the next query on it surfaces a
-      // connection error that translates to ConnectionNotEstablished — rather
-      // than transparently retrying (allowRetry defaults to false).
+      // connection error that translates to a retryable connection error —
+      // rather than transparently retrying (allowRetry defaults to false).
+      //
+      // DEVIATION (node-pg): Rails asserts ConnectionNotEstablished here, but
+      // only because its test explicitly pre-sends a query with the raw libpq
+      // connection to flip PG::Connection#status to CONNECTION_BAD, forcing the
+      // "no connection to the server" message that translate_exception maps to
+      // ConnectionNotEstablished (postgresql_adapter.rb:801-821). Without that
+      // libpq-status trick — which the pure-JS node-pg driver has no analogue
+      // for — the natural post-terminate query surfaces node-pg's single
+      // "Client has encountered a connection error and is not queryable" string,
+      // indistinguishable from a mid-query sever. trails maps that query-path
+      // connection error to the retryable ConnectionFailed (see
+      // postgresql-adapter.ts _translateException). Both are retryable
+      // connection errors (retryable_connection_error? covers each), so the
+      // reconnect-on-next-use behavior is unchanged.
       await withSecondAdapter(PG_TEST_URL, async (adapter2) => {
         await adapter2.execute(`SELECT pg_terminate_backend(${pid})`);
       });
-      await expect(adapter.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionNotEstablished);
+      await expect(adapter.execute("SELECT 1")).rejects.toBeInstanceOf(ConnectionFailed);
     });
 
     it("reload type map for newly defined types", async () => {

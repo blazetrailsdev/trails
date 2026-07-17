@@ -128,6 +128,14 @@ function sleep(ms: number): Promise<void> {
 // non-SQLite adapter.
 async function remoteDisconnect(conn: DatabaseAdapter): Promise<void> {
   if (adapterType === "postgres") {
+    // Rails: `connection.verify! if raw_connection.status == PG::CONNECTION_BAD`
+    // — a previous non-retryable query may have left the raw connection dead;
+    // reconnect it before provoking a fresh disconnect. node-pg exposes no
+    // `status`, so probe liveness (activePredicate issues a no-op `;`) and
+    // verify!/reconnect when it is not queryable.
+    if (!(await activePredicate(conn))) {
+      await conn.verifyBang();
+    }
     const raw = (
       conn as unknown as {
         _rawConnectionForTest(): { query(sql: string): Promise<unknown> } | null;
@@ -921,26 +929,30 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(connection.active).toBe(true);
   });
 
-  itBlocked("querying a 'clean' long-failed connection restores and succeeds", async () => {
-    await remoteDisconnect(connection);
+  it.skipIf(!remoteSupported)(
+    "querying a 'clean' long-failed connection restores and succeeds",
+    async () => {
+      await remoteDisconnect(connection);
 
-    connection.cleanBang(); // this simulates a fresh checkout from the pool
+      connection.cleanBang(); // this simulates a fresh checkout from the pool
 
-    // Backdate last activity to simulate a connection we haven't used in a while
-    (connection as unknown as { _lastActivity: number })._lastActivity = Date.now() - 5 * 60 * 1000;
+      // Backdate last activity to simulate a connection we haven't used in a while
+      (connection as unknown as { _lastActivity: number })._lastActivity =
+        Date.now() - 5 * 60 * 1000;
 
-    // Clean did not verify / fix the connection
-    expect(await activePredicate(connection)).toBe(false);
+      // Clean did not verify / fix the connection
+      expect(await activePredicate(connection)).toBe(false);
 
-    // Because the connection hasn't been verified since checkout, and the
-    // query cannot safely be retried, the connection is verified before
-    // querying.
-    await Post.deleteAll();
+      // Because the connection hasn't been verified since checkout, and the
+      // query cannot safely be retried, the connection is verified before
+      // querying.
+      await Post.deleteAll();
 
-    expect(connection.active).toBe(true);
-  });
+      expect(connection.active).toBe(true);
+    },
+  );
 
-  itBlocked(
+  it.skipIf(!remoteSupported)(
     "querying a 'clean' recently-used but now-failed connection skips verification",
     async () => {
       await remoteDisconnect(connection);
@@ -957,7 +969,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     },
   );
 
-  itBlocked(
+  it.skipIf(!remoteSupported)(
     "quoting a string on a 'clean' failed connection will not prevent reconnecting",
     async () => {
       await remoteDisconnect(connection);
@@ -978,34 +990,40 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     },
   );
 
-  itBlocked("querying after a failed non-retryable query restores and succeeds", async () => {
-    await Post.first(); // Connection verified (and prepared statement pool populated)
+  it.skipIf(!remoteSupported)(
+    "querying after a failed non-retryable query restores and succeeds",
+    async () => {
+      await Post.first(); // Connection verified (and prepared statement pool populated)
 
-    await remoteDisconnect(connection);
+      await remoteDisconnect(connection);
 
-    await expect(
-      connection.execute("INSERT INTO posts(title, body) VALUES ('foo', 'bar')"),
-    ).rejects.toBeInstanceOf(ConnectionFailed);
+      await expect(
+        connection.execute("INSERT INTO posts(title, body) VALUES ('foo', 'bar')"),
+      ).rejects.toBeInstanceOf(ConnectionFailed);
 
-    expect(await Post.first()).toBeTruthy(); // Verifying causes a reconnect and the query succeeds
-    expect(connection.active).toBe(true);
-  });
+      expect(await Post.first()).toBeTruthy(); // Verifying causes a reconnect and the query succeeds
+      expect(connection.active).toBe(true);
+    },
+  );
 
-  itBlocked("idempotent SELECT queries are retried and result in a reconnect", async () => {
-    await Post.first();
+  it.skipIf(!remoteSupported)(
+    "idempotent SELECT queries are retried and result in a reconnect",
+    async () => {
+      await Post.first();
 
-    await remoteDisconnect(connection);
+      await remoteDisconnect(connection);
 
-    expect(await Post.first()).toBeTruthy();
-    expect(connection.active).toBe(true);
+      expect(await Post.first()).toBeTruthy();
+      expect(connection.active).toBe(true);
 
-    await remoteDisconnect(connection);
+      await remoteDisconnect(connection);
 
-    expect(await Post.where({ id: [1, 2] }).first()).toBeTruthy();
-    expect(connection.active).toBe(true);
-  });
+      expect(await Post.where({ id: [1, 2] }).first()).toBeTruthy();
+      expect(connection.active).toBe(true);
+    },
+  );
 
-  itBlocked(
+  it.skipIf(!remoteSupported)(
     "#find and #find_by queries with known attributes are retried and result in a reconnect",
     async () => {
       await Post.first();
@@ -1022,7 +1040,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     },
   );
 
-  itBlocked("queries containing SQL fragments are not retried", async () => {
+  it.skipIf(!remoteSupported)("queries containing SQL fragments are not retried", async () => {
     await Post.first();
 
     await remoteDisconnect(connection);
@@ -1048,7 +1066,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(await activePredicate(connection)).toBe(false);
   });
 
-  itBlocked("queries containing SQL functions are not retried", async () => {
+  it.skipIf(!remoteSupported)("queries containing SQL functions are not retried", async () => {
     await Post.first();
 
     await remoteDisconnect(connection);
@@ -1104,24 +1122,27 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     },
   );
 
-  itBlocked("dirty transaction cannot be restored after remote disconnection", async () => {
-    let invocations = 0;
-    await expect(
-      Post.transaction(async () => {
-        invocations += 1;
-        await Post.deleteAll();
-        await remoteDisconnect(connection);
-        await Post.count();
-      }),
-    ).rejects.toBeInstanceOf(ConnectionFailed);
+  it.skipIf(!remoteSupported)(
+    "dirty transaction cannot be restored after remote disconnection",
+    async () => {
+      let invocations = 0;
+      await expect(
+        Post.transaction(async () => {
+          invocations += 1;
+          await Post.deleteAll();
+          await remoteDisconnect(connection);
+          await Post.count();
+        }),
+      ).rejects.toBeInstanceOf(ConnectionFailed);
 
-    expect(invocations).toBe(1); // the whole transaction block is not retried
+      expect(invocations).toBe(1); // the whole transaction block is not retried
 
-    // After the (outermost) transaction block failed, the connection is ready
-    // to reconnect on next use, but hasn't done so yet.
-    expect(await activePredicate(connection)).toBe(false);
-    expect((await Post.count()) as number).toBeGreaterThan(0);
-  });
+      // After the (outermost) transaction block failed, the connection is ready
+      // to reconnect on next use, but hasn't done so yet.
+      expect(await activePredicate(connection)).toBe(false);
+      expect((await Post.count()) as number).toBeGreaterThan(0);
+    },
+  );
 
   it("can reconnect and retry queries under limit when retry deadline is set", async () => {
     let attempts = 0;
@@ -1162,7 +1183,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     });
   });
 
-  itBlocked("#execute is retryable", async () => {
+  it.skipIf(!remoteSupported)("#execute is retryable", async () => {
     const connectionIdSql =
       adapterType === "mysql" ? "SELECT CONNECTION_ID()" : "SELECT pg_backend_pid()";
     const connId = (await connection.execQuery(connectionIdSql)).rows[0][0];

@@ -4273,19 +4273,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           return new ConnectionNotEstablished(msg, { cause });
         default:
           // A severed connection (08xxx, "Connection terminated", pg's
-          // "Client has encountered a connection error", …) surfaces as a
-          // generic Error or non-DatabaseError; map it to ConnectionNotEstablished
-          // so callers see the lost connection rather than a raw driver error.
-          //
-          // Rails' translate_exception (postgresql_adapter.rb:801-821) additionally
-          // splits a libpq PG::ConnectionBad whose message ends with "\n" into
-          // ConnectionFailed (vs ConnectionNotEstablished for the pg-internal case).
-          // That distinction is a libpq PQerrorMessage artifact; node-pg is pure JS
-          // with no libpq layer and doesn't carry the pg-internal/libpq split, so
-          // there is no reliable signal to reproduce it — every severed-connection
-          // error maps to ConnectionNotEstablished here.
+          // "Client has encountered a connection error", …) surfaces here as a
+          // generic Error or non-DatabaseError. This is the query path
+          // (_translateException runs inside execute/execQuery, after the query
+          // was dispatched), so it is the analogue of Rails'
+          // translate_exception (postgresql_adapter.rb:801-821) splitting a
+          // libpq PG::ConnectionBad whose message ends with "\n" into
+          // ConnectionFailed — "the server may have already executed part or all
+          // of the query". node-pg is pure JS with no libpq layer, so it cannot
+          // reproduce Rails' newline signal that separates a libpq failure from a
+          // pg-internal (pre-send) ConnectionBad; every severed-connection error
+          // on the query path surfaces the SAME "Client has encountered a
+          // connection error and is not queryable" string. We map it to the
+          // retryable ConnectionFailed so idempotent queries retry+reconnect and
+          // non-retryable queries raise a connection error rather than a raw
+          // driver error, matching Rails' remote-disconnect behavior. (Connect
+          // path failures still surface as ConnectionNotEstablished — see
+          // newClient.)
           if (PostgreSQLAdapter._isConnectionError(e)) {
-            return new ConnectionNotEstablished(msg, { cause });
+            return new ConnectionFailed(msg, { sql, binds, cause });
           }
           // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
           // 5-char shape alone isn't enough — Node system errors like

@@ -202,18 +202,25 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     );
   }
 
-  // No verifyBang override: now that the sync `active` getter reflects real
-  // connection state, a never-connected adapter reports inactive and flows
-  // through the inherited base `verifyBang` (abstract-adapter.ts) exactly like
-  // any other inactive adapter — `_unconfiguredConnection` promotion when the
-  // deprecated raw-connection was stashed (mysql2's `_isFakeConnection` path),
-  // otherwise `reconnectBang({ restoreTransactions: true })` with its retry
-  // loop. This mirrors Rails' `verify!` (abstract_adapter.rb:759), which gates
-  // the `attempt_configure_connection`-only shortcut on `@unconfigured_connection`
-  // and routes a genuinely fresh (`@raw_connection == nil`) adapter through the
-  // full retry-capable `reconnect!` — there is no separate "never connected"
-  // shortcut. `Mysql2Adapter#reconnect` closes a nil `_client` as a no-op, so the
-  // full path costs nothing extra on a fresh adapter and gains connect retries.
+  // Mirrors Rails' `verify!` (abstract_adapter.rb:759), which decides whether to
+  // reconnect by calling `active?` — a real `mysql_ping` on the raw connection.
+  // trails' sync `active` getter is optimistic (it reports the cached
+  // `_activeState`, unchanged by a remote disconnect the adapter hasn't yet
+  // observed), so the inherited base `verifyBang` — which gates on that sync
+  // getter — would no-op on a socket the server has already severed
+  // (`wait_timeout`, server-side `KILL`). Probe with the async ping first
+  // (`activeAsync`, the analogue of Rails' `active?`) so the cached state
+  // reflects reality, then delegate to the inherited flow: base `verifyBang`
+  // now sees `active === false` and drives `reconnectBang({ restoreTransactions:
+  // true })` (or the `_unconfiguredConnection` promotion for the fake-connection
+  // stash). A never-connected/fake/closed adapter skips the ping and flows
+  // straight through the base logic, exactly as before.
+  override async verifyBang(): Promise<void> {
+    if (this._client !== null && !this._permanentlyClosed && !this._isFakeConnection) {
+      await this.activeAsync();
+    }
+    await super.verifyBang();
+  }
 
   // Single persistent connection — mirrors Rails' @raw_connection. Unified onto
   // the inherited base `_connection` slot rather than a parallel field: Rails
@@ -611,7 +618,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
     return this.internalExecQuery(sql, name, binds, options);
   }
@@ -620,7 +627,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql: string,
     name?: string | null,
     binds?: unknown[],
-    options?: { prepare?: boolean },
+    options?: { prepare?: boolean; allowRetry?: boolean },
   ): Promise<Result> {
     sql = this.preprocessQuery(sql);
     this._syncDatabaseTimezone();
@@ -638,58 +645,66 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        return await this.withRawConnection(async (conn) => {
-          const mysqlConn = conn as unknown as mysql.Connection;
-          const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
-          if (prepare) this._trackPrepared(mysqlConn, driverSql);
-          // Request array-mode rows so duplicate column names
-          // (e.g. `SELECT 1 AS a, 2 AS a`) survive: object-keyed rows would
-          // collapse the second `a` onto the first. This mirrors Rails, whose
-          // `configure_connection` sets `query_options[:as] = :array`
-          // (mysql2_adapter.rb:159), making `raw_result.to_a` positional — so
-          // cast_result builds the Result from `result.fields` + positional rows.
-          const [rawResult, rawFields] = prepare
-            ? await mysqlConn.execute(
-                { sql: driverSql, rowsAsArray: true } as any,
-                driverBinds as any[],
-              )
-            : await mysqlConn.query({ sql: driverSql, rowsAsArray: true } as any, driverBinds);
-          // Unwrap mysql2's nested CALL/multi-result sets to the single result
-          // set Rails' cast_result reads (the same seam internalExecute uses).
-          // `fields` are the field descriptors for the returned rows — present
-          // whenever a SELECT projected columns, even at zero rows matched.
-          const { result, fields } = unwrapMultiResult(
-            rawResult,
-            rawFields as mysql.FieldPacket[] | undefined,
-          );
-          // DML results in a ResultSetHeader (no rows array); SELECT results
-          // in an array of positional row arrays. Return empty Result for DML
-          // to avoid throwing on INSERT/UPDATE/DELETE passed to execQuery.
-          if (!Array.isArray(result)) {
-            payload.row_count = result.affectedRows ?? 0;
+        // Thread allowRetry (Rails' select_all → internal_exec_query
+        // `allow_retry: preparable`) into withRawConnection so idempotent SELECTs
+        // retry+reconnect after a severed connection, while raw-SQL-fragment
+        // reads (allowRetry false) surface the connection error. Mirrors PG's
+        // internalExecQuery (postgresql-adapter.ts).
+        return await this.withRawConnection(
+          { allowRetry: options?.allowRetry ?? false },
+          async (conn) => {
+            const mysqlConn = conn as unknown as mysql.Connection;
+            const prepare = options?.prepare ?? this._shouldPrepare(binds ?? []);
+            if (prepare) this._trackPrepared(mysqlConn, driverSql);
+            // Request array-mode rows so duplicate column names
+            // (e.g. `SELECT 1 AS a, 2 AS a`) survive: object-keyed rows would
+            // collapse the second `a` onto the first. This mirrors Rails, whose
+            // `configure_connection` sets `query_options[:as] = :array`
+            // (mysql2_adapter.rb:159), making `raw_result.to_a` positional — so
+            // cast_result builds the Result from `result.fields` + positional rows.
+            const [rawResult, rawFields] = prepare
+              ? await mysqlConn.execute(
+                  { sql: driverSql, rowsAsArray: true } as any,
+                  driverBinds as any[],
+                )
+              : await mysqlConn.query({ sql: driverSql, rowsAsArray: true } as any, driverBinds);
+            // Unwrap mysql2's nested CALL/multi-result sets to the single result
+            // set Rails' cast_result reads (the same seam internalExecute uses).
+            // `fields` are the field descriptors for the returned rows — present
+            // whenever a SELECT projected columns, even at zero rows matched.
+            const { result, fields } = unwrapMultiResult(
+              rawResult,
+              rawFields as mysql.FieldPacket[] | undefined,
+            );
+            // DML results in a ResultSetHeader (no rows array); SELECT results
+            // in an array of positional row arrays. Return empty Result for DML
+            // to avoid throwing on INSERT/UPDATE/DELETE passed to execQuery.
+            if (!Array.isArray(result)) {
+              payload.row_count = result.affectedRows ?? 0;
+              await this._handleWarningsOn(mysqlConn, driverSql);
+              return new Result([], []);
+            }
+            payload.row_count = result.length;
             await this._handleWarningsOn(mysqlConn, driverSql);
-            return new Result([], []);
-          }
-          payload.row_count = result.length;
-          await this._handleWarningsOn(mysqlConn, driverSql);
-          // Build the Result from the field descriptors plus the positional
-          // (array-mode) rows, mirroring Rails' `cast_result`: columns come
-          // from `result.fields` and rows from `result.to_a`. This preserves
-          // duplicate column names and keeps the column set when zero rows
-          // matched (the field descriptors are present whenever a SELECT
-          // projected columns).
-          const fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
-          const names = fieldList.map((f) => f.name);
-          if (names.length === 0) return Result.empty();
-          // Report column_types from the field descriptors (numeric/decimal
-          // families) so extra/computed select columns deserialize to the
-          // faithful trails type — a BigDecimal for NEWDECIMAL rather than the
-          // raw "1.1" driver string. Mirrors the PostgreSQL adapter's
-          // cast_result; node-mysql2 (decimalNumbers:false) has no driver-level
-          // BigDecimal cast, so the adapter reports the type map itself.
-          const columnTypes = buildColumnTypes(fieldList, (t) => this.lookupCastType(t));
-          return new Result(names, result as unknown[][], columnTypes);
-        });
+            // Build the Result from the field descriptors plus the positional
+            // (array-mode) rows, mirroring Rails' `cast_result`: columns come
+            // from `result.fields` and rows from `result.to_a`. This preserves
+            // duplicate column names and keeps the column set when zero rows
+            // matched (the field descriptors are present whenever a SELECT
+            // projected columns).
+            const fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
+            const names = fieldList.map((f) => f.name);
+            if (names.length === 0) return Result.empty();
+            // Report column_types from the field descriptors (numeric/decimal
+            // families) so extra/computed select columns deserialize to the
+            // faithful trails type — a BigDecimal for NEWDECIMAL rather than the
+            // raw "1.1" driver string. Mirrors the PostgreSQL adapter's
+            // cast_result; node-mysql2 (decimalNumbers:false) has no driver-level
+            // BigDecimal cast, so the adapter reports the type map itself.
+            const columnTypes = buildColumnTypes(fieldList, (t) => this.lookupCastType(t));
+            return new Result(names, result as unknown[][], columnTypes);
+          },
+        );
       } catch (e: any) {
         const translated =
           e instanceof MismatchedForeignKey
@@ -914,6 +929,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     sql: string,
     binds: unknown[] = [],
     name: string = "SQL",
+    { allowRetry = false }: { allowRetry?: boolean } = {},
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
     this._syncDatabaseTimezone();
@@ -933,7 +949,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     };
     return Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        return await this.withRawConnection(async (conn) => {
+        return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
           // Use server-side prepared statements when enabled and binds
           // are present — matches PR #589's preparedStatements toggle.
@@ -2148,6 +2164,17 @@ function isMysql2ConnectionError(e: unknown): boolean {
   const errno = (e as { errno?: number }).errno;
   if (typeof errno === "number" && errno > 0) return false;
   const code = (e as { code?: string }).code;
+  // The node-mysql2 driver's client-side "Can't add new command when
+  // connection is in closed state" error (base/connection.js#_addCommandClosedState)
+  // carries no `code`/`errno`. It fires when the socket was severed out from
+  // under the adapter (e.g. a `wait_timeout` remote disconnect), the analogue
+  // of Rails' Mysql2::Error::ConnectionError. Without this the raw driver error
+  // surfaces untranslated instead of the retryable ConnectionFailed. Match on
+  // the message: the `fatal` flag is stripped by the time the error reaches
+  // translation (it is re-wrapped in the withRawConnection retry path).
+  if (/add new command when connection is in closed state/i.test(e.message)) {
+    return true;
+  }
   return (
     code === "PROTOCOL_CONNECTION_LOST" ||
     code === "PROTOCOL_ENQUEUE_AFTER_QUIT" ||
