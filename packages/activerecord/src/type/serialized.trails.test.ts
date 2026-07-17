@@ -86,11 +86,16 @@ describe("Serialized#isChanged", () => {
     expect(type.isChanged({ a: undefined }, { a: undefined })).toBe(false);
   });
 
-  it("documents that two distinct NaN Hash values compare equal (JSON limitation)", () => {
-    // Ruby's Float::NAN == Float::NAN is false, but a deterministic canonical
-    // key cannot express NaN's non-reflexivity. Only manifests in-memory since
-    // JSON coders cannot round-trip NaN. Pinned to flag intentional divergence.
-    expect(type.isChanged({ a: NaN }, { a: NaN })).toBe(false);
+  it("reports changed for two distinct NaN Hash values, matching Ruby NaN non-reflexivity", () => {
+    // Ruby's Float::NAN == Float::NAN is false, so {a: Float::NAN} == {a:
+    // Float::NAN} is false and reports changed. Structural deep-equal compares
+    // leaf primitives with ===, so NaN is never equal to itself. Only manifests
+    // in-memory since JSON coders cannot round-trip NaN.
+    expect(type.isChanged({ a: NaN }, { a: NaN })).toBe(true);
+    expect(type.isChanged([NaN], [NaN])).toBe(true);
+    expect(type.isChanged({ a: { b: NaN } }, { a: { b: NaN } })).toBe(true);
+    // A finite number at the same key is still order-insensitively equal.
+    expect(type.isChanged({ a: 1, b: 2 }, { b: 2, a: 1 })).toBe(false);
   });
 
   it("falls back to reference equality for identity-== object_class instances", () => {

@@ -93,10 +93,11 @@ function canonicalKey(value: unknown): string {
  * JSON payloads do not carry raw control characters — so a real string can
  * never masquerade as an encoded `undefined`/`NaN`.
  *
- * Residual limitation: two distinct `NaN` values canonicalize identically and
- * so compare equal here, whereas Ruby's `Float::NAN == Float::NAN` is false.
- * This only surfaces for in-memory reassignment (JSON coders cannot carry a
- * `NaN` across a DB round-trip) and is pinned by a test in the sibling suite.
+ * Note: `canonicalKey` is a _deterministic_ string, so two distinct `NaN`
+ * values canonicalize identically. That is fine for default detection (a coder
+ * default never contains `NaN`), but change detection needs Ruby's non-reflexive
+ * `Float::NAN == Float::NAN == false`; `isChanged` therefore compares Hash
+ * values structurally via {@link railsHashEqual} rather than by canonical key.
  *
  * @internal
  */
@@ -125,6 +126,68 @@ function normalize(value: unknown): unknown {
     sorted[key] = normalize((value as Record<string, unknown>)[key]);
   }
   return sorted;
+}
+
+/**
+ * Unwraps `toHash()`-bearing objects (HashWithIndifferentAccess) so the wrapped
+ * contents — not the Map-backed internal shape — drive comparison.
+ *
+ * @internal
+ */
+function unwrapHash(value: unknown): unknown {
+  while (
+    value !== null &&
+    typeof value === "object" &&
+    typeof (value as { toHash?: unknown }).toHash === "function"
+  ) {
+    value = (value as { toHash(): unknown }).toHash();
+  }
+  return value;
+}
+
+/**
+ * @internal
+ */
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
+}
+
+/**
+ * Structural, order-insensitive deep equality mirroring Ruby's `Hash#==` /
+ * `Array#==` as `Type::Value#changed?` relies on them. Unlike `canonicalKey`
+ * (a deterministic string), leaf primitives are compared with `===`, so a `NaN`
+ * is never equal to itself — matching Ruby's non-reflexive
+ * `Float::NAN == Float::NAN == false`. Leaf value objects (e.g. Date) retain the
+ * value-based comparison `canonicalKey`'s JSON serialization gave them.
+ *
+ * @internal
+ */
+function railsHashEqual(aRaw: unknown, bRaw: unknown): boolean {
+  const a = unwrapHash(aRaw);
+  const b = unwrapHash(bRaw);
+  const aArr = Array.isArray(a);
+  const bArr = Array.isArray(b);
+  if (aArr || bArr) {
+    if (!aArr || !bArr || a.length !== b.length) return false;
+    return a.every((v, i) => railsHashEqual(v, b[i]));
+  }
+  const aObj = isPlainObject(a);
+  const bObj = isPlainObject(b);
+  if (aObj || bObj) {
+    if (!aObj || !bObj) return false;
+    const ak = Object.keys(a).sort();
+    const bk = Object.keys(b).sort();
+    if (ak.length !== bk.length || ak.some((k, i) => k !== bk[i])) return false;
+    return ak.every((k) => railsHashEqual(a[k], b[k]));
+  }
+  // Leaves: value objects (Date, etc.) keep value semantics via canonicalKey;
+  // primitives use `===` so NaN is non-reflexive.
+  if (a !== null && b !== null && typeof a === "object" && typeof b === "object") {
+    return canonicalKey(a) === canonicalKey(b);
+  }
+  return a === b;
 }
 
 export interface Coder {
@@ -211,9 +274,11 @@ export class Serialized extends ValueType {
   // same distinction `isValueComparable`/`canonicalKey` already draw for
   // `default_value?`. Sharing that scope is deliberate: a coder whose `load`
   // returns a non-Array/Hash value with its own value-based `==` (e.g.
-  // Date/Time) is compared through `hasValueEquality` below. `canonicalKey`
-  // sorts object keys, so two content-equal hashes built in a different
-  // insertion order compare equal, matching Ruby's order-insensitive `Hash#==`.
+  // Date/Time) is compared through `hasValueEquality` below. `railsHashEqual`
+  // compares object keys order-insensitively, matching Ruby's `Hash#==`, and
+  // uses `===` on leaf primitives so a `NaN` is never equal to itself —
+  // mirroring Ruby's non-reflexive `Float::NAN == Float::NAN == false` (a
+  // deterministic canonical key cannot express that).
   override isChanged(
     oldValue: unknown,
     newValue: unknown,
@@ -222,7 +287,7 @@ export class Serialized extends ValueType {
     if (oldValue === newValue) return false;
     if (isValueComparable(oldValue) && isValueComparable(newValue)) {
       try {
-        return canonicalKey(oldValue) !== canonicalKey(newValue);
+        return !railsHashEqual(oldValue, newValue);
       } catch {
         return true;
       }
