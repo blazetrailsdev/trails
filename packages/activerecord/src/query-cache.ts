@@ -130,7 +130,10 @@ export class QueryCache {
    */
   static installExecutorHooks(
     executor?: {
-      registerHook(hook: { run(): void; complete(): void }): void;
+      registerHook(hook: {
+        run(): (QueryCacheRunTarget & QueryCacheCompleteTarget)[];
+        complete(pools: QueryCacheCompleteTarget[]): void;
+      }): void;
     },
     targets:
       | (QueryCacheRunTarget & QueryCacheCompleteTarget)[]
@@ -140,18 +143,18 @@ export class QueryCache {
     const resolve = typeof targets === "function" ? targets : () => targets;
 
     // Mirrors Rails' ExecutorHooks module with static run/complete. Rails'
-    // executor threads `run`'s return value into `complete(pools)` as its
-    // state; we carry the enabled-target list across the two static calls so
-    // `complete` only touches the pools `run` enabled (never a config-disabled
-    // pool `run` skipped).
+    // executor keeps per-execution `hook_state` and passes `run`'s return value
+    // as the argument to `complete` (execution_wrapper.rb:25-37, :145-148), so
+    // `run` returns the enabled-pool list and `complete` receives it — no
+    // shared state that a nested/overlapping execution could clobber. `complete`
+    // then only touches the pools `run` enabled (never a config-disabled pool
+    // `run` skipped).
     class ExecutorHooks {
-      static enabledTargets: (QueryCacheRunTarget & QueryCacheCompleteTarget)[] = [];
-      static run() {
-        ExecutorHooks.enabledTargets = QueryCache.run(resolve());
+      static run(): (QueryCacheRunTarget & QueryCacheCompleteTarget)[] {
+        return QueryCache.run(resolve());
       }
-      static complete() {
-        QueryCache.complete(ExecutorHooks.enabledTargets);
-        ExecutorHooks.enabledTargets = [];
+      static complete(pools: QueryCacheCompleteTarget[]): void {
+        QueryCache.complete(pools);
       }
     }
 

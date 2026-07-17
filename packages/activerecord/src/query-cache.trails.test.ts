@@ -170,18 +170,47 @@ describe("run returns enabled targets for complete (trails)", () => {
   it("complete only disables/clears the pools run enabled", () => {
     const enabled = new FakeTarget();
     const configDisabled = new FakeTarget(true);
-    let hook: { run(): void; complete(): void } | null = null;
-    QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, () => [
+    let hook: {
+      run(): FakeTarget[];
+      complete(pools: FakeTarget[]): void;
+    } | null = null;
+    QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h as never) }, () => [
       enabled,
       configDisabled,
     ]);
 
-    hook!.run();
-    hook!.complete();
+    const state = hook!.run();
+    hook!.complete(state);
 
     expect(enabled.disabledCount).toBe(1);
     expect(enabled.clearedCount).toBe(1);
     expect(configDisabled.disabledCount).toBe(0);
     expect(configDisabled.clearedCount).toBe(0);
+  });
+
+  it("threads each execution's own run result to its complete", () => {
+    // Rails keeps per-execution hook_state and passes run's return to complete
+    // as an argument (execution_wrapper.rb:25-37): overlapping/nested executions
+    // must not clobber each other's enabled-pool list. Interleave two runs
+    // against different pool sets before either completes.
+    const outer = new FakeTarget();
+    const inner = new FakeTarget();
+    let pools: FakeTarget[] = [outer];
+    let hook: {
+      run(): FakeTarget[];
+      complete(pools: FakeTarget[]): void;
+    } | null = null;
+    QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h as never) }, () => pools);
+
+    const outerState = hook!.run(); // enables outer
+    pools = [inner];
+    const innerState = hook!.run(); // enables inner
+    hook!.complete(innerState);
+    hook!.complete(outerState);
+
+    expect(outerState).toEqual([outer]);
+    expect(innerState).toEqual([inner]);
+    expect(outer.disabledCount).toBe(1);
+    expect(inner.disabledCount).toBe(1);
   });
 });
