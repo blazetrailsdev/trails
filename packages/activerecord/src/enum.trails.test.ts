@@ -62,6 +62,25 @@ describe("Enum name conflict detection", () => {
     }).toThrow(/already defined by another enum/);
   });
 
+  // Rails defines each special-char label's friendly alias immediately through
+  // `_enum_methods_module` (enum.rb:273-275), so `detect_enum_conflict!`
+  // (enum.rb:302-310, 381-384) catches a same-enum collision between one
+  // label's friendly alias and a sibling label's generated predicate/bang.
+  // The camelCase friendly-alias surface is trails-specific: `"api-key"`
+  // camelizes to `apiKey` → `isApiKey`, which also is `api_key`'s main
+  // predicate, defining `isApiKey` twice.
+  it("raises when a friendly alias collides with a sibling label within one enum", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", { "api-key": 0, api_key: 1 });
+        }
+      }
+      new Klass();
+    }).toThrow(/already defined/);
+  });
+
   // Rails runs the `?`/`!` `detect_enum_conflict!` calls *only* inside
   // `if instance_methods` (enum.rb:303-311), so a second enum that opts out of
   // instance methods can reuse a value-method name a prior enum generated — no

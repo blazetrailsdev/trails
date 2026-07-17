@@ -747,6 +747,16 @@ export function _enum(
         notScopeName: notFriendlyName,
       } = enumMethodNamesFor(friendlyName);
       if (instanceMethodsEnabled) {
+        // Rails defines each friendly alias immediately through
+        // `_enum_methods_module`, so `detect_enum_conflict!` catches an
+        // already-defined method within the *same* enum (enum.rb:273-275,
+        // 302-310, 381-384). Mirror the main-label branch: check and record
+        // `fp`/`friendlyBang` in `definedNames` so one label's friendly alias
+        // colliding with a sibling label's generated predicate/bang raises.
+        if (definedNames.has(fp)) raiseConflictError.call(this, attribute, fp);
+        if (definedNames.has(friendlyBang)) raiseConflictError.call(this, attribute, friendlyBang);
+        definedNames.add(fp);
+        definedNames.add(friendlyBang);
         if (dangerousMethods.has(fp)) raiseConflictError.call(this, attribute, fp);
         if (enumMethodNames.has(fp))
           raiseConflictError.call(this, attribute, fp, { source: "another enum" });
