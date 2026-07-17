@@ -14,7 +14,7 @@ describe("FormatValidationTest", () => {
     }).toThrow(/multiline/i);
   });
 
-  it("validates format of without lambda without arguments", () => {
+  it("validates format of without lambda without arguments", async () => {
     // JS regex has no \A/\z analogues for Ruby's start-of-string /
     // end-of-string anchors. JS ^/$ default to start/end of input
     // (line anchors only with the `m` flag), but Rails inspects regex
@@ -27,8 +27,8 @@ describe("FormatValidationTest", () => {
         this.validates("name", { format: { with: /^[a-z]+$/, multiline: true } });
       }
     }
-    expect(new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(new Person({ name: "Alice123" }).isValid()).toBe(false);
+    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
+    expect(await new Person({ name: "Alice123" }).isValid()).toBe(false);
   });
 
   it("validates format of with both regexps should raise error", () => {
@@ -68,7 +68,7 @@ describe("FormatValidationTest", () => {
     }).toThrow(/regular expression or a proc or lambda must be supplied as :without/);
   });
 
-  it("validates format of without lambda", () => {
+  it("validates format of without lambda", async () => {
     class Person extends Model {
       static {
         this.attribute("email", "string");
@@ -76,33 +76,33 @@ describe("FormatValidationTest", () => {
       }
     }
     const p = new Person({ email: "invalid" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("validate format", () => {
+  it("validate format", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { format: { with: /^[A-Z]/, multiline: true } });
       }
     }
-    expect(new Person({ title: "Hello" }).isValid()).toBe(true);
-    expect(new Person({ title: "hello" }).isValid()).toBe(false);
+    expect(await new Person({ title: "Hello" }).isValid()).toBe(true);
+    expect(await new Person({ title: "hello" }).isValid()).toBe(false);
   });
 
-  it("validate format with not option", () => {
+  it("validate format with not option", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { format: { without: /\d/ } });
       }
     }
-    expect(new Person({ title: "hello" }).isValid()).toBe(true);
-    expect(new Person({ title: "hello123" }).isValid()).toBe(false);
+    expect(await new Person({ title: "hello" }).isValid()).toBe(true);
+    expect(await new Person({ title: "hello123" }).isValid()).toBe(false);
   });
 
-  it("validate format with formatted message", () => {
+  it("validate format with formatted message", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -112,11 +112,11 @@ describe("FormatValidationTest", () => {
       }
     }
     const p = new Person({ title: "hello" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("title")).toContain("must start with uppercase");
   });
 
-  it("validate format with allow blank", () => {
+  it("validate format with allow blank", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
@@ -125,20 +125,20 @@ describe("FormatValidationTest", () => {
         });
       }
     }
-    expect(new Person({ title: "" }).isValid()).toBe(true);
-    expect(new Person({ title: "Hello" }).isValid()).toBe(true);
-    expect(new Person({ title: "hello" }).isValid()).toBe(false);
+    expect(await new Person({ title: "" }).isValid()).toBe(true);
+    expect(await new Person({ title: "Hello" }).isValid()).toBe(true);
+    expect(await new Person({ title: "hello" }).isValid()).toBe(false);
   });
 
-  it("validate format numeric", () => {
+  it("validate format numeric", async () => {
     class Person extends Model {
       static {
         this.attribute("value", "string");
         this.validates("value", { format: { with: /^\d+$/, multiline: true } });
       }
     }
-    expect(new Person({ value: "123" }).isValid()).toBe(true);
-    expect(new Person({ value: "abc" }).isValid()).toBe(false);
+    expect(await new Person({ value: "123" }).isValid()).toBe(true);
+    expect(await new Person({ value: "abc" }).isValid()).toBe(false);
   });
 
   it("validate format of with multiline regexp should raise error", () => {
@@ -174,34 +174,34 @@ describe("FormatValidationTest", () => {
     }).toThrow(/Either :with or :without must be supplied/);
   });
 
-  it("validates format of with lambda", () => {
+  it("validates format of with lambda", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { format: { with: () => /^[a-z]+$/ } });
       }
     }
-    expect(new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(new Person({ name: "Alice123" }).isValid()).toBe(false);
+    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
+    expect(await new Person({ name: "Alice123" }).isValid()).toBe(false);
   });
 
-  it("validates format of with lambda without arguments", () => {
+  it("validates format of with lambda without arguments", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { format: { with: () => /^\w+$/ } });
       }
     }
-    expect(new Person({ name: "alice" }).isValid()).toBe(true);
-    expect(new Person({ name: "" }).isValid()).toBe(false);
+    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
+    expect(await new Person({ name: "" }).isValid()).toBe(false);
   });
 
-  it("validates format of for ruby class", () => {
+  it("validates format of for ruby class", async () => {
     class Person extends Model {}
     Person.attribute("email", "string");
     Person.validates("email", { format: { with: /@/ } });
-    expect(new Person({ email: "a@b.com" }).isValid()).toBe(true);
-    expect(new Person({ email: "invalid" }).isValid()).toBe(false);
+    expect(await new Person({ email: "a@b.com" }).isValid()).toBe(true);
+    expect(await new Person({ email: "invalid" }).isValid()).toBe(false);
   });
 });
 describe("format with 'without' option", () => {
@@ -212,17 +212,17 @@ describe("format with 'without' option", () => {
     }
   }
 
-  it("accepts values not matching 'without'", () => {
-    expect(new NoNumbers({ name: "dean" }).isValid()).toBe(true);
+  it("accepts values not matching 'without'", async () => {
+    expect(await new NoNumbers({ name: "dean" }).isValid()).toBe(true);
   });
 
-  it("rejects values matching 'without'", () => {
+  it("rejects values matching 'without'", async () => {
     const n = new NoNumbers({ name: "dean123" });
-    expect(n.isValid()).toBe(false);
+    expect(await n.isValid()).toBe(false);
     expect(n.errors.get("name")).toContain("is invalid");
   });
 
-  it("validate format does not mutate regex lastIndex across calls (g flag)", () => {
+  it("validate format does not mutate regex lastIndex across calls (g flag)", async () => {
     // Rails regexp.match? is stateless. JS RegExp#test mutates lastIndex
     // for /g and /y regexes — a shared regex would alternate
     // pass/fail. Pin the stateless behavior here.
@@ -233,9 +233,9 @@ describe("format with 'without' option", () => {
         this.validates("code", { format: { with: sharedRe } });
       }
     }
-    expect(new P({ code: "abc123" }).isValid()).toBe(true);
-    expect(new P({ code: "abc123" }).isValid()).toBe(true);
-    expect(new P({ code: "abc123" }).isValid()).toBe(true);
+    expect(await new P({ code: "abc123" }).isValid()).toBe(true);
+    expect(await new P({ code: "abc123" }).isValid()).toBe(true);
+    expect(await new P({ code: "abc123" }).isValid()).toBe(true);
     expect(sharedRe.lastIndex).toBe(0);
   });
 });

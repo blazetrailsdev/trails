@@ -700,7 +700,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
   it("dynamic find all should respect readonly access", async () => {
     const activeRecord = projects("active_record");
     for (const d of await activeRecord.readonlyDevelopers.toArray()) {
-      if (d.isValid()) {
+      if (await d.isValid()) {
         await expect((d as any).saveBang()).rejects.toThrow(ReadOnlyRecord);
       }
     }
@@ -1107,7 +1107,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     const richPerson = new RichPerson({});
     const treasure = new Treasure({});
     await treasure.richPeople.push(richPerson as any);
-    treasure.isValid();
+    await treasure.isValid();
 
     expect(await treasure.richPeople.size()).toBe(1);
     // Rails asserts `assert_nil rich_person.first_name`; an unset attribute
@@ -1123,7 +1123,7 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
 
     const treasure = new Treasure({});
     await (treasure as any).richPeople.push(richPerson as any);
-    treasure.isValid();
+    await treasure.isValid();
 
     expect(await (treasure as any).richPeople.size()).toBe(1);
     expect((richPerson as any).first_name).toBe(personFirstName);

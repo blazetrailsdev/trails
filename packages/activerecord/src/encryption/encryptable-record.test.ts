@@ -427,19 +427,19 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     new Post();
     const post = await Post.create({ title: "Original", body: "body" });
     post.title = "Some new title";
-    expect(post.isValid()).toBe(true);
-    withEncryptionContext({ frozenEncryption: true }, () => {
-      expect(post.isValid()).toBe(false);
+    expect(await post.isValid()).toBe(true);
+    await withEncryptionContext({ frozenEncryption: true }, async () => {
+      expect(await post.isValid()).toBe(false);
     });
   });
 
   it("validate column sizes", async () => {
     const Author = makeEncryptedAuthor(await freshAdapter());
     new Author();
-    expect(new Author({ name: "jorge" }).isValid()).toBe(true);
-    expect(new Author({ name: "a".repeat(AUTHOR_NAME_LIMIT + 1) }).isValid()).toBe(false);
+    expect(await new Author({ name: "jorge" }).isValid()).toBe(true);
+    expect(await new Author({ name: "a".repeat(AUTHOR_NAME_LIMIT + 1) }).isValid()).toBe(false);
     const author = await Author.create({ name: "a".repeat(AUTHOR_NAME_LIMIT + 1) });
-    expect(author.isValid()).toBe(false);
+    expect(await author.isValid()).toBe(false);
   });
 
   it("forces UTF-8 encoding for deterministic attributes by default", async () => {

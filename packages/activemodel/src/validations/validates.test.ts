@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { Model } from "../index.js";
 
 describe("ValidatesTest", () => {
-  it("validates with messages empty", () => {
+  it("validates with messages empty", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -10,11 +10,11 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({ name: "test" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBe(0);
   });
 
-  it("validates with attribute specified as string", () => {
+  it("validates with attribute specified as string", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -22,11 +22,11 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("validates with unless shared conditions", () => {
+  it("validates with unless shared conditions", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -37,10 +37,10 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates with regexp", () => {
+  it("validates with regexp", async () => {
     class Person extends Model {
       static {
         this.attribute("email", "string");
@@ -48,11 +48,11 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({ email: "invalid" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("validates with array", () => {
+  it("validates with array", async () => {
     class Person extends Model {
       static {
         this.attribute("role", "string");
@@ -60,10 +60,10 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({ role: "admin" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates with range", () => {
+  it("validates with range", async () => {
     class Person extends Model {
       static {
         this.attribute("age", "integer");
@@ -71,7 +71,7 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({ age: 25 });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
   it("validates with included validator", () => {
@@ -84,7 +84,7 @@ describe("ValidatesTest", () => {
     expect(Person.validators().length).toBeGreaterThan(0);
   });
 
-  it("validates with included validator and options", () => {
+  it("validates with included validator and options", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -92,7 +92,7 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({ name: "A" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
@@ -106,7 +106,7 @@ describe("ValidatesTest", () => {
     expect(Person.validators().length).toBeGreaterThan(0);
   });
 
-  it("defining extra default keys for validates", () => {
+  it("defining extra default keys for validates", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -114,33 +114,33 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates with built in validation", () => {
+  it("validates with built in validation", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true });
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
-    expect(new Person({ title: "Hello" }).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(false);
+    expect(await new Person({ title: "Hello" }).isValid()).toBe(true);
   });
 
-  it("validates with built in validation and options", () => {
+  it("validates with built in validation and options", async () => {
     class Person extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true, length: { minimum: 3 } });
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
-    expect(new Person({ title: "ab" }).isValid()).toBe(false);
-    expect(new Person({ title: "abc" }).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(false);
+    expect(await new Person({ title: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ title: "abc" }).isValid()).toBe(true);
   });
 
-  it("validates with if as local conditions", () => {
+  it("validates with if as local conditions", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -151,11 +151,11 @@ describe("ValidatesTest", () => {
         });
       }
     }
-    expect(new Person({ active: false }).isValid()).toBe(true);
-    expect(new Person({ active: true }).isValid()).toBe(false);
+    expect(await new Person({ active: false }).isValid()).toBe(true);
+    expect(await new Person({ active: true }).isValid()).toBe(false);
   });
 
-  it("validates with unless as local conditions", () => {
+  it("validates with unless as local conditions", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -166,11 +166,11 @@ describe("ValidatesTest", () => {
         });
       }
     }
-    expect(new Person({ skip: true }).isValid()).toBe(true);
-    expect(new Person({ skip: false }).isValid()).toBe(false);
+    expect(await new Person({ skip: true }).isValid()).toBe(true);
+    expect(await new Person({ skip: false }).isValid()).toBe(false);
   });
 
-  it("validates with validator class", () => {
+  it("validates with validator class", async () => {
     class MyValidator {
       validate(record: any) {
         if (!record.readAttribute("name")) {
@@ -185,11 +185,11 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person();
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toEqual(["must be present"]);
   });
 
-  it("validates with namespaced validator class", () => {
+  it("validates with namespaced validator class", async () => {
     const Validators = {
       NameValidator: class {
         validate(record: any) {
@@ -206,11 +206,11 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person();
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toEqual(["is required"]);
   });
 
-  it("validates with unknown validator", () => {
+  it("validates with unknown validator", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -218,10 +218,10 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates with disabled unknown validator", () => {
+  it("validates with disabled unknown validator", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -229,10 +229,10 @@ describe("ValidatesTest", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("validates with if as shared conditions", () => {
+  it("validates with if as shared conditions", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -245,13 +245,13 @@ describe("ValidatesTest", () => {
       }
     }
     // When inactive, both validations should be skipped
-    expect(new Person({ active: false }).isValid()).toBe(true);
+    expect(await new Person({ active: false }).isValid()).toBe(true);
     // When active, both validations should run
-    expect(new Person({ active: true }).isValid()).toBe(false);
-    expect(new Person({ active: true, name: "abc" }).isValid()).toBe(true);
+    expect(await new Person({ active: true }).isValid()).toBe(false);
+    expect(await new Person({ active: true, name: "abc" }).isValid()).toBe(true);
   });
 
-  it("validates with allow nil shared conditions", () => {
+  it("validates with allow nil shared conditions", async () => {
     class Person extends Model {
       static {
         this.attribute("value", "string");
@@ -261,12 +261,12 @@ describe("ValidatesTest", () => {
         });
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
-    expect(new Person({ value: "42" }).isValid()).toBe(true);
-    expect(new Person({ value: "abc" }).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(true);
+    expect(await new Person({ value: "42" }).isValid()).toBe(true);
+    expect(await new Person({ value: "abc" }).isValid()).toBe(false);
   });
 
-  it("validates with validator class and options", () => {
+  it("validates with validator class and options", async () => {
     class CustomValidator {
       private min: number;
       constructor(options: any = {}) {
@@ -285,7 +285,7 @@ describe("ValidatesTest", () => {
         this.validatesWith(CustomValidator, { minimum: 5 });
       }
     }
-    expect(new Person({ name: "ab" }).isValid()).toBe(false);
-    expect(new Person({ name: "alice" }).isValid()).toBe(true);
+    expect(await new Person({ name: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ name: "alice" }).isValid()).toBe(true);
   });
 });

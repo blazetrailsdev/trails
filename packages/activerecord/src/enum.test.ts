@@ -343,7 +343,7 @@ describe("EnumTest", () => {
     }).toThrow("'unknown' is not a valid status");
   });
 
-  it("validation with 'validate: true' option", () => {
+  it("validation with 'validate: true' option", async () => {
     class K extends Base {
       static _tableName = "books";
       static {
@@ -352,19 +352,19 @@ describe("EnumTest", () => {
     }
 
     let validBook = new K({ status: "proposed" } as any);
-    expect((validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBe(true);
 
     validBook = new K({ status: "written" } as any);
-    expect((validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBe(true);
 
     let invalidBook = new K({ status: null } as any);
-    expect((invalidBook as any).isValid()).toBe(false);
+    expect(await (invalidBook as any).isValid()).toBe(false);
 
     invalidBook = new K({ status: "unknown" } as any);
-    expect((invalidBook as any).isValid()).toBe(false);
+    expect(await (invalidBook as any).isValid()).toBe(false);
   });
 
-  it("validation with 'validate: hash' option", () => {
+  it("validation with 'validate: hash' option", async () => {
     class K extends Base {
       static _tableName = "books";
       static {
@@ -373,16 +373,16 @@ describe("EnumTest", () => {
     }
 
     let validBook = new K({ status: "proposed" } as any);
-    expect((validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBe(true);
 
     validBook = new K({ status: "written" } as any);
-    expect((validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBe(true);
 
     validBook = new K({ status: null } as any);
-    expect((validBook as any).isValid()).toBe(true);
+    expect(await (validBook as any).isValid()).toBe(true);
 
     const invalidBook = new K({ status: "unknown" } as any);
-    expect((invalidBook as any).isValid()).toBe(false);
+    expect(await (invalidBook as any).isValid()).toBe(false);
   });
 
   it("NULL values from database should be casted to nil", async () => {

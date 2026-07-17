@@ -46,7 +46,7 @@ describe("I18nValidationTest", () => {
 
   // Rails generates one test per COMMON_CASE via string interpolation; the
   // canonical (interpolation-stripped) name is the "given no options" case.
-  it("validates_associated on generated message ", () => {
+  it("validates_associated on generated message ", async () => {
     class Topic extends Base {
       static {
         this.attribute("title", "string");
@@ -59,14 +59,14 @@ describe("I18nValidationTest", () => {
     seedAssociationCache(topic, "replies", replies);
 
     const spy = vi.spyOn(ActiveModelError, "generateMessage");
-    topic.isValid();
+    await topic.isValid();
     void topic.errors.messages;
     // Rails' assert_called_with asserts exactly one call with these args.
     expect(spy).toHaveBeenCalledWith("replies", "invalid", topic, { value: replies });
     expect(spy).toHaveBeenCalledTimes(1);
   });
 
-  it("validates associated finds custom model key translation", () => {
+  it("validates associated finds custom model key translation", async () => {
     I18n.storeTranslations("en", {
       activerecord: {
         errors: { models: { topic: { attributes: { replies: { invalid: "custom message" } } } } },
@@ -86,11 +86,11 @@ describe("I18nValidationTest", () => {
     const topic = new Topic({ title: "topic" });
     seedAssociationCache(topic, "replies", [new FakeReply()]);
 
-    topic.isValid();
+    await topic.isValid();
     expect([...new Set(topic.errors.get("replies"))]).toEqual(["custom message"]);
   });
 
-  it("validates associated finds global default translation", () => {
+  it("validates associated finds global default translation", async () => {
     I18n.storeTranslations("en", {
       activerecord: { errors: { messages: { invalid: "global message" } } },
     });
@@ -105,7 +105,7 @@ describe("I18nValidationTest", () => {
     const topic = new Topic({ title: "topic" });
     seedAssociationCache(topic, "replies", [new FakeReply()]);
 
-    topic.isValid();
+    await topic.isValid();
     expect(topic.errors.get("replies")).toEqual(["global message"]);
   });
 });

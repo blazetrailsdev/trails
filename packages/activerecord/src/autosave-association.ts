@@ -938,7 +938,10 @@ export function isNestedRecordsChangedForAutosave(this: AutosaveAssociationHost)
 }
 
 /** @internal */
-export function validateHasOneAssociation(this: AutosaveAssociationHost, reflection: any): void {
+export async function validateHasOneAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<void> {
   const inst = _loadedAssociation(this, reflection.name);
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
@@ -961,11 +964,14 @@ export function validateHasOneAssociation(this: AutosaveAssociationHost, reflect
     )
       return;
   }
-  isAssociationValid(reflection, record, this, inst);
+  await isAssociationValid(reflection, record, this, inst);
 }
 
 /** @internal */
-export function validateBelongsToAssociation(this: AutosaveAssociationHost, reflection: any): void {
+export async function validateBelongsToAssociation(
+  this: AutosaveAssociationHost,
+  reflection: any,
+): Promise<void> {
   const inst = _loadedAssociation(this, reflection.name);
   const record = inst?.target;
   if (!record || typeof record !== "object" || Array.isArray(record)) return;
@@ -976,17 +982,17 @@ export function validateBelongsToAssociation(this: AutosaveAssociationHost, refl
   if (!(record.changedForAutosave?.() ?? false) && !customCtx) return;
   _setValidatingBelongsToFor(this, reflection, true);
   try {
-    isAssociationValid(reflection, record, this, inst);
+    await isAssociationValid(reflection, record, this, inst);
   } finally {
     _setValidatingBelongsToFor(this, reflection, false);
   }
 }
 
 /** @internal */
-export function validateCollectionAssociation(
+export async function validateCollectionAssociation(
   this: AutosaveAssociationHost,
   reflection: any,
-): void {
+): Promise<void> {
   // Mirrors Rails: use associatedRecordsToValidateOrSave to filter by new_record/autosave state.
   // Pass the real Association instance so downstream readers can reach
   // subclass methods (`isUpdated`, `setInverseInstance`, etc.) — Slot A.
@@ -1010,17 +1016,17 @@ export function validateCollectionAssociation(
       );
   if (!records) return;
   for (const record of records) {
-    isAssociationValid(reflection, record, this, association);
+    await isAssociationValid(reflection, record, this, association);
   }
 }
 
 /** @internal */
-export function isAssociationValid(
+export async function isAssociationValid(
   reflection: any,
   record: any,
   owner: any,
   association: any,
-): boolean {
+): Promise<boolean> {
   // Mirrors Rails `association_valid?` (autosave_association.rb:371-398).
   if (typeof record.isDestroyed === "function" && record.isDestroyed()) return true;
   if (reflection.options?.autosave && isMarkedForDestruction(record)) return true;
@@ -1028,7 +1034,7 @@ export function isAssociationValid(
     typeof owner?.customValidationContext === "function" && owner.customValidationContext()
       ? owner._validationContext
       : undefined;
-  const isChildValid = typeof record.isValid === "function" ? record.isValid(context) : true;
+  const isChildValid = typeof record.isValid === "function" ? await record.isValid(context) : true;
   if (isChildValid) return true;
 
   const childErrors: any[] = record.errors?.objects ?? [];

@@ -19,30 +19,30 @@ describe("AbsenceValidationTest", () => {
     }
     return { Topic };
   }
-  it("non association", () => {
+  it("non association", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ body: "filled" });
-    expect(t.isValid()).toBe(false);
+    expect(await t.isValid()).toBe(false);
   });
-  it("has one marked for destruction", () => {
+  it("has one marked for destruction", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ body: "" });
-    expect(t.isValid()).toBe(true);
+    expect(await t.isValid()).toBe(true);
   });
-  it("has many marked for destruction", () => {
+  it("has many marked for destruction", async () => {
     const { Topic } = makeModel();
     const t = new Topic({});
-    expect(t.isValid()).toBe(true);
+    expect(await t.isValid()).toBe(true);
   });
-  it("does not call to a on associations", () => {
+  it("does not call to a on associations", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ title: "ok" });
-    expect(t.isValid()).toBe(true);
+    expect(await t.isValid()).toBe(true);
   });
-  it("validates absence of virtual attribute on model", () => {
+  it("validates absence of virtual attribute on model", async () => {
     const { Topic } = makeModel();
     const t = new Topic({ body: "present" });
-    expect(t.isValid()).toBe(false);
+    expect(await t.isValid()).toBe(false);
     expect(t.errors.empty).toBe(false);
   });
 });

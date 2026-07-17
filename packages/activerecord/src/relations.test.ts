@@ -1631,7 +1631,7 @@ describe("RelationTest", () => {
     const parrot = await Bird.where({ color: "green" }).findOrInitializeBy({ name: "parrot" });
     expect(parrot).toBeInstanceOf(Bird);
     expect(parrot.isNewRecord()).toBe(true);
-    expect(parrot.isValid()).toBe(true);
+    expect(await parrot.isValid()).toBe(true);
     expect(parrot.name).toBe("parrot");
     expect(parrot.color).toBe("green");
   });
@@ -1640,7 +1640,7 @@ describe("RelationTest", () => {
     const parrot = await Bird.where({ color: "green" }).findOrInitializeBy({});
     expect(parrot).toBeInstanceOf(Bird);
     expect(parrot.isNewRecord()).toBe(true);
-    expect(parrot.isValid()).toBe(false);
+    expect(await parrot.isValid()).toBe(false);
     expect(parrot.color).toBe("green");
   });
 
@@ -1703,7 +1703,7 @@ describe("RelationTest", () => {
     let err: unknown;
     try {
       const bird = await Bird.createOrFindBy({ color: "green" });
-      expect(bird.isValid()).toBe(false);
+      expect(await bird.isValid()).toBe(false);
     } catch (e) {
       err = e;
     }

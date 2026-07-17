@@ -59,7 +59,7 @@ class DogValidatorWithOnMultipleCondition extends Dog {
 }
 
 describe("CallbacksWithMethodNamesShouldBeCalled", () => {
-  it("before validation and after validation callbacks should be called", () => {
+  it("before validation and after validation callbacks should be called", async () => {
     const order: string[] = [];
     class Person extends Model {
       static {
@@ -74,12 +74,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    p.isValid();
+    await p.isValid();
     expect(order).toContain("before_validation");
     expect(order).toContain("after_validation");
   });
 
-  it("before validation and after validation callbacks should be called in declared order", () => {
+  it("before validation and after validation callbacks should be called in declared order", async () => {
     const order: string[] = [];
     class Person extends Model {
       static {
@@ -99,12 +99,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    p.isValid();
+    await p.isValid();
     expect(order.indexOf("first_before")).toBeLessThan(order.indexOf("second_before"));
     expect(order.indexOf("first_after")).toBeLessThan(order.indexOf("second_after"));
   });
 
-  it("further callbacks should not be called if before validation throws abort", () => {
+  it("further callbacks should not be called if before validation throws abort", async () => {
     const order: string[] = [];
     class Person extends Model {
       static {
@@ -119,12 +119,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    p.isValid();
+    await p.isValid();
     expect(order).toContain("before");
     expect(order).not.toContain("after");
   });
 
-  it("validation test should be done", () => {
+  it("validation test should be done", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -132,40 +132,40 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
     const p2 = new Person({});
-    expect(p2.isValid()).toBe(false);
+    expect(await p2.isValid()).toBe(false);
   });
 
-  it("on condition is respected for validation without matching context", () => {
+  it("on condition is respected for validation without matching context", async () => {
     const d = new DogValidatorWithOnCondition();
-    d.isValid("save");
+    await d.isValid("save");
     expect(d.history).toEqual([]);
   });
 
-  it("on condition is respected for validation without context", () => {
+  it("on condition is respected for validation without context", async () => {
     const d = new DogValidatorWithOnCondition();
-    d.isValid();
+    await d.isValid();
     expect(d.history).toEqual([]);
   });
 
-  it("on multiple condition is respected for validation with matching context", () => {
+  it("on multiple condition is respected for validation with matching context", async () => {
     const d1 = new DogValidatorWithOnMultipleCondition();
-    d1.isValid("context_a");
+    await d1.isValid("context_a");
     expect(d1.history).toEqual([
       "before_validation_marker on context_a",
       "after_validation_marker on context_a",
     ]);
 
     const d2 = new DogValidatorWithOnMultipleCondition();
-    d2.isValid("context_b");
+    await d2.isValid("context_b");
     expect(d2.history).toEqual([
       "before_validation_marker on context_b",
       "after_validation_marker on context_b",
     ]);
 
     const d3 = new DogValidatorWithOnMultipleCondition();
-    d3.isValid(["context_a", "context_b"]);
+    await d3.isValid(["context_a", "context_b"]);
     expect(d3.history).toEqual([
       "before_validation_marker on context_a",
       "before_validation_marker on context_b",
@@ -174,19 +174,19 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
     ]);
   });
 
-  it("on multiple condition is respected for validation without matching context", () => {
+  it("on multiple condition is respected for validation without matching context", async () => {
     const d = new DogValidatorWithOnMultipleCondition();
-    d.isValid("save");
+    await d.isValid("save");
     expect(d.history).toEqual([]);
   });
 
-  it("on multiple condition is respected for validation without context", () => {
+  it("on multiple condition is respected for validation without context", async () => {
     const d = new DogValidatorWithOnMultipleCondition();
-    d.isValid();
+    await d.isValid();
     expect(d.history).toEqual([]);
   });
 
-  it("further callbacks should be called if before validation returns false", () => {
+  it("further callbacks should be called if before validation returns false", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -197,11 +197,11 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p = new Person({ name: "test" });
-    p.isValid();
+    await p.isValid();
     expect(log).toContain("after");
   });
 
-  it("further callbacks should be called if after validation returns false", () => {
+  it("further callbacks should be called if after validation returns false", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -216,7 +216,7 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p = new Person({ name: "test" });
-    p.isValid();
+    await p.isValid();
     expect(log).toContain("first");
   });
 
@@ -248,7 +248,7 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
     expect(opts).toEqual({ if: opts.if, on: "create" });
   });
 
-  it("before validation and after validation callbacks should be called with proc", () => {
+  it("before validation and after validation callbacks should be called with proc", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -263,12 +263,12 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p = new Person({ name: "Alice" });
-    p.isValid();
+    await p.isValid();
     expect(log).toContain("before_proc");
     expect(log).toContain("after_proc");
   });
 
-  it("if condition is respected for before validation", () => {
+  it("if condition is respected for before validation", async () => {
     const log: string[] = [];
     class Person extends Model {
       static {
@@ -282,17 +282,17 @@ describe("CallbacksWithMethodNamesShouldBeCalled", () => {
       }
     }
     const p1 = new Person({ name: "Alice" });
-    p1.isValid();
+    await p1.isValid();
     expect(log).toEqual([]);
 
     const p2 = new Person({ name: "trigger" });
-    p2.isValid();
+    await p2.isValid();
     expect(log).toEqual(["before"]);
   });
 
-  it("on condition is respected for validation with matching context", () => {
+  it("on condition is respected for validation with matching context", async () => {
     const d = new DogValidatorWithOnCondition();
-    d.isValid("create");
+    await d.isValid("create");
     expect(d.history).toEqual(["before_validation_marker", "after_validation_marker"]);
   });
 });

@@ -4662,10 +4662,10 @@ export class Base extends Model {
    * Delegates to validations module for context resolution, then runs
    * autosave association validations.
    */
-  override isValid(context?: ValidationContextArg): boolean {
+  override async isValid(context?: ValidationContextArg): Promise<boolean> {
     const effectiveContext =
       context ?? this._validationContext ?? defaultValidationContext.call(this);
-    const result = validationsIsValid.call(this, effectiveContext);
+    const result = await validationsIsValid.call(this, effectiveContext);
     return result && !this.errors.any;
   }
 
@@ -4757,7 +4757,7 @@ export interface Base extends Included<typeof AutosaveAssociation> {
   loadBelongsTo(name: string): Promise<Base | null>;
   loadHasOne(name: string): Promise<Base | null>;
   readAttributeForValidation(attribute: string): unknown;
-  validate(context?: ValidationContextArg): boolean;
+  validate(context?: ValidationContextArg): Promise<boolean>;
   customValidationContext(): boolean;
   increment(attribute: string, by?: number): this;
   decrement(attribute: string, by?: number): this;

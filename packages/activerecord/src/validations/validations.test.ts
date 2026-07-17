@@ -42,10 +42,10 @@ describe("ValidationsTest", () => {
     Topic.clearValidatorsBang();
   });
 
-  it("valid uses create context when new", () => {
+  it("valid uses create context when new", async () => {
     const r = new WrongReply();
     r.title = "Wrong Create";
-    expect(r.isValid()).toBe(false);
+    expect(await r.isValid()).toBe(false);
     expect(r.errors.messagesFor("title").length).toBeGreaterThan(0);
     expect(r.errors.messagesFor("title")).toEqual(["is Wrong Create"]);
   });
@@ -57,48 +57,48 @@ describe("ValidationsTest", () => {
     expect(await r.save()).toBe(true);
 
     r.title = "Wrong Update";
-    expect(r.isValid()).toBe(false);
+    expect(await r.isValid()).toBe(false);
 
     expect(r.errors.messagesFor("title").length).toBeGreaterThan(0);
     expect(r.errors.messagesFor("title")).toEqual(["is Wrong Update"]);
   });
 
-  it("valid using special context", () => {
+  it("valid using special context", async () => {
     const r = new WrongReply({ title: "Valid title" });
-    expect(r.isValid("specialCase")).toBe(false);
+    expect(await r.isValid("specialCase")).toBe(false);
     expect(r.errors.messagesFor("author_name").join("")).toBe("Invalid");
 
     r.author_name = "secret";
     r.content = "Good";
-    expect(r.isValid("specialCase")).toBe(true);
+    expect(await r.isValid("specialCase")).toBe(true);
 
     r.author_name = null as unknown as string;
-    expect(r.isValid("specialCase")).toBe(false);
+    expect(await r.isValid("specialCase")).toBe(false);
     expect(r.errors.messagesFor("author_name").join("")).toBe("Invalid");
 
     r.author_name = "secret";
-    expect(r.isValid("specialCase")).toBe(true);
+    expect(await r.isValid("specialCase")).toBe(true);
   });
 
-  it("invalid using multiple contexts", () => {
+  it("invalid using multiple contexts", async () => {
     const r = new WrongReply({ title: "Wrong Create" });
-    expect(r.isInvalid(["specialCase", "create"])).toBe(true);
+    expect(await r.isInvalid(["specialCase", "create"])).toBe(true);
     expect(r.errors.messagesFor("author_name").join("")).toBe("Invalid");
     expect(r.errors.messagesFor("title").join("")).toBe("is Wrong Create");
   });
 
-  it("validate", () => {
+  it("validate", async () => {
     const r = new WrongReply();
 
-    r.validate();
+    await r.validate();
     expect(r.errors.messagesFor("author_name")).toEqual([]);
 
-    r.validate("specialCase");
+    await r.validate("specialCase");
     expect(r.errors.messagesFor("author_name").length).toBeGreaterThan(0);
 
     r.author_name = "secret";
 
-    r.validate("specialCase");
+    await r.validate("specialCase");
     expect(r.errors.messagesFor("author_name")).toEqual([]);
   });
 
@@ -121,7 +121,7 @@ describe("ValidationsTest", () => {
       RecordInvalid,
     );
     const r = new WrongReply({ title: "Valid title", author_name: "secret", content: "Good" });
-    expect(r.validateBang("specialCase")).toBe(true);
+    expect(await r.validateBang("specialCase")).toBe(true);
   });
 
   it("exception on create bang many", async () => {
@@ -158,9 +158,9 @@ describe("ValidationsTest", () => {
     expect(() => IncorporealModel.validatesAcceptanceOf("incorporeal_column")).not.toThrow();
   });
 
-  it("throw away typing", () => {
+  it("throw away typing", async () => {
     const d = new Developer({ name: "David", salary: "100,000" });
-    expect(d.isValid()).toBe(false);
+    expect(await d.isValid()).toBe(false);
     expect(d.salary).toBe(100);
     expect(d.readAttributeBeforeTypeCast("salary")).toBe("100,000");
   });
@@ -191,7 +191,7 @@ describe("ValidationsTest", () => {
     expect(Company.validatorsOn("name").length).toBe(1);
   });
 
-  it("numericality validation with mutation", () => {
+  it("numericality validation with mutation", async () => {
     class Klass extends Topic {
       static name = "Topic";
     }
@@ -204,10 +204,10 @@ describe("ValidationsTest", () => {
     // current attribute value (now all digits) validates.
     topic.writeAttribute("wibble", String(topic.readAttribute("wibble")).replaceAll("-", ""));
 
-    expect(topic.isValid()).toBe(true);
+    expect(await topic.isValid()).toBe(true);
   });
 
-  it("numericality validation checks against raw value", () => {
+  it("numericality validation checks against raw value", async () => {
     class Klass extends Topic {
       static name = "Topic";
     }
@@ -217,13 +217,13 @@ describe("ValidationsTest", () => {
     for (const rawValue of ["97.179", 97.179, new BigDecimal("97.179")]) {
       const subject = Klass.new({ wibble: rawValue });
       expect((subject.readAttribute("wibble") as BigDecimal).toString()).toBe("97.18");
-      expect(subject.isValid()).toBe(true);
+      expect(await subject.isValid()).toBe(true);
     }
 
     for (const rawValue of ["97.174", 97.174, new BigDecimal("97.174")]) {
       const subject = Klass.new({ wibble: rawValue });
       expect((subject.readAttribute("wibble") as BigDecimal).toString()).toBe("97.17");
-      expect(subject.isValid()).toBe(false);
+      expect(await subject.isValid()).toBe(false);
     }
   });
 
@@ -235,12 +235,12 @@ describe("ValidationsTest", () => {
     expect(priceEstimate.readAttribute("price")).toBe(50);
 
     expect(cameFromUser(priceEstimate, "price")).toBe(true);
-    expect(priceEstimate.isValid()).toBe(true);
+    expect(await priceEstimate.isValid()).toBe(true);
 
     await priceEstimate.saveBang();
 
     expect(cameFromUser(priceEstimate, "price")).toBe(false);
-    expect(priceEstimate.isValid()).toBe(true);
+    expect(await priceEstimate.isValid()).toBe(true);
   });
 
   it("acceptance validator doesnt require db connection", async () => {

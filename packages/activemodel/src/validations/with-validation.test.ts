@@ -3,7 +3,7 @@ import { Model, Errors } from "../index.js";
 import { WithValidator } from "./with.js";
 
 describe("ValidatesWithTest", () => {
-  it("validates_with with options", () => {
+  it("validates_with with options", async () => {
     class CustomValidator {
       private minLength: number;
       constructor(options: any = {}) {
@@ -23,12 +23,12 @@ describe("ValidatesWithTest", () => {
       }
     }
     const p = new Person({ name: "ab" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     const p2 = new Person({ name: "alice" });
-    expect(p2.isValid()).toBe(true);
+    expect(await p2.isValid()).toBe(true);
   });
 
-  it("with multiple classes", () => {
+  it("with multiple classes", async () => {
     class V1 {
       validate(record: any) {
         if (!record.readAttribute("name")) {
@@ -52,11 +52,11 @@ describe("ValidatesWithTest", () => {
       }
     }
     const p = new Person();
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBe(2);
   });
 
-  it("validates_with preserves standard options", () => {
+  it("validates_with preserves standard options", async () => {
     class CustomValidator {
       validate(record: any) {
         if (!record.readAttribute("name")) {
@@ -71,11 +71,11 @@ describe("ValidatesWithTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("validates_with preserves validator options", () => {
+  it("validates_with preserves validator options", async () => {
     class CustomValidator {
       options: any;
       constructor(options: any = {}) {
@@ -90,10 +90,10 @@ describe("ValidatesWithTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("instance validates_with method preserves validator options", () => {
+  it("instance validates_with method preserves validator options", async () => {
     class CustomValidator {
       options: any;
       constructor(options: any = {}) {
@@ -108,10 +108,10 @@ describe("ValidatesWithTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("each validator checks validity", () => {
+  it("each validator checks validity", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -121,11 +121,11 @@ describe("ValidatesWithTest", () => {
       if (!value) record.errors.add(attr, "blank");
     });
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("each validator expects attributes to be given", () => {
+  it("each validator expects attributes to be given", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -135,11 +135,11 @@ describe("ValidatesWithTest", () => {
       if (!value) record.errors.add(attr, "blank");
     });
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("name").length).toBeGreaterThan(0);
   });
 
-  it("each validator skip nil values if :allow_nil is set to true", () => {
+  it("each validator skip nil values if :allow_nil is set to true", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -151,12 +151,12 @@ describe("ValidatesWithTest", () => {
       }
     });
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     // null values are skipped
     expect(p.errors.count).toBe(0);
   });
 
-  it("each validator skip blank values if :allow_blank is set to true", () => {
+  it("each validator skip blank values if :allow_blank is set to true", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -170,11 +170,11 @@ describe("ValidatesWithTest", () => {
       record.errors.add(attr, "invalid");
     });
     const p = new Person({ name: "  " });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBe(0);
   });
 
-  it("validates_with can validate with an instance method", () => {
+  it("validates_with can validate with an instance method", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -187,11 +187,11 @@ describe("ValidatesWithTest", () => {
     }
     Person.validate("customValidation");
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBeGreaterThan(0);
   });
 
-  it("optionally pass in the attribute being validated when validating with an instance method", () => {
+  it("optionally pass in the attribute being validated when validating with an instance method", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -204,11 +204,11 @@ describe("ValidatesWithTest", () => {
     }
     Person.validate("checkName");
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("name").length).toBeGreaterThan(0);
   });
 
-  it("validates_with each validator", () => {
+  it("validates_with each validator", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -221,13 +221,13 @@ describe("ValidatesWithTest", () => {
       }
     });
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.count).toBe(2);
     expect(p.errors.get("name").length).toBeGreaterThan(0);
     expect(p.errors.get("age").length).toBeGreaterThan(0);
   });
 
-  it("validation with class that adds errors", () => {
+  it("validation with class that adds errors", async () => {
     class CustomValidator {
       validate(record: any) {
         const val = record.readAttribute("name");
@@ -242,11 +242,11 @@ describe("ValidatesWithTest", () => {
         this.validatesWith(CustomValidator);
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
-    expect(new Person({ name: "Alice" }).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(false);
+    expect(await new Person({ name: "Alice" }).isValid()).toBe(true);
   });
 
-  it("with a class that returns valid", () => {
+  it("with a class that returns valid", async () => {
     class PassValidator {
       validate(_record: any) {}
     }
@@ -256,10 +256,10 @@ describe("ValidatesWithTest", () => {
         this.validatesWith(PassValidator);
       }
     }
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("passes all configuration options to the validator class", () => {
+  it("passes all configuration options to the validator class", async () => {
     class MinLenValidator {
       min: number;
       constructor(opts: any = {}) {
@@ -278,8 +278,8 @@ describe("ValidatesWithTest", () => {
         this.validatesWith(MinLenValidator, { minimum: 5 });
       }
     }
-    expect(new Person({ name: "ab" }).isValid()).toBe(false);
-    expect(new Person({ name: "abcde" }).isValid()).toBe(true);
+    expect(await new Person({ name: "ab" }).isValid()).toBe(false);
+    expect(await new Person({ name: "abcde" }).isValid()).toBe(true);
   });
 });
 

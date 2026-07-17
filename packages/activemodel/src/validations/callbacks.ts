@@ -16,7 +16,7 @@ export interface CallbacksClassMethods {
 
 export interface CallbacksInstanceMethods {
   /** @internal Rails-private helper. */
-  runValidationsBang(): boolean;
+  runValidationsBang(): Promise<boolean>;
 }
 
 export type Callbacks = CallbacksClassMethods & CallbacksInstanceMethods;
@@ -35,8 +35,8 @@ interface CallbackHostRecord {
 
 /** @internal Host shape for the callbacks-wrapping `runValidationsBang` override. */
 export interface RunValidationsBangHost {
-  _runValidationCallbacks?: (block: () => boolean) => boolean;
-  runValidations?: () => boolean;
+  _runValidationCallbacks?: (block: () => boolean | Promise<boolean>) => boolean | Promise<boolean>;
+  runValidations?: () => boolean | Promise<boolean>;
 }
 
 /**
@@ -54,8 +54,8 @@ export interface RunValidationsBangHost {
  *
  * @internal Rails-private helper.
  */
-export function runValidationsBang(this: RunValidationsBangHost): boolean {
-  const block = (): boolean => {
+export async function runValidationsBang(this: RunValidationsBangHost): Promise<boolean> {
+  const block = (): boolean | Promise<boolean> => {
     if (typeof this.runValidations === "function") return this.runValidations();
     return true;
   };

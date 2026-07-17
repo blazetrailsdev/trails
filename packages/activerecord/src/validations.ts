@@ -79,8 +79,8 @@ export interface Validations {
    * AM's alias `validate → valid?`
    * (activemodel/lib/active_model/validations.rb:370).
    */
-  validate(context?: ValidationContextArg): boolean;
-  isValid(context?: ValidationContextArg): boolean;
+  validate(context?: ValidationContextArg): Promise<boolean>;
+  isValid(context?: ValidationContextArg): Promise<boolean>;
 }
 
 /**
@@ -102,7 +102,7 @@ interface ValidationsHost {
   isNewRecord?(): boolean;
   _newRecord?: boolean;
   errors: { any: boolean };
-  isValid(context?: ValidationContextArg): boolean;
+  isValid(context?: ValidationContextArg): Promise<boolean>;
   _associationCache?(name: string): { target?: unknown } | undefined;
   _collectionProxies?: { get?(name: string): unknown };
   association?(name: string): { loaded?: boolean; target?: unknown } | undefined;
@@ -111,10 +111,10 @@ interface ValidationsHost {
 
 // Reference to the parent class's isValid (Model.prototype.isValid).
 // Set by Base at module load via _setSuperIsValid to avoid circular imports.
-let _superIsValid: ((context?: ValidationContextArg) => boolean) | null = null;
+let _superIsValid: ((context?: ValidationContextArg) => Promise<boolean>) | null = null;
 
 /** @internal Called by Base to register the super isValid for delegation. */
-export function _setSuperIsValid(fn: (context?: ValidationContextArg) => boolean): void {
+export function _setSuperIsValid(fn: (context?: ValidationContextArg) => Promise<boolean>): void {
   _superIsValid = fn;
 }
 
@@ -154,7 +154,10 @@ export function _setSuperIsValid(fn: (context?: ValidationContextArg) => boolean
  * and the INSERT aren't atomic), so the save-time-only behavior here is closer
  * to the concurrency-safe pattern — but it still diverges observably.
  */
-export function isValid(this: ValidationsHost, context?: ValidationContextArg): boolean {
+export async function isValid(
+  this: ValidationsHost,
+  context?: ValidationContextArg,
+): Promise<boolean> {
   const effectiveContext =
     context ?? this._validationContext ?? defaultValidationContext.call(this);
   if (_superIsValid == null) {
@@ -165,7 +168,7 @@ export function isValid(this: ValidationsHost, context?: ValidationContextArg): 
   const previousContext = this._validationContext;
   this._validationContext = effectiveContext;
   try {
-    const result = _superIsValid.call(this, effectiveContext);
+    const result = await _superIsValid.call(this, effectiveContext);
     return result && !this.errors.any;
   } finally {
     this._validationContext = previousContext;
@@ -176,7 +179,7 @@ export function isValid(this: ValidationsHost, context?: ValidationContextArg): 
  * Mirrors: ActiveRecord::Validations#validate — inherited alias of `valid?`
  * (activemodel/lib/active_model/validations.rb:370).
  */
-export function validate(this: ValidationsHost, context?: ValidationContextArg): boolean {
+export function validate(this: ValidationsHost, context?: ValidationContextArg): Promise<boolean> {
   return isValid.call(this, context);
 }
 
@@ -205,8 +208,8 @@ export function defaultValidationContext(this: ValidationsHost): string {
 export function performValidations(
   this: ValidationsHost,
   options?: { validate?: boolean; context?: string },
-): boolean {
-  if (options?.validate === false) return true;
+): Promise<boolean> {
+  if (options?.validate === false) return Promise.resolve(true);
   return this.isValid(options?.context);
 }
 

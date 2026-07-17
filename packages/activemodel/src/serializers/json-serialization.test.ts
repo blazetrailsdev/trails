@@ -112,7 +112,7 @@ describe("JsonSerializationTest", () => {
     expect(JSON.stringify(mn)).toBeDefined();
   });
 
-  it("should return Hash for errors", () => {
+  it("should return Hash for errors", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -120,7 +120,7 @@ describe("JsonSerializationTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     const errJson = p.errors.asJson();
     expect(errJson).toHaveProperty("name");
   });

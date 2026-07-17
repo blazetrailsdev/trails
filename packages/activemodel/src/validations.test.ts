@@ -14,25 +14,25 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("rejects null", () => {
+    it("rejects null", async () => {
       const a = new Article();
-      expect(a.isValid()).toBe(false);
+      expect(await a.isValid()).toBe(false);
       expect(a.errors.get("title")).toContain("can't be blank");
     });
 
-    it("rejects empty string", () => {
+    it("rejects empty string", async () => {
       const a = new Article({ title: "" });
-      expect(a.isValid()).toBe(false);
+      expect(await a.isValid()).toBe(false);
     });
 
-    it("rejects whitespace-only string", () => {
+    it("rejects whitespace-only string", async () => {
       const a = new Article({ title: "   " });
-      expect(a.isValid()).toBe(false);
+      expect(await a.isValid()).toBe(false);
     });
 
-    it("accepts a real value", () => {
+    it("accepts a real value", async () => {
       const a = new Article({ title: "Hello" });
-      expect(a.isValid()).toBe(true);
+      expect(await a.isValid()).toBe(true);
     });
   });
 
@@ -45,17 +45,17 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("accepts null", () => {
-      expect(new Blank().isValid()).toBe(true);
+    it("accepts null", async () => {
+      expect(await new Blank().isValid()).toBe(true);
     });
 
-    it("accepts empty string", () => {
-      expect(new Blank({ name: "" }).isValid()).toBe(true);
+    it("accepts empty string", async () => {
+      expect(await new Blank({ name: "" }).isValid()).toBe(true);
     });
 
-    it("rejects a value", () => {
+    it("rejects a value", async () => {
       const b = new Blank({ name: "dean" });
-      expect(b.isValid()).toBe(false);
+      expect(await b.isValid()).toBe(false);
       expect(b.errors.get("name")).toContain("must be blank");
     });
   });
@@ -71,49 +71,49 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("validates length of using minimum", () => {
+    it("validates length of using minimum", async () => {
       const w = new WithLength({ name: "ab" });
-      expect(w.isValid()).toBe(false);
+      expect(await w.isValid()).toBe(false);
       expect(w.errors.get("name")[0]).toMatch(/is too short/);
     });
 
-    it("validates length of using maximum", () => {
+    it("validates length of using maximum", async () => {
       const w = new WithLength({ name: "abcdefghijk" });
-      expect(w.isValid()).toBe(false);
+      expect(await w.isValid()).toBe(false);
       expect(w.errors.get("name")[0]).toMatch(/is too long/);
     });
 
-    it("validates length of using within", () => {
-      expect(new WithLength({ name: "dean" }).isValid()).toBe(true);
+    it("validates length of using within", async () => {
+      expect(await new WithLength({ name: "dean" }).isValid()).toBe(true);
     });
 
-    it("validates length of using is", () => {
+    it("validates length of using is", async () => {
       class Exact extends Model {
         static {
           this.attribute("code", "string");
           this.validates("code", { length: { is: 4 } });
         }
       }
-      expect(new Exact({ code: "1234" }).isValid()).toBe(true);
-      expect(new Exact({ code: "123" }).isValid()).toBe(false);
-      expect(new Exact({ code: "12345" }).isValid()).toBe(false);
+      expect(await new Exact({ code: "1234" }).isValid()).toBe(true);
+      expect(await new Exact({ code: "123" }).isValid()).toBe(false);
+      expect(await new Exact({ code: "12345" }).isValid()).toBe(false);
     });
 
-    it("validates with in (range)", () => {
+    it("validates with in (range)", async () => {
       class WithRange extends Model {
         static {
           this.attribute("name", "string");
           this.validates("name", { length: { in: [2, 5] } });
         }
       }
-      expect(new WithRange({ name: "a" }).isValid()).toBe(false);
-      expect(new WithRange({ name: "ab" }).isValid()).toBe(true);
-      expect(new WithRange({ name: "abcde" }).isValid()).toBe(true);
-      expect(new WithRange({ name: "abcdef" }).isValid()).toBe(false);
+      expect(await new WithRange({ name: "a" }).isValid()).toBe(false);
+      expect(await new WithRange({ name: "ab" }).isValid()).toBe(true);
+      expect(await new WithRange({ name: "abcde" }).isValid()).toBe(true);
+      expect(await new WithRange({ name: "abcdef" }).isValid()).toBe(false);
     });
 
-    it("skips null values (null has no length)", () => {
-      expect(new WithLength({}).isValid()).toBe(true);
+    it("skips null values (null has no length)", async () => {
+      expect(await new WithLength({}).isValid()).toBe(true);
     });
   });
 
@@ -126,113 +126,113 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("default validates numericality of", () => {
-      expect(new Numeric({ value: "42" }).isValid()).toBe(true);
-      expect(new Numeric({ value: "3.14" }).isValid()).toBe(true);
+    it("default validates numericality of", async () => {
+      expect(await new Numeric({ value: "42" }).isValid()).toBe(true);
+      expect(await new Numeric({ value: "3.14" }).isValid()).toBe(true);
     });
 
-    it("rejects non-numeric strings", () => {
+    it("rejects non-numeric strings", async () => {
       const n = new Numeric({ value: "not a number" });
-      expect(n.isValid()).toBe(false);
+      expect(await n.isValid()).toBe(false);
       expect(n.errors.get("value")).toContain("is not a number");
     });
 
-    it("validates numericality of with nil allowed", () => {
+    it("validates numericality of with nil allowed", async () => {
       class NilOk extends Model {
         static {
           this.attribute("value", "string");
           this.validates("value", { numericality: { allowNil: true } });
         }
       }
-      expect(new NilOk({}).isValid()).toBe(true);
+      expect(await new NilOk({}).isValid()).toBe(true);
     });
 
-    it("validates numericality of only integers", () => {
+    it("validates numericality of only integers", async () => {
       class IntOnly extends Model {
         static {
           this.attribute("value", "string");
           this.validates("value", { numericality: { onlyInteger: true } });
         }
       }
-      expect(new IntOnly({ value: "42" }).isValid()).toBe(true);
-      expect(new IntOnly({ value: "3.14" }).isValid()).toBe(false);
+      expect(await new IntOnly({ value: "42" }).isValid()).toBe(true);
+      expect(await new IntOnly({ value: "3.14" }).isValid()).toBe(false);
     });
 
-    it("validates numericality with greater_than", () => {
+    it("validates numericality with greater_than", async () => {
       class GreaterThan extends Model {
         static {
           this.attribute("value", "integer");
           this.validates("value", { numericality: { greaterThan: 5 } });
         }
       }
-      expect(new GreaterThan({ value: 6 }).isValid()).toBe(true);
-      expect(new GreaterThan({ value: 5 }).isValid()).toBe(false);
+      expect(await new GreaterThan({ value: 6 }).isValid()).toBe(true);
+      expect(await new GreaterThan({ value: 5 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with greater_than_or_equal_to", () => {
+    it("validates numericality with greater_than_or_equal_to", async () => {
       class GreaterThanOrEqual extends Model {
         static {
           this.attribute("value", "integer");
           this.validates("value", { numericality: { greaterThanOrEqualTo: 5 } });
         }
       }
-      expect(new GreaterThanOrEqual({ value: 5 }).isValid()).toBe(true);
-      expect(new GreaterThanOrEqual({ value: 4 }).isValid()).toBe(false);
+      expect(await new GreaterThanOrEqual({ value: 5 }).isValid()).toBe(true);
+      expect(await new GreaterThanOrEqual({ value: 4 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with equal_to", () => {
+    it("validates numericality with equal_to", async () => {
       class EqualTo extends Model {
         static {
           this.attribute("value", "integer");
           this.validates("value", { numericality: { equalTo: 5 } });
         }
       }
-      expect(new EqualTo({ value: 5 }).isValid()).toBe(true);
-      expect(new EqualTo({ value: 4 }).isValid()).toBe(false);
+      expect(await new EqualTo({ value: 5 }).isValid()).toBe(true);
+      expect(await new EqualTo({ value: 4 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with less_than", () => {
+    it("validates numericality with less_than", async () => {
       class LessThan extends Model {
         static {
           this.attribute("value", "integer");
           this.validates("value", { numericality: { lessThan: 5 } });
         }
       }
-      expect(new LessThan({ value: 4 }).isValid()).toBe(true);
-      expect(new LessThan({ value: 5 }).isValid()).toBe(false);
+      expect(await new LessThan({ value: 4 }).isValid()).toBe(true);
+      expect(await new LessThan({ value: 5 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with less_than_or_equal_to", () => {
+    it("validates numericality with less_than_or_equal_to", async () => {
       class LessThanOrEqual extends Model {
         static {
           this.attribute("value", "integer");
           this.validates("value", { numericality: { lessThanOrEqualTo: 5 } });
         }
       }
-      expect(new LessThanOrEqual({ value: 5 }).isValid()).toBe(true);
-      expect(new LessThanOrEqual({ value: 6 }).isValid()).toBe(false);
+      expect(await new LessThanOrEqual({ value: 5 }).isValid()).toBe(true);
+      expect(await new LessThanOrEqual({ value: 6 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with odd", () => {
+    it("validates numericality with odd", async () => {
       class Odd extends Model {
         static {
           this.attribute("value", "integer");
           this.validates("value", { numericality: { odd: true } });
         }
       }
-      expect(new Odd({ value: 3 }).isValid()).toBe(true);
-      expect(new Odd({ value: 4 }).isValid()).toBe(false);
+      expect(await new Odd({ value: 3 }).isValid()).toBe(true);
+      expect(await new Odd({ value: 4 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with even", () => {
+    it("validates numericality with even", async () => {
       class Even extends Model {
         static {
           this.attribute("value", "integer");
           this.validates("value", { numericality: { even: true } });
         }
       }
-      expect(new Even({ value: 4 }).isValid()).toBe(true);
-      expect(new Even({ value: 3 }).isValid()).toBe(false);
+      expect(await new Even({ value: 4 }).isValid()).toBe(true);
+      expect(await new Even({ value: 3 }).isValid()).toBe(false);
     });
   });
 
@@ -248,19 +248,19 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("accepts included and non-excluded values", () => {
-      expect(new Colorful({ color: "red" }).isValid()).toBe(true);
+    it("accepts included and non-excluded values", async () => {
+      expect(await new Colorful({ color: "red" }).isValid()).toBe(true);
     });
 
-    it("rejects values not in inclusion list", () => {
+    it("rejects values not in inclusion list", async () => {
       const c = new Colorful({ color: "yellow" });
-      expect(c.isValid()).toBe(false);
+      expect(await c.isValid()).toBe(false);
       expect(c.errors.get("color")).toContain("is not included in the list");
     });
 
-    it("rejects values in exclusion list", () => {
+    it("rejects values in exclusion list", async () => {
       const c = new Colorful({ color: "black" });
-      expect(c.isValid()).toBe(false);
+      expect(await c.isValid()).toBe(false);
       expect(c.errors.get("color")).toContain("is reserved");
     });
   });
@@ -276,13 +276,13 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("accepts valid email", () => {
-      expect(new EmailUser({ email: "user@example.com" }).isValid()).toBe(true);
+    it("accepts valid email", async () => {
+      expect(await new EmailUser({ email: "user@example.com" }).isValid()).toBe(true);
     });
 
-    it("rejects invalid email", () => {
+    it("rejects invalid email", async () => {
       const u = new EmailUser({ email: "invalid" });
-      expect(u.isValid()).toBe(false);
+      expect(await u.isValid()).toBe(false);
       expect(u.errors.get("email")).toContain("is invalid");
     });
   });
@@ -297,15 +297,15 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("accepts matching password and confirmation", () => {
-      expect(new Signup({ password: "secret", passwordConfirmation: "secret" }).isValid()).toBe(
-        true,
-      );
+    it("accepts matching password and confirmation", async () => {
+      expect(
+        await new Signup({ password: "secret", passwordConfirmation: "secret" }).isValid(),
+      ).toBe(true);
     });
 
-    it("rejects mismatched password and confirmation", () => {
+    it("rejects mismatched password and confirmation", async () => {
       const s = new Signup({ password: "secret", passwordConfirmation: "wrong" });
-      expect(s.isValid()).toBe(false);
+      expect(await s.isValid()).toBe(false);
       expect(s.errors.get("passwordConfirmation")).toContain("doesn't match Password");
     });
   });
@@ -323,8 +323,8 @@ describe("ValidationsTest", () => {
         });
       }
 
-      override isValid(): boolean {
-        const valid = super.isValid();
+      override async isValid(): Promise<boolean> {
+        const valid = await super.isValid();
         if (!valid) return false;
         const name = this.readAttribute("name") as string;
         if (UniqueUser.existingNames.has(name)) {
@@ -336,18 +336,18 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("accepts unique names", () => {
+    it("accepts unique names", async () => {
       UniqueUser.existingNames.clear();
-      expect(new UniqueUser({ name: "alice" }).isValid()).toBe(true);
-      expect(new UniqueUser({ name: "bob" }).isValid()).toBe(true);
+      expect(await new UniqueUser({ name: "alice" }).isValid()).toBe(true);
+      expect(await new UniqueUser({ name: "bob" }).isValid()).toBe(true);
     });
 
-    it("rejects duplicate names", () => {
+    it("rejects duplicate names", async () => {
       UniqueUser.existingNames.clear();
       const first = new UniqueUser({ name: "alice" });
       const second = new UniqueUser({ name: "alice" });
-      expect(first.isValid()).toBe(true);
-      expect(second.isValid()).toBe(false);
+      expect(await first.isValid()).toBe(true);
+      expect(await second.isValid()).toBe(false);
       expect(second.errors.get("name")).toContain("has already been taken");
     });
   });
@@ -363,19 +363,19 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("accepts valid types", () => {
-      expect(new TypedModel({ age: 30, email: "test@example.com" }).isValid()).toBe(true);
+    it("accepts valid types", async () => {
+      expect(await new TypedModel({ age: 30, email: "test@example.com" }).isValid()).toBe(true);
     });
 
-    it("rejects invalid types", () => {
+    it("rejects invalid types", async () => {
       const m = new TypedModel({ age: "not a number", email: "" } as any);
-      expect(m.isValid()).toBe(false);
+      expect(await m.isValid()).toBe(false);
       expect(m.errors.get("age").length).toBeGreaterThan(0);
       expect(m.errors.get("email").length).toBeGreaterThan(0);
     });
   });
 
-  it("single field validation", () => {
+  it("single field validation", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -383,11 +383,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name").length).toBeGreaterThan(0);
   });
 
-  it("single attr validation and error msg", () => {
+  it("single attr validation and error msg", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -395,11 +395,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.fullMessages.length).toBeGreaterThan(0);
   });
 
-  it("double attr validation and error msg", () => {
+  it("double attr validation and error msg", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -409,11 +409,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.fullMessages.length).toBe(2);
   });
 
-  it("errors on base", () => {
+  it("errors on base", async () => {
     class Person extends Model {
       static {
         this.validate((record: any) => {
@@ -422,7 +422,7 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.fullMessages).toContain("Model is invalid");
   });
 
@@ -437,7 +437,7 @@ describe("ValidationsTest", () => {
     expect(p.errors.empty).toBe(true);
   });
 
-  it("validates each", () => {
+  it("validates each", async () => {
     class Person extends Model {
       static {
         this.attribute("price", "integer");
@@ -450,11 +450,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({ price: -5, discount: 10 });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.fullMessages).toContain("Price must be non-negative");
   });
 
-  it("validate block", () => {
+  it("validate block", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -465,11 +465,11 @@ describe("ValidationsTest", () => {
         });
       }
     }
-    expect(new Person({ name: "INVALID" }).isValid()).toBe(false);
-    expect(new Person({ name: "valid" }).isValid()).toBe(true);
+    expect(await new Person({ name: "INVALID" }).isValid()).toBe(false);
+    expect(await new Person({ name: "valid" }).isValid()).toBe(true);
   });
 
-  it("validate block with params", () => {
+  it("validate block with params", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -480,21 +480,21 @@ describe("ValidationsTest", () => {
         });
       }
     }
-    expect(new Person({}).isValid()).toBe(false);
+    expect(await new Person({}).isValid()).toBe(false);
   });
 
-  it("invalid should be the opposite of valid", () => {
+  it("invalid should be the opposite of valid", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
       }
     }
-    expect(new Person({}).isInvalid()).toBe(true);
-    expect(new Person({ name: "Alice" }).isInvalid()).toBe(false);
+    expect(await new Person({}).isInvalid()).toBe(true);
+    expect(await new Person({ name: "Alice" }).isInvalid()).toBe(false);
   });
 
-  it("validation order", () => {
+  it("validation order", async () => {
     const order: string[] = [];
     class Person extends Model {
       static {
@@ -508,39 +508,39 @@ describe("ValidationsTest", () => {
         });
       }
     }
-    new Person({}).isValid();
+    await new Person({}).isValid();
     expect(order).toEqual(["name_check", "email_check"]);
   });
 
-  it("validation with if and on", () => {
+  it("validation with if and on", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, on: "create", if: () => true });
       }
     }
-    expect(new Person({}).isValid()).toBe(true); // no context
-    expect(new Person({}).isValid("create")).toBe(false); // with context
+    expect(await new Person({}).isValid()).toBe(true); // no context
+    expect(await new Person({}).isValid("create")).toBe(false); // with context
   });
 
-  it("strict validation in validates", () => {
+  it("strict validation in validates", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, strict: true });
       }
     }
-    expect(() => new Person({}).isValid()).toThrow();
+    await expect(new Person({}).isValid()).rejects.toThrow();
   });
 
-  it("strict validation not fails", () => {
+  it("strict validation not fails", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true, strict: true });
       }
     }
-    expect(new Person({ name: "Alice" }).isValid()).toBe(true);
+    expect(await new Person({ name: "Alice" }).isValid()).toBe(true);
   });
 
   it("list of validators for model", () => {
@@ -574,18 +574,18 @@ describe("ValidationsTest", () => {
     expect(Person.validatorsOn("name").length).toBe(0);
   });
 
-  it("validate with bang", () => {
+  it("validate with bang", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
       }
     }
-    expect(() => new Person({}).validateBang()).toThrow();
-    expect(new Person({ name: "Alice" }).validateBang()).toBe(true);
+    await expect(new Person({}).validateBang()).rejects.toThrow();
+    expect(await new Person({ name: "Alice" }).validateBang()).toBe(true);
   });
 
-  it("errors to json", () => {
+  it("errors to json", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -593,7 +593,7 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     const json = p.errors.asJson();
     expect(json.name.length).toBeGreaterThan(0);
   });
@@ -609,7 +609,7 @@ describe("ValidationsTest", () => {
     expect(opts).toEqual({ presence: true });
   });
 
-  it("validates with false hash value", () => {
+  it("validates with false hash value", async () => {
     // When presence is false, no validation should be added
     class Person extends Model {
       static {
@@ -617,10 +617,10 @@ describe("ValidationsTest", () => {
       }
     }
     Person.validates("name", { presence: false });
-    expect(new Person({}).isValid()).toBe(true);
+    expect(await new Person({}).isValid()).toBe(true);
   });
 
-  it("multiple errors per attr iteration with full error composition", () => {
+  it("multiple errors per attr iteration with full error composition", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -628,11 +628,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({ name: "" });
-    p.isValid();
+    await p.isValid();
     expect(p.errors.fullMessages.length).toBeGreaterThanOrEqual(1);
   });
 
-  it("errors on base with symbol message", () => {
+  it("errors on base with symbol message", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -642,11 +642,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person();
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("base")).toContain("Model is invalid");
   });
 
-  it("validates with bang", () => {
+  it("validates with bang", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -654,10 +654,10 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person();
-    expect(() => p.validateBang()).toThrow(/Validation failed/);
+    await expect(p.validateBang()).rejects.toThrow(/Validation failed/);
   });
 
-  it("validate with bang and context", () => {
+  it("validate with bang and context", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -665,10 +665,10 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person();
-    expect(() => p.validateBang()).toThrow(/Validation failed/);
+    await expect(p.validateBang()).rejects.toThrow(/Validation failed/);
   });
 
-  it("strict validation error message", () => {
+  it("strict validation error message", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -676,11 +676,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person();
-    p.isValid();
+    await p.isValid();
     expect(p.errors.fullMessages.join(", ")).toContain("can't be blank");
   });
 
-  it("validation with message as proc that takes a record as a parameter", () => {
+  it("validation with message as proc that takes a record as a parameter", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -690,11 +690,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person();
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("name")).toContain("Person name is required");
   });
 
-  it("frozen models can be validated", () => {
+  it("frozen models can be validated", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -704,10 +704,10 @@ describe("ValidationsTest", () => {
     const p = new Person({ name: "Alice" });
     // We can't truly freeze JS objects with Maps inside,
     // but we can verify validation works after model creation
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("dup validity is independent", () => {
+  it("dup validity is independent", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -716,11 +716,11 @@ describe("ValidationsTest", () => {
     }
     const p1 = new Person({ name: "Alice" });
     const p2 = new Person();
-    expect(p1.isValid()).toBe(true);
-    expect(p2.isValid()).toBe(false);
+    expect(await p1.isValid()).toBe(true);
+    expect(await p2.isValid()).toBe(false);
   });
 
-  it("errors on nested attributes expands name", () => {
+  it("errors on nested attributes expands name", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -728,11 +728,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.fullMessages).toContain("Name can't be blank");
   });
 
-  it("validates each custom reader", () => {
+  it("validates each custom reader", async () => {
     // Mirrors Rails' CustomReader: validation reads attribute values through
     // an overridden `read_attribute_for_validation`, not the model's own store.
     class Person extends Model {
@@ -749,12 +749,12 @@ describe("ValidationsTest", () => {
     });
     const p = new Person({ name: "ignored" });
     p.data = { name: "" };
-    p.isValid();
+    await p.isValid();
     // The empty value comes from `data`, proving the override drove the read.
     expect(p.errors.get("name")).toContain("gotcha");
   });
 
-  it("validates an undeclared getter via the send default", () => {
+  it("validates an undeclared getter via the send default", async () => {
     // Rails' default `read_attribute_for_validation` is `send`, so a plain
     // getter with no declared attribute is read by its accessor, not nil.
     class Person extends Model {
@@ -769,10 +769,10 @@ describe("ValidationsTest", () => {
       if (!value) record.errors.add(attr, "gotcha");
     });
     const present = new Person({ first: "Al" });
-    present.isValid();
+    await present.isValid();
     expect(present.errors.get("fullName")).not.toContain("gotcha");
     const blank = new Person({ first: "" });
-    blank.isValid();
+    await blank.isValid();
     expect(blank.errors.get("fullName")).toContain("gotcha");
   });
 
@@ -841,7 +841,7 @@ describe("ValidationsTest", () => {
     expect(() => Person.validates("name", {})).not.toThrow();
   });
 
-  it("callback options to validate", () => {
+  it("callback options to validate", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -849,8 +849,8 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    expect(p.isValid()).toBe(true);
-    expect(p.isValid("create")).toBe(false);
+    expect(await p.isValid()).toBe(true);
+    expect(await p.isValid("create")).toBe(false);
   });
 
   it("accessing instance of validator on an attribute", () => {
@@ -863,7 +863,7 @@ describe("ValidationsTest", () => {
     expect(Person.validatorsOn("name").length).toBeGreaterThan(0);
   });
 
-  it("strict validation in custom validator helper", () => {
+  it("strict validation in custom validator helper", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -871,10 +871,10 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    expect(() => p.isValid()).toThrow();
+    await expect(p.isValid()).rejects.toThrow();
   });
 
-  it("validation with message as proc that takes record and data as a parameters", () => {
+  it("validation with message as proc that takes record and data as a parameters", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -886,11 +886,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({});
-    p.isValid();
+    await p.isValid();
     expect(p.errors.get("name")[0]).toContain("needs a name");
   });
 
-  it("validations some with except", () => {
+  it("validations some with except", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -901,7 +901,7 @@ describe("ValidationsTest", () => {
     }
     const p = new Person({ age: "abc" });
     // Without context, only name validation runs
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
   });
 
   it("validates format of with multiline regexp should raise error", () => {
@@ -926,7 +926,7 @@ describe("ValidationsTest", () => {
     }).toThrow(/with.*without/i);
   });
 
-  it("validations on the instance level", () => {
+  it("validations on the instance level", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -938,11 +938,11 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person({ name: "invalid" });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toEqual(["is not allowed"]);
   });
 
-  it("validate with except on", () => {
+  it("validate with except on", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -951,12 +951,12 @@ describe("ValidationsTest", () => {
     }
     const p = new Person();
     // Without context, "on: create" validations should not run
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
     // With matching context, they should run
-    expect(p.isValid("create")).toBe(false);
+    expect(await p.isValid("create")).toBe(false);
   });
 
-  it("frozen models can be validated", () => {
+  it("frozen models can be validated", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -966,10 +966,10 @@ describe("ValidationsTest", () => {
     const p = new Person({ name: "Alice" });
     // Object.freeze doesn't prevent our validation from reading
     // (we can't truly freeze a Model, but we can test that validation works)
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 
-  it("dup validity is independent", () => {
+  it("dup validity is independent", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -978,13 +978,13 @@ describe("ValidationsTest", () => {
     }
     const p1 = new Person({ name: "Alice" });
     const p2 = new Person();
-    expect(p1.isValid()).toBe(true);
-    expect(p2.isValid()).toBe(false);
+    expect(await p1.isValid()).toBe(true);
+    expect(await p2.isValid()).toBe(false);
     // p1's validity should not be affected by p2
     expect(p1.errors.empty).toBe(true);
   });
 
-  it("validation with message as proc", () => {
+  it("validation with message as proc", async () => {
     class Person extends Model {
       static {
         this.attribute("name", "string");
@@ -996,7 +996,7 @@ describe("ValidationsTest", () => {
       }
     }
     const p = new Person();
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.get("name")).toEqual(["name is required for record"]);
   });
 
@@ -1015,7 +1015,7 @@ describe("ValidationsTest", () => {
     expect(authorValidators.length).toBe(1);
   });
 
-  it("validate", () => {
+  it("validate", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
@@ -1027,28 +1027,28 @@ describe("ValidationsTest", () => {
     });
     const topic = new Topic({});
     expect(topic.errors.empty).toBe(true);
-    topic.validate();
+    await topic.validate();
     expect(topic.errors.get("title")).toContain("can't be blank");
   });
 
-  it("strict validation particular validator", () => {
+  it("strict validation particular validator", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true, strict: true });
       }
     }
-    expect(() => new Topic({}).isValid()).toThrow();
+    await expect(new Topic({}).isValid()).rejects.toThrow();
   });
 
-  it("strict validation custom exception", () => {
+  it("strict validation custom exception", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
         this.validates("title", { presence: true, strict: true });
       }
     }
-    expect(() => new Topic({}).isValid()).toThrow(/title/i);
+    await expect(new Topic({}).isValid()).rejects.toThrow(/title/i);
   });
 
   describe("return-shape parity", () => {
@@ -1059,12 +1059,12 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("validate returns boolean (Rails alias_method :validate, :valid?)", () => {
-      expect(new Topic({ title: "ok" }).validate()).toBe(true);
-      expect(new Topic({}).validate()).toBe(false);
+    it("validate returns boolean (Rails alias_method :validate, :valid?)", async () => {
+      expect(await new Topic({ title: "ok" }).validate()).toBe(true);
+      expect(await new Topic({}).validate()).toBe(false);
     });
 
-    it("invalid? accepts a context argument", () => {
+    it("invalid? accepts a context argument", async () => {
       class Scoped extends Model {
         static {
           this.attribute("name", "string");
@@ -1072,16 +1072,16 @@ describe("ValidationsTest", () => {
         }
       }
       const s = new Scoped({});
-      expect(s.isInvalid()).toBe(false);
-      expect(s.isInvalid("create")).toBe(true);
+      expect(await s.isInvalid()).toBe(false);
+      expect(await s.isInvalid("create")).toBe(true);
     });
 
-    it("validate! returns true and raises otherwise (never returns false)", () => {
-      expect(new Topic({ title: "ok" }).validateBang()).toBe(true);
-      expect(() => new Topic({}).validateBang()).toThrow(/Validation failed/);
+    it("validate! returns true and raises otherwise (never returns false)", async () => {
+      expect(await new Topic({ title: "ok" }).validateBang()).toBe(true);
+      await expect(new Topic({}).validateBang()).rejects.toThrow(/Validation failed/);
     });
 
-    it("validate! forwards context to valid?", () => {
+    it("validate! forwards context to valid?", async () => {
       // Rails validations.rb:417-419 — `valid?(context) || raise_validation_error`.
       class Scoped extends Model {
         static {
@@ -1090,12 +1090,12 @@ describe("ValidationsTest", () => {
         }
       }
       // No context → default context → no validators active → passes.
-      expect(new Scoped({}).validateBang()).toBe(true);
+      expect(await new Scoped({}).validateBang()).toBe(true);
       // :create context → presence validator active → raises.
-      expect(() => new Scoped({}).validateBang("create")).toThrow(/Validation failed/);
+      await expect(new Scoped({}).validateBang("create")).rejects.toThrow(/Validation failed/);
     });
 
-    it("valid? accepts an array context that matches :on-registered validators", () => {
+    it("valid? accepts an array context that matches :on-registered validators", async () => {
       // Rails `predicate_for_validation_context` (validations.rb:294-306)
       // intersects the registered `on:` set with the model's current
       // context — either side may be a single symbol or an array.
@@ -1109,33 +1109,33 @@ describe("ValidationsTest", () => {
       }
       // Single-symbol context → only the `on: :create` validator fires.
       const a = new Scoped({});
-      expect(a.isValid("create")).toBe(false);
+      expect(await a.isValid("create")).toBe(false);
       expect(a.errors.attributeNames).toEqual(["name"]);
 
       // Array context → both validators fire (Rails: intersection).
       const b = new Scoped({});
-      expect(b.isValid(["create", "publish"])).toBe(false);
+      expect(await b.isValid(["create", "publish"])).toBe(false);
       expect(b.errors.attributeNames.sort()).toEqual(["name", "title"]);
 
       // Array context matching only one registered value fires that one.
       const c = new Scoped({});
-      expect(c.isValid(["publish"])).toBe(false);
+      expect(await c.isValid(["publish"])).toBe(false);
       expect(c.errors.attributeNames).toEqual(["title"]);
     });
 
-    it("on: [array] validator fires when current context is a single symbol in the set", () => {
+    it("on: [array] validator fires when current context is a single symbol in the set", async () => {
       class Scoped extends Model {
         static {
           this.attribute("name", "string");
           this.validates("name", { presence: true, on: ["create", "publish"] });
         }
       }
-      expect(new Scoped({}).isValid("create")).toBe(false);
-      expect(new Scoped({}).isValid("publish")).toBe(false);
-      expect(new Scoped({}).isValid("unrelated")).toBe(true);
+      expect(await new Scoped({}).isValid("create")).toBe(false);
+      expect(await new Scoped({}).isValid("publish")).toBe(false);
+      expect(await new Scoped({}).isValid("unrelated")).toBe(true);
     });
 
-    it("validationContext round-trips array contexts while a validation is in flight", () => {
+    it("validationContext round-trips array contexts while a validation is in flight", async () => {
       // Rails `validation_context` surfaces whatever context is currently
       // set — when called inside a validator with an array context, it
       // returns the array.
@@ -1148,11 +1148,11 @@ describe("ValidationsTest", () => {
           });
         }
       }
-      new Scoped({}).isValid(["create", "publish"]);
+      await new Scoped({}).isValid(["create", "publish"]);
       expect(captured).toEqual([["create", "publish"]]);
     });
 
-    it("valid?(null) clears the context (Rails sets it to nil on entry)", () => {
+    it("valid?(null) clears the context (Rails sets it to nil on entry)", async () => {
       // Rails `valid?(context = nil)` always assigns
       // `context_for_validation.context = context` — passing nil clears.
       const captured: Array<string | string[] | null> = [];
@@ -1165,14 +1165,14 @@ describe("ValidationsTest", () => {
         }
       }
       const m = new Scoped({});
-      m.isValid("previous");
-      m.isValid(null);
+      await m.isValid("previous");
+      await m.isValid(null);
       // First call saw "previous"; second call saw null (explicit clear),
       // not "previous" carried over.
       expect(captured).toEqual(["previous", null]);
     });
 
-    it("valid? restores previous context in ensure/finally even on failure", () => {
+    it("valid? restores previous context in ensure/finally even on failure", async () => {
       // Rails validations.rb:361-368 uses `ensure` to restore context.
       class Scoped extends Model {
         static {
@@ -1182,7 +1182,7 @@ describe("ValidationsTest", () => {
       }
       const m = new Scoped({});
       const before = m.validationContext;
-      m.isValid("custom");
+      await m.isValid("custom");
       expect(m.validationContext).toBe(before);
     });
   });
@@ -1195,10 +1195,10 @@ describe("ValidationsTest", () => {
       }
     }
 
-    it("ValidationError message comes from I18n :model_invalid", () => {
+    it("ValidationError message comes from I18n :model_invalid", async () => {
       // Default en → "Validation failed: %{errors}"
       // (activemodel locale/en.yml:9).
-      expect(() => new Topic({}).validateBang()).toThrow(
+      await expect(new Topic({}).validateBang()).rejects.toThrow(
         /^Validation failed: Title can't be blank$/,
       );
     });
@@ -1213,7 +1213,7 @@ describe("ValidationsTest", () => {
         },
       });
       try {
-        expect(() => new Topic({}).validateBang()).toThrow(/^Nope: /);
+        await expect(new Topic({}).validateBang()).rejects.toThrow(/^Nope: /);
       } finally {
         I18n.reset();
       }
@@ -1409,7 +1409,7 @@ describe("ValidationsTest", () => {
   });
 });
 describe("validatesEach", () => {
-  it("validates each", () => {
+  it("validates each", async () => {
     class Payment extends Model {
       static {
         this.attribute("price", "integer");
@@ -1423,18 +1423,18 @@ describe("validatesEach", () => {
     }
 
     const p = new Payment({ price: -5, discount: 10 });
-    expect(p.isValid()).toBe(false);
+    expect(await p.isValid()).toBe(false);
     expect(p.errors.fullMessages).toContain("Price must be non-negative");
 
     const p2 = new Payment({ price: 5, discount: -3 });
-    expect(p2.isValid()).toBe(false);
+    expect(await p2.isValid()).toBe(false);
     expect(p2.errors.fullMessages).toContain("Discount must be non-negative");
 
     const p3 = new Payment({ price: 5, discount: 10 });
-    expect(p3.isValid()).toBe(true);
+    expect(await p3.isValid()).toBe(true);
   });
 
-  it("supports conditional options", () => {
+  it("supports conditional options", async () => {
     class Payment extends Model {
       static {
         this.attribute("price", "integer");
@@ -1457,12 +1457,12 @@ describe("validatesEach", () => {
     }
 
     const p = new Payment({ price: null, discount: -3 });
-    expect(p.isValid()).toBe(true);
+    expect(await p.isValid()).toBe(true);
   });
 });
 
 describe("validatesWith", () => {
-  it("validation with class that adds errors", () => {
+  it("validation with class that adds errors", async () => {
     class EvenValidator {
       validate(record: any) {
         const val = record.readAttribute("count");
@@ -1480,14 +1480,14 @@ describe("validatesWith", () => {
     }
 
     const item = new Item({ count: 3 });
-    expect(item.isValid()).toBe(false);
+    expect(await item.isValid()).toBe(false);
     expect(item.errors.fullMessages).toContain("Count must be even");
 
     const item2 = new Item({ count: 4 });
-    expect(item2.isValid()).toBe(true);
+    expect(await item2.isValid()).toBe(true);
   });
 
-  it("passes all configuration options to the validator class", () => {
+  it("passes all configuration options to the validator class", async () => {
     class ThresholdValidator {
       threshold: number;
       constructor(options: any = {}) {
@@ -1511,14 +1511,14 @@ describe("validatesWith", () => {
     }
 
     const g = new Game({ score: 30 });
-    expect(g.isValid()).toBe(false);
+    expect(await g.isValid()).toBe(false);
     expect(g.errors.fullMessages).toContain("Score must be at least 50");
 
     const g2 = new Game({ score: 60 });
-    expect(g2.isValid()).toBe(true);
+    expect(await g2.isValid()).toBe(true);
   });
 
-  it("supports conditional options", () => {
+  it("supports conditional options", async () => {
     class AlwaysInvalidValidator {
       validate(record: any) {
         record.errors.add("base", "invalid", { message: "always invalid" });
@@ -1535,10 +1535,10 @@ describe("validatesWith", () => {
     }
 
     const w = new Widget({ active: false });
-    expect(w.isValid()).toBe(true);
+    expect(await w.isValid()).toBe(true);
 
     const w2 = new Widget({ active: true });
-    expect(w2.isValid()).toBe(false);
+    expect(await w2.isValid()).toBe(false);
   });
 });
 describe("Validations", () => {
@@ -1551,25 +1551,25 @@ describe("Validations", () => {
       }
     }
 
-    it("rejects null", () => {
+    it("rejects null", async () => {
       const a = new Article();
-      expect(a.isValid()).toBe(false);
+      expect(await a.isValid()).toBe(false);
       expect(a.errors.get("title")).toContain("can't be blank");
     });
 
-    it("rejects empty string", () => {
+    it("rejects empty string", async () => {
       const a = new Article({ title: "" });
-      expect(a.isValid()).toBe(false);
+      expect(await a.isValid()).toBe(false);
     });
 
-    it("rejects whitespace-only string", () => {
+    it("rejects whitespace-only string", async () => {
       const a = new Article({ title: "   " });
-      expect(a.isValid()).toBe(false);
+      expect(await a.isValid()).toBe(false);
     });
 
-    it("accepts a real value", () => {
+    it("accepts a real value", async () => {
       const a = new Article({ title: "Hello" });
-      expect(a.isValid()).toBe(true);
+      expect(await a.isValid()).toBe(true);
     });
   });
 
@@ -1582,17 +1582,17 @@ describe("Validations", () => {
       }
     }
 
-    it("accepts null", () => {
-      expect(new Blank().isValid()).toBe(true);
+    it("accepts null", async () => {
+      expect(await new Blank().isValid()).toBe(true);
     });
 
-    it("accepts empty string", () => {
-      expect(new Blank({ name: "" }).isValid()).toBe(true);
+    it("accepts empty string", async () => {
+      expect(await new Blank({ name: "" }).isValid()).toBe(true);
     });
 
-    it("rejects a value", () => {
+    it("rejects a value", async () => {
       const b = new Blank({ name: "dean" });
-      expect(b.isValid()).toBe(false);
+      expect(await b.isValid()).toBe(false);
       expect(b.errors.get("name")).toContain("must be blank");
     });
   });
@@ -1608,49 +1608,49 @@ describe("Validations", () => {
       }
     }
 
-    it("validates length of using minimum", () => {
+    it("validates length of using minimum", async () => {
       const w = new WithLength({ name: "ab" });
-      expect(w.isValid()).toBe(false);
+      expect(await w.isValid()).toBe(false);
       expect(w.errors.get("name")[0]).toMatch(/is too short/);
     });
 
-    it("validates length of using maximum", () => {
+    it("validates length of using maximum", async () => {
       const w = new WithLength({ name: "abcdefghijk" });
-      expect(w.isValid()).toBe(false);
+      expect(await w.isValid()).toBe(false);
       expect(w.errors.get("name")[0]).toMatch(/is too long/);
     });
 
-    it("validates length of using within", () => {
-      expect(new WithLength({ name: "dean" }).isValid()).toBe(true);
+    it("validates length of using within", async () => {
+      expect(await new WithLength({ name: "dean" }).isValid()).toBe(true);
     });
 
-    it("validates length of using is", () => {
+    it("validates length of using is", async () => {
       class Exact extends Model {
         static {
           this.attribute("code", "string");
           this.validates("code", { length: { is: 4 } });
         }
       }
-      expect(new Exact({ code: "1234" }).isValid()).toBe(true);
-      expect(new Exact({ code: "123" }).isValid()).toBe(false);
-      expect(new Exact({ code: "12345" }).isValid()).toBe(false);
+      expect(await new Exact({ code: "1234" }).isValid()).toBe(true);
+      expect(await new Exact({ code: "123" }).isValid()).toBe(false);
+      expect(await new Exact({ code: "12345" }).isValid()).toBe(false);
     });
 
-    it("validates with in (range)", () => {
+    it("validates with in (range)", async () => {
       class WithRange extends Model {
         static {
           this.attribute("name", "string");
           this.validates("name", { length: { in: [2, 5] } });
         }
       }
-      expect(new WithRange({ name: "a" }).isValid()).toBe(false);
-      expect(new WithRange({ name: "ab" }).isValid()).toBe(true);
-      expect(new WithRange({ name: "abcde" }).isValid()).toBe(true);
-      expect(new WithRange({ name: "abcdef" }).isValid()).toBe(false);
+      expect(await new WithRange({ name: "a" }).isValid()).toBe(false);
+      expect(await new WithRange({ name: "ab" }).isValid()).toBe(true);
+      expect(await new WithRange({ name: "abcde" }).isValid()).toBe(true);
+      expect(await new WithRange({ name: "abcdef" }).isValid()).toBe(false);
     });
 
-    it("skips null values (null has no length)", () => {
-      expect(new WithLength({}).isValid()).toBe(true);
+    it("skips null values (null has no length)", async () => {
+      expect(await new WithLength({}).isValid()).toBe(true);
     });
   });
 
@@ -1663,82 +1663,82 @@ describe("Validations", () => {
       }
     }
 
-    it("default validates numericality of", () => {
-      expect(new Numeric({ value: "42" }).isValid()).toBe(true);
-      expect(new Numeric({ value: "3.14" }).isValid()).toBe(true);
+    it("default validates numericality of", async () => {
+      expect(await new Numeric({ value: "42" }).isValid()).toBe(true);
+      expect(await new Numeric({ value: "3.14" }).isValid()).toBe(true);
     });
 
-    it("rejects non-numeric strings", () => {
+    it("rejects non-numeric strings", async () => {
       const n = new Numeric({ value: "not a number" });
-      expect(n.isValid()).toBe(false);
+      expect(await n.isValid()).toBe(false);
       expect(n.errors.get("value")).toContain("is not a number");
     });
 
-    it("validates numericality of with nil allowed", () => {
+    it("validates numericality of with nil allowed", async () => {
       class NilOk extends Model {
         static {
           this.attribute("count", "string");
           this.validates("count", { numericality: { allowNil: true } });
         }
       }
-      expect(new NilOk({}).isValid()).toBe(true);
+      expect(await new NilOk({}).isValid()).toBe(true);
     });
 
-    it("validates numericality of with integer only", () => {
+    it("validates numericality of with integer only", async () => {
       class IntOnly extends Model {
         static {
           this.attribute("count", "string");
           this.validates("count", { numericality: { onlyInteger: true } });
         }
       }
-      expect(new IntOnly({ count: "5" }).isValid()).toBe(true);
+      expect(await new IntOnly({ count: "5" }).isValid()).toBe(true);
       const f = new IntOnly({ count: "5.5" });
-      expect(f.isValid()).toBe(false);
+      expect(await f.isValid()).toBe(false);
       expect(f.errors.get("count")).toContain("must be an integer");
     });
 
-    it("validates numericality with greater than", () => {
+    it("validates numericality with greater than", async () => {
       class GT extends Model {
         static {
           this.attribute("age", "integer");
           this.validates("age", { numericality: { greaterThan: 0 } });
         }
       }
-      expect(new GT({ age: 1 }).isValid()).toBe(true);
-      expect(new GT({ age: 0 }).isValid()).toBe(false);
+      expect(await new GT({ age: 1 }).isValid()).toBe(true);
+      expect(await new GT({ age: 0 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with less than", () => {
+    it("validates numericality with less than", async () => {
       class LT extends Model {
         static {
           this.attribute("rating", "integer");
           this.validates("rating", { numericality: { lessThan: 10 } });
         }
       }
-      expect(new LT({ rating: 9 }).isValid()).toBe(true);
-      expect(new LT({ rating: 10 }).isValid()).toBe(false);
+      expect(await new LT({ rating: 9 }).isValid()).toBe(true);
+      expect(await new LT({ rating: 10 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with odd", () => {
+    it("validates numericality with odd", async () => {
       class Odd extends Model {
         static {
           this.attribute("n", "integer");
           this.validates("n", { numericality: { odd: true } });
         }
       }
-      expect(new Odd({ n: 3 }).isValid()).toBe(true);
-      expect(new Odd({ n: 4 }).isValid()).toBe(false);
+      expect(await new Odd({ n: 3 }).isValid()).toBe(true);
+      expect(await new Odd({ n: 4 }).isValid()).toBe(false);
     });
 
-    it("validates numericality with even", () => {
+    it("validates numericality with even", async () => {
       class Even extends Model {
         static {
           this.attribute("n", "integer");
           this.validates("n", { numericality: { even: true } });
         }
       }
-      expect(new Even({ n: 4 }).isValid()).toBe(true);
-      expect(new Even({ n: 3 }).isValid()).toBe(false);
+      expect(await new Even({ n: 4 }).isValid()).toBe(true);
+      expect(await new Even({ n: 3 }).isValid()).toBe(false);
     });
   });
 
@@ -1751,13 +1751,13 @@ describe("Validations", () => {
       }
     }
 
-    it("validates inclusion of", () => {
-      expect(new Status({ status: "draft" }).isValid()).toBe(true);
+    it("validates inclusion of", async () => {
+      expect(await new Status({ status: "draft" }).isValid()).toBe(true);
     });
 
-    it("rejects non-included values", () => {
+    it("rejects non-included values", async () => {
       const s = new Status({ status: "invalid" });
-      expect(s.isValid()).toBe(false);
+      expect(await s.isValid()).toBe(false);
       expect(s.errors.get("status")).toContain("is not included in the list");
     });
   });
@@ -1770,13 +1770,13 @@ describe("Validations", () => {
       }
     }
 
-    it("accepts non-excluded values", () => {
-      expect(new NoAdmin({ role: "user" }).isValid()).toBe(true);
+    it("accepts non-excluded values", async () => {
+      expect(await new NoAdmin({ role: "user" }).isValid()).toBe(true);
     });
 
-    it("validates exclusion of", () => {
+    it("validates exclusion of", async () => {
       const n = new NoAdmin({ role: "admin" });
-      expect(n.isValid()).toBe(false);
+      expect(await n.isValid()).toBe(false);
       expect(n.errors.get("role")).toContain("is reserved");
     });
   });
@@ -1790,17 +1790,17 @@ describe("Validations", () => {
       }
     }
 
-    it("validate format", () => {
-      expect(new Email({ email: "dean@example.com" }).isValid()).toBe(true);
+    it("validate format", async () => {
+      expect(await new Email({ email: "dean@example.com" }).isValid()).toBe(true);
     });
 
-    it("rejects non-matching format", () => {
+    it("rejects non-matching format", async () => {
       const e = new Email({ email: "not-an-email" });
-      expect(e.isValid()).toBe(false);
+      expect(await e.isValid()).toBe(false);
       expect(e.errors.get("email")).toContain("is invalid");
     });
 
-    it("skips null", () => {
+    it("skips null", async () => {
       // Rails format validator does NOT auto-skip nil — opt in via
       // allow_nil: true (matches EachValidator's allow_nil dispatch).
       class NilSkippingEmail extends Model {
@@ -1811,7 +1811,7 @@ describe("Validations", () => {
           });
         }
       }
-      expect(new NilSkippingEmail({}).isValid()).toBe(true);
+      expect(await new NilSkippingEmail({}).isValid()).toBe(true);
     });
   });
 
@@ -1828,17 +1828,17 @@ describe("Validations", () => {
       }
     }
 
-    it("terms of service agreement", () => {
-      expect(new Terms({ accepted: "1" }).isValid()).toBe(true);
-      expect(new Terms({ accepted: true }).isValid()).toBe(true);
+    it("terms of service agreement", async () => {
+      expect(await new Terms({ accepted: "1" }).isValid()).toBe(true);
+      expect(await new Terms({ accepted: true }).isValid()).toBe(true);
     });
 
-    it("terms of service agreement no acceptance", () => {
-      expect(new Terms({ accepted: "0" }).isValid()).toBe(false);
-      expect(new Terms({ accepted: false }).isValid()).toBe(false);
+    it("terms of service agreement no acceptance", async () => {
+      expect(await new Terms({ accepted: "0" }).isValid()).toBe(false);
+      expect(await new Terms({ accepted: false }).isValid()).toBe(false);
     });
 
-    it("terms of service agreement with accept value", () => {
+    it("terms of service agreement with accept value", async () => {
       class Custom extends Model {
         static {
           this.attribute("agreed", "string");
@@ -1847,8 +1847,8 @@ describe("Validations", () => {
           });
         }
       }
-      expect(new Custom({ agreed: "I agree" }).isValid()).toBe(true);
-      expect(new Custom({ agreed: "no" }).isValid()).toBe(false);
+      expect(await new Custom({ agreed: "I agree" }).isValid()).toBe(true);
+      expect(await new Custom({ agreed: "no" }).isValid()).toBe(false);
     });
   });
 
@@ -1861,32 +1861,32 @@ describe("Validations", () => {
       }
     }
 
-    it("passes when no confirmation field set", () => {
-      expect(new WithConfirm({ password: "secret" }).isValid()).toBe(true);
+    it("passes when no confirmation field set", async () => {
+      expect(await new WithConfirm({ password: "secret" }).isValid()).toBe(true);
     });
 
-    it("title confirmation", () => {
+    it("title confirmation", async () => {
       expect(
-        new WithConfirm({
+        await new WithConfirm({
           password: "secret",
           passwordConfirmation: "secret",
         }).isValid(),
       ).toBe(true);
     });
 
-    it("no title confirmation", () => {
+    it("no title confirmation", async () => {
       const w = new WithConfirm({
         password: "secret",
         passwordConfirmation: "wrong",
       });
-      expect(w.isValid()).toBe(false);
+      expect(await w.isValid()).toBe(false);
       expect(w.errors.get("passwordConfirmation")).toContain("doesn't match Password");
     });
   });
 
   // -- Conditional validation --
   describe("conditional", () => {
-    it("if validation using block false", () => {
+    it("if validation using block false", async () => {
       class Cond extends Model {
         static {
           this.attribute("name", "string");
@@ -1898,11 +1898,11 @@ describe("Validations", () => {
           });
         }
       }
-      expect(new Cond({ requireName: false }).isValid()).toBe(true);
-      expect(new Cond({ requireName: true }).isValid()).toBe(false);
+      expect(await new Cond({ requireName: false }).isValid()).toBe(true);
+      expect(await new Cond({ requireName: true }).isValid()).toBe(false);
     });
 
-    it("unless validation using block true", () => {
+    it("unless validation using block true", async () => {
       class Unless extends Model {
         static {
           this.attribute("name", "string");
@@ -1914,14 +1914,14 @@ describe("Validations", () => {
           });
         }
       }
-      expect(new Unless({ optional: true }).isValid()).toBe(true);
-      expect(new Unless({ optional: false }).isValid()).toBe(false);
+      expect(await new Unless({ optional: true }).isValid()).toBe(true);
+      expect(await new Unless({ optional: false }).isValid()).toBe(false);
     });
   });
 
   // -- Custom validate --
   describe("custom validate", () => {
-    it("function validator", () => {
+    it("function validator", async () => {
       class Custom extends Model {
         static {
           this.attribute("value", "integer");
@@ -1933,27 +1933,27 @@ describe("Validations", () => {
           });
         }
       }
-      expect(new Custom({ value: 4 }).isValid()).toBe(true);
+      expect(await new Custom({ value: 4 }).isValid()).toBe(true);
       const c = new Custom({ value: 3 });
-      expect(c.isValid()).toBe(false);
+      expect(await c.isValid()).toBe(false);
       expect(c.errors.get("value")).toContain("must be even");
     });
   });
 
   // -- isInvalid --
-  it("invalid should be the opposite of valid", () => {
+  it("invalid should be the opposite of valid", async () => {
     class Required extends Model {
       static {
         this.attribute("name", "string");
         this.validates("name", { presence: true });
       }
     }
-    expect(new Required().isInvalid()).toBe(true);
-    expect(new Required({ name: "dean" }).isInvalid()).toBe(false);
+    expect(await new Required().isInvalid()).toBe(true);
+    expect(await new Required({ name: "dean" }).isInvalid()).toBe(false);
   });
 
   // -- fullMessages --
-  it("fullMessages prefixes attribute name", () => {
+  it("fullMessages prefixes attribute name", async () => {
     class FM extends Model {
       static {
         this.attribute("title", "string");
@@ -1961,11 +1961,11 @@ describe("Validations", () => {
       }
     }
     const f = new FM();
-    f.isValid();
+    await f.isValid();
     expect(f.errors.fullMessages).toContain("Title can't be blank");
   });
 
-  it("fullMessages for :base has no prefix", () => {
+  it("fullMessages for :base has no prefix", async () => {
     class Base extends Model {
       static {
         this.validate((record: any) => {
@@ -1974,12 +1974,12 @@ describe("Validations", () => {
       }
     }
     const b = new Base();
-    b.isValid();
+    await b.isValid();
     expect(b.errors.fullMessages).toContain("is broken");
   });
 
   // -- errors.clear between validations --
-  it("errors are cleared between isValid calls", () => {
+  it("errors are cleared between isValid calls", async () => {
     class Clearable extends Model {
       static {
         this.attribute("name", "string");
@@ -1987,15 +1987,15 @@ describe("Validations", () => {
       }
     }
     const c = new Clearable();
-    c.isValid();
+    await c.isValid();
     expect(c.errors.count).toBeGreaterThan(0);
     c.writeAttribute("name", "dean");
-    c.isValid();
+    await c.isValid();
     expect(c.errors.count).toBe(0);
   });
 });
 describe("custom messages", () => {
-  it("presence with custom message", () => {
+  it("presence with custom message", async () => {
     class Custom extends Model {
       static {
         this.attribute("name", "string");
@@ -2003,11 +2003,11 @@ describe("custom messages", () => {
       }
     }
     const c = new Custom();
-    c.isValid();
+    await c.isValid();
     expect(c.errors.get("name")).toContain("is required");
   });
 
-  it("length with custom tooShort and tooLong", () => {
+  it("length with custom tooShort and tooLong", async () => {
     class Custom extends Model {
       static {
         this.attribute("name", "string");
@@ -2017,16 +2017,16 @@ describe("custom messages", () => {
       }
     }
     const short = new Custom({ name: "ab" });
-    short.isValid();
+    await short.isValid();
     expect(short.errors.get("name")).toContain("too few!");
 
     const long = new Custom({ name: "abcdef" });
-    long.isValid();
+    await long.isValid();
     expect(long.errors.get("name")).toContain("too many!");
   });
 });
 describe("errors.fullMessagesFor()", () => {
-  it("full_messages_for contains all the error messages for the given attribute indifferent", () => {
+  it("full_messages_for contains all the error messages for the given attribute indifferent", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2036,7 +2036,7 @@ describe("errors.fullMessagesFor()", () => {
       }
     }
     const u = new User({});
-    u.isValid();
+    await u.isValid();
     expect(u.errors.fullMessagesFor("name")).toEqual(["Name can't be blank"]);
     expect(u.errors.fullMessagesFor("email")).toEqual(["Email can't be blank"]);
     expect(u.errors.fullMessagesFor("other")).toEqual([]);
@@ -2044,7 +2044,7 @@ describe("errors.fullMessagesFor()", () => {
 });
 
 describe("errors.ofKind()", () => {
-  it("of_kind? defaults message to :invalid", () => {
+  it("of_kind? defaults message to :invalid", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2052,7 +2052,7 @@ describe("errors.ofKind()", () => {
       }
     }
     const u = new User({});
-    u.isValid();
+    await u.isValid();
     expect(u.errors.ofKind("name", "blank")).toBe(true);
     expect(u.errors.ofKind("name", "invalid")).toBe(false);
     // Without a type arg, ofKind checks for any error on the attribute.
@@ -2104,7 +2104,7 @@ describe("validators / validatorsOn", () => {
 });
 
 describe("custom validation contexts", () => {
-  it("with a class that adds errors on create and validating a new model", () => {
+  it("with a class that adds errors on create and validating a new model", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2115,12 +2115,12 @@ describe("custom validation contexts", () => {
     }
     const u = new User({ name: "Alice" });
     // Without context, terms_accepted validation is skipped
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
     // With custom context, terms_accepted presence validation runs
-    expect(u.isValid("registration")).toBe(false);
+    expect(await u.isValid("registration")).toBe(false);
   });
 
-  it("with a class that adds errors on update and validating a new model", () => {
+  it("with a class that adds errors on update and validating a new model", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2130,8 +2130,8 @@ describe("custom validation contexts", () => {
       }
     }
     const u = new User({ name: "Alice" });
-    expect(u.isValid("create")).toBe(false);
-    expect(u.isValid("update")).toBe(true);
+    expect(await u.isValid("create")).toBe(false);
+    expect(await u.isValid("update")).toBe(true);
   });
 });
 
@@ -2244,7 +2244,7 @@ describe("Errors enhancements", () => {
 });
 
 describe("conditional validates (if/unless)", () => {
-  it("skips validation when if condition returns false", () => {
+  it("skips validation when if condition returns false", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2256,10 +2256,10 @@ describe("conditional validates (if/unless)", () => {
       }
     }
     const u = new User({ requires_name: false });
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("runs validation when if condition returns true", () => {
+  it("runs validation when if condition returns true", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2271,10 +2271,10 @@ describe("conditional validates (if/unless)", () => {
       }
     }
     const u = new User({ requires_name: true });
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("skips validation when unless condition returns true", () => {
+  it("skips validation when unless condition returns true", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2286,10 +2286,10 @@ describe("conditional validates (if/unless)", () => {
       }
     }
     const u = new User({ skip_validation: true });
-    expect(u.isValid()).toBe(true);
+    expect(await u.isValid()).toBe(true);
   });
 
-  it("runs validation when unless condition returns false", () => {
+  it("runs validation when unless condition returns false", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2301,12 +2301,12 @@ describe("conditional validates (if/unless)", () => {
       }
     }
     const u = new User({ skip_validation: false });
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 });
 
 describe("validates_*_of shorthand methods", () => {
-  it("validate presences", () => {
+  it("validate presences", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
@@ -2315,12 +2315,12 @@ describe("validates_*_of shorthand methods", () => {
       }
     }
     const u = new User({});
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
     expect(u.errors.get("name").length).toBeGreaterThan(0);
     expect(u.errors.get("email").length).toBeGreaterThan(0);
   });
 
-  it("validates absence of", () => {
+  it("validates absence of", async () => {
     class User extends Model {
       static {
         this.attribute("spam", "string");
@@ -2328,65 +2328,65 @@ describe("validates_*_of shorthand methods", () => {
       }
     }
     const u = new User({ spam: "not empty" });
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("validatesLengthOf validates length", () => {
+  it("validatesLengthOf validates length", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
         this.validatesLengthOf("name", { minimum: 3 });
       }
     }
-    expect(new User({ name: "AB" }).isValid()).toBe(false);
-    expect(new User({ name: "ABC" }).isValid()).toBe(true);
+    expect(await new User({ name: "AB" }).isValid()).toBe(false);
+    expect(await new User({ name: "ABC" }).isValid()).toBe(true);
   });
 
-  it("validatesSizeOf is an alias for validatesLengthOf", () => {
+  it("validatesSizeOf is an alias for validatesLengthOf", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
         this.validatesSizeOf("name", { minimum: 3 });
       }
     }
-    expect(new User({ name: "AB" }).isValid()).toBe(false);
-    expect(new User({ name: "ABC" }).isValid()).toBe(true);
+    expect(await new User({ name: "AB" }).isValid()).toBe(false);
+    expect(await new User({ name: "ABC" }).isValid()).toBe(true);
   });
 
-  it("validatesNumericalityOf validates numericality", () => {
+  it("validatesNumericalityOf validates numericality", async () => {
     class Item extends Model {
       static {
         this.attribute("price", "float");
         this.validatesNumericalityOf("price", { greaterThan: 0 });
       }
     }
-    expect(new Item({ price: -1 }).isValid()).toBe(false);
-    expect(new Item({ price: 10 }).isValid()).toBe(true);
+    expect(await new Item({ price: -1 }).isValid()).toBe(false);
+    expect(await new Item({ price: 10 }).isValid()).toBe(true);
   });
 
-  it("validatesInclusionOf validates inclusion", () => {
+  it("validatesInclusionOf validates inclusion", async () => {
     class User extends Model {
       static {
         this.attribute("role", "string");
         this.validatesInclusionOf("role", { in: ["admin", "user"] });
       }
     }
-    expect(new User({ role: "hacker" }).isValid()).toBe(false);
-    expect(new User({ role: "admin" }).isValid()).toBe(true);
+    expect(await new User({ role: "hacker" }).isValid()).toBe(false);
+    expect(await new User({ role: "admin" }).isValid()).toBe(true);
   });
 
-  it("validatesFormatOf validates format", () => {
+  it("validatesFormatOf validates format", async () => {
     class User extends Model {
       static {
         this.attribute("email", "string");
         this.validatesFormatOf("email", { with: /@/ });
       }
     }
-    expect(new User({ email: "nope" }).isValid()).toBe(false);
-    expect(new User({ email: "a@b.com" }).isValid()).toBe(true);
+    expect(await new User({ email: "nope" }).isValid()).toBe(false);
+    expect(await new User({ email: "a@b.com" }).isValid()).toBe(true);
   });
 
-  it("validatesConfirmationOf validates confirmation", () => {
+  it("validatesConfirmationOf validates confirmation", async () => {
     class User extends Model {
       static {
         this.attribute("password", "string");
@@ -2394,10 +2394,10 @@ describe("validates_*_of shorthand methods", () => {
       }
     }
     const u = new User({ password: "secret", passwordConfirmation: "mismatch" });
-    expect(u.isValid()).toBe(false);
+    expect(await u.isValid()).toBe(false);
   });
 
-  it("validatesLengthOf accepts multiple attributes", () => {
+  it("validatesLengthOf accepts multiple attributes", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
@@ -2406,42 +2406,42 @@ describe("validates_*_of shorthand methods", () => {
       }
     }
     const t = new Topic({ title: "", content: "" });
-    expect(t.isValid()).toBe(false);
+    expect(await t.isValid()).toBe(false);
     expect(t.errors.get("title").length).toBeGreaterThan(0);
     expect(t.errors.get("content").length).toBeGreaterThan(0);
-    expect(new Topic({ title: "ok", content: "ok" }).isValid()).toBe(true);
+    expect(await new Topic({ title: "ok", content: "ok" }).isValid()).toBe(true);
   });
 
-  it("validatesPresenceOf passes through strict option", () => {
+  it("validatesPresenceOf passes through strict option", async () => {
     class User extends Model {
       static {
         this.attribute("name", "string");
         this.validatesPresenceOf("name", { strict: true });
       }
     }
-    expect(() => new User({}).isValid()).toThrow();
-    expect(new User({ name: "Alice" }).isValid()).toBe(true);
+    await expect(new User({}).isValid()).rejects.toThrow();
+    expect(await new User({ name: "Alice" }).isValid()).toBe(true);
   });
 
-  it("validatesPresenceOf passes through if and on options", () => {
+  it("validatesPresenceOf passes through if and on options", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
         this.validatesPresenceOf("title", { if: () => true, on: "update" });
       }
     }
-    expect(new Topic({ title: "" }).isValid()).toBe(true); // no context
-    expect(new Topic({ title: "" }).isInvalid("update")).toBe(true);
+    expect(await new Topic({ title: "" }).isValid()).toBe(true); // no context
+    expect(await new Topic({ title: "" }).isInvalid("update")).toBe(true);
   });
 
-  it("validatesPresenceOf passes through unless option", () => {
+  it("validatesPresenceOf passes through unless option", async () => {
     class Topic extends Model {
       static {
         this.attribute("title", "string");
         this.validatesPresenceOf("title", { unless: () => true });
       }
     }
-    expect(new Topic({ title: "" }).isValid()).toBe(true);
+    expect(await new Topic({ title: "" }).isValid()).toBe(true);
   });
 });
 

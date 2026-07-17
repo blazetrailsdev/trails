@@ -30,11 +30,20 @@ export function validatesAssociated(
 }
 
 export class AssociatedValidator extends EachValidator {
-  validateEach(record: any, attribute: string, value: unknown): void {
+  async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
     const context = recordValidationContextForAssociation(record);
     const values = Array.isArray(value) ? value : value != null ? [value] : [];
 
-    if (values.some((assoc: any) => !isValidObject(assoc, context))) {
+    // Rails `Array(value).reject { |r| valid_object?(r, context) }`
+    // (associated.rb:6-10) runs sequentially: `valid?` clears errors and
+    // swaps the validation context around each run, so concurrent validation
+    // would race on a repeated/shared associated record and reorder
+    // callbacks. Await each in order to preserve that observable behavior.
+    let anyInvalid = false;
+    for (const assoc of values) {
+      if (!(await isValidObject(assoc, context))) anyInvalid = true;
+    }
+    if (anyInvalid) {
       const { attributes: _, ...errorOpts } = this.options;
       record.errors.add(attribute, "invalid", { ...errorOpts, value });
     }
@@ -49,7 +58,7 @@ export class AssociatedValidator extends EachValidator {
  *
  * @internal
  */
-function isValidObject(record: any, context: string | undefined): boolean {
+async function isValidObject(record: any, context: string | undefined): Promise<boolean> {
   if (typeof record?.markedForDestruction === "function" && record.markedForDestruction()) {
     return true;
   }
