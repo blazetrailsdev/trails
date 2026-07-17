@@ -347,11 +347,14 @@ export function isShardSwappingProhibited(): boolean {
 }
 
 export function clearQueryCachesForCurrentThread(this: typeof Base): void {
+  // Mirror Rails' `each_connection_pool { pool.clear_query_cache }`
+  // (connection_handling.rb:258-260): clear the pool's per-thread Store
+  // directly, NOT `pool.active_connection.clear_query_cache`. A pool whose
+  // connection is currently checked in still holds this thread's cached rows
+  // in its registry (they survive checkin, keyed by execution context), so a
+  // re-read after checkout would hit stale results unless the Store is cleared.
   this.connectionHandler.eachConnectionPool(null, (pool) => {
-    const conn = pool.activeConnection;
-    if (conn && typeof (conn as any).clearQueryCache === "function") {
-      (conn as any).clearQueryCache();
-    }
+    (pool as unknown as { clearQueryCache?: () => void }).clearQueryCache?.();
   });
 }
 
