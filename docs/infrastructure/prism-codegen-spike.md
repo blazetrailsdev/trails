@@ -220,8 +220,53 @@ data (biggest correctness gaps first, not biggest node buckets):
    `defined?` edge forms, back-references).
 6. **Golden-output tests** — snapshot the generated JS per file so handler
    changes are reviewable.
+7. **Zero-deviation convergence guard** — the real north star for this repo is
+   _no deviations_ from Rails, so the highest-value use of the generator is not
+   its coverage % but a structural diff of the generated (Rails-faithful) JS
+   against the trails port, **filtered by the deviation catalog**
+   (`SKIP` / `SCOPED_SKIP` / the api-compare exclude lists) and by the
+   generator's own known false-positive sources. Anything left is a candidate
+   untracked deviation to converge. Across the 10 most-central files that
+   residual is currently empty (every diff resolves to a catalogued exception or
+   a generator artifact — see below), so the guard would act as a regression
+   tripwire: a _newly_ ported file that silently renamed, inlined, or dropped a
+   Rails method — without a catalog entry — would light up. Prerequisites are
+   the two false-positive suppressors: (a) predicate-candidate ambiguity
+   (`exists?` → `["isExists","exists"]`; the generator picks the first, the port
+   may pick either), and (b) file-scoped symbol lookup (a method ported into a
+   _different_ file than its Rails home reads as "missing").
 
 These are registered as stories under RFC 0065 in the `tasks` repo.
+
+## What "accurate" and "working" would take
+
+The spike stops at _shape_. Three escalating bars, each a real jump in
+machinery:
+
+- **More accurate (same architecture).** The generator artifacts above are the
+  cheap wins: resolve the predicate-candidate choice against the port's actual
+  symbol, index symbols across files (not per-file), and add the receiver
+  resolution + stdlib-idiom passes already on the roadmap. This closes the _diff
+  noise_ without changing what the tool fundamentally is.
+- **Compiles.** Requires a type layer the deterministic walk cannot invent from
+  Ruby: parameter/return types, generics, and the `this`-typed host interfaces
+  the mixin pattern needs. The realistic route is to emit against the port's
+  _existing_ type signatures (read the trails `.d.ts` / declaration for each
+  method and graft its signature onto the generated body) rather than infer
+  types from untyped Ruby.
+- **Working (passes the ported tests).** This is where deterministic codegen
+  hits its ceiling. Faithful _behavior_ needs the semantics Ruby computes at
+  runtime and trails re-architected by hand: macro-DSL expansion into real mixin
+  wiring, the async surface (already partly sourced from the port), Arel/query
+  construction, and the dozens of small idiom shims. A deterministic walk can
+  get a method body structurally right and still be behaviorally wrong wherever
+  the port deviated for a reason (see `performFind`'s composite-PK handling vs
+  Rails' thin `find`). The honest assessment: deterministic codegen can plausibly
+  reach _compiles_ for the tractable, body-heavy files, but _working_ for the
+  central AR surface is not reachable by AST-walking alone — it would need either
+  an LLM in the loop (explicitly out of scope here) or so many hand-authored
+  per-construct rules that the rules become the port. The durable value is
+  therefore the **guard** (item 7), not autonomous porting.
 
 ## Deliverables map
 
