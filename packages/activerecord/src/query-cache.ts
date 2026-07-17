@@ -93,7 +93,12 @@ export class QueryCache {
    * Mirrors: ActiveRecord::QueryCache.run
    * (`each_connection_pool.reject(&:query_cache_enabled).each { next if
    * pool.db_config&.query_cache == false; pool.enable_query_cache! }`), whose
-   * return value the executor threads into `complete(pools)`.
+   * return value the executor threads into `complete(pools)`. Rails' block
+   * returns the rejected array (config-disabled pools included, since
+   * `disable_query_cache!`/`clear_query_cache` no-op there); we return only the
+   * enabled subset because in trails `clearQueryCache` on an unenabled pool
+   * still lazily instantiates its `Store` (and bumps the version when pinned),
+   * so leaving config-disabled pools untouched is behaviorally meaningful here.
    */
   static run<T extends QueryCacheRunTarget>(targets: T[]): T[] {
     const enabled: T[] = [];
