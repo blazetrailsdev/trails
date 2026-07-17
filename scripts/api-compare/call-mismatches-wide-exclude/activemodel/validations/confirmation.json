@@ -2,6 +2,13 @@
   {
     "package": "activemodel",
     "tsFile": "validations/confirmation.ts",
+    "rubyName": "initialize",
+    "call": "merge!",
+    "reason": "Rails merges the `case_sensitive: true` default into options before super; trails applies that default lazily in isConfirmationValueEqual (survives an explicit undefined), so the constructor calls super(options) without a merge! — mirrors the baselined acceptance.ts initialize merge! deferral."
+  },
+  {
+    "package": "activemodel",
+    "tsFile": "validations/confirmation.ts",
     "rubyName": "setup!",
     "call": "filter_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
