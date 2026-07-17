@@ -17,6 +17,7 @@ import { QueryCache } from "./query-cache.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import { Notifications, Logger, type NotificationEvent } from "@blazetrails/activesupport";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { inMemoryDb } from "./test-adapter.js";
 
 for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 
@@ -669,16 +670,39 @@ describe("QueryCacheTest", () => {
     await mw();
   });
 
-  it.skip("clear query cache is called on all connections", () => {
-    // TRACKED-PENDING-CONVERGENCE (0023-surfaced-deviations:
-    // query-cache-dirties-wiring-incomplete): a write under the :writing role
-    // must clear the query cache on ALL of the current thread's pools (Rails'
-    // `dirties_query_cache` decorator calls
-    // `ActiveRecord::Base.clear_query_caches_for_current_thread`,
-    // query_cache.rb:24). trails' decorator (abstract/query-cache.ts) clears
-    // only the writing connection's own Store, so the :reading pool's cache
-    // stays stale and the re-read returns the pre-write title. Un-skips once
-    // that story wires clearing across connections.
+  // Rails guards this with `unless in_memory_db?`: a separate :reading
+  // connection cannot see the :writing connection's committed rows on an
+  // in-memory SQLite database, so the cross-pool clear is unobservable there.
+  it.skipIf(inMemoryDb())("clear query cache is called on all connections", async () => {
+    // Establish a separate :reading pool against the same config, mirroring
+    // Rails' `establish_connection(db_config)` under `connected_to(:reading)`.
+    const dbConfig = Base.connectionPool().dbConfig;
+    await Base.connectedTo({ role: "reading" }, async () => {
+      await Base.establishConnection(dbConfig);
+    });
+
+    const mw = middleware(async () => {
+      let topic: Topic | null = null;
+      await Base.connectedTo({ role: "reading" }, async () => {
+        topic = await Topic.first();
+      });
+
+      expect(topic).not.toBeNull();
+
+      await Base.connectedTo({ role: "writing" }, async () => {
+        topic!.title = "Topic title";
+        await topic!.save();
+      });
+
+      expect(topic!.title).toBe("Topic title");
+
+      await Base.connectedTo({ role: "reading" }, async () => {
+        const fresh = await Topic.first();
+        expect(fresh!.title).toBe("Topic title");
+      });
+    });
+
+    await mw();
   });
 
   it.skip("query cache is enabled in threads with shared connection", () => {

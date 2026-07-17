@@ -10,6 +10,7 @@ import {
   executionContextId,
   registerContextExitHook,
 } from "./connection-pool/execution-context.js";
+import { ExecutorHooks } from "./connection-pool.js";
 
 /**
  * Matches the locking suffixes Rails refuses to cache (`SELECT ... FOR
@@ -183,22 +184,26 @@ export interface QueryCacheHost extends DatabaseStatementsHost {
   // Mixed in from the QueryCache module below. Dispatched through `this` (not
   // the module-level functions) so a per-connection override is honored, as in
   // Rails' `def connection.cache_notification_info`.
+  /** @internal */
   cacheNotificationInfo(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
   ): Record<string, unknown>;
+  /** @internal */
   cacheNotificationInfoResult(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
     result: Record<string, unknown>[],
   ): Record<string, unknown>;
+  /** @internal */
   lookupSqlCache(
     sql: string,
     name: string | null | undefined,
     binds: unknown[],
   ): Record<string, unknown>[] | undefined;
+  /** @internal */
   cacheSql(
     sql: string,
     name: string | null | undefined,
@@ -553,6 +558,39 @@ function withWriteDirtyDepth(host: QueryCacheHost, original: () => unknown): unk
   return result;
 }
 
+/**
+ * Clear the query cache on every connection pool of the current thread,
+ * mirroring `ActiveRecord::Base.clear_query_caches_for_current_thread`, which
+ * Rails' `dirties_query_cache` decorator calls (query_cache.rb:24). A write
+ * under one role (`:writing`) must invalidate the caches of the current
+ * thread's *other* pools (`:reading`) too, so a subsequent read there does not
+ * return a stale row.
+ *
+ * Clear every handler pool's per-thread Store, then the host's own Store if it
+ * was not one of them: a standalone / NullPool adapter (`abstract-adapter.ts`)
+ * owns a local Store that `eachConnectionPool` never enumerates, so clearing
+ * only the handler pools would leave its own cached reads stale after a write.
+ * Dedup by Store identity so the writing connection — whose `_queryCache` IS
+ * its pool's per-thread Store — is cleared exactly once, preserving the
+ * `times: 1` collapse.
+ * @internal
+ */
+function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
+  // Mirror `each_connection_pool { pool.clear_query_cache }`: clear the pool's
+  // per-thread Store directly, NOT `pool.active_connection.clear_query_cache`.
+  // A pool whose connection is currently checked in still holds this thread's
+  // cached rows in its registry (they survive checkin, keyed by execution
+  // context), so a re-read after checkout would hit stale results unless the
+  // Store itself is cleared here.
+  const cleared = new Set<Store>();
+  ExecutorHooks.connectionHandler()?.eachConnectionPool(null, (pool) => {
+    const p = pool as unknown as QueryCachePool & { queryCache?: Store };
+    p.clearQueryCache?.();
+    if (p.queryCache) cleared.add(p.queryCache);
+  });
+  if (host._queryCache && !cleared.has(host._queryCache)) host._queryCache.clear();
+}
+
 /** @internal Reassign each named prototype slot to a cache-dirtying wrapper. */
 function wireDirties(
   base: { prototype: object },
@@ -576,7 +614,7 @@ function wireDirties(
       const dirtying =
         !!this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"));
       if (dirtying) {
-        this._queryCache!.clear();
+        clearCurrentThreadQueryCaches(this);
         // Raise the write-dirty scope ONLY when this call is itself dirtying, so
         // the leaf `executeMutation` it funnels into defers (times: 1). A
         // non-dirtying call — cache off, `uncached(dirties: false)`, or a
@@ -696,7 +734,7 @@ export function dirtiesQueryCacheUnlessNested(
 
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
       if (this._queryCache?.dirties && (this._writeDirtyDepth ?? 0) === 0) {
-        this._queryCache.clear();
+        clearCurrentThreadQueryCaches(this);
       }
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
