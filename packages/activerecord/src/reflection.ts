@@ -10,7 +10,7 @@ import {
   demodulize,
   foreignKey as deriveForeignKey,
 } from "@blazetrails/activesupport";
-import { Table } from "@blazetrails/arel";
+import { Table, type TableRef } from "@blazetrails/arel";
 import { _correctNames } from "./associations.js";
 import { joinTableName } from "./migration/join-table.js";
 import { rubyInspectArray } from "./relation/ruby-inspect.js";
@@ -265,7 +265,7 @@ export class AbstractReflection {
     return [this];
   }
 
-  buildScope(table?: Table, _predicateBuilder?: any, klass?: typeof Base): any {
+  buildScope(table?: TableRef, _predicateBuilder?: any, klass?: typeof Base): any {
     // Rails: `Relation.create(klass, table:, predicate_builder:)` — a genuinely
     // bare relation. Default scope and the STI `type_condition` are layered on
     // later by `klassJoinScope` (scope_for_association) and `joinScope`, so the
@@ -274,7 +274,7 @@ export class AbstractReflection {
     return target._buildBareRelation?.(table) ?? target.all();
   }
 
-  joinScope(table: Table, foreignTable: Table, foreignKlass: typeof Base): any {
+  joinScope(table: TableRef, foreignTable: TableRef, foreignKlass: typeof Base): any {
     let scope = this.klassJoinScope(table);
 
     const typeCol = this._concrete().type;
@@ -312,7 +312,7 @@ export class AbstractReflection {
     return scope;
   }
 
-  joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+  joinScopes(table: TableRef, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
     if (this.scope) {
       const rel = this.buildScope(table, predicateBuilder, klass);
       const result = this._concrete().scopeFor?.(rel, record) ?? this.scope(rel);
@@ -321,7 +321,7 @@ export class AbstractReflection {
     return [];
   }
 
-  klassJoinScope(table?: Table, predicateBuilder?: any): any {
+  klassJoinScope(table?: TableRef, predicateBuilder?: any): any {
     // Rails: `klass.scope_for_association(build_scope(table, predicate_builder))`.
     // `build_scope` is a bare relation (no default scope, no STI); the STI
     // `type_condition` is added by `joinScope`, qualified by the join's table.
@@ -1792,7 +1792,7 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.scopeFor(relation, owner);
   }
 
-  joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+  joinScopes(table: TableRef, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
     const sourceScopes =
       this.sourceReflection?.joinScopes(table, predicateBuilder, klass, record) ?? [];
     return [...sourceScopes, ...super.joinScopes(table, predicateBuilder, klass, record)];
@@ -2105,7 +2105,7 @@ export class PolymorphicReflection extends AbstractReflection {
     return (this._reflection as any).scopeFor?.(relation, owner) ?? relation;
   }
 
-  joinScopes(table: Table, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
+  joinScopes(table: TableRef, predicateBuilder?: any, klass?: typeof Base, record?: any): any[] {
     const scopes = super.joinScopes(table, predicateBuilder, klass, record);
     if (!(this._previousReflection as any).isThroughReflection?.()) {
       const prevScopes =

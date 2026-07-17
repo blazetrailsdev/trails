@@ -1,4 +1,5 @@
 export { Table } from "./table.js";
+export { type TableRef, tableSqlName, tableRealName } from "./table-ref.js";
 export * as Nodes from "./nodes/index.js";
 export * as Visitors from "./visitors/index.js";
 export * as Collectors from "./collectors/index.js";
