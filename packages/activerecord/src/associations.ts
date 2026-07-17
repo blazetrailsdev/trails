@@ -1503,9 +1503,11 @@ export async function loadBelongsTo(
     : Array.isArray(foreignKey)
       ? foreignKey
       : [foreignKey];
+  const fkSnapshot: unknown[] = [];
   for (const fk of fkColsForCheck) {
     const v = record._readAttribute(fk);
     if (v === null || v === undefined) return null;
+    fkSnapshot.push(v);
   }
 
   let result: Base | null;
@@ -1552,6 +1554,27 @@ export async function loadBelongsTo(
         [primaryKey as string]: record._readAttribute(foreignKey),
       });
     }
+  }
+
+  // Rails' `find_target` is synchronous, so it never observes the owner's
+  // foreign key change mid-load. Our loader awaits DB I/O: an in-flight reader
+  // query (e.g. `node.parent` accessed but never awaited) can still be pending
+  // when the caller synchronously reassigns the association
+  // (`node.parent = other`) with a new FK. Once RFC 0063 made `save` genuinely
+  // await the validation chain, that window widened enough for the stale query
+  // to resolve mid-save and `syncToAssociationInstance` clobber the
+  // freshly-assigned holder target with the old record — dropping the FK change
+  // from `previousChanges`. If the owner's FK moved off the snapshot we queried,
+  // the fetched record is stale: leave the holder's newer target intact and
+  // return it instead of the stale row.
+  const fkMovedDuringLoad = fkColsForCheck.some(
+    (fk, i) => record._readAttribute(fk) !== fkSnapshot[i],
+  );
+  if (fkMovedDuringLoad) {
+    const holder = record._associationInstances.get(assocName) as
+      | { isLoaded?: () => boolean; target?: Base | null }
+      | undefined;
+    if (holder?.isLoaded?.()) return holder.target ?? null;
   }
 
   // Set inverse_of: store reference back to the owner. Resolve via the
