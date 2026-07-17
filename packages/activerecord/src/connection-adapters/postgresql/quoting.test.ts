@@ -239,6 +239,18 @@ describe("PostgreSQL quoting", () => {
     expect(quotedBinary("ab")).toBe("'\\x6162'");
   });
 
+  it("quotedBinary hexes an ArrayBuffer view like MySQL/SQLite do", () => {
+    // Routed through the shared toBytes: a DataView (non-Uint8Array view) hexes
+    // its own bytes rather than raising inside escapeBytea's Buffer.from.
+    const buffer = new Uint8Array([0x1f, 0x8b]).buffer;
+    expect(quotedBinary(new DataView(buffer))).toBe("'\\x1f8b'");
+  });
+
+  it("quotedBinary hexes a bare ArrayBuffer like MySQL/SQLite do", () => {
+    const buffer = new Uint8Array([0x1f, 0x8b]).buffer;
+    expect(quotedBinary(buffer)).toBe("'\\x1f8b'");
+  });
+
   it("quote(Uint8Array) emits a bytea hex literal via quotedBinary", () => {
     // byte 0x8b (> 0x7f) must not be corrupted to the UTF-8 replacement
     // character sequence EF BF BD — regression for the String(buffer) path

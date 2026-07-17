@@ -12,6 +12,7 @@ import { BinaryData } from "@blazetrails/activemodel";
 import {
   quote as abstractQuote,
   quotedDate as abstractQuotedDate,
+  toBytes,
   typeCast as abstractTypeCast,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
@@ -104,9 +105,16 @@ export function quoteSchemaName(schemaName: string): string {
  * quotes, never nil. Rails' signature takes the `Type::Binary::Data` itself
  * (`postgresql/quoting.rb:152`), so accept it alongside the raw views our
  * `quote` unwraps to — a Rails-shaped call then works here too.
+ *
+ * Routes its byte union through the shared {@link toBytes}, as the abstract,
+ * MySQL and SQLite overrides do. `toBytes` returns `null` for a latin1 `string`,
+ * so the string branch stays ordered after it — PG's `escapeBytea` accepts one.
  */
-export function quotedBinary(value: Buffer | Uint8Array | string | BinaryData): string {
-  return `'${escapeBytea(value instanceof BinaryData ? value.bytes : value)}'`;
+export function quotedBinary(
+  value: Buffer | ArrayBufferView | ArrayBuffer | string | BinaryData,
+): string {
+  const bytes = toBytes(value);
+  return bytes ? `'${escapeBytea(bytes)}'` : `'${escapeBytea(value as string)}'`;
 }
 
 export function quote(this: QuotingDispatchHost, value: unknown): string {
