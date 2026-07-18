@@ -474,9 +474,9 @@ export class UnknownAttributeError<TRecord extends object = object> extends glob
 /**
  * Mirrors: ActiveModel::RangeError
  */
-export class ActiveModelRangeError extends globalThis.RangeError {
+export class RangeError extends globalThis.RangeError {
   constructor(message?: string) {
     super(message);
-    this.name = "ActiveModelRangeError";
+    this.name = "RangeError";
   }
 }

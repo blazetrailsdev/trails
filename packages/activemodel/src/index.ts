@@ -2,12 +2,7 @@ export { Model } from "./model.js";
 export type { NormalizesArgs } from "./model.js";
 export { I18n } from "./i18n.js";
 export { Error } from "./error.js";
-export {
-  Errors,
-  StrictValidationFailed,
-  UnknownAttributeError,
-  ActiveModelRangeError,
-} from "./errors.js";
+export { Errors, StrictValidationFailed, UnknownAttributeError, RangeError } from "./errors.js";
 export { NestedError } from "./nested-error.js";
 export { ValidationError, ValidationContext } from "./validations.js";
 export type { ModelWithErrors } from "./validations.js";

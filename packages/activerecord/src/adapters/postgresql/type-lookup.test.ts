@@ -2,7 +2,7 @@
  * Mirrors Rails activerecord/test/cases/adapters/postgresql/type_lookup_test.rb
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
-import { ActiveModelRangeError } from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { Range } from "../../connection-adapters/postgresql/oid/range.js";
 

@@ -18,7 +18,7 @@ import {
 } from "@blazetrails/arel";
 import {
   Attribute as ModelAttribute,
-  ActiveModelRangeError,
+  RangeError as ActiveModelRangeError,
   BinaryData,
 } from "@blazetrails/activemodel";
 import { Notifications, BigDecimal } from "@blazetrails/activesupport";
