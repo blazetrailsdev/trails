@@ -213,14 +213,7 @@ export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
   valuesInput: string[] | Record<string, string | number | boolean | null>,
-  options?: {
-    prefix?: boolean | string;
-    suffix?: boolean | string;
-    scopes?: boolean;
-    instanceMethods?: boolean;
-    validate?: boolean | Record<string, unknown>;
-    default?: unknown;
-  },
+  options?: EnumMacroOptions,
 ): void {
   _enum.call(modelClass, attribute, valuesInput, options);
 }
@@ -477,6 +470,23 @@ export class EnumMethods {
 }
 
 /**
+ * Options accepted by the `enum` macro and its `defineEnum` alias.
+ *
+ * Mirrors the keyword arguments of `ActiveRecord::Enum#enum`
+ * (`prefix:`, `suffix:`, `scopes:`, `instance_methods:`, `validate:`,
+ * `default:`). Shared by `enumMethod`, `_enum`, and `defineEnum` so the three
+ * entry points cannot drift out of sync.
+ */
+export interface EnumMacroOptions {
+  prefix?: boolean | string;
+  suffix?: boolean | string;
+  scopes?: boolean;
+  instanceMethods?: boolean;
+  validate?: boolean | Record<string, unknown>;
+  default?: unknown;
+}
+
+/**
  * Public `enum` macro. Validates then delegates to the private `_enum` impl.
  *
  * `_enum` is the single enum entry point: it defines `is{Name}()` predicates,
@@ -491,14 +501,7 @@ export function enumMethod(
   this: typeof Base,
   name: string,
   values: string[] | Record<string, EnumValue>,
-  options?: {
-    prefix?: boolean | string;
-    suffix?: boolean | string;
-    scopes?: boolean;
-    instanceMethods?: boolean;
-    validate?: boolean | Record<string, unknown>;
-    default?: unknown;
-  },
+  options?: EnumMacroOptions,
 ): void {
   _enum.call(this, name, values, options);
 }
@@ -520,14 +523,7 @@ export function _enum(
   this: typeof import("./base.js").Base,
   name: string,
   values: string[] | Record<string, string | number | boolean | null>,
-  options?: {
-    prefix?: boolean | string;
-    suffix?: boolean | string;
-    scopes?: boolean;
-    instanceMethods?: boolean;
-    validate?: boolean | Record<string, unknown>;
-    default?: unknown;
-  },
+  options?: EnumMacroOptions,
 ): void {
   if (values == null) throw new ArgumentError(`${String(name)} enum values must not be nil`);
   assertValidEnumDefinitionValues(values);
