@@ -8,7 +8,7 @@
  * shared branch, the affected-rows source, and that PG's RETURNING-append +
  * readonly guard survive the fold.
  */
-import { it, expect, beforeEach, afterEach } from "vitest";
+import { it, expect, beforeEach, afterEach, vi } from "vitest";
 import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./test-helper.js";
 import { ReadOnlyError } from "../../errors.js";
 
@@ -81,5 +81,18 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   it("does not prevent a read routed through execute while preventing writes", async () => {
     preventWrites(adapter);
     await expect(adapter.execute(`SELECT * FROM pq`)).resolves.toEqual([]);
+  });
+
+  it("re-applies the session timezone on a reconnected session", async () => {
+    // update_typemap_for_default_timezone is guarded on @mapped_default_timezone
+    // (postgresql_adapter.rb:1094). A reconnect opens a fresh session at
+    // PostgreSQL's default timezone, so the cache must be cleared in
+    // configure_connection (:1112) or the guard would skip reconfiguring it.
+    await adapter.execute(`SELECT 1`); // maps the timezone for the first session
+    const spy = vi.spyOn(adapter, "reconfigureConnectionTimezone");
+    await adapter.reconnect(); // opens a fresh session; configure clears the cache
+    await adapter.execute(`SELECT 1`); // fresh session must re-apply the timezone
+    expect(spy).toHaveBeenCalled();
+    spy.mockRestore();
   });
 });

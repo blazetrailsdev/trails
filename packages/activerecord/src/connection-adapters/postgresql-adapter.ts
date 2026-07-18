@@ -689,6 +689,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private async _maybeConfigureConnection(client: pg.Client): Promise<void> {
     if (this._connectionConfigured) return;
+    // Rails resets @mapped_default_timezone = nil while installing decoders in
+    // configure_connection (postgresql_adapter.rb:1112) so the next
+    // update_typemap_for_default_timezone re-applies the session timezone. This
+    // is a fresh physical session (reconnect/reset/discard cleared
+    // _connectionConfigured), which starts at PostgreSQL's default timezone, so
+    // the cache must be invalidated here or the guard would skip reconfiguring.
+    this._mappedDefaultTimezone = null;
     // Mirrors: set_standard_conforming_strings — required for correct quoting behaviour.
     await client.query("SET standard_conforming_strings = on");
     // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
