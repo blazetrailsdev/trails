@@ -43,17 +43,16 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     await expect(adapter.execute(`SELECT nick FROM pq`)).resolves.toEqual([{ nick: "a" }]);
   });
 
-  it("affectedRows reports the rows changed by the last write", async () => {
+  it("executeMutation sources affected rows through the affectedRows port", async () => {
     await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
     await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);
+    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('c')`);
 
-    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'z'`)).toBe(2);
-    expect(adapter.affectedRows()).toBe(2);
-
-    // A read leaves the count alone — it tracks the last write, as
-    // affected_rows / @last_affected_rows does in Rails.
-    await adapter.execute(`SELECT * FROM pq`);
-    expect(adapter.affectedRows()).toBe(2);
+    // The count comes from the statement's own PG::Result (cmd_tuples), read
+    // via the affectedRows port — no cross-statement state.
+    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'z' WHERE nick <> 'a'`)).toBe(2);
+    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'y' WHERE nick = 'nope'`)).toBe(0);
+    expect(await adapter.executeMutation(`DELETE FROM pq`)).toBe(3);
   });
 
   it("executeMutation appends RETURNING id and returns the inserted id for a bare INSERT", async () => {
@@ -68,13 +67,6 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   it("executeMutation returns the inserted id for an explicit INSERT ... RETURNING", async () => {
     const id = await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a') RETURNING id`);
     expect(id).toBe(1);
-  });
-
-  it("executeMutation returns affected rows for UPDATE and DELETE", async () => {
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('a')`);
-    await adapter.executeMutation(`INSERT INTO pq (nick) VALUES ('b')`);
-    expect(await adapter.executeMutation(`UPDATE pq SET nick = 'z'`)).toBe(2);
-    expect(await adapter.executeMutation(`DELETE FROM pq WHERE nick = 'z'`)).toBe(2);
   });
 
   it("errors when a write is routed through executeMutation while preventing writes", async () => {

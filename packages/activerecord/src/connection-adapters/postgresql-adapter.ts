@@ -368,8 +368,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
-  /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
-  _lastAffectedRows = 0;
+  // Rails' @mapped_default_timezone: the timezone the session/typemap was last
+  // configured for. `null` until the first query configures it, matching Rails'
+  // nil start (postgresql_adapter.rb:1094).
+  private _mappedDefaultTimezone: "utc" | "local" | null = null;
   private _minMessages = "warning";
   // Memoized search path, backing Rails' @schema_search_path. Populated lazily
   // by schemaSearchPath() and updated by setSchemaSearchPath().
@@ -1761,6 +1763,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     binds: unknown[],
     payload: Record<string, unknown>,
   ): Promise<pg.QueryResult> {
+    // Rails' perform_query first syncs the timestamp typemap / session timezone
+    // when default_timezone changed (database_statements.rb:136 →
+    // update_typemap_for_default_timezone); guarded, so it's a no-op unless the
+    // timezone actually changed.
+    await this.updateTypemapForDefaultTimezone();
     const queryResult = await this._runQuery(client, sql, binds);
     // Mirrors Rails' perform_query → verified!: a successful round-trip proves
     // the connection is live, so skip the verify ping on the next
@@ -1773,26 +1780,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const result = (
       Array.isArray(queryResult) ? queryResult[queryResult.length - 1] : queryResult
     ) as pg.QueryResult;
-    // Record the affected-row count for the no-arg `affectedRows()` accessor.
-    // executeMutation instead passes the fresh `result` to the port (race-free,
-    // matching Rails' affected_rows(result) → cmd_tuples); this field is the
-    // stable backing for a later read after the statement returns.
-    this._lastAffectedRows = result ? pgAffectedRows(result) : 0;
     payload.row_count = result?.rows?.length ?? 0;
     this._flushWarnings(sql);
     return result;
   }
 
   /**
-   * Rows affected by the most recent write. Mirrors Rails' `affected_rows`,
-   * wired to the existing this-less port so api:compare coverage points at
-   * live code.
+   * Rows affected by a write, read from its `PG::Result` (`cmd_tuples`).
+   * Wired to the existing this-less port so api:compare coverage points at live
+   * code. Unlike sqlite3, PG holds no `@last_affected_rows` state — the count is
+   * sourced strictly from the passed result, matching Rails.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows
    * @internal
    */
-  affectedRows(result?: pg.QueryResult): number {
-    return result ? pgAffectedRows(result) : this._lastAffectedRows;
+  affectedRows(result: pg.QueryResult): number {
+    return pgAffectedRows(result);
   }
 
   /**
@@ -4942,6 +4945,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   async reconfigureConnectionTimezone(): Promise<void> {
+    // Rails returns early when `variables["timezone"]` was set by the user
+    // (postgresql_adapter.rb:1005): configure_connection already applied it and
+    // it must never be overridden by the default_timezone SET below.
+    if (this._sessionVariables["timezone"]) return;
     const tz = getDefaultTimezone();
     // Off the withRawConnection loop. This runs as the first step of
     // performQuery (database-statements.ts), which is itself the block
@@ -5018,9 +5025,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   async updateTypemapForDefaultTimezone(): Promise<void> {
-    // node-pg uses custom type parsers registered at pool construction time
-    // via getTypeParser (see constructor). A timezone change only requires
-    // a session-level SET so subsequent result sets are interpreted correctly.
+    // Rails guards on `@mapped_default_timezone != default_timezone`
+    // (postgresql_adapter.rb:1094): reconfigure only when the timezone actually
+    // changed, so `perform_query` calling this per statement is a cheap no-op on
+    // the hot path. node-pg uses custom type parsers registered at pool
+    // construction time via getTypeParser (see constructor); a timezone change
+    // only requires a session-level SET so subsequent result sets decode right.
+    const tz = getDefaultTimezone();
+    if (this._mappedDefaultTimezone === tz) return;
+    this._mappedDefaultTimezone = tz;
     await this.reconfigureConnectionTimezone();
   }
 
