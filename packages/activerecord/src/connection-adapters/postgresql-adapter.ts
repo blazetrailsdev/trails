@@ -1789,6 +1789,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * live code.
    *
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows
+   * @internal
    */
   affectedRows(result?: pg.QueryResult): number {
     return result ? pgAffectedRows(result) : this._lastAffectedRows;
