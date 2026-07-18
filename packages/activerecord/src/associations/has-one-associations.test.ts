@@ -830,7 +830,7 @@ describe("HasOneAssociationsTest", () => {
     expect(newShip.isEqual(ships("black_pearl"))).toBe(false);
     expect((await readHasOne(pirate, "ship")).isEqual(newShip)).toBe(true);
     expect(newShip.isNewRecord()).toBe(true);
-    expect(newShip.isInvalid()).toBe(true);
+    expect(await newShip.isInvalid()).toBe(true);
     expect(origShip.pirate_id).toBeNull();
     expect(origShip.changed).toBe(false); // check it was saved
   });
@@ -841,7 +841,7 @@ describe("HasOneAssociationsTest", () => {
 
     const newShip = await pirate.createDependentShip();
     expect(newShip.isNewRecord()).toBe(true);
-    expect(newShip.isInvalid()).toBe(true);
+    expect(await newShip.isInvalid()).toBe(true);
     expect(origShip.isDestroyed()).toBe(true);
   });
 
@@ -870,7 +870,7 @@ describe("HasOneAssociationsTest", () => {
     const currentShip = await readHasOne(pirate, "ship");
     currentShip.name = null;
 
-    expect(currentShip.isValid()).toBe(false);
+    expect(await currentShip.isValid()).toBe(false);
     let error: any;
     try {
       await pirate.association("ship").writer(ships("interceptor"));
