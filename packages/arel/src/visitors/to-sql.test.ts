@@ -302,18 +302,19 @@ describe("the to_sql visitor", () => {
     expect(mgr.toSql()).toContain("VALUES (?)");
   });
 
-  it("string-quotes non-finite numbers in a ValuesList instead of emitting a bareword", () => {
-    // Databases reject `VALUES (Infinity)` because the unquoted identifier
-    // case-folds to a missing column; PG accepts `'Infinity'::float8`.
+  it("renders non-finite numbers bare in a ValuesList, matching the abstract adapter", () => {
+    // Rails' abstract `quote` emits `when Numeric then value.to_s`
+    // (abstract/quoting.rb:82), so the connection-less default visitor renders
+    // non-finite numbers bare. Only PostgreSQL's adapter string-quotes them.
     const mgr = new InsertManager(users);
     mgr.insert([[users.get("name"), Number.POSITIVE_INFINITY]]);
-    expect(mgr.toSql()).toContain("VALUES ('Infinity')");
+    expect(mgr.toSql()).toContain("VALUES (Infinity)");
     const mgr2 = new InsertManager(users);
     mgr2.insert([[users.get("name"), Number.NEGATIVE_INFINITY]]);
-    expect(mgr2.toSql()).toContain("VALUES ('-Infinity')");
+    expect(mgr2.toSql()).toContain("VALUES (-Infinity)");
     const mgr3 = new InsertManager(users);
     mgr3.insert([[users.get("name"), Number.NaN]]);
-    expect(mgr3.toSql()).toContain("VALUES ('NaN')");
+    expect(mgr3.toSql()).toContain("VALUES (NaN)");
   });
 
   describe("Nodes::UnionAll", () => {
@@ -2005,17 +2006,17 @@ describe("the to_sql visitor", () => {
         // Rails: Float has no `unboundable?`, so `attr.eq(Float::INFINITY)`
         // builds Casted(INFINITY) and renders `= Infinity` via `quote` →
         // `when Numeric then value.to_s` (abstract/quoting.rb:82), which is what
-        // the AR adapter path emits. The connection-less default quoter
-        // string-quotes non-finite numbers (default-quoter.ts:48-52) because
-        // bare `Infinity` is not valid SQL in every dialect.
-        expect(compile(id.eq(Infinity))).toBe('"users"."id" = \'Infinity\'');
-        expect(compile(id.gt(-Infinity))).toBe('"users"."id" > \'-Infinity\'');
-        expect(compile(id.in([1, Infinity, 2]))).toBe('"users"."id" IN (1, \'Infinity\', 2)');
+        // the abstract AR adapter path emits. The connection-less default quoter
+        // mirrors that and renders non-finite numbers bare; only PostgreSQL's
+        // adapter string-quotes them (postgresql/quoting.rb:111-115).
+        expect(compile(id.eq(Infinity))).toBe('"users"."id" = Infinity');
+        expect(compile(id.gt(-Infinity))).toBe('"users"."id" > -Infinity');
+        expect(compile(id.in([1, Infinity, 2]))).toBe('"users"."id" IN (1, Infinity, 2)');
       });
 
       it("Quoted wrapping INFINITY is bounded too (Quoted has no unboundable?)", () => {
         const eq = new Nodes.Equality(id, new Nodes.Quoted(Infinity));
-        expect(compile(eq)).toBe('"users"."id" = \'Infinity\'');
+        expect(compile(eq)).toBe('"users"."id" = Infinity');
       });
 
       it("bounded comparisons are unaffected", () => {
