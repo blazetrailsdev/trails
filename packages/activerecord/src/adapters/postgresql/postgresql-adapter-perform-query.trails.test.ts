@@ -22,6 +22,7 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await adapter.exec(`DROP TABLE IF EXISTS pq`);
     await adapter.close();
   });
@@ -93,6 +94,5 @@ describeIfPg("PostgreSQLAdapterPerformQueryTest (trails)", () => {
     await adapter.reconnect(); // opens a fresh session; configure clears the cache
     await adapter.execute(`SELECT 1`); // fresh session must re-apply the timezone
     expect(spy).toHaveBeenCalled();
-    spy.mockRestore();
   });
 });
