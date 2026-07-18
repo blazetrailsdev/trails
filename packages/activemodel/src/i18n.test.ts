@@ -51,13 +51,22 @@ describe("I18n", () => {
 
   describe("raise on missing", () => {
     it("raises MissingTranslationData for an unknown key with raise:true", () => {
-      expect(() => I18n.t("nope", { raise: true })).toThrow(MissingTranslationData);
+      let error: MissingTranslationData | undefined;
+      try {
+        I18n.t("nope", { raise: true });
+      } catch (e) {
+        error = e as MissingTranslationData;
+      }
+      expect(error).toBeInstanceOf(MissingTranslationData);
+      // No-default branch of MissingTranslation::Base#message.
+      expect(error?.message).toBe("Translation missing: en.nope");
     });
 
     it("lists the considered keys when the default chain is exhausted", () => {
-      // Mirrors i18n MissingTranslation::Base#message: with a `default` chain the
-      // message appends `. Options considered were:` listing every resolved key
-      // (activemodel CHANGELOG, human_attribute_name raise path).
+      // Options branch of i18n MissingTranslation::Base#message: with a
+      // non-empty `default` chain the message is `Translation missing. Options
+      // considered were:` listing every resolved key — the shape ActiveModel's
+      // human_attribute_name raise path produces (activemodel CHANGELOG).
       let error: MissingTranslationData | undefined;
       try {
         I18n.t("a.b", { raise: true, defaults: [{ key: "c.d" }, { key: "e.f" }] });
@@ -66,7 +75,7 @@ describe("I18n", () => {
       }
       expect(error).toBeInstanceOf(MissingTranslationData);
       expect(error?.message).toBe(
-        "translation missing: en.a.b. Options considered were:\n- en.a.b\n- en.c.d\n- en.e.f",
+        "Translation missing. Options considered were:\n- en.a.b\n- en.c.d\n- en.e.f",
       );
       expect(error?.consideredKeys).toEqual(["a.b", "c.d", "e.f"]);
     });
