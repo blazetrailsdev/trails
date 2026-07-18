@@ -28,13 +28,13 @@ const DEFAULT_MAX_SIZE = 100;
  */
 export class Store {
   private _map = new Map<string, Record<string, unknown>[]>();
-  private _maxSize: number;
+  private _maxSize: number | null;
   private _version: { value: number } | null;
   private _currentVersion: number;
   enabled = false;
   dirties = true;
 
-  constructor(version: { value: number } | null = null, maxSize: number = DEFAULT_MAX_SIZE) {
+  constructor(version: { value: number } | null = null, maxSize: number | null = DEFAULT_MAX_SIZE) {
     this._maxSize = maxSize;
     this._version = version;
     this._currentVersion = version?.value ?? 0;
@@ -87,11 +87,7 @@ export class Store {
     }
 
     return compute().then((result) => {
-      if (this._maxSize <= 0) {
-        // maxSize of 0 or negative disables caching — return without storing
-        return result;
-      }
-      if (this._map.size >= this._maxSize) {
+      if (this._maxSize != null && this._map.size >= this._maxSize) {
         const firstKey = this._map.keys().next().value;
         if (firstKey !== undefined) this._map.delete(firstKey);
       }
@@ -332,12 +328,7 @@ export class ConnectionPoolConfiguration {
 
   get queryCache(): Store {
     return this._threadQueryCaches.computeIfAbsent(String(executionContextId()), () => {
-      // A null max size is Rails' "unbounded" (nil) — the Store never evicts.
-      // trails' Store keys unboundedness off a number, so map nil to Infinity.
-      return new Store(
-        this._queryCacheVersion,
-        this._queryCacheMaxSize ?? Number.POSITIVE_INFINITY,
-      );
+      return new Store(this._queryCacheVersion, this._queryCacheMaxSize);
     });
   }
 
