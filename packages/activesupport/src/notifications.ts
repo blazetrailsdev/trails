@@ -11,13 +11,18 @@ import { Temporal } from "./temporal.js";
 import { Event, Instrumenter } from "./notifications/instrumenter.js";
 import type { EventPayload, NotificationHandle } from "./notifications/instrumenter.js";
 import { Fanout } from "./notifications/fanout.js";
-import type { Subscriber as FanoutSubscriber } from "./notifications/fanout.js";
 
+// The concrete subscriber handle the notifier hands back. Kept internal (not the
+// public `NotificationSubscriber`) so the `Fanout` subscriber's members don't
+// leak into this module's exported API surface.
+type FanoutSubscriber = ReturnType<Fanout["subscribe"]>;
+
+declare const notificationSubscriberBrand: unique symbol;
 /**
  * Opaque handle returned by `subscribe`; pass it back to `unsubscribe`. Backed
- * by the notifier's `Fanout` subscriber.
+ * by the notifier's `Fanout` subscriber, but exposed as an opaque token.
  */
-export type NotificationSubscriber = FanoutSubscriber;
+export type NotificationSubscriber = { readonly [notificationSubscriberBrand]: true };
 
 export type { NotificationHandle };
 
@@ -59,7 +64,8 @@ export class Notifications {
     pattern: string | RegExp | null | undefined,
     callback: (event: Event) => void,
   ): NotificationSubscriber {
-    return this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event));
+    const sub = this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event));
+    return sub as unknown as NotificationSubscriber;
   }
 
   /** Subscribe and automatically unsubscribe after the first matching event. */
@@ -71,12 +77,12 @@ export class Notifications {
       this._notifier.unsubscribe(sub);
       callback(event);
     });
-    return sub;
+    return sub as unknown as NotificationSubscriber;
   }
 
   /** Remove a previously registered subscriber. */
   static unsubscribe(subscriber: NotificationSubscriber): void {
-    this._notifier.unsubscribe(subscriber);
+    this._notifier.unsubscribe(subscriber as unknown as FanoutSubscriber);
   }
 
   /** Remove all subscribers. Useful in tests. */

@@ -110,7 +110,7 @@ function wrapMatcher(pattern: string | RegExp | null): Matcher {
 
 type SubscriberKind = "evented" | "timed" | "monotonic" | "event_object";
 
-export interface Subscriber {
+interface Subscriber {
   readonly matcher: Matcher;
   readonly kind: SubscriberKind;
   readonly delegate: EventedListener | TimedCallback | EventObjectCallback;
