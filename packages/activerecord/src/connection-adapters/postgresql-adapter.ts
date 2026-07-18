@@ -4311,20 +4311,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           //     ConnectionFailed ("the server may have already executed part or
           //     all of the query").
           // We preserve ConnectionNotEstablished for node-pg's pre-send/closed
-          // analogues (see _isConnectionClosedBeforeSend). The remaining
-          // live-socket severs map to the retryable ConnectionFailed so
-          // idempotent queries retry+reconnect and non-retryable queries raise a
-          // connection error rather than a raw driver error, matching Rails'
-          // remote-disconnect behavior. node-pg has no libpq layer, so it cannot
-          // reproduce Rails' newline signal for the ambiguous server-sever case
-          // ("Client has encountered a connection error and is not queryable" is
-          // emitted identically whether the socket died mid-send or just before);
-          // that residual case takes ConnectionFailed. (Connect-path failures
-          // still surface as ConnectionNotEstablished — see newClient.)
+          // analogues (see _isConnectionClosedBeforeSend). Rails matches these
+          // messages directly, ahead of the PG::ConnectionBad split, so this
+          // check runs FIRST — some of its messages ("connection is closed",
+          // "no connection to the server", "client was closed") are not in
+          // _isConnectionError's set and would otherwise fall through as raw
+          // Errors. The remaining live-socket severs map to the retryable
+          // ConnectionFailed so idempotent queries retry+reconnect and
+          // non-retryable queries raise a connection error rather than a raw
+          // driver error, matching Rails' remote-disconnect behavior. node-pg
+          // has no libpq layer, so it cannot reproduce Rails' newline signal for
+          // the ambiguous server-sever case ("Client has encountered a
+          // connection error and is not queryable" is emitted identically
+          // whether the socket died mid-send or just before); that residual case
+          // takes ConnectionFailed. (Connect-path failures still surface as
+          // ConnectionNotEstablished — see newClient.)
+          if (PostgreSQLAdapter._isConnectionClosedBeforeSend(e)) {
+            return new ConnectionNotEstablished(msg, { cause });
+          }
           if (PostgreSQLAdapter._isConnectionError(e)) {
-            if (PostgreSQLAdapter._isConnectionClosedBeforeSend(e)) {
-              return new ConnectionNotEstablished(msg, { cause });
-            }
             return new ConnectionFailed(msg, { sql, binds, cause });
           }
           // Only wrap node-postgres `DatabaseError`s. The SQLSTATE
