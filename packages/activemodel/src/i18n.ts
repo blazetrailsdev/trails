@@ -39,22 +39,40 @@ export class MissingInterpolationArgument extends globalThis.Error {
 }
 
 /**
- * Raised by `I18n.t(key, { raise: true })` when a key resolves to nothing and
- * no default is supplied.
+ * Raised by `I18n.t(key, { raise: true })` when a key (and every default key)
+ * resolves to nothing.
  *
  * Mirrors: I18n::MissingTranslationData (i18n/lib/i18n/exceptions.rb) — the i18n
  * gem's `MissingTranslation` alias, an `ArgumentError` subclass in Ruby. We root
  * it at the global `Error` here since the activemodel service has no local
  * `ArgumentError` home, matching the sibling ActiveSupport port.
+ *
+ * `MissingTranslation::Base` stores `locale`/`key`/`options` and its `#message`
+ * appends `. Options considered were:` listing every fully-resolved key when a
+ * `default` was supplied — the shape shown in activemodel's CHANGELOG for the
+ * `human_attribute_name` raise path (which passes the ancestor lookup chain as
+ * `defaults`). We reproduce that so the exhausted-`defaults` branch reports the
+ * considered keys, not just the primary.
  */
 export class MissingTranslationData extends globalThis.Error {
   readonly key: string;
   readonly locale: string;
-  constructor(locale: string, key: string) {
-    super(`Translation missing: ${locale}.${key}`);
+  readonly consideredKeys: string[];
+  constructor(locale: string, key: string, defaults?: TranslateOptions["defaults"]) {
+    const consideredKeys = [key, ...(defaults ?? []).flatMap((d) => ("key" in d ? [d.key] : []))];
+    const first = `${locale}.${consideredKeys[0]}`;
+    let message = `translation missing: ${first}`;
+    // `#message` only lists options when a `default` chain was passed
+    // (i18n MissingTranslation::Base#message).
+    if (defaults && defaults.length > 0) {
+      const lines = consideredKeys.map((k) => `- ${locale}.${k}`).join("\n");
+      message += `. Options considered were:\n${lines}`;
+    }
+    super(message);
     this.name = "MissingTranslationData";
     this.locale = locale;
     this.key = key;
+    this.consideredKeys = consideredKeys;
   }
 }
 
@@ -160,7 +178,7 @@ class I18nService {
     }
 
     if (options?.raise ?? raiseOnMissingTranslations()) {
-      throw new MissingTranslationData(locale, key);
+      throw new MissingTranslationData(locale, key, options?.defaults);
     }
     return key;
   }
