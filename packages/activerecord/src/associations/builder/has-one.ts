@@ -45,19 +45,6 @@ export class HasOne extends SingularAssociation {
     super.defineConstructors(mixin, name);
     if (!mixin || typeof mixin !== "object") return;
     const cap = name.charAt(0).toUpperCase() + name.slice(1);
-    // Ergonomic awaitable setter (`await firm.setAccount(x)` /
-    // `await firm.setAccount(null)`), the RFC-sanctioned alternative to the
-    // racy native `firm.account = x` property setter. A thin delegation to the
-    // association-level `writer`, whose has_one / has_one_through overrides run
-    // the Rails-faithful immediate replace/persist. Returns the `writer` promise
-    // so a failed replacement (`RecordNotSaved`) rejects at the call site.
-    Object.defineProperty(mixin, `set${cap}`, {
-      value: function (this: { association(n: string): any }, value: unknown) {
-        return this.association(name).writer(value);
-      },
-      writable: true,
-      configurable: true,
-    });
     // Redefine the `build#{name}` accessor to mirror Rails' synchronous
     // `set_new_record` → `replace` → `load_target`: materialize the current
     // target before the built record displaces it. The accessor returns a
@@ -114,6 +101,29 @@ export class HasOne extends SingularAssociation {
 
   static override defineWriters(mixin: object, name: string): void {
     if (!mixin || typeof mixin !== "object") return;
+    const cap = name.charAt(0).toUpperCase() + name.slice(1);
+    // Ergonomic awaitable setter (`await firm.setAccount(x)` /
+    // `await firm.setAccount(null)`), the RFC-sanctioned alternative to the
+    // racy native `firm.account = x` property setter defined below. Generated
+    // here — beside that setter, unconditionally (including polymorphic
+    // has_one) — rather than in `defineConstructors`, which Rails skips for
+    // polymorphic; the sugar must exist wherever the `=` setter does. A thin
+    // delegation to the association-level `writer`, whose has_one /
+    // has_one_through overrides run the Rails-faithful immediate replace/persist
+    // and whose returned promise rejects (`RecordNotSaved`) at the call site.
+    const setter = Object.getOwnPropertyDescriptor(mixin, `set${cap}`);
+    if (!setter || setter.configurable) {
+      Object.defineProperty(mixin, `set${cap}`, {
+        value: function (
+          this: { association(n: string): { writer(v: unknown): unknown } },
+          value: unknown,
+        ) {
+          return this.association(name).writer(value);
+        },
+        writable: true,
+        configurable: true,
+      });
+    }
     const existing = Object.getOwnPropertyDescriptor(mixin, name);
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, name, {

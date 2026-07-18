@@ -35,6 +35,7 @@ import { Ship } from "../test-helpers/models/ship.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Club } from "../test-helpers/models/club.js";
 import { Membership, CurrentMembership } from "../test-helpers/models/membership.js";
+import { Sponsor } from "../test-helpers/models/sponsor.js";
 
 type Setter = { [k: string]: (value: Base | null) => Promise<void> };
 const set = (owner: unknown) => owner as Setter;
@@ -145,5 +146,28 @@ describe("has_one :through set#{Name} awaitable accessor", () => {
     await (member as unknown as { reload(): Promise<unknown> }).reload();
 
     expect((await readHasOne(member, "club"))?.id).toBe(newClub.id);
+  });
+});
+
+describe("polymorphic has_one set#{Name} awaitable accessor", () => {
+  // The `=` setter is defined unconditionally for polymorphic has_one, so the
+  // sugar must exist there too — even though `build#{Name}` / `create#{Name}`
+  // are skipped for polymorphic. Member#sponsor is a `has_one as: sponsorable`.
+  const { members } = fixtures(["members", "sponsors"]);
+
+  beforeAll(() => {
+    registerModel(Member);
+    registerModel(Sponsor);
+  });
+
+  it("persists the replacement, setting the polymorphic foreign key and type", async () => {
+    const member = members("groucho") as Base;
+    const sponsor = new Sponsor();
+
+    await set(member).setSponsor(sponsor);
+
+    expect(sponsor.isPersisted()).toBe(true);
+    expect(sponsor.sponsorable_id).toBe(Number((member as unknown as { id: number }).id));
+    expect(sponsor.sponsorable_type).toBe("Member");
   });
 });
