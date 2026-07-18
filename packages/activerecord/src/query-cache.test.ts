@@ -74,8 +74,8 @@ function assertCache(
 // per-connection `Store`; trails' `Store` coalesces a disabled pool's `nil`
 // size to `0`, so the faithful value lives on the pool's cache config
 // (`@query_cache_max_size` in Rails). `false`/`0` → `null`, an Integer → that
-// integer, `nil` → the default size (100). trails represents Rails' "unbounded"
-// `nil` (the fall-through for a raw string like "unlimited") as `Infinity`.
+// integer, `nil` → the default size (100). Rails' fall-through for a raw string
+// like "unlimited" leaves it `nil` (unbounded), same as `false`/`0`.
 function poolQueryCacheMaxSize(pool: ConnectionPool): number | null {
   return (pool as unknown as { _cacheConfig: { _queryCacheMaxSize: number | null } })._cacheConfig
     ._queryCacheMaxSize;
@@ -233,12 +233,7 @@ describe("QueryCacheTest", () => {
     const mw = middleware(async () => {
       await Base.connectedTo({ role: "reading" }, async () => {
         assertCache("clean");
-        // Rails leaves `@max_size` nil (unbounded) for a raw string config;
-        // trails overloads null as "disabled" so represents unbounded as
-        // `Infinity` (converged by 0023-surfaced-deviations:
-        // query-cache-disabled-gate-on-config-not-maxsize, which will flip this
-        // assertion to null).
-        expect(poolQueryCacheMaxSize(Base.connectionPool())).toBe(Number.POSITIVE_INFINITY);
+        expect(poolQueryCacheMaxSize(Base.connectionPool())).toBeNull();
       });
     });
 
