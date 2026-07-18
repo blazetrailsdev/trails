@@ -83,19 +83,31 @@ export class QueryCache {
   }
 
   /**
-   * Enable query cache on all provided pools/adapters, skipping those whose
-   * cache is already enabled or disabled by configuration.
+   * Enable query cache on all provided pools/adapters that are not already
+   * enabled, skipping (without enabling) those disabled by configuration.
+   * Returns the not-already-enabled targets — the receiver of Rails' `each`,
+   * config-disabled pools included — so the executor can thread that exact list
+   * into `complete`.
    * Called at the start of a request/execution context.
    *
    * Mirrors: ActiveRecord::QueryCache.run
    * (`each_connection_pool.reject(&:query_cache_enabled).each { next if
-   * pool.db_config&.query_cache == false; pool.enable_query_cache! }`)
+   * pool.db_config&.query_cache == false; pool.enable_query_cache! }`). Ruby's
+   * `Array#each` returns its receiver, so `run` returns the whole
+   * `reject(&:query_cache_enabled)` array (including the config-disabled pools
+   * `next` skips over), and the executor threads it into `complete(pools)`.
+   * `complete` disabling/clearing a config-disabled pool is inert in Rails
+   * exactly as in trails — `disable_query_cache!` re-disables an already-off
+   * cache and `clear_query_cache` only bumps the version when pinned
+   * (query_cache.rb:164-190) — so we mirror Rails rather than pre-filter.
    */
-  static run(targets: QueryCacheRunTarget[]): void {
-    for (const target of targets) {
-      if (target.queryCacheEnabled || target.queryCacheDisabled) continue;
+  static run<T extends QueryCacheRunTarget>(targets: T[]): T[] {
+    const notAlreadyEnabled = targets.filter((target) => !target.queryCacheEnabled);
+    for (const target of notAlreadyEnabled) {
+      if (target.queryCacheDisabled) continue;
       target.enableQueryCacheBang();
     }
+    return notAlreadyEnabled;
   }
 
   /**
@@ -118,7 +130,10 @@ export class QueryCache {
    */
   static installExecutorHooks(
     executor?: {
-      registerHook(hook: { run(): void; complete(): void }): void;
+      registerHook(hook: {
+        run(): (QueryCacheRunTarget & QueryCacheCompleteTarget)[];
+        complete(pools: QueryCacheCompleteTarget[]): void;
+      }): void;
     },
     targets:
       | (QueryCacheRunTarget & QueryCacheCompleteTarget)[]
@@ -127,13 +142,19 @@ export class QueryCache {
     if (!executor) return;
     const resolve = typeof targets === "function" ? targets : () => targets;
 
-    // Mirrors Rails' ExecutorHooks module with static run/complete
+    // Mirrors Rails' ExecutorHooks module with static run/complete. Rails'
+    // executor keeps per-execution `hook_state` and passes `run`'s return value
+    // as the argument to `complete` (execution_wrapper.rb:25-37, :145-148), so
+    // `run` returns its not-already-enabled receiver and `complete` receives
+    // that exact list — no shared state a nested/overlapping execution could
+    // clobber, and `complete` acts only on the pools this execution's `run`
+    // observed rather than re-resolving the list independently.
     class ExecutorHooks {
-      static run() {
-        QueryCache.run(resolve());
+      static run(): (QueryCacheRunTarget & QueryCacheCompleteTarget)[] {
+        return QueryCache.run(resolve());
       }
-      static complete() {
-        QueryCache.complete(resolve());
+      static complete(pools: QueryCacheCompleteTarget[]): void {
+        QueryCache.complete(pools);
       }
     }
 

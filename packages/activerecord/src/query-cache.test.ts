@@ -13,7 +13,7 @@ import { Post } from "./test-helpers/models/post.js";
 import { association } from "./associations.js";
 import { Rollback } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
-import { QueryCache } from "./query-cache.js";
+import { QueryCache, type QueryCacheCompleteTarget } from "./query-cache.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import { Notifications, Logger, type NotificationEvent } from "@blazetrails/activesupport";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -26,22 +26,27 @@ for (const m of [Task, Topic, Category, Post]) registerModel(m as never);
 // wraps the block — enabling the query cache on every pool for the request and
 // disabling + clearing it afterward.
 function middleware(app: () => unknown | Promise<unknown>): () => Promise<void> {
-  let hook: { run(): void; complete(): void } | null = null;
+  let hook: {
+    run(): QueryCacheCompleteTarget[];
+    complete(pools: QueryCacheCompleteTarget[]): void;
+  } | null = null;
   // Resolve the pool list lazily on each run/complete so pools established
   // after the middleware is built (the multi-role `connected_to(role: :reading)`
   // tests) are included, mirroring Rails' `connection_pool_list(:all)`.
-  // (Rails threads run's enabled-pool result into complete so a disabled pool
-  // is never touched on complete; trails re-resolves the full list — tracked by
-  // 0023-surfaced-deviations: query-cache-run-returns-enabled-pools-for-complete.)
+  // (Rails threads run's return — the whole not-already-enabled receiver — into
+  // complete via the executor's per-execution hook_state, so complete acts on
+  // exactly the list this execution's run observed rather than re-resolving it;
+  // installExecutorHooks returns that list from run and threads it into
+  // complete for the same reason.)
   QueryCache.installExecutorHooks({ registerHook: (h) => (hook = h) }, () =>
     Base.connectionHandler.connectionPoolList("all"),
   );
   return async () => {
-    hook!.run();
+    const enabled = hook!.run();
     try {
       await app();
     } finally {
-      hook!.complete();
+      hook!.complete(enabled);
     }
   };
 }
