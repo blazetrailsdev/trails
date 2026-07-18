@@ -1773,8 +1773,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const result = (
       Array.isArray(queryResult) ? queryResult[queryResult.length - 1] : queryResult
     ) as pg.QueryResult;
-    // Rails stashes the count on the result and reads it back via affected_rows;
-    // keep a last-affected-rows field so the port has a stable backing value.
+    // Record the affected-row count for the no-arg `affectedRows()` accessor.
+    // executeMutation instead passes the fresh `result` to the port (race-free,
+    // matching Rails' affected_rows(result) → cmd_tuples); this field is the
+    // stable backing for a later read after the statement returns.
     this._lastAffectedRows = result ? pgAffectedRows(result) : 0;
     payload.row_count = result?.rows?.length ?? 0;
     this._flushWarnings(sql);
@@ -1823,10 +1825,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
     };
-    const m = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      let rc: number;
+    return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        rc = await this.withRawConnection(async (conn) => {
+        return await this.withRawConnection(async (conn) => {
           const client = conn as unknown as pg.Client;
           const upper = sql.trimStart().toUpperCase();
 
@@ -1911,9 +1912,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         const translated = this._translateException(e, pgSql, binds);
         throw translated;
       }
-      return rc!;
     });
-    return m;
   }
 
   /**
