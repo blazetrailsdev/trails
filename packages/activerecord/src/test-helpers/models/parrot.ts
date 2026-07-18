@@ -13,7 +13,7 @@ export class Parrot extends Base {
   declare treasures: AssociationProxy<Treasure>;
   declare loots: AssociationProxy<Treasure>;
   declare cancelSaveFromCallback: boolean;
-  declare breed: number | null;
+  declare breed: "african" | "australian" | null;
   declare color: string;
   declare created_at: Temporal.Instant | Temporal.PlainDateTime;
   declare created_on: Temporal.Instant | Temporal.PlainDateTime;

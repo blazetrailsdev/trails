@@ -37,7 +37,13 @@ export class Membership extends Base {
   declare favorite: boolean | null;
   declare joined_on: Temporal.Instant | Temporal.PlainDateTime;
   declare member_id: number;
-  declare "type": number;
+  declare "type":
+    | "Membership"
+    | "CurrentMembership"
+    | "SuperMembership"
+    | "SelectedMembership"
+    | "TenantMembership"
+    | null;
   declare updated_at: Temporal.Instant | Temporal.PlainDateTime;
 
   static {

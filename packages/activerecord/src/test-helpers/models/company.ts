@@ -50,7 +50,7 @@ export class Company extends AbstractCompany {
   declare firm_name: string;
   declare name: string;
   declare rating: bigint | null;
-  declare status: number | null;
+  declare status: "active" | "suspended" | null;
   declare "type": string;
 
   static {
