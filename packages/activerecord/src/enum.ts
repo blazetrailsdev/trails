@@ -213,7 +213,14 @@ export function defineEnum(
   modelClass: typeof Base,
   attribute: string,
   valuesInput: string[] | Record<string, string | number | boolean | null>,
-  options?: { prefix?: boolean | string; suffix?: boolean | string },
+  options?: {
+    prefix?: boolean | string;
+    suffix?: boolean | string;
+    scopes?: boolean;
+    instanceMethods?: boolean;
+    validate?: boolean | Record<string, unknown>;
+    default?: unknown;
+  },
 ): void {
   _enum.call(modelClass, attribute, valuesInput, options);
 }

@@ -176,6 +176,25 @@ class Article extends Base {
   }
 }
 
+// `defineEnum`'s options match `_enum`'s full surface (prefix/suffix/scopes/
+// instanceMethods/validate/default) — no `as any` needed for a supported
+// option. Compile-only: never invoked.
+export function _defineEnumOptionsTypecheck(): void {
+  defineEnum(
+    Article,
+    "status",
+    { draft: 0, published: 1 },
+    {
+      prefix: true,
+      suffix: "state",
+      scopes: false,
+      instanceMethods: false,
+      validate: true,
+      default: "draft",
+    },
+  );
+}
+
 // --- Temporal attribute typing ---
 import { Temporal } from "@blazetrails/activesupport/temporal";
 class Event extends Base {
