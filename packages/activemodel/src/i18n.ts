@@ -39,6 +39,26 @@ export class MissingInterpolationArgument extends globalThis.Error {
 }
 
 /**
+ * Raised by `I18n.t(key, { raise: true })` when a key resolves to nothing and
+ * no default is supplied.
+ *
+ * Mirrors: I18n::MissingTranslationData (i18n/lib/i18n/exceptions.rb) — the i18n
+ * gem's `MissingTranslation` alias, an `ArgumentError` subclass in Ruby. We root
+ * it at the global `Error` here since the activemodel service has no local
+ * `ArgumentError` home, matching the sibling ActiveSupport port.
+ */
+export class MissingTranslationData extends globalThis.Error {
+  readonly key: string;
+  readonly locale: string;
+  constructor(locale: string, key: string) {
+    super(`Translation missing: ${locale}.${key}`);
+    this.name = "MissingTranslationData";
+    this.locale = locale;
+    this.key = key;
+  }
+}
+
+/**
  * Keys the I18n gem reserves (not forwarded as `%{}` interpolations).
  * See i18n/lib/i18n.rb RESERVED_KEYS.
  */
@@ -140,7 +160,7 @@ class I18nService {
     }
 
     if (options?.raise ?? raiseOnMissingTranslations()) {
-      throw new Error(`Translation missing: ${key}`);
+      throw new MissingTranslationData(locale, key);
     }
     return key;
   }
