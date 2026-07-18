@@ -959,12 +959,31 @@ describe("EnumTest", () => {
     expect(typeof (instance as any).isEasyToRead).toBe("function");
   });
 
-  // Depends on the in-memory DB-default seeding gap above: `new K()` doesn't
-  // seed `status` → 0 → "active" through EnumType#cast.
-  it.skip("enum labels as keyword arguments", () => {});
+  it("enum labels as keyword arguments", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { active: 0, archived: 1 });
+      }
+    }
+    const book = new K();
+    expect((book as any).isActive()).toBe(true);
+    expect((book as any).isArchived()).toBe(false);
+  });
 
-  // Same in-memory DB-default seeding gap: `new K()` doesn't seed `status` → 0.
-  it.skip("option names can be used as label", () => {});
+  it("option names can be used as label", () => {
+    class K extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", { default: 0, scopes: 1, prefix: 2, suffix: 3 });
+      }
+    }
+    const book = new K();
+    expect((book as any).isDefault()).toBe(true);
+    expect((book as any).isScopes()).toBe(false);
+    expect((book as any).isPrefix()).toBe(false);
+    expect((book as any).isSuffix()).toBe(false);
+  });
 
   it("scopes are named like methods", () => {
     class K extends Base {
