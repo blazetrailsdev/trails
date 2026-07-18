@@ -189,18 +189,15 @@ export function columnNameWithOrderMatcher(): RegExp {
  * `quote` runs the abstract `quote` and the MySQL-specific behaviour flows in
  * through the dispatched helpers (`quote_string`, `quoted_binary`,
  * `quoted_date`/`quoted_time`). We mirror that here: only the branches whose
- * dispatch the abstract `quote` doesn't thread through `this` (symbols, strings
- * — plus the trails-only non-finite guard) stay inline; the rest
+ * dispatch the abstract `quote` doesn't thread through `this` (symbols, strings)
+ * stay inline; the rest
  * delegates to {@link abstractQuote} with `this` threaded so the date/time
- * dispatch lands on MySQL's {@link quotedDate}. Booleans fall through to the
+ * dispatch lands on MySQL's {@link quotedDate}. Non-finite numbers fall through
+ * to the abstract `when Numeric then value.to_s` and render bare — Rails' MySQL
+ * adapter has no non-finite override (only PG does). Booleans fall through to the
  * abstract `"TRUE"`/`"FALSE"`; binds serialize to 1/0 via {@link castBoundValue}.
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
-  // Non-finite numbers (±Infinity, NaN) have no MySQL literal — `String(Infinity)`
-  // produces the bareword `Infinity`, which MySQL parses as an identifier and
-  // throws "Unknown column 'Infinity'". Mirror PG's behavior and quote them as
-  // strings; MySQL coerces or rejects at the column-type boundary.
-  if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
   if (typeof value === "symbol") {
     const desc = value.description;
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");

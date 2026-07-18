@@ -45,11 +45,11 @@ function isDateLike(value: unknown): value is { toISOString(): string } {
 
 function quoteScalar(this: ArelConnection, value: unknown): string {
   if (value === null || value === undefined) return "NULL";
-  if (typeof value === "number") {
-    // Non-finite numbers must be string-quoted; databases reject bare
-    // `Infinity` / `NaN` identifiers. PG accepts 'Infinity'::float8.
-    return Number.isFinite(value) ? String(value) : `'${String(value)}'`;
-  }
+  // Mirrors Rails' abstract `when Numeric then value.to_s` (abstract/quoting.rb:82):
+  // every number renders bare, including non-finite ones. Only PostgreSQL's adapter
+  // overrides this to string-quote non-finite values (postgresql/quoting.rb:111-115);
+  // postgresqlDefaultQuoter.quote layers that on top before delegating here.
+  if (typeof value === "number") return String(value);
   if (typeof value === "bigint") return String(value);
   if (typeof value === "boolean") return value ? this.quotedTrue() : this.quotedFalse();
   // Normalise all typed-array views to Uint8Array before handing off so
@@ -216,6 +216,12 @@ export const postgresqlDefaultQuoter: ArelConnection = {
   ...defaultQuoter,
 
   quote(value: unknown): string {
+    // Mirrors PostgreSQL::Quoting#quote (postgresql/quoting.rb:111-115): non-finite
+    // Numerics string-quote (`'Infinity'::float8`). This override is PG-only — the
+    // base/MySQL hosts emit them bare, per the abstract adapter.
+    if (typeof value === "number" && !Number.isFinite(value)) {
+      return `'${String(value)}'`;
+    }
     if (Array.isArray(value)) {
       // formatElement keeps #4867's fix alive on this path: a date element gets
       // the same `quoted_date` form the scalar path emits, mirroring Rails'

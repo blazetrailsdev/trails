@@ -38,10 +38,15 @@ describe("MySQL quoting — quote", () => {
     expect(quote(BigInt("9007199254740993"))).toBe("9007199254740993");
   });
 
-  it("quotes non-finite numbers as strings", () => {
-    expect(quote(Number.POSITIVE_INFINITY)).toBe("'Infinity'");
-    expect(quote(Number.NEGATIVE_INFINITY)).toBe("'-Infinity'");
-    expect(quote(NaN)).toBe("'NaN'");
+  it("renders non-finite numbers bare (Rails' MySQL adapter has no non-finite override)", () => {
+    // Rails' MySQL adapter defines no `quote` override, so non-finite numbers
+    // fall through to the abstract `when Numeric then value.to_s`
+    // (abstract/quoting.rb:82) and render bare — only PostgreSQL string-quotes
+    // them (postgresql/quoting.rb:111-115). This is invalid SQL on MySQL, but it
+    // is exactly what Rails emits; trails converges rather than mirror PG here.
+    expect(quote(Number.POSITIVE_INFINITY)).toBe("Infinity");
+    expect(quote(Number.NEGATIVE_INFINITY)).toBe("-Infinity");
+    expect(quote(NaN)).toBe("NaN");
   });
 
   it("throws on Date — Date is no longer accepted", () => {
