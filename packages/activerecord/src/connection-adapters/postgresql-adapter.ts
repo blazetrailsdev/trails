@@ -107,6 +107,7 @@ import {
   suppressCompositePrimaryKey,
   castResult,
   performQuery,
+  affectedRows as pgAffectedRows,
   handleWarnings,
   returningColumnValues as pgReturningColumnValues,
 } from "./postgresql/database-statements.js";
@@ -367,6 +368,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
+  /** @internal Rails' `@last_affected_rows`; read by the affected_rows port. */
+  _lastAffectedRows = 0;
   private _minMessages = "warning";
   // Memoized search path, backing Rails' @schema_search_path. Populated lazily
   // by schemaSearchPath() and updated by setSchemaSearchPath().
@@ -1729,28 +1732,64 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
-          const queryResult = await this._runQuery(client, rewritten, bindArray);
-          // Mirrors Rails' raw_execute → verified! (database_statements.rb):
-          // a successful round-trip proves the connection is live, so mark it
-          // verified to skip the verify ping on the next withRawConnection.
-          this.verifiedBang();
-          // A multi-statement string (e.g. disable_referential_integrity's
-          // joined ALTERs) runs under the simple-query protocol, where node-pg
-          // returns one Result per statement. Mirror Rails' execute and surface
-          // the last command's result.
-          const result = Array.isArray(queryResult)
-            ? queryResult[queryResult.length - 1]
-            : queryResult;
-          const rows = result?.rows ?? [];
-          payload.row_count = rows.length;
-          this._flushWarnings(rewritten);
-          return rows;
+          const result = await this._performQuery(client, rewritten, bindArray, payload);
+          return result?.rows ?? [];
         });
       } catch (e: any) {
         const translated = this._translateException(e, rewritten, bindArray);
         throw translated;
       }
     });
+  }
+
+  /**
+   * The single SQL primitive: run a statement, mark the connection verified,
+   * flush warnings, record the affected-row count, and set the notification
+   * payload's row count — the shared body of `execute` and `executeMutation`,
+   * mirroring Rails' one `perform_query`. Returns the raw pg result (rows for a
+   * row-returning statement, `rowCount` for a write). Unlike sqlite, node-pg
+   * does not throw on a non-row-returning statement, so there is no branch on a
+   * driver throw — the read/write split lives in the callers' contracts
+   * (`execute` returns `.rows`, `executeMutation` sources affected rows through
+   * the `affectedRows` port).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
+   */
+  private async _performQuery(
+    client: pg.Client,
+    sql: string,
+    binds: unknown[],
+    payload: Record<string, unknown>,
+  ): Promise<pg.QueryResult> {
+    const queryResult = await this._runQuery(client, sql, binds);
+    // Mirrors Rails' perform_query → verified!: a successful round-trip proves
+    // the connection is live, so skip the verify ping on the next
+    // withRawConnection.
+    this.verifiedBang();
+    // A multi-statement string (e.g. disable_referential_integrity's joined
+    // ALTERs) runs under the simple-query protocol, where node-pg returns one
+    // Result per statement. Mirror Rails' execute and surface the last
+    // command's result.
+    const result = (
+      Array.isArray(queryResult) ? queryResult[queryResult.length - 1] : queryResult
+    ) as pg.QueryResult;
+    // Rails stashes the count on the result and reads it back via affected_rows;
+    // keep a last-affected-rows field so the port has a stable backing value.
+    this._lastAffectedRows = result ? pgAffectedRows(result) : 0;
+    payload.row_count = result?.rows?.length ?? 0;
+    this._flushWarnings(sql);
+    return result;
+  }
+
+  /**
+   * Rows affected by the most recent write. Mirrors Rails' `affected_rows`,
+   * wired to the existing this-less port so api:compare coverage points at
+   * live code.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows
+   */
+  affectedRows(result?: pg.QueryResult): number {
+    return result ? pgAffectedRows(result) : this._lastAffectedRows;
   }
 
   /**
@@ -1812,19 +1851,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 await this._serializePinnedQuery(client, () =>
                   client.query(`SAVEPOINT "${spName}"`),
                 );
-              const result = await this._runQuery(client, withReturning, binds);
+              const result = await this._performQuery(client, withReturning, binds, payload);
               if (useSavepoint)
                 await this._serializePinnedQuery(client, () =>
                   client.query(`RELEASE SAVEPOINT "${spName}"`),
                 );
-              payload.row_count = result.rowCount ?? 0;
+              const affected = this.affectedRows(result);
+              payload.row_count = affected;
               if (result.rows.length > 1) {
-                return result.rowCount ?? result.rows.length;
+                return affected;
               }
               if (result.rows.length > 0) {
                 return result.rows[0][Object.keys(result.rows[0])[0]] as number;
               }
-              return result.rowCount ?? 0;
+              return affected;
             } catch (err) {
               // Cached-plan failures must propagate to the
               // transaction-retry machinery (Rails raises
@@ -1843,37 +1883,34 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 ).catch(() => {});
               }
               payload.sql = pgSql;
-              const result = await this._runQuery(client, pgSql, binds);
-              payload.row_count = result.rowCount ?? 0;
-              return result.rowCount ?? 0;
+              const result = await this._performQuery(client, pgSql, binds, payload);
+              const affected = this.affectedRows(result);
+              payload.row_count = affected;
+              return affected;
             }
           }
 
           // For INSERT with explicit RETURNING
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-            const result = await this._runQuery(client, pgSql, binds);
-            payload.row_count = result.rowCount ?? 0;
+            const result = await this._performQuery(client, pgSql, binds, payload);
+            const affected = this.affectedRows(result);
+            payload.row_count = affected;
             if (result.rows.length > 0) {
               return result.rows[0][Object.keys(result.rows[0])[0]] as number;
             }
-            return result.rowCount ?? 0;
+            return affected;
           }
 
           // For UPDATE/DELETE, return affected rows
-          const result = await this._runQuery(client, pgSql, binds);
-          payload.row_count = result.rowCount ?? 0;
-          return result.rowCount ?? 0;
+          const result = await this._performQuery(client, pgSql, binds, payload);
+          const affected = this.affectedRows(result);
+          payload.row_count = affected;
+          return affected;
         });
       } catch (e: any) {
         const translated = this._translateException(e, pgSql, binds);
         throw translated;
       }
-      // Mirrors Rails' raw_execute → verified!: the block completed a live
-      // round-trip, so mark verified to skip the next withRawConnection's ping.
-      this.verifiedBang();
-      // Flush inside the instrumented callback so a raised SQLWarning is visible
-      // to instrumentation subscribers — mirrors handle_warnings inside perform_query.
-      this._flushWarnings(payload.sql as string);
       return rc!;
     });
     return m;
