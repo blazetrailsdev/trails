@@ -209,6 +209,13 @@ describe("I18nTest", () => {
     expect(I18n.translate("nope.never.was", { default: [Symbol("fallback.greeting")] })).toBe("Hi");
   });
 
+  it("test_translate_with_default_and_raise_false", () => {
+    I18n.backend.storeTranslations("en", { translations: { foo: "Foo" } });
+    expect(
+      I18n.translate("translations.missing", { default: Symbol("translations.foo"), raise: false }),
+    ).toBe("Foo");
+  });
+
   it("test_translate_with_array_of_string_defaults", () => {
     expect(
       I18n.translate("translations.missing", {

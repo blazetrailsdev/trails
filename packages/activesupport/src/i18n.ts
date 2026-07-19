@@ -224,7 +224,7 @@ interface TranslateOptions {
   locale?: string;
   /** A value, or — following i18n — a chain tried entry by entry, Symbols
    * resolving as further keys, before the lookup is declared missing. */
-  default?: TranslationValue | (TranslationValue | symbol)[];
+  default?: TranslationValue | symbol | (TranslationValue | symbol)[];
   scope?: string;
   count?: number;
   /** When true, raise `MissingTranslationData` instead of returning a
@@ -318,35 +318,32 @@ class I18nModule {
     const keyStr = this._scopedKey(symbolToString(key), options.scope);
     const result = this.backend.lookup(locale, keyStr);
     if (result !== undefined) return interpolate(this._pluralize(result, options.count), options);
-    // An array `default` is always a chain (i18n/lib/i18n/backend/base.rb:124-145):
-    // each entry is tried in turn, Symbols resolving as further keys under the
-    // caller's scope, and resolution continues past any entry that yields nil.
-    // A non-array default is a single value — including an array *entry*, which
-    // stays literal (`default: [[]]` resolves to `[]`).
-    if (Array.isArray(options.default)) {
-      const consideredKeys: string[] = [keyStr];
-      for (const entry of options.default) {
-        if (entry === null || entry === undefined) continue;
-        if (typeof entry !== "symbol") {
-          return interpolate(this._pluralize(entry as TranslationValue, options.count), options);
-        }
-        const defaultKey = this._scopedKey(symbolToString(entry), options.scope);
-        consideredKeys.push(defaultKey);
-        const found = this.backend.lookup(locale, defaultKey);
-        if (found !== undefined) return interpolate(this._pluralize(found, options.count), options);
+    // `default` is a chain (i18n/lib/i18n/backend/base.rb:124-145): #default
+    // wraps its subject with Array(), so a lone default is a one-entry chain.
+    // Each entry is tried in turn, Symbols resolving as further keys under the
+    // caller's scope (base.rb:151-163), and resolution continues past any entry
+    // that yields nil. An array *entry* stays literal (`default: [[]]` → `[]`).
+    const chain =
+      options.default === undefined || options.default === null
+        ? []
+        : Array.isArray(options.default)
+          ? options.default
+          : [options.default];
+    const consideredKeys: string[] = [keyStr];
+    for (const entry of chain) {
+      if (entry === null || entry === undefined) continue;
+      if (typeof entry !== "symbol") {
+        return interpolate(this._pluralize(entry as TranslationValue, options.count), options);
       }
-      const hasDefaults = options.default.length > 0;
-      if (options.raise)
-        throw new MissingTranslationData(locale, keyStr, consideredKeys, hasDefaults);
-      return missingTranslationMessage(locale, keyStr, consideredKeys, hasDefaults);
+      const defaultKey = this._scopedKey(symbolToString(entry), options.scope);
+      consideredKeys.push(defaultKey);
+      const found = this.backend.lookup(locale, defaultKey);
+      if (found !== undefined) return interpolate(this._pluralize(found, options.count), options);
     }
-    if (options.default !== undefined)
-      return interpolate(
-        this._pluralize(options.default as TranslationValue, options.count),
-        options,
-      );
-    if (options.raise) throw new MissingTranslationData(locale, keyStr);
-    return `Translation missing: ${locale}.${keyStr}`;
+    const hasDefaults = chain.length > 0;
+    if (options.raise)
+      throw new MissingTranslationData(locale, keyStr, consideredKeys, hasDefaults);
+    return missingTranslationMessage(locale, keyStr, consideredKeys, hasDefaults);
   }
 
   /** @internal Mirrors I18n.normalize_keys' scope prefixing (i18n/lib/i18n.rb:360-370). */
