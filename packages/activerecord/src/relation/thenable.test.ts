@@ -130,6 +130,21 @@ describe("Thenable", () => {
     expect(await first.toArray()).toEqual(await davids.toArray());
   });
 
+  it("chaining load off a loaded relation does not nest views", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const once = await davids.load();
+    // Methods called on the view run with `this` bound to the view, so this
+    // re-enters stripThenable with the view itself. Rails' `load` returns
+    // `self`, so it must land back on the same object rather than wrapping.
+    const twice = await once.load();
+    const thrice = await (await twice.reload()).load();
+
+    expect(twice).toBe(once);
+    expect(thrice).toBe(once);
+    expect(await thrice.toArray()).toHaveLength(1);
+  });
+
   it("relation stays awaitable after destroyAll", async () => {
     const davids = Author.where({ name: "David" });
     expect(await davids).toHaveLength(1);

@@ -21,17 +21,29 @@
  * Deleting `.then` in place made the original binding's runtime shape
  * diverge from its static type: `await rel` after `await rel.load()`
  * silently resolved to the relation object instead of the records,
- * with no type error. The view forwards every operation to the target
- * with `this` bound to the target, so method calls still mutate (and
- * read) the one underlying relation — Rails' "same object, now loaded"
- * identity semantics — while leaving the original awaitable.
+ * with no type error. The view forwards every operation to the target,
+ * so reads and writes still land on the one underlying relation —
+ * Rails' "same object, now loaded" identity semantics — while leaving
+ * the original awaitable.
  *
  * The view is memoized per instance, so repeated `load()` calls return
- * the same view rather than allocating on every materialization.
+ * the same view rather than allocating on every materialization, and it
+ * is idempotent: `stripThenable(view)` is the view. Idempotency is load
+ * bearing, not a nicety. A method invoked *on* the view runs with `this`
+ * bound to the view (the `get` trap's receiver argument only rebinds
+ * accessors, not method calls), so `await (await rel.load()).load()`
+ * re-enters `stripThenable` with the view — which would otherwise wrap a
+ * view in a view, one layer per chained call. Rails' `load` and
+ * `presence` return `self` and `reload` is `reset; load`
+ * (`relation.rb:1179,1185,1189-1191`; `object/blank.rb:45-46`), so
+ * chaining must land back on the same object.
  */
 const thenlessViews = new WeakMap<object, object>();
+const thenlessViewSet = new WeakSet<object>();
 
 export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
+  if (thenlessViewSet.has(obj)) return obj as Omit<T, "then">;
+
   const cached = thenlessViews.get(obj);
   if (cached) return cached as Omit<T, "then">;
 
@@ -52,6 +64,7 @@ export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
   });
 
   thenlessViews.set(obj, view);
+  thenlessViewSet.add(view);
   return view as Omit<T, "then">;
 }
 
