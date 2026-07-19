@@ -2584,11 +2584,9 @@ function ensureAbstractAdapterMixinsApplied(): void {
   // go through the public `update`/`delete` — which themselves call
   // `execUpdate`/`execDelete`. Wiring the public methods would miss the direct
   // save path; wiring the low-level method catches both, exactly once each. The
-  // still-lower `executeMutation` these funnel through is wrapped separately
-  // (on each concrete adapter, via `dirtiesQueryCacheUnlessNested`) so DDL —
-  // which reaches `executeMutation` directly — also dirties; the
-  // `_writeDirtyDepth` guard suppresses its clear when nested under one of these
-  // wrappers so a logical write still clears exactly once. Wire the methods NOT overridden
+  // still-lower `executeMutation` these funnel through stays unwrapped, so a
+  // logical write clears exactly once. DDL dirties because schema-statements
+  // routes it through the wired public `execute`, as Rails does. Wire the methods NOT overridden
   // by a concrete adapter here — they're only defined on AbstractAdapter, and a
   // subclass prototype doesn't yet inherit them when the per-adapter module runs
   // (circular-import load order), so they must be wired on AbstractAdapter. The

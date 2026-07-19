@@ -25,11 +25,7 @@ import {
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
 } from "./abstract/schema-statements.js";
-import {
-  dirtiesQueryCache,
-  dirtiesQueryCacheExceptSchema,
-  dirtiesQueryCacheUnlessNested,
-} from "./abstract/query-cache.js";
+import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -1575,7 +1571,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       return;
     }
     const indexName = indexNameForRemoveFrom(genName, all, tableName, columnName, opts);
-    await this.executeMutation(`DROP INDEX ${quoteColumnName(indexName)}`);
+    await this.execute(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
   createSchemaDumper(
@@ -1637,7 +1633,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // as an identifier since it occupies a SQL keyword position.
     const args = Array.isArray(virtualValues) ? virtualValues.map(String) : [];
     const rawArgs = args.join(", ");
-    await this.executeMutation(
+    await this.execute(
       `CREATE VIRTUAL TABLE IF NOT EXISTS ${quoteTableName(tableName)} USING ${mod}(${rawArgs})`,
     );
   }
@@ -1647,13 +1643,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     _moduleName?: string,
     _values?: string[],
   ): Promise<void> {
-    await this.executeMutation(`DROP TABLE IF EXISTS ${quoteTableName(tableName)}`);
+    await this.execute(`DROP TABLE IF EXISTS ${quoteTableName(tableName)}`);
   }
 
   async renameTable(tableName: string, newName: string): Promise<void> {
     this.schemaCache.clearDataSourceCacheBang(this.pool, tableName);
     this.schemaCache.clearDataSourceCacheBang(this.pool, newName);
-    await this.executeMutation(
+    await this.execute(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME TO ${quoteTableName(newName)}`,
     );
   }
@@ -1676,7 +1672,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // the SQLite override would leave a stale columns entry after an
     // `ALTER TABLE … ADD COLUMN`.
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
-    await this.executeMutation(sql);
+    await this.execute(sql);
   }
 
   async removeColumn(tableName: string, columnName: string, _type?: string): Promise<void> {
@@ -1728,7 +1724,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       const existing = (await this.columns(tableName)).find((c) => c.name === columnName);
       const serialized = this.serializeDefaultForColumn(defaultValue, existing?.sqlType ?? null);
       const quotedDefault = this.quoteDefault(serialized);
-      await this.executeMutation(
+      await this.execute(
         `UPDATE ${quoteTableName(tableName)} SET ${quoteColumnName(columnName)} = ${quotedDefault} WHERE ${quoteColumnName(columnName)} IS NULL`,
       );
     }
@@ -1762,7 +1758,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   async renameColumn(tableName: string, columnName: string, newColumnName: string): Promise<void> {
     this.schemaCache?.clearDataSourceCacheBang(this.pool, tableName);
-    await this.executeMutation(
+    await this.execute(
       `ALTER TABLE ${quoteTableName(tableName)} RENAME COLUMN ${quoteColumnName(columnName)} TO ${quoteColumnName(newColumnName)}`,
     );
   }
@@ -3213,8 +3209,8 @@ function translateException(
 // this adapter does NOT override (`execUpdate`/`execDelete`/`execInsertAll`/
 // `truncateTables`/`restartDbTransaction`) are wired once on AbstractAdapter.
 // Each logical write clears the cache exactly once; the still-lower
-// `executeMutation` these funnel through is wrapped separately (below) but
-// guarded to defer to the outer clear, and reads route through
+// `executeMutation` these funnel through is deliberately NOT wrapped (DDL runs
+// through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(
   AbstractSQLite3Adapter,
@@ -3227,11 +3223,6 @@ dirtiesQueryCache(
 // "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
 // use the schema-aware variant here — those reflection reads must not dirty.
 dirtiesQueryCacheExceptSchema(AbstractSQLite3Adapter, "execQuery", "execute");
-// DDL funnels through `executeMutation` (schema-statements), not the wired
-// `execute`; wire it so schema changes dirty the cache like Rails' `execute`-based
-// DDL. Nested CRUD (`execInsert`/`execUpdate`/`execDelete` → `executeMutation`)
-// is suppressed by the `_writeDirtyDepth` guard to avoid a double-clear.
-dirtiesQueryCacheUnlessNested(AbstractSQLite3Adapter, "executeMutation");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers
