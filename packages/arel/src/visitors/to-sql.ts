@@ -5,6 +5,7 @@ import { Composite } from "../collectors/composite.js";
 import { SubstituteBinds } from "../collectors/substitute-binds.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
+import { rubyToS } from "../ruby-to-s.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -1617,13 +1618,13 @@ export class ToSql extends Visitor {
   /** @internal */
   protected quoteTableName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteTableName(String(name));
+    return this.connection.quoteTableName(rubyToS(name));
   }
 
   /** @internal */
   protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteColumnName(String(name));
+    return this.connection.quoteColumnName(rubyToS(name));
   }
 
   /**

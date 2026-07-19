@@ -871,12 +871,11 @@ describe("inspect wrapper class name", () => {
   // Note the resulting SQL is a *broken* column reference in Rails too:
   // `Arel::Table#[]` builds `Attribute.new(table, name)` for any name
   // (arel/table.rb:82) and `visit_Arel_Attributes_Attribute` hands it to the
-  // adapter's `quote_column_name`, which stringifies the Array. So Rails emits
-  // `"cpk_orders"."[\"shop_id\", \"id\"]"` and we emit
-  // `"cpk_orders"."shop_id,id"` — same shape, differing only by Ruby's
-  // `Array#to_s` vs JS's. Both fail at the database. Reproducing that is the
-  // point: the deviation being fixed is the *raise*, and converging the
-  // stringification would mean inventing formatting Rails never specified.
+  // adapter's `quote_column_name`, which stringifies the Array via `name.to_s`.
+  // We match Rails byte-for-byte — `"cpk_orders"."[\"shop_id\", \"id\"]"` —
+  // because the visitor routes the name through `rubyToS` (Ruby's `Array#to_s`
+  // is inspect-style, not JS's comma-join). Both fail at the database;
+  // reproducing Rails' exact text is the point.
   it("defaults an unordered reverseOrder to a composite primary key descending", () => {
     const clauses = reverseSqlOrder.call(CpkOrder.all() as any, []);
     expect(clauses).toHaveLength(1);
@@ -886,7 +885,11 @@ describe("inspect wrapper class name", () => {
 
     // End-to-end: builds rather than raising.
     expect(CpkOrder.all().reverseOrder().toSql()).toContain(`ORDER BY`);
-    expect(CpkOrder.all().reverseOrder().toSql()).toMatch(/ORDER BY .*shop_id.*id.* DESC/i);
+    // `quote_column_name` wraps the `to_s` in `"` and doubles the interior
+    // quotes, so the inspect-style `["shop_id", "id"]` lands as `[""shop_id""…`.
+    expect(CpkOrder.all().reverseOrder().toSql()).toContain(
+      `"cpk_orders"."[""shop_id"", ""id""]" DESC`,
+    );
   });
 
   // compact_blank: a blank string order is rejected before the reverse, so the
