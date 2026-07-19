@@ -40,6 +40,7 @@ import { Result } from "../result.js";
 import { ForeignKeyDefinition } from "./abstract/schema-definitions.js";
 import { ExplainPrettyPrinter } from "./mysql/explain-pretty-printer.js";
 import {
+  affectedRows as mysql2AffectedRows,
   buildColumnTypes,
   castResult as mysql2CastResult,
   performQuery as mysql2PerformQuery,
@@ -288,6 +289,13 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Updated by {@link _syncDatabaseTimezone} from the perform-query path.
    */
   databaseTimezone: "utc" | "local" = "utc";
+
+  /**
+   * Rows affected by the most recent write, recorded by {@link _performQuery}.
+   * Rails takes the statement result in `affected_rows` and ignores it, reading
+   * `@affected_rows` (set inside `perform_query`) instead — this is that field.
+   */
+  _affectedRowsBeforeWarnings = 0;
 
   /**
    * Refresh {@link databaseTimezone} from the global default. Called from
@@ -920,6 +928,51 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
   }
 
   /**
+   * The single SQL primitive `execute` / `executeMutation` delegate to: track
+   * the prepared statement, run the statement through the shared array-mode
+   * `performQuery` seam (which records the affected-row count in
+   * `_affectedRowsBeforeWarnings`), fetch warnings, and set the notification
+   * payload's row count. Returns the raw `{ rows, fields, affectedRows,
+   * insertId }` — `execute` rebuilds row objects from it, `executeMutation`
+   * reads the affected rows / insert id. mysql2 hands back a ResultSetHeader
+   * (with `affectedRows` / `insertId`) rather than rows for a non-row-returning
+   * statement, so the read/write split is which shape came back, not a driver
+   * throw.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#perform_query
+   */
+  private async _performQuery(
+    conn: mysql.Connection,
+    driverSql: string,
+    binds: unknown[],
+    driverBinds: unknown[],
+    payload: Record<string, unknown>,
+  ): Promise<Mysql2RawResult> {
+    // Track the SQL in our statement pool first so LRU eviction sends
+    // COM_STMT_CLOSE (via unprepare) when we exceed `statement_limit`.
+    const prepare = this._shouldPrepare(binds);
+    if (prepare) this._trackPrepared(conn, driverSql);
+    const raw = await mysql2PerformQuery.call(this as any, conn, driverSql, binds, driverBinds, {
+      prepare,
+    });
+    payload.row_count = raw.rows?.length ?? 0;
+    await this._handleWarningsOn(conn, driverSql);
+    return raw;
+  }
+
+  /**
+   * Rows affected by the most recent write. Rails takes the statement result
+   * and ignores it, reading `@affected_rows` instead — wired to the this-less
+   * port so api:compare's `affected_rows` coverage points at reachable code.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::Mysql2::DatabaseStatements#affected_rows
+   * @internal
+   */
+  affectedRows(rawResult: Mysql2RawResult): number {
+    return mysql2AffectedRows.call(this as any, rawResult);
+  }
+
+  /**
    * Execute a SELECT query and return rows. Wrapped in a
    * `sql.active_record` notification — mirrors Rails'
    * `AbstractAdapter#log` so LogSubscriber / ExplainSubscriber /
@@ -951,33 +1004,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          // Use server-side prepared statements when enabled and binds
-          // are present — matches PR #589's preparedStatements toggle.
-          // Track the SQL in our statement pool first so LRU eviction
-          // sends COM_STMT_CLOSE (via unprepare) when we exceed
-          // `statement_limit`.
-          const prepare = this._shouldPrepare(binds);
-          if (prepare) this._trackPrepared(mysqlConn, driverSql);
-          const [rows, rowFields] = prepare
-            ? await mysqlConn.execute(driverSql, driverBinds as any[])
-            : await mysqlConn.query(driverSql, driverBinds);
-          // Unwrap nested result sets from CALL (see execQuery for the full
-          // comment). Use rowFields[0] as the fields.empty? discriminator.
-          let r: Record<string, unknown>[];
-          if (Array.isArray(rowFields) && Array.isArray(rowFields[0])) {
-            r = (rows as unknown[])[0] as Record<string, unknown>[];
-          } else if (
-            Array.isArray(rowFields) &&
-            rowFields[0] === undefined &&
-            Array.isArray(rows)
-          ) {
-            r = [];
-          } else {
-            r = Array.isArray(rows) ? (rows as Record<string, unknown>[]) : [];
-          }
-          payload.row_count = r.length;
-          await this._handleWarningsOn(mysqlConn, driverSql);
-          return r;
+          const raw = await this._performQuery(mysqlConn, driverSql, binds, driverBinds, payload);
+          // A non-row-returning statement (DML passed to execute) has null rows.
+          // Rebuild hash-keyed row objects from the array-mode positional rows +
+          // field descriptors `perform_query` returns — the same objects a
+          // non-array-mode driver query would have produced (duplicate column
+          // names collapse either way).
+          if (raw.rows == null) return [];
+          const names = raw.fields.map((f) => f.name);
+          return raw.rows.map((row) => {
+            const obj: Record<string, unknown> = {};
+            for (let i = 0; i < names.length; i++) obj[names[i]] = row[i];
+            return obj;
+          });
         });
       } catch (e: any) {
         const translated =
@@ -1014,25 +1053,23 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       try {
         return await this.withRawConnection(async (conn) => {
           const mysqlConn = conn as unknown as mysql.Connection;
-          const prepare = this._shouldPrepare(binds);
-          if (prepare) this._trackPrepared(mysqlConn, driverSql);
-          const [result] = prepare
-            ? await mysqlConn.execute(driverSql, driverBinds as any[])
-            : await mysqlConn.query(driverSql, driverBinds);
-          const info = result as mysql.ResultSetHeader;
-          payload.row_count = info.affectedRows ?? 0;
-          await this._handleWarningsOn(mysqlConn, driverSql);
+          const raw = await this._performQuery(mysqlConn, driverSql, binds, driverBinds, payload);
+          // Source affected rows through the `affected_rows` port (reads the
+          // `_affectedRowsBeforeWarnings` field `perform_query` set) rather than
+          // off the statement result, mirroring Rails' `affected_rows`.
+          const affected = this.affectedRows(raw);
+          payload.row_count = affected;
 
           // For INSERT, return the last inserted ID (or affected rows for multi-row)
           if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
-            if (info.affectedRows > 1) {
-              return info.affectedRows;
+            if (affected > 1) {
+              return affected;
             }
-            return info.insertId;
+            return raw.insertId ?? 0;
           }
 
           // For UPDATE/DELETE, return affected rows
-          return info.affectedRows;
+          return affected;
         });
       } catch (e: any) {
         const translated =
