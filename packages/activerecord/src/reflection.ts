@@ -585,17 +585,31 @@ export class MacroReflection extends AbstractReflection {
   private _klassCacheGeneration = -1;
 
   constructor(
-    name: string,
+    name: string | null,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
     activeRecord: typeof Base,
   ) {
     super();
-    this.name = name;
+    // Rails' `name` is a Symbol that callers always supply, but
+    // `Reflection.create` itself tolerates nil (reflection_test.rb:126). The
+    // field stays typed `string` because every real association path sets it;
+    // the nil case is confined to this assignment.
+    this.name = name as string;
     this._scope = scope;
     this.options = this.normalizeOptions(options);
     this.activeRecord = activeRecord;
-    this.pluralName = pluralize(name);
+    this.pluralName = activeRecord.pluralizeTableNames ? pluralize(name ?? "") : (name ?? "");
+  }
+
+  /**
+   * Ruby's `name.to_s` — nil renders as "". Rails stores `@name = name` but
+   * every string derivation goes through interpolation or `to_s`
+   * (reflection.rb:453, :821-825, :829), so a nil name yields "" / "_id" /
+   * "_type" rather than the literal "null" JS template strings would produce.
+   */
+  protected get nameString(): string {
+    return this.name ?? "";
   }
 
   equals(other: unknown): boolean {
@@ -623,7 +637,7 @@ export class MacroReflection extends AbstractReflection {
 
   get className(): string {
     if (this.options.className) return this.options.className as string;
-    return camelize(singularize(this.name));
+    return camelize(singularize(this.nameString));
   }
 
   get klass(): typeof Base {
@@ -689,7 +703,7 @@ export class MacroReflection extends AbstractReflection {
       // (reflection.rb:495-508). Match AssociationReflection#computeClass so
       // callers rescuing only NameError treat both paths uniformly.
       throw new NameError(
-        `Model '${lookupName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
+        `Model '${lookupName}' not found in registry (for '${this.nameString}' on ${this.activeRecord.name})`,
       );
     }
     return resolved;
@@ -712,7 +726,7 @@ export class MacroReflection extends AbstractReflection {
    * Derives class name from association name. Used by `className` getter.
    */
   protected deriveClassName(): string {
-    return camelize(this.name);
+    return camelize(this.nameString);
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
@@ -784,7 +798,7 @@ export class AssociationReflection extends MacroReflection {
   private _activeRecordPrimaryKeyCache: string | string[] | null = null;
 
   constructor(
-    name: string,
+    name: string | null,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
     activeRecord: typeof Base,
@@ -799,7 +813,7 @@ export class AssociationReflection extends MacroReflection {
       const macro = new.target.name.replace(/Reflection$/, "");
       const macroName = macro.charAt(0).toLowerCase() + macro.slice(1);
       throw new ConfigurationError(
-        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${macroName} :${name}\` ` +
+        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${macroName} :${name ?? ""}\` ` +
           `is not allowed. To get the same behavior, use the \`foreignKey\` option instead.`,
       );
     }
@@ -844,7 +858,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   private deriveForeignKey(inferFromInverseOf = true): string {
-    if (this.belongsTo()) return `${underscore(this.name)}_id`;
+    if (this.belongsTo()) return `${underscore(this.nameString)}_id`;
     if (this.options.as) return `${underscore(this.options.as as string)}_id`;
     if (this.options.inverseOf && inferFromInverseOf) {
       const inv = this.inverseOf();
@@ -904,7 +918,9 @@ export class AssociationReflection extends MacroReflection {
   get foreignType(): string | null {
     if (!this.options.polymorphic && !this.options.as) return null;
     if (this.belongsTo())
-      return (this.options.foreignType as string | undefined) ?? `${underscore(this.name)}_type`;
+      return (
+        (this.options.foreignType as string | undefined) ?? `${underscore(this.nameString)}_type`
+      );
     if (this.options.as) {
       return (
         (this.options.foreignType as string | undefined) ??
@@ -1154,7 +1170,7 @@ export class AssociationReflection extends MacroReflection {
     //   klass.cached_find_by_statement(key, &block)
     // The compiled statement is memoized on the *target* class, keyed by this
     // reflection (plus the owner's polymorphic type when applicable).
-    let key = `assocScope:${this.activeRecord.name}#${this.name}`;
+    let key = `assocScope:${this.activeRecord.name}#${this.nameString}`;
     if (this.isPolymorphic()) {
       key += `:${owner?._readAttribute?.(this.foreignType)}`;
     }
@@ -1188,7 +1204,7 @@ export class AssociationReflection extends MacroReflection {
     // Rails checks scope.arity == 0 because it uses instance_exec for the relation.
     if (this.scope.length > 1) {
       throw new ArgumentError(
-        `The association scope '${this.name}' is instance dependent (the scope ` +
+        `The association scope '${this.nameString}' is instance dependent (the scope ` +
           `block takes more than one argument). Eager loading instance dependent scopes is not supported.`,
       );
     }
@@ -1300,7 +1316,7 @@ export class AssociationReflection extends MacroReflection {
           if (resolved) {
             if (!(resolved as any)._isActiveRecordBase) {
               throw new ArgumentError(
-                `The ${candidate} model class for the ${this.activeRecord.name}#${this.name} association is not an ActiveRecord::Base subclass.`,
+                `The ${candidate} model class for the ${this.activeRecord.name}#${this.nameString} association is not an ActiveRecord::Base subclass.`,
               );
             }
             return resolved;
@@ -1315,12 +1331,12 @@ export class AssociationReflection extends MacroReflection {
       // error check_validity! callers rescue); the subclass guard below raises
       // ArgumentError, which must propagate. reflection.rb:495-508.
       throw new NameError(
-        `Model '${simpleName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
+        `Model '${simpleName}' not found in registry (for '${this.nameString}' on ${this.activeRecord.name})`,
       );
     }
     if (!(resolved as any)._isActiveRecordBase) {
       throw new ArgumentError(
-        `The ${simpleName} model class for the ${this.activeRecord.name}#${this.name} association is not an ActiveRecord::Base subclass.`,
+        `The ${simpleName} model class for the ${this.activeRecord.name}#${this.nameString} association is not an ActiveRecord::Base subclass.`,
       );
     }
     return resolved;
@@ -1333,9 +1349,9 @@ export class AssociationReflection extends MacroReflection {
   get className(): string {
     if (this.options.className) return this.options.className as string;
     if (this.isCollection()) {
-      return camelize(singularize(this.name));
+      return camelize(singularize(this.nameString));
     }
-    return camelize(this.name);
+    return camelize(this.nameString);
   }
 
   /** @internal */
@@ -1559,6 +1575,11 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.name;
   }
 
+  /** Ruby's `name.to_s` — see MacroReflection#nameString. */
+  private get nameString(): string {
+    return this.name ?? "";
+  }
+
   get macro(): MacroType {
     return this.delegateReflection.macro;
   }
@@ -1705,14 +1726,14 @@ export class ThroughReflection extends AbstractReflection {
     const throughRef = this.throughReflection;
     if (throughRef) {
       try {
-        const singular = singularize(this.name);
+        const singular = singularize(this.nameString);
         if (throughRef.klass._reflectOnAssociation(singular)) return singular;
         if (throughRef.klass._reflectOnAssociation(this.name)) return this.name;
       } catch {
         /* klass resolution may fail */
       }
     }
-    return this._delegate.isCollection() ? singularize(this.name) : this.name;
+    return this._delegate.isCollection() ? singularize(this.nameString) : this.name;
   }
 
   get sourceReflection(): AssociationReflection | ThroughReflection | null {
@@ -1869,7 +1890,7 @@ export class ThroughReflection extends AbstractReflection {
 
   sourceReflectionNames(): string[] {
     if (this.options.source) return [this.options.source as string];
-    const singular = singularize(this.name);
+    const singular = singularize(this.nameString);
     const names = [singular, this.name];
     return [...new Set(names)];
   }
@@ -1892,7 +1913,7 @@ export class ThroughReflection extends AbstractReflection {
     }
 
     try {
-      const singular = singularize(this.name);
+      const singular = singularize(this.nameString);
       const candidates = [...new Set([singular, this.name])];
       const matching = candidates.filter((n) => throughRef.klass._reflectOnAssociation(n) != null);
 
@@ -2217,7 +2238,7 @@ export class ColumnReflection {
 function reflectionClassFor(
   macro: string,
 ): new (
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
@@ -2241,21 +2262,21 @@ function reflectionClassFor(
  */
 export function create(
   macro: Exclude<MacroType, "composedOf">,
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): AssociationReflection | ThroughReflection;
 export function create(
   macro: "composedOf",
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): AggregateReflection;
 export function create(
   macro: MacroType,
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
