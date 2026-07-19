@@ -849,4 +849,22 @@ describe("inspect wrapper class name", () => {
     expect(relation.isLoaded).toBe(false);
     expect(relation.inspect()).toBe("#<ActiveRecord::Relation [...]>");
   });
+
+  // reverse_sql_order's empty-order branch has two outcomes; the no-PK raise is
+  // covered by Rails' test_default_reverse_order_on_table_without_primary_key in
+  // relations.test.ts. This guards the other half, which has no like-named Rails
+  // test: a PK-bearing table falls back to ORDER BY <pk> DESC. Before the
+  // reverseOrderBang fix, an empty order was a silent no-op and emitted no
+  // ORDER BY at all.
+  it("defaults an unordered reverseOrder to the primary key descending", () => {
+    expect(CanonPost.all().reverseOrder().toSql()).toContain("ORDER BY");
+    expect(CanonPost.all().reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
+  });
+
+  // compact_blank: a blank string order is rejected before the reverse, so the
+  // relation still falls back to the primary-key default rather than trying to
+  // flip "" into " DESC".
+  it("treats a blank string order as no order when reversing", () => {
+    expect(CanonPost.order("").reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
+  });
 });
