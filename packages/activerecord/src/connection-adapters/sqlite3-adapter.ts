@@ -25,7 +25,7 @@ import {
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
 } from "./abstract/schema-statements.js";
-import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
+import { dirtiesQueryCache } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -1519,11 +1519,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async primaryKeys(tableName: string): Promise<string[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = await this.execute(
-      `PRAGMA ${prefix}table_info(${quoteColumnName(bare)})`,
-      [],
-      "SCHEMA",
-    );
+    const rows = await this.schemaQuery(`PRAGMA ${prefix}table_info(${quoteColumnName(bare)})`);
     return rows
       .filter((r) => Number(r.pk) > 0)
       .sort((a, b) => Number(a.pk) - Number(b.pk))
@@ -1571,7 +1567,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       return;
     }
     const indexName = indexNameForRemoveFrom(genName, all, tableName, columnName, opts);
-    await this.execute(`DROP INDEX ${quoteColumnName(indexName)}`);
+    await this.schemaQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
   createSchemaDumper(
@@ -1583,10 +1579,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
 
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3::SchemaStatements#virtual_table_exists?
   async virtualTableExists(tableName: string): Promise<boolean> {
-    const rows = await this.execute(
+    const rows = await this.schemaQuery(
       `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND type = 'virtual' AND name = ?`,
       [tableName],
-      "SCHEMA",
     );
     return rows.length > 0;
   }
@@ -1596,8 +1591,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async virtualTables(): Promise<Record<string, [string, string]>> {
     const rows = (await this.execute(
       "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql LIKE '%VIRTUAL%'",
-      [],
-      "SCHEMA",
     )) as Array<{ name: string; sql: string }>;
     const result: Record<string, [string, string]> = {};
     for (const r of rows) {
@@ -1633,7 +1626,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // as an identifier since it occupies a SQL keyword position.
     const args = Array.isArray(virtualValues) ? virtualValues.map(String) : [];
     const rawArgs = args.join(", ");
-    await this.execute(
+    await this.schemaQuery(
       `CREATE VIRTUAL TABLE IF NOT EXISTS ${quoteTableName(tableName)} USING ${mod}(${rawArgs})`,
     );
   }
@@ -1793,11 +1786,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = await this.execute(
-      `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
-      [],
-      "SCHEMA",
-    );
+    const rows = await this.execute(`PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`);
     const grouped = new Map<number, Array<Record<string, unknown>>>();
     for (const row of rows) {
       const id = row.id as number;
@@ -2030,19 +2019,15 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    * matches Rails' SQLite3::SchemaStatements#tables filter.
    */
   async tables(): Promise<string[]> {
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       "SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND type IN ('table')",
-      [],
-      "SCHEMA",
     )) as Array<{ name: string }>;
     return rows.map((r) => r.name);
   }
 
   async views(): Promise<string[]> {
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       "SELECT name FROM sqlite_master WHERE type='view' ORDER BY name",
-      [],
-      "SCHEMA",
     )) as Array<{ name: string }>;
     return rows.map((r) => r.name);
   }
@@ -2090,17 +2075,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     if (name.includes(".")) {
       // Schema-qualified name (e.g. "aux.widgets") — query the attached schema's catalog.
       const { sqliteMaster, bare } = this._sqliteMasterFor(name);
-      const rows = (await this.execute(
+      const rows = (await this.schemaQuery(
         `SELECT 1 AS one FROM ${sqliteMaster} WHERE type='table' AND name=${sqliteQuoteStringLiteral(bare)}`,
-        [],
-        "SCHEMA",
       )) as Array<{ one: number }>;
       return rows.length > 0;
     }
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(name)} AND type IN ('table')`,
-      [],
-      "SCHEMA",
     )) as Array<{ name: string }>;
     return rows.length > 0;
   }
@@ -2113,17 +2094,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       // bare-name branches on the same exclusion semantics (no virtuals,
       // no FTS shadow tables).
       const { schema, bare } = this._splitTableName(name);
-      const rows = (await this.execute(
+      const rows = (await this.schemaQuery(
         `SELECT name FROM pragma_table_list WHERE schema = ${sqliteQuoteStringLiteral(schema)} COLLATE NOCASE AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(bare)} AND type IN ('table','view')`,
-        [],
-        "SCHEMA",
       )) as Array<{ name: string }>;
       return rows.length > 0;
     }
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       `SELECT name FROM pragma_table_list WHERE schema <> 'temp' AND name NOT IN ('sqlite_sequence', 'sqlite_schema') AND name = ${sqliteQuoteStringLiteral(name)} AND type IN ('table','view')`,
-      [],
-      "SCHEMA",
     )) as Array<{ name: string }>;
     return rows.length > 0;
   }
@@ -2142,10 +2119,8 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async primaryKey(tableName: string): Promise<string | string[] | null> {
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = (await this.execute(
+    const rows = (await this.schemaQuery(
       `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bare)})`,
-      [],
-      "SCHEMA",
     )) as Array<{ name: string; pk: number }>;
     const pks = rows.filter((r) => r.pk > 0).sort((a, b) => a.pk - b.pk);
     if (pks.length === 0) return null;
@@ -2567,7 +2542,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const { schema, bare } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const pragma = this.supportsVirtualColumns() ? "table_xinfo" : "table_info";
-    return this.execute(`PRAGMA ${pragmaPrefix}${pragma}(${quoteColumnName(bare)})`, [], "SCHEMA");
+    return this.schemaQuery(`PRAGMA ${pragmaPrefix}${pragma}(${quoteColumnName(bare)})`);
   }
 
   /** @internal */
@@ -3219,10 +3194,7 @@ dirtiesQueryCache(
   "rollbackToSavepoint",
   "truncate",
 );
-// Schema reflection reuses the wrapped `execute`/`exec_query` with name
-// "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
-// use the schema-aware variant here — those reflection reads must not dirty.
-dirtiesQueryCacheExceptSchema(AbstractSQLite3Adapter, "execQuery", "execute");
+dirtiesQueryCache(AbstractSQLite3Adapter, "execQuery", "execute");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`
 // at the bottom of Rails' sqlite3_adapter.rb — lets railtie initializers

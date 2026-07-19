@@ -555,32 +555,6 @@ function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
   if (host._queryCache && !cleared.has(host._queryCache)) host._queryCache.clear();
 }
 
-/** @internal Reassign each named prototype slot to a cache-dirtying wrapper. */
-function wireDirties(
-  base: { prototype: object },
-  methodNames: string[],
-  skipSchemaReflection: boolean,
-): void {
-  const proto = base.prototype as Record<string, unknown>;
-  for (const methodName of methodNames) {
-    const original = proto[methodName];
-    if (typeof original !== "function") continue;
-
-    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      // Clear unconditionally, mirroring Rails' `dirties_query_cache` (each wired
-      // method clears via `super`, query_cache.rb:13). The clear is idempotent, so
-      // a nested wired write clearing an already-cleared cache is harmless. Each
-      // logical write clears exactly once anyway: the write primitive
-      // (`executeMutation`) these funnel into is not itself wired, and DDL —
-      // which Rails also dirties — reaches the wired `execute` directly.
-      if (!!this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"))) {
-        clearCurrentThreadQueryCaches(this);
-      }
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
-    };
-  }
-}
-
 /**
  * Wraps the named write methods on `base.prototype` so each clears the
  * per-connection query cache (when its `dirties` flag is set) before
@@ -592,27 +566,26 @@ function wireDirties(
  * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache.dirties_query_cache
  */
 export function dirtiesQueryCache(base: { prototype: object }, ...methodNames: string[]): void {
-  wireDirties(base, methodNames, false);
-}
+  const proto = base.prototype as Record<string, unknown>;
+  for (const methodName of methodNames) {
+    const original = proto[methodName];
+    if (typeof original !== "function") continue;
 
-/**
- * Like {@link dirtiesQueryCache}, but skips the clear for schema-reflection
- * queries (name `"SCHEMA"`). Use this ONLY for `execute`/`execQuery`: Rails
- * routes schema reflection through the permanently-unwrapped `internal_exec_query`,
- * so it never dirties the cache, whereas trails reuses the wrapped
- * `execute`/`exec_query` (with name `"SCHEMA"`) for reflection. Skipping those
- * reproduces Rails' behavior (otherwise re-reflecting columns inside a `cache`
- * block would evict the cache). This is deliberately NOT applied to the generic
- * write wiring — a real mutation whose `name` happened to be `"SCHEMA"` (e.g.
- * `truncate(table, "SCHEMA")`) must still dirty — and within `execute`/`execQuery`
- * the only non-SQL string argument is the `name`, so the check can't false-match
- * a bind (binds are passed as an array, never the bare string `"SCHEMA"`).
- */
-export function dirtiesQueryCacheExceptSchema(
-  base: { prototype: object },
-  ...methodNames: string[]
-): void {
-  wireDirties(base, methodNames, true);
+    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
+      // Clear unconditionally, mirroring Rails' `dirties_query_cache` (each wired
+      // method clears via `super`, query_cache.rb:13). The clear is idempotent, so
+      // a nested wired write clearing an already-cleared cache is harmless. Each
+      // logical write clears exactly once anyway: the write primitive
+      // (`executeMutation`) these funnel into is not itself wired, and DDL —
+      // which Rails also dirties — reaches the wired `execute` directly. Schema
+      // reflection never reaches here: it routes through the permanently
+      // unwrapped `internalExecQuery`, as in Rails.
+      if (this._queryCache?.dirties) {
+        clearCurrentThreadQueryCaches(this);
+      }
+      return (original as (...a: unknown[]) => unknown).apply(this, args);
+    };
+  }
 }
 
 /**

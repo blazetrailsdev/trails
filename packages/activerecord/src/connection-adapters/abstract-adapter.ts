@@ -888,20 +888,12 @@ export class AbstractAdapter implements Quoting {
    * Mirrors: ActiveRecord's `internal_exec_query(sql, "SCHEMA")` usage
    * pattern in SchemaStatements / SchemaCache.
    */
-  schemaQuery(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
-    const execute = (
-      this as unknown as {
-        execute?: (
-          sql: string,
-          binds?: unknown[],
-          name?: string,
-        ) => Promise<Record<string, unknown>[]>;
-      }
-    ).execute;
-    if (typeof execute !== "function") {
-      throw new Error("schemaQuery requires the adapter to implement execute()");
-    }
-    return execute.call(this, sql, binds, "SCHEMA");
+  async schemaQuery(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+    // `internalExecQuery` is never wrapped by `dirtiesQueryCache`, so reflection
+    // cannot evict the query cache — the structural distinction Rails gets from
+    // `internal_exec_query` being a separate method from the public `exec_query`.
+    const result = await this.internalExecQuery(sql, "SCHEMA", binds);
+    return result.toArray();
   }
 
   // --- QueryCache mixin (mirrors ActiveRecord::ConnectionAdapters::QueryCache) ---
