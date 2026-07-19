@@ -123,6 +123,75 @@ export function cteRelationSelfWraps(relation: Node): boolean {
 }
 
 /**
+ * Ruby `Object#to_s`, as applied by every adapter's `quote_column_name` /
+ * `quote_table_name` (`name.to_s`, sqlite3/quoting.rb:45, mysql/quoting.rb:47,
+ * postgresql/quoting.rb:47). Rails does that coercion inside the adapter, which
+ * receives the raw name; trails' `Connection` quoting surface is typed to take
+ * a string, so the visitor is where the name is stringified and therefore where
+ * Ruby's semantics have to be reproduced.
+ *
+ * `String(value)` agrees with Ruby for the String/Symbol names that every valid
+ * query produces. It diverges for an Array: Ruby's `Array#to_s` is
+ * inspect-style (`["shop_id", "id"]`), JS comma-joins (`shop_id,id`). An
+ * Array-named `Attribute` arises on the composite-primary-key default order
+ * path (`table[primaryKey].desc`); the column reference it yields is invalid in
+ * Rails too, so this exists to keep the emitted text identical to Rails, not to
+ * make such a query work.
+ */
+function rubyToS(value: unknown): string {
+  if (Array.isArray(value)) return rubyInspect(value);
+  return String(value);
+}
+
+function rubyInspect(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(rubyInspect).join(", ")}]`;
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "string") return rubyStringInspect(value);
+  return String(value);
+}
+
+/** Ruby's named single-character escapes, in `String#inspect` order. */
+const RUBY_STRING_ESCAPES: ReadonlyMap<string, string> = new Map([
+  ["\\", "\\\\"],
+  ['"', '\\"'],
+  ["\n", "\\n"],
+  ["\t", "\\t"],
+  ["\r", "\\r"],
+  ["\f", "\\f"],
+  ["\v", "\\v"],
+  ["\x07", "\\a"],
+  ["\b", "\\b"],
+  ["\x1b", "\\e"],
+]);
+
+/**
+ * Ruby `String#inspect`. Beyond `\` and `"`, Ruby emits named escapes for the
+ * usual control characters, `\uXXXX` (uppercase, four digits) for any other
+ * non-printable, and escapes a `#` only when it would start an interpolation
+ * (`#{`, `#$`, `#@`). Printable non-ASCII passes through literally.
+ */
+function rubyStringInspect(value: string): string {
+  let out = '"';
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    const escape = RUBY_STRING_ESCAPES.get(ch);
+    if (escape !== undefined) {
+      out += escape;
+    } else if (ch === "#" && "{$@".includes(value[i + 1] ?? "")) {
+      out += "\\#";
+    } else {
+      const code = ch.charCodeAt(0);
+      out += code < 0x20 || code === 0x7f ? `\\u${hex4(code)}` : ch;
+    }
+  }
+  return out + '"';
+}
+
+function hex4(code: number): string {
+  return code.toString(16).toUpperCase().padStart(4, "0");
+}
+
+/**
  * ToSql visitor — walks the AST and produces SQL strings.
  *
  * Mirrors: Arel::Visitors::ToSql
@@ -1617,13 +1686,13 @@ export class ToSql extends Visitor {
   /** @internal */
   protected quoteTableName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteTableName(String(name));
+    return this.connection.quoteTableName(rubyToS(name));
   }
 
   /** @internal */
   protected quoteColumnName(name: string | Nodes.SqlLiteral): string {
     if (name instanceof Nodes.SqlLiteral) return name.value;
-    return this.connection.quoteColumnName(String(name));
+    return this.connection.quoteColumnName(rubyToS(name));
   }
 
   /**
