@@ -13,6 +13,7 @@ import {
   SerializeCastValue,
   runAfterCallbacksOnProto,
   assertHashAttributes,
+  isMassAssignmentEmpty,
 } from "@blazetrails/activemodel";
 import { InsertManager, UpdateManager, DeleteManager, Table as ArelTable } from "@blazetrails/arel";
 import {
@@ -593,6 +594,34 @@ function assertLockingColumnNotExplicitly(
  * setter so records are built / marked-for-destruction in memory before save.
  * @internal
  */
+/**
+ * The `assign_attributes` prelude shared by `#update` and `#update!`: the
+ * empty-bag guard and `sanitize_for_mass_assignment`
+ * (attribute_assignment.rb:32-34), then the raw per-key loop that stands in for
+ * `_assign_attributes` (see update() for why the loop is raw rather than a call
+ * to Base#assignAttributes).
+ *
+ * `isMassAssignmentEmpty` rather than `Object.keys(attrs).length` because a
+ * params wrapper's own keys are its instance fields, not its contents.
+ *
+ * The trails-local locking guard runs on the SANITIZED hash, after the
+ * sanitizer. Rails' #update does only `assign_attributes` before saving
+ * (persistence.rb:563-579), so nothing may preempt ForbiddenAttributesError;
+ * and on the raw wrapper the guard inspects a params object's instance fields
+ * rather than its contents, so it silently missed `lock_version` there anyway.
+ */
+async function assignUpdateAttributes(self: any, attrs: Record<string, unknown>): Promise<void> {
+  if (isMassAssignmentEmpty(attrs)) return;
+  const sanitized = sanitizeForMassAssignment(attrs);
+  assertLockingColumnNotExplicitly(self, sanitized);
+  const pending: Promise<void>[] = [];
+  for (const [key, value] of Object.entries(sanitized)) {
+    const p = assignUpdateAttribute(self, key, value);
+    if (p) pending.push(p);
+  }
+  if (pending.length) await Promise.all(pending);
+}
+
 function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<void> | void {
   const configs = self.constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
@@ -644,7 +673,6 @@ export async function update<T extends UpdateRecord>(
   attrs: Record<string, unknown>,
 ): Promise<boolean | undefined> {
   assertHashAttributes(attrs);
-  assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // Rails' #update delegates to `assign_attributes`, which iterates setters
@@ -657,12 +685,14 @@ export async function update<T extends UpdateRecord>(
     // through their setter (assignUpdateAttribute). A column with a custom writer
     // would be missed; none exist today. TODO: unify on `public_send`-equivalent
     // setter dispatch if/when a custom column writer is introduced.
-    const pending: Promise<void>[] = [];
-    for (const [key, value] of Object.entries(attrs)) {
-      const p = assignUpdateAttribute(self, key, value);
-      if (p) pending.push(p);
-    }
-    if (pending.length) await Promise.all(pending);
+    //
+    // The raw loop replaces only `_assign_attributes`; the empty-bag guard and
+    // `sanitize_for_mass_assignment` that `assign_attributes` runs first
+    // (attribute_assignment.rb:32-34) still apply, or an unpermitted params
+    // wrapper would mass-assign here unchecked. Rails runs both INSIDE the
+    // transaction, so they stay inside this block. An empty bag skips only the
+    // assignment — `save` still runs, as in Rails.
+    await assignUpdateAttributes(self, attrs);
     return self.save() as Promise<boolean | undefined>;
   }) as Promise<boolean | undefined>;
 }
@@ -676,18 +706,13 @@ export async function updateBang<T extends UpdateRecord>(
   attrs: Record<string, unknown>,
 ): Promise<true | undefined> {
   assertHashAttributes(attrs);
-  assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // See update(): raw loop preserves original error classes (matches Rails,
     // avoids Base#assignAttributes's AttributeAssignmentError wrap); nested
-    // attribute writers still route through their setter.
-    const pending: Promise<void>[] = [];
-    for (const [key, value] of Object.entries(attrs)) {
-      const p = assignUpdateAttribute(self, key, value);
-      if (p) pending.push(p);
-    }
-    if (pending.length) await Promise.all(pending);
+    // attribute writers still route through their setter, and the empty-bag +
+    // sanitize guards from `assign_attributes` run first.
+    await assignUpdateAttributes(self, attrs);
     return self.saveBang() as Promise<true | undefined>;
   }) as Promise<true | undefined>;
 }
