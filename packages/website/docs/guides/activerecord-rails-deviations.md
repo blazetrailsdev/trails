@@ -69,11 +69,11 @@ access through async drivers.
 
 ### Practical consequences
 
-- `if (user.valid?)` in Rails becomes `if (record.isValid())` in
-  Trails — still synchronous — **but** if any uniqueness validator
-  fired, you must `await` its pending promise before trusting
-  `record.errors`. `save()` does this for you; manual `isValid()`
-  callers don't get it for free. See
+- `if (user.valid?)` in Rails becomes `if (await record.isValid())` in
+  Trails — `isValid()` returns a `Promise` and the validation chain is
+  awaited, so DB-backed validators (like `uniqueness`) run inline and
+  `record.errors` is populated by the time it resolves. `save()` runs the
+  same chain. See
   `packages/activerecord/src/validations/uniqueness.ts`.
 - Sequencing matters. `user.posts.toArray()` and `user.posts.count()`
   are separate round-trips unless you preload. Accidentally awaiting
@@ -507,23 +507,23 @@ inside test setup/teardown.
 
 ## Summary
 
-| Area                     | Rails                                   | Trails                                            |
-| ------------------------ | --------------------------------------- | ------------------------------------------------- |
-| Finders / reads          | Sync                                    | Async (`await` required)                          |
-| Persistence              | Sync                                    | Async                                             |
-| Relation iteration       | `to_a`, `each` (sync)                   | `toArray()`, `for await`                          |
-| Transactions             | `transaction do ... end`                | `await transaction(async (tx) => { ... })`        |
-| Per-flow state           | `Thread.current`                        | `AsyncLocalStorage` via `getAsyncContext()`       |
-| Connection pool          | Thread-checkout model                   | Per-handler pools, per-query acquisition          |
-| Relation method dispatch | `method_missing`                        | `Proxy` wrapper (`wrapWithScopeProxy`)            |
-| Scopes                   | Generated via `define_singleton_method` | `_scopes` Map + delegation                        |
-| Enum bang methods        | Sync                                    | Async (`draftBang()` hits DB)                     |
-| Ranges                   | `Range`                                 | Plain `{ begin, end, excludeEnd }`                |
-| Numerics                 | `Integer`/`Float`/`BigDecimal`          | `number`/`bigint` only                            |
-| File / crypto access     | Direct stdlib                           | Pluggable adapters for browser support            |
-| Callbacks                | Ruby blocks                             | Async functions                                   |
-| Uniqueness validation    | Sync DB hit                             | Async, coordinated via `_asyncValidationPromises` |
-| Test fixtures            | YAML `test/fixtures/*.yml` + ERB        | Not ported; use factories or `Model.create`       |
+| Area                     | Rails                                   | Trails                                              |
+| ------------------------ | --------------------------------------- | --------------------------------------------------- |
+| Finders / reads          | Sync                                    | Async (`await` required)                            |
+| Persistence              | Sync                                    | Async                                               |
+| Relation iteration       | `to_a`, `each` (sync)                   | `toArray()`, `for await`                            |
+| Transactions             | `transaction do ... end`                | `await transaction(async (tx) => { ... })`          |
+| Per-flow state           | `Thread.current`                        | `AsyncLocalStorage` via `getAsyncContext()`         |
+| Connection pool          | Thread-checkout model                   | Per-handler pools, per-query acquisition            |
+| Relation method dispatch | `method_missing`                        | `Proxy` wrapper (`wrapWithScopeProxy`)              |
+| Scopes                   | Generated via `define_singleton_method` | `_scopes` Map + delegation                          |
+| Enum bang methods        | Sync                                    | Async (`draftBang()` hits DB)                       |
+| Ranges                   | `Range`                                 | Plain `{ begin, end, excludeEnd }`                  |
+| Numerics                 | `Integer`/`Float`/`BigDecimal`          | `number`/`bigint` only                              |
+| File / crypto access     | Direct stdlib                           | Pluggable adapters for browser support              |
+| Callbacks                | Ruby blocks                             | Async functions                                     |
+| Uniqueness validation    | Sync DB hit                             | Runs inline on the awaited (async) validation chain |
+| Test fixtures            | YAML `test/fixtures/*.yml` + ERB        | Not ported; use factories or `Model.create`         |
 
 If something in Rails surprises you with its absence here, the most
 common cause is: "it was synchronous in Ruby and the JavaScript

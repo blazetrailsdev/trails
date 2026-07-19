@@ -103,16 +103,14 @@ export class Topic extends Base {
     });
     // Rails registers these as plain synchronous method hooks
     // (`before_validation :before_validation_for_transaction`, etc. —
-    // all `def ...; end`). They MUST stay sync: `before_validation` runs on
-    // the strict-sync validation chain (ActiveModel `valid?`), which rejects
-    // a Promise-returning callback. The record arrives as the callback arg
-    // (not `this`), matching the `afterInitialize`/`setEmailAddress` hook below.
-    // Deferred rather than run inline: the cancellation test installs a
-    // `before_validation_for_transaction` that performs a DB write then
+    // all `def ...; end`), so we mirror them as sync. The record arrives as the
+    // callback arg (not `this`), matching the `afterInitialize`/`setEmailAddress`
+    // hook below. Deferred rather than run inline: the cancellation test installs
+    // a `before_validation_for_transaction` that performs a DB write then
     // `throw :abort`. Rails runs it inside the save transaction so the write
-    // rolls back, but trails' validation chain is strict-sync (can't await an
-    // async DB call). Enqueuing the thunk lets `save` await it inside the
-    // transaction. The default no-op hook is a harmless enqueued no-op.
+    // rolls back with it; enqueuing the thunk lets `save` await it inside the
+    // transaction rather than during the (pre-transaction) validation pass. The
+    // default no-op hook is a harmless enqueued no-op.
     this.beforeValidation((record: Topic) => {
       ((record as any)._beforeValidationSideEffects ??= []).push(() =>
         (record as any).beforeValidationForTransaction(),

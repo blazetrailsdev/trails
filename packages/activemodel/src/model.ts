@@ -663,10 +663,11 @@ export class Model {
   ): void {
     const fn: CallbackFn = (record: object) => {
       // Return the underlying result so a Promise-returning validator flows
-      // into the callback runner, where strict-sync mode (on the `validate`
-      // event) throws instead of dropping it as an unhandled rejection.
-      // Validations are synchronous in trails — an async `validate` callback
-      // is an authoring bug; move the async work to before_save/after_save.
+      // into the callback runner, which awaits it (RFC 0063 made the validation
+      // chain async) rather than dropping it as an unhandled rejection. Most
+      // validators are synchronous like Rails; the exception is a DB-backed one
+      // such as `uniqueness`, whose existence check the awaited chain runs
+      // inline.
       const r = record as T & Record<string, unknown>;
       if (typeof methodOrFn === "function") {
         // Bind `this` to the record so block validators written as

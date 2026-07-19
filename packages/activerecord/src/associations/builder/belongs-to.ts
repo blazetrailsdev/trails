@@ -299,13 +299,13 @@ export class BelongsTo extends SingularAssociation {
     // Mirrors Rails Associations::Builder::BelongsTo.add_default_callbacks:
     //   model.before_validation { |o| o.association(name).default(&default) }
     // so the defaulted target satisfies a presence validation on a required
-    // association. trails' validation chain is strictly synchronous while the
-    // default block may run an async finder (e.g. `() => Developer.first()`), so
-    // the awaited resolution actually runs in Base#_runBelongsToDefaults — an
-    // async pre-validation phase invoked from `save` before the chain. This
-    // before_validation callback fires `default` for the standalone `valid?`
-    // path; it's fire-and-forget because the sync chain cannot await it. On the
-    // save path the pre-pass already ran the block once and sets
+    // association. The default block may run an async finder (e.g.
+    // `() => Developer.first()`); on the save path the awaited resolution runs
+    // in Base#_runBelongsToDefaults — a pre-validation pass invoked from `save`
+    // before the chain. This before_validation callback fires `default` for the
+    // standalone `valid?` path; it's fire-and-forget (the pre-pass owns awaited
+    // resolution on the save path). On the save path the pre-pass already ran
+    // the block once and sets
     // `_belongsToDefaultsApplied`, so we skip here to keep the block at Rails'
     // exactly-once (belongs_to_association.rb:46-48) — re-running would invoke a
     // block that returned nil a second time.
@@ -361,9 +361,9 @@ export class BelongsTo extends SingularAssociation {
           : [reflection.foreignType ?? `${underscore(reflection.name)}_type`]
         : [];
 
-      // trails validations are synchronous (see CLAUDE.md) and cannot load an
-      // unloaded target, so we suppress the presence check when the FK is
-      // already populated — keeping `create({ parentId: id })` valid and
+      // The presence check reads the in-memory target and does not itself load
+      // an unloaded record, so we suppress it when the FK is already populated —
+      // keeping `create({ parentId: id })` valid and
       // matching Rails' observable behavior (where reading the association
       // loads the record from the FK).
       const foreignKeyPresent = (record: any): boolean => {

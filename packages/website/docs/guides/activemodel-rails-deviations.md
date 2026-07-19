@@ -64,9 +64,9 @@ to a method) is accepted as a method-name string or a direct function
 (`packages/activemodel/src/callbacks.ts`), and because it awaits
 each handler, calling it is itself async.
 
-## Validations: sync signature, async reality
+## Validations: async chain
 
-`validates` / `validate` look the same:
+`validates` / `validate` are declared the same as Rails:
 
 ```ts
 import { Model } from "@blazetrails/activemodel";
@@ -78,14 +78,15 @@ class Post extends Model {
 }
 ```
 
-The deviation surfaces when a validator needs I/O. `uniqueness` is the
-canonical case (it has to hit the DB), and it lives in ActiveRecord, not
-ActiveModel, but ActiveModel is where the machinery that supports it
-lives. `isValid()` stays synchronous for back-compat with Rails'
-signature, and async validators push their `Promise`s onto
-`record._asyncValidationPromises` for the caller to await. `save()`
-awaits these automatically; bare `isValid()` callers have to do it
-themselves.
+The deviation is at the call site, not the declaration: Rails' `valid?`
+is synchronous, while trails' `isValid()` / `validate()` return a
+`Promise` and the whole validation callback chain is awaited (RFC 0063).
+This lets a validator that needs I/O run inline like any other. The
+canonical case is `uniqueness` — it has to hit the DB — which lives in
+ActiveRecord, not ActiveModel, but ActiveModel is where the machinery
+that supports it lives. Because the chain awaits, `isValid()` runs
+DB-backed validators before returning and `save()` sees the same result;
+there is no separate async-validator queue for callers to drain.
 
 See `packages/activerecord/src/validations/uniqueness.ts` for the
 pattern; ActiveModel contributes the validator registration and error
@@ -123,14 +124,14 @@ The cross-package conventions — [method casing](./index.md#method-casing),
 
 ## Summary
 
-| Area              | Rails                              | Trails                                                                   |
-| ----------------- | ---------------------------------- | ------------------------------------------------------------------------ |
-| Attribute methods | `method_missing` + `define_method` | Generated methods in `_generatedMethods`; index signature for reads      |
-| Dirty tracking    | Scattered ivars                    | `DirtyTracker` instance at `_dirtyTracker`                               |
-| Callbacks         | Blocks (`before_save do ... end`)  | Async-capable functions; `runCallbacks` is async                         |
-| Validations       | Synchronous                        | Sync signature; async validators collected on `_asyncValidationPromises` |
-| DSL sugar         | Block receivers                    | One `Proxy` in `Model.withOptions`                                       |
-| Serialization     | Eager map over ivars               | Same API, supports lazy attribute stores                                 |
+| Area              | Rails                              | Trails                                                                                                                 |
+| ----------------- | ---------------------------------- | ---------------------------------------------------------------------------------------------------------------------- |
+| Attribute methods | `method_missing` + `define_method` | Generated methods in `_generatedMethods`; index signature for reads                                                    |
+| Dirty tracking    | Scattered ivars                    | `DirtyTracker` instance at `_dirtyTracker`                                                                             |
+| Callbacks         | Blocks (`before_save do ... end`)  | Async-capable functions; `runCallbacks` is async                                                                       |
+| Validations       | Synchronous                        | Async: `valid?`/`validate` return a `Promise`; the callback chain awaits DB-backed validators (e.g. uniqueness) inline |
+| DSL sugar         | Block receivers                    | One `Proxy` in `Model.withOptions`                                                                                     |
+| Serialization     | Eager map over ivars               | Same API, supports lazy attribute stores                                                                               |
 
 Cross-package deviations (mixins, method casing, bang methods, symbols/
 kwargs) live in the [guides index](./).

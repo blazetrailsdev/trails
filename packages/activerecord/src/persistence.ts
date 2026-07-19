@@ -807,9 +807,9 @@ export async function save<T extends SaveRecord>(
   // Resolve `belongs_to ..., default:` blocks before validation. Rails registers
   // these on before_validation (builder/belongs_to.rb#add_default_callbacks) so a
   // required association's presence validation sees the defaulted FK. The block
-  // may be async (e.g. `() => Developer.first()`) and trails' validation chain is
-  // strictly synchronous, so we run it here — an async pre-validation phase —
-  // rather than inside the sync chain. Gated on `validate !== false`: Rails skips
+  // may be async (e.g. `() => Developer.first()`), so on the save path we resolve
+  // it here — a pre-validation pass — before running the chain. Gated on
+  // `validate !== false`: Rails skips
   // perform_validations (and thus every before_validation callback, including
   // this default) when `validate: false` (validations.rb:47-49), so the default
   // must not fire on that path. `_belongsToDefaultsApplied` then suppresses the
@@ -874,9 +874,10 @@ export async function save<T extends SaveRecord>(
       // an aborting async `before_validation`: trails reports `errors.any`
       // (validators already ran) where Rails reports none (abort halts first).
       // The four cancellation tests don't hit this (validations pass); the
-      // governing constraint is the strict-sync validation chain — see the
-      // Topic wiring and `validations.ts#isValid`. Tracked for convergence:
-      // RFC 0023 story `save-runs-validations-inside-transaction`.
+      // governing constraint is that `performValidations` runs outside the
+      // transaction — see the Topic wiring and `validations.ts#isValid`. Tracked
+      // for convergence: RFC 0023 story
+      // `save-runs-validations-inside-transaction`.
       const sideEffects = self._beforeValidationSideEffects as Array<() => unknown>;
       for (const thunk of sideEffects) {
         try {

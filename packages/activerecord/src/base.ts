@@ -3876,12 +3876,12 @@ export class Base extends Model {
    *
    * Rails registers the default on before_validation
    * (associations/builder/belongs_to.rb#add_default_callbacks) so a required
-   * association's presence validation sees the defaulted foreign key. trails'
-   * validation chain is strictly synchronous while a default block may be async
-   * (e.g. `() => Developer.first()`), so the async resolution runs here — an
-   * async pre-validation phase invoked from `save` — rather than inside the sync
-   * chain. The synchronous before_validation callback the builder registers
-   * still covers sync blocks and the standalone `valid?` path.
+   * association's presence validation sees the defaulted foreign key. A default
+   * block may be async (e.g. `() => Developer.first()`); on the save path its
+   * awaited resolution runs here — a pre-validation pass invoked from `save` —
+   * before the chain, so the FK is set once and marked applied. The
+   * before_validation callback the builder registers still covers the
+   * standalone `valid?` path.
    *
    * @internal
    */
