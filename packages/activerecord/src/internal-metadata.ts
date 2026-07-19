@@ -84,17 +84,19 @@ export class InternalMetadata {
     return this._enabled;
   }
 
+  // Rails: create_table(table_name, id: false) { |t| t.string :key, **...; t.string
+  // :value; t.timestamps } behind a table_exists? guard
+  // (internal_metadata.rb:85-98). `t.timestamps` defaults to null: false, so the
+  // resulting table matches the DDL this used to hand-build — but the column
+  // types and quoting now come from the adapter instead of an adapterName branch.
   async createTable(): Promise<void> {
     if (!this._enabled) return;
-    const tsType = this._connection.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
-    const q = (n: string) => this._q(n);
-    await this._connection.execute(
-      `CREATE TABLE IF NOT EXISTS ${this._connection.quoteTableName(this.tableName)} (` +
-        `${q("key")} VARCHAR(255) NOT NULL PRIMARY KEY, ` +
-        `${q("value")} VARCHAR(255), ` +
-        `${q("created_at")} ${tsType} NOT NULL, ` +
-        `${q("updated_at")} ${tsType} NOT NULL)`,
-    );
+    if (await this._connection.tableExists(this.tableName)) return;
+    await this._connection.createTable(this.tableName, { id: false }, (t) => {
+      t.string("key", this._connection.internalStringOptionsForPrimaryKey());
+      t.string("value");
+      t.timestamps();
+    });
   }
 
   /**
@@ -116,10 +118,8 @@ export class InternalMetadata {
     // reaching over and dropping ar_internal_metadata that another
     // config or adapter is actively using.
     if (!this._enabled) return;
-    await this._connection.execute(
-      // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
-      `DROP TABLE IF EXISTS ${this._connection.quoteTableName(this.tableName)}`,
-    );
+    // Rails: drop_table table_name, if_exists: true (internal_metadata.rb:100-104).
+    await this._connection.dropTable(this.tableName, { ifExists: true });
   }
 
   async get(key: string): Promise<string | null> {

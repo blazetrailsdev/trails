@@ -44,14 +44,21 @@ export class SchemaMigration {
     return `${Base.tableNamePrefix}${Base.schemaMigrationsTableName}${Base.tableNameSuffix}`;
   }
 
+  // Rails: create_table(table_name, id: false) { |t| t.string :version,
+  // **connection.internal_string_options_for_primary_key } behind a
+  // table_exists? guard (schema_migration.rb:53-61). Going through create_table
+  // — rather than hand-built DDL — is what gets the adapter's own
+  // TableDefinition and identifier quoting.
   async createTable(): Promise<void> {
-    await this._adapter.execute(
-      `CREATE TABLE IF NOT EXISTS "${this.tableName}" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
-    );
+    if (await this._adapter.tableExists(this.tableName)) return;
+    await this._adapter.createTable(this.tableName, { id: false }, (t) => {
+      t.string(this.primaryKey, this._adapter.internalStringOptionsForPrimaryKey());
+    });
   }
 
+  // Rails: drop_table table_name, if_exists: true (schema_migration.rb:64-66).
   async dropTable(): Promise<void> {
-    await this._adapter.execute(`DROP TABLE IF EXISTS "${this.tableName}"`);
+    await this._adapter.dropTable(this.tableName, { ifExists: true });
   }
 
   async createVersion(version: string): Promise<void> {

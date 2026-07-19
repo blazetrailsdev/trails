@@ -306,6 +306,10 @@ export interface AbstractAdapter {
     options?: { name?: string; unique?: boolean; valid?: boolean },
   ): Promise<boolean>;
   tableExists(tableName: string): Promise<boolean>;
+  // Options SchemaMigration / InternalMetadata pass to `t.string` for their
+  // primary key. Mixed in from SchemaStatements; declared here so those
+  // callers can reach it through the AbstractAdapter type.
+  internalStringOptionsForPrimaryKey(): Record<string, unknown>;
   // Rails' `column_exists?(table, column, type = nil, **options)` narrows the
   // match by column `type` and the columnOptionsKeys when given.
   columnExists(
