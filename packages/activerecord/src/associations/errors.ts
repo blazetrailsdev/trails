@@ -366,3 +366,30 @@ export class DeleteRestrictionError extends ActiveRecordError {
     this.association = association;
   }
 }
+
+/**
+ * Thrown when a `has_one` association is assigned with the native `=` setter
+ * (or a mass-assignment key) on a *persisted* owner. This is a deliberate
+ * trails-only deviation with no Rails counterpart: Rails'
+ * `HasOneAssociation#replace` persists the displacement + new record inline at
+ * assignment, which is synchronous DB I/O JS cannot do from a property setter.
+ * Rather than silently deferring the writes to the owner's next `save()` — the
+ * order-undefined two-row race RFC 0068 exists to kill — we throw loudly and
+ * name the exact awaitable replacement. See RFC 0068-awaitable-has-one-setter
+ * ("Why 'loud' beats 'deferred'") for the ergonomic-tradeoff decision.
+ */
+export class HasOnePersistedAssignmentError extends ActiveRecordError {
+  readonly association: string;
+
+  constructor(association: string) {
+    const cap = association.charAt(0).toUpperCase() + association.slice(1);
+    super(
+      `Cannot assign has_one association \`${association}\` with \`=\` on a ` +
+        `persisted record: Rails persists the replacement at assignment time, ` +
+        `which requires \`await\` in JS. Use \`await owner.set${cap}(x)\` (or ` +
+        `\`await owner.association("${association}").writer(x)\`).`,
+    );
+    this.name = "HasOnePersistedAssignmentError";
+    this.association = association;
+  }
+}

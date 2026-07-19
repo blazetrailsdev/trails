@@ -2,6 +2,7 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import {
+  HasOnePersistedAssignmentError,
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
@@ -95,13 +96,17 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
-   * The deferred (non-awaitable) property-setter / mass-assignment path. The
-   * base `queueWrite` records a displaced record for the direct-FK autosave to
-   * remove, but a through routes displacement through the join model
-   * (`createThroughRecord` destroys the stale join), so we defer purely to
-   * `replace` (which queues `_pendingReplace`).
+   * The non-awaitable property-setter / mass-assignment path. Same
+   * throw-or-in-memory dispatch as the base `HasOneAssociation#queueWrite`:
+   * a persisted owner throws (Rails persists the join-row displacement inline
+   * at assignment, which needs `await` in JS — see RFC 0068), and an
+   * unpersisted owner does the in-memory `replace` (which builds the join
+   * record for the owner's next `save()` to persist).
    */
   override queueWrite(record: Base | null): void {
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+      throw new HasOnePersistedAssignmentError(this.reflection.name);
+    }
     this.replace(record);
   }
 

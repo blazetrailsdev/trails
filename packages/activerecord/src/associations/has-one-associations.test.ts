@@ -260,33 +260,27 @@ describe("HasOneAssociationsTest", () => {
   it("proxy assignment", async () => {
     const company = companies("first_firm") as any;
     const account = await readHasOne(company, "account");
-    expect(() => {
-      company.account = account;
-    }).not.toThrow();
+    await expect(company.setAccount(account)).resolves.toBeUndefined();
   });
 
   it("type mismatch", async () => {
     const firm = companies("first_firm") as any;
-    expect(() => {
-      firm.account = 1;
-    }).toThrow(AssociationTypeMismatch);
+    await expect(firm.setAccount(1)).rejects.toThrow(AssociationTypeMismatch);
     const project = await (await import("../test-helpers/models/project.js")).Project.find(1);
-    expect(() => {
-      firm.account = project;
-    }).toThrow(AssociationTypeMismatch);
+    await expect(firm.setAccount(project)).rejects.toThrow(AssociationTypeMismatch);
   });
 
   it("natural assignment", async () => {
     const apple = await Firm.create({ name: "Apple" });
     const citibank = await Account.create({ credit_limit: 10 });
-    (apple as any).account = citibank;
+    await (apple as any).setAccount(citibank);
     expect((citibank as any).firm_id).toBe(Number(apple.id));
   });
 
   it("natural assignment to nil", async () => {
     const firm = companies("first_firm") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
-    firm.account = null;
+    await firm.setAccount(null);
     await firm.save();
     expect(await readHasOne(firm, "account")).toBeNull();
     // account is dependent, therefore is destroyed when reference to owner is lost
@@ -302,10 +296,10 @@ describe("HasOneAssociationsTest", () => {
     // fix in associations.ts / instance-methods.ts).
     const firm = companies("rails_core") as any;
     const oldAccountId = (await readHasOne(firm, "account")).id;
-    // Property setter queues the change; `firm.save()` flushes it
-    // (flushPendingReplaces → persistReplace), nullifying the displaced account.
-    firm.account = new Account({ credit_limit: 5 });
-    await firm.save();
+    // Rails persists the replacement inline at assignment; the awaitable setter
+    // is the faithful surface (the native `=` setter throws on a persisted
+    // owner — RFC 0068), nullifying the displaced account immediately.
+    await firm.setAccount(new Account({ credit_limit: 5 }));
     // account is dependent with nullify, therefore its firm_id should be nil
     expect((await Account.find(oldAccountId)).firm_id).toBeNull();
   });
@@ -338,11 +332,10 @@ describe("HasOneAssociationsTest", () => {
     const otherBook = await CpkBook.create({ id: [3, 4] });
     const order = await CpkOrderWithNullifiedBook.create({ book });
 
-    // Property setter queues the replace; `order.save()` flushes it
-    // (matching the sibling `nullification on association change` test),
-    // nullifying the displaced book's composite foreign key.
-    (order as any).book = otherBook;
-    await (order as any).save();
+    // Rails persists the replacement inline at assignment; the awaitable setter
+    // is the faithful surface (RFC 0068), nullifying the displaced book's
+    // composite foreign key immediately.
+    await (order as any).setBook(otherBook);
 
     expect(book.order_id).toBeNull();
     expect(book.shop_id).toBeNull();
@@ -353,26 +346,23 @@ describe("HasOneAssociationsTest", () => {
     const account = await readHasOne(firm, "account");
     const oldAccountId = account.id;
     await account.destroy();
-    firm.account = null;
+    await firm.setAccount(null);
     expect(await readHasOne(companies("rails_core"), "account")).toBeNull();
     await expect(Account.find(oldAccountId)).rejects.toThrow(RecordNotFound);
   });
 
   it("association change calls delete", async () => {
     const firm = companies("first_firm") as any;
-    // Property setter queues; `firm.save()` flushes the displaced-record delete.
     // dependent: :delete skips callbacks, so destroyed_account_ids stays empty.
-    firm.deletableAccount = new Account({ credit_limit: 5 });
-    await firm.save();
+    await firm.setDeletableAccount(new Account({ credit_limit: 5 }));
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([]);
   });
 
   it("association change calls destroy", async () => {
     const firm = companies("first_firm") as any;
-    // Property setter queues on an unloaded has_one; `firm.save()` loads the
-    // existing DB account and runs the dependent: :destroy remove against it.
-    firm.account = new Account({ credit_limit: 5 });
-    await firm.save();
+    // The awaitable setter loads the existing DB account and runs the
+    // dependent: :destroy remove against it, inline at assignment (RFC 0068).
+    await firm.setAccount(new Account({ credit_limit: 5 }));
     expect(Account.destroyedAccountIds().get(firm.id) ?? []).toEqual([firm.id]);
   });
 
@@ -380,7 +370,7 @@ describe("HasOneAssociationsTest", () => {
     const company = companies("first_firm") as any;
     const account = accounts("signals37") as any;
     expect((await readHasOne(company, "account")).id).toBe(account.id);
-    company.account = account;
+    await company.setAccount(account);
     await company.reload();
     await account.reload();
     expect((await readHasOne(company, "account")).id).toBe(account.id);
@@ -708,7 +698,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     await (firm as any).save();
     const account = new Account({ credit_limit: 1000 });
-    (firm as any).account = account;
+    await (firm as any).setAccount(account);
     expect((await readHasOne(firm, "account")).id).toBe(account.id ?? account.id);
     expect(await account.save()).toBeTruthy();
     await firm.reload();
@@ -719,8 +709,7 @@ describe("HasOneAssociationsTest", () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     await (firm as any).save();
     const account = await Account.create({ credit_limit: 1000 });
-    (firm as any).account = account;
-    await firm.save();
+    await (firm as any).setAccount(account);
     expect((await readHasOne(firm, "account")).id).toBe(account.id);
   });
 
@@ -975,17 +964,15 @@ describe("HasOneAssociationsTest", () => {
     await readHasOne(company, "account"); // force loading
     await assertNoQueries(false, async () => {
       // Re-assigning the already-loaded record is a `sameRecord` no-op — the
-      // property setter queues nothing, so no queries fire.
-      company.account = account;
+      // awaitable setter changes nothing, so no queries fire.
+      await company.setAccount(account);
     });
 
     // Rails persists `company.account = nil` immediately (destroying the
-    // dependent account); JS setters can't await, so drive the awaitable writer
-    // to do the same — otherwise the destroy would defer and inflate the
-    // account2 assignment's query count below.
+    // dependent account); the awaitable setter is the faithful surface.
     await company.association("account").writer(null);
     await assertNoQueries(false, async () => {
-      company.account = null;
+      await company.setAccount(null);
     });
 
     const account2 = await Account.find(2);
@@ -1012,8 +999,8 @@ describe("HasOneAssociationsTest", () => {
     ship.name = "new name";
     expect(ship.changed).toBe(true);
     await assertQueriesCount(3, false, async () => {
-      (pirate as any).ship = ship;
-      await pirate.save();
+      // One query for updating name, not triggering query for updating pirate_id
+      await (pirate as any).setShip(ship);
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
   });
@@ -1025,8 +1012,8 @@ describe("HasOneAssociationsTest", () => {
 
     const newShip = await Ship.create({ name: "new name" });
     await assertQueriesCount(4, false, async () => {
-      (pirate as any).ship = newShip;
-      await pirate.save();
+      // One query to nullify the old ship, one query to update the new ship
+      await (pirate as any).setShip(newShip);
     });
     expect((await (pirate.association("ship") as any).forceReloadReader()).name).toBe("new name");
   });
@@ -1060,8 +1047,7 @@ describe("HasOneAssociationsTest", () => {
     const post = await Post.create({ title: "foo", body: "bar" });
     const image = await Image.create();
 
-    (post as any).mainImage = image;
-    await (post as any).save();
+    await (post as any).setMainImage(image);
     await post.reload();
 
     const mainImage = await readHasOne(post, "mainImage");
@@ -1172,13 +1158,10 @@ describe("HasOneAssociationsTest", () => {
   it("association enum works properly", async () => {
     const author = await (SpecialAuthor as any).createBang({ name: "Test" });
     const book = await (SpecialBook as any).createBang({ status: "published" });
-    author.book = book;
     // Rails' `author.book = book` persists the FK synchronously (has_one
-    // replace saves the child). In trails, plain assignment routes through
-    // queueWrite, which defers persistence to the owner's next save() — so
-    // save() is required for book.author_id to actually hit the DB before the
-    // join count below observes it.
-    await author.save();
+    // replace saves the child); the awaitable setter is the faithful surface
+    // (the native `=` setter throws on a persisted owner — RFC 0068).
+    await author.setBook(book);
 
     expect(book.status).toBe("published");
     expect(
@@ -1192,7 +1175,7 @@ describe("HasOneAssociationsTest", () => {
   it("association enum works properly with nested join", async () => {
     const author = await (SpecialAuthor as any).createBang({ name: "Test" });
     const book = await (SpecialBook as any).createBang({ status: "published" });
-    author.book = book;
+    await author.setBook(book);
 
     const whereClause = { books: { subscriptions: { subscriber_id: null } } };
     // Rails' assert_nothing_raised wraps only relation *construction*

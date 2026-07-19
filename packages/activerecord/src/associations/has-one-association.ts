@@ -1,7 +1,7 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { loadHasOne } from "../associations.js";
-import { DeleteRestrictionError } from "./errors.js";
+import { DeleteRestrictionError, HasOnePersistedAssignmentError } from "./errors.js";
 import { RecordNotSaved } from "../errors.js";
 import { underscore } from "@blazetrails/activesupport";
 import { reflectOnAllAssociations } from "../reflection.js";
@@ -58,52 +58,30 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   /**
-   * Queue-only writer for the JS property setter (`owner.account = x`,
-   * builder/has-one.ts `defineWriters`) and mass-assignment, neither of which
-   * can `await`. Sets the foreign key and inverse in memory via `replace` and
-   * defers persistence to the owner's next `save()`, where the has_one autosave
-   * callback (`autosaveHasOne`) persists the new record and removes any
-   * displaced one — the single Rails `save_has_one_association` path. No DB I/O,
-   * no Promise returned, no floating promise. The awaitable `writer` below is
-   * the Rails-faithful immediate-persist path.
+   * Writer for the JS property setter (`owner.account = x`, builder/has-one.ts
+   * `defineWriters`) and mass-assignment, neither of which can `await`.
+   *
+   * - **Unpersisted owner:** in-memory `replace` (FK + inverse set), exactly as
+   *   Rails' `replace` does no I/O for a new-record owner (`save &&=
+   *   owner.persisted?`, has_one_association.rb:66). Autosave persists at the
+   *   owner's first `save()`.
+   * - **Persisted owner:** THROW. Rails persists the displacement + new record
+   *   inline at assignment; JS cannot do synchronous DB I/O from a property
+   *   setter, so rather than deferring the writes to the owner's next `save()`
+   *   (the order-undefined two-row race RFC 0068 exists to kill) we throw and
+   *   name the awaitable replacement (`await owner.set#{Name}(x)`). See RFC
+   *   0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'") for the
+   *   ergonomic-tradeoff decision to deviate loudly from Rails' legal syntax.
    */
   queueWrite(record: Base | null): void {
-    const wasLoaded = this.loaded;
-    const displaced = this.target;
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+      throw new HasOnePersistedAssignmentError(this.reflection.name);
+    }
+    // Unpersisted owner: Rails' `replace` does no DB I/O here, so the sync
+    // property setter is faithful — set the FK/inverse in memory and let the
+    // owner's first `save()` autosave persist. No displacement can need DB
+    // removal (a new owner keys no persisted row), so nothing is queued.
     this.replace(record);
-    if (!(this.owner as { isPersisted?: () => boolean }).isPersisted?.()) return;
-    // Rails `HasOneAssociation#replace` runs `remove_target!` on the current
-    // `target` for *every* assigning-another replacement (has_one_association.rb
-    // :64-84, :69) before `self.target = record`, so the record this assignment
-    // displaces must be queued regardless of whether the assignment also reverts
-    // an earlier displacement. Only a *persisted* displaced record has a
-    // row/foreign key to nullify; a transient in-memory target has none.
-    if (
-      displaced &&
-      (displaced as { isPersisted?: () => boolean }).isPersisted?.() &&
-      !(displaced as { isDestroyed?: () => boolean }).isDestroyed?.() &&
-      !sameRecord(displaced, record)
-    ) {
-      this._displacedRecords.push(displaced);
-    } else if (!wasLoaded && !displaced) {
-      // The current target was never materialized, so we have no in-memory
-      // displaced record — but a DB row keyed by the owner may exist. Rails'
-      // `replace` always evaluates `load_target` (has_one_association.rb:59), so
-      // it materializes and `remove_target!`s any displaced row regardless of
-      // `:dependent` — the `else` branch nullifies the old FK even with no
-      // `:dependent`. We defer that load to `removeDisplaced` at the owner's save.
-      this._removeDisplacedFromDb = true;
-    }
-    // Reverting to a record already queued for removal cancels *just its*
-    // removal (`owner.x = other; owner.x = original`) — the now-target record no
-    // longer needs its FK nullified. This runs after the queue above so it only
-    // cancels the reverted record, never the one this same assignment displaced
-    // (which the push guard guarantees is a different record). Leaves every other
-    // pending displacement intact.
-    if (record) {
-      const idx = this._displacedRecords.findIndex((r) => sameRecord(record, r));
-      if (idx !== -1) this._displacedRecords.splice(idx, 1);
-    }
   }
 
   /**

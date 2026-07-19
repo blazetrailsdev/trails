@@ -468,7 +468,7 @@ describe("InverseHasOneTests", () => {
   it("parent instance should be shared with replaced via accessor child", async () => {
     const human = (await Human.first())!;
     const face = new Face({ description: "haunted" }) as any;
-    (human as any).face = face;
+    await (human as any).setFace(face);
     expect(face.human).not.toBeNull();
     expect(face.human.name).toBe((human as any).name);
     (human as any).name = "Bongo";
