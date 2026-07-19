@@ -71,6 +71,36 @@ describe("PostgreSQLAdapter conn_params", () => {
     expect(options).not.toHaveProperty("host");
   });
 
+  it("maps username onto user before slicing", () => {
+    const options = clientOptions({ username: "alice", database: "trails_test" });
+
+    expect(options.user).toBe("alice");
+    expect(options).not.toHaveProperty("username");
+  });
+
+  it("lets a truthy username overwrite an explicit user", () => {
+    // Ruby truthiness: "" is truthy, so a blank username still overwrites.
+    expect(clientOptions({ username: "alice", user: "bob" }).user).toBe("alice");
+    expect(clientOptions({ username: "", user: "bob" }).user).toBe("");
+    expect(clientOptions({ username: false, user: "bob" }).user).toBe("bob");
+  });
+
+  it("forwards driver params that @types/pg omits", () => {
+    // pg/lib/connection-parameters.js:82,103 and pg/lib/client.js:75,86 read
+    // these even though the published ClientConfig interface lacks them.
+    const options = clientOptions({
+      binary: true,
+      replication: "database",
+      enableChannelBinding: true,
+    });
+
+    expect(options).toMatchObject({
+      binary: true,
+      replication: "database",
+      enableChannelBinding: true,
+    });
+  });
+
   it("keeps database rather than renaming it to dbname", () => {
     const options = clientOptions({ database: "trails_test" });
 
