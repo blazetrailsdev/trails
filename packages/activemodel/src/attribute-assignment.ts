@@ -7,17 +7,6 @@ interface PermittedAttributes {
   toH?(): Record<string, unknown>;
 }
 
-/**
- * Reads a params-like wrapper's `permitted?`. The real
- * `ActionController::Parameters` exposes it as a boolean GETTER
- * (strong-parameters.ts:113), while duck-typed wrappers may expose a method —
- * Ruby draws no such distinction, so both must answer here.
- */
-function readPermitted(attrs: PermittedAttributes): boolean {
-  const permitted = attrs.permitted;
-  return typeof permitted === "function" ? permitted.call(attrs) : Boolean(permitted);
-}
-
 export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
   assertHashAttributes(newAttributes);
 
@@ -26,57 +15,6 @@ export function assignAttributes(model: AttributeAssignment, newAttributes: unkn
 
   const sanitized = sanitizeForMassAssignment(attrs);
   _assignAttributes(model, sanitized);
-}
-
-/**
- * The mass-assignment empty-bag guard shared by every entry point that runs
- * `sanitize_for_mass_assignment` before per-key dispatch (the `Model`
- * constructor, `Model#assignAttributes`, and the ActiveRecord `Base`
- * constructor).
- *
- * Mirrors ActiveModel::AttributeAssignment#assign_attributes'
- * `return if new_attributes.empty?` (attribute_assignment.rb:32). A params-like
- * wrapper (the `ActionController::Parameters` analogue) delegates `empty?` to
- * its private parameter store (strong_parameters.rb:250) — so counting the
- * wrapper's own `Object.keys` reads its instance fields (`parameters`,
- * `_permitted`), NOT its parameter count, and an EMPTY unpermitted wrapper
- * would wrongly read as non-empty and proceed into sanitization instead of
- * being a no-op. Consult the wrapper's `empty` when present; a plain hash has
- * no such delegate, so it falls through to the key count.
- *
- * @internal Rails-private helper.
- */
-export function isMassAssignmentEmpty(attrs: object): boolean {
-  if (isParamsLikeWrapper(attrs)) {
-    const empty = (attrs as { empty?: unknown }).empty;
-    if (typeof empty === "boolean") return empty;
-  }
-  return Object.keys(attrs).length === 0;
-}
-
-/**
- * A non-plain object duck-typing the `ActionController::Parameters` surface —
- * the trails analogue of Rails' params wrapper, distinct from a plain hash whose
- * own keys ARE its contents. Single source of truth for wrapper recognition on
- * the mass-assignment path: `isHashLike` admits it as hash-like, and
- * `isMassAssignmentEmpty` consults its `empty` (so a plain hash that happens to
- * carry an `empty: <boolean>` attribute is unaffected).
- *
- * For the real ActionController::Parameters, `permitted` is a boolean getter
- * (strong-parameters.ts:113), not a method, so the probe tests key presence
- * rather than callability — the non-plain-prototype gate above is what keeps a
- * plain hash with a literal `permitted` key from being mistaken for a wrapper.
- */
-function isParamsLikeWrapper(attrs: object): boolean {
-  const proto = Object.getPrototypeOf(attrs);
-  if (proto === Object.prototype || proto === null) return false;
-  const wrapper = attrs as PermittedAttributes;
-  return "permitted" in wrapper || typeof wrapper.toH === "function";
-}
-
-export interface AttributeAssignment {
-  writeAttribute(name: string, value: unknown): void;
-  attributeWriterMissing?(name: string, value: unknown): void;
 }
 
 export function attributeWriterMissing(
@@ -125,6 +63,68 @@ export function _assignAttribute(model: AttributeAssignment, key: string, value:
   }
 }
 
+export interface AttributeAssignment {
+  writeAttribute(name: string, value: unknown): void;
+  attributeWriterMissing?(name: string, value: unknown): void;
+}
+
+/**
+ * Reads a params-like wrapper's `permitted?`. The real
+ * `ActionController::Parameters` exposes it as a boolean GETTER
+ * (strong-parameters.ts:113), while duck-typed wrappers may expose a method —
+ * Ruby draws no such distinction, so both must answer here.
+ */
+function readPermitted(attrs: PermittedAttributes): boolean {
+  const permitted = attrs.permitted;
+  return typeof permitted === "function" ? permitted.call(attrs) : Boolean(permitted);
+}
+
+/**
+ * The mass-assignment empty-bag guard shared by every entry point that runs
+ * `sanitize_for_mass_assignment` before per-key dispatch (the `Model`
+ * constructor, `Model#assignAttributes`, and the ActiveRecord `Base`
+ * constructor).
+ *
+ * Mirrors ActiveModel::AttributeAssignment#assign_attributes'
+ * `return if new_attributes.empty?` (attribute_assignment.rb:32). A params-like
+ * wrapper (the `ActionController::Parameters` analogue) delegates `empty?` to
+ * its private parameter store (strong_parameters.rb:250) — so counting the
+ * wrapper's own `Object.keys` reads its instance fields (`parameters`,
+ * `_permitted`), NOT its parameter count, and an EMPTY unpermitted wrapper
+ * would wrongly read as non-empty and proceed into sanitization instead of
+ * being a no-op. Consult the wrapper's `empty` when present; a plain hash has
+ * no such delegate, so it falls through to the key count.
+ *
+ * @internal Rails-private helper.
+ */
+export function isMassAssignmentEmpty(attrs: object): boolean {
+  if (isParamsLikeWrapper(attrs)) {
+    const empty = (attrs as { empty?: unknown }).empty;
+    if (typeof empty === "boolean") return empty;
+  }
+  return Object.keys(attrs).length === 0;
+}
+
+/**
+ * A non-plain object duck-typing the `ActionController::Parameters` surface —
+ * the trails analogue of Rails' params wrapper, distinct from a plain hash whose
+ * own keys ARE its contents. Single source of truth for wrapper recognition on
+ * the mass-assignment path: `isHashLike` admits it as hash-like, and
+ * `isMassAssignmentEmpty` consults its `empty` (so a plain hash that happens to
+ * carry an `empty: <boolean>` attribute is unaffected).
+ *
+ * For the real ActionController::Parameters, `permitted` is a boolean getter
+ * (strong-parameters.ts:113), not a method, so the probe tests key presence
+ * rather than callability — the non-plain-prototype gate above is what keeps a
+ * plain hash with a literal `permitted` key from being mistaken for a wrapper.
+ */
+function isParamsLikeWrapper(attrs: object): boolean {
+  const proto = Object.getPrototypeOf(attrs);
+  if (proto === Object.prototype || proto === null) return false;
+  const wrapper = attrs as PermittedAttributes;
+  return "permitted" in wrapper || typeof wrapper.toH === "function";
+}
+
 /** @internal Rails-private helper. */
 export function sanitizeForMassAssignment(
   attributes: Record<string, unknown>,
@@ -135,11 +135,9 @@ export function sanitizeForMassAssignment(
   // unwrap via `to_h` so the caller iterates a plain hash, not the wrapper.
   // Rails calls `attributes.to_h` unconditionally; a permitted params object is
   // expected to respond to it (a malformed one would NoMethodError there too).
-  // `permitted` is a boolean getter on the real Parameters, so probing for a
-  // function here would silently skip the whole guard for the exact class this
-  // mirrors. Gate on wrapper-hood + key presence instead, which keeps a plain
-  // hash carrying a literal `permitted` key out (Ruby's Hash does not
-  // `respond_to?(:permitted?)` either).
+  // The wrapper-hood conjunct is what stands in for `respond_to?`: it keeps a
+  // plain hash carrying a literal `permitted` key out of the guard, since
+  // Ruby's Hash does not `respond_to?(:permitted?)` either.
   if (isParamsLikeWrapper(attrs) && "permitted" in attrs) {
     if (!readPermitted(attrs)) {
       throw new ForbiddenAttributesError();
