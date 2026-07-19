@@ -25,7 +25,7 @@ import {
   indexExistsForRemoveFrom,
   canRemoveIndexByName,
 } from "./abstract/schema-statements.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
+import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
@@ -3194,6 +3194,10 @@ dirtiesQueryCache(
   "rollbackToSavepoint",
   "truncate",
 );
+// Snapshot the unwrapped `execute` first: schema reflection routes through it
+// (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
+// `internal_exec_query`.
+captureUnwrappedExecute(AbstractSQLite3Adapter);
 dirtiesQueryCache(AbstractSQLite3Adapter, "execQuery", "execute");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_sqlite3adapter, self)`

@@ -21,7 +21,7 @@ import {
   RAW_CONNECTION_DEPRECATION_MESSAGE,
 } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache } from "./abstract/query-cache.js";
+import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import {
   ActiveRecordError,
   AdapterError,
@@ -2265,6 +2265,10 @@ function isMysql2ConnectionError(e: unknown): boolean {
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(Mysql2Adapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
+// Snapshot the unwrapped `execute` first: schema reflection routes through it
+// (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
+// `internal_exec_query`.
+captureUnwrappedExecute(Mysql2Adapter);
 dirtiesQueryCache(Mysql2Adapter, "execQuery", "execute");
 
 // Mirrors: mysql2_adapter.rb:190-198 — adapter-scoped type registrations. The

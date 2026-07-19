@@ -556,6 +556,31 @@ function clearCurrentThreadQueryCaches(host: QueryCacheHost): void {
 }
 
 /**
+ * Prototype slot holding the pre-wiring `execute`, so schema reflection can
+ * reach the implementation `dirtiesQueryCache` never wrapped.
+ */
+export const UNWRAPPED_EXECUTE = "_unwrappedExecute";
+
+/**
+ * Snapshots `base.prototype.execute` before {@link dirtiesQueryCache} replaces
+ * it, giving schema reflection an unwrapped entry point.
+ *
+ * Rails gets this structurally: `internal_exec_query` is a separate method from
+ * the public `exec_query`, and only the latter is wired by
+ * `dirties_query_cache`, so reflection (`internal_exec_query(sql, "SCHEMA")`)
+ * cannot evict the cache. trails' reflection funnels through
+ * `AbstractAdapter#schemaQuery`, which reads this slot — same structural
+ * distinction, and it runs the adapter's real `execute` body, so reflection
+ * keeps the exact row/value semantics it had before.
+ *
+ * Must be called BEFORE `dirtiesQueryCache` wires the same prototype.
+ */
+export function captureUnwrappedExecute(base: { prototype: object }): void {
+  const proto = base.prototype as Record<string, unknown>;
+  if (typeof proto.execute === "function") proto[UNWRAPPED_EXECUTE] = proto.execute;
+}
+
+/**
  * Wraps the named write methods on `base.prototype` so each clears the
  * per-connection query cache (when its `dirties` flag is set) before
  * delegating to the original implementation. Rails uses `class_eval` to

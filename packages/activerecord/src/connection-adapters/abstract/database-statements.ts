@@ -1960,22 +1960,21 @@ export function internalExecute(
   this: DatabaseStatementsHost,
   sql: string,
   name: string = "SQL",
-  opts: {
-    binds?: unknown[];
-    prepare?: boolean;
-    allowRetry?: boolean;
-    materializeTransactions?: boolean;
-  } = {},
+  binds: unknown[] = [],
+  prepare = false,
+  _async = false,
+  allowRetry = false,
+  materializeTransactions = true,
 ): Promise<unknown> {
   const processed = preprocessQuery.call(this, sql);
   return (this as any).rawExecute(
     processed,
     name,
-    opts.binds ?? [],
-    opts.prepare ?? false,
+    binds,
+    prepare,
     false,
-    opts.allowRetry ?? false,
-    opts.materializeTransactions ?? true,
+    allowRetry,
+    materializeTransactions,
   );
 }
 

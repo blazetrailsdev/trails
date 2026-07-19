@@ -8,7 +8,6 @@ import { AbstractSQLite3Adapter } from "../sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../better-sqlite3-adapter.js";
 import { AbstractAdapter } from "../abstract-adapter.js";
 import { ForeignKeyDefinition } from "./schema-definitions.js";
-import { Result } from "../../result.js";
 
 let adapter: AbstractSQLite3Adapter | undefined;
 
@@ -83,12 +82,6 @@ class SqliteCapturingAdapter extends AbstractAdapter {
     return Promise.resolve(
       this.allSql.length === 1 ? this.firstRows : ([] as Record<string, unknown>[]),
     );
-  }
-  // Schema reflection routes through the unwrapped internal path (as in Rails),
-  // so the capture seam lives here rather than on the public `execute`.
-  override async internalExecQuery(sql: string) {
-    const rows = await this.execute(sql);
-    return rows.length > 0 ? Result.fromRowHashes(rows) : new Result([], []);
   }
   executeMutation(_sql: string) {
     return Promise.resolve(0);
