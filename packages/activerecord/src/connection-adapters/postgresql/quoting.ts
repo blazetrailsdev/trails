@@ -152,7 +152,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
 }
 
 export function quoteDefaultExpression(
-  this: QuotingDispatchHost | void,
+  this: QuotingDispatchHost,
   value: unknown,
   column?: DefaultExpressionColumn | null,
   typeMap?: TypeMapLike | null,
@@ -167,6 +167,14 @@ export function quoteDefaultExpression(
     );
   }
   if (isSqlLiteral(value)) return value.value;
+  // Rails: `elsif column.type == :uuid && value.is_a?(String) && value.include?("()")`
+  // (postgresql/quoting.rb:159-160) — "Does not quote function default values
+  // for UUID columns", so `default: "gen_random_uuid()"` emits the bare call
+  // rather than the string literal `'gen_random_uuid()'`. Must precede the
+  // array/super paths, and matches `()` anywhere in the string as Rails does.
+  if (column?.type === "uuid" && typeof value === "string" && value.includes("()")) {
+    return value;
+  }
 
   let serialized: unknown = value;
   if (column != null && "array" in column) {
@@ -196,11 +204,10 @@ export function quoteDefaultExpression(
       serialized = castType.serialize(value);
     }
   }
-  // `quote` requires a host receiver; thread our own so a receiver-less binary
-  // default reaches PG's bytea `quotedBinary` rather than the abstract
-  // byte-string fallback, and a date default reaches PG's BC-suffixing
-  // `quotedDate` (postgresql/quoting.rb:143) rather than the abstract format.
-  return quote.call(this || { quotedDate, quotedBinary }, serialized);
+  // Rails: `quote(value)` — self-dispatched, so a binary default reaches PG's
+  // bytea `quotedBinary` and a date default PG's BC-suffixing `quotedDate`
+  // (postgresql/quoting.rb:143) rather than the abstract formats.
+  return quote.call(this, serialized);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

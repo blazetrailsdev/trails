@@ -2,13 +2,17 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   quote as quoteFn,
-  quoteDefaultExpression,
+  quoteDefaultExpression as quoteDefaultExpressionFn,
 } from "./connection-adapters/abstract/quoting.js";
 import { Nodes } from "@blazetrails/arel";
 
 // `quote` requires a host receiver (no receiver-less dispatch); bind an empty
 // host so date/time values route through the abstract module helpers.
 const quote = (value: unknown): string => quoteFn.call({}, value);
+// Likewise `quoteDefaultExpression` — an empty host has no `quote` override, so
+// values fall through to the abstract module quoting.
+const quoteDefaultExpression = (value: unknown, column?: { sqlType?: string | null } | null) =>
+  quoteDefaultExpressionFn.call({}, value, column);
 
 describe("quote", () => {
   it("returns NULL for null", () => {

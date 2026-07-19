@@ -3520,12 +3520,16 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         } | null;
       },
     };
-    return pgQuoteDefaultExpression(
+    return pgQuoteDefaultExpression.call(
+      this,
       value,
       col != null
         ? {
             array: isArray,
             sqlType: rawSqlType,
+            // Rails' uuid branch tests `column.type` (the AR type symbol), not
+            // sql_type, so forward it separately from `rawSqlType`.
+            type: col.type ?? null,
           }
         : null,
       lookup,

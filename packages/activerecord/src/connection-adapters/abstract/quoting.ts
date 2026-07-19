@@ -87,8 +87,8 @@ export function quoteColumnName(_columnName: string): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting::ClassMethods#quote_table_name
  * (activerecord/.../abstract/quoting.rb L66 — `quote_column_name(table_name)`)
  */
-export function quoteTableName(this: QuotingDispatchHost | void, name: string): string {
-  if (this && typeof this === "object" && typeof this.quoteColumnName === "function") {
+export function quoteTableName(this: QuotingDispatchHost, name: string): string {
+  if (typeof this.quoteColumnName === "function") {
     return this.quoteColumnName(name);
   }
   return quoteColumnName(name);
@@ -249,7 +249,10 @@ export function quoteString(s: string): string {
  * Mirrors: ActiveRecord::ConnectionAdapters::Quoting#quote_table_name_for_assignment
  */
 export function quoteTableNameForAssignment(table: string, attr: string): string {
-  return quoteTableName(`${table}.${attr}`);
+  // `quoteTableName` requires a host receiver; this module-level helper has no
+  // adapter, so bind a bare host — dispatch falls to the throwing
+  // `quoteColumnName`, matching Rails' abstract behaviour.
+  return quoteTableName.call({}, `${table}.${attr}`);
 }
 
 /**
@@ -267,7 +270,7 @@ export function quoteTableNameForAssignment(table: string, attr: string): string
  * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#quote_default_expression
  */
 export function quoteDefaultExpression(
-  this: (QuotingDispatchHost & QuotingHost) | void,
+  this: QuotingDispatchHost & QuotingHost,
   value: unknown,
   column?: { sqlType?: string | null } | null,
 ): string {
@@ -288,7 +291,7 @@ export function quoteDefaultExpression(
   // returns the raw sqlType string and the value passes through unserialized.
   let serialized: unknown = value;
   if (column != null) {
-    const castType = lookupCastTypeFromColumn.call(this || undefined, {
+    const castType = lookupCastTypeFromColumn.call(this, {
       sqlType: column.sqlType ?? null,
     }) as { serialize?(v: unknown): unknown } | null;
     if (castType && typeof castType.serialize === "function") {
@@ -301,7 +304,7 @@ export function quoteDefaultExpression(
   // deliberately lacks. Falling straight to the module `quote` here would bypass
   // the dialect entirely and raise `can't quote Uint8Array` on a binary default.
   // Hosts without a `quote` (ABSTRACT_SCHEMA_QUOTER) keep the module helper.
-  return dispatchQuote(this || {}, serialized);
+  return dispatchQuote(this, serialized);
 }
 
 /**
