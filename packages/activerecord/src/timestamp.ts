@@ -242,8 +242,8 @@ async function touchRow(this: Base, touchCols: string[], now: Temporal.Instant):
  *
  * Mirrors: ActiveRecord::Base.touch_all
  */
-export async function touchAll(this: typeof Base, ...names: string[]): Promise<number> {
-  return this.all().touchAll(...names);
+export async function touchAll(this: typeof Base, ...args: TouchAllArgs): Promise<number> {
+  return this.all().touchAll(...args);
 }
 
 // ---------------------------------------------------------------------------
@@ -274,6 +274,23 @@ interface TimestampInstanceHost {
   id?: unknown;
   recordTimestamps?: boolean;
   constructor: TimestampHost & { recordTimestamps: boolean; partialUpdates?: boolean };
+}
+
+/**
+ * Argument list for `touch_all(*names, time: nil)`. Ruby's trailing keyword
+ * becomes an optional trailing options object in TS.
+ */
+export type TouchAllArgs = (string | { time?: Temporal.Instant })[];
+
+export function parseTouchAllArgs(args: TouchAllArgs): {
+  names: string[];
+  time: Temporal.Instant | undefined;
+} {
+  const last = args[args.length - 1];
+  if (last !== undefined && typeof last !== "string") {
+    return { names: args.slice(0, -1) as string[], time: last.time };
+  }
+  return { names: args as string[], time: undefined };
 }
 
 export function touchAttributesWithTime(

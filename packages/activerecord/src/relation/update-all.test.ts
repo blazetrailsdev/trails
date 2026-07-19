@@ -251,9 +251,7 @@ describe("UpdateAllTest", () => {
     const previouslyCreatedAt = developer.legacy_created_at;
     const previouslyUpdatedAt = developer.legacy_updated_at;
     const newTime = instant("2015-02-16T04:54:00Z");
-    vi.useFakeTimers({ now: newTime.epochMilliseconds });
-    await Developer.where({ name: "David" }).touchAll("created_at");
-    vi.useRealTimers();
+    await Developer.where({ name: "David" }).touchAll("created_at", { time: newTime });
     await developer.reload();
 
     expect(epochMs(developer.legacy_created_at)).not.toBe(epochMs(previouslyCreatedAt));
