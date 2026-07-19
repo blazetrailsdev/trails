@@ -3748,23 +3748,8 @@ export class Relation<T extends Base> {
     await this._materializeDeferredDistinctPkPredicates();
 
     const table = this._modelClass.arelTable;
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
-      ([key, val]) => {
-        const def = this._modelClass._attributeDefinitions.get(key);
-        const isArray = def?.type?.name === "array";
-        if (isArray) return [table.get(key), def.type.serialize(val)];
-        const isRangeCol =
-          val instanceof Range &&
-          (def?.type as { isForceEquality?(v: unknown): boolean } | undefined)?.isForceEquality?.(
-            val,
-          );
-        if (isRangeCol) return [table.get(key), def!.type.serialize(val)];
-        // Mirrors Rails relation.rb#_substitute_values: a raw `Arel.sql(...)`
-        // assignment value is wrapped in a Grouping so a scalar-subquery value
-        // renders as `SET col = (select ...)`, which SQLite/MySQL/PG require.
-        if (val instanceof Nodes.SqlLiteral) return [table.get(key), new Nodes.Grouping(val)];
-        return [table.get(key), val];
-      },
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = this._substituteValues(
+      Object.entries(updates),
     );
     // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
     // Uses _incrementAttribute (COALESCE(col, 0) + 1) for NULL-safe increment.
@@ -7065,11 +7050,20 @@ export class Relation<T extends Base> {
     }
   }
 
+  // Mirrors relation.rb:1381-1393.
   private _substituteValues(values: [string, unknown][]): [any, any][] {
     return values.map(([name, value]) => {
       const attr = this._modelClass.arelTable.get(name);
-      const bind = this.predicateBuilder.buildBindAttribute(name, value);
-      return [attr, bind];
+      // Mirrors `Arel.arel_node?` (arel.rb): Node, SqlLiteral, or Attribute.
+      if (
+        value instanceof Nodes.Node ||
+        value instanceof Nodes.SqlLiteral ||
+        value instanceof Nodes.Attribute
+      ) {
+        return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
+      }
+      const type = this._modelClass.typeForAttribute(attr.name);
+      return [attr, this.predicateBuilder.buildBindAttribute(attr.name, type.cast(value))];
     });
   }
 
