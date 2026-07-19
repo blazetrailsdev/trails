@@ -557,6 +557,12 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     const { username: railsUsername, ...mysqlDriverConfig } = mysqlConfig as typeof mysqlConfig & {
       username?: string;
     };
+    // No compact/allowlist here, unlike PostgreSQLAdapter (which mirrors
+    // postgresql_adapter.rb:322-331). Rails hands mysql2 the residual config
+    // hash verbatim — `::Mysql2::Client.new(config)` (mysql2_adapter.rb:24-25)
+    // — with no `compact` and no `slice!`, so passing the residual hash through
+    // IS the faithful port. The `username` remap above is a separate,
+    // driver-forced deviation and does not imply an allowlist belongs here.
     this._poolConfig = {
       ...mysqlDriverConfig,
       ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
