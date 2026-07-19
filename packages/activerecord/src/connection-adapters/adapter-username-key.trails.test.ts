@@ -9,11 +9,12 @@
  *
  *     conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
  *
- * so the precedence asserted here is Rails': a *present* `username` overwrites
- * `user` rather than deferring to it, and is always deleted from the hash.
- * Present, not JS-truthy — `conn_params = @config.compact` drops the nils
- * before the guard, and Ruby treats `""` as truthy, so a blank username maps
- * too.
+ * so the precedence asserted here is Rails': a *Ruby-truthy* `username`
+ * overwrites `user` rather than deferring to it, and is deleted from the hash.
+ * Ruby-truthy, not JS-truthy, and the two differ in both directions here: `""`
+ * is truthy in Ruby (so a blank username maps), while `false` is falsey and
+ * survives `@config.compact` (which drops only nils), so `username: false` is
+ * the one present value that does NOT map.
  *
  * For MySQL there is no Rails counterpart — Ruby's mysql2 gem reads `:username`
  * natively, so Rails passes the hash through untouched. The mapping is a
@@ -67,6 +68,16 @@ describe.each([
     const driverConfig = driverConfigFor({ ...BASE, username: "", user: "driver" });
     expect(driverConfig.user).toBe("");
     expect(driverConfig).not.toHaveProperty("username");
+  });
+
+  it("leaves an explicit user alone when username is false", () => {
+    // `false` is the one present value the guard rejects: `@config.compact`
+    // drops only nils, so `username: false` survives to line 326 and Ruby
+    // reads it as falsey. Verified against Ruby:
+    //   {username: false, user: "driver"}.compact
+    //     => {:username=>false, :user=>"driver"}  (mapping does not run)
+    const driverConfig = driverConfigFor({ ...BASE, username: false, user: "driver" });
+    expect(driverConfig.user).toBe("driver");
   });
 
   it("leaves user absent when neither key is given", () => {

@@ -11,6 +11,7 @@ import {
   type MysqlPreparedStatement,
 } from "./abstract-mysql-adapter.js";
 import { StringType, ImmutableStringType, BinaryData } from "@blazetrails/activemodel";
+import { isRubyTruthy } from "../ruby-truthy.js";
 import { TypeMap } from "../type/type-map.js";
 import * as Type from "../type.js";
 import { UnsignedInteger } from "../type/unsigned-integer.js";
@@ -554,15 +555,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails-spelled hash connects as the OS user instead of failing.
     //
     // Semantics deliberately match the one place Rails DOES translate —
-    // postgresql_adapter.rb:326 — so both adapters agree: a PRESENT `username`
-    // (including "", which is truthy in Ruby) overwrites `user` and is always
-    // removed from the driver config.
+    // postgresql_adapter.rb:326 — so both adapters agree, down to the same
+    // `isRubyTruthy` guard: a Ruby-truthy `username` (including "") overwrites
+    // `user`, while `username: false` does not.
     const { username: railsUsername, ...mysqlDriverConfig } = mysqlConfig as typeof mysqlConfig & {
       username?: string;
     };
     this._poolConfig = {
       ...mysqlDriverConfig,
-      ...(railsUsername == null ? {} : { user: railsUsername }),
+      ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
       flags: resolvedFlags,
       strict,
       waitTimeout,
