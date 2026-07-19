@@ -665,8 +665,11 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).not.toMatch(/createSchema\("public"\)/);
       expect(output).toMatch(/createSchema\("test_schema"\)/);
       expect(output).toMatch(/createSchema\("test_schema2"\)/);
-      // Timeout raised above vitest's 5s default: a full pg schema dump is heavy
-      // enough to cross it under parallel-fork contention (Rails has no such budget).
+      // Timeout raised above vitest's 5s default: even with the /./ filter above
+      // skipping per-table introspection, this case has repeatedly crossed 5s under
+      // parallel-fork contention and passed on rerun. Rails' test_dumping_schemas
+      // (schema_test.rb:530) is plain minitest with no per-test budget, so the 5s
+      // ceiling is a harness artifact, not behavior we are meant to hold to.
     }, 30_000);
   });
 
