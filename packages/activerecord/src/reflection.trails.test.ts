@@ -346,6 +346,28 @@ describe("ReflectionTest", () => {
     expect(poly.foreignType).toBe("_type");
   });
 
+  it("nil name through-source inference coerces like Ruby to_s", () => {
+    // Rails: options[:source] ? [options[:source]] : [name.to_s.singularize, name].uniq
+    // (reflection.rb:1109) — the singular candidate is coerced, the second is
+    // the raw name. singularize(null) would otherwise throw or infer wrongly.
+    class NilThroughOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("NilThroughOwner", NilThroughOwner);
+
+    const through = create(
+      "hasMany",
+      null,
+      null,
+      { through: "nilThroughs" },
+      NilThroughOwner,
+    ) as ThroughReflection;
+    expect(through.sourceReflectionNames()).toEqual(["", null]);
+    expect(() => through.source).not.toThrow();
+  });
+
   it("plural_name honors pluralize_table_names", () => {
     // Rails: active_record.pluralize_table_names ? name.to_s.pluralize : name.to_s
     // (reflection.rb:395). We previously pluralized unconditionally.

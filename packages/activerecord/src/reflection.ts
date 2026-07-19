@@ -703,7 +703,7 @@ export class MacroReflection extends AbstractReflection {
       // (reflection.rb:495-508). Match AssociationReflection#computeClass so
       // callers rescuing only NameError treat both paths uniformly.
       throw new NameError(
-        `Model '${lookupName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
+        `Model '${lookupName}' not found in registry (for '${this.nameString}' on ${this.activeRecord.name})`,
       );
     }
     return resolved;
@@ -1170,7 +1170,7 @@ export class AssociationReflection extends MacroReflection {
     //   klass.cached_find_by_statement(key, &block)
     // The compiled statement is memoized on the *target* class, keyed by this
     // reflection (plus the owner's polymorphic type when applicable).
-    let key = `assocScope:${this.activeRecord.name}#${this.name}`;
+    let key = `assocScope:${this.activeRecord.name}#${this.nameString}`;
     if (this.isPolymorphic()) {
       key += `:${owner?._readAttribute?.(this.foreignType)}`;
     }
@@ -1204,7 +1204,7 @@ export class AssociationReflection extends MacroReflection {
     // Rails checks scope.arity == 0 because it uses instance_exec for the relation.
     if (this.scope.length > 1) {
       throw new ArgumentError(
-        `The association scope '${this.name}' is instance dependent (the scope ` +
+        `The association scope '${this.nameString}' is instance dependent (the scope ` +
           `block takes more than one argument). Eager loading instance dependent scopes is not supported.`,
       );
     }
@@ -1316,7 +1316,7 @@ export class AssociationReflection extends MacroReflection {
           if (resolved) {
             if (!(resolved as any)._isActiveRecordBase) {
               throw new ArgumentError(
-                `The ${candidate} model class for the ${this.activeRecord.name}#${this.name} association is not an ActiveRecord::Base subclass.`,
+                `The ${candidate} model class for the ${this.activeRecord.name}#${this.nameString} association is not an ActiveRecord::Base subclass.`,
               );
             }
             return resolved;
@@ -1331,12 +1331,12 @@ export class AssociationReflection extends MacroReflection {
       // error check_validity! callers rescue); the subclass guard below raises
       // ArgumentError, which must propagate. reflection.rb:495-508.
       throw new NameError(
-        `Model '${simpleName}' not found in registry (for '${this.name}' on ${this.activeRecord.name})`,
+        `Model '${simpleName}' not found in registry (for '${this.nameString}' on ${this.activeRecord.name})`,
       );
     }
     if (!(resolved as any)._isActiveRecordBase) {
       throw new ArgumentError(
-        `The ${simpleName} model class for the ${this.activeRecord.name}#${this.name} association is not an ActiveRecord::Base subclass.`,
+        `The ${simpleName} model class for the ${this.activeRecord.name}#${this.nameString} association is not an ActiveRecord::Base subclass.`,
       );
     }
     return resolved;
@@ -1575,6 +1575,11 @@ export class ThroughReflection extends AbstractReflection {
     return this.delegateReflection.name;
   }
 
+  /** Ruby's `name.to_s` — see MacroReflection#nameString. */
+  private get nameString(): string {
+    return this.name ?? "";
+  }
+
   get macro(): MacroType {
     return this.delegateReflection.macro;
   }
@@ -1721,14 +1726,14 @@ export class ThroughReflection extends AbstractReflection {
     const throughRef = this.throughReflection;
     if (throughRef) {
       try {
-        const singular = singularize(this.name);
+        const singular = singularize(this.nameString);
         if (throughRef.klass._reflectOnAssociation(singular)) return singular;
         if (throughRef.klass._reflectOnAssociation(this.name)) return this.name;
       } catch {
         /* klass resolution may fail */
       }
     }
-    return this._delegate.isCollection() ? singularize(this.name) : this.name;
+    return this._delegate.isCollection() ? singularize(this.nameString) : this.name;
   }
 
   get sourceReflection(): AssociationReflection | ThroughReflection | null {
@@ -1885,7 +1890,7 @@ export class ThroughReflection extends AbstractReflection {
 
   sourceReflectionNames(): string[] {
     if (this.options.source) return [this.options.source as string];
-    const singular = singularize(this.name);
+    const singular = singularize(this.nameString);
     const names = [singular, this.name];
     return [...new Set(names)];
   }
@@ -1908,7 +1913,7 @@ export class ThroughReflection extends AbstractReflection {
     }
 
     try {
-      const singular = singularize(this.name);
+      const singular = singularize(this.nameString);
       const candidates = [...new Set([singular, this.name])];
       const matching = candidates.filter((n) => throughRef.klass._reflectOnAssociation(n) != null);
 
