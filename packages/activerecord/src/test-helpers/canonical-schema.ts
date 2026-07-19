@@ -1853,10 +1853,6 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
   });
 
-  await define("libraries", {}, (t) => {
-    t.string("name");
-  });
-
   await define("ms_departments", {}, (t) => {
     t.integer("hotel_id");
   });

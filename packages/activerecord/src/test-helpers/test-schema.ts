@@ -1780,7 +1780,6 @@ export const TEST_SCHEMA: Schema = {
   hot_profiles: { hot_account_id: "integer" },
   jt_categories: { name: "string" },
   jt_products: { name: "string" },
-  libraries: { name: "string" },
   ms_departments: { hotel_id: "integer" },
   ms_hotels: { name: "string" },
   n_authors: { name: "string" },

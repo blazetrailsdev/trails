@@ -519,9 +519,12 @@ describe("ReflectionTest", () => {
     expect(type.serialize(object)).toBe(object);
   });
   it("reflection klass for nested class name", async () => {
+    // Rails passes a nil name here (reflection_test.rb:126) — the test exercises
+    // klass resolution only, and nothing on that path reads the name.
+    const anonymous = null as unknown as string;
     const reflection = createReflection(
       "hasMany",
-      null as unknown as string,
+      anonymous,
       null,
       { className: "MyApplication::Business::Company" },
       Customer,
