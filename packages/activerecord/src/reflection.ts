@@ -585,17 +585,21 @@ export class MacroReflection extends AbstractReflection {
   private _klassCacheGeneration = -1;
 
   constructor(
-    name: string,
+    name: string | null,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
     activeRecord: typeof Base,
   ) {
     super();
-    this.name = name;
+    // Rails' `name` is a Symbol that callers always supply, but
+    // `Reflection.create` itself tolerates nil (reflection_test.rb:126). The
+    // field stays typed `string` because every real association path sets it;
+    // the nil case is confined to this assignment.
+    this.name = name as string;
     this._scope = scope;
     this.options = this.normalizeOptions(options);
     this.activeRecord = activeRecord;
-    this.pluralName = pluralize(name);
+    this.pluralName = activeRecord.pluralizeTableNames ? pluralize(name ?? "") : (name ?? "");
   }
 
   equals(other: unknown): boolean {
@@ -784,7 +788,7 @@ export class AssociationReflection extends MacroReflection {
   private _activeRecordPrimaryKeyCache: string | string[] | null = null;
 
   constructor(
-    name: string,
+    name: string | null,
     scope: ((...args: any[]) => any) | null,
     options: Record<string, unknown>,
     activeRecord: typeof Base,
@@ -2217,7 +2221,7 @@ export class ColumnReflection {
 function reflectionClassFor(
   macro: string,
 ): new (
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
@@ -2241,21 +2245,21 @@ function reflectionClassFor(
  */
 export function create(
   macro: Exclude<MacroType, "composedOf">,
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): AssociationReflection | ThroughReflection;
 export function create(
   macro: "composedOf",
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
 ): AggregateReflection;
 export function create(
   macro: MacroType,
-  name: string,
+  name: string | null,
   scope: ((...args: any[]) => any) | null,
   options: Record<string, unknown>,
   activeRecord: typeof Base,
