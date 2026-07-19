@@ -106,6 +106,54 @@ describe("Thenable", () => {
     });
   });
 
+  it("relation stays awaitable after load", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const loaded = await davids.load();
+    expect(loaded.isLoaded).toBe(true);
+
+    const records = await davids;
+    expect(Array.isArray(records)).toBe(true);
+    expect(records).toHaveLength(1);
+  });
+
+  it("load returns a stable view that shares state with the relation", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const first = await davids.load();
+    const second = await davids.load();
+    expect(second).toBe(first);
+
+    // The view is not a copy: loading through it marked the original loaded,
+    // and both read the same records.
+    expect(davids.isLoaded).toBe(true);
+    expect(await first.toArray()).toEqual(await davids.toArray());
+  });
+
+  it("chaining load off a loaded relation does not nest views", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const once = await davids.load();
+    // Methods called on the view run with `this` bound to the view, so this
+    // re-enters stripThenable with the view itself. Rails' `load` returns
+    // `self`, so it must land back on the same object rather than wrapping.
+    const twice = await once.load();
+    const thrice = await (await twice.reload()).load();
+
+    expect(twice).toBe(once);
+    expect(thrice).toBe(once);
+    expect(await thrice.toArray()).toHaveLength(1);
+  });
+
+  it("relation stays awaitable after destroyAll", async () => {
+    const davids = Author.where({ name: "David" });
+    expect(await davids).toHaveLength(1);
+
+    await davids.destroyAll();
+
+    expect(await davids).toEqual([]);
+  });
+
   describe("BatchEnumerator", () => {
     it("BatchEnumerator is directly awaitable", async () => {
       const batches = await Author.all().inBatches({ batchSize: 2 });
