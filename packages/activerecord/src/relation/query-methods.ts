@@ -1467,7 +1467,23 @@ function optimizerHintsBang(this: QueryMethodsHost, ...hints: string[]): any {
 }
 
 function reverseOrderBang(this: QueryMethodsHost): any {
-  this._orderClauses = this._orderClauses.map((clause) => {
+  // Rails hands the whole (compact_blank'd) order list to reverse_sql_order, so an
+  // empty order falls into its default branch: ORDER BY <pk> DESC, or an
+  // IrreversibleOrderError when the table has no primary key. Mapping over the
+  // clauses here skips that branch entirely, so delegate the empty case.
+  // Rails' compact_blank is reject(&:blank?). activesupport's isBlank is not a
+  // substitute here: it reports a key-less object as blank, but Ruby's blank? is
+  // false for an Arel node (it has no #empty?), so routing clauses through it
+  // would drop every Ordering. Only nil/blank-string clauses are blank in this
+  // list; nodes and [col, dir] tuples never are.
+  const clauses = this._orderClauses.filter(
+    (clause) => clause != null && !(typeof clause === "string" && /^\s*$/.test(clause)),
+  );
+  if (clauses.length === 0) {
+    this._orderClauses = reverseSqlOrder.call(this, []) as typeof this._orderClauses;
+    return this;
+  }
+  this._orderClauses = clauses.map((clause) => {
     if (clause instanceof Nodes.Node) {
       // Arel::Nodes::SqlLiteral is a String subclass in Rails, so reverse_sql_order
       // reverses it via the `when String` branch (flip trailing ASC↔DESC), not .desc.
