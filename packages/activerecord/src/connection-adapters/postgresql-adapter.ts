@@ -399,6 +399,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * Rails-native keys (`adapter`, `pool`, `checkoutTimeout`, `migrationsPaths`,
    * ...) and typo'd driver keys are dropped rather than silently ignored by the
    * driver.
+   *
+   * Order matters and matches Rails: the AR-to-PG name mapping
+   * (`username` -> `user`, postgresql_adapter.rb:325) must run BEFORE this
+   * slice, or the Rails-spelled key is dropped before it can be renamed.
    * @internal
    */
   private static _sliceValidConnParams(config: Record<string, unknown>): pg.ClientConfig {

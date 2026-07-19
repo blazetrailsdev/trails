@@ -35,6 +35,30 @@ describe("PostgreSQLAdapter conn_params", () => {
     expect(options).not.toHaveProperty("hsot");
   });
 
+  it("forwards every driver-native param it is given", () => {
+    const options = clientOptions({
+      user: "alice",
+      password: "s3cret",
+      database: "trails_test",
+      host: "localhost",
+      port: 5432,
+      application_name: "trails",
+      connectionTimeoutMillis: 100,
+      ssl: false,
+    });
+
+    expect(options).toMatchObject({
+      user: "alice",
+      password: "s3cret",
+      database: "trails_test",
+      host: "localhost",
+      port: 5432,
+      application_name: "trails",
+      connectionTimeoutMillis: 100,
+      ssl: false,
+    });
+  });
+
   it("drops undefined-valued params so pg applies its own defaults", () => {
     const options = clientOptions({
       database: "trails_test",
