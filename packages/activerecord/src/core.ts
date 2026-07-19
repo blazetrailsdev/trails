@@ -30,7 +30,7 @@ import { Table, Nodes } from "@blazetrails/arel";
 import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
-import { ActiveModelRangeError } from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { hasDefaultScopeOverride } from "./scoping/default.js";
 
 /**

@@ -11,7 +11,7 @@
 import { Nodes } from "@blazetrails/arel";
 import { pluralize } from "@blazetrails/activesupport";
 import {
-  ActiveModelRangeError,
+  RangeError as ActiveModelRangeError,
   sanitizeForMassAssignment as sanitizeForbiddenAttributes,
 } from "@blazetrails/activemodel";
 import { RecordNotFound, RecordNotSaved, RecordNotUnique, SoleRecordExceeded } from "../errors.js";

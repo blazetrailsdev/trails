@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { ActiveModelRangeError } from "@blazetrails/activemodel";
+import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { UnsignedInteger } from "./unsigned-integer.js";
 
 describe("UnsignedIntegerTest", () => {

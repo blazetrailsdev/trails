@@ -10,7 +10,7 @@
  *   const results = await cache.execute(["my book"], connection);
  */
 
-import { Attribute, ActiveModelRangeError } from "@blazetrails/activemodel";
+import { Attribute, RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
 import { Nodes } from "@blazetrails/arel";
 import { RangeError as ARRangeError } from "./errors.js";
 import type { Base } from "./base.js";

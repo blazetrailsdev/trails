@@ -1,5 +1,4 @@
 [
-  "packages/activemodel/src/errors.ts",
   "packages/activemodel/src/i18n.ts",
   "packages/activemodel/src/lint.ts",
   "packages/activerecord/src/adapters/postgresql/pg-range.ts",

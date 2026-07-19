@@ -1,6 +1,6 @@
 import { isBlank } from "@blazetrails/activesupport";
 import { ValueType } from "./value.js";
-import { ActiveModelRangeError } from "../errors.js";
+import { RangeError as ActiveModelRangeError } from "../errors.js";
 import { applyNumericMixin } from "./helpers/numeric.js";
 
 /** Mirrors: ActiveModel::Type::Integer::DEFAULT_LIMIT (integer.rb:43). */
