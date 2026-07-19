@@ -177,3 +177,36 @@ describe("generated relation methods — remaining delegate-class carriers", () 
     }
   });
 });
+
+describe("name delegate — property-reader typing invariant", () => {
+  // `delegate :name, to: :model` is a Rails property reader (`relation.name`,
+  // no parens). It is typed to return `RelationName` — a *supertype* of `string`
+  // — rather than plain `string` on purpose: a plain-string `name` getter would
+  // make the structurally typed `Relation` satisfy `{ name: string }`, flipping
+  // `Array#reduce` accumulator inference (`relations.test.ts` "find all with
+  // multiple should use and"). These assertions pin both halves of that
+  // invariant at compile time so a future regression fails loudly here.
+
+  it("reads as a getter returning the model class name (no parens)", () => {
+    expect(Comment.all().name).toBe("Comment");
+  });
+
+  it("keeps Relation off the `{ name: string }` structural surface (reduce guard)", () => {
+    const rel = Comment.all();
+    // If `name` were typed `string`, `rel` would be assignable to
+    // `{ name: string }` and this assignment would compile — flipping reduce
+    // inference. The `@ts-expect-error` is load-bearing: regressing the getter
+    // to `string` makes the directive unused, which is itself a type error.
+    // @ts-expect-error Relation must NOT be assignable to { name: string }
+    const structural: { name: string } = rel;
+    void structural;
+  });
+
+  it("stays a supertype of `string` so string literals remain assignable at call sites", () => {
+    // The other half: `RelationName` must accept a plain string, so
+    // `expect(relation.name).toBe("Comment")` type-checks without a cast.
+    const rel = Comment.all();
+    const name: typeof rel.name = "Comment";
+    expect(name).toBe("Comment");
+  });
+});
