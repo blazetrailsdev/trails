@@ -1471,6 +1471,14 @@ export class Relation<T extends Base> {
       case "skipQueryCache":
         rel._skipQueryCache = undefined;
         break;
+      case "reverseOrder":
+        // `:reverse_order` is in VALUE_METHODS, so `values.except`/`values.slice`
+        // touch it; but trails (like the pinned Rails' `reverse_order!`) flips
+        // order eagerly and leaves `_reverseOrderValue` vestigial-nil, so this
+        // reset is a faithful no-op — the flipped order lives in `_orderClauses`
+        // (the `order` key).
+        rel._reverseOrderValue = undefined;
+        break;
       default:
         // Rails' `values` slice/except silently ignores unknown keys;
         // resetValueForScope's switch no-ops on any non-UnscopeType string.

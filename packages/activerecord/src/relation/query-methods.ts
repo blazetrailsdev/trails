@@ -801,12 +801,14 @@ export const VALID_UNSCOPING_VALUES: ReadonlySet<UnscopeType> = new Set<UnscopeT
  * Value keys accepted by `SpawnMethods#except` — Rails' `Relation::VALUE_METHODS`.
  * A superset of `UnscopeType`: it additionally covers value keys that have no
  * `unscope` equivalent (`distinct`, `strictLoading`, `references`, `extending`,
- * `unscope`, `reordering`, `skipQueryCache`), mirroring
+ * `unscope`, `reordering`, `skipQueryCache`, `reverseOrder`), mirroring
  * `relation_with values.except(*skips)`.
  *
- * Rails' `:reverse_order` is omitted: trails applies `reverseOrder` eagerly
- * (it flips `_orderClauses` in place rather than storing a `reverse_order`
- * value), so there is no stored value key to remove.
+ * `reverseOrder` (`:reverse_order`, a SINGLE_VALUE_METHOD) is included for
+ * surface parity with `Relation::VALUE_METHODS` and the merger, but resetting it
+ * is a faithful no-op: trails applies `reverseOrder` eagerly (flipping
+ * `_orderClauses` in place), leaving `_reverseOrderValue` vestigial-nil — exactly
+ * as the pinned Rails' `reverse_order!` leaves `values[:reverse_order]` nil.
  */
 export type ExceptKey =
   | UnscopeType
@@ -816,7 +818,8 @@ export type ExceptKey =
   | "extending"
   | "unscope"
   | "reordering"
-  | "skipQueryCache";
+  | "skipQueryCache"
+  | "reverseOrder";
 
 /**
  * The full `Relation::VALUE_METHODS` key surface handled by `SpawnMethods#except`
@@ -833,6 +836,7 @@ export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
   "unscope",
   "reordering",
   "skipQueryCache",
+  "reverseOrder",
 ];
 
 /**
