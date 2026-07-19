@@ -179,6 +179,86 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Encoding#dump"]).toMatchObject({ params: ["value", "options"], notes: "alias" });
   });
 
+  it("resolves a target defined in an included module", () => {
+    const r = aliasParams({
+      "mix.rb": `
+        module Pkg
+          module Delegation
+            def to_ary(limit = nil); end
+          end
+
+          class Relation
+            include Delegation
+            alias :to_a :to_ary
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Relation#to_a"]).toMatchObject({ params: ["limit"], notes: "alias" });
+  });
+
+  it("resolves a target inherited from a superclass", () => {
+    const r = aliasParams({
+      "sup.rb": `
+        class Parent
+          def compute(a, b); end
+        end
+
+        class Child < Parent
+          alias :calc :compute
+        end
+      `,
+    });
+    expect(r["Child#calc"].params).toEqual(["a", "b"]);
+  });
+
+  it("resolves a class-method target through `extend`", () => {
+    const r = aliasParams({
+      "ext.rb": `
+        module Builders
+          def build(scope, opts = {}); end
+        end
+
+        class Host
+          extend Builders
+          class << self
+            alias_method :create, :build
+          end
+        end
+      `,
+    });
+    expect(r["Host#create"].params).toEqual(["scope", "opts"]);
+  });
+
+  it("prefers a same-bucket definition over an inherited one", () => {
+    const r = aliasParams({
+      "shadow.rb": `
+        module Mixin
+          def target(wrong); end
+        end
+
+        class Owner
+          include Mixin
+          def target(right, also); end
+          alias :aka :target
+        end
+      `,
+    });
+    expect(r["Owner#aka"].params).toEqual(["right", "also"]);
+  });
+
+  it("leaves an alias empty when its target is outside the package", () => {
+    const r = aliasParams({
+      "out.rb": `
+        class Orphan < SomeGem::Base
+          include SomeGem::Mixin
+          alias :local :elsewhere
+        end
+      `,
+    });
+    expect(r["Orphan#local"]).toMatchObject({ params: [], notes: "alias", hasAliasTarget: false });
+  });
+
   it("follows an alias chain (alias of an alias)", () => {
     const r = aliasParams({
       "c.rb": `

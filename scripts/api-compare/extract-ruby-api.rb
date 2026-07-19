@@ -1023,11 +1023,21 @@ class ApiExtractor
   # reaches the manifest.
   # Public: invoked by `run` per package and by the extractor unit test.
   public def resolve_aliases!
-    (@classes.values + @modules.values).each do |info|
+    all = @classes.merge(@modules)
+    all.each do |fqn, info|
       [:instanceMethods, :classMethods].each do |bucket|
         methods = info[bucket]
         by_name = {}
         methods.each { |m| by_name[m[:name]] ||= m }
+        # Second resolution stage: an alias whose target is not defined in this
+        # same bucket may still be reachable through the class's ancestors —
+        # `include`d modules (and inherited superclasses) supply instance
+        # methods, `extend`ed modules supply class methods. Fold those in as
+        # lower-priority candidates so the fixpoint below can use them, without
+        # ever shadowing a same-bucket definition.
+        ancestor_methods(fqn, info, bucket, all).each do |m|
+          by_name[m[:name]] ||= m
+        end
         # Fixpoint: each non-breaking pass fills at least one previously-empty
         # alias (filled aliases are skipped on later passes), so the count of
         # unresolved aliases strictly decreases and the loop always terminates —
@@ -1048,6 +1058,53 @@ class ApiExtractor
         methods.each { |m| m.delete(:alias_target) }
       end
     end
+  end
+
+  # Methods an alias in `fqn`'s `bucket` can resolve against beyond its own
+  # bucket, walking the ancestors the extractor recorded. For instance methods
+  # that's the superclass chain plus each `include`d module's instance methods
+  # (a module's own `include` is followed transitively); for class methods it's
+  # the superclass chain plus each `extend`ed module's INSTANCE methods, since
+  # `extend Foo` promotes Foo's instance methods to singleton methods.
+  # Ancestors outside the package simply aren't in `all`, so their aliases stay
+  # empty-param — best-effort, exactly as before.
+  def ancestor_methods(fqn, info, bucket, all, seen = nil)
+    seen ||= {}
+    return [] if seen[fqn]
+    seen[fqn] = true
+
+    out = []
+    sup = lookup_ancestor(info[:superclass], fqn, all)
+    if sup
+      out.concat(sup[1][bucket])
+      out.concat(ancestor_methods(sup[0], sup[1], bucket, all, seen))
+    end
+    mixin_key = bucket == :classMethods ? :extends : :includes
+    info[mixin_key].each do |mod_name|
+      found = lookup_ancestor(mod_name, fqn, all)
+      next unless found
+      out.concat(found[1][:instanceMethods])
+      out.concat(ancestor_methods(found[0], found[1], :instanceMethods, all, seen))
+    end
+    out
+  end
+
+  # Resolve a `class X < Sup` / `include Mod` constant reference written inside
+  # `from_fqn` to a recorded `[fqn, info]`. Tries the name as an absolute FQN
+  # first, then as relative to each enclosing lexical scope (Ruby's own constant
+  # lookup order), so `include Delegation` inside `ActiveRecord::Relation`
+  # finds `ActiveRecord::Delegation`.
+  def lookup_ancestor(name, from_fqn, all)
+    return nil unless name
+    name = name.sub(/\A::/, "")
+    return [name, all[name]] if all[name]
+    parts = from_fqn.split("::")
+    while parts.any?
+      candidate = (parts + [name]).join("::")
+      return [candidate, all[candidate]] if all[candidate]
+      parts.pop
+    end
+    nil
   end
 
   # `class_attribute`/`cattr_accessor`/`mattr_accessor` (and their reader/writer
