@@ -145,17 +145,16 @@ describe("test-connection-env", () => {
     expect(withDatabase(settings, "other")).toEqual({ ...settings, database: "other" });
   });
 
-  it("driverConfig emits both spellings of the credential and the socket", () => {
-    // Regression guard: DatabaseTasks reads Rails' `username`/`socket`, the
-    // drivers read `user`/`socketPath`, and both drivers IGNORE the key they
-    // don't know — so emitting one spelling connects as the OS user instead of
-    // failing. Caught as `Access denied for user ''` on the MySQL
-    // slot-provisioning path, which routes through DatabaseTasks.
+  it("driverConfig emits Rails' username and both spellings of the socket", () => {
+    // The credential is Rails' `username` alone — the adapters map it to the
+    // driver-native `user`. The socket still straddles: mysql2 reads
+    // `socketPath` and IGNORES `socket`, so emitting one spelling silently
+    // falls back to TCP instead of failing.
     const config = driverConfig(
       mysqlSettings(reader({ MYSQL_USER: "u", MYSQL_PASSWORD: "p", MYSQL_SOCK: "/tmp/m.sock" })),
     );
     expect(config.username).toBe("u");
-    expect(config.user).toBe("u");
+    expect(config).not.toHaveProperty("user");
     expect(config.socket).toBe("/tmp/m.sock");
     expect(config.socketPath).toBe("/tmp/m.sock");
   });

@@ -216,10 +216,16 @@ const mysqlAdapter: DbTemplateAdapter = {
 
     // Built from the config hash rather than a URL so a socket-configured run
     // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
-    const { database: _adminDb, ...adminOpts } = driverConfig(settings);
+    // This connection is opened against the `mysql2` driver directly rather than
+    // through Mysql2Adapter, so it does not get the adapter's `username` → `user`
+    // mapping — spell the driver-native key here.
+    const { database: _adminDb, username, ...adminOpts } = driverConfig(settings);
     // CREATE DATABASE for all slots first (sequential — DDL against the same
     // server, DROP/CREATE must not race with themselves).
-    const admin = await mysql.createConnection(adminOpts as mysql.ConnectionOptions);
+    const admin = await mysql.createConnection({
+      ...adminOpts,
+      user: username,
+    } as mysql.ConnectionOptions);
     for (let slot = 1; slot <= n; slot++) {
       const slotDb = slot === 1 ? settings.database : `${settings.database}_${slot}`;
       await admin.query(`DROP DATABASE IF EXISTS \`${slotDb}\``);

@@ -547,8 +547,18 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         ? inputFlags
         : [...inputFlags, "FOUND_ROWS"]
       : ["FOUND_ROWS"];
+    // Rails' database.yml spells the credential `username`
+    // (database_configurations/hash_config.rb); the mysql2 driver reads `user`
+    // and ignores unknown keys, so a Rails-spelled hash would otherwise connect
+    // as the OS user instead of failing. Map it here. An explicit `user` wins.
+    const { username: railsUsername, ...mysqlDriverConfig } = mysqlConfig as typeof mysqlConfig & {
+      username?: string;
+    };
     this._poolConfig = {
-      ...mysqlConfig,
+      ...mysqlDriverConfig,
+      ...(mysqlDriverConfig.user === undefined && railsUsername !== undefined
+        ? { user: railsUsername }
+        : {}),
       flags: resolvedFlags,
       strict,
       waitTimeout,
