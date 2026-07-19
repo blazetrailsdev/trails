@@ -1,5 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { IntegerType } from "@blazetrails/activemodel";
+import { Table } from "@blazetrails/arel";
 import { Company, Firm } from "../test-helpers/models/company.js";
+import { PredicateBuilder } from "./predicate-builder.js";
 
 // trails-specific regression guard (no Rails counterpart): Base.predicateBuilder
 // is now TableMetadata-backed, and that metadata is bound to the class. The memo
@@ -17,5 +20,28 @@ describe("Base.predicateBuilder STI memoization", () => {
     // Idempotent per class.
     expect(Company.predicateBuilder).toBe(companyPb);
     expect(Firm.predicateBuilder).toBe(firmPb);
+  });
+});
+
+// trails-specific regression guard (no Rails counterpart): Rails re-roots the
+// builder's `table` per association, so `build_bind_attribute` always sees the
+// right type caster. trails instead threads the attribute's own relation through
+// the shared type cascade — without it, a joined/aliased out-of-range equality
+// falls through to the identity fallback and silently binds a raw value the
+// column cannot hold, instead of collapsing to `1=0`.
+describe("PredicateBuilder positive-equality bind typing", () => {
+  it("types a joined/aliased equality bind via the relation type caster", () => {
+    const int8 = new IntegerType({ limit: 8 });
+    // Only the attribute's relation knows the column type; the builder's own
+    // table answers undefined, which is the identity-fallback trap.
+    const relation = { typeForAttribute: () => int8 };
+    const table = new Table("posts", { typeCaster: { typeForAttribute: () => undefined } });
+    const builder = new PredicateBuilder(table);
+    const attribute = Object.assign(table.get("author_id"), { relation });
+
+    const bind = builder.buildBindAttribute(attribute.name, 2n ** 63n, relation);
+    expect(bind.isUnboundable()).toBe(1);
+    // The narrow this.table-only lookup finds nothing → identity → not detected.
+    expect(builder.buildBindAttribute(attribute.name, 2n ** 63n).isUnboundable()).toBe(false);
   });
 });

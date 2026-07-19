@@ -17,6 +17,23 @@ interface BoundType {
   serialize?(x: unknown): unknown;
 }
 
+/** A type as the cascade sees it — any level may answer null/undefined. */
+type TypeCandidate = (BoundType & { isForceEquality?(v: unknown): boolean }) | null | undefined;
+
+interface TypeCaster {
+  typeForAttribute?(name: string): TypeCandidate;
+}
+
+/** The typeCaster-bearing relation an Arel attribute was resolved against. */
+function attributeRelationOf(attribute: Nodes.Attribute): unknown {
+  return (attribute as unknown as { relation?: unknown }).relation;
+}
+
+const IDENTITY_CAST_TYPE = {
+  cast: (v: unknown) => v,
+  serialize: (v: unknown) => v,
+};
+
 /**
  * Converts hash conditions ({ name: "dean", age: 30 }) into
  * Arel predicate nodes. Used by Relation to build WHERE clauses.
@@ -66,8 +83,7 @@ export class PredicateBuilder {
    * equality/negation single-value paths, and handles non-numeric out-of-range
    * bounds (e.g. custom types) type-agnostically.
    *
-   * Callers pass the type from {@link resolveBoundType} (not the narrower
-   * `this.table`-only lookup `buildBindAttribute` uses) so sign detection uses
+   * Callers pass the type from {@link resolveBoundType} so sign detection uses
    * the same type as the accompanying cast — otherwise a joined/aliased bound
    * could be detected against the wrong (or identity) type.
    */
@@ -82,8 +98,7 @@ export class PredicateBuilder {
 
   /**
    * Builds a QueryAttribute bind for a bound using {@link resolveBoundType}'s
-   * relation/context/table cascade rather than `buildBindAttribute`'s narrower
-   * `this.table`-only lookup. Used by the negation path so a joined/aliased
+   * relation/context/table cascade. Used by the negation path so a joined/aliased
    * out-of-range bound is typed correctly (and thus detected as unboundable →
    * `1=1`) instead of falling through to the identity fallback and silently
    * binding a raw value the column can't hold.
@@ -97,7 +112,7 @@ export class PredicateBuilder {
     value: unknown,
     type: BoundType | undefined,
   ): QueryAttribute {
-    const castType = (type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v }) as {
+    const castType = (type ?? IDENTITY_CAST_TYPE) as {
       cast(v: unknown): unknown;
       serialize(v: unknown): unknown;
     };
@@ -111,17 +126,33 @@ export class PredicateBuilder {
    * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
    */
   private resolveBoundType(attribute: Nodes.Attribute): BoundType | undefined {
-    const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
-    const attrType = (
-      attrRelation as { typeForAttribute?(n: string): BoundType | null } | undefined
-    )?.typeForAttribute?.(attribute.name);
-    if (attrType) return attrType;
-    const ctx = this._tableContext as {
-      typeForAttribute?(n: string): BoundType | null;
-    } | null;
-    const ctxType = ctx?.typeForAttribute?.(attribute.name);
-    if (ctxType) return ctxType;
-    return this.table.typeForAttribute(attribute.name) as BoundType | undefined;
+    return this.resolveColumnType(attribute.name, attributeRelationOf(attribute)) as
+      | BoundType
+      | undefined;
+  }
+
+  /**
+   * The single type-resolution cascade every bind-building path shares:
+   * the attribute's own relation typeCaster (covers joined/aliased tables),
+   * then the predicate builder's table/model context, then the arel table.
+   * Yields each candidate (including misses) so callers that need to probe
+   * every level — `_buildForceEqualityOrNull`'s `isForceEquality?` scan — can
+   * walk the same order as callers that just want the first hit.
+   *
+   * @internal
+   */
+  private *_typeLookups(columnName: string, relation?: unknown): Generator<TypeCandidate> {
+    yield (relation as TypeCaster | undefined)?.typeForAttribute?.(columnName);
+    yield (this._tableContext as TypeCaster | null)?.typeForAttribute?.(columnName);
+    yield this.table.typeForAttribute(columnName) as TypeCandidate;
+  }
+
+  /** First hit of the {@link _typeLookups} cascade, or undefined. */
+  private resolveColumnType(columnName: string, relation?: unknown): TypeCandidate {
+    for (const type of this._typeLookups(columnName, relation)) {
+      if (type) return type;
+    }
+    return undefined;
   }
 
   buildFromHash(
@@ -629,7 +660,9 @@ export class PredicateBuilder {
     // tuple lists allocation-light.
     const attrs = cols.map((c) => this.resolveColumn(c));
     const groupings: Nodes.Node[] = validTuples.map((tuple) => {
-      const eqs = attrs.map((attr, i) => attr.eq(this.buildBindAttribute(attr.name, tuple[i])));
+      const eqs = attrs.map((attr, i) =>
+        attr.eq(this.buildBindAttribute(attr.name, tuple[i], attributeRelationOf(attr))),
+      );
       return new Nodes.Grouping(new Nodes.And(eqs));
     });
     if (groupings.length === 1) return groupings[0];
@@ -668,12 +701,19 @@ export class PredicateBuilder {
     this.handlers.unshift([klass, handler]);
   }
 
-  buildBindAttribute(columnName: string, value: unknown): QueryAttribute {
-    const type = this.table.typeForAttribute(columnName) as
-      | { cast(v: unknown): unknown; serialize(v: unknown): unknown }
-      | undefined;
-    const castType = type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v };
-    return new QueryAttribute(columnName, value, castType);
+  /**
+   * Rails' `build_bind_attribute(column_name, value)`. The optional `relation`
+   * is the trails-side stand-in for Rails re-rooting `table` per association:
+   * a joined/aliased column is typed on the attribute's own relation, so
+   * without it an out-of-range equality would bind a raw value through the
+   * identity fallback instead of collapsing to `1=0`.
+   */
+  buildBindAttribute(columnName: string, value: unknown, relation?: unknown): QueryAttribute {
+    return this.queryAttributeWithType(
+      columnName,
+      value,
+      this.resolveColumnType(columnName, relation) ?? undefined,
+    );
   }
 
   resolveArelAttribute(
@@ -736,25 +776,7 @@ export class PredicateBuilder {
    */
   private _buildForceEqualityOrNull(attribute: Nodes.Attribute, value: unknown): Nodes.Node | null {
     type CastLike = { cast(v: unknown): unknown; serialize(v: unknown): unknown };
-    type TypeLike =
-      | ({ isForceEquality?(v: unknown): boolean } & Partial<CastLike>)
-      | null
-      | undefined;
-    const lookups = [
-      () => {
-        const rel = (attribute as unknown as { relation?: unknown }).relation;
-        return (rel as { typeForAttribute?(n: string): TypeLike } | undefined)?.typeForAttribute?.(
-          attribute.name,
-        );
-      },
-      () =>
-        (
-          this._tableContext as { typeForAttribute?(n: string): TypeLike } | null
-        )?.typeForAttribute?.(attribute.name),
-      () => this.table.typeForAttribute(attribute.name) as TypeLike,
-    ];
-    for (const lookup of lookups) {
-      const t = lookup();
+    for (const t of this._typeLookups(attribute.name, attributeRelationOf(attribute))) {
       if (t?.isForceEquality?.(value)) {
         // Rails (`predicate_builder.rb#build`) emits a bind for force-equality
         // types: `attribute.eq(build_bind_attribute(attribute.name, value))`. The
@@ -766,10 +788,7 @@ export class PredicateBuilder {
         // may be typed on `attribute.relation` / `_tableContext` but not on
         // `this.table`, so deferring to `buildBindAttribute`'s `this.table` lookup
         // would bind through the identity type and skip `RangeType#serialize`.
-        const castType =
-          t.cast && t.serialize
-            ? (t as CastLike)
-            : { cast: (v: unknown) => v, serialize: (v: unknown) => v };
+        const castType = t.cast && t.serialize ? (t as CastLike) : IDENTITY_CAST_TYPE;
         return attribute.eq(new QueryAttribute(attribute.name, value, castType));
       }
     }
