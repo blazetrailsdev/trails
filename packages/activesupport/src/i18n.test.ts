@@ -216,6 +216,21 @@ describe("I18nTest", () => {
     ).toBe("Foo");
   });
 
+  it("test_returns_missing_translation_message_does_filters_out_i18n_options", () => {
+    expect(I18n.translate("translations.missing", { year: "2015", default: [] })).toBe(
+      "Translation missing: en.translations.missing",
+    );
+    expect(I18n.translate("translations.missing", { year: "2015", scope: "scoped" })).toBe(
+      "Translation missing: en.scoped.translations.missing",
+    );
+  });
+
+  it("translate with an unresolved non-array default reports the bare missing message", () => {
+    expect(I18n.translate("translations.missing", { default: Symbol("also.missing") })).toBe(
+      "Translation missing: en.translations.missing",
+    );
+  });
+
   it("translate with an explicit null default returns null instead of raising", () => {
     expect(I18n.translate("translations.missing", { default: null })).toBeNull();
     expect(I18n.translate("translations.missing", { default: null, raise: true })).toBeNull();
