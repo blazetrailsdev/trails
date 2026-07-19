@@ -5,7 +5,6 @@ import { Composite } from "../collectors/composite.js";
 import { SubstituteBinds } from "../collectors/substitute-binds.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
-import { rubyToS } from "../ruby-to-s.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
 import { UnsupportedVisitError, NotImplementedError, BindError } from "../errors.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
@@ -121,6 +120,36 @@ export function cteRelationSelfWraps(relation: Node): boolean {
     relation instanceof Nodes.Intersect ||
     relation instanceof Nodes.Except
   );
+}
+
+/**
+ * Ruby `Object#to_s`, as applied by every adapter's `quote_column_name` /
+ * `quote_table_name` (`name.to_s`, sqlite3/quoting.rb:45, mysql/quoting.rb:47,
+ * postgresql/quoting.rb:47). Rails does that coercion inside the adapter, which
+ * receives the raw name; trails' `Connection` quoting surface is typed to take
+ * a string, so the visitor is where the name is stringified and therefore where
+ * Ruby's semantics have to be reproduced.
+ *
+ * `String(value)` agrees with Ruby for the String/Symbol names that every valid
+ * query produces. It diverges for an Array: Ruby's `Array#to_s` is
+ * inspect-style (`["shop_id", "id"]`), JS comma-joins (`shop_id,id`). An
+ * Array-named `Attribute` arises on the composite-primary-key default order
+ * path (`table[primaryKey].desc`); the column reference it yields is invalid in
+ * Rails too, so this exists to keep the emitted text identical to Rails, not to
+ * make such a query work.
+ */
+function rubyToS(value: unknown): string {
+  if (Array.isArray(value)) return rubyInspect(value);
+  return String(value);
+}
+
+function rubyInspect(value: unknown): string {
+  if (Array.isArray(value)) return `[${value.map(rubyInspect).join(", ")}]`;
+  if (value === null || value === undefined) return "nil";
+  if (typeof value === "string") {
+    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
+  }
+  return String(value);
 }
 
 /**
