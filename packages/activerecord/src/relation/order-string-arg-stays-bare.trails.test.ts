@@ -1,6 +1,10 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Customer } from "../test-helpers/models/customer.js";
+import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
+
+// Adapter-aware `"customers"."name"` — backticks on MySQL/MariaDB.
+const qualifiedName = escapeRegExp(quoteTableName("customers.name"));
 
 /**
  * Locks the string-vs-symbol order-arg deviation resolved by
@@ -34,24 +38,26 @@ describe("order string arg stays bare", () => {
     const dupSymbol = (Customer as unknown as { order(...a: symbol[]): { toSql(): string } })
       .order(Symbol.for("name"), Symbol.for("name"))
       .toSql();
-    expect(dupSymbol.match(/"customers"\."name"/g)).toHaveLength(1);
+    expect(dupSymbol.match(new RegExp(qualifiedName, "g"))).toHaveLength(1);
   });
 
   it("leaves a directionless string bare (no implicit ASC, no qualification)", () => {
     const sql = Customer.order("name").toSql();
     expect(sql).toContain("ORDER BY name");
-    expect(sql).not.toMatch(/ORDER BY .*"customers"\."name"/);
+    expect(sql).not.toMatch(new RegExp(`ORDER BY .*${qualifiedName}`));
   });
 
   it("qualifies a Symbol order arg to the table, like Rails order(:name)", () => {
     const sql = (Customer as unknown as { order(arg: symbol): { toSql(): string } })
       .order(Symbol.for("name"))
       .toSql();
-    expect(sql).toMatch(/ORDER BY "customers"\."name" ASC/);
+    expect(sql).toMatch(new RegExp(`ORDER BY ${qualifiedName} ASC`));
   });
 
   it("qualifies a Hash order arg to the table", () => {
-    expect(Customer.order({ name: "asc" }).toSql()).toMatch(/ORDER BY "customers"\."name" ASC/);
+    expect(Customer.order({ name: "asc" }).toSql()).toMatch(
+      new RegExp(`ORDER BY ${qualifiedName} ASC`),
+    );
   });
 
   it("reversing a string order keeps it bare (flips the trailing direction)", () => {
