@@ -1810,15 +1810,6 @@ export const TEST_SCHEMA: Schema = {
   post_tags: { post_id: "integer", tag_id: "integer" },
   profiles: { user_id: "integer" },
   publishers: {},
-  refl_authors: { name: "string" },
-  refl_categories: { name: "string" },
-  refl_essays: {
-    name: "string",
-    writer_id: "integer",
-    writer_type: "string",
-    category_id: "integer",
-  },
-  refl_organizations: { name: "string" },
   sc2_chef_lists: {
     employable_list_id: "integer",
     employable_list_type: "string",

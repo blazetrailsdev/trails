@@ -2,6 +2,7 @@
  * Tests to increase Rails test coverage matching.
  * Test names are chosen to match Ruby test names from the Rails test suite.
  */
+import "./test-helpers/canonical-model-index.js";
 import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import {
@@ -26,8 +27,13 @@ import {
   MyAppBillingAccount,
   MyAppBillingFirm,
   MyAppBillingNestedFirm,
+  MyAppBusinessCompany,
 } from "./test-helpers/models/company-in-module.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { create as createReflection } from "./reflection.js";
+import { Customer } from "./test-helpers/models/customer.js";
+import { Organization } from "./test-helpers/models/organization.js";
+import { Author } from "./test-helpers/models/author.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -513,27 +519,16 @@ describe("ReflectionTest", () => {
     expect(type.serialize(object)).toBe(object);
   });
   it("reflection klass for nested class name", async () => {
-    class Author extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class Book extends Base {
-      declare title: string | null;
-
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    registerModel("Library::Book", Book);
-    registerModel("Author", Author);
-    Associations.hasMany.call(Author, "books", { className: "Library::Book" });
-    const ref = reflectOnAssociation(Author, "books");
-    expect(ref).not.toBeNull();
-    expect(ref!.klass).toBe(Book);
+    const reflection = createReflection(
+      "hasMany",
+      null as unknown as string,
+      null,
+      { className: "MyApplication::Business::Company" },
+      Customer,
+    );
+    expect(reflection.klass).toBe(MyAppBusinessCompany);
   });
+
   it("irregular reflection class name", async () => {
     class Person extends Base {
       declare name: string | null;
@@ -1439,83 +1434,14 @@ describe("ReflectionTest", () => {
   });
 
   it("chain", () => {
-    class ReflCategory extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    class ReflEssay extends Base {
-      declare name: string | null;
-      declare writer_id: number | null;
-      declare writer_type: string | null;
-      declare category_id: number | null;
-      declare category: ReflCategory | null;
-      declare writer: Base | null;
-      declare loadBelongsTo: ((name: "category") => Promise<ReflCategory | null>) &
-        ((name: "writer") => Promise<Base | null>);
-
-      static {
-        this.attribute("name", "string");
-        this.attribute("writer_id", "integer");
-        this.attribute("writer_type", "string");
-        this.attribute("category_id", "integer");
-        this.belongsTo("category", {
-          className: "ReflCategory",
-          primaryKey: "name",
-        });
-        this.belongsTo("writer", { primaryKey: "name", polymorphic: true });
-      }
-    }
-    class ReflAuthor extends Base {
-      declare name: string | null;
-      declare essays: AssociationProxy<ReflEssay>;
-      declare essayCategories: AssociationProxy<Base>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("essays", {
-          className: "ReflEssay",
-          primaryKey: "name",
-          as: "writer",
-        });
-        this.hasMany("essayCategories", {
-          through: "essays",
-          source: "category",
-        });
-      }
-    }
-    class ReflOrganization extends Base {
-      declare name: string | null;
-      declare authors: AssociationProxy<ReflAuthor>;
-      declare authorEssayCategories: AssociationProxy<Base>;
-
-      static {
-        this.attribute("name", "string");
-        this.hasMany("authors", {
-          className: "ReflAuthor",
-          primaryKey: "name",
-        });
-        this.hasMany("authorEssayCategories", {
-          through: "authors",
-          source: "essayCategories",
-        });
-      }
-    }
-    registerModel("ReflCategory", ReflCategory);
-    registerModel("ReflEssay", ReflEssay);
-    registerModel("ReflAuthor", ReflAuthor);
-    registerModel("ReflOrganization", ReflOrganization);
-
-    const authorEssayCatRef = reflectOnAssociation(ReflOrganization, "authorEssayCategories");
+    const authorEssayCatRef = reflectOnAssociation(Organization, "authorEssayCategories");
     expect(authorEssayCatRef).toBeInstanceOf(ThroughReflection);
 
     const chain = (authorEssayCatRef as ThroughReflection).chain;
     expect(chain).toHaveLength(3);
     expect(chain[0]).toBe(authorEssayCatRef);
-    expect(chain[1]).toBe(reflectOnAssociation(ReflAuthor, "essays"));
-    expect(chain[2]).toBe(reflectOnAssociation(ReflOrganization, "authors"));
+    expect(chain[1]).toBe(reflectOnAssociation(Author, "essays"));
+    expect(chain[2]).toBe(reflectOnAssociation(Organization, "authors"));
   });
 
   it("nested?", () => {
