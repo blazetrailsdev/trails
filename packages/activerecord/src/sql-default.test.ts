@@ -2,13 +2,17 @@ import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import {
   quote as quoteFn,
-  quoteDefaultExpression,
+  quoteDefaultExpression as quoteDefaultExpressionFn,
 } from "./connection-adapters/abstract/quoting.js";
 import { Nodes } from "@blazetrails/arel";
 
 // `quote` requires a host receiver (no receiver-less dispatch); bind an empty
 // host so date/time values route through the abstract module helpers.
 const quote = (value: unknown): string => quoteFn.call({}, value);
+// Likewise `quoteDefaultExpression` — an empty host has no `quote` override, so
+// values fall through to the abstract module quoting.
+const quoteDefaultExpression = (value: unknown, column?: { sqlType?: string | null } | null) =>
+  quoteDefaultExpressionFn.call({}, value, column);
 
 describe("quote", () => {
   it("returns NULL for null", () => {
@@ -57,46 +61,46 @@ describe("quote", () => {
 
 describe("quoteDefaultExpression", () => {
   it("returns empty string for undefined", () => {
-    expect(quoteDefaultExpression.call({}, undefined)).toBe("");
+    expect(quoteDefaultExpression(undefined)).toBe("");
   });
 
   it("returns DEFAULT NULL for null", () => {
-    expect(quoteDefaultExpression.call({}, null)).toBe("NULL");
+    expect(quoteDefaultExpression(null)).toBe("NULL");
   });
 
   it("returns DEFAULT TRUE/FALSE for booleans", () => {
-    expect(quoteDefaultExpression.call({}, true)).toBe("TRUE");
-    expect(quoteDefaultExpression.call({}, false)).toBe("FALSE");
+    expect(quoteDefaultExpression(true)).toBe("TRUE");
+    expect(quoteDefaultExpression(false)).toBe("FALSE");
   });
 
   it("returns unquoted numbers", () => {
-    expect(quoteDefaultExpression.call({}, 42)).toBe("42");
+    expect(quoteDefaultExpression(42)).toBe("42");
   });
 
   it("quotes regular strings", () => {
-    expect(quoteDefaultExpression.call({}, "hello")).toBe("'hello'");
+    expect(quoteDefaultExpression("hello")).toBe("'hello'");
   });
 
   it("passes through function return values as raw SQL", () => {
-    expect(quoteDefaultExpression.call({}, () => "CURRENT_TIMESTAMP")).toBe("CURRENT_TIMESTAMP");
+    expect(quoteDefaultExpression(() => "CURRENT_TIMESTAMP")).toBe("CURRENT_TIMESTAMP");
   });
 
   it("passes through function calls like now()", () => {
-    expect(quoteDefaultExpression.call({}, () => "now()")).toBe("now()");
+    expect(quoteDefaultExpression(() => "now()")).toBe("now()");
   });
 
   it("passes through SqlLiteral instances as raw SQL", () => {
-    expect(quoteDefaultExpression.call({}, new Nodes.SqlLiteral("CURRENT_TIMESTAMP"))).toBe(
+    expect(quoteDefaultExpression(new Nodes.SqlLiteral("CURRENT_TIMESTAMP"))).toBe(
       "CURRENT_TIMESTAMP",
     );
   });
 
   it("quotes plain string CURRENT_TIMESTAMP as a literal", () => {
-    expect(quoteDefaultExpression.call({}, "CURRENT_TIMESTAMP")).toBe("'CURRENT_TIMESTAMP'");
+    expect(quoteDefaultExpression("CURRENT_TIMESTAMP")).toBe("'CURRENT_TIMESTAMP'");
   });
 
   it("throws TypeError when function returns non-string/non-SqlLiteral", () => {
-    expect(() => quoteDefaultExpression.call({}, () => 123)).toThrow(TypeError);
-    expect(() => quoteDefaultExpression.call({}, () => undefined)).toThrow(TypeError);
+    expect(() => quoteDefaultExpression(() => 123)).toThrow(TypeError);
+    expect(() => quoteDefaultExpression(() => undefined)).toThrow(TypeError);
   });
 });

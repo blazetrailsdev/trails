@@ -5,7 +5,7 @@ import {
   quote as quoteFn,
   quoteString,
   quoteColumnName,
-  quoteTableName,
+  quoteTableName as quoteTableNameFn,
   quoteTableNameForAssignment,
   quotedDate,
   quotedTime as quotedTimeFn,
@@ -21,11 +21,13 @@ import {
   columnNameWithOrderMatcher,
 } from "./connection-adapters/abstract/quoting.js";
 
-// `quote` / `typeCast` / `quotedTime` require a host receiver (no receiver-less
-// dispatch); bind an empty host so date/time values route through the abstract
-// module helpers.
+// `quote` / `typeCast` / `quotedTime` / `quoteTableName` require a host receiver
+// (no receiver-less dispatch); bind an empty host so date/time values route
+// through the abstract module helpers and table-name dispatch falls to the
+// throwing module-level `quoteColumnName`, as Rails' abstract layer does.
 const HOST = {};
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
+const quoteTableName = (name: string): string => quoteTableNameFn.call(HOST, name);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 const quotedTime = (value: Temporal.PlainTime | Temporal.PlainDateTime): string =>
   quotedTimeFn.call(HOST, value);
@@ -123,7 +125,7 @@ describe("QuotingTest", () => {
   it("quote table name", () => {
     // Rails: abstract quote_table_name delegates to quote_column_name, which
     // raises NotImplementedError (quoting.rb L66).
-    expect(() => quoteTableName.call({}, "foo")).toThrow(NotImplementedError);
+    expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
 
   it("quote table name for assignment", () => {
@@ -141,10 +143,20 @@ describe("QuotingTest", () => {
   });
   it("quote table name calls quote column name", () => {
     // Rails overrides quote_column_name and asserts quote_table_name routes
-    // through it. trails has no module-level dispatch to monkey-patch, so the
-    // ported assertion verifies the delegation by its observable effect: the
-    // abstract quote_table_name surfaces quote_column_name's NotImplementedError.
-    expect(() => quoteTableName.call({}, "foo")).toThrow(NotImplementedError);
+    // through it. Now that a host receiver is required, that is directly
+    // expressible: bind a host whose quoteColumnName is a spy and assert the
+    // dispatch reaches it.
+    const calls: string[] = [];
+    const host = {
+      quoteColumnName(name: string): string {
+        calls.push(name);
+        return `[${name}]`;
+      },
+    };
+    expect(quoteTableNameFn.call(host, "foo")).toBe("[foo]");
+    expect(calls).toEqual(["foo"]);
+    // Without an override the abstract quote_column_name still raises.
+    expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
   });
   it("quoted timestamp local", () => {
     setDefaultTimezone("local");
