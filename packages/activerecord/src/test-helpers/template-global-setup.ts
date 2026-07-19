@@ -38,7 +38,7 @@ import {
   driverConfig,
   mysqlSettings,
   postgresSettings,
-  postgresUrl,
+  settingsUrl,
   withDatabase,
 } from "./test-connection-env.js";
 
@@ -123,12 +123,6 @@ const sqliteAdapter: DbTemplateAdapter = {
 // means the PG template path did not run (sqlite/MySQL run, or globalSetup off).
 export const PG_TEMPLATE_ENV = "AR_TEST_PG_TEMPLATE";
 
-function pgAdminUrl(baseUrl: string): string {
-  const u = new URL(baseUrl);
-  u.pathname = "/postgres";
-  return u.toString();
-}
-
 async function pgTerminateConnections(admin: pg.Client, dbName: string): Promise<void> {
   await admin.query(
     `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
@@ -141,21 +135,20 @@ const pgAdapter: DbTemplateAdapter = {
   isActive: () => activeLane() === "postgres",
 
   async provision() {
-    const baseUrl = postgresUrl();
-    const baseDb = postgresSettings().database;
-    const templateDb = `${baseDb}_template`;
+    const settings = postgresSettings();
+    const templateDb = `${settings.database}_template`;
 
-    const admin = new pg.Client(pgAdminUrl(baseUrl));
+    // Derive both connections from the settings rather than rewriting the URL
+    // string: a socket-directory PGHOST does not survive `new URL()` surgery.
+    const admin = new pg.Client(settingsUrl("postgres", withDatabase(settings, "postgres")));
     await admin.connect();
 
     await pgTerminateConnections(admin, templateDb);
     await admin.query(`DROP DATABASE IF EXISTS "${templateDb}"`);
     await admin.query(`CREATE DATABASE "${templateDb}"`);
 
-    const tplUrl = new URL(baseUrl);
-    tplUrl.pathname = `/${templateDb}`;
     const adapter = new PostgreSQLAdapter({
-      connectionString: tplUrl.toString(),
+      connectionString: settingsUrl("postgres", withDatabase(settings, templateDb)),
       max: 1,
     }) as unknown as DatabaseAdapter;
     try {
@@ -181,7 +174,7 @@ const pgAdapter: DbTemplateAdapter = {
     }
 
     for (let slot = 1; slot <= slotCount(); slot++) {
-      const slotDb = slot === 1 ? baseDb : `${baseDb}_${slot}`;
+      const slotDb = slot === 1 ? settings.database : `${settings.database}_${slot}`;
       await pgTerminateConnections(admin, slotDb);
       await admin.query(`DROP DATABASE IF EXISTS "${slotDb}"`);
       await admin.query(`CREATE DATABASE "${slotDb}" TEMPLATE "${templateDb}"`);
@@ -191,7 +184,7 @@ const pgAdapter: DbTemplateAdapter = {
     await admin.end();
 
     return async () => {
-      const cleanup = new pg.Client(pgAdminUrl(baseUrl));
+      const cleanup = new pg.Client(settingsUrl("postgres", withDatabase(settings, "postgres")));
       await cleanup.connect();
       await pgTerminateConnections(cleanup, templateDb);
       await cleanup.query(`DROP DATABASE IF EXISTS "${templateDb}"`);
@@ -228,7 +221,7 @@ const mysqlAdapter: DbTemplateAdapter = {
     // server, DROP/CREATE must not race with themselves).
     const admin = await mysql.createConnection(adminOpts as mysql.ConnectionOptions);
     for (let slot = 1; slot <= n; slot++) {
-      const slotDb = slot === 1 ? baseDb : `${baseDb}_${slot}`;
+      const slotDb = slot === 1 ? settings.database : `${settings.database}_${slot}`;
       await admin.query(`DROP DATABASE IF EXISTS \`${slotDb}\``);
       await admin.query(`CREATE DATABASE \`${slotDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`);
     }

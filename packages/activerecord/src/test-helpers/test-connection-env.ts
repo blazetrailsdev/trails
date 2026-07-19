@@ -244,22 +244,39 @@ function credentials({ user, password }: ServerSettings): string {
  * both `mysql2.arunit` and `mysql2.arunit2` (`config.example.yml:18-19,37-39`),
  * so every mysql path here has to preserve it.
  *
- * Postgres has no socket sub-setting (libpq spells a socket connection as
- * `PGHOST=/path`, which is already carried as `host`), so a socket on the
- * postgres scheme is unreachable and raises rather than being dropped.
+ * Postgres has no socket *sub-setting* because libpq spells a socket connection
+ * as a directory in `PGHOST` (`/var/run/postgresql`) — Rails' `postgresql:`
+ * entries carry no host fields at all and lean on that env
+ * (`config.example.yml:74-81`). A directory cannot go in the URL authority: it
+ * yields `postgres://user@/var/run/postgresql:5432/db`, which `pg` misreads as
+ * a hostname and reports as a confusing authentication failure rather than a
+ * parse error. libpq's own spelling for this is an empty authority plus a
+ * `host=` parameter, so a socket-directory `PGHOST` is emitted as
+ * `postgres://user:pass@/database?host=/dir&port=N` — verified against a real
+ * PostgreSQL socket.
  */
 export function settingsUrl(scheme: "postgres" | "mysql", settings: ServerSettings): string {
   const { host, port, database, socket } = settings;
-  const base = `${scheme}://${credentials(settings)}${host}:${port}/${database}`;
-  if (socket === undefined) return base;
+  const auth = credentials(settings);
+
   if (scheme === "postgres") {
-    // eslint-disable-next-line blazetrails/rails-error-parity
-    throw new Error(
-      `Postgres has no socket sub-setting; spell a socket connection as ` +
-        `PGHOST=${socket} so it is carried as the host.`,
-    );
+    // libpq treats a leading "/" in PGHOST as a socket directory, not a host.
+    if (host.startsWith("/")) {
+      const params = new URLSearchParams({ host, port: String(port) });
+      return `postgres://${auth}/${database}?${params.toString()}`;
+    }
+    if (socket !== undefined) {
+      // eslint-disable-next-line blazetrails/rails-error-parity
+      throw new Error(
+        `Postgres has no socket sub-setting; spell a socket connection as ` +
+          `PGHOST=${socket} so libpq resolves it as a socket directory.`,
+      );
+    }
+    return `postgres://${auth}${host}:${port}/${database}`;
   }
-  return `${base}?socketPath=${encodeURIComponent(socket)}`;
+
+  const base = `mysql://${auth}${host}:${port}/${database}`;
+  return socket === undefined ? base : `${base}?socketPath=${encodeURIComponent(socket)}`;
 }
 
 /** The primary PostgreSQL URL for the active worker. */

@@ -113,8 +113,21 @@ describe("test-connection-env", () => {
     );
   });
 
-  it("raises for a socket on the postgres scheme, which has no socket setting", () => {
-    // libpq spells a socket connection as PGHOST=/path, already carried as host.
+  it("spells a socket-directory PGHOST the way libpq does", () => {
+    // Rails' postgresql: entries carry no host and lean on libpq's PG* env
+    // (config.example.yml:74-81), where a leading "/" in PGHOST means a socket
+    // DIRECTORY. Putting that in the URL authority yields
+    // postgres://user@/var/run/postgresql:5432/db, which pg misreads as a
+    // hostname and reports as an authentication failure — verified against a
+    // real socket, as was the empty-authority + host= form emitted here.
+    const settings = postgresSettings(reader({ PGHOST: "/var/run/postgresql" }));
+    expect(settingsUrl("postgres", settings)).toBe(
+      "postgres://postgres@/rails_js_test?host=%2Fvar%2Frun%2Fpostgresql&port=5432",
+    );
+  });
+
+  it("raises for a socket field on the postgres scheme", () => {
+    // Postgres has no socket sub-setting; PGHOST carries it (see above).
     expect(() =>
       settingsUrl("postgres", { ...postgresSettings(reader({})), socket: "/tmp/pg.sock" }),
     ).toThrow(/PGHOST=/);
