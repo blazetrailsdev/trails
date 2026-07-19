@@ -105,7 +105,7 @@ describe("CascadedEagerLoadingTest", () => {
     const authors = await Author.joins("posts")
       .eagerLoad("comments")
       .where({ posts: { tags_count: 1 } })
-      .order("id");
+      .order(Symbol.for("id"));
     await assertQueriesCount(0, false, () => {
       expect(authors).toHaveLength(3);
     });

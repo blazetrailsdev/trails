@@ -718,7 +718,7 @@ describe("RelationTest", () => {
   // load time: the main query carries the literal `author_id IN (<ids>)`, never
   // a LIMIT-bearing subquery, on every adapter.
   it("where with eager-loading limited collection relation subquery materializes distinct primary keys at load time", async () => {
-    const subquery = CanonAuthor.eagerLoad("posts").order("id").limit(2);
+    const subquery = CanonAuthor.eagerLoad("posts").order({ id: "asc" }).limit(2);
 
     let records: any[] = [];
     const queries = await captureSql(async () => {
@@ -751,7 +751,7 @@ describe("RelationTest", () => {
   // short-circuits as a contradiction (Rails `none!`): an empty result with no
   // main query issued and no error.
   it("where with eager-loading limited collection relation subquery yielding no ids is empty", async () => {
-    const subquery = CanonAuthor.where({ id: -1 }).eagerLoad("posts").order("id").limit(2);
+    const subquery = CanonAuthor.where({ id: -1 }).eagerLoad("posts").order({ id: "asc" }).limit(2);
 
     let records: any[] = [];
     const queries = await captureSql(async () => {
@@ -768,7 +768,7 @@ describe("RelationTest", () => {
   // inline LIMIT-in-IN subquery MySQL rejects. Rails materializes at
   // `.where()`-build time, so all terminals see `pk IN (ids)`.
   it("count, pluck, and exists over an eager-loading limited collection subquery materialize distinct primary keys", async () => {
-    const subquery = () => CanonAuthor.eagerLoad("posts").order("id").limit(2);
+    const subquery = () => CanonAuthor.eagerLoad("posts").order({ id: "asc" }).limit(2);
     const limitedAuthorIds = await CanonAuthor.order("id").limit(2).pluck("id");
     const expectedPostIds = await CanonPost.where({ author_id: limitedAuthorIds })
       .order("id")
@@ -806,7 +806,7 @@ describe("RelationTest", () => {
   // (Author hasOne post → Post belongsTo author) stays limitable, so a
   // limit/offset relation is NOT deferred to distinct_relation_for_primary_key.
   it("where with a singular nested-hash eager-loading limited subquery does not defer materialization", () => {
-    const subquery = CanonAuthor.eagerLoad({ post: "author" }).order("id").limit(2);
+    const subquery = CanonAuthor.eagerLoad({ post: "author" }).order({ id: "asc" }).limit(2);
     expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(false);
   });
 
@@ -814,7 +814,7 @@ describe("RelationTest", () => {
   // hasMany comments) makes the reflection set non-limitable, so the relation
   // defers to distinct-PK materialization just as a top-level collection does.
   it("where with a collection nested-hash eager-loading limited subquery defers materialization", () => {
-    const subquery = CanonAuthor.eagerLoad({ post: "comments" }).order("id").limit(2);
+    const subquery = CanonAuthor.eagerLoad({ post: "comments" }).order({ id: "asc" }).limit(2);
     expect((subquery as any)._isDeferredDistinctPkSubquery()).toBe(true);
   });
 });

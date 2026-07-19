@@ -89,7 +89,12 @@ describe("OrderTest", () => {
     expect(await incOrder(Author.arelTable.get("name").desc(), { books: { name: "asc" } })).toEqual(
       authorDescThenBookName,
     );
-    expect(await incOrder({ authors: { name: "desc" } }, "name")).toEqual(authorDescThenBookName);
+    // Rails' final arg is the symbol `:name`, which qualifies to `books.name`.
+    // A bare string `"name"` would stay an unqualified SqlLiteral (matching
+    // Rails string semantics) and be ambiguous across the joined tables.
+    expect(await incOrder({ authors: { name: "desc" } }, Symbol.for("name"))).toEqual(
+      authorDescThenBookName,
+    );
   });
 
   it("order with association alias", async () => {
@@ -105,8 +110,13 @@ describe("OrderTest", () => {
       authorThenBookName,
     );
     expect(await incOrder("author.name", { books: { name: "asc" } })).toEqual(authorThenBookName);
-    expect(await incOrder({ author: { name: "asc" } }, "name")).toEqual(authorThenBookName);
-    expect(await incOrder(authorName, "name")).toEqual(authorThenBookName);
+    // Trailing `Symbol.for("name")` mirrors Rails' `:name` symbol (qualifies to
+    // `books.name`); a bare `"name"` string stays an unqualified SqlLiteral and
+    // would be ambiguous across the joined tables.
+    expect(await incOrder({ author: { name: "asc" } }, Symbol.for("name"))).toEqual(
+      authorThenBookName,
+    );
+    expect(await incOrder(authorName, Symbol.for("name"))).toEqual(authorThenBookName);
 
     const authorDescThenBookName = [y.id, x.id, z.id];
 
@@ -116,7 +126,9 @@ describe("OrderTest", () => {
     expect(await incOrder("author.name desc", { books: { name: "asc" } })).toEqual(
       authorDescThenBookName,
     );
-    expect(await incOrder({ author: { name: "desc" } }, "name")).toEqual(authorDescThenBookName);
-    expect(await incOrder(authorName.desc(), "name")).toEqual(authorDescThenBookName);
+    expect(await incOrder({ author: { name: "desc" } }, Symbol.for("name"))).toEqual(
+      authorDescThenBookName,
+    );
+    expect(await incOrder(authorName.desc(), Symbol.for("name"))).toEqual(authorDescThenBookName);
   });
 });

@@ -1263,7 +1263,9 @@ describe("CalculationsTest", () => {
 
   it("ids with includes and non primary key order", async () => {
     const all = (await Company.all().order("id")).map((c) => Number(c.id));
-    const ids = (await Company.all().includes("contracts").order("id").ids()).map(Number);
+    const ids = (await Company.all().includes("contracts").order(Symbol.for("id")).ids()).map(
+      Number,
+    );
     expect(ids).toEqual(all);
   });
 
@@ -1302,8 +1304,10 @@ describe("CalculationsTest", () => {
   });
 
   it("ids with includes offset", async () => {
-    expect((await Topic.includes("replies").order("id").offset(4).ids()).map(Number)).toEqual([5]);
-    expect(await Topic.includes("replies").order("id").offset(5).ids()).toEqual([]);
+    expect(
+      (await Topic.includes("replies").order(Symbol.for("id")).offset(4).ids()).map(Number),
+    ).toEqual([5]);
+    expect(await Topic.includes("replies").order(Symbol.for("id")).offset(5).ids()).toEqual([]);
   });
 
   it("pluck with includes limit and empty result", async () => {
@@ -1312,10 +1316,12 @@ describe("CalculationsTest", () => {
   });
 
   it("pluck with includes offset", async () => {
-    expect((await Topic.includes("replies").order("id").offset(4).pluck("id")).map(Number)).toEqual(
-      [5],
+    expect(
+      (await Topic.includes("replies").order(Symbol.for("id")).offset(4).pluck("id")).map(Number),
+    ).toEqual([5]);
+    expect(await Topic.includes("replies").order(Symbol.for("id")).offset(5).pluck("id")).toEqual(
+      [],
     );
-    expect(await Topic.includes("replies").order("id").offset(5).pluck("id")).toEqual([]);
   });
 
   it("pluck with join", async () => {

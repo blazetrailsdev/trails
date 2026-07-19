@@ -5702,49 +5702,13 @@ export class Relation<T extends Base> {
         continue;
       }
       if (typeof clause === "string") {
-        const trimmed = clause.trim();
-        // Detect SQL expressions (functions, parens, operators) and pass as raw SQL
-        if (trimmed.includes("(") || /\bcase\b/i.test(trimmed) || trimmed.includes("||")) {
-          manager.order(new Nodes.SqlLiteral(trimmed));
-        } else {
-          // Parse "column ASC/DESC" or "table.column ASC/DESC" strings
-          const match = trimmed.match(/^([A-Za-z_$][\w$.]*)\s+(ASC|DESC)$/i);
-          if (match) {
-            const rawCol = match[1];
-            const dir = match[2].toUpperCase();
-            // Any dotted identifier (one or more dots) passes through as raw SQL.
-            if (rawCol.includes(".")) {
-              manager.order(new Nodes.SqlLiteral(trimmed));
-            } else if (!this._fromClause.isEmpty() && !this._isKnownColumn(rawCol)) {
-              const lit = this.orderColumn(rawCol) as Nodes.Node;
-              manager.order(dir === "DESC" ? new Nodes.Descending(lit) : new Nodes.Ascending(lit));
-            } else if (!this._isKnownColumn(rawCol)) {
-              // A bare identifier that isn't a real column (e.g. a SELECT alias
-              // like `name AS dev_name` → `ORDER BY dev_name DESC`) must pass
-              // through verbatim — qualifying it to the base table would emit
-              // `developers.dev_name`, which the database can't resolve. Mirrors
-              // Rails treating a string order arg as a raw SQL literal.
-              manager.order(new Nodes.SqlLiteral(trimmed));
-            } else {
-              const node = table.get(rawCol);
-              manager.order(
-                dir === "DESC" ? new Nodes.Descending(node) : new Nodes.Ascending(node),
-              );
-            }
-          } else {
-            // Not "col DIR" form. Only wrap plain letter-start identifiers;
-            // everything else (positional "1", NULLS FIRST, commas, etc.) is raw SQL.
-            if (/^[A-Za-z_$][\w$]*$/.test(trimmed)) {
-              if (!this._fromClause.isEmpty() && !this._isKnownColumn(trimmed)) {
-                manager.order(new Nodes.Ascending(this.orderColumn(trimmed) as Nodes.Node));
-              } else {
-                manager.order(new Nodes.Ascending(table.get(trimmed)));
-              }
-            } else {
-              manager.order(new Nodes.SqlLiteral(trimmed));
-            }
-          }
-        }
+        // Rails leaves a string order arg bare: `order("name ASC")` /
+        // `order("name")` pass through as an unquoted `Arel::Nodes::SqlLiteral`,
+        // never qualified to the table or column-quoted. Only Symbol and Hash
+        // order args route through column resolution (the tuple branch below).
+        // See Relation#preprocess_order_args (query_methods.rb): the `else`
+        // branch returns the string unchanged.
+        manager.order(new Nodes.SqlLiteral(clause.trim()));
       } else if (Array.isArray(clause)) {
         const [col, dir] = clause;
         // Function expressions, quoted identifiers, and dotted names must be

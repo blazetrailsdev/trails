@@ -139,18 +139,14 @@ describe("RelationMutationTest", () => {
 
   it("reverse_order!", () => {
     const rel: any = Post.order("title ASC", "comments_count DESC");
+    // String order args stay bare (matching Rails), so reversing them keeps them
+    // as SqlLiteral strings with the trailing direction flipped — never
+    // re-qualified to `[col, dir]` tuples.
+    const litValues = (): string[] => rel._orderClauses.map((c: any) => String(c.value));
     rel.reverseOrderBang();
-    // trails stores reversed terms as [col, dir] tuples (Rails keeps strings like
-    // "title DESC"); the flip — first term ASC→DESC, last DESC→ASC — is identical.
-    expect(rel._orderClauses).toEqual([
-      ["title", "desc"],
-      ["comments_count", "asc"],
-    ]);
+    expect(litValues()).toEqual(["title DESC", "comments_count ASC"]);
     rel.reverseOrderBang();
-    expect(rel._orderClauses).toEqual([
-      ["title", "asc"],
-      ["comments_count", "desc"],
-    ]);
+    expect(litValues()).toEqual(["title ASC", "comments_count DESC"]);
   });
 
   it("create_with!", () => {

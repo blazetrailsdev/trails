@@ -167,7 +167,7 @@ describe("ReservedWordTest", () => {
 
   it("delete all with subselect", async () => {
     await createTestFixtures("values");
-    expect(await Values.order("as").limit(1).offset(1).deleteAll()).toBe(1);
+    expect(await Values.order(Symbol.for("as")).limit(1).offset(1).deleteAll()).toBe(1);
     await expect(Values.find(2)).rejects.toThrow(RecordNotFound);
     expect(await Values.find(1)).not.toBeNull();
   });
