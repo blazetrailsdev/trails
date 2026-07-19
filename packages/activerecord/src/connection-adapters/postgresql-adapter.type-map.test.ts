@@ -107,7 +107,7 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
   });
 
   it("normalizes `integer[]` sqlType so the integer subtype resolves", () => {
-    // If normalization were missing, `tm.lookup("integer[]")` would
+    // If normalization were missing, the `integer[]` lookup would
     // miss and the element subtype would fall back to ValueType,
     // emitting the floats verbatim ('{1.7,2.3}'). IntegerType#serialize
     // truncates to integers, so '{1,2}' confirms the subtype lookup hit.

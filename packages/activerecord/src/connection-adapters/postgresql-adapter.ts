@@ -3500,22 +3500,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const rawSqlType = col?.sqlType ?? col?.type ?? null;
     // Rails' lookup_cast_type_from_column normalizes formatted SQL types
     // (`integer` → `int4`, `numeric(10,2)` → `numeric`) before consulting
-    // the OID-keyed type map. Mirror that here so the TypeMapLike passed
-    // to pgQuoteDefaultExpression resolves element subtypes instead of
-    // falling back to ValueType.
-    const tm = this.typeMap;
+    // the OID-keyed type map. The CastTypeLookup passed to
+    // pgQuoteDefaultExpression delegates to it so element subtypes
+    // resolve instead of falling back to ValueType.
+    const self = this;
     const lookup = {
-      lookup(sqlType: string): { serialize?(v: unknown): unknown } | null {
+      lookupCastTypeFromColumn(col: { sqlType?: string | null }): {
+        serialize?(v: unknown): unknown;
+      } | null {
         // Strip a trailing `[]` so an array column's sqlType (e.g.
         // `integer[]` from ColumnDefinition.typeToSql) resolves to the
-        // element typname via normalizeFormatType + FORMAT_TYPE_ALIASES.
-        // normalizeFormatType deliberately preserves `[]` for the
-        // type-casting path, so the strip happens here at the call site.
-        // Forward the original (`[]`-stripped) sqlType as the third arg
-        // so registerClassWithLimit/Precision factories can recover
-        // limit/precision/scale from `numeric(10,2)` etc.
-        const base = sqlType.replace(/\[\]\s*$/, "");
-        return tm.lookup(normalizeFormatType(base), -1, base) as {
+        // element typname. `lookupCastTypeFromColumn` (Rails
+        // postgresql/quoting.rb:162) does the normalizeFormatType +
+        // FORMAT_TYPE_ALIASES lookup, but deliberately preserves `[]` for
+        // the type-casting path, so the strip happens here at the call site.
+        const base = (col.sqlType ?? "").replace(/\[\]\s*$/, "");
+        return self.lookupCastTypeFromColumn({ sqlType: base }) as {
           serialize?(v: unknown): unknown;
         } | null;
       },

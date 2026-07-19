@@ -103,8 +103,8 @@ describe("PostgreSQL quoting", () => {
   it("serializes defaults for any PostgreSQL column, not only array columns", () => {
     const column = { sqlType: "integer", array: false };
     const typeMap = {
-      lookup(sqlType: string) {
-        expect(sqlType).toBe("integer");
+      lookupCastTypeFromColumn(col: { sqlType?: string | null }) {
+        expect(col.sqlType).toBe("integer");
         return { serialize: (value: unknown) => Number(value) + 1 };
       },
     };
@@ -137,14 +137,14 @@ describe("PostgreSQL quoting", () => {
     // serialize emits must still reach PG's bytea form.
     // `array` must be present: the serialize branch is gated on `"array" in column`.
     const column = { sqlType: "bytea", array: false };
-    const typeMap = { lookup: () => new BinaryType() };
+    const typeMap = { lookupCastTypeFromColumn: () => new BinaryType() };
     expect(quoteDefaultExpression.call(HOST, "ab", column, typeMap)).toBe("'\\x6162'");
   });
 
   it("serializes array defaults via fallback OidArray when type map misses", () => {
     const column = { sqlType: "text[]", array: true };
     const nullTypeMap = {
-      lookup() {
+      lookupCastTypeFromColumn() {
         return null;
       },
     };
@@ -175,7 +175,7 @@ describe("PostgreSQL quoting", () => {
   it("does not apply array fallback when column.array is false", () => {
     const column = { sqlType: "text", array: false };
     const nullTypeMap = {
-      lookup() {
+      lookupCastTypeFromColumn() {
         return null;
       },
     };
@@ -187,7 +187,7 @@ describe("PostgreSQL quoting", () => {
     const arrayType = new OidArray(stringSubtype);
     const column = { sqlType: "text[]", array: true };
     const typeMap = {
-      lookup() {
+      lookupCastTypeFromColumn() {
         return { serialize: (value: unknown) => new ArrayData(arrayType, value as unknown[]) };
       },
     };
@@ -199,11 +199,11 @@ describe("PostgreSQL quoting", () => {
     // Mirrors Rails postgresql/quoting.rb:161-163 where
     // lookup_cast_type_from_column returns OID::Array(IntegerType) and
     // serialize walks each element through Integer#serialize. Trails'
-    // TypeMapLike returns the element subtype here; quoteDefaultExpression
+    // CastTypeLookup returns the element subtype here; quoteDefaultExpression
     // must wrap it in OidArray so per-element casting fires.
     const column = { sqlType: "integer", array: true };
     const typeMap = {
-      lookup() {
+      lookupCastTypeFromColumn() {
         return { cast: (v: unknown) => v, serialize: (v: unknown) => Number(v) + 100 };
       },
     };
@@ -218,7 +218,7 @@ describe("PostgreSQL quoting", () => {
     // pass-through; mirror that here.
     const column = { sqlType: "integer", array: true };
     const typeMap = {
-      lookup() {
+      lookupCastTypeFromColumn() {
         return { serialize: (v: unknown) => Number(v) };
       },
     };

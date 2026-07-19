@@ -61,8 +61,15 @@ export interface DefaultExpressionColumn {
   array?: boolean;
 }
 
-export interface TypeMapLike {
-  lookup(sqlType: string): { serialize?(value: unknown): unknown } | null;
+/**
+ * The `lookup_cast_type_from_column` surface `quote_default_expression`'s
+ * array branch needs (postgresql/quoting.rb:161-163), narrowed to what the
+ * branch actually uses.
+ */
+export interface CastTypeLookup {
+  lookupCastTypeFromColumn(column: DefaultExpressionColumn): {
+    serialize?(value: unknown): unknown;
+  } | null;
 }
 
 export function quoteTableName(name: string): string {
@@ -155,7 +162,7 @@ export function quoteDefaultExpression(
   this: QuotingDispatchHost,
   value: unknown,
   column?: DefaultExpressionColumn | null,
-  typeMap?: TypeMapLike | null,
+  castTypeLookup?: CastTypeLookup | null,
 ): string {
   if (value === undefined) return "";
   if (typeof value === "function") {
@@ -178,12 +185,11 @@ export function quoteDefaultExpression(
 
   let serialized: unknown = value;
   if (column != null && "array" in column) {
-    const sqlType = column.sqlType ?? column.type ?? null;
-    const castType = sqlType ? typeMap?.lookup(sqlType) : null;
+    const castType = castTypeLookup?.lookupCastTypeFromColumn(column) ?? null;
     if (column.array === true && globalThis.Array.isArray(value)) {
       // Rails routes JS arrays through OID::Array.serialize so each
       // element is cast by the element subtype before quoting. Trails'
-      // TypeMapLike permits two shapes: an already-array-aware type
+      // CastTypeLookup permits two shapes: an already-array-aware type
       // (serialize returns ArrayData) or the element subtype. Run
       // serialize first; if ArrayData, use it. Otherwise wrap the
       // original value in OidArray(subtype) for per-element coercion.
