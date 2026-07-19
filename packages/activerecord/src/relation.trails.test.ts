@@ -12,6 +12,8 @@ import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 import { performMerge } from "./relation/spawn-methods.js";
+import { reverseSqlOrder } from "./relation/query-methods.js";
+import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { AssociationRelation } from "./association-relation.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
@@ -859,6 +861,18 @@ describe("inspect wrapper class name", () => {
   it("defaults an unordered reverseOrder to the primary key descending", () => {
     expect(CanonPost.all().reverseOrder().toSql()).toContain("ORDER BY");
     expect(CanonPost.all().reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
+  });
+
+  // A composite primary key is an Array, which is truthy in Rails'
+  // `return [table[primary_key].desc] if primary_key` guard, so it takes the
+  // same default-order path as a scalar PK rather than raising. trails used to
+  // invent an IrreversibleOrderError here.
+  it("defaults an unordered reverseOrder to a composite primary key descending", () => {
+    const clauses = reverseSqlOrder.call(CpkOrder.all() as any, []);
+    expect(clauses).toHaveLength(1);
+    const ordering = clauses[0] as InstanceType<typeof Nodes.Descending>;
+    expect(ordering).toBeInstanceOf(Nodes.Descending);
+    expect((ordering.expr as any).name).toEqual(["shop_id", "id"]);
   });
 
   // compact_blank: a blank string order is rejected before the reverse, so the
