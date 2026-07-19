@@ -84,13 +84,16 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
  * DB — mirroring Rails' ActiveSchemaTest `setup` stub. This avoids issuing
  * real `CREATE TABLE` / `CREATE INDEX` round-trips for pure SQL-assertion
  * tests (and the mysql:8 DDL cost they carry).
+ *
+ * Pass `{ rethrow: true }` when capturing SQL from a real query, so a failure
+ * inside `fn` surfaces instead of being masked by the already-captured SQL.
  * @internal
  */
 export async function captureSql(
   fn: () => void | Promise<void>,
-  options: { includeSchema?: boolean; stub?: StubbableAdapter } = {},
+  options: { includeSchema?: boolean; stub?: StubbableAdapter; rethrow?: boolean } = {},
 ): Promise<string[]> {
-  const { includeSchema = true, stub } = options;
+  const { includeSchema = true, stub, rethrow = false } = options;
   const sqls: string[] = [];
   const sub = Notifications.subscribe("sql.active_record", (event: any) => {
     const payload = event.payload;
@@ -103,8 +106,12 @@ export async function captureSql(
   const restore = stub ? installExecuteStub(stub) : undefined;
   try {
     await fn();
-  } catch {
-    // intentional: mirrors Rails stub-mode where execute never throws
+  } catch (error) {
+    // Swallowing mirrors Rails stub-mode, where execute never throws. It is the
+    // wrong default for callers that capture SQL from a *real* query: the SQL is
+    // instrumented before the error propagates, so a query that raised would
+    // still yield its SQL and assert green. Those callers pass rethrow.
+    if (rethrow) throw error;
   } finally {
     restore?.();
     Notifications.unsubscribe(sub);
