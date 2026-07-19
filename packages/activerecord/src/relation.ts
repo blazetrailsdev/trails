@@ -7060,6 +7060,8 @@ export class Relation<T extends Base> {
         value instanceof Nodes.SqlLiteral ||
         value instanceof Nodes.Attribute
       ) {
+        // The Grouping is what makes a raw `Arel.sql(...)` scalar subquery
+        // render as `SET col = (select ...)`, which SQLite/MySQL/PG require.
         return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
       }
       const type = this._modelClass.typeForAttribute(attr.name);
