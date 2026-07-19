@@ -1,5 +1,6 @@
 // MySQL E2E suite — mirrors sqlite-happy-path.test.ts and postgres-happy-path.test.ts.
-// Set MYSQL_TEST_URL to run (same var used by packages/activerecord MySQL test suite).
+// Set MYSQL_TEST_URL to run. This is the CLI's own input (it feeds --database-url);
+// the activerecord harness selects its backend with ARCONN + sub-settings instead.
 
 import { describe, it, expect, beforeEach, afterEach, vi } from "vitest";
 import { readdir, writeFile } from "fs/promises";

@@ -12,13 +12,11 @@
  *     unconfigured connection,
  *   - `unless connection_name.include?(arunit_adapter) raise ArgumentError`
  *     (`connection.rb:35-37`) — a loud raise when `ARCONN` and the resolved
- *     adapter diverge. PR #4768's `*_TEST_URL`-presence guard folds into this:
- *     a live-backend `ARCONN` whose connection details are absent resolves to
- *     SQLite, whose adapter (`sqlite3`) is not a substring of the connection
- *     name (`postgresql` / `mysql2`), so the mismatch check raises.
+ *     adapter diverge.
  *
  * As in `config.example.yml`, `ENV` only feeds connection *sub-settings*
- * (host/port/socket/credentials); it never selects the backend.
+ * (host/port/socket/credentials, via `test-connection-env.ts`); it never
+ * selects the backend.
  *
  * Phase 1 of RFC 0002 — new file, no consumer changes.
  * Phase 2 of RFC 0002 — adds `establishFromTestConfig` for setupHandlerSuite.
@@ -32,8 +30,17 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { DatabaseTasks } from "../tasks/database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
+import {
+  connectionName,
+  driverConfig,
+  mysqlSettings,
+  postgresSettings,
+  type ConnectionName,
+  type ServerSettings,
+  type TestAdapterName,
+} from "./test-connection-env.js";
 
-export type TestAdapterName = "sqlite" | "postgres" | "mysql";
+export type { TestAdapterName };
 
 export interface TestDatabaseConfig {
   /** The `DatabaseConfigurations` instance wired into `DatabaseTasks`. */
@@ -59,7 +66,18 @@ interface NamedConnection {
   adapter: string;
   /** The public {@link TestAdapterName} lane this connection drives. */
   lane: TestAdapterName;
-  build(): HashConfig | UrlConfig | null;
+  build(): HashConfig;
+}
+
+/**
+ * Turn {@link ServerSettings} into the `configuration_hash` a `HashConfig`
+ * carries. Rails' `config.example.yml` entries are exactly this: an adapter
+ * plus discrete host/port/socket/credential keys — never a URL. The key
+ * translation (and why it emits two spellings of the credential and socket)
+ * lives in `driverConfig`.
+ */
+function serverHash(adapter: string, settings: ServerSettings): Record<string, unknown> {
+  return { adapter, ...driverConfig(settings) };
 }
 
 /**
@@ -67,14 +85,10 @@ interface NamedConnection {
  * `connections:` hash of `config.example.yml`. `ARCONN` selects one of these
  * keys; `DEFAULT_CONNECTION` is Rails' `config["default_connection"]` fallback.
  *
- * Connection details for the live backends still come from `PG_TEST_URL` /
- * `MYSQL_TEST_URL` in this foundation PR; migrating those onto Rails' discrete
- * sub-setting env vars is tracked as a follow-up story.
+ * Every entry builds a `HashConfig` from discrete sub-settings, matching how
+ * Rails' yml interpolates `MYSQL_HOST`/`MYSQL_PORT`/`MYSQL_SOCK` and defers to
+ * libpq's `PG*` vars. No entry reads a connection URL.
  */
-type ConnectionName = "sqlite3" | "sqlite3_mem" | "postgresql" | "mysql2";
-
-const DEFAULT_CONNECTION: ConnectionName = "sqlite3";
-
 const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   sqlite3: {
     adapter: "sqlite3",
@@ -90,18 +104,12 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
   postgresql: {
     adapter: "postgresql",
     lane: "postgres",
-    build: () => {
-      const pgUrl = getEnv("PG_TEST_URL");
-      return pgUrl ? new UrlConfig("test", "primary", pgUrl) : null;
-    },
+    build: () => new HashConfig("test", "primary", serverHash("postgresql", postgresSettings())),
   },
   mysql2: {
     adapter: "mysql2",
     lane: "mysql",
-    build: () => {
-      const mysqlUrl = getEnv("MYSQL_TEST_URL");
-      return mysqlUrl ? new UrlConfig("test", "primary", mysqlUrl) : null;
-    },
+    build: () => new HashConfig("test", "primary", serverHash("mysql2", mysqlSettings())),
   },
 };
 
@@ -112,31 +120,36 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
  * adapter-name guard in `connection.rb`.
  */
 function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfig } {
-  const connectionName = (getEnv("ARCONN") || DEFAULT_CONNECTION) as ConnectionName;
-  const connection = CONNECTIONS[connectionName];
+  const name = connectionName();
+  // `name` is arbitrary user input from ARCONN, so the lookup is a partial one;
+  // the miss below is Rails' "Connection not found" exit (connection.rb:14-19).
+  const connections: Partial<Record<string, NamedConnection>> = CONNECTIONS;
+  const connection = connections[name];
   if (!connection) {
     // Rails prints "Connection ... not found" and `exit 1`; we have no
     // `process.exit`, so the loud failure is a throw with the same message.
     // Test-helper invariant with no Rails error counterpart — a bare Error is intentional.
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(
-      `Connection "${connectionName}" not found. Available connections: ` +
+      `Connection "${name}" not found. Available connections: ` +
         `${Object.keys(CONNECTIONS).join(", ")}`,
     );
   }
 
   const envConfig = connection.build();
   // Rails: `unless connection_name.include?(arunit_adapter) raise ArgumentError`
-  // (connection.rb:35-37). A live-backend `ARCONN` whose connection details are
-  // absent would silently fall back to SQLite — folding in PR #4768's guard, we
-  // raise instead of resolving the wrong backend. The `arunit_adapter` proxy is
-  // the fallback lane (`sqlite3`); the message mirrors Rails' wording verbatim
-  // (single-quoted interpolations included) — only the trigger (missing env var
-  // vs. a genuine post-connect adapter mismatch) is necessarily trails-specific.
-  if (envConfig === null) {
+  // (connection.rb:35-37). Previously this fired on a missing `*_TEST_URL` — an
+  // env-presence proxy, since absent connection details silently resolved to
+  // SQLite. Sub-settings always carry defaults, so there is no "absent" state
+  // left to proxy for; the check is now Rails' literal one, comparing the
+  // connection name against the adapter its entry actually built. That makes it
+  // a structural invariant over the CONNECTIONS table (a mislabelled entry
+  // raises) rather than a report on the environment.
+  const builtAdapter = String(envConfig.configurationHash.adapter);
+  if (!name.includes(builtAdapter)) {
     throw new ArgumentError(
       `The connection name did not match the adapter name. Connection name is ` +
-        `'${connectionName}' and the adapter name is '${DEFAULT_CONNECTION}'.`,
+        `'${name}' and the adapter name is '${builtAdapter}'.`,
     );
   }
 

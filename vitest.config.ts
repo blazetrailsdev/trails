@@ -335,7 +335,7 @@ export default defineConfig({
           setupFiles: [
             "./packages/activerecord/src/test-setup-worker-db.ts",
             "./packages/activerecord/src/test-setup-ar.ts",
-            ...(process.env.MYSQL_TEST_URL
+            ...(process.env.ARCONN === "mysql2"
               ? ["./packages/activerecord/src/test-setup-mysql.ts"]
               : []),
             "./packages/activerecord/src/test-setup-dy.ts",
@@ -360,7 +360,7 @@ export default defineConfig({
           // letting CI fail on every transient race — burns more reviewer
           // time than the rare hidden flake costs. Revisit if a real
           // regression slips through.
-          retry: process.env.PG_TEST_URL || process.env.MYSQL_TEST_URL ? 2 : 0,
+          retry: process.env.ARCONN === "postgresql" || process.env.ARCONN === "mysql2" ? 2 : 0,
           // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
           // creates ~354 tables in one beforeAll). At ~30ms per CREATE on MySQL

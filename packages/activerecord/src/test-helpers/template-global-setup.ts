@@ -33,6 +33,14 @@ import {
   unlinkDbFiles,
 } from "./sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
+import {
+  activeLane,
+  driverConfig,
+  mysqlSettings,
+  postgresSettings,
+  settingsUrl,
+  withDatabase,
+} from "./test-connection-env.js";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -115,12 +123,6 @@ const sqliteAdapter: DbTemplateAdapter = {
 // means the PG template path did not run (sqlite/MySQL run, or globalSetup off).
 export const PG_TEMPLATE_ENV = "AR_TEST_PG_TEMPLATE";
 
-function pgAdminUrl(baseUrl: string): string {
-  const u = new URL(baseUrl);
-  u.pathname = "/postgres";
-  return u.toString();
-}
-
 async function pgTerminateConnections(admin: pg.Client, dbName: string): Promise<void> {
   await admin.query(
     `SELECT pg_terminate_backend(pid) FROM pg_stat_activity
@@ -130,24 +132,23 @@ async function pgTerminateConnections(admin: pg.Client, dbName: string): Promise
 }
 
 const pgAdapter: DbTemplateAdapter = {
-  isActive: () => Boolean(process.env.PG_TEST_URL),
+  isActive: () => activeLane() === "postgres",
 
   async provision() {
-    const baseUrl = process.env.PG_TEST_URL!;
-    const baseDb = new URL(baseUrl).pathname.replace(/^\//, "");
-    const templateDb = `${baseDb}_template`;
+    const settings = postgresSettings();
+    const templateDb = `${settings.database}_template`;
 
-    const admin = new pg.Client(pgAdminUrl(baseUrl));
+    // Derive both connections from the settings rather than rewriting the URL
+    // string: a socket-directory PGHOST does not survive `new URL()` surgery.
+    const admin = new pg.Client(settingsUrl("postgres", withDatabase(settings, "postgres")));
     await admin.connect();
 
     await pgTerminateConnections(admin, templateDb);
     await admin.query(`DROP DATABASE IF EXISTS "${templateDb}"`);
     await admin.query(`CREATE DATABASE "${templateDb}"`);
 
-    const tplUrl = new URL(baseUrl);
-    tplUrl.pathname = `/${templateDb}`;
     const adapter = new PostgreSQLAdapter({
-      connectionString: tplUrl.toString(),
+      connectionString: settingsUrl("postgres", withDatabase(settings, templateDb)),
       max: 1,
     }) as unknown as DatabaseAdapter;
     try {
@@ -173,7 +174,7 @@ const pgAdapter: DbTemplateAdapter = {
     }
 
     for (let slot = 1; slot <= slotCount(); slot++) {
-      const slotDb = slot === 1 ? baseDb : `${baseDb}_${slot}`;
+      const slotDb = slot === 1 ? settings.database : `${settings.database}_${slot}`;
       await pgTerminateConnections(admin, slotDb);
       await admin.query(`DROP DATABASE IF EXISTS "${slotDb}"`);
       await admin.query(`CREATE DATABASE "${slotDb}" TEMPLATE "${templateDb}"`);
@@ -183,7 +184,7 @@ const pgAdapter: DbTemplateAdapter = {
     await admin.end();
 
     return async () => {
-      const cleanup = new pg.Client(pgAdminUrl(baseUrl));
+      const cleanup = new pg.Client(settingsUrl("postgres", withDatabase(settings, "postgres")));
       await cleanup.connect();
       await pgTerminateConnections(cleanup, templateDb);
       await cleanup.query(`DROP DATABASE IF EXISTS "${templateDb}"`);
@@ -204,38 +205,23 @@ const pgAdapter: DbTemplateAdapter = {
 
 export const MYSQL_TEMPLATE_ENV = "AR_TEST_MYSQL_TEMPLATE";
 
-function mysqlSlotUrl(baseUrl: string, slot: number): string {
-  if (slot === 1) return baseUrl;
-  const u = new URL(baseUrl);
-  const db = u.pathname.replace(/^\//, "");
-  u.pathname = `/${db}_${slot}`;
-  return u.toString();
-}
-
-function mysqlConnOpts(url: string): mysql.ConnectionOptions {
-  const u = new URL(url);
-  return {
-    host: u.hostname,
-    port: u.port ? parseInt(u.port, 10) : 3306,
-    user: u.username || undefined,
-    password: u.password || undefined,
-  };
-}
-
 const mysqlAdapter: DbTemplateAdapter = {
-  isActive: () => Boolean(process.env.MYSQL_TEST_URL),
+  isActive: () => activeLane() === "mysql",
 
   async provision() {
     const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
-    const baseUrl = process.env.MYSQL_TEST_URL!;
-    const baseDb = new URL(baseUrl).pathname.replace(/^\//, "");
+    const settings = mysqlSettings();
+    const baseDb = settings.database;
     const n = slotCount();
 
+    // Built from the config hash rather than a URL so a socket-configured run
+    // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
+    const { database: _adminDb, ...adminOpts } = driverConfig(settings);
     // CREATE DATABASE for all slots first (sequential — DDL against the same
     // server, DROP/CREATE must not race with themselves).
-    const admin = await mysql.createConnection(mysqlConnOpts(baseUrl));
+    const admin = await mysql.createConnection(adminOpts as mysql.ConnectionOptions);
     for (let slot = 1; slot <= n; slot++) {
-      const slotDb = slot === 1 ? baseDb : `${baseDb}_${slot}`;
+      const slotDb = slot === 1 ? settings.database : `${settings.database}_${slot}`;
       await admin.query(`DROP DATABASE IF EXISTS \`${slotDb}\``);
       await admin.query(`CREATE DATABASE \`${slotDb}\` CHARACTER SET utf8mb4 COLLATE utf8mb4_bin`);
     }
@@ -248,7 +234,7 @@ const mysqlAdapter: DbTemplateAdapter = {
     await Promise.all(
       Array.from({ length: n }, (_, i) => i + 1).map(async (slot) => {
         const adapter = new Mysql2Adapter({
-          uri: mysqlSlotUrl(baseUrl, slot),
+          ...driverConfig(withDatabase(settings, slot === 1 ? baseDb : `${baseDb}_${slot}`)),
           connectionLimit: 1,
           flags: ["FOUND_ROWS"],
         }) as unknown as DatabaseAdapter;

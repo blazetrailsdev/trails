@@ -38,6 +38,7 @@ import type { FsAdapter } from "@blazetrails/activesupport/fs-adapter";
 import { getFsAsync, getPathAsync } from "@blazetrails/activesupport/fs-adapter";
 import { getOsAsync } from "@blazetrails/activesupport";
 import { betterSqlite3Driver } from "../sqlite/better-sqlite3.js";
+import { activeLane } from "./test-connection-env.js";
 
 /** WAL sidecars sqlite writes alongside a file DB, plus the DB file itself. */
 const DB_FILE_SUFFIXES = ["", "-wal", "-shm"] as const;
@@ -63,9 +64,9 @@ export const RUN_TOKEN_ENV = "AR_TEST_RUN_TOKEN";
 /** Env var: per-worker restored DB path (stamped by the worker setupFile). */
 export const WORKER_DB_ENV = "AR_TEST_WORKER_DB";
 
-/** True when the active run targets sqlite (no PG/MySQL URL present). */
+/** True when the connection named by ARCONN rides a sqlite lane. */
 export function isSqliteRun(): boolean {
-  return !process.env.PG_TEST_URL && !process.env.MYSQL_TEST_URL;
+  return activeLane() === "sqlite";
 }
 
 /** Temp directory root, via the os-adapter so the path is portable (TMPDIR/TEMP/TMP). */

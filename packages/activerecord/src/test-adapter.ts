@@ -1,10 +1,12 @@
 /**
  * Shared test adapter helpers.
  *
- * Resolves which backend the active lane uses from the environment:
- *   - PG_TEST_URL    → PostgreSQLAdapter
- *   - MYSQL_TEST_URL → Mysql2Adapter
- *   - (default)      → SQLite3Adapter (the per-worker template clone, or
+ * Resolves which backend the active lane uses the way Rails does — from
+ * `ARCONN` naming a key of the `connections:` hash, never from the presence of
+ * a connection detail (see `test-helpers/test-connection-env.ts`):
+ *   - ARCONN=postgresql → PostgreSQLAdapter
+ *   - ARCONN=mysql2     → Mysql2Adapter
+ *   - (default)         → SQLite3Adapter (the per-worker template clone, or
  *     `:memory:` when no clone was built)
  *
  * RFC 0059 retired the standing sidecar `_pool`: Rails has no sidecar test
@@ -27,18 +29,19 @@ import type { TransactionManager } from "./connection-adapters/abstract/transact
 import { resetTestTables } from "./test-helpers/drop-all-tables.js";
 import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
+import {
+  activeLane,
+  driverConfig,
+  mysqlSettings,
+  postgresSettings,
+} from "./test-helpers/test-connection-env.js";
 
-// PG_TEST_URL / MYSQL_TEST_URL are already worker-scoped by
-// test-setup-worker-db.ts (a setupFile that runs before this module loads).
-const PG_TEST_URL = getEnv("PG_TEST_URL");
-const MYSQL_TEST_URL = getEnv("MYSQL_TEST_URL");
-
-/** Which adapter backend is active. */
-export const adapterType: "sqlite" | "postgres" | "mysql" = PG_TEST_URL
-  ? "postgres"
-  : MYSQL_TEST_URL
-    ? "mysql"
-    : "sqlite";
+/**
+ * Which adapter backend is active. Read once at module load — the worker's
+ * isolation slot is published by test-setup-worker-db.ts (a setupFile that runs
+ * before this module loads), so the settings below are already worker-scoped.
+ */
+export const adapterType: "sqlite" | "postgres" | "mysql" = activeLane();
 
 /**
  * Mirror of Rails' `in_memory_db?`
@@ -83,11 +86,12 @@ export type LeasedTestAdapter = DatabaseAdapter & {
 // `ActiveRecord::Base.connection_pool.db_config.configuration_hash`, letting
 // pool-mechanics tests clone the ambient config (with per-test overrides)
 // instead of hardcoding `adapter: "sqlite3"`.
-const _primaryConfiguration: Record<string, unknown> = PG_TEST_URL
-  ? { adapter: "postgresql", url: PG_TEST_URL }
-  : MYSQL_TEST_URL
-    ? { adapter: "mysql2", url: MYSQL_TEST_URL }
-    : { adapter: "sqlite3", database: getEnv("AR_TEST_WORKER_DB") ?? ":memory:" };
+const _primaryConfiguration: Record<string, unknown> =
+  adapterType === "postgres"
+    ? { adapter: "postgresql", ...driverConfig(postgresSettings()) }
+    : adapterType === "mysql"
+      ? { adapter: "mysql2", ...driverConfig(mysqlSettings()) }
+      : { adapter: "sqlite3", database: getEnv("AR_TEST_WORKER_DB") ?? ":memory:" };
 
 /**
  * A copy of the active lane's primary configuration hash. Mirrors Rails'
@@ -113,17 +117,21 @@ export function ambientPoolConfiguration(): Record<string, unknown> {
  */
 export let newRawTestAdapter: () => DatabaseAdapter;
 
-if (PG_TEST_URL) {
+if (adapterType === "postgres") {
+  const config = driverConfig(postgresSettings());
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
   // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
   // exactly one PG server connection (the outer ConnectionPool multiplexes).
   newRawTestAdapter = () =>
-    new PostgreSQLAdapter({ connectionString: PG_TEST_URL, max: 1 }) as unknown as DatabaseAdapter;
-} else if (MYSQL_TEST_URL) {
+    new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
+} else if (adapterType === "mysql") {
+  // Built from the config hash rather than a URL so a socket-configured run
+  // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
+  const config = driverConfig(mysqlSettings());
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   newRawTestAdapter = () =>
     new Mysql2Adapter({
-      uri: MYSQL_TEST_URL,
+      ...config,
       connectionLimit: 1,
       flags: ["FOUND_ROWS"],
     }) as unknown as DatabaseAdapter;

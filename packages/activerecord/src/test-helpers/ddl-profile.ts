@@ -8,7 +8,7 @@
  * Not wired into CI; opt in for an ad-hoc measurement run, e.g.:
  *
  *   DDL_PROFILE=1 DDL_PROFILE_OUT_DIR=/tmp/ddlprof ARCONN=postgresql \
- *     PG_TEST_URL=postgres://… pnpm vitest run packages/activerecord/src/<file>
+ *     ARCONN=postgresql pnpm vitest run packages/activerecord/src/<file>
  *   node scripts/ddl-profile-aggregate.mjs /tmp/ddlprof
  *
  * See PR #3904 / the `ddl-timing-profile` audit for the methodology + findings.
@@ -292,8 +292,6 @@ function dumpSummary(): void {
       : `/tmp/ddl-profile-${process.env.ARCONN ?? "sqlite"}-${process.pid}.json`);
   const payload = {
     adapter: process.env.ARCONN ?? "sqlite3",
-    pgUrl: process.env.PG_TEST_URL ?? null,
-    mysqlUrl: process.env.MYSQL_TEST_URL ?? null,
     capturedAt: Temporal.Now.instant().toString(),
     totalCount: agg.totalCount,
     totalMs: agg.totalMs,

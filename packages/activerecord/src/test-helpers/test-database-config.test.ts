@@ -19,8 +19,6 @@ describe("buildTestDatabaseConfig", () => {
 
   it("selects the sqlite3 connection named by ARCONN", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
-    vi.stubEnv("PG_TEST_URL", "");
-    vi.stubEnv("MYSQL_TEST_URL", "");
     const { adapter, envConfig } = await buildTestDatabaseConfig();
     expect(adapter).toBe("sqlite");
     expect(envConfig.adapter).toMatch(/sqlite/i);
@@ -29,16 +27,12 @@ describe("buildTestDatabaseConfig", () => {
 
   it("falls back to the default_connection (sqlite3) when ARCONN is unset", async () => {
     vi.stubEnv("ARCONN", "");
-    vi.stubEnv("PG_TEST_URL", "");
-    vi.stubEnv("MYSQL_TEST_URL", "");
     const { adapter } = await buildTestDatabaseConfig();
     expect(adapter).toBe("sqlite");
   });
 
   it("inherits Rails' default pool size (5) on the file-backed lane", async () => {
     vi.stubEnv("ARCONN", "sqlite3");
-    vi.stubEnv("PG_TEST_URL", "");
-    vi.stubEnv("MYSQL_TEST_URL", "");
     vi.stubEnv("AR_TEST_WORKER_DB", "/tmp/ar-test-worker.sqlite3");
     const { envConfig } = await buildTestDatabaseConfig();
     expect(envConfig.pool).toBe(5);
@@ -46,8 +40,6 @@ describe("buildTestDatabaseConfig", () => {
 
   it("pins pool 1 on the sqlite3_mem :memory: connection", async () => {
     vi.stubEnv("ARCONN", "sqlite3_mem");
-    vi.stubEnv("PG_TEST_URL", "");
-    vi.stubEnv("MYSQL_TEST_URL", "");
     vi.stubEnv("AR_TEST_WORKER_DB", "");
     const { adapter, envConfig } = await buildTestDatabaseConfig();
     expect(adapter).toBe("sqlite");
@@ -56,15 +48,12 @@ describe("buildTestDatabaseConfig", () => {
 
   it("selects the postgresql connection named by ARCONN", async () => {
     vi.stubEnv("ARCONN", "postgresql");
-    vi.stubEnv("PG_TEST_URL", "postgresql://localhost/trails_test");
     const { adapter } = await buildTestDatabaseConfig();
     expect(adapter).toBe("postgres");
   });
 
   it("selects the mysql2 connection named by ARCONN", async () => {
     vi.stubEnv("ARCONN", "mysql2");
-    vi.stubEnv("PG_TEST_URL", "");
-    vi.stubEnv("MYSQL_TEST_URL", "mysql2://localhost/trails_test");
     const { adapter } = await buildTestDatabaseConfig();
     expect(adapter).toBe("mysql");
   });
@@ -74,21 +63,16 @@ describe("buildTestDatabaseConfig", () => {
     await expect(buildTestDatabaseConfig()).rejects.toThrow(/Connection "oracle" not found/);
   });
 
-  it("raises on an ARCONN / resolved-adapter mismatch (postgresql without PG_TEST_URL)", async () => {
-    vi.stubEnv("ARCONN", "postgresql");
-    vi.stubEnv("PG_TEST_URL", "");
-    vi.stubEnv("MYSQL_TEST_URL", "");
-    await expect(buildTestDatabaseConfig()).rejects.toThrow(
-      /connection name did not match the adapter name/,
-    );
-  });
-
-  it("raises on an ARCONN / resolved-adapter mismatch (mysql2 without MYSQL_TEST_URL)", async () => {
-    vi.stubEnv("ARCONN", "mysql2");
-    vi.stubEnv("PG_TEST_URL", "");
-    vi.stubEnv("MYSQL_TEST_URL", "");
-    await expect(buildTestDatabaseConfig()).rejects.toThrow(
-      /connection name did not match the adapter name/,
-    );
-  });
+  // The adapter-name guard (`connection.rb:35-37`) used to be tripped by a
+  // missing `*_TEST_URL`. Sub-settings always carry defaults, so there is no
+  // absent-details state left to trip it; what it now asserts is the structural
+  // invariant over the connections table, exercised here for every entry.
+  it.each(["sqlite3", "sqlite3_mem", "postgresql", "mysql2"])(
+    "builds an adapter whose name is contained in the connection name (%s)",
+    async (name) => {
+      vi.stubEnv("ARCONN", name);
+      const { envConfig } = await buildTestDatabaseConfig();
+      expect(name).toContain(String(envConfig.adapter));
+    },
+  );
 });

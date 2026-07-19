@@ -1,14 +1,18 @@
 /**
- * Vitest setupFile for the activerecord project: applies a per-worker
- * database suffix to PG_TEST_URL and MYSQL_TEST_URL before any test code
- * or import runs.
+ * Vitest setupFile for the activerecord project: claims this worker's database
+ * isolation slot before any test code or import runs.
  *
  * Opens a bootstrap connection to the base DB and tries an advisory lock for
  * slot N=1..slotPoolSize(). The pool is sized with headroom over the worker
  * count (see test-helpers/ar-db-slots.ts), so a worker recycling in between
- * files always finds a free slot. Claims the first free slot, rewrites the URL
- * to that slot's DB, and holds the bootstrap connection for the life of the
- * process (lock released automatically on disconnect).
+ * files always finds a free slot. Claims the first free slot, publishes it as
+ * `AR_DB_SLOT`, and holds the bootstrap connection for the life of the process
+ * (lock released automatically on disconnect).
+ *
+ * The slot is published as a *number*, not as a rewritten connection URL:
+ * `test-helpers/test-connection-env.ts` applies the `_N` database suffix, so
+ * every consumer derives the same worker database from one signal instead of
+ * reading a mutated string.
  *
  *   PG:      pg_try_advisory_lock(N)
  *   MariaDB: GET_LOCK('ar_test_slot_N', 0)  — 0-second timeout = non-blocking
@@ -31,21 +35,18 @@ import mysql from "mysql2/promise";
 import "./sqlite/better-sqlite3.js";
 import { WORKER_DB_ENV, ensureWorkerClone } from "./test-helpers/sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./test-helpers/ar-db-slots.js";
+import {
+  SLOT_ENV,
+  activeLane,
+  mysqlSettings,
+  postgresSettings,
+} from "./test-helpers/test-connection-env.js";
 
 // Shared by all evaluations of this module within the same worker process.
 const g = globalThis as typeof globalThis & {
   __arAdvisorySlotPg?: number;
   __arAdvisorySlotMysql?: number;
 };
-
-function slotDbUrl(baseUrl: string, slot: number): string {
-  if (slot === 1) return baseUrl;
-  const url = new URL(baseUrl);
-  const db = url.pathname.replace(/^\//, "");
-  if (!db) throw new Error(`slotDbUrl: no database name in URL: ${baseUrl}`);
-  url.pathname = `/${db}_${slot}`;
-  return url.toString();
-}
 
 // Bounded retry policy: when all slots are held, retry with linear backoff.
 // Workers that can't acquire within the window fail loudly rather than
@@ -57,17 +58,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
-  if (workerForkCount() <= 1) return baseUrl;
+async function acquireAdvisorySlotPg(): Promise<number> {
+  if (workerForkCount() <= 1) return 1;
   // Slot pool is sized with headroom over the worker count (see ar-db-slots.ts).
   const slots = slotPoolSize();
 
   // Idempotent: re-evaluation returns the already-claimed slot.
   if (g.__arAdvisorySlotPg !== undefined) {
-    return slotDbUrl(baseUrl, g.__arAdvisorySlotPg);
+    return g.__arAdvisorySlotPg;
   }
 
-  const client = new pg.Client(baseUrl);
+  const { host, port, user, password, database } = postgresSettings();
+  const client = new pg.Client({ host, port, user, password, database });
   await client.connect();
 
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
@@ -81,7 +83,7 @@ async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
         // Keep client open for the process lifetime; PG drops session locks on
         // disconnect, so no explicit release is needed on clean exit.
         process.on("exit", () => void client.end());
-        return slotDbUrl(baseUrl, slot);
+        return slot;
       }
     }
     if (attempt < SLOT_RETRY_ATTEMPTS - 1) await sleep(SLOT_RETRY_DELAY_MS);
@@ -95,24 +97,24 @@ async function acquireAdvisorySlotPg(baseUrl: string): Promise<string> {
   );
 }
 
-async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
-  if (workerForkCount() <= 1) return baseUrl;
+async function acquireAdvisorySlotMysql(): Promise<number> {
+  if (workerForkCount() <= 1) return 1;
   // Slot pool is sized with headroom over the worker count (see ar-db-slots.ts).
   const slots = slotPoolSize();
 
   // Idempotent: re-evaluation returns the already-claimed slot.
   if (g.__arAdvisorySlotMysql !== undefined) {
-    return slotDbUrl(baseUrl, g.__arAdvisorySlotMysql);
+    return g.__arAdvisorySlotMysql;
   }
 
-  // Parse the mysql:// URL into mysql2 connection options.
-  const u = new URL(baseUrl);
+  const { host, port, user, password, database, socket } = mysqlSettings();
   const conn = await mysql.createConnection({
-    host: u.hostname,
-    port: u.port ? parseInt(u.port, 10) : 3306,
-    user: u.username || undefined,
-    password: u.password || undefined,
-    database: u.pathname.replace(/^\//, "") || undefined,
+    host,
+    port,
+    user,
+    password,
+    database,
+    ...(socket === undefined ? {} : { socketPath: socket }),
   });
 
   for (let attempt = 0; attempt < SLOT_RETRY_ATTEMPTS; attempt++) {
@@ -126,7 +128,7 @@ async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
         g.__arAdvisorySlotMysql = slot;
         // Hold the connection open; MariaDB releases GET_LOCK on disconnect.
         process.on("exit", () => void conn.end());
-        return slotDbUrl(baseUrl, slot);
+        return slot;
       }
     }
     if (attempt < SLOT_RETRY_ATTEMPTS - 1) await sleep(SLOT_RETRY_DELAY_MS);
@@ -140,17 +142,18 @@ async function acquireAdvisorySlotMysql(baseUrl: string): Promise<string> {
   );
 }
 
-if (process.env.PG_TEST_URL) {
-  const base = process.env.PG_TEST_URL;
-  process.env.PG_TEST_URL = await acquireAdvisorySlotPg(base);
-  // When the URL was suffixed, this worker owns an exclusive per-worker DB;
+const lane = activeLane();
+if (lane === "postgres") {
+  const slot = await acquireAdvisorySlotPg();
+  process.env[SLOT_ENV] = String(slot);
+  // A slot above 1 means this worker owns an exclusive per-worker DB;
   // test-setup-dy.ts uses reconstructFromSchema (purge+load) instead of loadSchema.
-  if (process.env.PG_TEST_URL !== base) process.env.AR_PG_EXCLUSIVE_DB = "1";
+  if (slot > 1) process.env.AR_PG_EXCLUSIVE_DB = "1";
 }
-if (process.env.MYSQL_TEST_URL) {
-  const base = process.env.MYSQL_TEST_URL;
-  process.env.MYSQL_TEST_URL = await acquireAdvisorySlotMysql(base);
-  if (process.env.MYSQL_TEST_URL !== base) process.env.AR_MYSQL_EXCLUSIVE_DB = "1";
+if (lane === "mysql") {
+  const slot = await acquireAdvisorySlotMysql();
+  process.env[SLOT_ENV] = String(slot);
+  if (slot > 1) process.env.AR_MYSQL_EXCLUSIVE_DB = "1";
 }
 
 // Phase 0 sqlite template-clone: when globalSetup built a canonical template,
@@ -170,7 +173,7 @@ if (process.env.MYSQL_TEST_URL) {
 {
   const { resolve: resolveAdapter } = await import("./connection-adapters.js");
   const adapters: string[] = ["sqlite3"];
-  if (process.env.PG_TEST_URL) adapters.push("postgresql");
-  if (process.env.MYSQL_TEST_URL) adapters.push("mysql2");
+  if (lane === "postgres") adapters.push("postgresql");
+  if (lane === "mysql") adapters.push("mysql2");
   await Promise.all(adapters.map((a) => resolveAdapter(a)));
 }

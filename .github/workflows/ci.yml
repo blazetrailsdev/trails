@@ -988,10 +988,17 @@ jobs:
       - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: postgresql
-          PG_TEST_URL: postgres://postgres:postgres@localhost:5432/rails_js_test
+          PGHOST: localhost
+          PGPORT: "5432"
+          PGUSER: postgres
+          PGPASSWORD: postgres
+          PGDATABASE: rails_js_test
           AR_DB_FORKS: 8
       # CLI E2E is not sharded — run it once, on shard 1 only, to avoid a
       # redundant double-run across the two legs.
+      # PG_TEST_URL is the activerecord-cli E2E's own input (it drives the CLI's
+      # --database-url flag), not the activerecord harness's backend selector.
+      # It stays a URL because that is literally what the CLI takes.
       - if: ${{ matrix.shard == 1 }}
         run: pnpm vitest run packages/activerecord-cli
         env:
@@ -1049,9 +1056,12 @@ jobs:
       - run: pnpm vitest run packages/activerecord/
         env:
           ARCONN: mysql2
-          MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
+          MYSQL_HOST: localhost
+          MYSQL_PORT: "3306"
+          MYSQL_USER: root
+          MYSQL_DATABASE: rails_js_test
           AR_DB_FORKS: 8
-      # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
+      # No MySQL connection env: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
 
@@ -1113,9 +1123,12 @@ jobs:
       - run: pnpm vitest run packages/activerecord/ --shard=${{ matrix.shard }}/2
         env:
           ARCONN: mysql2
-          MYSQL_TEST_URL: mysql://root@localhost:3306/rails_js_test
+          MYSQL_HOST: localhost
+          MYSQL_PORT: "3306"
+          MYSQL_USER: root
+          MYSQL_DATABASE: rails_js_test
           AR_DB_FORKS: 8
-      # No MYSQL_TEST_URL: no mysql-happy-path E2E exists yet. This run
+      # No MySQL connection env: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       # CLI E2E is not sharded — run it once, on shard 1 only.
       - if: ${{ matrix.shard == 1 }}
