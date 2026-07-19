@@ -1985,13 +1985,10 @@ export function isDoesNotSupportReverse(order: string): boolean {
 export function reverseSqlOrder(this: QueryMethodsHost, orderQuery: unknown[]): unknown[] {
   if (orderQuery.length === 0) {
     const pk = (this as any)._modelClass?.primaryKey;
+    // Rails guards on `if primary_key` alone: a composite primary key is an
+    // Array, which is truthy, so it takes the same `table[primary_key].desc`
+    // path as a scalar one. The raise is reserved for a nil primary key.
     if (pk) {
-      if (Array.isArray(pk)) {
-        throw new IrreversibleOrderError(
-          "Relation has no current order and table has a composite primary key; cannot determine default reverse order",
-        );
-      }
-      const table: any = (this as any)._modelClass?.arelTable;
       const modelClass: any = (this as any)._modelClass;
       const arelTable =
         modelClass?.arelTable ??

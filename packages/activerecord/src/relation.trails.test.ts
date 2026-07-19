@@ -12,6 +12,8 @@ import { Nodes, Table as ArelTable } from "@blazetrails/arel";
 import { Base } from "./index.js";
 import { registerModel, modelRegistry } from "./associations.js";
 import { performMerge } from "./relation/spawn-methods.js";
+import { reverseSqlOrder } from "./relation/query-methods.js";
+import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { AssociationRelation } from "./association-relation.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
@@ -859,6 +861,32 @@ describe("inspect wrapper class name", () => {
   it("defaults an unordered reverseOrder to the primary key descending", () => {
     expect(CanonPost.all().reverseOrder().toSql()).toContain("ORDER BY");
     expect(CanonPost.all().reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
+  });
+
+  // A composite primary key is an Array, which is truthy in Rails'
+  // `return [table[primary_key].desc] if primary_key` guard, so it takes the
+  // same default-order path as a scalar PK rather than raising. trails used to
+  // invent an IrreversibleOrderError here.
+  //
+  // Note the resulting SQL is a *broken* column reference in Rails too:
+  // `Arel::Table#[]` builds `Attribute.new(table, name)` for any name
+  // (arel/table.rb:82) and `visit_Arel_Attributes_Attribute` hands it to the
+  // adapter's `quote_column_name`, which stringifies the Array. So Rails emits
+  // `"cpk_orders"."[\"shop_id\", \"id\"]"` and we emit
+  // `"cpk_orders"."shop_id,id"` — same shape, differing only by Ruby's
+  // `Array#to_s` vs JS's. Both fail at the database. Reproducing that is the
+  // point: the deviation being fixed is the *raise*, and converging the
+  // stringification would mean inventing formatting Rails never specified.
+  it("defaults an unordered reverseOrder to a composite primary key descending", () => {
+    const clauses = reverseSqlOrder.call(CpkOrder.all() as any, []);
+    expect(clauses).toHaveLength(1);
+    const ordering = clauses[0] as InstanceType<typeof Nodes.Descending>;
+    expect(ordering).toBeInstanceOf(Nodes.Descending);
+    expect((ordering.expr as any).name).toEqual(["shop_id", "id"]);
+
+    // End-to-end: builds rather than raising.
+    expect(CpkOrder.all().reverseOrder().toSql()).toContain(`ORDER BY`);
+    expect(CpkOrder.all().reverseOrder().toSql()).toMatch(/ORDER BY .*shop_id.*id.* DESC/i);
   });
 
   // compact_blank: a blank string order is rejected before the reverse, so the
