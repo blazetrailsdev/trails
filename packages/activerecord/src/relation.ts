@@ -327,6 +327,19 @@ type JoinClauseSpec = {
  */
 const EMPTY_VALUE_ARRAY: readonly never[] = Object.freeze([]);
 
+declare const relationNameBrand: unique symbol;
+
+/**
+ * Return type of {@link Relation.name} — a *supertype* of `string`
+ * (`string | { [relationNameBrand]: never }`). The runtime value is always a
+ * plain string (the model class name); the brand member is phantom and never
+ * present at runtime. Widening past `string` is deliberate: it keeps `name` off
+ * the structural surface so `Relation` does not satisfy `{ name: string }` (see
+ * `Relation#name`), while remaining a supertype of `string` so string literals
+ * stay assignable to it at call sites.
+ */
+export type RelationName = string | { readonly [relationNameBrand]: never };
+
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Relation<T extends Base> {
   /**
@@ -6257,19 +6270,25 @@ export class Relation<T extends Base> {
 
   /**
    * `delegate :name, to: :model` (relation/delegation.rb:106) — the model
-   * class name.
+   * class name. Exposed as a property reader (`relation.name`, no parens),
+   * matching Rails' calling convention.
    *
-   * Exposed as a method (not a `get name(): string`) deliberately: a
-   * string-typed `name` getter would make the structurally-typed `Relation`
-   * satisfy the ubiquitous `{ name: string }` object shape, which silently
-   * flips `Array#reduce` accumulator inference — e.g.
+   * The declared return type is {@link RelationName} — a *supertype* of
+   * `string` (`string | RelationNameBrand`), not plain `string`. The runtime
+   * value is always the model-class-name string, but the widened static type is
+   * deliberate: a plain-`string` `name` getter would make the structurally
+   * typed `Relation` satisfy the ubiquitous `{ name: string }` object shape,
+   * which silently flips `Array#reduce` accumulator inference — e.g.
    * `[{ name }, …].reduce((memo, param) => memo.where(param), Model.unscoped())`
    * would resolve the `reduce(cb, initial: T): T` overload with `T = { name }`
    * (since `Relation` would be assignable to the element type) instead of the
-   * generic `reduce<U>(cb, initial: U): U` with `U = Relation`. A method-typed
-   * `name` is not assignable to `{ name: string }`, so inference stays correct.
+   * generic `reduce<U>(cb, initial: U): U` with `U = Relation`. Because
+   * `RelationName` is not assignable to `string`, `Relation` is not assignable
+   * to `{ name: string }`, so inference stays correct; because it is a
+   * *supertype* of `string`, a string literal is still assignable to it, so
+   * `expect(relation.name).toBe("Comment")` type-checks at the call site.
    */
-  name(): string {
+  get name(): RelationName {
     return this.model.name;
   }
 
@@ -7664,12 +7683,13 @@ export interface Relation<T extends Base>
 // DelegationMethods carries getters (connection/primaryKey/tableName) and
 // generic/T-returning methods, so its surface is declared explicitly here rather
 // than via Included<> (which drops accessors and erases the generics).
-// NB: `name` (`delegate :name, to: :model`) is intentionally NOT a getter here —
-// a string-typed `name` accessor would make `Relation` structurally satisfy the
-// ubiquitous `{ name: string }` shape and flip `Array#reduce` accumulator
-// inference, so it lives as a class-body method (`name(): string`) on Relation
-// instead. `slice` (`to: :records`) is likewise a class-body method (its
-// signature must stay override-compatible with `CollectionProxy#slice`).
+// NB: `name` (`delegate :name, to: :model`) is a getter typed to return
+// `RelationName` (a supertype of `string`), NOT plain `string` — a plain-string
+// `name` accessor would make `Relation` structurally satisfy the ubiquitous
+// `{ name: string }` shape and flip `Array#reduce` accumulator inference. See
+// the `get name()` doc comment for the full rationale. `slice` (`to: :records`)
+// is a class-body method (its signature must stay override-compatible with
+// `CollectionProxy#slice`).
 export interface Relation<T extends Base> {
   each(fn: (record: T, index: number) => void): Promise<T[]>;
   join(separator?: string): Promise<string>;

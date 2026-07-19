@@ -612,7 +612,7 @@ describe("DelegationTest", () => {
     });
 
     it("delegates name to the model class name", () => {
-      expect(Comment.all().name()).toBe("Comment");
+      expect(Comment.all().name).toBe("Comment");
     });
   }); // DelegationNamedMethods
 });
