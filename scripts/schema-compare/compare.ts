@@ -20,7 +20,7 @@ import type {
 } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import { columnsOf } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import type { RailsTable } from "./parse-schema-rb.js";
-import { parseSchemaRb } from "./parse-schema-rb.js";
+import { declaredTableNames, parseSchemaRb } from "./parse-schema-rb.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -30,9 +30,11 @@ const BASELINE = path.join(HERE, "invented-baseline.json");
 /**
  * Pre-existing invented entries, recorded so the gate ratchets: anything in
  * the baseline is reported as debt, anything new is fatal. Entries are table
- * names, or `table.column` for a column on an otherwise-canonical table. The
- * list only ever shrinks — regenerate with `pnpm schema:compare --write` after
- * *removing* inventions, never to admit new ones.
+ * names, or `table.column` for a column on an otherwise-canonical table.
+ *
+ * The list only ever shrinks. Reseed with `pnpm schema:compare:reseed` after
+ * *removing* inventions — the reseed refuses to grow the file, so a red gate
+ * can never be "fixed" by blessing the invention that turned it red.
  */
 export interface Baseline {
   tables: string[];
@@ -182,6 +184,15 @@ function formatFinding(finding: Finding): string {
   return `${isFatal(finding) ? "FAIL" : "warn"}  ${finding.verdict.padEnd(15)} ${target} — ${finding.detail}`;
 }
 
+/**
+ * Table names schema.rb declares that the block parser failed to produce. Any
+ * result here means the parser has fallen behind the vendored source and its
+ * verdicts cannot be trusted — the caller must abort rather than report.
+ */
+export function unparsedTables(source: string, parsed: ReadonlyMap<string, RailsTable>): string[] {
+  return [...new Set(declaredTableNames(source))].filter((name) => !parsed.has(name));
+}
+
 /** The baseline key for a finding: the table, or `table.column`. */
 export function baselineKey(finding: Finding): string {
   return finding.column ? `${finding.table}.${finding.column}` : finding.table;
@@ -214,6 +225,18 @@ export function applyBaseline(
 export async function main(): Promise<void> {
   const source = await readFile(SCHEMA_RB, "utf8");
   const railsTables = parseSchemaRb(source);
+
+  // Trust the parser before trusting its verdicts.
+  const unparsed = unparsedTables(source, railsTables);
+  if (unparsed.length > 0) {
+    console.error(
+      `schema.rb declares ${unparsed.length} table(s) the parser could not read: ` +
+        `${unparsed.join(", ")}\nEvery verdict below would be unreliable, so nothing is reported. ` +
+        `Teach scripts/schema-compare/parse-schema-rb.ts the new create_table form.`,
+    );
+    process.exit(1);
+  }
+
   const findings = compareSchemas(TEST_SCHEMA, railsTables);
   const soft = findings.filter((f) => !isFatal(f));
 
@@ -229,6 +252,20 @@ export async function main(): Promise<void> {
         .map(baselineKey)
         .sort(),
     };
+    // A reseed exists to record that debt SHRANK. Letting it grow would let a
+    // red gate be "fixed" by blessing the very invention it caught — which
+    // silently retires the guard-rail this whole tool exists to be.
+    const { regressions } = applyBaseline(findings, await readBaseline());
+    if (regressions.length > 0 && !process.argv.includes("--allow-growth")) {
+      console.error(
+        `refusing to grow the baseline by ${regressions.length} new invention(s):\n` +
+          regressions.map((f) => `  ${baselineKey(f)}`).join("\n") +
+          "\n\nThe baseline records pre-existing debt only. Remove the table/column from " +
+          "TEST_SCHEMA, or add it to schema.rb upstream. Pass --allow-growth only when a " +
+          "vendored-Rails bump legitimately removed canonical schema.",
+      );
+      process.exit(1);
+    }
     await writeFile(BASELINE, `${JSON.stringify(next, null, 2)}\n`, "utf8");
     console.log(
       `wrote baseline — ${next.tables.length} tables, ${next.columns.length} columns of known debt`,
@@ -243,7 +280,9 @@ export async function main(): Promise<void> {
     for (const finding of soft) console.log(formatFinding(finding));
   }
   for (const key of stale) {
-    console.log(`note  BASELINE-STALE  ${key} — no longer invented; drop it via --write`);
+    console.log(
+      `note  BASELINE-STALE  ${key} — no longer invented; drop it with pnpm schema:compare:reseed`,
+    );
   }
 
   console.log(

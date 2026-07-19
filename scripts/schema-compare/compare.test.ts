@@ -1,6 +1,8 @@
 import { describe, it, expect } from "vitest";
-import { parseSchemaRb } from "./parse-schema-rb.js";
-import { applyBaseline, compareSchemas, isFatal } from "./compare.js";
+import { readFileSync } from "node:fs";
+import { declaredTableNames, parseSchemaRb } from "./parse-schema-rb.js";
+import { applyBaseline, compareSchemas, isFatal, readBaseline, unparsedTables } from "./compare.js";
+import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
 import type { Finding } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 
@@ -224,6 +226,34 @@ describe("compareSchemas", () => {
   });
 });
 
+describe("unparsedTables", () => {
+  const rb = `create_table :accounts, force: true do |t|
+       t.string :name
+     end
+     create_table :posts, force: true do |t|
+       t.string :title
+     end`;
+
+  it("returns nothing when every declared table parsed", () => {
+    expect(unparsedTables(`ActiveRecord::Schema.define do\n${rb}\nend\n`, parse(rb))).toEqual([]);
+  });
+
+  it("names a declared table the parser dropped", () => {
+    const dropped = new Map(parse(rb));
+    dropped.delete("posts");
+    expect(unparsedTables(`ActiveRecord::Schema.define do\n${rb}\nend\n`, dropped)).toEqual([
+      "posts",
+    ]);
+  });
+
+  it("ignores a create_table that only appears in a comment", () => {
+    const withComment = `# create_table :ghost, force: true do |t|\n${rb}`;
+    expect(
+      unparsedTables(`ActiveRecord::Schema.define do\n${withComment}\nend\n`, parse(withComment)),
+    ).toEqual([]);
+  });
+});
+
 describe("applyBaseline", () => {
   const findings: Finding[] = [
     { verdict: "INVENTED-TABLE", table: "known_table", detail: "" },
@@ -249,5 +279,39 @@ describe("applyBaseline", () => {
   it("never routes a non-fatal finding through the baseline", () => {
     const { regressions, known } = applyBaseline(findings, { tables: [], columns: [] });
     expect([...regressions, ...known].every(isFatal)).toBe(true);
+  });
+});
+
+// These exercise the real vendored schema.rb rather than a synthetic snippet.
+// They are the tests that actually fire on a `pnpm vendor:fetch` bump: the
+// synthetic cases above only prove the parser handles forms we already knew about.
+describe("against the vendored schema.rb", () => {
+  const source = readFileSync(
+    new URL("../../vendor/rails/activerecord/test/schema/schema.rb", import.meta.url),
+    "utf8",
+  );
+  const railsTables = parseSchemaRb(source);
+
+  it("parses every create_table the file declares", () => {
+    expect(unparsedTables(source, railsTables)).toEqual([]);
+    expect(railsTables.size).toBe(new Set(declaredTableNames(source)).size);
+  });
+
+  it("resolves the canonical tables TEST_SCHEMA is built on", () => {
+    for (const table of ["accounts", "posts", "authors", "topics", "comments"]) {
+      expect(railsTables.get(table)?.columns.size, table).toBeGreaterThan(0);
+    }
+  });
+
+  it("keeps TEST_SCHEMA free of inventions outside the committed baseline", async () => {
+    const findings = compareSchemas(TEST_SCHEMA, railsTables);
+    const { regressions } = applyBaseline(findings, await readBaseline());
+    expect(verdicts(regressions)).toEqual([]);
+  });
+
+  it("holds the invention baseline at or below its committed size", async () => {
+    // Ratchet: this number may fall as debt is paid off, never rise.
+    const baseline = await readBaseline();
+    expect(baseline.tables.length + baseline.columns.length).toBeLessThanOrEqual(100);
   });
 });

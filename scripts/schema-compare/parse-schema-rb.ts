@@ -56,6 +56,24 @@ const IGNORED_MACROS = new Set(
   "index check_constraint foreign_key exclusion_constraint".split(" "),
 );
 
+/**
+ * Every `create_table` the source declares, by name, found without parsing the
+ * blocks. Cross-checking this against {@link parseSchemaRb}'s output is what
+ * catches a vendored-Rails bump introducing a form the parser silently drops —
+ * a dropped table turns every TEST_SCHEMA table mirroring it into a phantom
+ * "invention", which is exactly the false verdict this tool must never emit.
+ */
+export function declaredTableNames(source: string): string[] {
+  const names: string[] = [];
+  for (const line of source.split("\n")) {
+    const match = /^\s*create_table\s+(.+)$/.exec(stripComment(line));
+    if (!match) continue;
+    const name = parseName(splitArgs(match[1]!)[0] ?? "");
+    if (name !== null) names.push(name);
+  }
+  return names;
+}
+
 /** Strips a trailing `# comment` that is not inside a string literal. */
 function stripComment(line: string): string {
   let inSingle = false;
