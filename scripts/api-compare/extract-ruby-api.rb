@@ -1947,11 +1947,16 @@ class ApiExtractor
     absolute_const_ref?(node) ? "::#{name}" : name
   end
 
-  # True when the leftmost element of a constant reference is `::`.
+  # True when the leftmost element of a constant reference is `::`. Ripper
+  # nests the qualifier leftwards, so `::A::B` is
+  # `const_path_ref(top_const_ref(A), B)` and the relative `A::B` is
+  # `const_path_ref(var_ref(A), B)` — recursing on node[1] separates them.
+  # (`:top_const_path_ref` is not a Ripper event; `Ripper::PARSER_EVENTS`
+  # defines only `:top_const_ref` and `:top_const_field`.)
   def absolute_const_ref?(node)
     return false unless node.is_a?(Array)
     case node[0]
-    when :top_const_ref, :top_const_path_ref
+    when :top_const_ref
       true
     when :const_path_ref, :var_ref, :const_ref
       absolute_const_ref?(node[1])
