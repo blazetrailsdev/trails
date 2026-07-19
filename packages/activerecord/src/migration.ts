@@ -1712,7 +1712,7 @@ export class MigrationContext {
         `Adapter ${this.connection.adapterName} does not expose schemaCreation; cannot render CREATE TABLE DDL.`,
       );
     }
-    await this.connection.executeMutation(schemaCreation.accept(td));
+    await this.connection.execute(schemaCreation.accept(td));
     if (options?.comment != null && options.comment.trim().length > 0) {
       const adapterWithComments = this.connection as {
         supportsComments?: () => boolean;

@@ -45,26 +45,26 @@ export class SchemaMigration {
   }
 
   async createTable(): Promise<void> {
-    await this._adapter.executeMutation(
+    await this._adapter.execute(
       `CREATE TABLE IF NOT EXISTS "${this.tableName}" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
     );
   }
 
   async dropTable(): Promise<void> {
-    await this._adapter.executeMutation(`DROP TABLE IF EXISTS "${this.tableName}"`);
+    await this._adapter.execute(`DROP TABLE IF EXISTS "${this.tableName}"`);
   }
 
   async createVersion(version: string): Promise<void> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
-    await this._adapter.executeMutation(this._adapter.toSql(im));
+    await this._adapter.execute(this._adapter.toSql(im));
   }
 
   async deleteVersion(version: string): Promise<void> {
     const dm = new DeleteManager();
     dm.from(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._adapter.executeMutation(this._adapter.toSql(dm));
+    await this._adapter.execute(this._adapter.toSql(dm));
   }
 
   async deleteAllVersions(): Promise<void> {
@@ -207,7 +207,7 @@ export class SchemaMigration {
       const rows = toInsert.map((v) => [v]);
       im.ast.columns = [col];
       im.values = im.createValuesList(rows);
-      await this._adapter.executeMutation(this._adapter.toSql(im));
+      await this._adapter.execute(this._adapter.toSql(im));
     }
   }
 }

@@ -88,7 +88,7 @@ export class InternalMetadata {
     if (!this._enabled) return;
     const tsType = this._connection.adapterName === "postgres" ? "TIMESTAMP" : "DATETIME";
     const q = (n: string) => this._q(n);
-    await this._connection.executeMutation(
+    await this._connection.execute(
       `CREATE TABLE IF NOT EXISTS ${this._connection.quoteTableName(this.tableName)} (` +
         `${q("key")} VARCHAR(255) NOT NULL PRIMARY KEY, ` +
         `${q("value")} VARCHAR(255), ` +
@@ -116,7 +116,8 @@ export class InternalMetadata {
     // reaching over and dropping ar_internal_metadata that another
     // config or adapter is actively using.
     if (!this._enabled) return;
-    await this._connection.executeMutation(
+    await this._connection.execute(
+      // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
       `DROP TABLE IF EXISTS ${this._connection.quoteTableName(this.tableName)}`,
     );
   }
@@ -165,7 +166,7 @@ export class InternalMetadata {
     if (!this._enabled) return;
     const dm = new DeleteManager();
     dm.from(this.arelTable);
-    await this._connection.executeMutation(this._connection.toSql(dm));
+    await this._connection.execute(this._connection.toSql(dm));
   }
 
   async count(): Promise<number> {
@@ -236,7 +237,7 @@ export class InternalMetadata {
       [this.arelTable.get("created_at"), now],
       [this.arelTable.get("updated_at"), now],
     ]);
-    await this._connection.executeMutation(this._connection.toSql(im));
+    await this._connection.execute(this._connection.toSql(im));
   }
 
   private async updateEntry(key: string, newValue: string): Promise<void> {
@@ -248,6 +249,6 @@ export class InternalMetadata {
       [this.arelTable.get("updated_at"), now],
     ]);
     um.where(this.arelTable.get(this.primaryKey).eq(key));
-    await this._connection.executeMutation(this._connection.toSql(um));
+    await this._connection.execute(this._connection.toSql(um));
   }
 }

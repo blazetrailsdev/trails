@@ -384,7 +384,7 @@ async function processNestedAttributes(record: Base): Promise<void> {
             .set(sets)
             .where((ctor as any)._buildPkWhereNode(record.id));
           const conn = (ctor as any).connection;
-          await conn.executeMutation(conn.toSql(um));
+          await conn.execute(conn.toSql(um));
 
           // The deferred FK write above bypasses the normal belongs_to
           // assignment, so the counter-cache machinery never runs for the
