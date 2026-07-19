@@ -1853,10 +1853,6 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
   });
 
-  await define("libraries", {}, (t) => {
-    t.string("name");
-  });
-
   await define("ms_departments", {}, (t) => {
     t.integer("hotel_id");
   });
@@ -1965,25 +1961,6 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("publishers", {}, (t) => {});
-
-  await define("refl_authors", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("refl_categories", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("refl_essays", {}, (t) => {
-    t.string("name");
-    t.integer("writer_id");
-    t.string("writer_type");
-    t.integer("category_id");
-  });
-
-  await define("refl_organizations", {}, (t) => {
-    t.string("name");
-  });
 
   await define("sc2_chef_lists", {}, (t) => {
     t.integer("employable_list_id");
