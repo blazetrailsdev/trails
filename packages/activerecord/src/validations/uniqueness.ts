@@ -310,11 +310,12 @@ function isCoveredByUniqueIndex(
   _options: Record<string, unknown>,
 ): boolean {
   // Rails reads `klass.schema_cache.indexes(klass.table_name)` synchronously,
-  // but Trails' SchemaCache#indexes is async (requires a pool + I/O). Calling
-  // it from this synchronous validator path isn't safe. Conservatively return
-  // false so uniqueness always performs the existence check — correct, just
-  // skips the Rails optimization that drops a redundant SELECT when the DB
-  // already enforces uniqueness via a unique index.
+  // but Trails' SchemaCache#indexes is async (requires a pool + I/O) and this
+  // helper is synchronous. Conservatively return false so uniqueness always
+  // performs the existence check — correct, just skips the Rails optimization
+  // that drops a redundant SELECT when the DB already enforces uniqueness via a
+  // unique index. (The validation chain itself is async now, so awaiting the
+  // index lookup is a possible future optimization.)
   return false;
 }
 
