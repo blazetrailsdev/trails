@@ -38,6 +38,7 @@ import {
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { isBaseInstance } from "./relation/predicate-builder/is-base-instance.js";
+import { QueryAttribute } from "./relation/query-attribute.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -7064,8 +7065,15 @@ export class Relation<T extends Base> {
         // render as `SET col = (select ...)`, which SQLite/MySQL/PG require.
         return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
       }
+      // Rails casts exactly once here: `build_bind_attribute` hands the already-cast
+      // value to `QueryAttribute.new` (predicate_builder.rb:67-69), and
+      // `QueryAttribute#type_cast` is identity (query_attribute.rb:22-24). trails'
+      // `QueryAttribute#typeCast` instead casts its input — most of its callers pass
+      // RAW values and rely on that — so routing a cast value through
+      // `buildBindAttribute` would cast twice. `withCastValue` is the preserving
+      // constructor that matches Rails' semantics.
       const type = this._modelClass.typeForAttribute(attr.name);
-      return [attr, this.predicateBuilder.buildBindAttribute(attr.name, type.cast(value))];
+      return [attr, QueryAttribute.withCastValue(attr.name, type.cast(value), type)];
     });
   }
 

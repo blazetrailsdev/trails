@@ -63,6 +63,37 @@ describe("update_all value substitution", () => {
     expect(binds[0]).toBe("bound value");
   });
 
+  it("casts each value exactly once", async () => {
+    // Rails casts once (relation.rb:1389-1390 + identity QueryAttribute#type_cast,
+    // query_attribute.rb:22-24). A non-idempotent type makes a second cast visible.
+    // A stub type whose `serialize` does NOT re-enter `cast` — every real type
+    // self-casts inside serialize, which would mask the bind-level double cast.
+    const casts: unknown[] = [];
+    const stub = {
+      cast: (v: unknown) => {
+        casts.push(v);
+        return `cast(${String(v)})`;
+      },
+      serialize: (v: unknown) => v,
+    };
+    const model = Topic as unknown as { typeForAttribute(n: string): unknown };
+    const real = model.typeForAttribute;
+    model.typeForAttribute = function (name: string) {
+      return name === "title" ? stub : real.call(this, name);
+    };
+
+    const rel = Topic.where({ id: 1 });
+    try {
+      const { binds } = await captureUpdate(rel, () => rel.updateAll({ title: "x" }));
+      // Cast exactly once, on the RAW value — the bind must preserve the result
+      // rather than casting it a second time.
+      expect(casts).toEqual(["x"]);
+      expect(binds[0]).toBe("cast(x)");
+    } finally {
+      model.typeForAttribute = real;
+    }
+  });
+
   it("passes Arel nodes through, wrapping SqlLiteral in a Grouping", async () => {
     const rel = Topic.where({ id: 1 });
     const { sql } = await captureUpdate(rel, () =>

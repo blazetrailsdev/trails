@@ -3442,5 +3442,19 @@
     "rubyName": "where",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "_substitute_values",
+    "call": "build_bind_attribute",
+    "reason": "Satisfied by QueryAttribute.withCastValue: Rails build_bind_attribute (predicate_builder.rb:67-69) is a PRESERVING constructor because QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails QueryAttribute#typeCast casts its input, so calling buildBindAttribute here would cast twice."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "_substitute_values",
+    "call": "predicate_builder",
+    "reason": "Satisfied by QueryAttribute.withCastValue: Rails build_bind_attribute (predicate_builder.rb:67-69) is a PRESERVING constructor because QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails QueryAttribute#typeCast casts its input, so calling buildBindAttribute here would cast twice."
   }
 ]
