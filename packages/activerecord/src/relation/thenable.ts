@@ -25,9 +25,17 @@
  * with `this` bound to the target, so method calls still mutate (and
  * read) the one underlying relation — Rails' "same object, now loaded"
  * identity semantics — while leaving the original awaitable.
+ *
+ * The view is memoized per instance, so repeated `load()` calls return
+ * the same view rather than allocating on every materialization.
  */
+const thenlessViews = new WeakMap<object, object>();
+
 export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
-  return new Proxy(obj, {
+  const cached = thenlessViews.get(obj);
+  if (cached) return cached as Omit<T, "then">;
+
+  const view = new Proxy(obj, {
     get(target, prop) {
       if (prop === "then") return undefined;
       return Reflect.get(target, prop, target);
@@ -41,7 +49,10 @@ export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
     getOwnPropertyDescriptor(target, prop) {
       return prop === "then" ? undefined : Reflect.getOwnPropertyDescriptor(target, prop);
     },
-  }) as Omit<T, "then">;
+  });
+
+  thenlessViews.set(obj, view);
+  return view as Omit<T, "then">;
 }
 
 export function applyThenable(prototype: object, evaluationMethod: string = "toArray"): void {

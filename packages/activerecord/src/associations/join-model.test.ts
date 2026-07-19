@@ -1242,7 +1242,10 @@ describe("AssociationsJoinModelTest", () => {
     const thinking = await Post.find(posts("thinking").id);
     const tagsProxy = (thinking as any).tags;
     const general = await Tag.find(tags("general").id);
-    expect(await tagsProxy.push(general)).toBe(tagsProxy);
+    // Rails: `assert_equal tags, posts(:thinking).tags.push(tags(:general))`
+    // (join_model_test.rb:555) — record equality, not identity.
+    const pushed = await tagsProxy.push(general);
+    expect(await pushed.toArray()).toEqual(await tagsProxy.toArray());
   });
 
   it("has many through sum uses calculations", async () => {

@@ -117,6 +117,19 @@ describe("Thenable", () => {
     expect(records).toHaveLength(1);
   });
 
+  it("load returns a stable view that shares state with the relation", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const first = await davids.load();
+    const second = await davids.load();
+    expect(second).toBe(first);
+
+    // The view is not a copy: loading through it marked the original loaded,
+    // and both read the same records.
+    expect(davids.isLoaded).toBe(true);
+    expect(await first.toArray()).toEqual(await davids.toArray());
+  });
+
   it("relation stays awaitable after destroyAll", async () => {
     const davids = Author.where({ name: "David" });
     expect(await davids).toHaveLength(1);

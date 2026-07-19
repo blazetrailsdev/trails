@@ -297,7 +297,9 @@ describe("AssociationProxyTest", () => {
     const david = developers("david") as any;
     const once = await david.projects.reload();
     const reloaded = await once.reload();
-    expect(reloaded).toBe(david.projects);
+    // Rails: `assert_equal david.projects, david.projects.reload.reload`
+    // (associations_test.rb:588) — record equality, not identity.
+    expect(await reloaded.toArray()).toEqual(await david.projects.toArray());
     expect(david.projects.loaded).toBe(true);
   });
   it("getting a scope from an association", async () => {
