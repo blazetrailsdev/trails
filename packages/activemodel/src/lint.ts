@@ -12,6 +12,22 @@
 export interface Lint {}
 
 /**
+ * Raised when an ActiveModel::Lint compliance check fails.
+ *
+ * Rails' `Lint::Tests` are Minitest test methods whose `assert*` calls raise
+ * `Minitest::Assertion` on failure (there is no ActiveModel error class for
+ * these — the failures are test-framework assertions). This ports that
+ * assertion-failure identity so the standalone lint functions surface a single
+ * named class instead of a bare `Error`.
+ */
+export class MinitestAssertion extends globalThis.Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "MinitestAssertion";
+  }
+}
+
+/**
  * Resolve the model fixture under test. Mirrors Rails
  * `Lint::Tests#model` (activemodel/lib/active_model/lint.rb:108-111)
  * which calls `@model.to_model` so the fixture can stand in via
@@ -34,7 +50,7 @@ export function model<T>(m: T | { toModel(): T }): T {
  */
 export function assertBoolean(result: unknown, name: string): void {
   if (result !== true && result !== false) {
-    throw new Error(`${name} should be a boolean`);
+    throw new MinitestAssertion(`${name} should be a boolean`);
   }
 }
 
@@ -45,19 +61,19 @@ export namespace Tests {
     const m = model(input);
     const key = m.toKey();
     if (key !== null && !Array.isArray(key)) {
-      throw new Error("toKey must return null or an array");
+      throw new MinitestAssertion("toKey must return null or an array");
     }
 
     const persisted = m.isPersisted();
     assertBoolean(persisted, "isPersisted");
 
     if (persisted && key === null) {
-      throw new Error("toKey must not return null when the model is persisted");
+      throw new MinitestAssertion("toKey must not return null when the model is persisted");
     }
 
     withPatchedPersistedFalse(m, () => {
       if (m.toKey() !== null) {
-        throw new Error("toKey should return null when `isPersisted` returns false");
+        throw new MinitestAssertion("toKey should return null when `isPersisted` returns false");
       }
     });
   }
@@ -71,7 +87,7 @@ export namespace Tests {
     const m = model(input);
     const param = m.toParam();
     if (param !== null && typeof param !== "string") {
-      throw new Error("toParam must return null or a string");
+      throw new MinitestAssertion("toParam must return null or a string");
     }
 
     withPatched(
@@ -81,7 +97,9 @@ export namespace Tests {
       () => {
         withPatchedPersistedFalse(m, () => {
           if (m.toParam() !== null) {
-            throw new Error("toParam should return null when `isPersisted` returns false");
+            throw new MinitestAssertion(
+              "toParam should return null when `isPersisted` returns false",
+            );
           }
         });
       },
@@ -95,7 +113,7 @@ export namespace Tests {
     const m = model(input);
     const path = m.toPartialPath();
     if (typeof path !== "string") {
-      throw new Error("toPartialPath must return a string");
+      throw new MinitestAssertion("toPartialPath must return a string");
     }
   }
 
@@ -107,7 +125,7 @@ export namespace Tests {
   export function testErrors(model: { errors: { fullMessages: unknown[] } }): void {
     const messages = model.errors.fullMessages;
     if (!Array.isArray(messages)) {
-      throw new Error("errors.fullMessages must return an array");
+      throw new MinitestAssertion("errors.fullMessages must return an array");
     }
   }
 
@@ -118,19 +136,19 @@ export namespace Tests {
   export function testModelNaming(model: ModelNamingHost): void {
     const classModelName = model.constructor.modelName;
     if (!classModelName) {
-      throw new Error("model.constructor.modelName must be defined");
+      throw new MinitestAssertion("model.constructor.modelName must be defined");
     }
     if (typeof classModelName.human !== "string") {
-      throw new Error("modelName.human must return a string");
+      throw new MinitestAssertion("modelName.human must return a string");
     }
     if (typeof classModelName.singular !== "string") {
-      throw new Error("modelName.singular must return a string");
+      throw new MinitestAssertion("modelName.singular must return a string");
     }
     if (typeof classModelName.plural !== "string") {
-      throw new Error("modelName.plural must return a string");
+      throw new MinitestAssertion("modelName.plural must return a string");
     }
     if (model.modelName !== classModelName) {
-      throw new Error("model.modelName must equal model.constructor.modelName");
+      throw new MinitestAssertion("model.modelName must equal model.constructor.modelName");
     }
   }
 
@@ -142,7 +160,7 @@ export namespace Tests {
   export function testErrorsAref(model: { errors: { get(attribute: string): string[] } }): void {
     const result = model.errors.get("attribute");
     if (!Array.isArray(result)) {
-      throw new Error("errors.get(attribute) must return an array");
+      throw new MinitestAssertion("errors.get(attribute) must return an array");
     }
   }
 }

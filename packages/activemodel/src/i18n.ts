@@ -39,6 +39,44 @@ export class MissingInterpolationArgument extends globalThis.Error {
 }
 
 /**
+ * Raised by `I18n.t(key, { raise: true })` when a key (and every default key)
+ * resolves to nothing.
+ *
+ * Mirrors: I18n::MissingTranslationData (i18n/lib/i18n/exceptions.rb) — the i18n
+ * gem's `MissingTranslation` alias, an `ArgumentError` subclass in Ruby. We root
+ * it at the global `Error` here since the activemodel service has no local
+ * `ArgumentError` home, matching the sibling ActiveSupport port.
+ *
+ * `MissingTranslation::Base` stores `locale`/`key`/`options` and its `#message`
+ * has two branches (i18n/lib/i18n/exceptions.rb): with a non-empty `default`
+ * chain it returns `Translation missing. Options considered were:` followed by
+ * each fully-resolved key; otherwise the bare `Translation missing: <keys>`.
+ * ActiveModel's `human_attribute_name` raise path passes the ancestor lookup
+ * chain as `default:` (activemodel/lib/active_model/translation.rb), so it hits
+ * the options-listing branch — the shape shown in activemodel's CHANGELOG.
+ */
+export class MissingTranslationData extends globalThis.Error {
+  readonly key: string;
+  readonly locale: string;
+  readonly consideredKeys: string[];
+  constructor(locale: string, key: string, defaults?: TranslateOptions["defaults"]) {
+    const consideredKeys = [key, ...(defaults ?? []).flatMap((d) => ("key" in d ? [d.key] : []))];
+    let message: string;
+    if (defaults && defaults.length > 0) {
+      const lines = consideredKeys.map((k) => `- ${locale}.${k}`).join("\n");
+      message = `Translation missing. Options considered were:\n${lines}`;
+    } else {
+      message = `Translation missing: ${locale}.${key}`;
+    }
+    super(message);
+    this.name = "MissingTranslationData";
+    this.locale = locale;
+    this.key = key;
+    this.consideredKeys = consideredKeys;
+  }
+}
+
+/**
  * Keys the I18n gem reserves (not forwarded as `%{}` interpolations).
  * See i18n/lib/i18n.rb RESERVED_KEYS.
  */
@@ -140,7 +178,7 @@ class I18nService {
     }
 
     if (options?.raise ?? raiseOnMissingTranslations()) {
-      throw new Error(`Translation missing: ${key}`);
+      throw new MissingTranslationData(locale, key, options?.defaults);
     }
     return key;
   }

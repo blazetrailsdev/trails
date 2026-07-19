@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeEach } from "vitest";
 import { I18n } from "./i18n.js";
-import { MissingInterpolationArgument } from "./i18n.js";
+import { MissingInterpolationArgument, MissingTranslationData } from "./i18n.js";
 
 describe("I18n", () => {
   beforeEach(() => {
@@ -46,6 +46,38 @@ describe("I18n", () => {
       expect(() => I18n.t("hi", { locale: "en", defaults: [{ key: "missing" }] })).toThrow(
         MissingInterpolationArgument,
       );
+    });
+  });
+
+  describe("raise on missing", () => {
+    it("raises MissingTranslationData for an unknown key with raise:true", () => {
+      let error: MissingTranslationData | undefined;
+      try {
+        I18n.t("nope", { raise: true });
+      } catch (e) {
+        error = e as MissingTranslationData;
+      }
+      expect(error).toBeInstanceOf(MissingTranslationData);
+      // No-default branch of MissingTranslation::Base#message.
+      expect(error?.message).toBe("Translation missing: en.nope");
+    });
+
+    it("lists the considered keys when the default chain is exhausted", () => {
+      // Options branch of i18n MissingTranslation::Base#message: with a
+      // non-empty `default` chain the message is `Translation missing. Options
+      // considered were:` listing every resolved key — the shape ActiveModel's
+      // human_attribute_name raise path produces (activemodel CHANGELOG).
+      let error: MissingTranslationData | undefined;
+      try {
+        I18n.t("a.b", { raise: true, defaults: [{ key: "c.d" }, { key: "e.f" }] });
+      } catch (e) {
+        error = e as MissingTranslationData;
+      }
+      expect(error).toBeInstanceOf(MissingTranslationData);
+      expect(error?.message).toBe(
+        "Translation missing. Options considered were:\n- en.a.b\n- en.c.d\n- en.e.f",
+      );
+      expect(error?.consideredKeys).toEqual(["a.b", "c.d", "e.f"]);
     });
   });
 
