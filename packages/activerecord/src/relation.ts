@@ -3963,8 +3963,8 @@ export class Relation<T extends Base> {
     // touch_all which calls update_all internally (relation.rb).
     const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, time);
     const updates: Record<string, unknown> = {};
-    for (const [col, time] of Object.entries(touchUpdates)) {
-      updates[col] = new Nodes.Quoted(time);
+    for (const [col, touchedAt] of Object.entries(touchUpdates)) {
+      updates[col] = new Nodes.Quoted(touchedAt);
     }
 
     // Deviation: Rails passes the empty hash straight to update_all, which
