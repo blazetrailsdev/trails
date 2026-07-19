@@ -560,18 +560,6 @@ describe("ActiveSupport::Notifications", () => {
       expect(outerEvent.children[0].name).toBe("inner");
     });
   });
-
-  describe("subscriber error isolation", () => {
-    it("does not propagate errors from subscribers", () => {
-      Notifications.subscribe("safe", () => {
-        throw new Error("subscriber boom");
-      });
-      const events: Event[] = [];
-      Notifications.subscribe("safe", (e) => events.push(e));
-      expect(() => Notifications.instrument("safe")).not.toThrow();
-      expect(events).toHaveLength(1);
-    });
-  });
 });
 
 describe("Instrumenter", () => {

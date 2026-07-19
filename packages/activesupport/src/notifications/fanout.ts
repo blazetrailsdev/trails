@@ -1,5 +1,6 @@
 import { Temporal } from "../temporal.js";
 import { Event } from "./instrumenter.js";
+import { IsolatedExecutionState } from "../isolated-execution-state.js";
 
 export class InstrumentationSubscriberError extends Error {
   readonly exceptions: Error[];
@@ -39,6 +40,14 @@ export function iterateGuardingExceptions<T>(collection: T[], fn: (item: T) => v
 
   // Rails' iterate_guarding_exceptions returns the collection (fanout.rb:41).
   return collection;
+}
+
+// Rails' Fanout::Handle#ensure_state! raises ArgumentError (fanout.rb:263-267).
+class ArgumentError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "ArgumentError";
+  }
 }
 
 type EventedListener = {
@@ -200,22 +209,27 @@ export class MonotonicTimedGroup extends BaseTimeGroup {
 }
 
 export class EventObjectGroup extends BaseGroup {
-  private event: Event | null = null;
+  private _event: Event | null = null;
   constructor(private listeners: EventObjectCallback[]) {
     super();
   }
 
+  /** The Event built at #start — trails threads child-event nesting through it. */
+  get event(): Event | null {
+    return this._event;
+  }
+
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
-    this.event = new Event(name, Temporal.Now.instant(), payload, String(id));
+    this._event = new Event(name, Temporal.Now.instant(), payload, String(id));
   }
 
   finish(_name: string, _id: unknown, payload: Record<string, unknown>): void {
-    if (this.event) {
+    if (this._event) {
       // Rails' EventObjectGroup#finish: `@event.payload = payload` — replace the
       // dup with the final object so deletions are reflected (fanout.rb:166-178).
-      this.event.payload = payload;
-      this.event.finish();
-      iterateGuardingExceptions(this.listeners, (l) => l(this.event!));
+      this._event.payload = payload;
+      this._event.finish();
+      iterateGuardingExceptions(this.listeners, (l) => l(this._event!));
     }
   }
 }
@@ -234,9 +248,20 @@ export class Handle {
     this._payload = payload;
   }
 
+  /**
+   * The Event this handle's event-object group built at #start (if any), so a
+   * caller can thread trails' child-event nesting across nested handles.
+   */
+  get event(): Event | null {
+    for (const g of this.groups) {
+      if (g instanceof EventObjectGroup) return g.event;
+    }
+    return null;
+  }
+
   start(): void {
     if (this.state !== "initialized") {
-      throw new Error(`expected state to be "initialized" but was "${this.state}"`);
+      throw new ArgumentError(`expected state to be "initialized" but was "${this.state}"`);
     }
     this.state = "started";
     iterateGuardingExceptions(this.groups, (g) => g.start(this._name, this._id, this._payload));
@@ -248,7 +273,7 @@ export class Handle {
 
   finishWithValues(name: string, id: unknown, payload: Record<string, unknown>): void {
     if (this.state !== "started") {
-      throw new Error(`expected state to be "started" but was "${this.state}"`);
+      throw new ArgumentError(`expected state to be "started" but was "${this.state}"`);
     }
     this.state = "finished";
     iterateGuardingExceptions(this.groups, (g) => g.finish(name, id, payload));
@@ -261,7 +286,16 @@ export class Fanout {
   private stringSubscribers = new Map<string, Subscriber[]>();
   private otherSubscribers: Subscriber[] = [];
   private listenersCache = new Map<string, Subscriber[]>();
-  private handleStack: FanoutHandle[] = [];
+
+  // Rails keeps the evented start/finish handle stack in
+  // `IsolatedExecutionState[:_fanout_handle_stack]` (fanout.rb:277), so
+  // concurrent tasks don't share one stack. The key is per-Fanout so separate
+  // notifiers can't collide.
+  private readonly _handleStackKey = Symbol("as_fanout_handle_stack");
+
+  private handleStack(): FanoutHandle[] {
+    return IsolatedExecutionState.fetch<FanoutHandle[]>(this._handleStackKey, () => []);
+  }
 
   subscribe(
     pattern: string | RegExp | null,
@@ -313,12 +347,12 @@ export class Fanout {
 
   start(name: string, id: unknown, payload: Record<string, unknown>): void {
     const handle = this.buildHandle(name, id, payload);
-    this.handleStack.push(handle);
+    this.handleStack().push(handle);
     handle.start();
   }
 
   finish(name: string, id: unknown, payload: Record<string, unknown>): void {
-    const handle = this.handleStack.pop();
+    const handle = this.handleStack().pop();
     if (handle) {
       handle.finishWithValues(name, id, payload);
     }
@@ -327,6 +361,46 @@ export class Fanout {
   buildHandle(name: string, id: unknown, payload: Record<string, unknown>): Handle {
     const groups = this.groupsFor(name);
     return new FanoutHandle(groups, name, id, payload);
+  }
+
+  /**
+   * Routes an already-built Event to matching subscribers — Rails'
+   * `Fanout#publish_event` (fanout.rb:293-295): run every matching listener under
+   * `iterate_guarding_exceptions` (run all, then re-raise/aggregate). Each kind
+   * consumes the event as its subscriber class' `publish_event` does (fanout.rb:
+   * 396-441): event-object gets the Event; timed/monotonic convert to the 5-arg
+   * `(name, start, finish, id, payload)` form off the event's own times; an
+   * evented delegate delegates to its own `publishEvent`/`publish` if it has one
+   * (fanout.rb:396-401), and a plain start/finish-only listener no-ops.
+   */
+  publishEvent(event: Event): void {
+    const start = event.time;
+    const finish = event.end ?? event.time;
+    const { name, transactionId: id, payload } = event;
+
+    iterateGuardingExceptions(this.allListenersFor(name), (s) => {
+      if (s.kind === "event_object") {
+        (s.delegate as EventObjectCallback)(event);
+      } else if (s.kind === "timed" || s.kind === "monotonic") {
+        (s.delegate as TimedCallback)(name, start, finish, id, payload);
+      } else {
+        const d = s.delegate as EventedListener & {
+          publishEvent?: (event: Event) => void;
+          publish?: TimedCallback;
+        };
+        // Call the method on its own receiver, as Rails' `@delegate.publish`
+        // does — an evented object's publish may read instance state.
+        if (typeof d.publishEvent === "function") d.publishEvent(event);
+        else if (typeof d.publish === "function") d.publish(name, start, finish, id, payload);
+      }
+    });
+  }
+
+  /** Drop every subscriber and reset cached state. Used by unsubscribeAll. */
+  clear(): void {
+    this.stringSubscribers.clear();
+    this.otherSubscribers.length = 0;
+    this.listenersCache.clear();
   }
 
   private allListenersFor(name: string): Subscriber[] {
