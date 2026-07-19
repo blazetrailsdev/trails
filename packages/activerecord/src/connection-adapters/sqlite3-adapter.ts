@@ -1567,7 +1567,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       return;
     }
     const indexName = indexNameForRemoveFrom(genName, all, tableName, columnName, opts);
-    await this.schemaQuery(`DROP INDEX ${quoteColumnName(indexName)}`);
+    // Rails: `exec_query "DROP INDEX ..."` (sqlite3_adapter.rb:290) — DDL on the
+    // wrapped path, so it dirties the query cache, and with no "SCHEMA" name.
+    await this.execute(`DROP INDEX ${quoteColumnName(indexName)}`);
   }
 
   createSchemaDumper(
@@ -1589,8 +1591,13 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // Mirrors: ActiveRecord::ConnectionAdapters::SQLite3Adapter#virtual_tables
   // Returns { tableName => [moduleName, argsString] }
   async virtualTables(): Promise<Record<string, [string, string]>> {
+    // Rails uses `exec_query(query, "SCHEMA")` (sqlite3_adapter.rb:301): the
+    // wrapped path — so this dirties — but it still carries the "SCHEMA" name
+    // for LogSubscriber/ExplainSubscriber filtering.
     const rows = (await this.execute(
       "SELECT name, sql FROM sqlite_master WHERE type = 'table' AND sql LIKE '%VIRTUAL%'",
+      [],
+      "SCHEMA",
     )) as Array<{ name: string; sql: string }>;
     const result: Record<string, [string, string]> = {};
     for (const r of rows) {
@@ -1626,7 +1633,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // as an identifier since it occupies a SQL keyword position.
     const args = Array.isArray(virtualValues) ? virtualValues.map(String) : [];
     const rawArgs = args.join(", ");
-    await this.schemaQuery(
+    // Rails: `exec_query "CREATE VIRTUAL TABLE ..."` (sqlite3_adapter.rb:314) —
+    // DDL on the wrapped path, so it dirties the query cache.
+    await this.execute(
       `CREATE VIRTUAL TABLE IF NOT EXISTS ${quoteTableName(tableName)} USING ${mod}(${rawArgs})`,
     );
   }
@@ -1786,7 +1795,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   async foreignKeys(tableName: string): Promise<ForeignKeyDefinition[]> {
     const { schema, bare } = this._splitTableName(tableName);
     const prefix = schema ? `${quoteColumnName(schema)}.` : "";
-    const rows = await this.execute(`PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`);
+    const rows = await this.schemaQuery(
+      `PRAGMA ${prefix}foreign_key_list(${quoteColumnName(bare)})`,
+    );
     const grouped = new Map<number, Array<Record<string, unknown>>>();
     for (const row of rows) {
       const id = row.id as number;

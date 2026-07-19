@@ -16,6 +16,7 @@ import { describe, it, expect, afterEach } from "vitest";
 import { registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Post } from "./test-helpers/models/post.js";
+import { isSqliteRun } from "./test-helpers/sqlite-template.js";
 
 registerModel(Post as never);
 
@@ -67,4 +68,38 @@ describe("QueryCache DDL dirties (trails)", () => {
       }
     });
   });
+
+  // sqlite3's `removeIndex` and `createVirtualTable` are DDL that Rails issues
+  // via `exec_query` (sqlite3_adapter.rb:290, :314) — the wrapped path, so they
+  // dirty. They are one regex away from looking like the reflection reads
+  // around them (both were briefly mis-routed through the non-dirtying
+  // `schemaQuery`), so pin that they still clear.
+  it.skipIf(!isSqliteRun())(
+    "sqlite removeIndex and createVirtualTable dirty the query cache",
+    async () => {
+      const conn = (await Post.leaseConnection()) as never as {
+        _queryCache: { clear(): void };
+        addIndex(t: string, c: string, o?: Record<string, unknown>): Promise<void>;
+        removeIndex(t: string, o: Record<string, unknown>): Promise<void>;
+      };
+
+      await conn.addIndex("posts", "title", { name: "index_posts_ddl_probe" });
+      await Post.cache(async () => {
+        await Post.find(1);
+        const store = conn._queryCache;
+        const real = store.clear.bind(store);
+        let clears = 0;
+        store.clear = () => {
+          clears++;
+          real();
+        };
+        try {
+          await conn.removeIndex("posts", { name: "index_posts_ddl_probe" });
+          expect(clears).toBeGreaterThan(0);
+        } finally {
+          store.clear = real;
+        }
+      });
+    },
+  );
 });
