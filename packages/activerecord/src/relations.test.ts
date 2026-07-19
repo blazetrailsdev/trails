@@ -985,7 +985,7 @@ describe("RelationTest", () => {
         async () => {
           await Post.eagerLoad("lastComment").order("comments.id DESC");
         },
-        { includeSchema: false, rethrow: true },
+        { includeSchema: false },
       )
     )[0];
     const actual = Post.eagerLoad("lastComment").order("comments.id DESC").toSql();
