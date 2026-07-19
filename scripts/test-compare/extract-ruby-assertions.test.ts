@@ -327,6 +327,38 @@ describe("Ruby extractor assertion-count collection", () => {
     // assertion and never expanded, so it cannot diverge either way.
     expect(counts["blocked"]).toBe(1);
   });
+
+  it("finds the includer of a nested module included by qualified constant", () => {
+    const counts = rubyAssertionCounts({
+      "cases/nested_mixin_test.rb": `
+        module SharedTests
+          module WithRoutingSharedTests
+            def test_reachable
+              check_route
+            end
+
+            def check_route
+              assert_equal 1, a
+              assert_equal 2, b
+            end
+          end
+        end
+
+        class WithRoutingTest < ActionDispatch::IntegrationTest
+          include SharedTests::WithRoutingSharedTests
+
+          def check_route
+            assert_equal 1, a
+          end
+        end
+      `,
+    });
+    // actionpack routing_assertions_test.rb includes a nested shared module by
+    // its QUALIFIED constant, so the includer is keyed
+    // "SharedTests::WithRoutingSharedTests" while the module's scope path is
+    // segmented — the includer must still be found and its override (1) win.
+    expect(counts["reachable"]).toBe(1);
+  });
 });
 
 // Exercises the Ruby extractor's literal expected-VALUE capture (assertionValues)

@@ -990,7 +990,14 @@ class TestExtractor
   # classes. Searching the includer first reproduces that lookup; the module
   # itself stays in the chain as the fallback (its default definition).
   def lookup_scopes(scope)
-    includer = @module_includers[scope.last]
+    return [scope] if scope.empty?
+
+    # A nested module is `include`d by its QUALIFIED constant
+    # (`include RoutingAssertionsSharedTests::WithRoutingSharedTests` —
+    # actionpack routing_assertions_test.rb), which is how the includer is
+    # keyed; an include from within the enclosing scope names it bare. Try the
+    # qualified path first, then the bare name.
+    includer = @module_includers[scope.join("::")] || @module_includers[scope.last]
     includer && includer != scope ? [includer, scope] : [scope]
   end
 
