@@ -174,6 +174,41 @@ describe("I18nTest", () => {
     expect((caught as Error).message).toBe("Translation missing: en.nope.never.was");
   });
 
+  it("translate { raise: true } lists the options considered for a default chain", () => {
+    let caught: unknown = null;
+    try {
+      I18n.translate("nope.never.was", {
+        raise: true,
+        default: [Symbol("also.missing"), Symbol("still.missing")],
+      });
+    } catch (e) {
+      caught = e;
+    }
+    expect(caught).toBeInstanceOf(MissingTranslationData);
+    expect((caught as MissingTranslationData).consideredKeys).toEqual([
+      "nope.never.was",
+      "also.missing",
+      "still.missing",
+    ]);
+    expect((caught as Error).message).toBe(
+      "Translation missing. Options considered were:\n" +
+        "- en.nope.never.was\n" +
+        "- en.also.missing\n" +
+        "- en.still.missing",
+    );
+  });
+
+  it("translate returns the options-considered message for a default chain without raise", () => {
+    expect(I18n.translate("nope.never.was", { default: [Symbol("also.missing")] })).toBe(
+      "Translation missing. Options considered were:\n- en.nope.never.was\n- en.also.missing",
+    );
+  });
+
+  it("translate resolves a Symbol default chain entry to its translation", () => {
+    I18n.backend.storeTranslations("en", { fallback: { greeting: "Hi" } });
+    expect(I18n.translate("nope.never.was", { default: [Symbol("fallback.greeting")] })).toBe("Hi");
+  });
+
   it("translate { raise: true } honors a supplied default (does not throw)", () => {
     expect(I18n.translate("nope", { raise: true, default: "fallback" })).toBe("fallback");
   });

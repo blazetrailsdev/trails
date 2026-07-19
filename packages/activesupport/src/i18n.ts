@@ -222,7 +222,9 @@ interface LocalizeOptions {
 
 interface TranslateOptions {
   locale?: string;
-  default?: TranslationValue;
+  /** A value, or — following i18n — a chain whose Symbol entries are tried as
+   * further keys before the lookup is declared missing. */
+  default?: TranslationValue | (string | symbol)[];
   scope?: string;
   count?: number;
   /** When true, raise `MissingTranslationData` instead of returning a
@@ -240,12 +242,34 @@ interface TranslateOptions {
 export class MissingTranslationData extends Error {
   readonly key: string;
   readonly locale: string;
-  constructor(locale: string, key: string) {
-    super(`Translation missing: ${locale}.${key}`);
+  readonly consideredKeys: string[];
+  constructor(locale: string, key: string, defaults?: (string | symbol)[]) {
+    const consideredKeys = [key, ...(defaults ?? []).map(symbolToString)];
+    super(missingTranslationMessage(locale, key, consideredKeys, defaults));
     this.name = "MissingTranslationData";
     this.locale = locale;
     this.key = key;
+    this.consideredKeys = consideredKeys;
   }
+}
+
+/**
+ * The i18n gem's `MissingTranslation::Base#message`
+ * (i18n/lib/i18n/exceptions.rb:63-68) has two branches: with a non-empty
+ * `default` chain it lists every fully-resolved key that was considered,
+ * otherwise it names the single missing key.
+ */
+function missingTranslationMessage(
+  locale: string,
+  key: string,
+  consideredKeys: string[],
+  defaults?: (string | symbol)[],
+): string {
+  if (defaults && defaults.length > 0) {
+    const lines = consideredKeys.map((k) => `- ${locale}.${k}`).join("\n");
+    return `Translation missing. Options considered were:\n${lines}`;
+  }
+  return `Translation missing: ${locale}.${key}`;
 }
 
 class I18nModule {
@@ -296,8 +320,36 @@ class I18nModule {
     if (options.scope) keyStr = `${options.scope}.${keyStr}`;
     const result = this.backend.lookup(locale, keyStr);
     if (result !== undefined) return interpolate(this._pluralize(result, options.count), options);
+    // i18n resolves Symbol entries in a `default` chain as further keys; a
+    // plain array of strings stays a translation value.
+    const defaultChain =
+      Array.isArray(options.default) && options.default.some((d) => typeof d === "symbol")
+        ? (options.default as (string | symbol)[])
+        : undefined;
+    if (defaultChain) {
+      const considered: symbol[] = [];
+      for (const entry of defaultChain) {
+        if (typeof entry !== "symbol") {
+          return interpolate(this._pluralize(entry, options.count), options);
+        }
+        const defaultKey = symbolToString(entry);
+        considered.push(entry);
+        const found = this.backend.lookup(locale, defaultKey);
+        if (found !== undefined) return interpolate(this._pluralize(found, options.count), options);
+      }
+      if (options.raise) throw new MissingTranslationData(locale, keyStr, considered);
+      return missingTranslationMessage(
+        locale,
+        keyStr,
+        [keyStr, ...considered.map(symbolToString)],
+        considered,
+      );
+    }
     if (options.default !== undefined)
-      return interpolate(this._pluralize(options.default, options.count), options);
+      return interpolate(
+        this._pluralize(options.default as TranslationValue, options.count),
+        options,
+      );
     if (options.raise) throw new MissingTranslationData(locale, keyStr);
     return `Translation missing: ${locale}.${keyStr}`;
   }
