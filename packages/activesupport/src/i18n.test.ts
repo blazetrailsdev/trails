@@ -209,6 +209,39 @@ describe("I18nTest", () => {
     expect(I18n.translate("nope.never.was", { default: [Symbol("fallback.greeting")] })).toBe("Hi");
   });
 
+  it("test_translate_with_array_of_string_defaults", () => {
+    expect(
+      I18n.translate("translations.missing", {
+        default: ["A Generic String", "Second generic string"],
+      }),
+    ).toBe("A Generic String");
+  });
+
+  it("test_translate_with_array_of_defaults_with_nil", () => {
+    expect(
+      I18n.translate("translations.missing", {
+        default: [Symbol("also_missing"), null, "A Generic String"],
+      }),
+    ).toBe("A Generic String");
+  });
+
+  it("test_translate_with_array_of_array_default", () => {
+    expect(I18n.translate("translations.missing", { default: [[]] })).toEqual([]);
+  });
+
+  it("translate resolves Symbol default chain entries under the caller's scope", () => {
+    I18n.backend.storeTranslations("en", { scoped: { fellback: "Fell back" } });
+    expect(I18n.translate("missing", { scope: "scoped", default: [Symbol("fellback")] })).toBe(
+      "Fell back",
+    );
+  });
+
+  it("translate reports scoped default keys in the options-considered message", () => {
+    expect(I18n.translate("missing", { scope: "scoped", default: [Symbol("also_missing")] })).toBe(
+      "Translation missing. Options considered were:\n- en.scoped.missing\n- en.scoped.also_missing",
+    );
+  });
+
   it("translate { raise: true } honors a supplied default (does not throw)", () => {
     expect(I18n.translate("nope", { raise: true, default: "fallback" })).toBe("fallback");
   });
