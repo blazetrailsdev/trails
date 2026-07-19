@@ -6,10 +6,9 @@
  * activerecord/test/cases/adapters/abstract_mysql_adapter/active_schema_test.rb:
  * the test monkey-patches `connection.execute` to instrument the SQL and
  * return it instead of running it.  We subscribe to the notification instead.
- * SQL strings are collected from the payload before any error propagates
- * (Notifications.instrumentAsync fires _notify in its finally block), so
- * errors from fn() are swallowed — matching Rails' stub-mode where execute
- * never throws.  Tables referenced in tests need not exist.
+ * Errors from fn() propagate, matching Rails' capture_sql (test_case.rb:90),
+ * which wraps a bare `yield` with no rescue.  In stub mode the statement never
+ * reaches the database, so tables referenced in tests need not exist.
  *
  * Usage:
  *   const sqls = await captureSql(() => adapter.addIndex("t", "c"));
@@ -75,22 +74,25 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
  * Runs `fn` and returns every SQL string emitted via `sql.active_record`
  * during its execution.  Subscription is cleaned up afterward.
  *
- * Cached statements are always dropped (Rails SQLCounter parity). Pass
- * `{ includeSchema: false }` to also drop `name: "SCHEMA"` introspection
- * queries, mirroring Rails' `capture_sql(include_schema: false)`.
+ * Cached statements are always dropped (Rails SQLCounter parity). `name: "SCHEMA"`
+ * introspection queries are dropped too, mirroring Rails'
+ * `capture_sql(include_schema: false)` (test_case.rb:89), which returns
+ * `counter.log` unless the caller opts in. Pass `{ includeSchema: true }` for
+ * Rails' `log_all` behaviour.
  *
  * Pass `{ stub: adapter }` to intercept the adapter's `execute`/
  * `executeMutation` so DDL is instrumented-and-returned without hitting the
  * DB — mirroring Rails' ActiveSchemaTest `setup` stub. This avoids issuing
  * real `CREATE TABLE` / `CREATE INDEX` round-trips for pure SQL-assertion
  * tests (and the mysql:8 DDL cost they carry).
+ *
  * @internal
  */
 export async function captureSql(
   fn: () => void | Promise<void>,
   options: { includeSchema?: boolean; stub?: StubbableAdapter } = {},
 ): Promise<string[]> {
-  const { includeSchema = true, stub } = options;
+  const { includeSchema = false, stub } = options;
   const sqls: string[] = [];
   const sub = Notifications.subscribe("sql.active_record", (event: any) => {
     const payload = event.payload;
@@ -101,10 +103,13 @@ export async function captureSql(
     sqls.push(sql);
   });
   const restore = stub ? installExecuteStub(stub) : undefined;
+  // No catch: Rails' capture_sql wraps a bare `yield` in Notifications.subscribed
+  // (test_case.rb:90) with no rescue, so block errors propagate. Swallowing here
+  // would let captured-query tests assert green after the code under test raised,
+  // since the SQL is instrumented before the error unwinds. Stub mode keeps DDL
+  // off the database by stubbing execute, not by suppressing errors.
   try {
     await fn();
-  } catch {
-    // intentional: mirrors Rails stub-mode where execute never throws
   } finally {
     restore?.();
     Notifications.unsubscribe(sub);

@@ -12,6 +12,7 @@ import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
 import { sql as arelSql } from "@blazetrails/arel";
+import { captureSql } from "./testing/sql-capture.js";
 
 // Canonical models
 import {
@@ -977,10 +978,14 @@ describe("RelationTest", () => {
     expect(postWithLastComment.lastComment).toEqual(directLastComment);
   });
 
-  it.skip("to sql on eager join", () => {
-    // BLOCKED: relations — Rails uses capture_sql { ... }.first to get the actual SQL
-    // executed when loading, then asserts it equals to_sql. Trails has no capture_sql
-    // helper, so there is no way to verify toSql matches the executed query shape.
+  it("to sql on eager join", async () => {
+    const expected = (
+      await captureSql(async () => {
+        await Post.eagerLoad("lastComment").order("comments.id DESC");
+      })
+    )[0];
+    const actual = Post.eagerLoad("lastComment").order("comments.id DESC").toSql();
+    expect(expected).toEqual(actual);
   });
 
   it("to sql on scoped proxy", async () => {

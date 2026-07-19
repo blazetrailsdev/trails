@@ -780,10 +780,10 @@ describe("PreloaderTest", () => {
       { shippingLines: { discountApplications: "discount" } },
     ];
     const readDiscounts = (inv: Base) => {
-      const li = association(inv, "lineItems").target[0];
-      const sl = association(inv, "shippingLines").target[0];
-      expect(association(li, "discountApplications").target[0].discount).not.toBeNull();
-      expect(association(sl, "discountApplications").target[0].discount).not.toBeNull();
+      const li = (inv as any).association("lineItems").target[0];
+      const sl = (inv as any).association("shippingLines").target[0];
+      expect(li.association("discountApplications").target[0].discount).not.toBeNull();
+      expect(sl.association("discountApplications").target[0].discount).not.toBeNull();
     };
 
     // First preload: nothing loaded, so all five levels query —
@@ -1194,8 +1194,8 @@ describe("PreloaderTest", () => {
     // comes from availableRecords (assert_same → toBe), dave's is freshly loaded
     // (assert_equal → value equality).
     const reads = await captureSql(async () => {
-      expect(association(mary, "essayCategory").reader).toBe(tech);
-      expect((association(dave, "essayCategory").reader as any).id).toBe(general.id);
+      expect((mary as any).association("essayCategory").reader).toBe(tech);
+      expect((dave as any).association("essayCategory").reader.id).toBe(general.id);
     });
     expect(reads).toHaveLength(0);
   });
