@@ -532,6 +532,7 @@ interface SchemaHost {
   _defaultAttributes(): { deepDup(): { toHash(): Record<string, unknown> } };
   _columnsHash?: Record<string, unknown>;
   _columns?: any[];
+  _returningColumnsForInsertCache?: string[];
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
   _virtualAttributesReconciled?: boolean;
@@ -598,13 +599,25 @@ export function _returningColumnsForInsert(
   // reflected Column objects implement; the synthesized column-hash fallback (used
   // before the schema cache is warm) holds plain shapes, so skip those — they
   // carry no auto-increment metadata and the PK fallback below covers them.
+  // Rails memoizes into @_returning_columns_for_insert (model_schema.rb:437)
+  // and clears it in reload_schema_from_cache; the `||=` is mirrored here, with
+  // the clear in resetColumnInformation (what trails' reloadSchemaFromCache
+  // delegates to). Ruby class instance variables are NOT inherited, so that
+  // memo is genuinely per-class -- hence the own-property check: a plain static
+  // read walks the JS prototype chain and would hand a subclass on a different
+  // table the base's list.
+  if (Object.prototype.hasOwnProperty.call(this, "_returningColumnsForInsertCache")) {
+    const memo = this._returningColumnsForInsertCache;
+    if (memo !== undefined) return memo;
+  }
   const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
+  const memoize = (value: string[]): string[] => (this._returningColumnsForInsertCache = value);
   const autoPopulated = cols
     .filter(
       (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
     )
     .map((c) => c.name);
-  if (autoPopulated.length > 0) return autoPopulated;
+  if (autoPopulated.length > 0) return memoize(autoPopulated);
   // PK fallback. Restrict to columns that actually exist on the table: Rails
   // reflects `primary_key` as nil for a table without that column (e.g. an
   // id-less HABTM join table whose model still defaults `primary_key` to "id"),
@@ -613,7 +626,7 @@ export function _returningColumnsForInsert(
   const colNames = new Set(cols.map((c) => c.name));
   const pk = this.primaryKey;
   const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
-  return pkArr.filter((p) => colNames.has(p));
+  return memoize(pkArr.filter((p) => colNames.has(p)));
 }
 
 export function resetSequenceName(this: SchemaHost): void {
@@ -812,6 +825,7 @@ export function resetColumnInformation(this: SchemaHost): void {
       "_schemaLoaded",
       "_cachedDefaultAttributes",
       "_virtualAttributesReconciled",
+      "_returningColumnsForInsertCache",
     ]) {
       if (Object.prototype.hasOwnProperty.call(this, key)) Reflect.deleteProperty(this, key);
     }
@@ -834,6 +848,7 @@ export function resetColumnInformation(this: SchemaHost): void {
   }
   this._columnsHash = undefined;
   this._columns = undefined;
+  this._returningColumnsForInsertCache = undefined;
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
   this._virtualAttributesReconciled = false;
