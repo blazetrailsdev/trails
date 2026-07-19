@@ -354,6 +354,95 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       });
     }
   }
+  /**
+   * The node-pg analogue of `PG::Connection.conndefaults_hash.keys + [:requiressl]`
+   * (postgresql_adapter.rb:330-331). libpq's conndefaults enumerates the keywords
+   * libpq itself accepts; node-pg does not talk to libpq, so its accepted keyword
+   * set is every key `pg.Client` actually reads. That is derived from the
+   * pinned pg@8.20 SOURCE, not from `@types/pg`: the published `ClientConfig`
+   * interface is narrower than the driver, omitting `binary`, `replication`,
+   * `enableChannelBinding`, `connection` and `Promise`. Slicing against the
+   * types would silently reject params node-pg accepts — the same silent-drop
+   * failure this allowlist exists to prevent. The two read sites are:
+   *   - `pg/lib/connection-parameters.js:63-127` — user, database, password,
+   *     port, host, binary, options, ssl, client_encoding, replication,
+   *     application_name, fallback_application_name, statement_timeout,
+   *     lock_timeout, idle_in_transaction_session_timeout, query_timeout,
+   *     connectionTimeoutMillis, keepAlive, keepAliveInitialDelayMillis
+   *     (plus `connectionString`, which it parses).
+   *   - `pg/lib/client.js:62-99` — Promise, types, enableChannelBinding,
+   *     connection, stream, binary, connectionTimeoutMillis.
+   * `Promise` and `connection` are deprecated in pg@9 but accepted today;
+   * Rails slices against what the driver accepts, so they stay in.
+   *
+   * `database` is deliberately NOT renamed to Rails' `dbname`: Rails renames
+   * because libpq's keyword is `dbname`, whereas node-pg's keyword IS `database`
+   * (ConnectionParameters reads `config.database`) and it has no `dbname` key at
+   * all. Renaming would drop the database name. This is an intentional
+   * divergence from postgresql_adapter.rb:326.
+   * @internal
+   */
+  private static readonly VALID_CONN_PARAM_KEYS: ReadonlySet<string> = new Set([
+    "user",
+    "database",
+    "password",
+    "port",
+    "host",
+    "connectionString",
+    "keepAlive",
+    "stream",
+    "statement_timeout",
+    "ssl",
+    "query_timeout",
+    "lock_timeout",
+    "keepAliveInitialDelayMillis",
+    "idle_in_transaction_session_timeout",
+    "application_name",
+    "fallback_application_name",
+    "connectionTimeoutMillis",
+    "types",
+    "options",
+    "client_encoding",
+    "binary",
+    "replication",
+    "enableChannelBinding",
+    "connection",
+    "Promise",
+  ]);
+
+  /**
+   * Mirrors the whole `conn_params` pipeline of `PostgreSQLAdapter#initialize`
+   * (postgresql_adapter.rb:322-331), in Rails' order:
+   *
+   *   1. `conn_params = @config.compact` — drop absent values so node-pg
+   *      applies its own defaults.
+   *   2. `conn_params[:user] = conn_params.delete(:username) if conn_params[:username]`
+   *      — map the AR param name onto the driver's. Applied by the CALLER
+   *      (shared `isRubyTruthy` guard, #4964); this helper receives the
+   *      already-mapped hash.
+   *   3. `conn_params.slice!(*valid_conn_param_keys)` — forward only keys the
+   *      driver understands, so Rails-native keys (`adapter`, `pool`,
+   *      `checkoutTimeout`, `migrationsPaths`, ...) and typo'd driver keys are
+   *      dropped here rather than silently ignored by the driver.
+   *
+   * The order is load-bearing: slicing before the mapping would drop `username`
+   * before it could be renamed, and node-pg would then connect as the OS user
+   * instead of failing (`user` is what `ConnectionParameters` reads; unknown
+   * keys are ignored). The call site therefore slices the mapped hash.
+   * @internal
+   */
+  private static _sliceValidConnParams(config: Record<string, unknown>): pg.ClientConfig {
+    const sliced: Record<string, unknown> = {};
+    for (const [key, value] of Object.entries(config)) {
+      // Ruby's `compact` drops nil; both `undefined` and `null` are the JS
+      // spelling of an absent value in a database.yml-shaped config.
+      if (value === undefined || value === null) continue;
+      if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key)) continue;
+      sliced[key] = value;
+    }
+    return sliced as pg.ClientConfig;
+  }
+
   private _pgClientOptions: pg.ClientConfig | null = null;
   // Non-null when a transaction is open on _rawConnection. Always equals
   // _rawConnection while set — kept as a field for legibility of the
@@ -624,9 +713,14 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const { username: railsUsername, ...pgDriverConfig } = pgConfig as typeof pgConfig & {
       username?: string;
     };
+    // The slice runs on the ALREADY-MAPPED hash, matching Rails' order
+    // (postgresql_adapter.rb:325 then :331): slicing first would drop
+    // `username` before it could be renamed.
     this._pgClientOptions = {
-      ...pgDriverConfig,
-      ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
+      ...PostgreSQLAdapter._sliceValidConnParams({
+        ...pgDriverConfig,
+        ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
+      }),
       types: {
         getTypeParser(oid: number, format?: string): unknown {
           // Our Temporal parsers handle text-format for the 5 datetime OIDs.
