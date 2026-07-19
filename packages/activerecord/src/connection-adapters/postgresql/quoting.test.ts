@@ -113,8 +113,8 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotes a binary default through PG's quotedBinary", () => {
-    // Receiver-less: the fallback host must still reach the bytea escape form,
-    // not the abstract byte-string fallback. Cover both shapes that reach here —
+    // Binary self-dispatches through the host, so it must reach the bytea escape
+    // form, not the abstract byte-string fallback. Cover both shapes here —
     // the raw Uint8Array trails' BinaryType#serialize actually returns, and the
     // BinaryData Rails' Binary#serialize returns (activemodel/.../binary.rb:31).
     expect(quoteDefaultExpression.call(HOST, new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
@@ -124,8 +124,9 @@ describe("PostgreSQL quoting", () => {
   });
 
   it("quotes a BC date default through PG's quotedDate", () => {
-    // Receiver-less: the fallback host must reach PG's BC-suffixing quotedDate
-    // (postgresql/quoting.rb:143), not the abstract formatter which drops " BC".
+    // Dates self-dispatch through the host, so they must reach PG's BC-suffixing
+    // quotedDate (postgresql/quoting.rb:143), not the abstract formatter which
+    // drops " BC".
     expect(quoteDefaultExpression.call(HOST, Temporal.PlainDate.from("-000043-03-15"))).toBe(
       "'0044-03-15 BC'",
     );
@@ -149,6 +150,26 @@ describe("PostgreSQL quoting", () => {
     };
     expect(quoteDefaultExpression.call(HOST, [], column, nullTypeMap)).toBe("'{}'");
     expect(quoteDefaultExpression.call(HOST, ["a", "b"], column, nullTypeMap)).toBe("'{a,b}'");
+  });
+
+  it("does not quote function default values for UUID columns", () => {
+    // Rails postgresql/quoting.rb:159-160. Both pgcrypto and uuid-ossp spellings
+    // are exercised (uuid_test.rb:16 picks between them by extension support).
+    const column = { type: "uuid", sqlType: "uuid" };
+    expect(quoteDefaultExpression.call(HOST, "gen_random_uuid()", column)).toBe(
+      "gen_random_uuid()",
+    );
+    expect(quoteDefaultExpression.call(HOST, "uuid_generate_v4()", column)).toBe(
+      "uuid_generate_v4()",
+    );
+    // A non-function string default on a uuid column is still quoted.
+    expect(quoteDefaultExpression.call(HOST, "11111111-1111-1111-1111-111111111111", column)).toBe(
+      "'11111111-1111-1111-1111-111111111111'",
+    );
+    // The branch is uuid-only — the same string on a text column is quoted.
+    expect(
+      quoteDefaultExpression.call(HOST, "gen_random_uuid()", { type: "text", sqlType: "text" }),
+    ).toBe("'gen_random_uuid()'");
   });
 
   it("does not apply array fallback when column.array is false", () => {

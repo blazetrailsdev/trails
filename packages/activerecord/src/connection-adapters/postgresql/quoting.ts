@@ -167,6 +167,14 @@ export function quoteDefaultExpression(
     );
   }
   if (isSqlLiteral(value)) return value.value;
+  // Rails: `elsif column.type == :uuid && value.is_a?(String) && value.include?("()")`
+  // (postgresql/quoting.rb:159-160) — "Does not quote function default values
+  // for UUID columns", so `default: "gen_random_uuid()"` emits the bare call
+  // rather than the string literal `'gen_random_uuid()'`. Must precede the
+  // array/super paths, and matches `()` anywhere in the string as Rails does.
+  if (column?.type === "uuid" && typeof value === "string" && value.includes("()")) {
+    return value;
+  }
 
   let serialized: unknown = value;
   if (column != null && "array" in column) {
