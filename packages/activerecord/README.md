@@ -298,27 +298,24 @@ p.author; // Author (preloaded)
   [`src/strict-loading-sync-reader.test.ts`](src/strict-loading-sync-reader.test.ts)
   and the `loadBelongsTo` implementation in [`src/associations.ts`](src/associations.ts).
 
-### 3. `isValid()` is synchronous — but uniqueness/associated are async
+### 3. `isValid()` is async
 
-`record.isValid()` (Rails' `valid?`) is **synchronous** and returns a boolean.
-It runs all the synchronous validators (presence, length, numericality,
-absence, format, inclusion/exclusion, …) inline.
-
-But uniqueness and `validates_associated` need a DB round-trip, so they're
-**async**: they push a promise onto the record rather than blocking `isValid()`.
-That means a manual `isValid()` call returns _before_ those async validators
-have finished, so `record.errors` may not yet reflect them.
+`record.isValid()` (Rails' `valid?`) returns a `Promise<boolean>`. It runs the
+full validator chain inline — including the DB-backed `UniquenessValidator` and
+`validates_associated`, which issue their `SELECT`s and populate `errors` before
+the promise resolves. So `await record.isValid()` returns `false` on a
+uniqueness collision before any save, matching Rails' `valid?`.
 
 ```ts
-if (record.isValid()) { ... }   // sync validators only — uniqueness not yet resolved
+if (await record.isValid()) { ... }   // full chain, including uniqueness
 ```
 
-`save()` / `saveBang()` await the async validators for you — so the simplest
-correct pattern is to let `save` do the validating:
+`save()` / `saveBang()` run the same chain, so the simplest correct pattern is
+to let `save` do the validating:
 
 ```ts
 if (await record.save()) {
-  // runs sync + async validators, then persists
+  // runs the validation chain, then persists
   // saved
 } else {
   record.errors; // fully populated, including uniqueness
@@ -326,8 +323,7 @@ if (await record.save()) {
 ```
 
 See [`src/validations.ts`](src/validations.ts) (`isValid`) and
-[`src/validations/uniqueness.ts`](src/validations/uniqueness.ts) for the exact
-split, plus `_runAsyncValidations` in [`src/base.ts`](src/base.ts).
+[`src/validations/uniqueness.ts`](src/validations/uniqueness.ts).
 
 ### 4. Async everywhere else the DB is touched
 

@@ -787,15 +787,37 @@ export class Model {
           const origErrors = r.errors;
           const tempErrors = new Errors(r);
           r.errors = tempErrors;
+          // Restore the real errors, then raise if the validator flagged
+          // anything. A DB-backed validator (uniqueness / associated) returns a
+          // Promise — its `errors.add` runs when that promise resolves, so we
+          // must await before inspecting `tempErrors`; otherwise strict would
+          // never fire for async validators (RFC 0063 made the chain async).
+          const settle = (): void => {
+            r.errors = origErrors;
+            if (tempErrors.any) {
+              throw new StrictValidationFailed(tempErrors.fullMessages.join(", "));
+            }
+          };
           let validateResult: unknown;
           try {
             validateResult = validator.validate(r);
-          } finally {
+          } catch (e) {
             r.errors = origErrors;
+            throw e;
           }
-          if (tempErrors.any) {
-            throw new StrictValidationFailed(tempErrors.fullMessages.join(", "));
+          if (
+            validateResult != null &&
+            typeof (validateResult as PromiseLike<void>).then === "function"
+          ) {
+            return Promise.resolve(validateResult as PromiseLike<void>).then(
+              () => settle(),
+              (e) => {
+                r.errors = origErrors;
+                throw e;
+              },
+            );
           }
+          settle();
           return validateResult as void;
         };
       } else {

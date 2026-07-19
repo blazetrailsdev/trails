@@ -3,11 +3,10 @@
  *
  * Test names are chosen to match Ruby test names from the Rails test suite.
  *
- * Architectural note: trails keeps uniqueness validation off the synchronous
- * validator chain — it needs a DB round-trip, so it runs on `save`, not on the
- * sync `valid?`/`isValid()` pass (see base.ts `_runAsyncValidations`). Rails'
- * bodies assert via `record.valid?`; the faithful trails mirror drives the same
- * record through `save()` and reads `errors` after the deferred check runs.
+ * Since RFC 0063 made the validation chain async, uniqueness runs inline in
+ * `valid?`/`isValid()` like any other validator — `await record.isValid()`
+ * issues the existence check and returns `false` on a collision, matching
+ * Rails' `valid?` before any save.
  */
 import { describe, it, expect, beforeAll, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -157,6 +156,7 @@ describe("UniquenessValidationTest", () => {
     expect(await t.save()).toBe(true);
 
     const t2 = new Topic({ title: "I'm uniqué!" });
+    expect(await t2.isValid()).toBe(false);
     expect(await t2.save()).toBe(false);
     expect(t2.errors.get("title")).toEqual(["has already been taken"]);
 
@@ -435,12 +435,25 @@ describe("UniquenessValidationTest", () => {
 
   it("validate uniqueness of with multiple attributes and array forms", async () => {
     // Rails' `validates_uniqueness_of(*attr_names)` arity: `_merge_attributes`
-    // flattens nested arrays and registers a deferred check per attribute, so a
-    // single call can guard several columns. (A string-column variant of the
-    // multi-attr form used by Rails' test_validate_case_insensitive_uniqueness;
-    // the integer `:parent_id` case-insensitive column that test also covers is
-    // asserted directly in "validate case insensitive uniqueness".)
+    // flattens nested arrays into one validator whose EachValidator loop guards
+    // each column, so a single call can guard several columns. (A string-column
+    // variant of the multi-attr form used by Rails'
+    // test_validate_case_insensitive_uniqueness; the integer `:parent_id`
+    // case-insensitive column that test also covers is asserted directly in
+    // "validate case insensitive uniqueness".)
     Topic.validatesUniquenessOf(["title"], "author_name");
+
+    // Rails registers ONE UniquenessValidator owning both attributes
+    // (validates_with UniquenessValidator, _merge_attributes(...)), so it
+    // de-dups to a single instance rather than one per attribute.
+    const uniqValidators = Topic.validators().filter(
+      (v) => (v as { kind?: string }).kind === "uniqueness",
+    );
+    expect(uniqValidators).toHaveLength(1);
+    expect((uniqValidators[0] as { attributes: readonly string[] }).attributes).toEqual([
+      "title",
+      "author_name",
+    ]);
 
     // Fixture topics(:first): title "The First Topic", author_name "David".
     const collideTitle = new Topic({ title: "The First Topic", author_name: "Someone Else" });
@@ -617,12 +630,14 @@ describe("UniquenessValidationTest", () => {
     expect(await t4.save()).toBe(true);
   });
 
-  it("validate uniqueness with non callable conditions is not supported", async () => {
-    Topic.validatesUniqueness("title", {
-      conditions: Topic.where({ approved: true }) as any,
-    });
-    const t = new Topic({ title: "test" });
-    await expect(t.save()).rejects.toThrow();
+  it("validate uniqueness with non callable conditions is not supported", () => {
+    // Rails instantiates the validator at declaration time (validates_with),
+    // so a non-callable :conditions raises immediately, not at save.
+    expect(() =>
+      Topic.validatesUniqueness("title", {
+        conditions: Topic.where({ approved: true }) as any,
+      }),
+    ).toThrow();
   });
 
   it("validate uniqueness with conditions with record arg", async () => {

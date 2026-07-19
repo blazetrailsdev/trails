@@ -33,13 +33,23 @@ function validateScopeOption(scope: unknown): void {
 }
 
 /**
- * Register a deferred uniqueness validation to run on save (since uniqueness
- * requires a DB round-trip, it's kept off the synchronous validator chain).
+ * Register a uniqueness validation. Now that the AR/AM validation chain is
+ * async (RFC 0063), uniqueness runs inline in `valid?` like any other
+ * validator: it registers via `validates_with UniquenessValidator` and the
+ * validator's async `validateEach` issues the `SELECT 1 ... WHERE attr = ?`
+ * existence check, awaited by the validate callback chain.
+ *
+ * The declaring class is threaded through as the `:class` option so the
+ * validator reproduces Rails' `find_finder_class_for` (the existence query
+ * must target the class the validation was declared on — e.g. an abstract STI
+ * base — not the leaf subclass of the record being validated).
  *
  * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
  */
 export function validatesUniqueness(
-  this: unknown,
+  this: {
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+  },
   attribute: string,
   options: {
     scope?: string | string[];
@@ -47,8 +57,6 @@ export function validatesUniqueness(
     conditions?: (this: any) => any;
     caseSensitive?: boolean;
     allowNil?: boolean;
-    // Context-guard keys honored by Base#_runAsyncValidations (it re-applies
-    // the on:/if:/unless: intersection that the sync callback chain installs).
     on?: string | string[];
     if?: unknown;
     unless?: unknown;
@@ -57,51 +65,39 @@ export function validatesUniqueness(
 ): void {
   // Validate options eagerly to match Rails' ArgumentError at declaration time.
   validateScopeOption(options.scope);
-  const klass = this as { _asyncValidations?: Array<unknown> };
-  if (!Object.prototype.hasOwnProperty.call(klass, "_asyncValidations")) {
-    klass._asyncValidations = [...(klass._asyncValidations ?? [])];
-  }
-  // Capture the declaring class so the deferred runner can reproduce Rails'
-  // `find_finder_class_for` (the existence query must target the class the
-  // validation was declared on — e.g. an abstract STI base — not the leaf
-  // subclass of the record being validated).
-  (klass._asyncValidations as Array<unknown>).push({ attribute, options, declaringClass: this });
+  this.validatesWith(UniquenessValidator, {
+    ...options,
+    attributes: [attribute],
+    class: this,
+  });
 }
 
 /**
- * Register deferred uniqueness validations for one or more attributes,
- * delegating through `_mergeAttributes` so multiple / nested-array attr lists
- * (Rails' `*attr_names` arity) and the trailing options hash are normalized the
- * same way as the other `validates_*_of` helpers.
+ * Register a uniqueness validation for one or more attributes, delegating
+ * through `_mergeAttributes` so multiple / nested-array attr lists (Rails'
+ * `*attr_names` arity) and the trailing options hash are normalized the same
+ * way as the other `validates_*_of` helpers.
  *
  * Mirrors: ActiveRecord::Validations::ClassMethods#validates_uniqueness_of
- * (activerecord/lib/active_record/validations/uniqueness.rb:291-292).
- *
- * TRACKED DEVIATION (structural, behavior-preserving) — Rails registers a single
- * `validates_with UniquenessValidator, _merge_attributes(attr_names)`: one
- * validator instance owns the flattened `attributes` list, and
- * `EachValidator#validate` loops `attributes.each { |a| validate_each(record, a, value) }`
- * (activemodel/lib/active_model/validations/with.rb:88-104 →
- * each_validator.rb#validate). trails keeps uniqueness OFF the synchronous
- * validator chain in the `_asyncValidations` registry (the ratified sync-only
- * deviation documented on `isValid` in validations.ts), and that registry is
- * keyed by a single `attribute` per entry — `Base#_runAsyncValidations`
- * constructs one `UniquenessValidator` per entry and calls `validateEach` once,
- * never iterating a multi-attribute `attributes` array. So fanning the merged
- * names into one deferred entry each is the faithful equivalent: it produces the
- * same per-attribute `validateEach` calls (same count, same options, same
- * errors) as Rails' single-validator/`attributes.each` loop. Carrying them in
- * one entry would require teaching the deferred runner to loop `attributes`,
- * duplicating Rails' EachValidator loop in a different layer — out of scope here.
+ * (activerecord/lib/active_record/validations/uniqueness.rb:291-292) —
+ * `validates_with UniquenessValidator, _merge_attributes(attr_names)`. Like
+ * Rails, this registers a SINGLE `UniquenessValidator` owning the flattened
+ * `attributes` list (its `EachValidator#validate` loops `attributes.each`), so
+ * `validators` de-dups to one instance rather than one per attribute.
  */
 export function validatesUniquenessOf(
-  this: { _mergeAttributes(attrNames: unknown[]): Record<string, unknown> },
+  this: {
+    _mergeAttributes(attrNames: unknown[]): Record<string, unknown>;
+    validatesWith(validatorClass: unknown, opts: Record<string, unknown>): void;
+  },
   ...attrNames: unknown[]
 ): void {
-  const { attributes, ...options } = this._mergeAttributes(attrNames);
-  for (const attribute of attributes as string[]) {
-    validatesUniqueness.call(this, attribute, options);
-  }
+  const merged = this._mergeAttributes(attrNames);
+  // Validate options eagerly to match Rails' ArgumentError at declaration time
+  // (the constructor validates too, but validatesWith reaches it only after
+  // bucketing).
+  validateScopeOption(merged.scope);
+  this.validatesWith(UniquenessValidator, { ...merged, class: this });
 }
 
 export class UniquenessValidator extends EachValidator {
@@ -134,9 +130,29 @@ export class UniquenessValidator extends EachValidator {
     this._klass = options.class ?? null;
   }
 
-  validateEach(record: any, attribute: string, value: unknown): void {
-    // Mirror EachValidator#validate's allow_nil/allow_blank guard (the deferred
-    // runner calls validateEach directly, bypassing EachValidator#validate).
+  /**
+   * Rails' EachValidator#validate reads `record.read_attribute_for_validation`,
+   * which for an association returns the (loaded) associated object. trails'
+   * `readAttributeForValidation` deliberately does NOT lazy-load an unloaded
+   * association (to avoid strict-loading violations), so for an association
+   * attribute we read the underlying foreign-key scalar instead — build_relation
+   * reflects on the same attribute and compares the FK, matching Rails'
+   * observable existence check without triggering a load.
+   *
+   * @internal
+   */
+  protected override readAttributeForValidation(record: any, attribute: string): unknown {
+    const refl = record?.constructor?._reflectOnAssociation?.(attribute);
+    if (refl) {
+      const fk = Array.isArray(refl.foreignKey) ? refl.foreignKey[0] : refl.foreignKey;
+      return record.readAttribute(fk);
+    }
+    return super.readAttributeForValidation(record, attribute);
+  }
+
+  async validateEach(record: any, attribute: string, value: unknown): Promise<void> {
+    // Mirror EachValidator#validate's allow_nil/allow_blank guard (EachValidator
+    // already applies it, but validateEach is defensive against direct calls).
     if (value === undefined) return;
     const o = this.options as { allowNil?: unknown; allowBlank?: unknown };
     if (value == null && o.allowNil === true) return;
@@ -157,61 +173,56 @@ export class UniquenessValidator extends EachValidator {
 
     const opts = this.options as any;
 
-    let asyncValidations = record._asyncValidationPromises as Promise<unknown>[] | undefined;
-    if (!Array.isArray(asyncValidations)) {
-      asyncValidations = [];
-      record._asyncValidationPromises = asyncValidations;
-    }
-
     const errorOpts: Record<string, unknown> = { value };
     if (opts?.message != null) errorOpts.message = opts.message;
+    // `strict` does not arrive in options — validatesWith strips it and enforces
+    // it via its own wrapper (now async-aware, so it raises StrictValidationFailed
+    // for this async validator too). This line stays for parity with any caller
+    // that constructs the validator directly with a strict option.
     if (opts?.strict != null) errorOpts.strict = opts.strict;
 
-    const validationPromise = (async () => {
-      let [relation] = await buildRelation(modelClass, attribute, mapped, this.options);
+    let [relation] = await buildRelation(modelClass, attribute, mapped, this.options);
 
-      if (record.isPersisted?.()) {
-        const pk = modelClass.primaryKey;
-        // Rails raises UnknownPrimaryKey rather than excluding the record by id
-        // when a persisted record's finder class has no primary key — there is
-        // no way to exclude the row itself from the existence check.
-        if (pk == null) {
-          throw new UnknownPrimaryKey(
-            modelClass,
-            "Cannot validate uniqueness for persisted record without primary key.",
-          );
-        }
-        if (Array.isArray(pk)) {
-          const dbVals = pk.map((col: string) =>
-            record._dirty?.attributeChanged(col)
-              ? record._dirty.attributeWas(col)
-              : record.readAttribute(col),
-          );
-          relation = relation.whereNot(pk, [dbVals]);
-        } else {
-          const dbVal = record._dirty?.attributeChanged(pk)
-            ? record._dirty.attributeWas(pk)
-            : record.readAttribute(pk);
-          relation = relation.whereNot({ [pk]: [dbVal] });
-        }
+    if (record.isPersisted?.()) {
+      const pk = modelClass.primaryKey;
+      // Rails raises UnknownPrimaryKey rather than excluding the record by id
+      // when a persisted record's finder class has no primary key — there is
+      // no way to exclude the row itself from the existence check.
+      if (pk == null) {
+        throw new UnknownPrimaryKey(
+          modelClass,
+          "Cannot validate uniqueness for persisted record without primary key.",
+        );
       }
-
-      relation = scopeRelation(record, relation, this.options);
-
-      if (opts?.conditions && typeof opts.conditions === "function") {
-        const conditioned =
-          opts.conditions.length === 0
-            ? opts.conditions.call(relation)
-            : opts.conditions.call(relation, record);
-        if (conditioned != null) relation = conditioned;
+      if (Array.isArray(pk)) {
+        const dbVals = pk.map((col: string) =>
+          record._dirty?.attributeChanged(col)
+            ? record._dirty.attributeWas(col)
+            : record.readAttribute(col),
+        );
+        relation = relation.whereNot(pk, [dbVals]);
+      } else {
+        const dbVal = record._dirty?.attributeChanged(pk)
+          ? record._dirty.attributeWas(pk)
+          : record.readAttribute(pk);
+        relation = relation.whereNot({ [pk]: [dbVal] });
       }
+    }
 
-      const exists = await relation.exists();
-      if (exists) {
-        record.errors.add(attribute, "taken", errorOpts);
-      }
-    })();
-    asyncValidations.push(validationPromise);
+    relation = scopeRelation(record, relation, this.options);
+
+    if (opts?.conditions && typeof opts.conditions === "function") {
+      const conditioned =
+        opts.conditions.length === 0
+          ? opts.conditions.call(relation)
+          : opts.conditions.call(relation, record);
+      if (conditioned != null) relation = conditioned;
+    }
+
+    const exists = await relation.exists();
+    if (exists) {
+      record.errors.add(attribute, "taken", errorOpts);
+    }
   }
 }
 
