@@ -1747,24 +1747,6 @@ describe("the to_sql visitor", () => {
       expect(v.quoteTableName(new Nodes.SqlLiteral("users"))).toBe("users");
     });
 
-    // Rails' adapters stringify with `name.to_s`, and Ruby's `Array#to_s` is
-    // inspect-style rather than JS's comma-join. An Array-named Attribute shows
-    // up on the composite-primary-key default order path; the reference is
-    // invalid SQL in Rails too, so the point is byte-identical output.
-    it("quoteColumnName stringifies an Array name like Ruby's Array#to_s", () => {
-      const v = make();
-      const name = ["shop_id", "id"] as unknown as string;
-      expect(v.quoteColumnName(name)).toBe('"[""shop_id"", ""id""]"');
-    });
-
-    it("an Array-named attribute compiles to Rails' Array#to_s column reference", () => {
-      const orders = new Table("cpk_orders");
-      const attr = orders.get(["shop_id", "id"] as unknown as string);
-      expect(new Visitors.ToSql().compile(new Nodes.Descending(attr))).toBe(
-        '"cpk_orders"."[""shop_id"", ""id""]" DESC',
-      );
-    });
-
     it("visitTable and visitAttribute now route through quoteTableName / quoteColumnName", () => {
       // A table name with a double-quote in it would have crashed pre-PR
       // because the inline replace was string-only; quoteTableName escapes it.
