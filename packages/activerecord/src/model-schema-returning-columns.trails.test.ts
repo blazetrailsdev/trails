@@ -22,6 +22,38 @@ describe("_returningColumnsForInsert memoization", () => {
     resetColumnInformation(): void;
   };
 
+  it("does not let a subclass reuse the base's memo", () => {
+    // Ruby class instance variables are NOT inherited, so Rails' `||=` on
+    // @_returning_columns_for_insert is genuinely per-class (model_schema.rb
+    // :436-443). A plain JS static read walks the prototype chain, so without
+    // an own-property check a subclass would hand back the base's list.
+    //
+    // Pinned with a sentinel memo rather than two real tables on purpose: a
+    // base/subclass pair on different tables ALSO mis-answers here because
+    // loading the base clobbers the subclass's `_columns`, which reproduces
+    // with the memo entirely disabled and so is a separate pre-existing bug.
+    // A sentinel isolates the prototype-chain read this test is about.
+    class Parent extends Base {
+      static tableName = "topics";
+    }
+    class Child extends Parent {}
+    const sentinel = ["LEAKED_FROM_BASE"];
+    (
+      Parent as unknown as { _returningColumnsForInsertCache?: string[] }
+    )._returningColumnsForInsertCache = sentinel;
+
+    const connection = {
+      returnValueAfterInsert: (column: { name: string }) => column.name === "id",
+    };
+    const child = Child as unknown as typeof schemaHost;
+
+    expect(child._returningColumnsForInsert(connection)).not.toEqual(sentinel);
+    expect(
+      (Parent as unknown as { _returningColumnsForInsertCache?: string[] })
+        ._returningColumnsForInsertCache,
+    ).toBe(sentinel);
+  });
+
   it("computes the auto-populated filter only once per class", async () => {
     await Topic.loadSchema();
     let calls = 0;

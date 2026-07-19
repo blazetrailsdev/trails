@@ -599,12 +599,17 @@ export function _returningColumnsForInsert(
   // reflected Column objects implement; the synthesized column-hash fallback (used
   // before the schema cache is warm) holds plain shapes, so skip those — they
   // carry no auto-increment metadata and the PK fallback below covers them.
-  // Rails memoizes into @_returning_columns_for_insert (a per-class ivar,
-  // model_schema.rb:437) and clears it in reload_schema_from_cache; the `||=`
-  // is mirrored here, with the clear in resetColumnInformation (which is what
-  // trails' reloadSchemaFromCache delegates to).
-  const memo = this._returningColumnsForInsertCache;
-  if (memo !== undefined) return memo;
+  // Rails memoizes into @_returning_columns_for_insert (model_schema.rb:437)
+  // and clears it in reload_schema_from_cache; the `||=` is mirrored here, with
+  // the clear in resetColumnInformation (what trails' reloadSchemaFromCache
+  // delegates to). Ruby class instance variables are NOT inherited, so that
+  // memo is genuinely per-class -- hence the own-property check: a plain static
+  // read walks the JS prototype chain and would hand a subclass on a different
+  // table the base's list.
+  if (Object.prototype.hasOwnProperty.call(this, "_returningColumnsForInsertCache")) {
+    const memo = this._returningColumnsForInsertCache;
+    if (memo !== undefined) return memo;
+  }
   const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
   const memoize = (value: string[]): string[] => (this._returningColumnsForInsertCache = value);
   const autoPopulated = cols
