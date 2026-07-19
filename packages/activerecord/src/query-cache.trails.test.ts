@@ -12,6 +12,7 @@ import { Task } from "./test-helpers/models/task.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { QueryCache } from "./query-cache.js";
 import { Store } from "./connection-adapters/abstract/query-cache.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
 
 registerModel(Task as never);
 
@@ -256,5 +257,52 @@ describe("Store max size eviction gate (trails)", () => {
     expect(store.get("a")).toBeUndefined();
     expect(store.get("b")).toEqual([{ key: "b" }]);
     expect(store.get("c")).toEqual([{ key: "c" }]);
+  });
+});
+
+// Rails routes schema reflection through `internal_exec_query`, a method
+// `dirties_query_cache` never wraps (database_statements.rb:546-559), so
+// reflection structurally cannot evict the cache. trails previously reproduced
+// that with a `name === "SCHEMA"` check inside the dirtying wrapper; these pin
+// the structural property instead, so re-introducing a name check (or routing
+// `schemaQuery` back through the wrapped `execute`) fails here.
+describe("schema reflection does not dirty the query cache (trails)", () => {
+  fixtures(["tasks"]);
+
+  it("schemaQuery leaves cached results in place", async () => {
+    await Task.cache(async () => {
+      await Task.find(1);
+      const conn = await Base.leaseConnection();
+      const cachedBefore = conn.queryCache?.size ?? 0;
+      expect(cachedBefore).toBeGreaterThan(0);
+
+      // A real reflection call, through the same public API every adapter's
+      // schema statements use — portable across sqlite3/postgresql/mysql2.
+      await conn.columns("tasks");
+
+      expect(conn.queryCache?.size).toBe(cachedBefore);
+      await assertNoQueries(false, async () => {
+        await Task.find(1);
+      });
+    });
+  });
+
+  it("schemaQuery bypasses the wrapped execute entirely", async () => {
+    const conn = (await Base.leaseConnection()) as unknown as {
+      execute: (...a: unknown[]) => unknown;
+      schemaQuery: (sql: string) => Promise<unknown>;
+    };
+    const original = conn.execute;
+    let executeCalls = 0;
+    conn.execute = function (...args: unknown[]) {
+      executeCalls++;
+      return original.apply(this, args);
+    };
+    try {
+      await conn.schemaQuery("SELECT 1");
+    } finally {
+      conn.execute = original;
+    }
+    expect(executeCalls).toBe(0);
   });
 });
