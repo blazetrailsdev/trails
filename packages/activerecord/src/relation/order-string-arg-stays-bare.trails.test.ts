@@ -20,6 +20,13 @@ describe("order string arg stays bare", () => {
     expect(Customer.offset(1).order("name ASC").toSql()).toContain("ORDER BY name ASC");
   });
 
+  it("keeps each of multiple string args bare — no direction pairing", () => {
+    // Rails maps every String arg through unchanged (no pairing of a trailing
+    // "asc"/"desc" string), so `order("name", "desc")` is two bare terms.
+    const sql = Customer.order("name", "desc").toSql();
+    expect(sql).toContain("ORDER BY name, desc");
+  });
+
   it("leaves a directionless string bare (no implicit ASC, no qualification)", () => {
     const sql = Customer.order("name").toSql();
     expect(sql).toContain("ORDER BY name");

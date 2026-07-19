@@ -320,7 +320,7 @@ describe("FinderTest", () => {
       undefined,
       false,
       async () => {
-        await Topic.order("updated_at").secondToLast();
+        await Topic.order(Symbol.for("updated_at")).secondToLast();
       },
     );
   });

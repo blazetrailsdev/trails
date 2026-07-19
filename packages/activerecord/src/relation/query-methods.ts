@@ -646,20 +646,15 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       disallowRawSqlBang([name], resolveOrderMatcher(this));
       this._orderClauses.push([name, "asc"]);
     } else if (typeof arg === "string") {
-      if (arg.trim() === "") {
-        const next = args[i + 1];
-        i += typeof next === "string" && /^(asc|desc)$/i.test(next) ? 2 : 1;
-        continue;
+      // Rails maps each String order arg through unchanged (preprocess_order_args'
+      // `else` branch) and compact_blanks blank strings away. A string never pairs
+      // with a following "asc"/"desc" arg nor qualifies — it stays a bare
+      // SqlLiteral (see _applyOrderToManager). Validate immediately, mirroring
+      // Rails raising on order("invalid") at call time.
+      if (arg.trim() !== "") {
+        disallowRawSqlBang([arg], resolveOrderMatcher(this));
+        this._orderClauses.push(arg);
       }
-      // Validate immediately — mirrors Rails raising on order("invalid") at call time.
-      disallowRawSqlBang([arg], resolveOrderMatcher(this));
-      const next = args[i + 1];
-      if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
-        this._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
-        i += 2;
-        continue;
-      }
-      this._orderClauses.push(arg);
     } else if (arg !== null && typeof arg === "object") {
       // Hash form { col: "asc"|"desc" } — and nested { table: { col: "asc" } },
       // which Rails expands to a `table.col dir` qualified order.
@@ -722,19 +717,13 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       disallowRawSqlBang([name], resolveOrderMatcher(this));
       this._orderClauses.push([name, "asc"]);
     } else if (typeof arg === "string") {
-      if (arg.trim() === "") {
-        const next = args[i + 1];
-        i += typeof next === "string" && /^(asc|desc)$/i.test(next) ? 2 : 1;
-        continue;
+      // Each String order arg maps through unchanged and stays bare (see the
+      // orderBang string branch); blanks are compact_blank'd away. No pairing
+      // with a following "asc"/"desc" arg, no qualification.
+      if (arg.trim() !== "") {
+        disallowRawSqlBang([arg], resolveOrderMatcher(this));
+        this._orderClauses.push(arg);
       }
-      disallowRawSqlBang([arg], resolveOrderMatcher(this));
-      const next = args[i + 1];
-      if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
-        this._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
-        i += 2;
-        continue;
-      }
-      this._orderClauses.push(arg);
     } else if (arg !== null && typeof arg === "object") {
       for (const clause of expandOrderHash(this, arg as Record<string, unknown>)) {
         this._orderClauses.push(clause);
