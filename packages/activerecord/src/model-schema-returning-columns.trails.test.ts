@@ -59,4 +59,50 @@ describe("_returningColumnsForInsert memoization", () => {
     expect(schemaHost._returningColumnsForInsert(connection)).toEqual(["id"]);
     expect(calls).toBeGreaterThan(first);
   });
+
+  it("resetting a base clears a descendant's memo", async () => {
+    class Reply extends Topic {}
+    const sub = Reply as unknown as typeof schemaHost;
+
+    // Clear first: Topic is describe-scoped and earlier tests memoized on it,
+    // which Reply would otherwise inherit through the prototype chain — the
+    // descendant would never compute its OWN memo and this test would be
+    // vacuous.
+    schemaHost.resetColumnInformation();
+    await Reply.loadSchema();
+
+    let calls = 0;
+    const connection = {
+      returnValueAfterInsert(column: { name: string }) {
+        calls += 1;
+        return column.name === "id";
+      },
+    };
+
+    sub._returningColumnsForInsert(connection);
+    const afterSubMemo = calls;
+    // The descendant really did compute (and now owns) a memo of its own.
+    expect(afterSubMemo).toBeGreaterThan(0);
+    expect(Object.prototype.hasOwnProperty.call(Reply, "_returningColumnsForInsertCache")).toBe(
+      true,
+    );
+    sub._returningColumnsForInsert(connection);
+    expect(calls).toBe(afterSubMemo);
+
+    // Resetting the BASE leaves the descendant's own `_columns` in place — a
+    // pre-existing, memo-independent trails divergence (Rails'
+    // reload_schema_from_cache recurses through `subclasses`, model_schema.rb
+    // :553-569, while trails' resetColumnInformation clears only `this`).
+    // This pins the property that makes the memo safe on top of that gap: the
+    // memoized value never differs from a fresh compute over the columns the
+    // class currently sees, so a stale memo is only ever as stale as the
+    // `_columns` behind it — exactly what the pre-memo code, recomputing from
+    // those same stale columns, already returned.
+    schemaHost.resetColumnInformation();
+    await Reply.loadSchema();
+
+    const memoized = sub._returningColumnsForInsert(connection);
+    Reflect.deleteProperty(Reply, "_returningColumnsForInsertCache");
+    expect(memoized).toEqual(sub._returningColumnsForInsert(connection));
+  });
 });

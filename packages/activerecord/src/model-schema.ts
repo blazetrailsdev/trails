@@ -599,20 +599,20 @@ export function _returningColumnsForInsert(
   // reflected Column objects implement; the synthesized column-hash fallback (used
   // before the schema cache is warm) holds plain shapes, so skip those — they
   // carry no auto-increment metadata and the PK fallback below covers them.
-  // Rails memoizes into @_returning_columns_for_insert (a per-class ivar), cleared
-  // by reload_schema_from_cache. Check own-property so an STI subclass doesn't
-  // inherit the base's memo through the prototype chain.
-  if (Object.prototype.hasOwnProperty.call(this, "_returningColumnsForInsertCache")) {
-    const memo = this._returningColumnsForInsertCache;
-    if (memo !== undefined) return memo;
-  }
+  // Rails memoizes into @_returning_columns_for_insert (a per-class ivar,
+  // model_schema.rb:437) and clears it in reload_schema_from_cache; the `||=`
+  // is mirrored here, with the clear in resetColumnInformation (which is what
+  // trails' reloadSchemaFromCache delegates to).
+  const memo = this._returningColumnsForInsertCache;
+  if (memo !== undefined) return memo;
   const cols = columns.call(this) as { name: string; isAutoPopulated?: unknown }[];
+  const memoize = (value: string[]): string[] => (this._returningColumnsForInsertCache = value);
   const autoPopulated = cols
     .filter(
       (c) => typeof c.isAutoPopulated === "function" && connection.returnValueAfterInsert?.(c),
     )
     .map((c) => c.name);
-  if (autoPopulated.length > 0) return (this._returningColumnsForInsertCache = autoPopulated);
+  if (autoPopulated.length > 0) return memoize(autoPopulated);
   // PK fallback. Restrict to columns that actually exist on the table: Rails
   // reflects `primary_key` as nil for a table without that column (e.g. an
   // id-less HABTM join table whose model still defaults `primary_key` to "id"),
@@ -621,7 +621,7 @@ export function _returningColumnsForInsert(
   const colNames = new Set(cols.map((c) => c.name));
   const pk = this.primaryKey;
   const pkArr = Array.isArray(pk) ? pk : pk ? [pk] : [];
-  return (this._returningColumnsForInsertCache = pkArr.filter((p) => colNames.has(p)));
+  return memoize(pkArr.filter((p) => colNames.has(p)));
 }
 
 export function resetSequenceName(this: SchemaHost): void {
