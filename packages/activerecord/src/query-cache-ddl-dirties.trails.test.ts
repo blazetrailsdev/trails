@@ -81,11 +81,13 @@ describe("QueryCache DDL dirties (trails)", () => {
         _queryCache: { clear(): void };
         addIndex(t: string, c: string, o?: Record<string, unknown>): Promise<void>;
         removeIndex(t: string, o: Record<string, unknown>): Promise<void>;
+        createVirtualTable(t: string, m: string, v: string[]): Promise<void>;
+        dropVirtualTable(t: string, m?: string, v?: string[]): Promise<void>;
       };
 
-      await conn.addIndex("posts", "title", { name: "index_posts_ddl_probe" });
-      await Post.cache(async () => {
-        await Post.find(1);
+      // Each arm counts clears independently, so a regression in either one
+      // fails on its own rather than being masked by the other.
+      const countClears = async (ddl: () => Promise<void>): Promise<number> => {
         const store = conn._queryCache;
         const real = store.clear.bind(store);
         let clears = 0;
@@ -94,10 +96,30 @@ describe("QueryCache DDL dirties (trails)", () => {
           real();
         };
         try {
-          await conn.removeIndex("posts", { name: "index_posts_ddl_probe" });
-          expect(clears).toBeGreaterThan(0);
+          await ddl();
         } finally {
           store.clear = real;
+        }
+        return clears;
+      };
+
+      await conn.addIndex("posts", "title", { name: "index_posts_ddl_probe" });
+      await Post.cache(async () => {
+        await Post.find(1);
+        const indexClears = await countClears(() =>
+          conn.removeIndex("posts", { name: "index_posts_ddl_probe" }),
+        );
+        expect(indexClears).toBeGreaterThan(0);
+
+        // Re-warm: the removeIndex clear emptied the store.
+        await Post.find(1);
+        const virtualClears = await countClears(() =>
+          conn.createVirtualTable("ddl_probe_vtable", "fts5", ["title"]),
+        );
+        try {
+          expect(virtualClears).toBeGreaterThan(0);
+        } finally {
+          await conn.dropVirtualTable("ddl_probe_vtable", "fts5", ["title"]);
         }
       });
     },
