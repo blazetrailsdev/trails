@@ -40,7 +40,8 @@ export class MigrationRunner {
    */
   private async ensureTable(): Promise<void> {
     const quoted = this.tableName.replace(/"/g, '""');
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
+      // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
       `CREATE TABLE IF NOT EXISTS "${quoted}" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
     );
   }
@@ -70,7 +71,7 @@ export class MigrationRunner {
       await entry.migration.run(this.adapter, "up");
       const im = new InsertManager(this.arelTable);
       im.insert([[this.arelTable.get("version"), entry.version]]);
-      await this.adapter.executeMutation(this.adapter.toSql(im));
+      await this.adapter.execute(this.adapter.toSql(im));
     }
   }
 
@@ -93,7 +94,7 @@ export class MigrationRunner {
       const dm = new DeleteManager();
       dm.from(this.arelTable);
       dm.where(this.arelTable.get("version").eq(entry.version));
-      await this.adapter.executeMutation(this.adapter.toSql(dm));
+      await this.adapter.execute(this.adapter.toSql(dm));
     }
   }
 

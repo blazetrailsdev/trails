@@ -44,27 +44,34 @@ export class SchemaMigration {
     return `${Base.tableNamePrefix}${Base.schemaMigrationsTableName}${Base.tableNameSuffix}`;
   }
 
+  // Rails: create_table(table_name, id: false) { |t| t.string :version,
+  // **connection.internal_string_options_for_primary_key } behind a
+  // table_exists? guard (schema_migration.rb:53-61). Going through create_table
+  // — rather than hand-built DDL — is what gets the adapter's own
+  // TableDefinition and identifier quoting.
   async createTable(): Promise<void> {
-    await this._adapter.executeMutation(
-      `CREATE TABLE IF NOT EXISTS "${this.tableName}" ("version" VARCHAR(255) NOT NULL PRIMARY KEY)`,
-    );
+    if (await this._adapter.tableExists(this.tableName)) return;
+    await this._adapter.createTable(this.tableName, { id: false }, (t) => {
+      t.string(this.primaryKey, this._adapter.internalStringOptionsForPrimaryKey());
+    });
   }
 
+  // Rails: drop_table table_name, if_exists: true (schema_migration.rb:64-66).
   async dropTable(): Promise<void> {
-    await this._adapter.executeMutation(`DROP TABLE IF EXISTS "${this.tableName}"`);
+    await this._adapter.dropTable(this.tableName, { ifExists: true });
   }
 
   async createVersion(version: string): Promise<void> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
-    await this._adapter.executeMutation(this._adapter.toSql(im));
+    await this._adapter.execute(this._adapter.toSql(im));
   }
 
   async deleteVersion(version: string): Promise<void> {
     const dm = new DeleteManager();
     dm.from(this.arelTable);
     dm.where(this.arelTable.get(this.primaryKey).eq(version));
-    await this._adapter.executeMutation(this._adapter.toSql(dm));
+    await this._adapter.execute(this._adapter.toSql(dm));
   }
 
   async deleteAllVersions(): Promise<void> {
@@ -207,7 +214,7 @@ export class SchemaMigration {
       const rows = toInsert.map((v) => [v]);
       im.ast.columns = [col];
       im.values = im.createValuesList(rows);
-      await this._adapter.executeMutation(this._adapter.toSql(im));
+      await this._adapter.execute(this._adapter.toSql(im));
     }
   }
 }

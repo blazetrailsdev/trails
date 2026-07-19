@@ -167,16 +167,6 @@ export interface QueryCachePool {
 export interface QueryCacheHost extends DatabaseStatementsHost {
   _queryCache: Store | null;
   pool?: DatabaseStatementsHost["pool"] & QueryCachePool;
-  /**
-   * Re-entrancy depth of the wired write methods. A `dirtiesQueryCache` wrapper
-   * bumps it around its (async) call ONLY when that call is itself dirtying (not
-   * on a `"SCHEMA"` reflection read or an `uncached(dirties: false)` write), so a
-   * lower-level `executeMutation` — which every CRUD write funnels through — can
-   * tell it is nested inside an already-dirtying write and skip a second clear.
-   * DDL reaches `executeMutation` directly (depth 0) and clears, matching Rails'
-   * `execute`-based DDL. @internal
-   */
-  _writeDirtyDepth?: number;
   // Mixed in from the QueryCache module below. Dispatched through `this` (not
   // the module-level functions) so a per-connection override is honored, as in
   // Rails' `def connection.cache_notification_info`.
@@ -533,42 +523,6 @@ export function makeCachedSelectAll(original: BaseSelectAll): BaseSelectAll {
 }
 
 /**
- * Run `original` with `_writeDirtyDepth` incremented for the whole (possibly
- * async) call, so a nested `executeMutation` sees depth > 0 and skips its own
- * clear. The counter must stay raised until the returned promise settles —
- * `executeMutation` is awaited *inside* `original`, after it returns the
- * promise — so bracket both the sync and async completion paths.
- * @internal
- */
-function withWriteDirtyDepth(host: QueryCacheHost, original: () => unknown): unknown {
-  host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) + 1;
-  const release = (): void => {
-    host._writeDirtyDepth = (host._writeDirtyDepth ?? 0) - 1;
-  };
-  let result: unknown;
-  try {
-    result = original();
-  } catch (err) {
-    release();
-    throw err;
-  }
-  if (result != null && typeof (result as { then?: unknown }).then === "function") {
-    return (result as Promise<unknown>).then(
-      (value) => {
-        release();
-        return value;
-      },
-      (err) => {
-        release();
-        throw err;
-      },
-    );
-  }
-  release();
-  return result;
-}
-
-/**
  * Clear the query cache on every connection pool of the current thread,
  * mirroring `ActiveRecord::Base.clear_query_caches_for_current_thread`, which
  * Rails' `dirties_query_cache` decorator calls (query_cache.rb:24). A write
@@ -615,27 +569,12 @@ function wireDirties(
     proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
       // Clear unconditionally, mirroring Rails' `dirties_query_cache` (each wired
       // method clears via `super`, query_cache.rb:13). The clear is idempotent, so
-      // a nested wired write clearing an already-cleared cache is harmless — do NOT
-      // gate the clear on `_writeDirtyDepth`: under concurrent writes on one
-      // connection (`Promise.all([a.save(), b.save()])`) B would be *entered* while
-      // A's depth is still raised across its await and would skip its clear, going
-      // stale. The depth guard lives only at the `executeMutation` leaf, where it
-      // keeps a single logical CRUD write to one clear (`times: 1`).
-      const dirtying =
-        !!this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"));
-      if (dirtying) {
+      // a nested wired write clearing an already-cleared cache is harmless. Each
+      // logical write clears exactly once anyway: the write primitive
+      // (`executeMutation`) these funnel into is not itself wired, and DDL —
+      // which Rails also dirties — reaches the wired `execute` directly.
+      if (!!this._queryCache?.dirties && !(skipSchemaReflection && args.includes("SCHEMA"))) {
         clearCurrentThreadQueryCaches(this);
-        // Raise the write-dirty scope ONLY when this call is itself dirtying, so
-        // the leaf `executeMutation` it funnels into defers (times: 1). A
-        // non-dirtying call — cache off, `uncached(dirties: false)`, or a
-        // `"SCHEMA"` reflection *read* — must NOT raise the counter: a read that
-        // held `_writeDirtyDepth > 0` would make a DDL `executeMutation` entered in
-        // its window skip its clear (the counter is named for *writes*). The
-        // nested leaf of a non-dirtying write won't clear anyway — same `dirties`
-        // gate — so skipping the bump changes nothing there.
-        return withWriteDirtyDepth(this, () =>
-          (original as (...a: unknown[]) => unknown).apply(this, args),
-        );
       }
       return (original as (...a: unknown[]) => unknown).apply(this, args);
     };
@@ -674,81 +613,6 @@ export function dirtiesQueryCacheExceptSchema(
   ...methodNames: string[]
 ): void {
   wireDirties(base, methodNames, true);
-}
-
-/**
- * Wraps `executeMutation` (the low-level write/DDL primitive) so it clears the
- * query cache only when NOT nested inside an already-wired write. Rails wires
- * `dirties_query_cache` on the public `execute`, through which DDL runs, so
- * schema changes clear the cache. trails routes DDL through `executeMutation`;
- * wiring it here reproduces that. But CRUD writes funnel
- * `execInsert`/`execUpdate`/`execDelete` (already wired) → `executeMutation`, so
- * an unconditional clear here would double-clear each logical write (breaking
- * the `times: 1` expiry assertions). The `_writeDirtyDepth` guard, raised by the
- * outer wired wrapper for the duration of its async call, tells this leaf it is
- * nested and must defer to the outer clear. DDL reaches `executeMutation` at
- * depth 0 and clears. Transaction control (`BEGIN`/`COMMIT`) bypasses
- * `executeMutation` on the real adapters (they use `internalExecute`), so it is
- * unaffected.
- *
- * `executeBatch` (fixture loading, `truncate_tables`) DOES currently funnel
- * through the cache-wired `executeMutation` / `execute` and so still dirties,
- * whereas Rails' `execute_batch` → `raw_execute` is outside the dirties set. On
- * PG (the only adapter with its own `executeBatch`, looping the already-wired
- * `execute`) that clear is pre-#4858; on sqlite/mysql2 the abstract mixin loops
- * `executeMutation`, which THIS PR wired, so a bare batch (`"Fixtures Load"`) goes
- * from zero clears to one per statement there — newly introduced, not pre-existing.
- * Either way the clear is idempotent, gated on `dirties`, and batches run outside
- * `cache` blocks, so the effect is nil; routing `executeBatch` through the unwired
- * `rawExecute` to match Rails is tracked by story
- * `converge-execute-batch-through-raw-execute`.
- *
- * The leaf guard is instance-scoped rather than stack-local, which is sufficient
- * for its sole job — collapsing a single sequential CRUD write
- * (`execInsert`/`execUpdate`/`execDelete` → `executeMutation`) to one clear so the
- * `times: 1` expiry tests hold. It is NOT extended to the `wireDirties` wrappers
- * (they clear unconditionally): doing so would make B skip its clear when entered
- * during A's still-pending write on the same connection.
- *
- * KNOWN LIMITATION (accepted): because the scope spans the outer write's whole
- * async duration, a concurrent DDL on the SAME leased connection —
- * `Promise.all([post.save(), conn.addColumn(...)])` — can enter `executeMutation`
- * while the `save` holds depth 1 and skip its clear, leaving a read that
- * repopulated the cache during the `save`'s await stale (Rails' DDL `execute`
- * clears unconditionally via `super`). This is far more exotic than concurrent
- * CRUD and interleaving DDL with a save on one connection is unusual; the real
- * fix is not a better guard but removing the whole `execute`/`executeMutation`
- * split (Rails has one `perform_query`), which deletes this counter and the
- * hazard with it — tracked by story `unify-execute-mutation-into-perform-query`,
- * which supersedes this PR's wiring.
- *
- * Unlike {@link dirtiesQueryCacheExceptSchema}, this leaf does NOT skip on a
- * `"SCHEMA"` name: that skip exists because trails reuses the wrapped
- * `execute`/`exec_query` for schema *reflection reads* (Rails routes those
- * through the unwrapped `internal_exec_query`). `executeMutation` only ever runs
- * mutations/DDL — a mutation named `"SCHEMA"` must still dirty — so honouring
- * `name` here would be wrong, matching the same rationale
- * `dirtiesQueryCacheExceptSchema` gives for the generic write wiring.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::QueryCache.dirties_query_cache
- * (as applied to `execute`, the DDL entry point).
- */
-export function dirtiesQueryCacheUnlessNested(
-  base: { prototype: object },
-  ...methodNames: string[]
-): void {
-  const proto = base.prototype as Record<string, unknown>;
-  for (const methodName of methodNames) {
-    const original = proto[methodName];
-    if (typeof original !== "function") continue;
-
-    proto[methodName] = function (this: QueryCacheHost, ...args: unknown[]) {
-      if (this._queryCache?.dirties && (this._writeDirtyDepth ?? 0) === 0) {
-        clearCurrentThreadQueryCaches(this);
-      }
-      return (original as (...a: unknown[]) => unknown).apply(this, args);
-    };
-  }
 }
 
 /**

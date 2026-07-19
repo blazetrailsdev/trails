@@ -759,17 +759,14 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   /**
    * Execute a DDL/DML statement on the concrete adapter.
    * AbstractMysqlAdapter itself does not hold a connection; this delegates to
-   * the concrete subclass (Mysql2Adapter) which implements
-   * executeMutation on DatabaseAdapter.
+   * the concrete subclass (Mysql2Adapter) which implements `execute` on
+   * DatabaseAdapter — the same public entry point Rails' DDL runs through.
    * @internal
    */
   protected async _execMutation(sql: string): Promise<void> {
-    const exec = (this as unknown as { executeMutation?: (sql: string) => Promise<number> })
-      .executeMutation;
+    const exec = (this as unknown as { execute?: (sql: string) => Promise<unknown> }).execute;
     if (typeof exec !== "function") {
-      throw new Error(
-        `${this.constructor.name} must implement executeMutation() to use DDL helpers`,
-      );
+      throw new Error(`${this.constructor.name} must implement execute() to use DDL helpers`);
     }
     await exec.call(this, sql);
   }

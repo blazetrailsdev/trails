@@ -3,11 +3,10 @@
  *
  * Rails wires `dirties_query_cache` on the public `execute` (query_cache.rb:13),
  * and DDL runs through `execute`, so a schema change inside a `cache` block
- * clears the query cache. trails routes DDL through the low-level
- * `executeMutation` (schema-statements), which CRUD writes also funnel through
- * below the wired `execInsert`/`execUpdate`/`execDelete`. `executeMutation` is
- * wired to dirty the cache but guarded (`_writeDirtyDepth`) so nested CRUD does
- * not double-clear. This test pins the DDL half of that contract: a schema
+ * clears the query cache. trails now routes DDL through that same wired
+ * `execute` (schema-statements), while CRUD writes clear at the wired
+ * `execInsert`/`execUpdate`/`execDelete` above the unwired `executeMutation`
+ * primitive. This test pins the DDL half of that contract: a schema
  * change issued inside an enabled `cache` block clears the cache exactly once,
  * matching Rails' `execute`-based DDL. (Rails' closest test,
  * `test_cache_gets_cleared_after_migration`, warms the cache *outside* a `cache`
@@ -55,11 +54,10 @@ describe("QueryCache DDL dirties (trails)", () => {
       };
       try {
         // `add_column` is a single `ALTER TABLE … ADD COLUMN` that funnels
-        // through `executeMutation` on every adapter (unlike sqlite's
+        // through the public `execute` on every adapter (unlike sqlite's
         // `change_column`, which takes the table-rebuild path). It must dirty
         // the cache exactly once — like Rails' `execute`-based DDL, where the
-        // pre-fix deviation left it untouched (zero clears), and not twice (the
-        // nested-CRUD double-clear that the `_writeDirtyDepth` guard prevents).
+        // pre-fix deviation left it untouched (zero clears).
         await conn.addColumn("posts", "queryCacheDdlProbe", "string");
         expect(clears).toBe(1);
       } finally {

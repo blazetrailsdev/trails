@@ -319,7 +319,7 @@ export class SchemaStatements {
     // supportsIndexSortOrder gate, which yields false on a cold connection
     // (mirrors addIndex's warm-up). Memoized → no-op when already warm.
     await this.adapter.getDatabaseVersion?.();
-    await this.adapter.executeMutation(this.schemaCreation.accept(td));
+    await this.adapter.execute(this.schemaCreation.accept(td));
 
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
@@ -401,7 +401,7 @@ export class SchemaStatements {
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     for (const name of tableNames) {
       this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
-      await this.adapter.executeMutation(`DROP TABLE${ifExists} ${this._qt(name)}`);
+      await this.adapter.execute(`DROP TABLE${ifExists} ${this._qt(name)}`);
     }
   }
 
@@ -414,7 +414,7 @@ export class SchemaStatements {
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.executeMutation(this.schemaCreation.accept(addColumnDef));
+    await this.adapter.execute(this.schemaCreation.accept(addColumnDef));
   }
 
   async removeColumn(
@@ -437,7 +437,7 @@ export class SchemaStatements {
       return adapter.removeColumn(tableName, columnName, _type, options);
     }
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} DROP COLUMN ${this._qi(columnName)}`,
     );
   }
@@ -455,7 +455,7 @@ export class SchemaStatements {
       return adapter.renameColumn(tableName, oldName, newName);
     }
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} RENAME COLUMN ${this._qi(oldName)} TO ${this._qi(newName)}`,
     );
   }
@@ -478,7 +478,7 @@ export class SchemaStatements {
       columns,
       options as Record<string, unknown>,
     );
-    await this.adapter.executeMutation(this.schemaCreation.accept(createIndex));
+    await this.adapter.execute(this.schemaCreation.accept(createIndex));
   }
 
   async removeIndex(
@@ -518,11 +518,9 @@ export class SchemaStatements {
     const indexName = await this.indexNameForRemove(tableName, positional, resolveOpts);
 
     if (this.adapterName === "mysql") {
-      await this.adapter.executeMutation(
-        `DROP INDEX ${this._qi(indexName)} ON ${this._qi(tableName)}`,
-      );
+      await this.adapter.execute(`DROP INDEX ${this._qi(indexName)} ON ${this._qi(tableName)}`);
     } else {
-      await this.adapter.executeMutation(`DROP INDEX ${this._qi(indexName)}`);
+      await this.adapter.execute(`DROP INDEX ${this._qi(indexName)}`);
     }
   }
 
@@ -554,7 +552,7 @@ export class SchemaStatements {
         options.default === undefined
           ? ""
           : ` DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`;
-      await this.adapter.executeMutation(
+      await this.adapter.execute(
         `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
       );
     } else if (this.adapterName === "postgres") {
@@ -569,14 +567,14 @@ export class SchemaStatements {
           `ALTER COLUMN ${col} SET DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`,
         );
       }
-      await this.adapter.executeMutation(`ALTER TABLE ${table} ${clauses.join(", ")}`);
+      await this.adapter.execute(`ALTER TABLE ${table} ${clauses.join(", ")}`);
     } else {
       const nullable = options.null === false ? " NOT NULL" : "";
       const defaultClause =
         options.default === undefined
           ? ""
           : ` DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`;
-      await this.adapter.executeMutation(
+      await this.adapter.execute(
         `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
       );
     }
@@ -585,9 +583,7 @@ export class SchemaStatements {
   async renameTable(oldName: string, newName: string): Promise<void> {
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, oldName);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, newName);
-    await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`,
-    );
+    await this.adapter.execute(`ALTER TABLE ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`);
   }
 
   async tableExists(tableName: string): Promise<boolean> {
@@ -675,7 +671,7 @@ export class SchemaStatements {
     const defaultVal = this.extractNewDefaultValue(options);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const clause = this.adapter.quoteDefaultExpression(defaultVal);
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET DEFAULT ${clause || "NULL"}`,
     );
   }
@@ -688,12 +684,12 @@ export class SchemaStatements {
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
       const quoted = this.adapter.quoteDefaultExpression(defaultValue);
-      await this.adapter.executeMutation(
+      await this.adapter.execute(
         `UPDATE ${this._qi(tableName)} SET ${this._qi(columnName)} = ${quoted} WHERE ${this._qi(columnName)} IS NULL`,
       );
     }
     const constraint = allowNull ? "DROP NOT NULL" : "SET NOT NULL";
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} ${constraint}`,
     );
   }
@@ -846,7 +842,7 @@ export class SchemaStatements {
     // table_name_prefix/suffix to to_table and re-runs foreign_key_options
     // idempotently (column/name already filled above), mirroring Rails.
     at.addForeignKey(toTable, opts as Partial<AddForeignKeyOptions>);
-    await this.adapter.executeMutation(this.schemaCreation.accept(at));
+    await this.adapter.execute(this.schemaCreation.accept(at));
   }
 
   async removeForeignKey(
@@ -895,7 +891,7 @@ export class SchemaStatements {
     // (MySQL/MariaDB `DROP FOREIGN KEY`) rather than a hardcoded `DROP CONSTRAINT`.
     const at = this.createAlterTable(fromTable);
     at.dropForeignKey(fk.name);
-    await this.adapter.executeMutation(this.schemaCreation.accept(at));
+    await this.adapter.execute(this.schemaCreation.accept(at));
   }
 
   async addCheckConstraint(
@@ -920,7 +916,7 @@ export class SchemaStatements {
     const name = this.checkConstraintName(tableName, { name: options.name, expression });
     const validate = options.validate !== false;
     const chkDef = new CheckConstraintDefinition(tableName, expression, name, validate);
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} ADD ${this.schemaCreation.accept(chkDef)}`,
     );
   }
@@ -967,7 +963,7 @@ export class SchemaStatements {
     // (MySQL `DROP CHECK`) rather than a hardcoded `DROP CONSTRAINT`.
     const at = this.createAlterTable(tableName);
     at.dropCheckConstraint(chk.name);
-    await this.adapter.executeMutation(this.schemaCreation.accept(at));
+    await this.adapter.execute(this.schemaCreation.accept(at));
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
@@ -979,9 +975,7 @@ export class SchemaStatements {
     // trails' SQLite3Adapter still defines its own addTimestamps override for direct callers.
     if ((this.adapter as any).supportsBulkAlter?.() === true) {
       const fragments = this.addTimestampsForAlter(tableName, options);
-      await this.adapter.executeMutation(
-        `ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`,
-      );
+      await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
       return;
     }
 
@@ -1085,9 +1079,7 @@ export class SchemaStatements {
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.executeMutation(
-      `ALTER INDEX ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`,
-    );
+    await this.adapter.execute(`ALTER INDEX ${this._qi(oldName)} RENAME TO ${this._qi(newName)}`);
   }
 
   indexName(
@@ -1803,7 +1795,7 @@ export class SchemaStatements {
   async removeConstraint(tableName: string, constraintName: string): Promise<void> {
     const at = new AlterTable(tableName);
     at.dropConstraint(constraintName);
-    await this.adapter.executeMutation(this.schemaCreation.accept(at));
+    await this.adapter.execute(this.schemaCreation.accept(at));
   }
 
   async dumpSchemaInformation(): Promise<string | null> {
@@ -1858,7 +1850,7 @@ export class SchemaStatements {
     // numeric `version.to_i` to `quote`, emitting an unquoted numeric literal —
     // pass `verNum`, not the `ver` string, so adapter dispatch matches.
     if (!migrated.includes(verNum)) {
-      await this.adapter.executeMutation(
+      await this.adapter.execute(
         `INSERT INTO ${smTable} (version) VALUES (${this.adapter.quote(verNum)})`,
       );
     }
@@ -1872,7 +1864,7 @@ export class SchemaStatements {
           `Duplicate migration ${duplicate}. Please renumber your migrations to resolve the conflict.`,
         );
       }
-      await this.adapter.executeMutation(this._insertVersionsSql(smTableName, inserting));
+      await this.adapter.execute(this._insertVersionsSql(smTableName, inserting));
     }
   }
 
@@ -2108,7 +2100,7 @@ export class SchemaStatements {
         }
       } else {
         if (sqlFragments.length > 0) {
-          await this.adapter.executeMutation(
+          await this.adapter.execute(
             `ALTER TABLE ${this._qt(tableName)} ${sqlFragments.join(", ")}`,
           );
           sqlFragments.length = 0;
@@ -2126,9 +2118,7 @@ export class SchemaStatements {
     }
 
     if (sqlFragments.length > 0) {
-      await this.adapter.executeMutation(
-        `ALTER TABLE ${this._qt(tableName)} ${sqlFragments.join(", ")}`,
-      );
+      await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${sqlFragments.join(", ")}`);
     }
     for (const proc of nonCombinable) await proc();
   }

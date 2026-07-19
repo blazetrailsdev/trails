@@ -97,7 +97,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, name);
     }
     const quoted = tableNames.map((n) => this._qt(n)).join(", ");
-    await this.adapter.executeMutation(`DROP TABLE${ifExists} ${quoted}${cascade}`);
+    await this.adapter.execute(`DROP TABLE${ifExists} ${quoted}${cascade}`);
   }
 
   // ---------------------------------------------------------------------------
@@ -916,9 +916,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     this.pg.clearCacheBang();
     const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
     const clause = this.pg.schemaCreation.accept(changeColDef);
-    // Route DDL through executeMutation (not the raw `exec`) so the
+    // Route DDL through the public `execute` (not the raw `exec`) so the
     // dirties_query_cache wrapper clears the query cache on schema changes.
-    await this.adapter.executeMutation(`ALTER TABLE ${this._qt(tableName)} ${clause}`);
+    await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${clause}`);
     if ("comment" in options) {
       await this.changeColumnComment(tableName, columnName, options.comment ?? null);
     }
@@ -956,7 +956,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // cache, rename, then fix up index names that embed the column name.
     this.pg.clearCacheBang();
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `ALTER TABLE ${this._qt(tableName)} RENAME COLUMN ${this._qi(columnName)} TO ${this._qi(newColumnName)}`,
     );
     await this.renameColumnIndexes(tableName, columnName, newColumnName);
@@ -976,13 +976,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const quotedCol = this._qi(columnName);
     const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
     if (defaultValue == null) {
-      await this.adapter.executeMutation(
+      await this.adapter.execute(
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,
       );
     } else {
       const col = (await this.columns(tableName)).find((c) => c.name === columnName);
       const expr = this.adapter.quoteDefaultExpression(defaultValue, col);
-      await this.adapter.executeMutation(
+      await this.adapter.execute(
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`,
       );
     }
@@ -1045,12 +1045,12 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       // column can't be found rather than quoting against an undefined column.
       if (col) {
         const expr = this.adapter.quoteDefaultExpression(defaultValue, col);
-        await this.adapter.executeMutation(
+        await this.adapter.execute(
           `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
         );
       }
     }
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} ${nullable ? "DROP" : "SET"} NOT NULL`,
     );
   }
@@ -1065,7 +1065,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // the COMMENT ON statement.
     this.pg.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `COMMENT ON COLUMN ${this._qt(tableName)}.${this._qi(columnName)} IS ${this.pg.quote(comment)}`,
     );
   }
@@ -1077,7 +1077,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Mirrors PostgreSQL::SchemaStatements#change_table_comment.
     this.pg.clearCacheBang();
     const comment = this.extractNewCommentValue(commentOrChanges) as string | null;
-    await this.adapter.executeMutation(
+    await this.adapter.execute(
       `COMMENT ON TABLE ${this._qt(tableName)} IS ${this.pg.quote(comment)}`,
     );
   }

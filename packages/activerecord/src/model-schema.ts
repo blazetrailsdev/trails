@@ -465,7 +465,8 @@ export async function createTable(this: typeof Base): Promise<void> {
   const pkSet = new Set(pks);
   const a = this.connection;
 
-  await a.executeMutation(`DROP TABLE IF EXISTS ${a.quoteTableName(table)}`);
+  // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
+  await a.execute(`DROP TABLE IF EXISTS ${a.quoteTableName(table)}`);
 
   const colDefs: string[] = [];
   if (pks.length === 1) {
@@ -494,7 +495,8 @@ export async function createTable(this: typeof Base): Promise<void> {
     colDefs.push(`PRIMARY KEY (${pks.map((pk) => a.quoteIdentifier(pk)).join(", ")})`);
   }
 
-  await a.executeMutation(
+  await a.execute(
+    // eslint-disable-next-line blazetrails/no-raw-sql -- DDL: Arel has no schema-statement nodes; Rails builds this SQL as a string too.
     `CREATE TABLE IF NOT EXISTS ${a.quoteTableName(table)} (${colDefs.join(", ")})`,
   );
 

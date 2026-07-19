@@ -9,7 +9,7 @@ function makeFakeAdapter() {
   const clearedTables: string[] = [];
   const adapter = {
     adapterName: "postgres" as const,
-    executeMutation: vi.fn(async (sql: string) => {
+    execute: vi.fn(async (sql: string) => {
       executed.push(sql);
     }),
     schemaCache: {
@@ -157,7 +157,7 @@ describe("PostgreSQLSchemaStatements#addForeignKey use_foreign_keys? guard", () 
       exec: vi.fn(async (sql: string) => {
         executed.push(sql);
       }),
-      executeMutation: vi.fn(async (sql: string) => {
+      execute: vi.fn(async (sql: string) => {
         executed.push(sql);
       }),
     } as unknown as DatabaseAdapter;
@@ -175,7 +175,7 @@ describe("PostgreSQLSchemaStatements#addForeignKey use_foreign_keys? guard", () 
     const adapter = {
       adapterName: "postgres" as const,
       supportsForeignKeys: () => true,
-      executeMutation: vi.fn(async (sql: string) => {
+      execute: vi.fn(async (sql: string) => {
         executed.push(sql);
       }),
     } as unknown as DatabaseAdapter;

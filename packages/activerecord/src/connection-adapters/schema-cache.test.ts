@@ -875,9 +875,9 @@ describe("DDL cache-invalidation safety-net", () => {
       order.push(`clear:${name}`);
       origClear(pool, name);
     });
-    adapter.executeMutation.mockImplementation(async () => {
+    adapter.execute.mockImplementation(async () => {
       order.push("sql");
-      return 0;
+      return [];
     });
 
     const ss = new SchemaStatements(adapter as any);
@@ -899,9 +899,9 @@ describe("DDL cache-invalidation safety-net", () => {
       order.push(`clear:${name}`);
       origClear(pool, name);
     });
-    adapter.executeMutation.mockImplementation(async () => {
+    adapter.execute.mockImplementation(async () => {
       order.push("sql");
-      return 0;
+      return [];
     });
 
     const ss = new SchemaStatements(adapter as any);
@@ -997,9 +997,9 @@ describe("DDL cache-invalidation safety-net", () => {
       order.push(`clear:${name}`);
       origClear(pool, name);
     });
-    adapter.executeMutation.mockImplementation(async () => {
+    adapter.execute.mockImplementation(async () => {
       order.push("sql");
-      return 0;
+      return [];
     });
 
     const ss = new SchemaStatements(adapter as any);
@@ -1021,9 +1021,9 @@ describe("DDL cache-invalidation safety-net", () => {
       order.push(`clear:${name}`);
       origClear(pool, name);
     });
-    adapter.executeMutation.mockImplementation(async () => {
+    adapter.execute.mockImplementation(async () => {
       order.push("sql");
-      return 0;
+      return [];
     });
 
     const ss = new SchemaStatements(adapter as any);
