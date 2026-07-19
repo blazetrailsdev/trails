@@ -819,6 +819,23 @@ export type ExceptKey =
   | "skipQueryCache";
 
 /**
+ * The full `Relation::VALUE_METHODS` key surface handled by `SpawnMethods#except`
+ * (reset the named keys) and `SpawnMethods#only` (reset every key NOT named — the
+ * complement of `values.slice(*onlies)`). A superset of `VALID_UNSCOPING_VALUES`
+ * with the seven value keys that have no `unscope` equivalent.
+ */
+export const EXCEPT_ONLY_KEYS: readonly ExceptKey[] = [
+  ...VALID_UNSCOPING_VALUES,
+  "distinct",
+  "strictLoading",
+  "references",
+  "extending",
+  "unscope",
+  "reordering",
+  "skipQueryCache",
+];
+
+/**
  * Argument type for `SpawnMethods#except`. Rails' `values.except(*skips)`
  * (spawn_methods.rb:59-60) accepts ANY key — unrecognized ones are a silent
  * no-op. The `(string & {})` arm preserves `ExceptKey` autocomplete while

@@ -52,7 +52,7 @@ import {
   WhereChain,
   QueryMethodBangs,
   areStructurallyCompatible,
-  VALID_UNSCOPING_VALUES,
+  EXCEPT_ONLY_KEYS,
   argumentError,
   assertModifiableBang as _assertModifiableBang,
   checkIfMethodHasArgumentsBang as _checkIfMethodHasArgumentsBang,
@@ -1380,11 +1380,20 @@ export class Relation<T extends Base> {
   /**
    * Keep only the specified query parts and remove everything else.
    *
-   * Mirrors: ActiveRecord::SpawnMethods#only
+   * Mirrors: ActiveRecord::SpawnMethods#only — `relation_with
+   * values.slice(*onlies)` (spawn_methods.rb). Like `except`, this resets value
+   * keys on the returned relation WITHOUT recording an `unscope_values`
+   * directive, so merging the result does not erase the same parts on the other
+   * relation (unlike delegating to `unscope`). It covers the same full
+   * `Relation::VALUE_METHODS` surface as `except`: every key NOT named is reset
+   * (the complement of `values.slice`).
    */
-  only(...types: Array<UnscopeType>): Relation<T> {
-    const toRemove = [...VALID_UNSCOPING_VALUES].filter((t) => !types.includes(t));
-    return this.unscope(...toRemove);
+  only(...onlies: Array<ExceptSkip>): Relation<T> {
+    const rel = this._clone();
+    for (const key of EXCEPT_ONLY_KEYS) {
+      if (!onlies.includes(key)) this._resetExceptValue(rel, key);
+    }
+    return rel;
   }
 
   /**
@@ -1418,46 +1427,56 @@ export class Relation<T extends Base> {
   except(...skips: Array<ExceptSkip>): Relation<T> {
     const rel = this._clone();
     for (const skip of skips) {
-      switch (skip) {
-        // Value keys that have no `unscope` equivalent (they are not in
-        // VALID_UNSCOPING_VALUES) but are part of Rails' `Relation::VALUE_METHODS`,
-        // so `values.except(*skips)` removes them too.
-        case "distinct":
-          rel._isDistinct = false;
-          break;
-        case "strictLoading":
-          // `:strict_loading` is a SINGLE_VALUE_METHOD (default `nil`); deleting
-          // the key reads back as unset, distinct from an explicit `false`.
-          rel._isStrictLoading = undefined;
-          break;
-        case "references":
-          // `:references` is a single Rails value key; trails splits its local
-          // representation into the values list and the manual-vs-derived
-          // marker, so both must be cleared together.
-          rel._referencesValues = [];
-          rel._manualReferences = [];
-          break;
-        case "extending":
-          rel._extending = [];
-          break;
-        case "unscope":
-          rel._unscopeValues = [];
-          break;
-        case "reordering":
-          // `values.except(:reordering)` deletes the key → unset (`nil`).
-          rel._reordering = undefined;
-          break;
-        case "skipQueryCache":
-          rel._skipQueryCache = undefined;
-          break;
-        default:
-          // Rails' `values.except(*skips)` silently ignores unknown keys;
-          // resetValueForScope's switch no-ops on any non-UnscopeType string.
-          _qm.resetValueForScope(rel as any, skip as UnscopeType);
-          break;
-      }
+      this._resetExceptValue(rel, skip);
     }
     return rel;
+  }
+
+  /**
+   * Reset a single `Relation::VALUE_METHODS` value key to its default on `rel`,
+   * with no `unscope_values` merge-replay side effect. Shared by `except`
+   * (reset the named keys) and `only` (reset the complement).
+   *
+   * @internal
+   */
+  private _resetExceptValue(rel: Relation<T>, key: ExceptSkip): void {
+    switch (key) {
+      // Value keys that have no `unscope` equivalent (they are not in
+      // VALID_UNSCOPING_VALUES) but are part of Rails' `Relation::VALUE_METHODS`.
+      case "distinct":
+        rel._isDistinct = false;
+        break;
+      case "strictLoading":
+        // `:strict_loading` is a SINGLE_VALUE_METHOD (default `nil`); deleting
+        // the key reads back as unset, distinct from an explicit `false`.
+        rel._isStrictLoading = undefined;
+        break;
+      case "references":
+        // `:references` is a single Rails value key; trails splits its local
+        // representation into the values list and the manual-vs-derived
+        // marker, so both must be cleared together.
+        rel._referencesValues = [];
+        rel._manualReferences = [];
+        break;
+      case "extending":
+        rel._extending = [];
+        break;
+      case "unscope":
+        rel._unscopeValues = [];
+        break;
+      case "reordering":
+        // `values.except(:reordering)` deletes the key → unset (`nil`).
+        rel._reordering = undefined;
+        break;
+      case "skipQueryCache":
+        rel._skipQueryCache = undefined;
+        break;
+      default:
+        // Rails' `values` slice/except silently ignores unknown keys;
+        // resetValueForScope's switch no-ops on any non-UnscopeType string.
+        _qm.resetValueForScope(rel as any, key as UnscopeType);
+        break;
+    }
   }
 
   /**
