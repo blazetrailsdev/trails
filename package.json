@@ -32,6 +32,8 @@
     "api:pins:all": "API_COMPARE_FORCE=1 pnpm api:compare && pnpm tsx scripts/api-compare/body-pins.ts --pin-all",
     "fixtures:adoption:inventory": "pnpm tsx scripts/fixtures-inventory/inventory.ts",
     "fixtures:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/fixtures-compare/compare.ts",
+    "schema:compare": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/schema-compare/compare.ts",
+    "schema:compare:reseed": "pnpm vendor:fetch >/dev/null && pnpm tsx scripts/schema-compare/compare.ts --write",
     "rails-privates:manifest": "pnpm tsx scripts/build-rails-privates-manifest.ts",
     "rails-errors:manifest": "pnpm tsx scripts/build-rails-error-manifest.ts",
     "rails-tosql:manifest": "pnpm tsx scripts/build-rails-tosql-manifest.ts",

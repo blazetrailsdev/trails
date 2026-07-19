@@ -1237,6 +1237,14 @@ jobs:
         # in conventions.ts; fail if it drifts so the agent-facing doc can't
         # go stale. Regenerate with `pnpm api:conventions`.
         run: pnpm exec tsx scripts/api-compare/conventions-doc.ts --check
+      - name: Schema comparison
+        # Structural parity of TEST_SCHEMA against the vendored
+        # test/schema/schema.rb it mirrors (RFC 0025). Fails on a table or
+        # column present in TEST_SCHEMA but absent from schema.rb, gated
+        # against scripts/schema-compare/invented-baseline.json — pre-existing
+        # debt only, and the baseline must never grow. Shape divergences on
+        # shared tables are report-only for now (`--verbose` lists them).
+        run: pnpm exec tsx scripts/schema-compare/compare.ts
       - name: Dependency lint
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Rails-private JSDoc lint
