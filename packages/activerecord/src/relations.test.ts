@@ -981,12 +981,9 @@ describe("RelationTest", () => {
 
   it("to sql on eager join", async () => {
     const expected = (
-      await captureSql(
-        async () => {
-          await Post.eagerLoad("lastComment").order("comments.id DESC");
-        },
-        { includeSchema: false },
-      )
+      await captureSql(async () => {
+        await Post.eagerLoad("lastComment").order("comments.id DESC");
+      })
     )[0];
     const actual = Post.eagerLoad("lastComment").order("comments.id DESC").toSql();
     expect(expected).toEqual(actual);

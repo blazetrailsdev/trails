@@ -74,9 +74,11 @@ function installExecuteStub(adapter: StubbableAdapter): () => void {
  * Runs `fn` and returns every SQL string emitted via `sql.active_record`
  * during its execution.  Subscription is cleaned up afterward.
  *
- * Cached statements are always dropped (Rails SQLCounter parity). Pass
- * `{ includeSchema: false }` to also drop `name: "SCHEMA"` introspection
- * queries, mirroring Rails' `capture_sql(include_schema: false)`.
+ * Cached statements are always dropped (Rails SQLCounter parity). `name: "SCHEMA"`
+ * introspection queries are dropped too, mirroring Rails'
+ * `capture_sql(include_schema: false)` (test_case.rb:89), which returns
+ * `counter.log` unless the caller opts in. Pass `{ includeSchema: true }` for
+ * Rails' `log_all` behaviour.
  *
  * Pass `{ stub: adapter }` to intercept the adapter's `execute`/
  * `executeMutation` so DDL is instrumented-and-returned without hitting the
@@ -90,7 +92,7 @@ export async function captureSql(
   fn: () => void | Promise<void>,
   options: { includeSchema?: boolean; stub?: StubbableAdapter } = {},
 ): Promise<string[]> {
-  const { includeSchema = true, stub } = options;
+  const { includeSchema = false, stub } = options;
   const sqls: string[] = [];
   const sub = Notifications.subscribe("sql.active_record", (event: any) => {
     const payload = event.payload;
