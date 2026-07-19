@@ -157,15 +157,7 @@ describe("RelationTest", () => {
     expect(attrs.title).toBe("scoped");
   });
 
-  // it.fails (active, not skipped): trails `updateAll` passes scalar SET values
-  // raw; the UPDATE-SET visitor (to-sql.ts visitArelNodesAssignment) quotes them
-  // by *column* type, so an attribute-declared custom type's cast/serialize is
-  // bypassed — unlike Rails `_substitute_values`, which binds via
-  // `type_for_attribute`. Marked `it.fails` so CI keeps running the faithful Rails
-  // assertion and flips red the moment the deviation is fixed (signalling the
-  // marker should be removed). Tracked by story
-  // 0023-surfaced-deviations/updateall-routes-values-through-attribute-type.
-  it.fails("update all goes through normal type casting", async () => {
+  it("update all goes through normal type casting", async () => {
     await UpdateAllTestModel.updateAll({ body: "value from user", type: null }); // No STI
 
     const first = await UpdateAllTestModel.first();

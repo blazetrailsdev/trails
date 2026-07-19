@@ -38,6 +38,7 @@ import {
 import { applyThenable, stripThenable } from "./relation/thenable.js";
 import { getInheritanceColumn, isStiSubclass } from "./inheritance.js";
 import { isBaseInstance } from "./relation/predicate-builder/is-base-instance.js";
+import { QueryAttribute } from "./relation/query-attribute.js";
 import {
   underscore as _toUnderscore,
   camelize as _camelize,
@@ -3790,23 +3791,8 @@ export class Relation<T extends Base> {
     await this._materializeDeferredDistinctPkPredicates();
 
     const table = this._modelClass.arelTable;
-    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = Object.entries(updates).map(
-      ([key, val]) => {
-        const def = this._modelClass._attributeDefinitions.get(key);
-        const isArray = def?.type?.name === "array";
-        if (isArray) return [table.get(key), def.type.serialize(val)];
-        const isRangeCol =
-          val instanceof Range &&
-          (def?.type as { isForceEquality?(v: unknown): boolean } | undefined)?.isForceEquality?.(
-            val,
-          );
-        if (isRangeCol) return [table.get(key), def!.type.serialize(val)];
-        // Mirrors Rails relation.rb#_substitute_values: a raw `Arel.sql(...)`
-        // assignment value is wrapped in a Grouping so a scalar-subquery value
-        // renders as `SET col = (select ...)`, which SQLite/MySQL/PG require.
-        if (val instanceof Nodes.SqlLiteral) return [table.get(key), new Nodes.Grouping(val)];
-        return [table.get(key), val];
-      },
+    const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = this._substituteValues(
+      Object.entries(updates),
     );
     // Mirrors Rails relation.rb#update_all: bump locking_column when omitted.
     // Uses _incrementAttribute (COALESCE(col, 0) + 1) for NULL-safe increment.
@@ -7078,11 +7064,29 @@ export class Relation<T extends Base> {
     }
   }
 
+  // Mirrors relation.rb:1381-1393.
   private _substituteValues(values: [string, unknown][]): [any, any][] {
     return values.map(([name, value]) => {
       const attr = this._modelClass.arelTable.get(name);
-      const bind = this.predicateBuilder.buildBindAttribute(name, value);
-      return [attr, bind];
+      // Mirrors `Arel.arel_node?` (arel.rb): Node, SqlLiteral, or Attribute.
+      if (
+        value instanceof Nodes.Node ||
+        value instanceof Nodes.SqlLiteral ||
+        value instanceof Nodes.Attribute
+      ) {
+        // The Grouping is what makes a raw `Arel.sql(...)` scalar subquery
+        // render as `SET col = (select ...)`, which SQLite/MySQL/PG require.
+        return [attr, value instanceof Nodes.SqlLiteral ? new Nodes.Grouping(value) : value];
+      }
+      // Rails casts exactly once here: `build_bind_attribute` hands the already-cast
+      // value to `QueryAttribute.new` (predicate_builder.rb:67-69), and
+      // `QueryAttribute#type_cast` is identity (query_attribute.rb:22-24). trails'
+      // `QueryAttribute#typeCast` instead casts its input — most of its callers pass
+      // RAW values and rely on that — so routing a cast value through
+      // `buildBindAttribute` would cast twice. `withCastValue` is the preserving
+      // constructor that matches Rails' semantics.
+      const type = this._modelClass.typeForAttribute(attr.name);
+      return [attr, QueryAttribute.withCastValue(attr.name, type.cast(value), type)];
     });
   }
 
