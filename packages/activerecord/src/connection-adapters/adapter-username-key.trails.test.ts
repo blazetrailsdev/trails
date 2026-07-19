@@ -9,8 +9,11 @@
  *
  *     conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
  *
- * so the precedence asserted here is Rails': a *truthy* `username` overwrites
+ * so the precedence asserted here is Rails': a *present* `username` overwrites
  * `user` rather than deferring to it, and is always deleted from the hash.
+ * Present, not JS-truthy — `conn_params = @config.compact` drops the nils
+ * before the guard, and Ruby treats `""` as truthy, so a blank username maps
+ * too.
  *
  * For MySQL there is no Rails counterpart — Ruby's mysql2 gem reads `:username`
  * natively, so Rails passes the hash through untouched. The mapping is a
@@ -57,11 +60,13 @@ describe.each([
     expect(driverConfig).not.toHaveProperty("username");
   });
 
-  it("ignores a blank username, mirroring Rails' truthiness guard", () => {
-    // `if conn_params[:username]` is falsy for "", so the key is left alone
-    // and `user` survives.
+  it("maps a blank username, since Ruby treats an empty string as truthy", () => {
+    // `if conn_params[:username]` fires for "" — Ruby is falsy only for nil
+    // and false, and `@config.compact` has already dropped the nils. So a
+    // blank username still overwrites `user` rather than deferring to it.
     const driverConfig = driverConfigFor({ ...BASE, username: "", user: "driver" });
-    expect(driverConfig.user).toBe("driver");
+    expect(driverConfig.user).toBe("");
+    expect(driverConfig).not.toHaveProperty("username");
   });
 
   it("leaves user absent when neither key is given", () => {

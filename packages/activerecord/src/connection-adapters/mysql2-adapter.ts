@@ -554,14 +554,15 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // Rails-spelled hash connects as the OS user instead of failing.
     //
     // Semantics deliberately match the one place Rails DOES translate —
-    // postgresql_adapter.rb:326 — so both adapters agree: a truthy `username`
-    // overwrites `user`, and is always removed from the driver config.
+    // postgresql_adapter.rb:326 — so both adapters agree: a PRESENT `username`
+    // (including "", which is truthy in Ruby) overwrites `user` and is always
+    // removed from the driver config.
     const { username: railsUsername, ...mysqlDriverConfig } = mysqlConfig as typeof mysqlConfig & {
       username?: string;
     };
     this._poolConfig = {
       ...mysqlDriverConfig,
-      ...(railsUsername ? { user: railsUsername } : {}),
+      ...(railsUsername == null ? {} : { user: railsUsername }),
       flags: resolvedFlags,
       strict,
       waitTimeout,
