@@ -395,6 +395,7 @@ export default defineConfig({
             "scripts/guides-typecheck/*.test.ts",
             "scripts/api-compare/*.test.ts",
             "scripts/fixtures-compare/*.test.ts",
+            "scripts/schema-compare/*.test.ts",
             "scripts/parity/**/*.test.ts",
             "scripts/strip-asany.test.ts",
             "scripts/test-deps/*.test.ts",
