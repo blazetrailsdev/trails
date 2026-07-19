@@ -191,6 +191,174 @@ describe("Ruby extractor assertion-count collection", () => {
     });
     expect(c["macro body"]).toBe(2);
   });
+
+  it("resolves a same-named helper to the caller's own class, not a sibling's", () => {
+    const counts = rubyAssertionCounts({
+      "cases/shadow_test.rb": `
+        class OneTest < ActiveSupport::TestCase
+          def check_row
+            assert_equal 1, a
+          end
+
+          def test_one
+            check_row
+          end
+        end
+
+        class ThreeTest < ActiveSupport::TestCase
+          def check_row
+            assert_equal 1, a
+            assert_equal 2, b
+            assert_equal 3, c
+          end
+
+          def test_three
+            check_row
+          end
+        end
+      `,
+    });
+    expect(counts["one"]).toBe(1);
+    expect(counts["three"]).toBe(3);
+  });
+
+  it("lets a class-local helper shadow a file-level one of the same name", () => {
+    const counts = rubyAssertionCounts({
+      "cases/outer_test.rb": `
+        def check_row
+          assert_equal 1, a
+        end
+
+        class InnerTest < ActiveSupport::TestCase
+          def check_row
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+
+          def test_shadowed
+            check_row
+          end
+        end
+      `,
+    });
+    expect(counts["shadowed"]).toBe(2);
+  });
+
+  it("still expands an unambiguous helper defined in an included module", () => {
+    const counts = rubyAssertionCounts({
+      "cases/mixin_test.rb": `
+        module RowAssertions
+          def check_row
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+        end
+
+        class MixinTest < ActiveSupport::TestCase
+          include RowAssertions
+
+          def test_mixed_in
+            check_row
+          end
+        end
+      `,
+    });
+    // The def's scope path is ["RowAssertions"], which does not enclose the
+    // caller — but it is the file's only definition, so the pre-scope flat
+    // behavior is preserved and the mixin's asserts still fold in.
+    expect(counts["mixed in"]).toBe(2);
+  });
+
+  it("resolves a sub-helper from the calling helper's own class scope", () => {
+    const counts = rubyAssertionCounts({
+      "cases/nested_test.rb": `
+        def leaf
+          assert_equal 1, a
+        end
+
+        class NestedTest < ActiveSupport::TestCase
+          def leaf
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+
+          def branch
+            leaf
+          end
+
+          def test_nested
+            branch
+          end
+        end
+      `,
+    });
+    // branch -> leaf must pick the class-local leaf (2), not the file-level one.
+    expect(counts["nested"]).toBe(2);
+  });
+
+  it("prefers the including class's override over a mixin module's own helper", () => {
+    const counts = rubyAssertionCounts({
+      "cases/mro_test.rb": `
+        module SharedTests
+          def test_blocked
+            check_blocked { post :index }
+          end
+
+          def check_blocked
+            assert_nil session[:x], "still present"
+            assert_response :success
+          end
+        end
+
+        class UsingExceptionTest < ActionController::TestCase
+          include SharedTests
+
+          def check_blocked(&block)
+            assert_raises(SomeError, &block)
+          end
+        end
+      `,
+    });
+    // The module's tests run as instances of the including class, so Ruby's
+    // method lookup finds that class's check_blocked (1 assertion), not the
+    // module's own default (2). Same shape as actionpack's
+    // request_forgery_protection_test.rb, but with a helper whose name is not
+    // assert_*-prefixed — an assert_*-named override is counted as a single
+    // assertion and never expanded, so it cannot diverge either way.
+    expect(counts["blocked"]).toBe(1);
+  });
+
+  it("finds the includer of a nested module included by qualified constant", () => {
+    const counts = rubyAssertionCounts({
+      "cases/nested_mixin_test.rb": `
+        module SharedTests
+          module WithRoutingSharedTests
+            def test_reachable
+              check_route
+            end
+
+            def check_route
+              assert_equal 1, a
+              assert_equal 2, b
+            end
+          end
+        end
+
+        class WithRoutingTest < ActionDispatch::IntegrationTest
+          include SharedTests::WithRoutingSharedTests
+
+          def check_route
+            assert_equal 1, a
+          end
+        end
+      `,
+    });
+    // actionpack routing_assertions_test.rb includes a nested shared module by
+    // its QUALIFIED constant, so the includer is keyed
+    // "SharedTests::WithRoutingSharedTests" while the module's scope path is
+    // segmented — the includer must still be found and its override (1) win.
+    expect(counts["reachable"]).toBe(1);
+  });
 });
 
 // Exercises the Ruby extractor's literal expected-VALUE capture (assertionValues)
