@@ -160,13 +160,13 @@ export function quoteDefaultExpression(
   if (value === undefined) return "";
   if (typeof value === "function") {
     const result = (value as () => unknown)();
-    if (typeof result === "string") return ` DEFAULT ${result}`;
-    if (isSqlLiteral(result)) return ` DEFAULT ${result.value}`;
+    if (typeof result === "string") return result;
+    if (isSqlLiteral(result)) return result.value;
     throw new TypeError(
       "quoteDefaultExpression expected function default to return a string or SqlLiteral",
     );
   }
-  if (isSqlLiteral(value)) return ` DEFAULT ${value.value}`;
+  if (isSqlLiteral(value)) return value.value;
 
   let serialized: unknown = value;
   if (column != null && "array" in column) {
@@ -200,7 +200,7 @@ export function quoteDefaultExpression(
   // default reaches PG's bytea `quotedBinary` rather than the abstract
   // byte-string fallback, and a date default reaches PG's BC-suffixing
   // `quotedDate` (postgresql/quoting.rb:143) rather than the abstract format.
-  return ` DEFAULT ${quote.call(this || { quotedDate, quotedBinary }, serialized)}`;
+  return quote.call(this || { quotedDate, quotedBinary }, serialized);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

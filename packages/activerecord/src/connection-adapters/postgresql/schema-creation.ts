@@ -237,7 +237,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
         // Mirrors Rails postgresql/schema_creation.rb:99 — pass column to
         // quote_default_expression so array/typeMap-aware serialization
         // is preserved on ALTER COLUMN SET DEFAULT.
-        sql += `, ALTER COLUMN ${quotedName} SET${this.adapter.quoteDefaultExpression(options["default"], column)}`;
+        sql += `, ALTER COLUMN ${quotedName} SET DEFAULT ${this.adapter.quoteDefaultExpression(options["default"], column)}`;
       }
     }
 
@@ -256,7 +256,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const action =
       o.default == null
         ? "DROP DEFAULT"
-        : `SET${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
+        : `SET DEFAULT ${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
     return `ALTER COLUMN ${col} ${action}`;
   }
 

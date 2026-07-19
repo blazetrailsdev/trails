@@ -550,7 +550,10 @@ export class SchemaStatements {
 
     if (this.adapterName === "mysql") {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = this.adapter.quoteDefaultExpression(options.default);
+      const defaultClause =
+        options.default === undefined
+          ? ""
+          : ` DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`;
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
       );
@@ -563,13 +566,16 @@ export class SchemaStatements {
       }
       if (options.default !== undefined) {
         clauses.push(
-          `ALTER COLUMN ${col} SET${this.adapter.quoteDefaultExpression(options.default)}`,
+          `ALTER COLUMN ${col} SET DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`,
         );
       }
       await this.adapter.executeMutation(`ALTER TABLE ${table} ${clauses.join(", ")}`);
     } else {
       const nullable = options.null === false ? " NOT NULL" : "";
-      const defaultClause = this.adapter.quoteDefaultExpression(options.default);
+      const defaultClause =
+        options.default === undefined
+          ? ""
+          : ` DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`;
       await this.adapter.executeMutation(
         `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
       );
@@ -670,7 +676,7 @@ export class SchemaStatements {
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
     const clause = this.adapter.quoteDefaultExpression(defaultVal);
     await this.adapter.executeMutation(
-      `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET${clause || " DEFAULT NULL"}`,
+      `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET DEFAULT ${clause || "NULL"}`,
     );
   }
 
@@ -681,7 +687,7 @@ export class SchemaStatements {
     defaultValue?: unknown,
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
-      const quoted = this.adapter.quoteDefaultExpression(defaultValue).replace(/^ DEFAULT /, "");
+      const quoted = this.adapter.quoteDefaultExpression(defaultValue);
       await this.adapter.executeMutation(
         `UPDATE ${this._qi(tableName)} SET ${this._qi(columnName)} = ${quoted} WHERE ${this._qi(columnName)} IS NULL`,
       );
@@ -2623,7 +2629,7 @@ export class SchemaStatements {
     if (newDefault == null) {
       return `ALTER COLUMN ${col} DROP DEFAULT`;
     }
-    return `ALTER COLUMN ${col} SET${this.adapter.quoteDefaultExpression(newDefault)}`;
+    return `ALTER COLUMN ${col} SET DEFAULT ${this.adapter.quoteDefaultExpression(newDefault)}`;
   }
 
   /** @internal */

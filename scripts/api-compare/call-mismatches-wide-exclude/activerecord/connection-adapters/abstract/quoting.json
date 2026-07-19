@@ -24,22 +24,8 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/quoting.ts",
     "rubyName": "quote_default_expression",
-    "call": "call",
-    "reason": "Rails' `value.call` invokes the Proc default; TS invokes it as `(value as () => unknown)()`, which has no `call` member. Previously matched only incidentally, by the `quote.call(...)` token that dispatchQuote replaced."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quote_default_expression",
     "call": "quote",
     "reason": "Satisfied via dispatchQuote, mirroring rb:162's bare `quote(value)` self-dispatch (host override, else the module helper) — same shape as the existing quote/quoted_date and quote/quoted_binary entries."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/quoting.ts",
-    "rubyName": "quote_default_expression",
-    "call": "serialize",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

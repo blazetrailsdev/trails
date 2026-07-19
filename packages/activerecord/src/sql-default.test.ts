@@ -61,38 +61,38 @@ describe("quoteDefaultExpression", () => {
   });
 
   it("returns DEFAULT NULL for null", () => {
-    expect(quoteDefaultExpression(null)).toBe(" DEFAULT NULL");
+    expect(quoteDefaultExpression(null)).toBe("NULL");
   });
 
   it("returns DEFAULT TRUE/FALSE for booleans", () => {
-    expect(quoteDefaultExpression(true)).toBe(" DEFAULT TRUE");
-    expect(quoteDefaultExpression(false)).toBe(" DEFAULT FALSE");
+    expect(quoteDefaultExpression(true)).toBe("TRUE");
+    expect(quoteDefaultExpression(false)).toBe("FALSE");
   });
 
   it("returns unquoted numbers", () => {
-    expect(quoteDefaultExpression(42)).toBe(" DEFAULT 42");
+    expect(quoteDefaultExpression(42)).toBe("42");
   });
 
   it("quotes regular strings", () => {
-    expect(quoteDefaultExpression("hello")).toBe(" DEFAULT 'hello'");
+    expect(quoteDefaultExpression("hello")).toBe("'hello'");
   });
 
   it("passes through function return values as raw SQL", () => {
-    expect(quoteDefaultExpression(() => "CURRENT_TIMESTAMP")).toBe(" DEFAULT CURRENT_TIMESTAMP");
+    expect(quoteDefaultExpression(() => "CURRENT_TIMESTAMP")).toBe("CURRENT_TIMESTAMP");
   });
 
   it("passes through function calls like now()", () => {
-    expect(quoteDefaultExpression(() => "now()")).toBe(" DEFAULT now()");
+    expect(quoteDefaultExpression(() => "now()")).toBe("now()");
   });
 
   it("passes through SqlLiteral instances as raw SQL", () => {
     expect(quoteDefaultExpression(new Nodes.SqlLiteral("CURRENT_TIMESTAMP"))).toBe(
-      " DEFAULT CURRENT_TIMESTAMP",
+      "CURRENT_TIMESTAMP",
     );
   });
 
   it("quotes plain string CURRENT_TIMESTAMP as a literal", () => {
-    expect(quoteDefaultExpression("CURRENT_TIMESTAMP")).toBe(" DEFAULT 'CURRENT_TIMESTAMP'");
+    expect(quoteDefaultExpression("CURRENT_TIMESTAMP")).toBe("'CURRENT_TIMESTAMP'");
   });
 
   it("throws TypeError when function returns non-string/non-SqlLiteral", () => {

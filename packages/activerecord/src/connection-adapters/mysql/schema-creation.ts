@@ -281,7 +281,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.default == null && o.column.options.null === false) {
       sql += "DROP DEFAULT";
     } else {
-      sql += `SET${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
+      sql += `SET DEFAULT ${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
     }
     return sql;
   }

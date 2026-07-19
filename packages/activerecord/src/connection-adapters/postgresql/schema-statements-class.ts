@@ -981,8 +981,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       );
     } else {
       const col = (await this.columns(tableName)).find((c) => c.name === columnName);
-      const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
-      const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
+      const expr = this.adapter.quoteDefaultExpression(defaultValue, col);
       await this.adapter.executeMutation(
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`,
       );
@@ -1045,8 +1044,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       // Rails guards the pre-ALTER UPDATE with `if column` — skip it when the
       // column can't be found rather than quoting against an undefined column.
       if (col) {
-        const clause = this.adapter.quoteDefaultExpression(defaultValue, col);
-        const expr = clause.startsWith(" DEFAULT ") ? clause.slice(" DEFAULT ".length) : clause;
+        const expr = this.adapter.quoteDefaultExpression(defaultValue, col);
         await this.adapter.executeMutation(
           `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
         );

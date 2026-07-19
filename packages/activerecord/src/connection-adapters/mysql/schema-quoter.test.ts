@@ -21,15 +21,13 @@ describe("mysqlSchemaQuoter", () => {
     // Uint8Array trails' BinaryType#serialize actually returns (which the
     // abstract `quote` alone would reject with "can't quote Uint8Array") and the
     // BinaryData Rails' Binary#serialize returns.
-    expect(q.quoteDefaultExpression(new Uint8Array([0xde, 0xad]))).toBe(" DEFAULT x'dead'");
-    expect(q.quoteDefaultExpression(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
-      " DEFAULT x'dead'",
-    );
+    expect(q.quoteDefaultExpression(new Uint8Array([0xde, 0xad]))).toBe("x'dead'");
+    expect(q.quoteDefaultExpression(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
   });
 
   it("quotes a binary default produced by BinaryType#serialize", () => {
     const q = mysqlSchemaQuoter();
-    expect(q.quoteDefaultExpression(new BinaryType().serialize("ab"))).toBe(" DEFAULT x'6162'");
+    expect(q.quoteDefaultExpression(new BinaryType().serialize("ab"))).toBe("x'6162'");
   });
 
   it("dispatches binary through a threaded host's quotedBinary override", () => {

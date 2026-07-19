@@ -98,12 +98,12 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
     // Simulates a ColumnDefinition built by addColumn/changeColumn:
     // array lives on `.options`, sqlType is the `[]`-suffixed form.
     const columnDef = { sqlType: "integer[]", options: { array: true } };
-    expect(adapter.quoteDefaultExpression([1, 2, 3], columnDef)).toBe(" DEFAULT '{1,2,3}'");
+    expect(adapter.quoteDefaultExpression([1, 2, 3], columnDef)).toBe("'{1,2,3}'");
   });
 
   it("reads `array` from a live Column instance", () => {
     const column = { sqlType: "integer", array: true };
-    expect(adapter.quoteDefaultExpression([4, 5, 6], column)).toBe(" DEFAULT '{4,5,6}'");
+    expect(adapter.quoteDefaultExpression([4, 5, 6], column)).toBe("'{4,5,6}'");
   });
 
   it("normalizes `integer[]` sqlType so the integer subtype resolves", () => {
@@ -112,6 +112,6 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
     // emitting the floats verbatim ('{1.7,2.3}'). IntegerType#serialize
     // truncates to integers, so '{1,2}' confirms the subtype lookup hit.
     const columnDef = { sqlType: "integer[]", options: { array: true } };
-    expect(adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe(" DEFAULT '{1,2}'");
+    expect(adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe("'{1,2}'");
   });
 });

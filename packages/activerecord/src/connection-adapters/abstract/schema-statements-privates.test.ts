@@ -11,7 +11,7 @@ function makeStatements(adapterOverrides: Record<string, unknown> = {}) {
     adapterName: "sqlite" as const,
     quoteIdentifier: (n: string) => `"${n}"`,
     quoteTableName: (n: string) => `"${n}"`,
-    quoteDefaultExpression: (v: unknown) => ` DEFAULT ${v}`,
+    quoteDefaultExpression: (v: unknown) => `${v}`,
     execute: vi.fn().mockResolvedValue([]),
     executeMutation: vi.fn().mockResolvedValue(undefined),
     config: {},
