@@ -107,6 +107,7 @@ import {
   suppressCompositePrimaryKey,
   castResult,
   performQuery,
+  affectedRows as pgAffectedRows,
   handleWarnings,
   returningColumnValues as pgReturningColumnValues,
 } from "./postgresql/database-statements.js";
@@ -367,6 +368,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   private _typeMap: HashLookupTypeMap | null = null;
   private _maxIdentifierLength: number | null = null;
   private _useInsertReturning = true;
+  // Rails' @mapped_default_timezone: the timezone the session/typemap was last
+  // configured for. `null` until the first query configures it, matching Rails'
+  // nil start (postgresql_adapter.rb:1094).
+  private _mappedDefaultTimezone: "utc" | "local" | null = null;
   private _minMessages = "warning";
   // Memoized search path, backing Rails' @schema_search_path. Populated lazily
   // by schemaSearchPath() and updated by setSchemaSearchPath().
@@ -684,6 +689,13 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   private async _maybeConfigureConnection(client: pg.Client): Promise<void> {
     if (this._connectionConfigured) return;
+    // Rails resets @mapped_default_timezone = nil while installing decoders in
+    // configure_connection (postgresql_adapter.rb:1112) so the next
+    // update_typemap_for_default_timezone re-applies the session timezone. This
+    // is a fresh physical session (reconnect/reset/discard cleared
+    // _connectionConfigured), which starts at PostgreSQL's default timezone, so
+    // the cache must be invalidated here or the guard would skip reconfiguring.
+    this._mappedDefaultTimezone = null;
     // Mirrors: set_standard_conforming_strings — required for correct quoting behaviour.
     await client.query("SET standard_conforming_strings = on");
     // Mirrors: SET intervalstyle — ISO 8601 so intervals parse cleanly.
@@ -1729,28 +1741,68 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       try {
         return await this.withRawConnection({ allowRetry }, async (conn) => {
           const client = conn as unknown as pg.Client;
-          const queryResult = await this._runQuery(client, rewritten, bindArray);
-          // Mirrors Rails' raw_execute → verified! (database_statements.rb):
-          // a successful round-trip proves the connection is live, so mark it
-          // verified to skip the verify ping on the next withRawConnection.
-          this.verifiedBang();
-          // A multi-statement string (e.g. disable_referential_integrity's
-          // joined ALTERs) runs under the simple-query protocol, where node-pg
-          // returns one Result per statement. Mirror Rails' execute and surface
-          // the last command's result.
-          const result = Array.isArray(queryResult)
-            ? queryResult[queryResult.length - 1]
-            : queryResult;
-          const rows = result?.rows ?? [];
-          payload.row_count = rows.length;
-          this._flushWarnings(rewritten);
-          return rows;
+          const result = await this._performQuery(client, rewritten, bindArray, payload);
+          return result?.rows ?? [];
         });
       } catch (e: any) {
         const translated = this._translateException(e, rewritten, bindArray);
         throw translated;
       }
     });
+  }
+
+  /**
+   * The single SQL primitive: run a statement, mark the connection verified,
+   * flush warnings, record the affected-row count, and set the notification
+   * payload's row count — the shared body of `execute` and `executeMutation`,
+   * mirroring Rails' one `perform_query`. Returns the raw pg result (rows for a
+   * row-returning statement, `rowCount` for a write). Unlike sqlite, node-pg
+   * does not throw on a non-row-returning statement, so there is no branch on a
+   * driver throw — the read/write split lives in the callers' contracts
+   * (`execute` returns `.rows`, `executeMutation` sources affected rows through
+   * the `affectedRows` port).
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#perform_query
+   */
+  private async _performQuery(
+    client: pg.Client,
+    sql: string,
+    binds: unknown[],
+    payload: Record<string, unknown>,
+  ): Promise<pg.QueryResult> {
+    // Rails' perform_query first syncs the timestamp typemap / session timezone
+    // when default_timezone changed (database_statements.rb:136 →
+    // update_typemap_for_default_timezone); guarded, so it's a no-op unless the
+    // timezone actually changed.
+    await this.updateTypemapForDefaultTimezone();
+    const queryResult = await this._runQuery(client, sql, binds);
+    // Mirrors Rails' perform_query → verified!: a successful round-trip proves
+    // the connection is live, so skip the verify ping on the next
+    // withRawConnection.
+    this.verifiedBang();
+    // A multi-statement string (e.g. disable_referential_integrity's joined
+    // ALTERs) runs under the simple-query protocol, where node-pg returns one
+    // Result per statement. Mirror Rails' execute and surface the last
+    // command's result.
+    const result = (
+      Array.isArray(queryResult) ? queryResult[queryResult.length - 1] : queryResult
+    ) as pg.QueryResult;
+    payload.row_count = result?.rows?.length ?? 0;
+    this._flushWarnings(sql);
+    return result;
+  }
+
+  /**
+   * Rows affected by a write, read from its `PG::Result` (`cmd_tuples`).
+   * Wired to the existing this-less port so api:compare coverage points at live
+   * code. Unlike sqlite3, PG holds no `@last_affected_rows` state — the count is
+   * sourced strictly from the passed result, matching Rails.
+   *
+   * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::DatabaseStatements#affected_rows
+   * @internal
+   */
+  affectedRows(result: pg.QueryResult): number {
+    return pgAffectedRows(result);
   }
 
   /**
@@ -1784,10 +1836,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
     };
-    const m = await Notifications.instrumentAsync("sql.active_record", payload, async () => {
-      let rc: number;
+    return await Notifications.instrumentAsync("sql.active_record", payload, async () => {
       try {
-        rc = await this.withRawConnection(async (conn) => {
+        return await this.withRawConnection(async (conn) => {
           const client = conn as unknown as pg.Client;
           const upper = sql.trimStart().toUpperCase();
 
@@ -1812,19 +1863,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 await this._serializePinnedQuery(client, () =>
                   client.query(`SAVEPOINT "${spName}"`),
                 );
-              const result = await this._runQuery(client, withReturning, binds);
+              const result = await this._performQuery(client, withReturning, binds, payload);
               if (useSavepoint)
                 await this._serializePinnedQuery(client, () =>
                   client.query(`RELEASE SAVEPOINT "${spName}"`),
                 );
-              payload.row_count = result.rowCount ?? 0;
+              const affected = this.affectedRows(result);
+              payload.row_count = affected;
               if (result.rows.length > 1) {
-                return result.rowCount ?? result.rows.length;
+                return affected;
               }
               if (result.rows.length > 0) {
                 return result.rows[0][Object.keys(result.rows[0])[0]] as number;
               }
-              return result.rowCount ?? 0;
+              return affected;
             } catch (err) {
               // Cached-plan failures must propagate to the
               // transaction-retry machinery (Rails raises
@@ -1843,40 +1895,35 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
                 ).catch(() => {});
               }
               payload.sql = pgSql;
-              const result = await this._runQuery(client, pgSql, binds);
-              payload.row_count = result.rowCount ?? 0;
-              return result.rowCount ?? 0;
+              const result = await this._performQuery(client, pgSql, binds, payload);
+              const affected = this.affectedRows(result);
+              payload.row_count = affected;
+              return affected;
             }
           }
 
           // For INSERT with explicit RETURNING
           if (upper.startsWith("INSERT") && upper.includes("RETURNING")) {
-            const result = await this._runQuery(client, pgSql, binds);
-            payload.row_count = result.rowCount ?? 0;
+            const result = await this._performQuery(client, pgSql, binds, payload);
+            const affected = this.affectedRows(result);
+            payload.row_count = affected;
             if (result.rows.length > 0) {
               return result.rows[0][Object.keys(result.rows[0])[0]] as number;
             }
-            return result.rowCount ?? 0;
+            return affected;
           }
 
           // For UPDATE/DELETE, return affected rows
-          const result = await this._runQuery(client, pgSql, binds);
-          payload.row_count = result.rowCount ?? 0;
-          return result.rowCount ?? 0;
+          const result = await this._performQuery(client, pgSql, binds, payload);
+          const affected = this.affectedRows(result);
+          payload.row_count = affected;
+          return affected;
         });
       } catch (e: any) {
         const translated = this._translateException(e, pgSql, binds);
         throw translated;
       }
-      // Mirrors Rails' raw_execute → verified!: the block completed a live
-      // round-trip, so mark verified to skip the next withRawConnection's ping.
-      this.verifiedBang();
-      // Flush inside the instrumented callback so a raised SQLWarning is visible
-      // to instrumentation subscribers — mirrors handle_warnings inside perform_query.
-      this._flushWarnings(payload.sql as string);
-      return rc!;
     });
-    return m;
   }
 
   /**
@@ -4950,6 +4997,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   async reconfigureConnectionTimezone(): Promise<void> {
+    // Rails returns early when `variables["timezone"]` was set by the user
+    // (postgresql_adapter.rb:1005): configure_connection already applied it and
+    // it must never be overridden by the default_timezone SET below.
+    if (this._sessionVariables["timezone"]) return;
     const tz = getDefaultTimezone();
     // Off the withRawConnection loop. This runs as the first step of
     // performQuery (database-statements.ts), which is itself the block
@@ -5026,9 +5077,15 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * @internal
    */
   async updateTypemapForDefaultTimezone(): Promise<void> {
-    // node-pg uses custom type parsers registered at pool construction time
-    // via getTypeParser (see constructor). A timezone change only requires
-    // a session-level SET so subsequent result sets are interpreted correctly.
+    // Rails guards on `@mapped_default_timezone != default_timezone`
+    // (postgresql_adapter.rb:1094): reconfigure only when the timezone actually
+    // changed, so `perform_query` calling this per statement is a cheap no-op on
+    // the hot path. node-pg uses custom type parsers registered at pool
+    // construction time via getTypeParser (see constructor); a timezone change
+    // only requires a session-level SET so subsequent result sets decode right.
+    const tz = getDefaultTimezone();
+    if (this._mappedDefaultTimezone === tz) return;
+    this._mappedDefaultTimezone = tz;
     await this.reconfigureConnectionTimezone();
   }
 
