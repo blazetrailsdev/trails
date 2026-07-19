@@ -11,11 +11,24 @@ import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
 import { Connection as TypeCasterConnection } from "../type-caster/connection.js";
+import { attributeRelationOf } from "./predicate-builder/attribute-relation.js";
 
 interface BoundType {
   cast?(x: unknown): unknown;
   serialize?(x: unknown): unknown;
 }
+
+/** A type as the cascade sees it — any level may answer null/undefined. */
+type TypeCandidate = (BoundType & { isForceEquality?(v: unknown): boolean }) | null | undefined;
+
+interface TypeCaster {
+  typeForAttribute?(name: string): TypeCandidate;
+}
+
+const IDENTITY_CAST_TYPE = {
+  cast: (v: unknown) => v,
+  serialize: (v: unknown) => v,
+};
 
 /**
  * Converts hash conditions ({ name: "dean", age: 30 }) into
@@ -66,8 +79,7 @@ export class PredicateBuilder {
    * equality/negation single-value paths, and handles non-numeric out-of-range
    * bounds (e.g. custom types) type-agnostically.
    *
-   * Callers pass the type from {@link resolveBoundType} (not the narrower
-   * `this.table`-only lookup `buildBindAttribute` uses) so sign detection uses
+   * Callers pass the type from {@link resolveBoundType} so sign detection uses
    * the same type as the accompanying cast — otherwise a joined/aliased bound
    * could be detected against the wrong (or identity) type.
    */
@@ -82,8 +94,7 @@ export class PredicateBuilder {
 
   /**
    * Builds a QueryAttribute bind for a bound using {@link resolveBoundType}'s
-   * relation/context/table cascade rather than `buildBindAttribute`'s narrower
-   * `this.table`-only lookup. Used by the negation path so a joined/aliased
+   * relation/context/table cascade. Used by the negation path so a joined/aliased
    * out-of-range bound is typed correctly (and thus detected as unboundable →
    * `1=1`) instead of falling through to the identity fallback and silently
    * binding a raw value the column can't hold.
@@ -97,7 +108,7 @@ export class PredicateBuilder {
     value: unknown,
     type: BoundType | undefined,
   ): QueryAttribute {
-    const castType = (type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v }) as {
+    const castType = (type ?? IDENTITY_CAST_TYPE) as {
       cast(v: unknown): unknown;
       serialize(v: unknown): unknown;
     };
@@ -111,17 +122,55 @@ export class PredicateBuilder {
    * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
    */
   private resolveBoundType(attribute: Nodes.Attribute): BoundType | undefined {
-    const attrRelation = (attribute as unknown as { relation?: unknown }).relation;
-    const attrType = (
-      attrRelation as { typeForAttribute?(n: string): BoundType | null } | undefined
-    )?.typeForAttribute?.(attribute.name);
-    if (attrType) return attrType;
-    const ctx = this._tableContext as {
-      typeForAttribute?(n: string): BoundType | null;
-    } | null;
-    const ctxType = ctx?.typeForAttribute?.(attribute.name);
-    if (ctxType) return ctxType;
-    return this.table.typeForAttribute(attribute.name) as BoundType | undefined;
+    return this.resolveColumnType(attribute.name, attributeRelationOf(attribute)) as
+      | BoundType
+      | undefined;
+  }
+
+  /**
+   * The single type-resolution cascade every bind-building path shares: the
+   * attribute's own relation typeCaster (covers joined/aliased tables), then
+   * the predicate builder's table/model context, then the arel table. Returns
+   * the first candidate `accept` approves.
+   *
+   * `accept` is what lets the force-equality scan share this cascade: it probes
+   * every level for `isForceEquality?(value)` rather than stopping at the first
+   * type that merely exists. Each level is evaluated lazily and only until
+   * `accept` is satisfied — the arel-table leg throws on a caster-less table,
+   * so it must stay unreached when an earlier level answers.
+   *
+   * Written as a straight-line cascade rather than a generator or a lookup
+   * array on purpose: positive single-value equality is the hottest path in the
+   * builder, and this runs once per `where` value — no iterator or closure
+   * allocation per call.
+   *
+   * @internal
+   */
+  private _resolveTypeBy(
+    columnName: string,
+    relation: unknown,
+    accept: (type: TypeCandidate) => boolean,
+  ): TypeCandidate {
+    const relationType = (relation as TypeCaster | undefined)?.typeForAttribute?.(columnName);
+    if (accept(relationType)) return relationType;
+    const contextType = (this._tableContext as TypeCaster | null)?.typeForAttribute?.(columnName);
+    if (accept(contextType)) return contextType;
+    const tableType = this.table.typeForAttribute(columnName) as TypeCandidate;
+    if (accept(tableType)) return tableType;
+    return undefined;
+  }
+
+  /**
+   * First existing type in the cascade, or undefined.
+   *
+   * Note this is byte-compatible with the old `this.table`-only lookup for
+   * plain (non-joined) columns: `table.get(col).relation` IS `this.table`, so
+   * the first leg answers with exactly the type the narrow lookup would have
+   * returned. The extra levels only come into play for joined/aliased
+   * attributes, which is precisely where the narrow lookup was wrong.
+   */
+  private resolveColumnType(columnName: string, relation?: unknown): TypeCandidate {
+    return this._resolveTypeBy(columnName, relation, Boolean);
   }
 
   buildFromHash(
@@ -629,7 +678,9 @@ export class PredicateBuilder {
     // tuple lists allocation-light.
     const attrs = cols.map((c) => this.resolveColumn(c));
     const groupings: Nodes.Node[] = validTuples.map((tuple) => {
-      const eqs = attrs.map((attr, i) => attr.eq(this.buildBindAttribute(attr.name, tuple[i])));
+      const eqs = attrs.map((attr, i) =>
+        attr.eq(this.buildBindAttribute(attr.name, tuple[i], attributeRelationOf(attr))),
+      );
       return new Nodes.Grouping(new Nodes.And(eqs));
     });
     if (groupings.length === 1) return groupings[0];
@@ -668,12 +719,19 @@ export class PredicateBuilder {
     this.handlers.unshift([klass, handler]);
   }
 
-  buildBindAttribute(columnName: string, value: unknown): QueryAttribute {
-    const type = this.table.typeForAttribute(columnName) as
-      | { cast(v: unknown): unknown; serialize(v: unknown): unknown }
-      | undefined;
-    const castType = type ?? { cast: (v: unknown) => v, serialize: (v: unknown) => v };
-    return new QueryAttribute(columnName, value, castType);
+  /**
+   * Rails' `build_bind_attribute(column_name, value)`. The optional `relation`
+   * is the trails-side stand-in for Rails re-rooting `table` per association:
+   * a joined/aliased column is typed on the attribute's own relation, so
+   * without it an out-of-range equality would bind a raw value through the
+   * identity fallback instead of collapsing to `1=0`.
+   */
+  buildBindAttribute(columnName: string, value: unknown, relation?: unknown): QueryAttribute {
+    return this.queryAttributeWithType(
+      columnName,
+      value,
+      this.resolveColumnType(columnName, relation) ?? undefined,
+    );
   }
 
   resolveArelAttribute(
@@ -736,44 +794,24 @@ export class PredicateBuilder {
    */
   private _buildForceEqualityOrNull(attribute: Nodes.Attribute, value: unknown): Nodes.Node | null {
     type CastLike = { cast(v: unknown): unknown; serialize(v: unknown): unknown };
-    type TypeLike =
-      | ({ isForceEquality?(v: unknown): boolean } & Partial<CastLike>)
-      | null
-      | undefined;
-    const lookups = [
-      () => {
-        const rel = (attribute as unknown as { relation?: unknown }).relation;
-        return (rel as { typeForAttribute?(n: string): TypeLike } | undefined)?.typeForAttribute?.(
-          attribute.name,
-        );
-      },
-      () =>
-        (
-          this._tableContext as { typeForAttribute?(n: string): TypeLike } | null
-        )?.typeForAttribute?.(attribute.name),
-      () => this.table.typeForAttribute(attribute.name) as TypeLike,
-    ];
-    for (const lookup of lookups) {
-      const t = lookup();
-      if (t?.isForceEquality?.(value)) {
-        // Rails (`predicate_builder.rb#build`) emits a bind for force-equality
-        // types: `attribute.eq(build_bind_attribute(attribute.name, value))`. The
-        // bind value (e.g. a `Range`) serializes to its pg literal string via the
-        // adapter's `typeCast` in the bind path (`type_casted_binds`).
-        //
-        // Construct the bind with the SAME type object that made the branch true
-        // (`table.type(attribute.name)` in Rails). A joined/aliased range attribute
-        // may be typed on `attribute.relation` / `_tableContext` but not on
-        // `this.table`, so deferring to `buildBindAttribute`'s `this.table` lookup
-        // would bind through the identity type and skip `RangeType#serialize`.
-        const castType =
-          t.cast && t.serialize
-            ? (t as CastLike)
-            : { cast: (v: unknown) => v, serialize: (v: unknown) => v };
-        return attribute.eq(new QueryAttribute(attribute.name, value, castType));
-      }
-    }
-    return null;
+    const forcing = this._resolveTypeBy(
+      attribute.name,
+      attributeRelationOf(attribute),
+      (type) => type?.isForceEquality?.(value) === true,
+    );
+    if (!forcing) return null;
+    // Rails (`predicate_builder.rb#build`) emits a bind for force-equality
+    // types: `attribute.eq(build_bind_attribute(attribute.name, value))`. The
+    // bind value (e.g. a `Range`) serializes to its pg literal string via the
+    // adapter's `typeCast` in the bind path (`type_casted_binds`).
+    //
+    // Construct the bind with the SAME type object that made the branch true
+    // (`table.type(attribute.name)` in Rails) rather than re-resolving — the
+    // cascade level that reported `force_equality?` is not necessarily the one
+    // a fresh first-hit lookup would return, and binding through the wrong type
+    // would skip e.g. `RangeType#serialize`.
+    const castType = forcing.cast && forcing.serialize ? (forcing as CastLike) : IDENTITY_CAST_TYPE;
+    return attribute.eq(new QueryAttribute(attribute.name, value, castType));
   }
 
   static references(conditions: string[] | Record<string, unknown>): Nodes.SqlLiteral[] {
