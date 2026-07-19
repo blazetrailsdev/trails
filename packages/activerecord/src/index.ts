@@ -142,6 +142,7 @@ export {
   setRunAfterTransactionCallbacksInOrderDefined,
 } from "./ar-config.js";
 export { defineEnum, readEnumValue, castEnumValue } from "./enum.js";
+export type { EnumMacroOptions } from "./enum.js";
 export {
   enableSti,
   getInheritanceColumn,
