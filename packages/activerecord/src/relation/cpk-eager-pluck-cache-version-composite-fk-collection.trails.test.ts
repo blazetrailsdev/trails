@@ -92,7 +92,9 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
 
   it("pluck over eagerLoad('chapters') joins the composite-FK collection", async () => {
     await seedBooks();
-    const titles = await CpkBook.eagerLoad("chapters").order("author_id", "id").pluck("title");
+    const titles = await CpkBook.eagerLoad("chapters")
+      .order("cpk_books.author_id", "cpk_books.id")
+      .pluck("title");
     expect(titles).toEqual(["Alpha", "Beta", "Gamma"]);
   });
 
@@ -107,7 +109,7 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
   it("pluck over multiple eager specs joins both", async () => {
     await seedBooks();
     const titles = await CpkBook.eagerLoad("author", "chapters")
-      .order("author_id", "id")
+      .order("cpk_books.author_id", "cpk_books.id")
       .pluck("title");
     expect(titles).toEqual(["Alpha", "Beta", "Gamma"]);
   });
@@ -120,7 +122,10 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     // rather than emitting a wrong single-column predicate. Tracked by
     // 0023-surfaced-deviations/composite-pk-distinct-relation-materialization.
     await expect(
-      CpkBook.eagerLoad("chapters").order("author_id", "id").limit(2).pluck("title"),
+      CpkBook.eagerLoad("chapters")
+        .order("cpk_books.author_id", "cpk_books.id")
+        .limit(2)
+        .pluck("title"),
     ).rejects.toThrow(/limit\/offset over a collection association/);
   });
 
@@ -145,9 +150,11 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     await withCollectionCacheVersioning(async () => {
       await seedBooks();
       const eager = await CpkBook.eagerLoad("chapters")
-        .order("author_id", "id")
+        .order("cpk_books.author_id", "cpk_books.id")
         .cacheVersion("revision");
-      const base = await CpkBook.order("author_id", "id").cacheVersion("revision");
+      const base = await CpkBook.order("cpk_books.author_id", "cpk_books.id").cacheVersion(
+        "revision",
+      );
       expect(eager).toBe(base);
     });
   });
@@ -156,7 +163,10 @@ describe("CpkBook eager pluck / cache_version over a composite-FK collection", (
     await withCollectionCacheVersioning(async () => {
       await seedBooks();
       await expect(
-        CpkBook.eagerLoad("chapters").order("author_id", "id").limit(2).cacheVersion("revision"),
+        CpkBook.eagerLoad("chapters")
+          .order("cpk_books.author_id", "cpk_books.id")
+          .limit(2)
+          .cacheVersion("revision"),
       ).rejects.toThrow(/limit\/offset over a collection association/);
     });
   });

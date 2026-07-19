@@ -151,6 +151,7 @@ type OrderDirection = "asc" | "desc" | "ASC" | "DESC";
  */
 export type OrderArg =
   | string
+  | symbol
   | Record<string, OrderDirection | Record<string, OrderDirection>>
   | Nodes.Node
   | string[]
@@ -637,21 +638,23 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       const blankLiteral =
         arg instanceof Nodes.SqlLiteral && String((arg as any).value ?? "").trim() === "";
       if (!blankLiteral) this._orderClauses.push(arg);
+    } else if (typeof arg === "symbol") {
+      // Rails qualifies a Symbol order arg (`order(:name)` → `"table"."name"
+      // ASC`), unlike a string, which stays bare. Store as a `[col, "asc"]`
+      // tuple so `_applyOrderToManager` routes it through column resolution.
+      const name = symbolToName(arg);
+      disallowRawSqlBang([name], resolveOrderMatcher(this));
+      this._orderClauses.push([name, "asc"]);
     } else if (typeof arg === "string") {
-      if (arg.trim() === "") {
-        const next = args[i + 1];
-        i += typeof next === "string" && /^(asc|desc)$/i.test(next) ? 2 : 1;
-        continue;
+      // Rails maps each String order arg through unchanged (preprocess_order_args'
+      // `else` branch) and compact_blanks blank strings away. A string never pairs
+      // with a following "asc"/"desc" arg nor qualifies — it stays a bare
+      // SqlLiteral (see _applyOrderToManager). Validate immediately, mirroring
+      // Rails raising on order("invalid") at call time.
+      if (arg.trim() !== "") {
+        disallowRawSqlBang([arg], resolveOrderMatcher(this));
+        this._orderClauses.push(arg);
       }
-      // Validate immediately — mirrors Rails raising on order("invalid") at call time.
-      disallowRawSqlBang([arg], resolveOrderMatcher(this));
-      const next = args[i + 1];
-      if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
-        this._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
-        i += 2;
-        continue;
-      }
-      this._orderClauses.push(arg);
     } else if (arg !== null && typeof arg === "object") {
       // Hash form { col: "asc"|"desc" } — and nested { table: { col: "asc" } },
       // which Rails expands to a `table.col dir` qualified order.
@@ -664,6 +667,8 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
     }
     i++;
   }
+  // Mirror Rails' `self.order_values |= args`: union dedupes repeated terms.
+  this._orderClauses = dedupeOrderClauses(this._orderClauses);
   return this;
 }
 
@@ -706,20 +711,21 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
       const blankLiteral =
         arg instanceof Nodes.SqlLiteral && String((arg as any).value ?? "").trim() === "";
       if (!blankLiteral) this._orderClauses.push(arg);
+    } else if (typeof arg === "symbol") {
+      // Rails qualifies a Symbol order arg (`order(:name)` → `"table"."name"
+      // ASC`), unlike a string, which stays bare. Store as a `[col, "asc"]`
+      // tuple so `_applyOrderToManager` routes it through column resolution.
+      const name = symbolToName(arg);
+      disallowRawSqlBang([name], resolveOrderMatcher(this));
+      this._orderClauses.push([name, "asc"]);
     } else if (typeof arg === "string") {
-      if (arg.trim() === "") {
-        const next = args[i + 1];
-        i += typeof next === "string" && /^(asc|desc)$/i.test(next) ? 2 : 1;
-        continue;
+      // Each String order arg maps through unchanged and stays bare (see the
+      // orderBang string branch); blanks are compact_blank'd away. No pairing
+      // with a following "asc"/"desc" arg, no qualification.
+      if (arg.trim() !== "") {
+        disallowRawSqlBang([arg], resolveOrderMatcher(this));
+        this._orderClauses.push(arg);
       }
-      disallowRawSqlBang([arg], resolveOrderMatcher(this));
-      const next = args[i + 1];
-      if (typeof next === "string" && /^(asc|desc)$/i.test(next)) {
-        this._orderClauses.push([arg, next.toLowerCase() as "asc" | "desc"]);
-        i += 2;
-        continue;
-      }
-      this._orderClauses.push(arg);
     } else if (arg !== null && typeof arg === "object") {
       for (const clause of expandOrderHash(this, arg as Record<string, unknown>)) {
         this._orderClauses.push(clause);
@@ -730,15 +736,21 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
     }
     i++;
   }
-  // Deduplicate identical order terms — mirrors Rails' order_values.uniq
+  this._orderClauses = dedupeOrderClauses(this._orderClauses);
+  return this;
+}
+
+// Remove duplicate order terms while preserving first-seen order. orderBang
+// mirrors Rails' `self.order_values |= args` and reorderBang its `args.uniq!` —
+// both dedupe by value (query_methods.rb order!/reorder!).
+function dedupeOrderClauses<T>(clauses: T[]): T[] {
   const seen = new Set<string>();
-  this._orderClauses = this._orderClauses.filter((c) => {
+  return clauses.filter((c) => {
     const key = JSON.stringify(c);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  return this;
 }
 
 /**
@@ -1487,25 +1499,13 @@ function reverseOrderBang(this: QueryMethodsHost): any {
       return clause;
     }
     if (typeof clause === "string") {
-      const match = clause.match(/^([\w.]+)\s+(ASC|DESC)$/i);
-      if (match) {
-        const col = match[1];
-        const dir = match[2].toUpperCase() === "ASC" ? "desc" : "asc";
-        return [col, dir] as [string, "asc" | "desc"];
-      }
-      // Multi-column comma-joined order ("salary DESC, name ASC"): mirror Rails'
-      // reverse_sql_order String branch — split on comma and flip each term.
-      // reverseSqlOrder calls isDoesNotSupportReverse (the faithful port of
-      // does_not_support_reverse?), so unbalanced-paren sections and "nulls
-      // first/last" still raise, while balanced expressions reverse.
-      if (clause.includes(",")) {
-        const reversed = reverseSqlOrder.call(this, [clause]) as string[];
-        return new Nodes.SqlLiteral(reversed.join(", "));
-      }
-      // Bare column flips to a quoted desc tuple; any SQL expression goes through reverseSqlOrder.
-      if (/^[\w.]+$/.test(clause)) {
-        return [clause, "desc" as const];
-      }
+      // A string order arg stays a bare SqlLiteral (see _applyOrderToManager),
+      // so reversing it mirrors Rails' reverse_sql_order String branch: split on
+      // comma and flip each term's trailing ASC↔DESC (appending DESC when
+      // unmarked), keeping the result a bare SqlLiteral rather than re-qualifying
+      // it to a `[col, dir]` tuple. reverseSqlOrder runs isDoesNotSupportReverse
+      // (the faithful port of does_not_support_reverse?), so unbalanced-paren
+      // sections and "nulls first/last" still raise.
       const reversed = reverseSqlOrder.call(this, [clause]) as string[];
       return new Nodes.SqlLiteral(reversed.join(", "));
     }

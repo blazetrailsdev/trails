@@ -303,7 +303,7 @@ export class Author extends Base {
 
     this.hasMany("ratings", { through: "comments" });
     this.hasMany("goodRatings", {
-      scope: (q: any) => q.where("ratings.value > 5").order("id"),
+      scope: (q: any) => q.where("ratings.value > 5").order({ id: "asc" }),
       through: "comments",
       source: "ratings",
     });
@@ -313,7 +313,7 @@ export class Author extends Base {
       source: "ratings",
     });
     this.hasMany("noJoinsGoodRatings", {
-      scope: (q: any) => q.where("ratings.value > 5").order("id"),
+      scope: (q: any) => q.where("ratings.value > 5").order({ id: "asc" }),
       through: "comments",
       source: "ratings",
       disableJoins: true,

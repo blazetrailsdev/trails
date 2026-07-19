@@ -411,7 +411,9 @@ describe("RelationTest", () => {
   });
 
   it("finding with subquery with eager loading in from", async () => {
-    const relation = Comment.includes("post").where({ "posts.type": "Post" }).order("id");
+    const relation = Comment.includes("post")
+      .where({ "posts.type": "Post" })
+      .order(Symbol.for("id"));
     const expected = (await relation.toArray()).map((c) => c.id);
     expect((await Comment.select("*").from(relation)).map((c) => c.id)).toEqual(expected);
     expect((await Comment.select("subquery.*").from(relation)).map((c) => c.id)).toEqual(expected);
@@ -428,7 +430,9 @@ describe("RelationTest", () => {
   // `toSql()` emits. This is Rails-correct, and shared with the where-subquery
   // path (`relation-handler`); converging to `t0_r*` here would diverge.
   it("eager from() subquery projects the table star, not column aliases", async () => {
-    const relation = Comment.includes("post").where({ "posts.type": "Post" }).order("id");
+    const relation = Comment.includes("post")
+      .where({ "posts.type": "Post" })
+      .order(Symbol.for("id"));
     const sql = await (Comment.select("*").from(relation) as any).toSql();
     // Adapter-agnostic: strip identifier quoting (`"` on sqlite/postgres,
     // backticks on mysql) so the shape assertion holds on every CI adapter.
@@ -572,7 +576,7 @@ describe("RelationTest", () => {
   });
 
   it("order with hash and symbol generates the same sql", () => {
-    expect(Topic.order("id").toSql()).toBe(Topic.order({ id: "asc" }).toSql());
+    expect(Topic.order(Symbol.for("id")).toSql()).toBe(Topic.order({ id: "asc" }).toSql());
   });
 
   it("finding with desc order with string", async () => {
@@ -626,7 +630,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with order by aliased attributes", async () => {
-    const topicsRel = Topic.order("heading");
+    const topicsRel = Topic.order(Symbol.for("heading"));
     expect(await topicsRel.size()).toBe(5);
     expect((await topicsRel.first())!.title).toBe(topics("fifth").title);
   });
@@ -655,7 +659,7 @@ describe("RelationTest", () => {
   });
 
   it("finding with reorder by aliased attributes", async () => {
-    const topicsRel = Topic.order("author_name").reorder("heading");
+    const topicsRel = Topic.order("author_name").reorder(Symbol.for("heading"));
     expect(await topicsRel.size()).toBe(5);
     expect((await topicsRel.first())!.title).toBe(topics("fifth").title);
   });

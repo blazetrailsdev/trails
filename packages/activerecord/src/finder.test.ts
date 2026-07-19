@@ -320,7 +320,7 @@ describe("FinderTest", () => {
       undefined,
       false,
       async () => {
-        await Topic.order("updated_at").secondToLast();
+        await Topic.order(Symbol.for("updated_at")).secondToLast();
       },
     );
   });
@@ -2096,10 +2096,7 @@ describe("FinderTest", () => {
   });
 
   it("include on unloaded relation with offset", async () => {
-    // Rails asserts /ORDER BY name ASC/; trails quotes the raw order string, so
-    // match the quoted `"customers"."name"` form the adapter emits.
-    const orderRe = new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("customers.name"))} ASC`);
-    await assertQueriesMatch(orderRe, undefined, false, async () => {
+    await assertQueriesMatch(/ORDER BY name ASC/, undefined, false, async () => {
       expect(await Customer.offset(1).order("name ASC").include(customers("mary"))).toBe(true);
     });
   });
@@ -2193,10 +2190,7 @@ describe("FinderTest", () => {
   });
 
   it("member on unloaded relation with offset", async () => {
-    // Rails asserts /ORDER BY name ASC/; trails quotes the raw order string, so
-    // match the quoted `"customers"."name"` form the adapter emits.
-    const orderRe = new RegExp(`ORDER BY ${escapeRegExp(quoteTableName("customers.name"))} ASC`);
-    await assertQueriesMatch(orderRe, undefined, false, async () => {
+    await assertQueriesMatch(/ORDER BY name ASC/, undefined, false, async () => {
       expect(await Customer.offset(1).order("name ASC").member(customers("mary"))).toBe(true);
     });
   });

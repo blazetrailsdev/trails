@@ -96,7 +96,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     let count = 0;
     const sqls = await captureSql(async () => {
       count = (await CpkBook.eagerLoad("chapters")
-        .order("author_id", "id")
+        .order("cpk_books.author_id", "cpk_books.id")
         .limit(2)
         .count("cpk_books.revision")) as number;
     });
@@ -145,7 +145,7 @@ describe("CpkBook eager count / aggregate build_joins fold", () => {
     // and 3 (rev 9) → COUNT(DISTINCT revision) = 2. Value-bounding would offset
     // into the distinct value list {5, 9} and (wrongly) return 1.
     const count = await CpkBook.eagerLoad("chapters")
-      .order("author_id", "id")
+      .order("cpk_books.author_id", "cpk_books.id")
       .offset(1)
       .count("cpk_books.revision");
     expect(count).toBe(2);
