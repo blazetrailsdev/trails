@@ -819,11 +819,14 @@ export async function save<T extends SaveRecord>(
     await self._runBelongsToDefaults();
     self._belongsToDefaultsApplied = true;
   }
-  // A `before_validation` that needs async DB work (Rails runs it inside the
-  // save transaction — transactions_test.rb:714) can't await on trails' strict-
-  // sync validation chain, so such a callback defers its thunk here instead of
-  // running inline. Reset the queue before the chain populates it so a prior
-  // save that bailed at validation doesn't leak a stale thunk into this one.
+  // A `before_validation` that needs async DB work should run inside the save
+  // transaction (Rails wraps `super` in `with_transaction_returning_status` and
+  // `perform_validations` runs inside it — transactions.rb:360, validations.rb:47;
+  // transactions_test.rb:714). Trails runs `performValidations` before opening
+  // the save transaction, so such a callback defers its thunk here for `save` to
+  // drain inside the transaction instead of running it during validation. Reset
+  // the queue before the chain populates it so a prior save that bailed at
+  // validation doesn't leak a stale thunk into this one.
   self._beforeValidationSideEffects = [];
   let validationsPassed: boolean;
   try {
