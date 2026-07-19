@@ -31,6 +31,13 @@
     "package": "activerecord",
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "build_bind_attribute",
+    "call": "table",
+    "reason": "Satisfied via a different path (story unify-predicate-builder-type-resolution-cascades): Rails' build_bind_attribute reads `table.type(column_name)` inline. trails unified the three duplicate type-resolution cascades into _resolveTypeBy, whose final leg IS `this.table.typeForAttribute(columnName)` \u2014 so the `table` read still happens on every call, one frame down. The name-based wide gate only inspects the Rails-mapped method body, so it cannot follow the shared resolver."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/predicate-builder.ts",
+    "rubyName": "build_bind_attribute",
     "call": "type",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -214,14 +221,14 @@
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "handler_for",
     "call": "detect",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body \u2014 these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "handler_for",
     "call": "last",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body \u2014 these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
