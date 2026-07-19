@@ -216,6 +216,11 @@ describe("I18nTest", () => {
     ).toBe("Foo");
   });
 
+  it("translate with an explicit null default returns null instead of raising", () => {
+    expect(I18n.translate("translations.missing", { default: null })).toBeNull();
+    expect(I18n.translate("translations.missing", { default: null, raise: true })).toBeNull();
+  });
+
   it("test_translate_with_array_of_string_defaults", () => {
     expect(
       I18n.translate("translations.missing", {

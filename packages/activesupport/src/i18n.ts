@@ -323,8 +323,9 @@ class I18nModule {
     // Each entry is tried in turn, Symbols resolving as further keys under the
     // caller's scope (base.rb:151-163), and resolution continues past any entry
     // that yields nil. An array *entry* stays literal (`default: [[]]` → `[]`).
+    const defaultGiven = Object.hasOwn(options, "default");
     const chain =
-      options.default === undefined || options.default === null
+      !defaultGiven || options.default === null || options.default === undefined
         ? []
         : Array.isArray(options.default)
           ? options.default
@@ -340,7 +341,11 @@ class I18nModule {
       const found = this.backend.lookup(locale, defaultKey);
       if (found !== undefined) return interpolate(this._pluralize(found, options.count), options);
     }
-    const hasDefaults = chain.length > 0;
+    // An explicit `default: nil` is a resolved nil fallback, not a miss: i18n
+    // skips the exception entirely when `options[:default].nil?` and the key was
+    // given (base.rb:43-46), so this returns null even under `raise: true`.
+    if (defaultGiven && (options.default === null || options.default === undefined)) return null;
+    const hasDefaults = defaultGiven && options.default !== false;
     if (options.raise)
       throw new MissingTranslationData(locale, keyStr, consideredKeys, hasDefaults);
     return missingTranslationMessage(locale, keyStr, consideredKeys, hasDefaults);
