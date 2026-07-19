@@ -57,21 +57,28 @@ const IGNORED_MACROS = new Set(
 );
 
 /**
- * Every `create_table` the source declares, by name, found without parsing the
- * blocks. Cross-checking this against {@link parseSchemaRb}'s output is what
- * catches a vendored-Rails bump introducing a form the parser silently drops —
- * a dropped table turns every TEST_SCHEMA table mirroring it into a phantom
- * "invention", which is exactly the false verdict this tool must never emit.
+ * A `create_table` call, optionally on a receiver. Rails declares the
+ * `courses` / `colleges` / `professors` cluster as
+ * `Course.lease_connection.create_table :courses` — outside the
+ * `Schema.define` block entirely — so anchoring on a bare `create_table`
+ * silently drops four canonical tables.
  */
-export function declaredTableNames(source: string): string[] {
-  const names: string[] = [];
-  for (const line of source.split("\n")) {
-    const match = /^\s*create_table\s+(.+)$/.exec(stripComment(line));
-    if (!match) continue;
-    const name = parseName(splitArgs(match[1]!)[0] ?? "");
-    if (name !== null) names.push(name);
+const CREATE_TABLE_CALL = /^(?:[A-Za-z_][\w:]*\s*\.\s*[\w.\s]*?)?\bcreate_table\b(.*)$/;
+
+/** Index of the `)` closing the `(` that `text` starts with, or -1. */
+function matchingParen(text: string): number {
+  let depth = 0;
+  for (let i = 0; i < text.length; i++) {
+    if (text[i] === "(") depth++;
+    else if (text[i] === ")" && --depth === 0) return i;
   }
-  return names;
+  return -1;
+}
+
+/** A literal table name as a single-element list, or null if not literal. */
+function nameOrNull(token: string): string[] | null {
+  const name = parseName(token);
+  return name === null ? null : [name];
 }
 
 /** Strips a trailing `# comment` that is not inside a string literal. */
@@ -291,26 +298,84 @@ function applyColumnLine(table: RailsTable, body: string): void {
  * Later definitions of the same table win, matching Ruby execution order.
  */
 export function parseSchemaRb(source: string): Map<string, RailsTable> {
+  return parseSchemaRbWithCoverage(source).tables;
+}
+
+export interface ParseResult {
+  tables: Map<string, RailsTable>;
+  /**
+   * `create_table` call sites whose table name the parser could not resolve.
+   * This is the honest coverage signal: it is produced by the parser itself as
+   * it fails, so — unlike re-scanning the source with the same regex the parser
+   * uses — it cannot share the parser's blind spots and quietly self-confirm.
+   */
+  unresolved: string[];
+  /** Total `create_table` call sites seen, resolved or not. */
+  callSites: number;
+}
+
+export function parseSchemaRbWithCoverage(source: string): ParseResult {
   const tables = new Map<string, RailsTable>();
+  const unresolved: string[] = [];
+  const callSites: string[] = [];
   const lines = source.split("\n");
   let table: RailsTable | null = null;
   let depth = 0;
+  let pendingEach: { variable: string; names: string[] } | null = null;
 
   for (const rawLine of lines) {
     const line = stripComment(rawLine).trim();
     if (line === "") continue;
 
     if (table === null) {
-      const createMatch = /^create_table\s+(.+)$/.exec(line);
+      // Remember `[:circles, :squares].each do |t|` so a `create_table(t, ...)`
+      // inside it can resolve its block variable to the literal names.
+      const eachMatch = /^\[(.+)\]\.each\s+do\s*\|(\w+)\|\s*$/.exec(line);
+      if (eachMatch) {
+        const names = splitArgs(eachMatch[1]!)
+          .map((token) => parseName(token))
+          .filter((n): n is string => n !== null);
+        pendingEach = names.length > 0 ? { variable: eachMatch[2]!, names } : null;
+        continue;
+      }
+      if (pendingEach && /^end\b/.test(line)) {
+        pendingEach = null;
+        continue;
+      }
+
+      const createMatch = CREATE_TABLE_CALL.exec(line);
       if (!createMatch) continue;
-      const rest = createMatch[1]!;
-      const doIndex = rest.search(/\bdo\s*\|/);
+      callSites.push(line);
+      // `OtherDog.lease_connection.create_table :dogs` builds a same-named
+      // table in a SECOND database; it is not a redefinition of the primary
+      // `dogs` and must not clobber that one's columns.
+      const onOtherConnection = !/^create_table\b/.test(line);
+      let rest = createMatch[1]!;
+      // `create_table(t, force: true) { }` — parenthesised args, brace block.
+      const parenthesised = rest.startsWith("(");
+      let braceBlock = false;
+      if (parenthesised) {
+        const close = matchingParen(rest);
+        if (close === -1) {
+          unresolved.push(line);
+          continue;
+        }
+        braceBlock = /^\s*\{/.test(rest.slice(close + 1));
+        rest = rest.slice(1, close);
+      }
+      const doIndex = parenthesised ? -1 : rest.search(/\bdo\s*\|/);
       const argsSource = doIndex === -1 ? rest : rest.slice(0, doIndex);
       const args = splitArgs(argsSource);
-      const name = parseName(args[0] ?? "");
-      if (!name) continue;
+      const first = (args[0] ?? "").trim();
+      // The name is a literal, or the enclosing `.each` block variable.
+      const names =
+        pendingEach && first === pendingEach.variable ? pendingEach.names : nameOrNull(first);
+      if (names === null) {
+        unresolved.push(line);
+        continue;
+      }
       const primaryKey = parseTablePrimaryKey(args.slice(1));
-      const built: RailsTable = {
+      const build = (name: string): RailsTable => ({
         name,
         columns: new Map(),
         primaryKey,
@@ -318,13 +383,18 @@ export function parseSchemaRb(source: string): Map<string, RailsTable> {
           primaryKey === false ? [] : primaryKey === null ? ["id"] : primaryKey,
         ),
         dynamic: false,
-      };
-      // `create_table :carriers, force: true` — no block, no extra columns.
-      if (doIndex === -1) {
-        tables.set(name, built);
+      });
+      // A loop or brace-block form declares complete tables on this line;
+      // `create_table :carriers, force: true` likewise has no block at all.
+      if (names.length > 1 || braceBlock || doIndex === -1) {
+        for (const name of names) {
+          if (onOtherConnection && tables.has(name)) continue;
+          tables.set(name, build(name));
+        }
         continue;
       }
-      table = built;
+      if (onOtherConnection && tables.has(names[0]!)) continue;
+      table = build(names[0]!);
       depth = 1;
       continue;
     }
@@ -346,5 +416,9 @@ export function parseSchemaRb(source: string): Map<string, RailsTable> {
     if (tMatch) applyColumnLine(table, tMatch[1]!);
   }
 
-  return tables;
+  // A block left open at EOF means the nesting tracker lost sync — report the
+  // call site rather than silently dropping the table.
+  if (table !== null) unresolved.push(`unterminated block for ${table.name}`);
+
+  return { tables, unresolved, callSites: callSites.length };
 }

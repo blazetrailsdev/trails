@@ -1,7 +1,13 @@
 import { describe, it, expect } from "vitest";
 import { readFileSync } from "node:fs";
-import { declaredTableNames, parseSchemaRb } from "./parse-schema-rb.js";
-import { applyBaseline, compareSchemas, isFatal, readBaseline, unparsedTables } from "./compare.js";
+import { parseSchemaRb, parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
+import {
+  applyBaseline,
+  compareSchemas,
+  isFatal,
+  readBaseline,
+  unresolvedCallSites,
+} from "./compare.js";
 import { TEST_SCHEMA } from "../../packages/activerecord/src/test-helpers/test-schema.js";
 import type { Finding } from "./compare.js";
 import type { Schema } from "../../packages/activerecord/src/test-helpers/schema-types.js";
@@ -139,6 +145,42 @@ describe("parseSchemaRb", () => {
     expect([...tables.get("carts")!.columns.keys()]).toEqual(["id", "title"]);
   });
 
+  it("parses a receiver-qualified create_table", () => {
+    const tables = parse(
+      `Course.lease_connection.create_table :courses, force: true do |t|
+         t.column :name, :string, null: false
+       end
+       OtherDog.lease_connection.create_table :other_dogs, force: true`,
+    );
+    expect([...tables.get("courses")!.columns.keys()]).toEqual(["name"]);
+    expect(tables.has("other_dogs")).toBe(true);
+  });
+
+  it("expands a literal-array each loop into one table per name", () => {
+    const tables = parse(
+      `[:circles, :squares, :triangles].each do |t|
+         create_table(t, force: true) { }
+       end
+       create_table :after, force: true do |t|
+         t.string :name
+       end`,
+    );
+    expect([...tables.keys()]).toEqual(["circles", "squares", "triangles", "after"]);
+    expect(tables.get("circles")!.columns.size).toBe(0);
+    // The loop must not swallow the table that follows it.
+    expect([...tables.get("after")!.columns.keys()]).toEqual(["name"]);
+  });
+
+  it("does not let a second connection clobber an existing table", () => {
+    const tables = parse(
+      `create_table :dogs, force: true do |t|
+         t.string :name
+       end
+       OtherDog.lease_connection.create_table :dogs, force: true`,
+    );
+    expect([...tables.get("dogs")!.columns.keys()]).toEqual(["name"]);
+  });
+
   it("marks a table dynamic when a column name is interpolated or computed", () => {
     const tables = parse(
       `create_table :integer_limits, force: true do |t|
@@ -226,31 +268,27 @@ describe("compareSchemas", () => {
   });
 });
 
-describe("unparsedTables", () => {
-  const rb = `create_table :accounts, force: true do |t|
-       t.string :name
-     end
-     create_table :posts, force: true do |t|
-       t.string :title
-     end`;
-
-  it("returns nothing when every declared table parsed", () => {
-    expect(unparsedTables(`ActiveRecord::Schema.define do\n${rb}\nend\n`, parse(rb))).toEqual([]);
+describe("unresolvedCallSites", () => {
+  it("returns nothing when every call site resolved", () => {
+    expect(
+      unresolvedCallSites(`create_table :accounts, force: true do |t|\n  t.string :name\nend`),
+    ).toEqual([]);
   });
 
-  it("names a declared table the parser dropped", () => {
-    const dropped = new Map(parse(rb));
-    dropped.delete("posts");
-    expect(unparsedTables(`ActiveRecord::Schema.define do\n${rb}\nend\n`, dropped)).toEqual([
-      "posts",
-    ]);
+  it("names a create_table whose table name it cannot resolve", () => {
+    const unresolved = unresolvedCallSites(`create_table SOME_CONSTANT, force: true do |t|\nend`);
+    expect(unresolved).toHaveLength(1);
+    expect(unresolved[0]).toContain("SOME_CONSTANT");
   });
 
   it("ignores a create_table that only appears in a comment", () => {
-    const withComment = `# create_table :ghost, force: true do |t|\n${rb}`;
+    expect(unresolvedCallSites(`# create_table :ghost, force: true do |t|`)).toEqual([]);
+  });
+
+  it("reports a block left unterminated at EOF", () => {
     expect(
-      unparsedTables(`ActiveRecord::Schema.define do\n${withComment}\nend\n`, parse(withComment)),
-    ).toEqual([]);
+      unresolvedCallSites(`create_table :x, force: true do |t|\n  t.string :name`),
+    ).toHaveLength(1);
   });
 });
 
@@ -292,9 +330,31 @@ describe("against the vendored schema.rb", () => {
   );
   const railsTables = parseSchemaRb(source);
 
-  it("parses every create_table the file declares", () => {
-    expect(unparsedTables(source, railsTables)).toEqual([]);
-    expect(railsTables.size).toBe(new Set(declaredTableNames(source)).size);
+  it("resolves every create_table call site the file contains", () => {
+    const { unresolved, callSites } = parseSchemaRbWithCoverage(source);
+    expect(unresolved).toEqual([]);
+    // Guards against the regex quietly matching fewer call sites over time.
+    expect(callSites).toBeGreaterThanOrEqual(239);
+  });
+
+  // Codex review of #4966: both forms were silently dropped, so ten canonical
+  // Rails tables were committed as invented-baseline debt.
+  it("parses tables declared on a model's connection outside Schema.define", () => {
+    for (const t of ["courses", "colleges", "professors", "courses_professors"]) {
+      expect(railsTables.has(t), t).toBe(true);
+    }
+  });
+
+  it("parses tables declared through a literal-array each loop", () => {
+    for (const t of ["circles", "squares", "triangles", "non_poly_ones", "non_poly_twos"]) {
+      expect(railsTables.has(t), t).toBe(true);
+    }
+  });
+
+  it("keeps the primary-connection dogs table, not OtherDog's empty one", () => {
+    // schema.rb:559 declares dogs with columns; schema.rb:1462 declares a
+    // same-named table in a SECOND database. The latter must not clobber it.
+    expect(railsTables.get("dogs")!.columns.size).toBeGreaterThan(0);
   });
 
   it("resolves the canonical tables TEST_SCHEMA is built on", () => {
@@ -312,6 +372,6 @@ describe("against the vendored schema.rb", () => {
   it("holds the invention baseline at or below its committed size", async () => {
     // Ratchet: this number may fall as debt is paid off, never rise.
     const baseline = await readBaseline();
-    expect(baseline.tables.length + baseline.columns.length).toBeLessThanOrEqual(100);
+    expect(baseline.tables.length + baseline.columns.length).toBeLessThanOrEqual(91);
   });
 });

@@ -20,7 +20,7 @@ import type {
 } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import { columnsOf } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import type { RailsTable } from "./parse-schema-rb.js";
-import { declaredTableNames, parseSchemaRb } from "./parse-schema-rb.js";
+import { parseSchemaRb, parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -185,12 +185,15 @@ function formatFinding(finding: Finding): string {
 }
 
 /**
- * Table names schema.rb declares that the block parser failed to produce. Any
- * result here means the parser has fallen behind the vendored source and its
- * verdicts cannot be trusted — the caller must abort rather than report.
+ * `create_table` call sites the parser could not resolve to a table name. Any
+ * result means the parser has fallen behind the vendored source and its
+ * verdicts cannot be trusted — the caller must abort rather than report. An
+ * unresolved call site would otherwise turn every TEST_SCHEMA table mirroring
+ * it into a phantom "invention", the one false verdict this tool must never
+ * emit (Codex review of #4966 found exactly that, twice).
  */
-export function unparsedTables(source: string, parsed: ReadonlyMap<string, RailsTable>): string[] {
-  return [...new Set(declaredTableNames(source))].filter((name) => !parsed.has(name));
+export function unresolvedCallSites(source: string): string[] {
+  return parseSchemaRbWithCoverage(source).unresolved;
 }
 
 /** The baseline key for a finding: the table, or `table.column`. */
@@ -227,12 +230,13 @@ export async function main(): Promise<void> {
   const railsTables = parseSchemaRb(source);
 
   // Trust the parser before trusting its verdicts.
-  const unparsed = unparsedTables(source, railsTables);
-  if (unparsed.length > 0) {
+  const unresolved = unresolvedCallSites(source);
+  if (unresolved.length > 0) {
     console.error(
-      `schema.rb declares ${unparsed.length} table(s) the parser could not read: ` +
-        `${unparsed.join(", ")}\nEvery verdict below would be unreliable, so nothing is reported. ` +
-        `Teach scripts/schema-compare/parse-schema-rb.ts the new create_table form.`,
+      `schema.rb has ${unresolved.length} create_table call site(s) the parser could not ` +
+        `resolve to a table name:\n${unresolved.map((l) => `  ${l}`).join("\n")}\n\n` +
+        `Every verdict would be unreliable, so nothing is reported. Teach ` +
+        `scripts/schema-compare/parse-schema-rb.ts the new create_table form.`,
     );
     process.exit(1);
   }
