@@ -114,4 +114,36 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
     const columnDef = { sqlType: "integer[]", options: { array: true } };
     expect(adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe("'{1,2}'");
   });
+
+  it("resolves a live column's cast type by oid/fmod, not by formatted name", () => {
+    // Rails keys lookup_cast_type_from_column on (oid, fmod, sql_type)
+    // (postgresql/quoting.rb:191). Registering a distinguishable type under
+    // an OID whose sqlType would otherwise resolve elsewhere proves the OID
+    // wins: `numeric` by name is a decimal, so `'99'` can only come from the
+    // OID-registered type.
+    adapter.typeMap.registerType(918_273, {
+      serialize: () => "99",
+    } as never);
+    const column = { oid: 918_273, fmod: -1, sqlType: "numeric", array: false };
+    expect(adapter.quoteDefaultExpression(1.5, column)).toBe("'99'");
+  });
+
+  it("forwards fmod so precision-carrying types resolve", () => {
+    // fmod is how numeric(10,2) recovers its precision/scale; dropping it
+    // would silently hand the factory -1.
+    let seen: number | undefined;
+    adapter.typeMap.registerType(918_274, {
+      serialize: (v: unknown) => v,
+    } as never);
+    const spy = vi.spyOn(adapter.typeMap, "fetch").mockImplementation(((
+      _oid: number,
+      fmod: number,
+    ) => {
+      seen = fmod;
+      return { serialize: (v: unknown) => v };
+    }) as never);
+    adapter.quoteDefaultExpression("x", { oid: 918_274, fmod: 655_366, sqlType: "numeric" });
+    expect(seen).toBe(655_366);
+    spy.mockRestore();
+  });
 });

@@ -59,6 +59,12 @@ export interface DefaultExpressionColumn {
   sqlType?: string | null;
   type?: string | null;
   array?: boolean;
+  // Rails' lookup_cast_type_from_column keys on (oid, fmod, sql_type)
+  // (postgresql/quoting.rb:191), so a live Column's OID and type modifier
+  // must survive the trip here — the formatted-name fallback is only for
+  // ColumnDefinitions, which have neither.
+  oid?: number | null;
+  fmod?: number | null;
 }
 
 /**
