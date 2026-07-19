@@ -1090,15 +1090,13 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     expect(connection.active).toBe(true);
   });
 
-  // Passes on PG; skipped on MySQL/MariaDB, where two separate tracked
-  // divergences block it: (1) mysql2's `verifyBang` keys off the optimistic sync
-  // `active` getter instead of an `active?`-style ping, so it does not detect the
-  // server-side kill and never reconnects (unlike the PG `verifyBang` override);
-  // and (2) the subsequent rollback then hits the mysql2 driver's "Can't add new
-  // command when connection is in closed state", which trails does not translate
-  // to an ActiveRecord error (story adapter-connection-failure-error-
-  // classification). Un-skip on MySQL once those converge.
-  it.skipIf(adapterType !== "postgres")(
+  // Runs on every remote-capable adapter (PG + MySQL/MariaDB). #4935 closed the
+  // two MySQL divergences that used to gate this to PG: (1) Mysql2Adapter now
+  // overrides `verifyBang` to probe with a real `active?`-style ping
+  // (`activeAsync`) so it detects the server-side kill and reconnects, and
+  // (2) `isMysql2ConnectionError` now maps the mysql2 driver's "Can't add new
+  // command when connection is in closed state" to `ConnectionFailed`.
+  it.skipIf(!remoteSupported)(
     "active transaction is restored after remote disconnection",
     async () => {
       expect((await Post.count()) as number).toBeGreaterThan(0);
