@@ -68,6 +68,44 @@ export class Notifications {
     return sub as unknown as NotificationSubscriber;
   }
 
+  /**
+   * monotonicSubscribe — like `subscribe`, but the notifier records the event's
+   * start/finish in monotonic time instead of wall-clock time. Mirrors
+   * `ActiveSupport::Notifications.monotonic_subscribe` (notifications.rb:~248):
+   * `notifier.subscribe(pattern, callback, monotonic: true)`.
+   */
+  static monotonicSubscribe(
+    pattern: string | RegExp | null | undefined,
+    callback: (event: Event) => void,
+  ): NotificationSubscriber {
+    const sub = this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event), true);
+    return sub as unknown as NotificationSubscriber;
+  }
+
+  /**
+   * subscribed — subscribe, run `block`, then unsubscribe in a `finally`.
+   * Mirrors `ActiveSupport::Notifications.subscribed` (notifications.rb:~256):
+   * `subscribe`, `yield`, `ensure unsubscribe`. Unlike Rails, `block` may be
+   * async and its result is awaited/returned.
+   */
+  static async subscribed<T>(
+    callback: (event: Event) => void,
+    pattern: string | RegExp | null | undefined,
+    block: () => T | Promise<T>,
+    options: { monotonic?: boolean } = {},
+  ): Promise<T> {
+    const sub = this._notifier.subscribe(
+      pattern ?? null,
+      (event: Event) => callback(event),
+      options.monotonic ?? false,
+    );
+    try {
+      return await block();
+    } finally {
+      this._notifier.unsubscribe(sub);
+    }
+  }
+
   /** Subscribe and automatically unsubscribe after the first matching event. */
   static subscribeOnce(
     pattern: string | RegExp | null | undefined,
@@ -149,6 +187,15 @@ export class Notifications {
     // Deliver the passed payload object itself, not Event#initialize's dup.
     event.payload = resolved;
     event.finish();
+    this._notifier.publishEvent(event);
+  }
+
+  /**
+   * publishEvent — route an already-built `Event` to matching subscribers.
+   * Mirrors `ActiveSupport::Notifications.publish_event` (notifications.rb:~204):
+   * `notifier.publish_event(event)`.
+   */
+  static publishEvent(event: Event): void {
     this._notifier.publishEvent(event);
   }
 

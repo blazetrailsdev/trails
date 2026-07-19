@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Notifications } from "./notifications.js";
+import { Event as EventClass } from "./notifications/instrumenter.js";
 import type { Event } from "./notifications/instrumenter.js";
+import { Temporal } from "./temporal.js";
 
 /**
  * trails-only coverage for the static Notifications surface: the
@@ -250,6 +252,19 @@ describe("Notifications (trails)", () => {
       Notifications.publish("ident", payload);
 
       expect(events[0].payload).toBe(payload);
+    });
+
+    it("publishEvent routes a prebuilt event to matching subscribers", () => {
+      const received: Event[] = [];
+      Notifications.subscribe("prebuilt", (e) => received.push(e));
+
+      const event = new EventClass("prebuilt", Temporal.Now.instant(), { b: 2 }, "id-1");
+      event.finish();
+      Notifications.publishEvent(event);
+
+      expect(received).toHaveLength(1);
+      expect(received[0].name).toBe("prebuilt");
+      expect(received[0].payload.b).toBe(2);
     });
   });
 });
