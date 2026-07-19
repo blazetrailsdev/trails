@@ -254,6 +254,84 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Host#create"].params).toEqual(["scope", "opts"]);
   });
 
+  it("prefers an included module's method over the superclass's", () => {
+    // Ruby inserts included modules between the class and its superclass, so
+    // `Mixin#target` wins over `Parent#target`.
+    const r = aliasParams({
+      "order.rb": `
+        class Parent
+          def target(from_superclass); end
+        end
+
+        module Mixin
+          def target(from_mixin, extra); end
+        end
+
+        class Child < Parent
+          include Mixin
+          alias :aka :target
+        end
+      `,
+    });
+    expect(r["Child#aka"].params).toEqual(["from_mixin", "extra"]);
+  });
+
+  it("prefers the last `include` statement, but the first name within one", () => {
+    // ancestors == [Host, Late, EarlyA, EarlyB]: a later `include` beats an
+    // earlier one, while `include EarlyA, EarlyB` puts EarlyA ahead of EarlyB.
+    const r = aliasParams({
+      "ancestry.rb": `
+        module EarlyA
+          def target(early_a); end
+        end
+        module EarlyB
+          def target(early_b); end
+        end
+        module Late
+          def target(late); end
+        end
+
+        class Host
+          include EarlyA, EarlyB
+          include Late
+          alias :aka :target
+        end
+
+        class Sibling
+          include EarlyA, EarlyB
+          alias :aka :target
+        end
+      `,
+    });
+    expect(r["Host#aka"].params).toEqual(["late"]);
+    expect(r["Sibling#aka"].params).toEqual(["early_a"]);
+  });
+
+  it("resolves an unqualified mixin lexically before the top level", () => {
+    // The ActiveRecord::Relation case: `include Delegation` inside
+    // `ActiveRecord::Relation` must find `ActiveRecord::Delegation`, not a
+    // top-level `::Delegation`.
+    const r = aliasParams({
+      "lex.rb": `
+        module Delegation
+          def target(top_level); end
+        end
+
+        module ActiveRecord
+          module Delegation
+            def target(nested, other); end
+          end
+
+          class Relation
+            include Delegation
+            alias :aka :target
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Relation#aka"].params).toEqual(["nested", "other"]);
+  });
+
   it("prefers a same-bucket definition over an inherited one", () => {
     const r = aliasParams({
       "shadow.rb": `

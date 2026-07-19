@@ -287,6 +287,12 @@ class ApiExtractor
     # `VALID_OPTIONS`-named symbol arrays per class FQN, expanded when a method
     # body passes the constant to `assert_valid_keys`. See collect_option_keys.
     @const_symbol_arrays = {}
+    # `include`/`extend` statements grouped per statement, keyed [fqn, :includes]
+    # / [fqn, :extends]. The flat `info[:includes]` the manifest emits loses
+    # statement boundaries, but Ruby's ancestor order needs them: a LATER
+    # `include` beats an earlier one, while within one `include A, B` the FIRST
+    # argument wins. Internal only — never emitted. See ancestor_methods.
+    @include_groups = {}
     # When true we're scanning a top-level umbrella file (e.g. active_record.rb)
     # one level above libPath. We only harvest module-level singleton config
     # (`singleton_class.attr_accessor` …) from it and redirect that config onto
@@ -808,9 +814,9 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    extract_const_args(args).each do |mod_name|
-      target[:includes] << mod_name
-    end
+    names = extract_const_args(args)
+    names.each { |mod_name| target[:includes] << mod_name }
+    (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
   end
 
   def process_include_from_arg_paren(args)
@@ -818,9 +824,9 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    extract_const_args_from_paren(args).each do |mod_name|
-      target[:includes] << mod_name
-    end
+    names = extract_const_args_from_paren(args)
+    names.each { |mod_name| target[:includes] << mod_name }
+    (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
   end
 
   def process_extend(args)
@@ -828,9 +834,9 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    extract_const_args(args).each do |mod_name|
-      target[:extends] << mod_name
-    end
+    names = extract_const_args(args)
+    names.each { |mod_name| target[:extends] << mod_name }
+    (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
   end
 
   def process_extend_from_arg_paren(args)
@@ -838,9 +844,9 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    extract_const_args_from_paren(args).each do |mod_name|
-      target[:extends] << mod_name
-    end
+    names = extract_const_args_from_paren(args)
+    names.each { |mod_name| target[:extends] << mod_name }
+    (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
   end
 
   # Is `recv` a `singleton_class` receiver — either the bare
@@ -1085,17 +1091,25 @@ class ApiExtractor
     seen[fqn] = true
 
     out = []
+    # Mixins BEFORE the superclass: Ruby inserts included modules between the
+    # class and its superclass, so an included override beats an inherited
+    # definition. Statement order is reversed (a later `include` wins) while
+    # names within one statement keep source order (`include A, B` puts A
+    # first) — the ancestor order `Module#include` actually produces.
+    mixin_key = bucket == :classMethods ? :extends : :includes
+    mixin_groups = @include_groups[[fqn, mixin_key]] || [info[mixin_key]]
+    mixin_groups.reverse_each do |group|
+      group.each do |mod_name|
+        found = lookup_ancestor(mod_name, fqn, all)
+        next unless found
+        out.concat(found[1][:instanceMethods])
+        out.concat(ancestor_methods(found[0], found[1], :instanceMethods, all, seen))
+      end
+    end
     sup = lookup_ancestor(info[:superclass], fqn, all)
     if sup
       out.concat(sup[1][bucket])
       out.concat(ancestor_methods(sup[0], sup[1], bucket, all, seen))
-    end
-    mixin_key = bucket == :classMethods ? :extends : :includes
-    info[mixin_key].each do |mod_name|
-      found = lookup_ancestor(mod_name, fqn, all)
-      next unless found
-      out.concat(found[1][:instanceMethods])
-      out.concat(ancestor_methods(found[0], found[1], :instanceMethods, all, seen))
     end
     out
   end
@@ -1107,15 +1121,25 @@ class ApiExtractor
   # finds `ActiveRecord::Delegation`.
   def lookup_ancestor(name, from_fqn, all)
     return nil unless name
-    name = name.sub(/\A::/, "")
-    return [name, all[name]] if all[name]
+    # Resolved lexically — innermost enclosing scope outwards, top level LAST.
+    # Checking `all[name]` up front would bind `include Delegation` inside
+    # `ActiveRecord::Relation` to a top-level `::Delegation` in preference to
+    # `ActiveRecord::Delegation`, which is the opposite of Ruby's rule.
+    #
+    # A leading `::` should strictly force the absolute lookup, but `const_name`
+    # normalizes `::Foo` to `Foo` before it reaches the recorded `includes`, so
+    # absoluteness isn't observable here; such a reference falls back to lexical
+    # order. Vendored Rails has no `include ::Foo` / `extend ::Foo` anywhere
+    # under `*/lib`, so nothing is misresolved today — teaching the extractor to
+    # preserve `::` would change emitted manifest values for every include and
+    # belongs in its own change.
     parts = from_fqn.split("::")
     while parts.any?
       candidate = (parts + [name]).join("::")
       return [candidate, all[candidate]] if all[candidate]
       parts.pop
     end
-    nil
+    all[name] ? [name, all[name]] : nil
   end
 
   # `class_attribute`/`cattr_accessor`/`mattr_accessor` (and their reader/writer
