@@ -417,21 +417,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    *   1. `conn_params = @config.compact` — drop absent values so node-pg
    *      applies its own defaults.
    *   2. `conn_params[:user] = conn_params.delete(:username) if conn_params[:username]`
-   *      — map the AR param name onto the driver's.
+   *      — map the AR param name onto the driver's. Applied by the CALLER
+   *      (shared `isRubyTruthy` guard, #4964); this helper receives the
+   *      already-mapped hash.
    *   3. `conn_params.slice!(*valid_conn_param_keys)` — forward only keys the
    *      driver understands, so Rails-native keys (`adapter`, `pool`,
    *      `checkoutTimeout`, `migrationsPaths`, ...) and typo'd driver keys are
    *      dropped here rather than silently ignored by the driver.
    *
-   * Steps 2 and 3 are fused into one pass so the ordering cannot be got wrong:
-   * slicing first would drop `username` before it could be renamed, and node-pg
-   * would then connect as the OS user instead of failing (`user` is what
-   * `ConnectionParameters` reads; unknown keys are ignored).
-   *
-   * The `if conn_params[:username]` guard is RUBY truthiness, which differs
-   * from JS in both directions: `""` is truthy in Ruby (a blank username maps
-   * and overwrites `user`), while `false` is falsy, so `username: false` is the
-   * one present value that does NOT map.
+   * The order is load-bearing: slicing before the mapping would drop `username`
+   * before it could be renamed, and node-pg would then connect as the OS user
+   * instead of failing (`user` is what `ConnectionParameters` reads; unknown
+   * keys are ignored). The call site therefore slices the mapped hash.
    * @internal
    */
   private static _sliceValidConnParams(config: Record<string, unknown>): pg.ClientConfig {
@@ -440,13 +437,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // Ruby's `compact` drops nil; both `undefined` and `null` are the JS
       // spelling of an absent value in a database.yml-shaped config.
       if (value === undefined || value === null) continue;
-      if (key === "username") continue;
       if (!PostgreSQLAdapter.VALID_CONN_PARAM_KEYS.has(key)) continue;
       sliced[key] = value;
-    }
-    const username = config.username;
-    if (username !== undefined && username !== null && username !== false) {
-      sliced.user = username;
     }
     return sliced as pg.ClientConfig;
   }
