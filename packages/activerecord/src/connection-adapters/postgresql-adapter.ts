@@ -614,18 +614,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const userGetTypeParser = (
       pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
     )?.getTypeParser;
-    // Rails' database.yml spells the credential `username`
-    // (database_configurations/hash_config.rb); `pg` reads `user` and ignores
-    // unknown keys, so a Rails-spelled hash would otherwise connect as the OS
-    // user instead of failing. Map it here. An explicit `user` wins.
+    // postgresql_adapter.rb:326 — "Map ActiveRecords param names to PGs."
+    //   conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
+    // Note the semantics this ports: a present (truthy) `username` OVERWRITES
+    // any `user`, and is always deleted. Without it a Rails-spelled config
+    // hash connects as the OS user rather than failing, because `pg` reads the
+    // driver-native `user` and ignores unknown keys.
     const { username: railsUsername, ...pgDriverConfig } = pgConfig as typeof pgConfig & {
       username?: string;
     };
     this._pgClientOptions = {
       ...pgDriverConfig,
-      ...(pgDriverConfig.user === undefined && railsUsername !== undefined
-        ? { user: railsUsername }
-        : {}),
+      ...(railsUsername ? { user: railsUsername } : {}),
       types: {
         getTypeParser(oid: number, format?: string): unknown {
           // Our Temporal parsers handle text-format for the 5 datetime OIDs.

@@ -1,12 +1,21 @@
 /**
  * Rails' `database.yml` spells the credential `username`
- * (`database_configurations/hash_config.rb`), but the `mysql2` and `pg` drivers
- * both read the driver-native `user` — and both IGNORE unknown keys. Before the
- * adapters mapped the key, a Rails-spelled config hash connected as the OS user
- * instead of failing, silently.
+ * (`database_configurations/hash_config.rb`), while the Node `mysql2` and `pg`
+ * drivers read the driver-native `user` — and both IGNORE unknown keys. Unmapped,
+ * a Rails-spelled config hash connects as the OS user instead of failing.
  *
- * These are trails-only guards: Rails has no such translation because the Ruby
- * drivers take `username` directly.
+ * For PostgreSQL this mirrors a real Rails translation
+ * (`postgresql_adapter.rb:326`):
+ *
+ *     conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
+ *
+ * so the precedence asserted here is Rails': a *truthy* `username` overwrites
+ * `user` rather than deferring to it, and is always deleted from the hash.
+ *
+ * For MySQL there is no Rails counterpart — Ruby's mysql2 gem reads `:username`
+ * natively, so Rails passes the hash through untouched. The mapping is a
+ * deviation forced by the Node driver; it follows the PostgreSQL semantics
+ * above so the two adapters agree.
  */
 import { describe, expect, it } from "vitest";
 
@@ -23,50 +32,58 @@ function pgClientOptions(config: Record<string, unknown>): Record<string, unknow
   return (adapter as unknown as { _pgClientOptions: Record<string, unknown> })._pgClientOptions;
 }
 
-describe("Mysql2Adapter credential key", () => {
+const BASE = { host: "127.0.0.1", database: "d" };
+
+describe.each([
+  ["Mysql2Adapter", mysqlPoolConfig],
+  ["PostgreSQLAdapter", pgClientOptions],
+])("%s credential key", (_name, driverConfigFor) => {
   it("maps Rails' username onto the driver's user", () => {
-    const poolConfig = mysqlPoolConfig({ host: "127.0.0.1", database: "d", username: "rails" });
-    expect(poolConfig.user).toBe("rails");
-    expect(poolConfig).not.toHaveProperty("username");
+    const driverConfig = driverConfigFor({ ...BASE, username: "rails" });
+    expect(driverConfig.user).toBe("rails");
+    expect(driverConfig).not.toHaveProperty("username");
   });
 
-  it("prefers an explicit user over username", () => {
-    const poolConfig = mysqlPoolConfig({
-      host: "127.0.0.1",
-      database: "d",
-      username: "rails",
-      user: "driver",
-    });
-    expect(poolConfig.user).toBe("driver");
-    expect(poolConfig).not.toHaveProperty("username");
+  it("passes an explicit user through untouched", () => {
+    const driverConfig = driverConfigFor({ ...BASE, user: "driver" });
+    expect(driverConfig.user).toBe("driver");
+  });
+
+  it("lets username overwrite an explicit user", () => {
+    // Rails' `if conn_params[:username]` overwrites unconditionally — it does
+    // not defer to a `user` already in the hash.
+    const driverConfig = driverConfigFor({ ...BASE, username: "rails", user: "driver" });
+    expect(driverConfig.user).toBe("rails");
+    expect(driverConfig).not.toHaveProperty("username");
+  });
+
+  it("ignores a blank username, mirroring Rails' truthiness guard", () => {
+    // `if conn_params[:username]` is falsy for "", so the key is left alone
+    // and `user` survives.
+    const driverConfig = driverConfigFor({ ...BASE, username: "", user: "driver" });
+    expect(driverConfig.user).toBe("driver");
   });
 
   it("leaves user absent when neither key is given", () => {
-    const poolConfig = mysqlPoolConfig({ host: "127.0.0.1", database: "d" });
-    expect(poolConfig).not.toHaveProperty("user");
+    expect(driverConfigFor({ ...BASE })).not.toHaveProperty("user");
   });
 });
 
-describe("PostgreSQLAdapter credential key", () => {
-  it("maps Rails' username onto the driver's user", () => {
-    const clientOptions = pgClientOptions({ host: "127.0.0.1", database: "d", username: "rails" });
-    expect(clientOptions.user).toBe("rails");
-    expect(clientOptions).not.toHaveProperty("username");
-  });
-
-  it("prefers an explicit user over username", () => {
-    const clientOptions = pgClientOptions({
-      host: "127.0.0.1",
-      database: "d",
-      username: "rails",
-      user: "driver",
-    });
-    expect(clientOptions.user).toBe("driver");
-    expect(clientOptions).not.toHaveProperty("username");
-  });
-
-  it("leaves user absent when neither key is given", () => {
-    const clientOptions = pgClientOptions({ host: "127.0.0.1", database: "d" });
-    expect(clientOptions).not.toHaveProperty("user");
+describe("retained config", () => {
+  // Rails maps `username` on the conn_params COPY and leaves `@config` alone
+  // (postgresql_adapter.rb:322 `conn_params = @config.compact`), so
+  // config-reading callers still see Rails' spelling. MySQLDatabaseTasks and
+  // PostgreSQLDatabaseTasks both depend on this — they read `username` off the
+  // config, not `user`.
+  it.each([
+    [
+      "Mysql2Adapter",
+      (c: Record<string, unknown>) => new Mysql2Adapter({ ...c, _fakeConnection: true } as never),
+    ],
+    ["PostgreSQLAdapter", (c: Record<string, unknown>) => new PostgreSQLAdapter(c as never)],
+  ])("%s keeps username in the config the driver mapping read from", (_name, build) => {
+    const adapter = build({ ...BASE, username: "rails" });
+    const config = (adapter as unknown as { _config: Record<string, unknown> })._config;
+    expect(config.username).toBe("rails");
   });
 });

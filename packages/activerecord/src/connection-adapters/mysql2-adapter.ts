@@ -547,18 +547,21 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         ? inputFlags
         : [...inputFlags, "FOUND_ROWS"]
       : ["FOUND_ROWS"];
-    // Rails' database.yml spells the credential `username`
-    // (database_configurations/hash_config.rb); the mysql2 driver reads `user`
-    // and ignores unknown keys, so a Rails-spelled hash would otherwise connect
-    // as the OS user instead of failing. Map it here. An explicit `user` wins.
+    // Deviation forced by the driver, NOT a port: Rails hands the config hash
+    // to Mysql2::Client untouched (mysql2_adapter.rb:24 `::Mysql2::Client.new(config)`)
+    // because the Ruby gem reads `:username` natively. Node's `mysql2` reads
+    // the driver-native `user` and ignores unknown keys, so an unmapped
+    // Rails-spelled hash connects as the OS user instead of failing.
+    //
+    // Semantics deliberately match the one place Rails DOES translate —
+    // postgresql_adapter.rb:326 — so both adapters agree: a truthy `username`
+    // overwrites `user`, and is always removed from the driver config.
     const { username: railsUsername, ...mysqlDriverConfig } = mysqlConfig as typeof mysqlConfig & {
       username?: string;
     };
     this._poolConfig = {
       ...mysqlDriverConfig,
-      ...(mysqlDriverConfig.user === undefined && railsUsername !== undefined
-        ? { user: railsUsername }
-        : {}),
+      ...(railsUsername ? { user: railsUsername } : {}),
       flags: resolvedFlags,
       strict,
       waitTimeout,
