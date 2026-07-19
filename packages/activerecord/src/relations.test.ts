@@ -1836,6 +1836,21 @@ describe("RelationTest", () => {
     expect(allArr.map((p) => p.id)).toEqual((await Post.order("id ASC")).map((p) => p.id));
   });
 
+  it("only does not replay unscope on merge", () => {
+    const stripped = Post.where({ author_id: 1 }).order("id ASC").limit(1).only("where");
+
+    // Unlike delegating to unscope, only records no unscope_values: merging the
+    // result must NOT erase the receiver's order/limit (mirrors except).
+    const merged = Post.order("title").limit(5).merge(stripped);
+    expect(merged.toSql()).toContain("ORDER BY");
+    expect(merged.toSql()).toContain("LIMIT");
+
+    // only keeps value keys with no unscope equivalent when named, and resets
+    // the rest (Rails VALUE_METHODS complement of values.slice).
+    expect(Post.all().distinct().only("distinct").toSql()).toContain("DISTINCT");
+    expect(Post.all().distinct().only("where").toSql()).not.toContain("DISTINCT");
+  });
+
   it("anonymous extension", () => {
     const relation = Post.where({ author_id: 1 })
       .order("id ASC")
