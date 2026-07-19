@@ -871,7 +871,7 @@ export async function save<T extends SaveRecord>(
       // Validations#save { perform_validations; Persistence#save } }`
       // (transactions.rb:360, validations.rb:47), so `before_validation` runs
       // *inside* the transaction and *before* `valid?`. trails runs
-      // `performValidations` above (outside the transaction, line 778), so the
+      // `performValidations` above (outside the transaction), so the
       // deferred thunk's async body runs here — after the validators, not
       // before. Observable only when a record has BOTH a failing validation and
       // an aborting async `before_validation`: trails reports `errors.any`
