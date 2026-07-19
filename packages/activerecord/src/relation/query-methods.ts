@@ -1467,7 +1467,16 @@ function optimizerHintsBang(this: QueryMethodsHost, ...hints: string[]): any {
 }
 
 function reverseOrderBang(this: QueryMethodsHost): any {
-  this._orderClauses = this._orderClauses.map((clause) => {
+  // Rails hands the whole (compact_blank'd) order list to reverse_sql_order, so an
+  // empty order falls into its default branch: ORDER BY <pk> DESC, or an
+  // IrreversibleOrderError when the table has no primary key. Mapping over the
+  // clauses here skips that branch entirely, so delegate the empty case.
+  const clauses = this._orderClauses.filter((clause) => clause !== null && clause !== undefined);
+  if (clauses.length === 0) {
+    this._orderClauses = reverseSqlOrder.call(this, []) as typeof this._orderClauses;
+    return this;
+  }
+  this._orderClauses = clauses.map((clause) => {
     if (clause instanceof Nodes.Node) {
       // Arel::Nodes::SqlLiteral is a String subclass in Rails, so reverse_sql_order
       // reverses it via the `when String` branch (flip trailing ASC↔DESC), not .desc.

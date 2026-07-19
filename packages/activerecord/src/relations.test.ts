@@ -570,9 +570,8 @@ describe("RelationTest", () => {
     );
   });
 
-  it.skip("default reverse order on table without primary key", () => {
-    // BLOCKED: relations — reverseOrder() on a no-PK table should raise IrreversibleOrderError;
-    // Trails' reverseOrder() doesn't check for a missing primary key yet
+  it("default reverse order on table without primary key", () => {
+    expect(() => Edge.all().reverseOrder()).toThrow(IrreversibleOrderError);
   });
 
   it("order with hash and symbol generates the same sql", () => {
@@ -2046,7 +2045,7 @@ describe("RelationTest", () => {
   });
 
   it("reverse order with reorder nil removes the order", () => {
-    const sql = Topic.order("title").reorder(null).reverseOrder().toSql();
+    const sql = Topic.order("title").reverseOrder().reorder(null).toSql();
     expect(sql).not.toContain("ORDER BY");
   });
 
