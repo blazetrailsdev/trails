@@ -222,7 +222,9 @@ interface LocalizeOptions {
 
 interface TranslateOptions {
   locale?: string;
-  default?: TranslationValue;
+  /** A value, or — following i18n — a chain tried entry by entry, Symbols
+   * resolving as further keys, before the lookup is declared missing. */
+  default?: TranslationValue | symbol | (TranslationValue | symbol)[];
   scope?: string;
   count?: number;
   /** When true, raise `MissingTranslationData` instead of returning a
@@ -240,12 +242,33 @@ interface TranslateOptions {
 export class MissingTranslationData extends Error {
   readonly key: string;
   readonly locale: string;
-  constructor(locale: string, key: string) {
-    super(`Translation missing: ${locale}.${key}`);
+  readonly consideredKeys: string[];
+  constructor(locale: string, key: string, consideredKeys: string[] = [key], hasDefaults = false) {
+    super(missingTranslationMessage(locale, key, consideredKeys, hasDefaults));
     this.name = "MissingTranslationData";
     this.locale = locale;
     this.key = key;
+    this.consideredKeys = consideredKeys;
   }
+}
+
+/**
+ * The i18n gem's `MissingTranslation::Base#message`
+ * (i18n/lib/i18n/exceptions.rb:63-68) has two branches: with a non-empty
+ * `default` chain it lists every fully-resolved key that was considered,
+ * otherwise it names the single missing key.
+ */
+function missingTranslationMessage(
+  locale: string,
+  key: string,
+  consideredKeys: string[],
+  hasDefaults: boolean,
+): string {
+  if (hasDefaults) {
+    const lines = consideredKeys.map((k) => `- ${locale}.${k}`).join("\n");
+    return `Translation missing. Options considered were:\n${lines}`;
+  }
+  return `Translation missing: ${locale}.${key}`;
 }
 
 class I18nModule {
@@ -292,14 +315,51 @@ class I18nModule {
 
   translate(key: string | symbol, options: TranslateOptions = {}): TranslationValue {
     const locale = options.locale ?? this.locale;
-    let keyStr = symbolToString(key);
-    if (options.scope) keyStr = `${options.scope}.${keyStr}`;
+    const keyStr = this._scopedKey(symbolToString(key), options.scope);
     const result = this.backend.lookup(locale, keyStr);
     if (result !== undefined) return interpolate(this._pluralize(result, options.count), options);
-    if (options.default !== undefined)
-      return interpolate(this._pluralize(options.default, options.count), options);
-    if (options.raise) throw new MissingTranslationData(locale, keyStr);
-    return `Translation missing: ${locale}.${keyStr}`;
+    // `default` is a chain (i18n/lib/i18n/backend/base.rb:124-145): #default
+    // wraps its subject with Array(), so a lone default is a one-entry chain.
+    // Each entry is tried in turn, Symbols resolving as further keys under the
+    // caller's scope (base.rb:151-163), and resolution continues past any entry
+    // that yields nil. An array *entry* stays literal (`default: [[]]` → `[]`).
+    const defaultGiven = Object.hasOwn(options, "default");
+    const chain =
+      !defaultGiven || options.default === null || options.default === undefined
+        ? []
+        : Array.isArray(options.default)
+          ? options.default
+          : [options.default];
+    const consideredKeys: string[] = [keyStr];
+    for (const entry of chain) {
+      if (entry === null || entry === undefined) continue;
+      if (typeof entry !== "symbol") {
+        return interpolate(this._pluralize(entry as TranslationValue, options.count), options);
+      }
+      const defaultKey = this._scopedKey(symbolToString(entry), options.scope);
+      consideredKeys.push(defaultKey);
+      const found = this.backend.lookup(locale, defaultKey);
+      if (found !== undefined) return interpolate(this._pluralize(found, options.count), options);
+    }
+    // An explicit `default: nil` is a resolved nil fallback, not a miss: i18n
+    // skips the exception entirely when `options[:default].nil?` and the key was
+    // given (base.rb:43-46), so this returns null even under `raise: true`.
+    if (defaultGiven && (options.default === null || options.default === undefined)) return null;
+    // Only an array default with a truthy entry lists the options considered
+    // (i18n/lib/i18n/exceptions.rb:66-72 — `default.is_a?(Array) && default.any?`).
+    // Ruby's block-less `any?` tests element truthiness, where only nil and
+    // false are falsey — 0 and "" are not.
+    const hasDefaults =
+      Array.isArray(options.default) &&
+      options.default.some((d) => d !== null && d !== undefined && d !== false);
+    if (options.raise)
+      throw new MissingTranslationData(locale, keyStr, consideredKeys, hasDefaults);
+    return missingTranslationMessage(locale, keyStr, consideredKeys, hasDefaults);
+  }
+
+  /** @internal Mirrors I18n.normalize_keys' scope prefixing (i18n/lib/i18n.rb:360-370). */
+  _scopedKey(key: string, scope?: string): string {
+    return scope ? `${scope}.${key}` : key;
   }
 
   t(key: string | symbol, options: TranslateOptions = {}): TranslationValue {
