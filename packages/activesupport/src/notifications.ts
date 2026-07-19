@@ -27,6 +27,26 @@ export type NotificationSubscriber = { readonly [notificationSubscriberBrand]: t
 export type { NotificationHandle };
 
 /**
+ * A subscriber callback. Mirrors the two block shapes Rails accepts (see
+ * `ActiveSupport::Notifications.subscribe`): a single-arity block receives the
+ * built `Event`, while the five-arity block receives `(name, start, finish, id,
+ * payload)`. The notifier classifies by arity, so `monotonic` subscribers must
+ * be the five-arity form to see monotonic (`number`) start/finish times.
+ */
+export type NotificationCallback =
+  | ((event: Event) => void)
+  | ((
+      name: string,
+      start: Temporal.Instant | number,
+      finish: Temporal.Instant | number,
+      id: string,
+      payload: EventPayload,
+    ) => void);
+
+/** The listener shape the underlying `Fanout` notifier accepts. */
+type FanoutListener = Parameters<Fanout["subscribe"]>[1];
+
+/**
  * Mirrors ActiveSupport::Notifications::Instrumenter — the object Rails reaches
  * via `ActiveSupport::Notifications.instrumenter`.
  */
@@ -71,32 +91,58 @@ export class Notifications {
   /**
    * monotonicSubscribe — like `subscribe`, but the notifier records the event's
    * start/finish in monotonic time instead of wall-clock time. Mirrors
-   * `ActiveSupport::Notifications.monotonic_subscribe` (notifications.rb:~248):
-   * `notifier.subscribe(pattern, callback, monotonic: true)`.
+   * `ActiveSupport::Notifications.monotonic_subscribe` (notifications.rb:254):
+   * `notifier.subscribe(pattern, callback, monotonic: true)`. The callback is
+   * forwarded with its arity intact (not wrapped) so a five-arity subscriber is
+   * classified as monotonic-timed and receives `number` start/finish times.
    */
   static monotonicSubscribe(
     pattern: string | RegExp | null | undefined,
-    callback: (event: Event) => void,
+    callback: NotificationCallback,
   ): NotificationSubscriber {
-    const sub = this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event), true);
+    const sub = this._notifier.subscribe(pattern ?? null, callback as FanoutListener, true);
     return sub as unknown as NotificationSubscriber;
   }
 
   /**
    * subscribed — subscribe, run `block`, then unsubscribe in a `finally`.
-   * Mirrors `ActiveSupport::Notifications.subscribed` (notifications.rb:~256):
-   * `subscribe`, `yield`, `ensure unsubscribe`. Unlike Rails, `block` may be
+   * Mirrors `ActiveSupport::Notifications.subscribed` (notifications.rb:258):
+   * `subscribe`, `yield`, `ensure unsubscribe`. `pattern` defaults to all events
+   * (Rails' `pattern = nil`), so it may be omitted. Unlike Rails, `block` may be
    * async and its result is awaited/returned.
    */
-  static async subscribed<T>(
-    callback: (event: Event) => void,
+  static subscribed<T>(
+    callback: NotificationCallback,
+    block: () => T | Promise<T>,
+    options?: { monotonic?: boolean },
+  ): Promise<T>;
+  static subscribed<T>(
+    callback: NotificationCallback,
     pattern: string | RegExp | null | undefined,
     block: () => T | Promise<T>,
-    options: { monotonic?: boolean } = {},
+    options?: { monotonic?: boolean },
+  ): Promise<T>;
+  static async subscribed<T>(
+    callback: NotificationCallback,
+    patternOrBlock: string | RegExp | null | undefined | (() => T | Promise<T>),
+    blockOrOptions?: (() => T | Promise<T>) | { monotonic?: boolean },
+    maybeOptions?: { monotonic?: boolean },
   ): Promise<T> {
+    let pattern: string | RegExp | null;
+    let block: () => T | Promise<T>;
+    let options: { monotonic?: boolean };
+    if (typeof patternOrBlock === "function") {
+      pattern = null;
+      block = patternOrBlock;
+      options = (blockOrOptions as { monotonic?: boolean } | undefined) ?? {};
+    } else {
+      pattern = patternOrBlock ?? null;
+      block = blockOrOptions as () => T | Promise<T>;
+      options = maybeOptions ?? {};
+    }
     const sub = this._notifier.subscribe(
-      pattern ?? null,
-      (event: Event) => callback(event),
+      pattern,
+      callback as FanoutListener,
       options.monotonic ?? false,
     );
     try {

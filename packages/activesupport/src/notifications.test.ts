@@ -74,10 +74,14 @@ describe("TimedAndMonotonicTimedSubscriberTest", () => {
   });
 
   it("monotonic subscribe", () => {
-    const events: Event[] = [];
-    Notifications.monotonicSubscribe("monotonic.event", (e) => events.push(e));
+    let classOfStarted: string | undefined;
+    let classOfFinished: string | undefined;
+    Notifications.monotonicSubscribe("monotonic.event", (_name, started, finished) => {
+      classOfStarted = typeof started;
+      classOfFinished = typeof finished;
+    });
     Notifications.instrument("monotonic.event", {});
-    expect(events[0].duration).toBeGreaterThanOrEqual(0);
+    expect([classOfStarted, classOfFinished]).toEqual(["number", "number"]);
   });
 });
 
@@ -122,7 +126,7 @@ describe("SubscribedTest", () => {
     const name2 = name + name;
     const events: string[] = [];
     const callback = (e: Event) => events.push(e.name);
-    await Notifications.subscribed(callback, null, () => {
+    await Notifications.subscribed(callback, () => {
       Notifications.instrument(name);
       Notifications.instrument(name2);
       Notifications.instrument(name);
