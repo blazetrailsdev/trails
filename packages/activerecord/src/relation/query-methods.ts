@@ -667,6 +667,8 @@ function orderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
     }
     i++;
   }
+  // Mirror Rails' `self.order_values |= args`: union dedupes repeated terms.
+  this._orderClauses = dedupeOrderClauses(this._orderClauses);
   return this;
 }
 
@@ -734,15 +736,21 @@ function reorderBang(this: QueryMethodsHost, ...args: OrderArg[]): any {
     }
     i++;
   }
-  // Deduplicate identical order terms — mirrors Rails' order_values.uniq
+  this._orderClauses = dedupeOrderClauses(this._orderClauses);
+  return this;
+}
+
+// Remove duplicate order terms while preserving first-seen order. orderBang
+// mirrors Rails' `self.order_values |= args` and reorderBang its `args.uniq!` —
+// both dedupe by value (query_methods.rb order!/reorder!).
+function dedupeOrderClauses<T>(clauses: T[]): T[] {
   const seen = new Set<string>();
-  this._orderClauses = this._orderClauses.filter((c) => {
+  return clauses.filter((c) => {
     const key = JSON.stringify(c);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
-  return this;
 }
 
 /**

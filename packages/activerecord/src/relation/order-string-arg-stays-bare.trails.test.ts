@@ -27,6 +27,16 @@ describe("order string arg stays bare", () => {
     expect(sql).toContain("ORDER BY name, desc");
   });
 
+  it("dedupes repeated order terms, like Rails order_values |= args", () => {
+    // Rails' order! runs `order_values |= args`, deduping repeated terms.
+    const dupString = Customer.order("name", "name").toSql();
+    expect(dupString.match(/ORDER BY name/g)).toHaveLength(1);
+    const dupSymbol = (Customer as unknown as { order(...a: symbol[]): { toSql(): string } })
+      .order(Symbol.for("name"), Symbol.for("name"))
+      .toSql();
+    expect(dupSymbol.match(/"customers"\."name"/g)).toHaveLength(1);
+  });
+
   it("leaves a directionless string bare (no implicit ASC, no qualification)", () => {
     const sql = Customer.order("name").toSql();
     expect(sql).toContain("ORDER BY name");
