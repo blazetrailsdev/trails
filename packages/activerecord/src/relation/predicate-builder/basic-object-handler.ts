@@ -1,4 +1,5 @@
 import { Nodes } from "@blazetrails/arel";
+import { attributeRelationOf } from "./attribute-relation.js";
 
 /**
  * Handles basic scalar values (strings, numbers, booleans) in where
@@ -29,7 +30,7 @@ export class BasicObjectHandler {
     const bind = this._predicateBuilder.buildBindAttribute(
       attribute.name,
       value,
-      (attribute as unknown as { relation?: unknown }).relation,
+      attributeRelationOf(attribute),
     );
     return attribute.eq(bind);
   }

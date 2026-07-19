@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { IntegerType } from "@blazetrails/activemodel";
-import { Table } from "@blazetrails/arel";
+import { Table, Visitors } from "@blazetrails/arel";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { PredicateBuilder } from "./predicate-builder.js";
 
@@ -30,18 +30,29 @@ describe("Base.predicateBuilder STI memoization", () => {
 // falls through to the identity fallback and silently binds a raw value the
 // column cannot hold, instead of collapsing to `1=0`.
 describe("PredicateBuilder positive-equality bind typing", () => {
-  it("types a joined/aliased equality bind via the relation type caster", () => {
-    const int8 = new IntegerType({ limit: 8 });
-    // Only the attribute's relation knows the column type; the builder's own
-    // table answers undefined, which is the identity-fallback trap.
-    const relation = { typeForAttribute: () => int8 };
-    const table = new Table("posts", { typeCaster: { typeForAttribute: () => undefined } });
-    const builder = new PredicateBuilder(table);
-    const attribute = Object.assign(table.get("author_id"), { relation });
+  const int8 = new IntegerType({ limit: 8 });
+  const OUT_OF_RANGE = 2n ** 63n;
 
-    const bind = builder.buildBindAttribute(attribute.name, 2n ** 63n, relation);
-    expect(bind.isUnboundable()).toBe(1);
-    // The narrow this.table-only lookup finds nothing → identity → not detected.
-    expect(builder.buildBindAttribute(attribute.name, 2n ** 63n).isUnboundable()).toBe(false);
+  // Only the attribute's relation knows the column type. The builder's own
+  // table answers undefined — the identity-fallback trap the narrow
+  // `this.table`-only lookup used to fall into.
+  const buildJoinedEquality = (value: unknown) => {
+    const table = new Table("posts", {
+      typeCaster: { typeForAttribute: () => undefined },
+    });
+    const builder = new PredicateBuilder(table);
+    const joined = new Table("authors", { typeCaster: { typeForAttribute: () => int8 } });
+    return builder.build(joined.get("id"), value);
+  };
+
+  it("collapses a joined out-of-range equality to 1=0", () => {
+    const sql = new Visitors.ToSql().compile(buildJoinedEquality(OUT_OF_RANGE));
+    expect(sql).toBe("1=0");
+  });
+
+  it("leaves an in-range joined equality as a bound predicate", () => {
+    const [sql, binds] = new Visitors.ToSql().compileWithBinds(buildJoinedEquality(7n));
+    expect(sql).not.toContain("1=0");
+    expect(binds).toHaveLength(1);
   });
 });
