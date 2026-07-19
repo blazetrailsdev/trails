@@ -665,7 +665,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       expect(output).not.toMatch(/createSchema\("public"\)/);
       expect(output).toMatch(/createSchema\("test_schema"\)/);
       expect(output).toMatch(/createSchema\("test_schema2"\)/);
-    });
+      // Timeout raised above vitest's 5s default: a full pg schema dump is heavy
+      // enough to cross it under parallel-fork contention (Rails has no such budget).
+    }, 30_000);
   });
 
   describe("SchemaForeignKeyTest", () => {
