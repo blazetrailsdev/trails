@@ -146,10 +146,49 @@ function rubyToS(value: unknown): string {
 function rubyInspect(value: unknown): string {
   if (Array.isArray(value)) return `[${value.map(rubyInspect).join(", ")}]`;
   if (value === null || value === undefined) return "nil";
-  if (typeof value === "string") {
-    return `"${value.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-  }
+  if (typeof value === "string") return rubyStringInspect(value);
   return String(value);
+}
+
+/** Ruby's named single-character escapes, in `String#inspect` order. */
+const RUBY_STRING_ESCAPES: ReadonlyMap<string, string> = new Map([
+  ["\\", "\\\\"],
+  ['"', '\\"'],
+  ["\n", "\\n"],
+  ["\t", "\\t"],
+  ["\r", "\\r"],
+  ["\f", "\\f"],
+  ["\v", "\\v"],
+  ["\x07", "\\a"],
+  ["\b", "\\b"],
+  ["\x1b", "\\e"],
+]);
+
+/**
+ * Ruby `String#inspect`. Beyond `\` and `"`, Ruby emits named escapes for the
+ * usual control characters, `\uXXXX` (uppercase, four digits) for any other
+ * non-printable, and escapes a `#` only when it would start an interpolation
+ * (`#{`, `#$`, `#@`). Printable non-ASCII passes through literally.
+ */
+function rubyStringInspect(value: string): string {
+  let out = '"';
+  for (let i = 0; i < value.length; i++) {
+    const ch = value[i];
+    const escape = RUBY_STRING_ESCAPES.get(ch);
+    if (escape !== undefined) {
+      out += escape;
+    } else if (ch === "#" && "{$@".includes(value[i + 1] ?? "")) {
+      out += "\\#";
+    } else {
+      const code = ch.charCodeAt(0);
+      out += code < 0x20 || code === 0x7f ? `\\u${hex4(code)}` : ch;
+    }
+  }
+  return out + '"';
+}
+
+function hex4(code: number): string {
+  return code.toString(16).toUpperCase().padStart(4, "0");
 }
 
 /**

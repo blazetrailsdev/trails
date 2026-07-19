@@ -28,4 +28,53 @@ describe("ToSql Array-named identifiers", () => {
       '"cpk_orders"."[""shop_id"", ""id""]" DESC',
     );
   });
+
+  // Ruby's Array#to_s inspects each element, so String#inspect escaping applies:
+  // named escapes for the usual control characters, \uXXXX (uppercase, four
+  // digits) for other non-printables, `\#` only where a `#` would begin an
+  // interpolation, and printable non-ASCII passed through. The expectation is
+  // the verbatim output of running these same inputs through
+  // `ruby -e 'puts cases.to_s'`.
+  it("quoteColumnName applies Ruby String#inspect escaping to Array elements", () => {
+    const names = [
+      "a\n",
+      "t\tb",
+      "esc\u001b",
+      "nul\u0000",
+      "del\u007f",
+      "u\u00e9",
+      "bs\\",
+      'q"',
+      "cr\r",
+      "ff\f",
+      "vt\u000b",
+      "bel\u0007",
+      "bsp\b",
+      "h#{x}",
+      "d#$g",
+      "a#@i",
+      "plain#hash",
+      "shop_id",
+      "id",
+      "\u0001\u001f",
+      "\u65e5\u672c",
+    ] as unknown as string;
+
+    const quoted = make().quoteColumnName(names);
+    // Undo the adapter's identifier quoting to compare the bare Array#to_s text.
+    expect(quoted.slice(1, -1).replaceAll('""', '"')).toBe(
+      String.raw`["a\n", "t\tb", "esc\e", "nul\u0000", "del\u007F", "ué", "bs\\", "q\"", "cr\r", "ff\f", "vt\v", "bel\a", "bsp\b", "h\#{x}", "d\#$g", "a\#@i", "plain#hash", "shop_id", "id", "\u0001\u001F", "日本"]`,
+    );
+  });
+
+  // Rails' MySQL visitor renders a CTE name with the visitor's own
+  // `quote_table_name` (arel/visitors/mysql.rb:73 → to_sql.rb:872), not the
+  // connection's, so the name goes through the same Array#to_s stand-in.
+  it("the MySQL CTE visitor routes its name through the ToSql quoteTableName helper", () => {
+    const cte = new Nodes.Cte(
+      ["a", "b"] as unknown as string,
+      new Table("t").from().project(new Nodes.SqlLiteral("1")).ast,
+    );
+    expect(new Visitors.MySQL().compile(cte)).toContain('`["a", "b"]` AS ');
+  });
 });

@@ -230,7 +230,7 @@ export class MySQL extends ToSql {
     // SelectManager as Rails does), so we add them explicitly. But a
     // Grouping (SqlLiteral path) or a set-operation node (array CTE → UnionAll)
     // visits with its own parens — skip the explicit wrap in that case.
-    collector.append(`${this.connection.quoteTableName(node.name)} AS `);
+    collector.append(`${this.quoteTableName(node.name)} AS `);
     if (cteRelationSelfWraps(node.relation)) {
       this.visit(node.relation, collector);
     } else {
@@ -251,6 +251,17 @@ export class MySQL extends ToSql {
       (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
     ) {
       return super.prepareUpdateStatement(o);
+    }
+    return o;
+  }
+
+  protected override prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
+    if (
+      o.offset ||
+      this.hasGroupByAndHaving(o) ||
+      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
+    ) {
+      return super.prepareDeleteStatement(o);
     }
     return o;
   }
@@ -291,16 +302,5 @@ export class MySQL extends ToSql {
     core.source = new Nodes.JoinSource(new Nodes.Grouping(subselect).as("__active_record_temp"));
     core.projections = [new Nodes.SqlLiteral(this.quoteColumnName(keyName), { retryable: true })];
     return stmt;
-  }
-
-  protected override prepareDeleteStatement(o: Nodes.DeleteStatement): Nodes.DeleteStatement {
-    if (
-      o.offset ||
-      this.hasGroupByAndHaving(o) ||
-      (this.hasJoinSources(o) && this.hasLimitOrOffsetOrOrders(o))
-    ) {
-      return super.prepareDeleteStatement(o);
-    }
-    return o;
   }
 }
