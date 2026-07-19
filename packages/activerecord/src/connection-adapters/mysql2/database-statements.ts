@@ -38,6 +38,10 @@ export interface Mysql2RawResult {
   rows: unknown[][] | null;
   fields: Mysql2FieldDescriptor[];
   affectedRows: number;
+  // The driver's `insertId` from a non-row-returning statement's
+  // ResultSetHeader — 0/undefined for a SELECT. Sourced by `execInsert`'s write
+  // path (mysql2_adapter.rb's `last_inserted_id`).
+  insertId?: number;
 }
 
 /**
@@ -264,12 +268,14 @@ export async function performQuery(
   let rows: unknown[][] | null = null;
   let fieldList: Mysql2FieldDescriptor[] = [];
   let affectedRows = 0;
+  let insertId: number | undefined;
   if (Array.isArray(result)) {
     rows = result as unknown[][];
     fieldList = (fields ?? []) as unknown as Mysql2FieldDescriptor[];
     affectedRows = rows.length;
   } else {
     affectedRows = result.affectedRows ?? 0;
+    insertId = result.insertId;
   }
 
   this._affectedRowsBeforeWarnings = affectedRows;
@@ -282,7 +288,7 @@ export async function performQuery(
   this.verified?.();
   this.handleWarnings?.(sql);
 
-  return { rows, fields: fieldList, affectedRows };
+  return { rows, fields: fieldList, affectedRows, insertId };
 }
 
 /**
