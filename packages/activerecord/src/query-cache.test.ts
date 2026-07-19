@@ -14,6 +14,7 @@ import { association } from "./associations.js";
 import { Rollback } from "./errors.js";
 import { assertQueriesCount, assertNoQueries } from "./testing/query-assertions.js";
 import { QueryCache, type QueryCacheCompleteTarget } from "./query-cache.js";
+import { Store } from "./connection-adapters/abstract/query-cache.js";
 import { LogSubscriber } from "./log-subscriber.js";
 import { Notifications, Logger, type NotificationEvent } from "@blazetrails/activesupport";
 import type { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
@@ -1015,9 +1016,37 @@ describe("QueryCacheExpiryTest", () => {
     });
   });
 
-  it.skip("query cache lru eviction", () => {
-    // BLOCKED: relies on swapping `connection.query_cache=` to a Store with a
-    // fixed max_size; trails has no public per-connection query-cache setter.
+  it("query cache lru eviction", async () => {
+    const store = new Store({ value: 0 }, 2);
+    store.enabled = true;
+
+    const connection = await Post.leaseConnection();
+    const oldStore = connection.queryCache;
+    connection.queryCache = store;
+    try {
+      await Post.cache(async () => {
+        await assertQueriesCount(2, false, async () => {
+          await connection.selectAll("SELECT 1");
+          await connection.selectAll("SELECT 2");
+          await connection.selectAll("SELECT 1");
+        });
+
+        await assertQueriesCount(1, false, async () => {
+          await connection.selectAll("SELECT 3");
+          await connection.selectAll("SELECT 3");
+        });
+
+        await assertNoQueries(false, async () => {
+          await connection.selectAll("SELECT 1");
+        });
+
+        await assertQueriesCount(1, false, async () => {
+          await connection.selectAll("SELECT 2");
+        });
+      });
+    } finally {
+      connection.queryCache = oldStore;
+    }
   });
 
   it.skip("threads use the same connection", () => {
