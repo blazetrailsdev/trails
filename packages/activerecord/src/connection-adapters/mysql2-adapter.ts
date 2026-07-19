@@ -952,10 +952,16 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // COM_STMT_CLOSE (via unprepare) when we exceed `statement_limit`.
     const prepare = this._shouldPrepare(binds);
     if (prepare) this._trackPrepared(conn, driverSql);
+    // Hand the payload to the port so it records both keys the way Rails'
+    // perform_query does (database_statements.rb:97-98):
+    // `affected_rows = @affected_rows_before_warnings` and
+    // `row_count = result&.size || 0` — the latter is 0 for a non-row-returning
+    // statement (mysql2 hands back a header, not a result set), so a write's
+    // row_count stays 0 and its count is reported only via affected_rows.
     const raw = await mysql2PerformQuery.call(this as any, conn, driverSql, binds, driverBinds, {
       prepare,
+      notificationPayload: payload,
     });
-    payload.row_count = raw.rows?.length ?? 0;
     await this._handleWarningsOn(conn, driverSql);
     return raw;
   }
@@ -1056,9 +1062,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           const raw = await this._performQuery(mysqlConn, driverSql, binds, driverBinds, payload);
           // Source affected rows through the `affected_rows` port (reads the
           // `_affectedRowsBeforeWarnings` field `perform_query` set) rather than
-          // off the statement result, mirroring Rails' `affected_rows`.
+          // off the statement result, mirroring Rails' `affected_rows`. The
+          // notification payload's `row_count` is left as `perform_query` set it
+          // (0 for a write) — Rails reports the count only via `affected_rows`.
           const affected = this.affectedRows(raw);
-          payload.row_count = affected;
 
           // For INSERT, return the last inserted ID (or affected rows for multi-row)
           if (sql.trimStart().toUpperCase().startsWith("INSERT")) {
