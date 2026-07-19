@@ -101,11 +101,23 @@ describe("test-connection-env", () => {
     );
   });
 
-  it("refuses to serialize a socket-configured connection as a URL", () => {
-    // A URL cannot carry a socket path; rendering host:port instead would
-    // connect somewhere the caller never asked for.
+  it("carries MYSQL_SOCK through a rendered URL as socketPath", () => {
+    // Rails puts MYSQL_SOCK in both mysql2.arunit and mysql2.arunit2
+    // (config.example.yml:18-19,37-39), so every mysql path must preserve it.
+    // mysql2's parseUrl copies query params into its options and honours
+    // socketPath (connection_config.js:52,271-290) — verified against the
+    // driver, which attempts the socket rather than falling back to TCP.
     const settings = mysqlSettings(reader({ MYSQL_SOCK: "/tmp/mysql.sock" }));
-    expect(() => settingsUrl("mysql", settings)).toThrow(/Cannot render a connection URL/);
+    expect(settingsUrl("mysql", settings)).toBe(
+      "mysql://root@localhost:3306/rails_js_test?socketPath=%2Ftmp%2Fmysql.sock",
+    );
+  });
+
+  it("raises for a socket on the postgres scheme, which has no socket setting", () => {
+    // libpq spells a socket connection as PGHOST=/path, already carried as host.
+    expect(() =>
+      settingsUrl("postgres", { ...postgresSettings(reader({})), socket: "/tmp/pg.sock" }),
+    ).toThrow(/PGHOST=/);
   });
 
   it("renders settings as a URL, encoding credentials", () => {

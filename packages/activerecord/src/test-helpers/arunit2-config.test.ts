@@ -41,6 +41,16 @@ describe("arunit2-config", () => {
     });
   });
 
+  it("carries MYSQL_SOCK into the arunit2 connection", () => {
+    // Rails puts the socket in mysql2.arunit2 as well as mysql2.arunit
+    // (config.example.yml:37-39) before ARUnit2Model.establish_connection
+    // :arunit2 (connection.rb:33), so the second database must reach the
+    // socket too — not just the primary.
+    expect(
+      resolveSecondDatabaseConfig(reader({ ARCONN: "mysql2", MYSQL_SOCK: "/tmp/m.sock" })).config,
+    ).toBe("mysql://root@localhost:3306/rails_js_test_arunit2?socketPath=%2Ftmp%2Fm.sock");
+  });
+
   it("carries the worker isolation slot into the arunit2 database name", () => {
     expect(resolveSecondDatabaseConfig(reader({ ARCONN: "mysql2", AR_DB_SLOT: "3" })).config).toBe(
       "mysql://root@localhost:3306/rails_js_test_3_arunit2",

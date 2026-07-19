@@ -13,6 +13,23 @@
  *     `PGPASSWORD` / `PGDATABASE` for the postgresql lane (Rails' `postgresql:`
  *     entries carry no host at all, deferring to libpq's own env).
  *
+ * ## Deviations from `config.example.yml` (deliberate, not parity)
+ *
+ * Rails interpolates ONLY `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK` from the
+ * environment and hard-codes the rest — notably `username: rails` on both
+ * `mysql2.arunit` and `mysql2.arunit2` (`config.example.yml:4,24`), because
+ * Rails' own CI provisions a `rails` user.
+ *
+ * trails makes the credential and database name env-driven too
+ * (`MYSQL_USER` / `MYSQL_PASSWORD` / `MYSQL_DATABASE`, and the `PG*` set), and
+ * defaults them to `root` / `postgres` / `rails_js_test` — the users and
+ * database the containers in `.github/workflows/ci.yml` actually provision.
+ * Hard-coding Rails' `rails` user would not authenticate against them.
+ *
+ * So: the ARCONN-selects / sub-settings-describe *split* is Rails parity; the
+ * particular set of interpolated keys and their defaults is a trails choice.
+ * Anything relying on Rails' literal credential must set `MYSQL_USER` itself.
+ *
  * trails previously collapsed both into a single `PG_TEST_URL` /
  * `MYSQL_TEST_URL` URL string, which made backend selection a side effect of
  * a connection detail being present. This module is the replacement: `ARCONN`
@@ -132,8 +149,10 @@ function applySlot(database: string, read: EnvReader): string {
 }
 
 /**
- * PostgreSQL connection details from libpq's standard env vars, exactly the
- * ones Rails' `postgresql:` entries rely on by carrying no host of their own.
+ * PostgreSQL connection details from libpq's standard env vars — the ones
+ * Rails' `postgresql:` entries rely on by carrying no host of their own. The
+ * defaults (`postgres` / `rails_js_test`) are a trails choice matching what CI
+ * provisions; see the deviations note in the module doc.
  */
 export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
   return {
@@ -146,8 +165,12 @@ export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
 }
 
 /**
- * MySQL/MariaDB connection details from the sub-settings `config.example.yml`
- * interpolates (`MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK`) plus credentials.
+ * MySQL/MariaDB connection details.
+ *
+ * `MYSQL_HOST` / `MYSQL_PORT` / `MYSQL_SOCK` mirror the keys Rails interpolates
+ * (`config.example.yml:12-19`). The credential and database name are a trails
+ * extension defaulting to what CI provisions — Rails hard-codes
+ * `username: rails` instead. See the deviations note in the module doc.
  */
 export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
   return {
@@ -212,21 +235,31 @@ function credentials({ user, password }: ServerSettings): string {
  * `pg` and `mysql2` drivers (and the CLI's `--database-url`) both accept one,
  * so this keeps a single formatting site instead of hand-built strings.
  *
- * A URL cannot carry a Unix socket path, so a socket-configured connection
- * raises here rather than silently serializing to `host:port` — that would
- * connect somewhere the caller did not ask for. Socket users go through the
- * config hash (`serverHash` in `test-database-config.ts`), which carries it.
+ * A `MYSQL_SOCK` connection survives the round trip: mysql2's `parseUrl` copies
+ * every query parameter into its options hash and `socketPath` is one of its
+ * recognised keys (`mysql2/lib/connection_config.js:52,271-290`), so the socket
+ * is emitted as `?socketPath=`. Verified against the driver — with a socket in
+ * the query it attempts the socket and fails `ENOENT` rather than silently
+ * falling back to TCP. This matters because Rails carries `MYSQL_SOCK` into
+ * both `mysql2.arunit` and `mysql2.arunit2` (`config.example.yml:18-19,37-39`),
+ * so every mysql path here has to preserve it.
+ *
+ * Postgres has no socket sub-setting (libpq spells a socket connection as
+ * `PGHOST=/path`, which is already carried as `host`), so a socket on the
+ * postgres scheme is unreachable and raises rather than being dropped.
  */
 export function settingsUrl(scheme: "postgres" | "mysql", settings: ServerSettings): string {
   const { host, port, database, socket } = settings;
-  if (socket !== undefined) {
+  const base = `${scheme}://${credentials(settings)}${host}:${port}/${database}`;
+  if (socket === undefined) return base;
+  if (scheme === "postgres") {
     // eslint-disable-next-line blazetrails/rails-error-parity
     throw new Error(
-      `Cannot render a connection URL for a socket-configured connection ` +
-        `(socket: ${JSON.stringify(socket)}). Use the configuration hash instead.`,
+      `Postgres has no socket sub-setting; spell a socket connection as ` +
+        `PGHOST=${socket} so it is carried as the host.`,
     );
   }
-  return `${scheme}://${credentials(settings)}${host}:${port}/${database}`;
+  return `${base}?socketPath=${encodeURIComponent(socket)}`;
 }
 
 /** The primary PostgreSQL URL for the active worker. */

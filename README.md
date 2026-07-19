@@ -264,10 +264,10 @@ Every sub-setting has a working default (`localhost`, the stock port, and the
 `ARCONN`. An empty value counts as unset. `ARCONN=sqlite3_mem` selects the pure
 `:memory:` lane.
 
-`MYSQL_SOCK` reaches the primary connection and the template provisioning that
-builds each worker's database. The adapter-specific probe suites
-(`describeIfMysql` / `describeIfPg` in `adapters/*/test-helper.ts`) still build
-a URL, and a URL cannot carry a socket path — those connect over TCP.
+Defaults are a trails choice matching what CI provisions, not Rails parity:
+Rails hard-codes `username: rails` and interpolates only host/port/socket
+(`vendor/rails/activerecord/test/config.example.yml`). `ARCONN` selecting the
+backend is the part that mirrors Rails.
 
 The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 
