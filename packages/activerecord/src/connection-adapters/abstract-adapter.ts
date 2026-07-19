@@ -44,6 +44,7 @@ import {
   checkVersion as checkVersionMixin,
   makeCachedSelectAll,
   dirtiesQueryCache,
+  UNWRAPPED_EXECUTE,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
@@ -888,12 +889,19 @@ export class AbstractAdapter implements Quoting {
    * Mirrors: ActiveRecord's `internal_exec_query(sql, "SCHEMA")` usage
    * pattern in SchemaStatements / SchemaCache.
    */
-  async schemaQuery(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
-    // `internalExecQuery` is never wrapped by `dirtiesQueryCache`, so reflection
-    // cannot evict the query cache — the structural distinction Rails gets from
-    // `internal_exec_query` being a separate method from the public `exec_query`.
-    const result = await this.internalExecQuery(sql, "SCHEMA", binds);
-    return result.toArray();
+  schemaQuery(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
+    // Prefer the snapshot taken before `dirtiesQueryCache` wired `execute`, so
+    // reflection runs the same body without the cache-clearing wrapper — Rails'
+    // `internal_exec_query` / `exec_query` split. Adapters that were never wired
+    // (test doubles) fall back to `execute`, which is unwrapped for them anyway.
+    const self = this as unknown as Record<string, unknown>;
+    const unwrapped = (self[UNWRAPPED_EXECUTE] ?? self.execute) as
+      | ((sql: string, binds?: unknown[], name?: string) => Promise<Record<string, unknown>[]>)
+      | undefined;
+    if (typeof unwrapped !== "function") {
+      throw new Error("schemaQuery requires the adapter to implement execute()");
+    }
+    return unwrapped.call(this, sql, binds, "SCHEMA");
   }
 
   // --- QueryCache mixin (mirrors ActiveRecord::ConnectionAdapters::QueryCache) ---
