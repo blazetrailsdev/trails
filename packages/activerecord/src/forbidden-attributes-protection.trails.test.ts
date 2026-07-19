@@ -45,6 +45,17 @@ describe("ForbiddenAttributesProtectionUpdateTest", () => {
     expect(person!.readAttribute("first_name")).toBe("Guille");
   });
 
+  it("forbidden attributes raise before the locking-column guard", async () => {
+    // trails adds a locking-column guard that Rails has no counterpart for. It
+    // must not preempt the sanitizer: Rails' #update runs `assign_attributes`
+    // (and so `sanitize_for_mass_assignment`) before anything else, so an
+    // un-permitted wrapper is rejected on permission, not on its contents.
+    const person = await Person.first();
+    await expect(
+      person!.update(new ProtectedParams({ lock_version: 1, first_name: "Guille" })),
+    ).rejects.toThrow(ForbiddenAttributesError);
+  });
+
   it("empty forbidden params still save without raising", async () => {
     // Rails' `assign_attributes` returns before sanitizing on an empty bag, so
     // an empty (always un-permitted) params object is an assignment no-op —

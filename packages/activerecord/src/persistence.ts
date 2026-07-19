@@ -603,10 +603,17 @@ function assertLockingColumnNotExplicitly(
  *
  * `isMassAssignmentEmpty` rather than `Object.keys(attrs).length` because a
  * params wrapper's own keys are its instance fields, not its contents.
+ *
+ * The trails-local locking guard runs on the SANITIZED hash, after the
+ * sanitizer. Rails' #update does only `assign_attributes` before saving
+ * (persistence.rb:563-579), so nothing may preempt ForbiddenAttributesError;
+ * and on the raw wrapper the guard inspects a params object's instance fields
+ * rather than its contents, so it silently missed `lock_version` there anyway.
  */
 async function assignUpdateAttributes(self: any, attrs: Record<string, unknown>): Promise<void> {
   if (isMassAssignmentEmpty(attrs)) return;
   const sanitized = sanitizeForMassAssignment(attrs);
+  assertLockingColumnNotExplicitly(self, sanitized);
   const pending: Promise<void>[] = [];
   for (const [key, value] of Object.entries(sanitized)) {
     const p = assignUpdateAttribute(self, key, value);
@@ -666,7 +673,6 @@ export async function update<T extends UpdateRecord>(
   attrs: Record<string, unknown>,
 ): Promise<boolean | undefined> {
   assertHashAttributes(attrs);
-  assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // Rails' #update delegates to `assign_attributes`, which iterates setters
@@ -700,7 +706,6 @@ export async function updateBang<T extends UpdateRecord>(
   attrs: Record<string, unknown>,
 ): Promise<true | undefined> {
   assertHashAttributes(attrs);
-  assertLockingColumnNotExplicitly(this, attrs);
   const self = this as any;
   return withTransactionReturningStatus.call(self, async () => {
     // See update(): raw loop preserves original error classes (matches Rails,
