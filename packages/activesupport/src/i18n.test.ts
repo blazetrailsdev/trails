@@ -225,6 +225,12 @@ describe("I18nTest", () => {
     );
   });
 
+  it("translate with an all-nil default array reports the bare missing message", () => {
+    expect(I18n.translate("translations.missing", { default: [null] })).toBe(
+      "Translation missing: en.translations.missing",
+    );
+  });
+
   it("translate with an unresolved non-array default reports the bare missing message", () => {
     expect(I18n.translate("translations.missing", { default: Symbol("also.missing") })).toBe(
       "Translation missing: en.translations.missing",

@@ -345,9 +345,13 @@ class I18nModule {
     // skips the exception entirely when `options[:default].nil?` and the key was
     // given (base.rb:43-46), so this returns null even under `raise: true`.
     if (defaultGiven && (options.default === null || options.default === undefined)) return null;
-    // Only an array default with entries lists the options considered
+    // Only an array default with a truthy entry lists the options considered
     // (i18n/lib/i18n/exceptions.rb:66-72 — `default.is_a?(Array) && default.any?`).
-    const hasDefaults = Array.isArray(options.default) && options.default.length > 0;
+    // Ruby's block-less `any?` tests element truthiness, where only nil and
+    // false are falsey — 0 and "" are not.
+    const hasDefaults =
+      Array.isArray(options.default) &&
+      options.default.some((d) => d !== null && d !== undefined && d !== false);
     if (options.raise)
       throw new MissingTranslationData(locale, keyStr, consideredKeys, hasDefaults);
     return missingTranslationMessage(locale, keyStr, consideredKeys, hasDefaults);
