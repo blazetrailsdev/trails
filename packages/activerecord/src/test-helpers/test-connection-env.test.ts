@@ -1,6 +1,8 @@
 import { describe, expect, it } from "vitest";
 import {
   activeLane,
+  driverConfig,
+  settingsUrl,
   connectionName,
   mysqlSettings,
   mysqlUrl,
@@ -71,6 +73,41 @@ describe("test-connection-env", () => {
     expect(mysqlSettings(reader({ AR_DB_SLOT: "2" })).database).toBe("rails_js_test_2");
   });
 
+  it("treats an empty sub-setting as unset rather than as an empty value", () => {
+    // CI routinely sets a var to "" to mean "no value". Taking that literally
+    // yields user: "" and the server answers `Access denied for user ''`.
+    const settings = mysqlSettings(
+      reader({ MYSQL_USER: "", MYSQL_HOST: "", MYSQL_DATABASE: "", MYSQL_SOCK: "" }),
+    );
+    expect(settings.user).toBe("root");
+    expect(settings.host).toBe("localhost");
+    expect(settings.database).toBe("rails_js_test");
+    expect(settings.socket).toBeUndefined();
+    expect(activeLane(reader({ ARCONN: "" }))).toBe("sqlite");
+  });
+
+  it("raises on a malformed slot rather than sharing the base database", () => {
+    // Silently falling back to the base DB is the cross-worker collision the
+    // slot mechanism exists to prevent, and would surface as an unrelated
+    // DDL failure much later.
+    expect(() => postgresSettings(reader({ AR_DB_SLOT: "abc" }))).toThrow(/must be an integer/);
+    expect(() => postgresSettings(reader({ AR_DB_SLOT: "0" }))).toThrow(/must be >= 1/);
+  });
+
+  it("raises on a non-integer port rather than passing NaN to the driver", () => {
+    expect(() => postgresSettings(reader({ PGPORT: "abc" }))).toThrow(/PGPORT must be an integer/);
+    expect(() => mysqlSettings(reader({ MYSQL_PORT: "3306.5" }))).toThrow(
+      /MYSQL_PORT must be an integer/,
+    );
+  });
+
+  it("refuses to serialize a socket-configured connection as a URL", () => {
+    // A URL cannot carry a socket path; rendering host:port instead would
+    // connect somewhere the caller never asked for.
+    const settings = mysqlSettings(reader({ MYSQL_SOCK: "/tmp/mysql.sock" }));
+    expect(() => settingsUrl("mysql", settings)).toThrow(/Cannot render a connection URL/);
+  });
+
   it("renders settings as a URL, encoding credentials", () => {
     expect(mysqlUrl(reader({}))).toBe("mysql://root@localhost:3306/rails_js_test");
     expect(postgresUrl(reader({ PGPASSWORD: "p@ss word" }))).toBe(
@@ -81,5 +118,28 @@ describe("test-connection-env", () => {
   it("withDatabase repoints settings at another database on the same server", () => {
     const settings = mysqlSettings(reader({ MYSQL_HOST: "db" }));
     expect(withDatabase(settings, "other")).toEqual({ ...settings, database: "other" });
+  });
+
+  it("driverConfig emits both spellings of the credential and the socket", () => {
+    // Regression guard: DatabaseTasks reads Rails' `username`/`socket`, the
+    // drivers read `user`/`socketPath`, and both drivers IGNORE the key they
+    // don't know — so emitting one spelling connects as the OS user instead of
+    // failing. Caught as `Access denied for user ''` on the MySQL
+    // slot-provisioning path, which routes through DatabaseTasks.
+    const config = driverConfig(
+      mysqlSettings(reader({ MYSQL_USER: "u", MYSQL_PASSWORD: "p", MYSQL_SOCK: "/tmp/m.sock" })),
+    );
+    expect(config.username).toBe("u");
+    expect(config.user).toBe("u");
+    expect(config.socket).toBe("/tmp/m.sock");
+    expect(config.socketPath).toBe("/tmp/m.sock");
+  });
+
+  it("driverConfig omits password and socket entirely when unset", () => {
+    // `undefined` is not the same as absent to mysql2.
+    const config = driverConfig(mysqlSettings(reader({})));
+    expect(config).not.toHaveProperty("password");
+    expect(config).not.toHaveProperty("socket");
+    expect(config).not.toHaveProperty("socketPath");
   });
 });

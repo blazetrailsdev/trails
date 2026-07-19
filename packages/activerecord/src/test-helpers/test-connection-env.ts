@@ -47,13 +47,44 @@ export const CONNECTION_LANES: Record<ConnectionName, TestAdapterName> = {
 export type EnvReader = (key: string) => string | undefined;
 
 /**
- * The connection name selected by `ARCONN`, falling back to
- * {@link DEFAULT_CONNECTION}. Mirrors `connection.rb:10`. The name is returned
- * unvalidated — `test-database-config.ts` owns Rails' "Connection not found"
- * failure so the error surfaces once, at config-build time.
+ * Read an env var, treating an empty value as absent.
+ *
+ * CI routinely sets a variable to `""` to mean "no value" (an empty password,
+ * an unused socket path), and `??` alone would take that literally — an empty
+ * `MYSQL_USER` becomes `user: ""` and the server answers
+ * `Access denied for user ''`. This matches the convention already used by
+ * `MySQLDatabaseTasks#resolvedField`, which likewise rejects `""`.
  */
-export function connectionName(read: EnvReader = getEnv): ConnectionName {
-  return (read("ARCONN") || DEFAULT_CONNECTION) as ConnectionName;
+function present(read: EnvReader, key: string): string | undefined {
+  const value = read(key);
+  return value === undefined || value === "" ? undefined : value;
+}
+
+/** Parse an integer sub-setting, failing loudly rather than yielding NaN. */
+function intSetting(read: EnvReader, key: string, fallback: number): number {
+  const raw = present(read, key);
+  if (raw === undefined) return fallback;
+  const parsed = Number(raw);
+  if (!Number.isInteger(parsed)) {
+    // Test-helper invariant with no Rails error counterpart — a bare Error is intentional.
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(`${key} must be an integer, got ${JSON.stringify(raw)}`);
+  }
+  return parsed;
+}
+
+/**
+ * The connection name selected by `ARCONN`, falling back to
+ * {@link DEFAULT_CONNECTION}. Mirrors `connection.rb:10`.
+ *
+ * Returns a bare `string`, not a {@link ConnectionName}: `ARCONN` is arbitrary
+ * user input, and asserting it into the union here would be a type lie that
+ * makes the unknown-name branch look unreachable to every caller.
+ * `test-database-config.ts` owns Rails' "Connection not found" failure, so the
+ * error surfaces once, at config-build time.
+ */
+export function connectionName(read: EnvReader = getEnv): string {
+  return present(read, "ARCONN") ?? DEFAULT_CONNECTION;
 }
 
 /**
@@ -62,7 +93,8 @@ export function connectionName(read: EnvReader = getEnv): ConnectionName {
  * `test-database-config.ts`, not to every lane predicate in the harness.
  */
 export function activeLane(read: EnvReader = getEnv): TestAdapterName {
-  return CONNECTION_LANES[connectionName(read)] ?? CONNECTION_LANES[DEFAULT_CONNECTION];
+  const lanes: Partial<Record<string, TestAdapterName>> = CONNECTION_LANES;
+  return lanes[connectionName(read)] ?? CONNECTION_LANES[DEFAULT_CONNECTION];
 }
 
 /** Connection details for a server-backed lane, assembled from sub-settings. */
@@ -88,8 +120,15 @@ export interface ServerSettings {
 export const SLOT_ENV = "AR_DB_SLOT";
 
 function applySlot(database: string, read: EnvReader): string {
-  const slot = parseInt(read(SLOT_ENV) ?? "1", 10);
-  return Number.isFinite(slot) && slot > 1 ? `${database}_${slot}` : database;
+  // A malformed slot must never silently degrade to the shared base database —
+  // that is precisely the cross-worker collision slots exist to prevent, and it
+  // would surface later as an unrelated DDL or fixture failure.
+  const slot = intSetting(read, SLOT_ENV, 1);
+  if (slot < 1) {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(`${SLOT_ENV} must be >= 1, got ${slot}`);
+  }
+  return slot > 1 ? `${database}_${slot}` : database;
 }
 
 /**
@@ -98,11 +137,11 @@ function applySlot(database: string, read: EnvReader): string {
  */
 export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
   return {
-    host: read("PGHOST") ?? "localhost",
-    port: parseInt(read("PGPORT") ?? "5432", 10),
-    user: read("PGUSER") ?? "postgres",
-    password: read("PGPASSWORD"),
-    database: applySlot(read("PGDATABASE") ?? "rails_js_test", read),
+    host: present(read, "PGHOST") ?? "localhost",
+    port: intSetting(read, "PGPORT", 5432),
+    user: present(read, "PGUSER") ?? "postgres",
+    password: present(read, "PGPASSWORD"),
+    database: applySlot(present(read, "PGDATABASE") ?? "rails_js_test", read),
   };
 }
 
@@ -112,12 +151,47 @@ export function postgresSettings(read: EnvReader = getEnv): ServerSettings {
  */
 export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
   return {
-    host: read("MYSQL_HOST") ?? "localhost",
-    port: parseInt(read("MYSQL_PORT") ?? "3306", 10),
-    user: read("MYSQL_USER") ?? "root",
-    password: read("MYSQL_PASSWORD"),
-    database: applySlot(read("MYSQL_DATABASE") ?? "rails_js_test", read),
-    socket: read("MYSQL_SOCK"),
+    host: present(read, "MYSQL_HOST") ?? "localhost",
+    port: intSetting(read, "MYSQL_PORT", 3306),
+    user: present(read, "MYSQL_USER") ?? "root",
+    password: present(read, "MYSQL_PASSWORD"),
+    database: applySlot(present(read, "MYSQL_DATABASE") ?? "rails_js_test", read),
+    socket: present(read, "MYSQL_SOCK"),
+  };
+}
+
+/**
+ * Translate {@link ServerSettings} into the key set a `configuration_hash` /
+ * driver options object needs, straddling two naming conventions that disagree.
+ *
+ * This is the single place that knows about the straddle:
+ *
+ *   - **credential** — `MySQLDatabaseTasks#buildAdapterConfig` and
+ *     `PostgreSQLDatabaseTasks` read Rails' canonical `username` (as
+ *     `database.yml` spells it), while `Mysql2Adapter` / `PostgreSQLAdapter`
+ *     forward the residual hash to the `mysql2` / `pg` drivers, which read the
+ *     driver-native `user`.
+ *   - **socket** — Rails' config key is `socket`; mysql2's driver option is
+ *     `socketPath`.
+ *
+ * Emitting only one spelling of either fails *silently*: both drivers ignore
+ * unknown keys, so a `username`-only config connects as the OS user rather than
+ * raising (verified against a live server). Converging the adapters onto Rails'
+ * spelling would let this collapse to one key each; that is its own story.
+ *
+ * `password` and the socket keys are omitted when unset so the drivers apply
+ * their own defaults — a literal `undefined` is not the same as absent.
+ */
+export function driverConfig(settings: ServerSettings): Record<string, unknown> {
+  const { host, port, user, password, database, socket } = settings;
+  return {
+    host,
+    port,
+    username: user,
+    user,
+    database,
+    ...(password === undefined ? {} : { password }),
+    ...(socket === undefined ? {} : { socket, socketPath: socket }),
   };
 }
 
@@ -137,9 +211,21 @@ function credentials({ user, password }: ServerSettings): string {
  * URLs are a *serialization* of the sub-settings, never a source of them: the
  * `pg` and `mysql2` drivers (and the CLI's `--database-url`) both accept one,
  * so this keeps a single formatting site instead of hand-built strings.
+ *
+ * A URL cannot carry a Unix socket path, so a socket-configured connection
+ * raises here rather than silently serializing to `host:port` — that would
+ * connect somewhere the caller did not ask for. Socket users go through the
+ * config hash (`serverHash` in `test-database-config.ts`), which carries it.
  */
 export function settingsUrl(scheme: "postgres" | "mysql", settings: ServerSettings): string {
-  const { host, port, database } = settings;
+  const { host, port, database, socket } = settings;
+  if (socket !== undefined) {
+    // eslint-disable-next-line blazetrails/rails-error-parity
+    throw new Error(
+      `Cannot render a connection URL for a socket-configured connection ` +
+        `(socket: ${JSON.stringify(socket)}). Use the configuration hash instead.`,
+    );
+  }
   return `${scheme}://${credentials(settings)}${host}:${port}/${database}`;
 }
 

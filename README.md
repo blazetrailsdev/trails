@@ -261,7 +261,12 @@ Connection _details_ come from discrete sub-setting env vars.
 
 Every sub-setting has a working default (`localhost`, the stock port, and the
 `rails_js_test` database), so a local server on default ports needs only
-`ARCONN`. `ARCONN=sqlite3_mem` selects the pure `:memory:` lane.
+`ARCONN`. An empty value counts as unset. `ARCONN=sqlite3_mem` selects the pure
+`:memory:` lane.
+
+`MYSQL_SOCK` reaches the primary connection only. The adapter-specific probe
+suites (`describeIfMysql` / `describeIfPg` in `adapters/*/test-helper.ts`) still
+build a URL, and a URL cannot carry a socket path — they connect over TCP.
 
 The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 

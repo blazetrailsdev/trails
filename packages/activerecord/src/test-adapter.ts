@@ -31,8 +31,8 @@ import { Base } from "./base.js";
 import { getEnv } from "@blazetrails/activesupport";
 import {
   activeLane,
+  driverConfig,
   mysqlSettings,
-  mysqlUrl,
   postgresSettings,
 } from "./test-helpers/test-connection-env.js";
 
@@ -88,9 +88,9 @@ export type LeasedTestAdapter = DatabaseAdapter & {
 // instead of hardcoding `adapter: "sqlite3"`.
 const _primaryConfiguration: Record<string, unknown> =
   adapterType === "postgres"
-    ? { adapter: "postgresql", ...postgresSettings() }
+    ? { adapter: "postgresql", ...driverConfig(postgresSettings()) }
     : adapterType === "mysql"
-      ? { adapter: "mysql2", ...mysqlSettings() }
+      ? { adapter: "mysql2", ...driverConfig(mysqlSettings()) }
       : { adapter: "sqlite3", database: getEnv("AR_TEST_WORKER_DB") ?? ":memory:" };
 
 /**
@@ -118,25 +118,20 @@ export function ambientPoolConfiguration(): Record<string, unknown> {
 export let newRawTestAdapter: () => DatabaseAdapter;
 
 if (adapterType === "postgres") {
-  const { host, port, user, password, database } = postgresSettings();
+  const config = driverConfig(postgresSettings());
   const { PostgreSQLAdapter } = await import("./connection-adapters/postgresql-adapter.js");
   // Constrain the driver pool to max: 1 so each pooled-adapter slot maps to
   // exactly one PG server connection (the outer ConnectionPool multiplexes).
   newRawTestAdapter = () =>
-    new PostgreSQLAdapter({
-      host,
-      port,
-      user,
-      password,
-      database,
-      max: 1,
-    }) as unknown as DatabaseAdapter;
+    new PostgreSQLAdapter({ ...config, max: 1 }) as unknown as DatabaseAdapter;
 } else if (adapterType === "mysql") {
-  const uri = mysqlUrl();
+  // Built from the config hash rather than a URL so a socket-configured run
+  // (MYSQL_SOCK) reaches the driver — a URL cannot carry a socket path.
+  const config = driverConfig(mysqlSettings());
   const { Mysql2Adapter } = await import("./connection-adapters/mysql2-adapter.js");
   newRawTestAdapter = () =>
     new Mysql2Adapter({
-      uri,
+      ...config,
       connectionLimit: 1,
       flags: ["FOUND_ROWS"],
     }) as unknown as DatabaseAdapter;

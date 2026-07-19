@@ -32,6 +32,7 @@ import { HashConfig } from "../database-configurations/hash-config.js";
 import { UrlConfig } from "../database-configurations/url-config.js";
 import {
   connectionName,
+  driverConfig,
   mysqlSettings,
   postgresSettings,
   type ConnectionName,
@@ -69,40 +70,14 @@ interface NamedConnection {
 }
 
 /**
- * Turn {@link ServerSettings} into the `configuration_hash` shape a
- * `HashConfig` carries. Rails' `config.example.yml` entries are exactly this:
- * an adapter plus discrete host/port/socket/credential keys — never a URL.
- *
- * The credential is emitted under BOTH `username` and `user`, because the two
- * layers that read it disagree — a divergence this config has to straddle, not
- * create:
- *
- *   - `MySQLDatabaseTasks#buildAdapterConfig` / `PostgreSQLDatabaseTasks` read
- *     Rails' canonical `username` (as `database.yml` spells it).
- *   - `Mysql2Adapter` / `PostgreSQLAdapter` hand the residual config straight to
- *     the `mysql2` / `pg` drivers, which read the driver-native `user`.
- *
- * The previous `UrlConfig` satisfied both by accident: each layer parsed the
- * credential out of the URL itself. Emitting only one key silently connects as
- * the OS user instead of failing — both drivers ignore the key they don't know
- * (verified against a live server). Converging the adapters onto Rails'
- * `username` alias would let this drop back to one key; that is its own story.
- *
- * `socket` and `password` are omitted when unset so the drivers apply their
- * own defaults (a literal `undefined` is not the same as absent to mysql2).
+ * Turn {@link ServerSettings} into the `configuration_hash` a `HashConfig`
+ * carries. Rails' `config.example.yml` entries are exactly this: an adapter
+ * plus discrete host/port/socket/credential keys — never a URL. The key
+ * translation (and why it emits two spellings of the credential and socket)
+ * lives in `driverConfig`.
  */
 function serverHash(adapter: string, settings: ServerSettings): Record<string, unknown> {
-  const { host, port, user, password, database, socket } = settings;
-  return {
-    adapter,
-    host,
-    port,
-    username: user,
-    user,
-    database,
-    ...(password === undefined ? {} : { password }),
-    ...(socket === undefined ? {} : { socket }),
-  };
+  return { adapter, ...driverConfig(settings) };
 }
 
 /**
@@ -146,7 +121,10 @@ const CONNECTIONS: Record<ConnectionName, NamedConnection> = {
  */
 function resolve(): { adapter: TestAdapterName; envConfig: HashConfig | UrlConfig } {
   const name = connectionName();
-  const connection = CONNECTIONS[name];
+  // `name` is arbitrary user input from ARCONN, so the lookup is a partial one;
+  // the miss below is Rails' "Connection not found" exit (connection.rb:14-19).
+  const connections: Partial<Record<string, NamedConnection>> = CONNECTIONS;
+  const connection = connections[name];
   if (!connection) {
     // Rails prints "Connection ... not found" and `exit 1`; we have no
     // `process.exit`, so the loud failure is a throw with the same message.
