@@ -295,6 +295,38 @@ describe("Ruby extractor assertion-count collection", () => {
     // branch -> leaf must pick the class-local leaf (2), not the file-level one.
     expect(counts["nested"]).toBe(2);
   });
+
+  it("prefers the including class's override over a mixin module's own helper", () => {
+    const counts = rubyAssertionCounts({
+      "cases/mro_test.rb": `
+        module SharedTests
+          def test_blocked
+            check_blocked { post :index }
+          end
+
+          def check_blocked
+            assert_nil session[:x], "still present"
+            assert_response :success
+          end
+        end
+
+        class UsingExceptionTest < ActionController::TestCase
+          include SharedTests
+
+          def check_blocked(&block)
+            assert_raises(SomeError, &block)
+          end
+        end
+      `,
+    });
+    // The module's tests run as instances of the including class, so Ruby's
+    // method lookup finds that class's check_blocked (1 assertion), not the
+    // module's own default (2). Same shape as actionpack's
+    // request_forgery_protection_test.rb, but with a helper whose name is not
+    // assert_*-prefixed — an assert_*-named override is counted as a single
+    // assertion and never expanded, so it cannot diverge either way.
+    expect(counts["blocked"]).toBe(1);
+  });
 });
 
 // Exercises the Ruby extractor's literal expected-VALUE capture (assertionValues)

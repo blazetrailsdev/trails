@@ -137,6 +137,14 @@ class TestExtractor
     @helper_defs = {}
     collect_helper_defs(sexp, [])
 
+    # module name → scope path of the FIRST class that `include`s it. A module's
+    # tests are emitted once and attributed to the first includer (see
+    # process_include / flush_collected_modules), so that class is the one whose
+    # method overrides Ruby's lookup would actually run for those tests.
+    # Pre-collected because a module body is walked before the later `include`.
+    @module_includers = {}
+    collect_module_includers(sexp, [])
+
     walk(sexp)
 
     flush_collected_modules
@@ -957,9 +965,41 @@ class TestExtractor
     node.each { |child| collect_helper_defs(child, scope) if child.is_a?(Array) }
   end
 
+  # Record the first class to `include` each module, keyed module name → the
+  # including class's scope path. Mirrors process_include's first-include-wins
+  # rule, which flush_collected_modules already uses for gates.
+  def collect_module_includers(node, scope)
+    return unless node.is_a?(Array)
+    if node[0] == :class || node[0] == :module
+      name = const_name(node[1])
+      inner = name ? scope + [name] : scope
+      node.each { |child| collect_module_includers(child, inner) if child.is_a?(Array) }
+      return
+    elsif node[0] == :command && ident_name(node[1]) == "include"
+      mod = const_name_from_args(node[2])
+      @module_includers[mod] ||= scope if mod && !scope.empty?
+    end
+    node.each { |child| collect_module_includers(child, scope) if child.is_a?(Array) }
+  end
+
+  # Scope paths to search, in Ruby method-resolution order, for a call made from
+  # `scope`. A test defined in a mixin module runs as an instance of the class
+  # that `include`s it, so that class's overrides win over the module's own defs
+  # — e.g. actionpack's request_forgery_protection_test.rb, where
+  # RequestForgeryProtectionTests#assert_blocked is overridden by both including
+  # classes. Searching the includer first reproduces that lookup; the module
+  # itself stays in the chain as the fallback (its default definition).
+  def lookup_scopes(scope)
+    includer = @module_includers[scope.last]
+    includer && includer != scope ? [includer, scope] : [scope]
+  end
+
   # The definition of `name` visible from a call site inside class/module path
   # `scope` — the innermost enclosing definition wins, so a class-local helper
   # shadows a file-level one of the same name. Returns [body, def_scope] or nil.
+  #
+  # Scopes are searched in Ruby method-resolution order (see lookup_scopes), so
+  # an including class's override beats a mixin module's own definition.
   #
   # When no enclosing definition exists, an UNAMBIGUOUS (single) definition
   # elsewhere in the file still resolves: the old flat behavior, kept so a helper
@@ -971,13 +1011,20 @@ class TestExtractor
     defs = @helper_defs[name] || []
     return nil if defs.empty?
 
-    best = nil
-    defs.each do |d|
-      next unless scope[0, d[:scope].length] == d[:scope]
-      best = d if best.nil? || d[:scope].length > best[:scope].length
+    lookup_scopes(scope).each do |lookup|
+      best = nil
+      defs.each do |d|
+        next unless lookup[0, d[:scope].length] == d[:scope]
+        best = d if best.nil? || d[:scope].length > best[:scope].length
+      end
+      next unless best
+
+      # Resolved through an includer: keep searching from that class's scope so
+      # nested helper calls also see its overrides.
+      return [best[:body], lookup == scope ? best[:scope] : lookup]
     end
-    best ||= defs.first if defs.length == 1
-    best && [best[:body], best[:scope]]
+
+    defs.length == 1 ? [defs.first[:body], defs.first[:scope]] : nil
   end
 
   # Raw (non-deduped) list of assertion *kind* tokens (method names) in a test
