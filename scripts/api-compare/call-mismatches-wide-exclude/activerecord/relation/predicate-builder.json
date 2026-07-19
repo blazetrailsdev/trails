@@ -32,7 +32,7 @@
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "build_bind_attribute",
     "call": "table",
-    "reason": "Satisfied via a different path (story unify-predicate-builder-type-resolution-cascades): Rails' build_bind_attribute reads `table.type(column_name)` inline. trails unified the three duplicate type-resolution cascades into _resolveTypeBy, whose final leg IS `this.table.typeForAttribute(columnName)` \u2014 so the `table` read still happens on every call, one frame down. The name-based wide gate only inspects the Rails-mapped method body, so it cannot follow the shared resolver."
+    "reason": "Adapted through the shared type cascade (story unify-predicate-builder-type-resolution-cascades): Rails' build_bind_attribute reads `table.type(column_name)` inline and unconditionally (predicate_builder.rb:67-68). trails resolves the same type through _resolveTypeBy, a shared relation -> _tableContext -> this.table cascade that returns the first level to answer, so `this.table` is the fallback leg rather than an unconditional read. This is equivalent for plain columns because `table.get(col).relation` IS `this.table`, so the relation leg returns exactly what Rails' inline read would; for joined/aliased attributes an earlier level intentionally answers first, which is the divergence this story exists to introduce (Rails gets the same effect by re-rooting PredicateBuilder#table per association, which trails cannot do). Either way the wide gate is name-based and inspects only the Rails-mapped method body, so it cannot see the read in the shared resolver."
   },
   {
     "package": "activerecord",
