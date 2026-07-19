@@ -3,8 +3,19 @@ import { UnknownAttributeError } from "./errors.js";
 import { MissingAttributeError } from "./attribute-methods.js";
 
 interface PermittedAttributes {
-  permitted?(): boolean;
+  permitted?: boolean | (() => boolean);
   toH?(): Record<string, unknown>;
+}
+
+/**
+ * Reads a params-like wrapper's `permitted?`. The real
+ * `ActionController::Parameters` exposes it as a boolean GETTER
+ * (strong-parameters.ts:113), while duck-typed wrappers may expose a method —
+ * Ruby draws no such distinction, so both must answer here.
+ */
+function readPermitted(attrs: PermittedAttributes): boolean {
+  const permitted = attrs.permitted;
+  return typeof permitted === "function" ? permitted.call(attrs) : Boolean(permitted);
 }
 
 export function assignAttributes(model: AttributeAssignment, newAttributes: unknown): void {
@@ -52,16 +63,15 @@ export function isMassAssignmentEmpty(attrs: object): boolean {
  * carry an `empty: <boolean>` attribute is unaffected).
  *
  * For the real ActionController::Parameters, `permitted` is a boolean getter
- * (strong-parameters.ts:113), not a method, so `toH` is the load-bearing check
- * that admits it here; the `permitted` function-probe covers other duck-typed
- * wrappers. (sanitizeForMassAssignment has the same permitted-as-function
- * assumption — tracked in `sanitize-mass-assignment-permitted-getter`.)
+ * (strong-parameters.ts:113), not a method, so the probe tests key presence
+ * rather than callability — the non-plain-prototype gate above is what keeps a
+ * plain hash with a literal `permitted` key from being mistaken for a wrapper.
  */
 function isParamsLikeWrapper(attrs: object): boolean {
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return false;
   const wrapper = attrs as PermittedAttributes;
-  return typeof wrapper.permitted === "function" || typeof wrapper.toH === "function";
+  return "permitted" in wrapper || typeof wrapper.toH === "function";
 }
 
 export interface AttributeAssignment {
@@ -125,8 +135,13 @@ export function sanitizeForMassAssignment(
   // unwrap via `to_h` so the caller iterates a plain hash, not the wrapper.
   // Rails calls `attributes.to_h` unconditionally; a permitted params object is
   // expected to respond to it (a malformed one would NoMethodError there too).
-  if (typeof attrs.permitted === "function") {
-    if (!attrs.permitted()) {
+  // `permitted` is a boolean getter on the real Parameters, so probing for a
+  // function here would silently skip the whole guard for the exact class this
+  // mirrors. Gate on wrapper-hood + key presence instead, which keeps a plain
+  // hash carrying a literal `permitted` key out (Ruby's Hash does not
+  // `respond_to?(:permitted?)` either).
+  if (isParamsLikeWrapper(attrs) && "permitted" in attrs) {
+    if (!readPermitted(attrs)) {
       throw new ForbiddenAttributesError();
     }
     return attrs.toH!();
