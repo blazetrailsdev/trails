@@ -9,13 +9,14 @@
  */
 
 import { applyThenable } from "../thenable.js";
+import type { TouchAllArgs } from "../../timestamp.js";
 
 interface BatchRelation {
   toArray(): Promise<any[]>;
   deleteAll(): Promise<number>;
   updateAll(updates: Record<string, unknown>): Promise<number>;
   destroyAll(): Promise<any[]>;
-  touchAll?(...names: string[]): Promise<number>;
+  touchAll?(...args: TouchAllArgs): Promise<number>;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -109,11 +110,11 @@ export class BatchEnumerator<T extends BatchRelation> {
     return total;
   }
 
-  async touchAll(...names: string[]): Promise<number> {
+  async touchAll(...args: TouchAllArgs): Promise<number> {
     let total = 0;
     for await (const batchRelation of this) {
       if (typeof batchRelation.touchAll === "function") {
-        total += await batchRelation.touchAll(...names);
+        total += await batchRelation.touchAll(...args);
       }
     }
     return total;

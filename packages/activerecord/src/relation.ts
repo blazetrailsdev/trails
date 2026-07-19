@@ -129,6 +129,8 @@ import {
 import { BatchEnumerator } from "./relation/batches/batch-enumerator.js";
 import {
   touchAttributesWithTime,
+  parseTouchAllArgs,
+  type TouchAllArgs,
   parseCounterCacheTouch,
   type CounterCacheTouchOption,
 } from "./timestamp.js";
@@ -3947,7 +3949,8 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#touch_all
    */
-  async touchAll(...names: string[]): Promise<number> {
+  async touchAll(...args: TouchAllArgs): Promise<number> {
+    const { names, time } = parseTouchAllArgs(args);
     // No `none?` guard here: Rails' touch_all (relation.rb:969-971) is a bare
     // `update_all model.touch_attributes_with_time(...)` and inherits the
     // `return 0 if @none` from update_all (relation.rb:592). Delegating rather
@@ -3958,10 +3961,10 @@ export class Relation<T extends Base> {
     // (e.g. Developer.updated_at → legacy_updated_at). Route through updateAll
     // so optimistic locking (lock_version increment) is applied — mirrors Rails
     // touch_all which calls update_all internally (relation.rb).
-    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, undefined);
+    const touchUpdates = touchAttributesWithTime.call(this._modelClass, ...names, time);
     const updates: Record<string, unknown> = {};
-    for (const [col, time] of Object.entries(touchUpdates)) {
-      updates[col] = new Nodes.Quoted(time);
+    for (const [col, touchedAt] of Object.entries(touchUpdates)) {
+      updates[col] = new Nodes.Quoted(touchedAt);
     }
 
     // Deviation: Rails passes the empty hash straight to update_all, which
