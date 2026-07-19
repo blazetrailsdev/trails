@@ -197,6 +197,30 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Pkg::Relation#to_a"]).toMatchObject({ params: ["limit"], notes: "alias" });
   });
 
+  it("resolves an alias whose mixin target is itself an unresolved alias", () => {
+    // The host's alias points at `to_ary`, which is itself only an alias inside
+    // the module. Resolution must not depend on the module happening to be
+    // visited before the host — hence the global fixpoint rather than a
+    // per-class sweep. `zz_` sorts the module after the host to make a
+    // hash-order-dependent implementation fail here.
+    const r = aliasParams({
+      "chain.rb": `
+        module Pkg
+          class Relation
+            include ZzDelegation
+            alias :to_a :to_ary
+          end
+
+          module ZzDelegation
+            def records(limit, offset); end
+            alias :to_ary :records
+          end
+        end
+      `,
+    });
+    expect(r["Pkg::Relation#to_a"].params).toEqual(["limit", "offset"]);
+  });
+
   it("resolves a target inherited from a superclass", () => {
     const r = aliasParams({
       "sup.rb": `
@@ -247,7 +271,7 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["Owner#aka"].params).toEqual(["right", "also"]);
   });
 
-  it("leaves an alias empty when its target is outside the package", () => {
+  it("leaves an alias empty when its ancestors are outside the package", () => {
     const r = aliasParams({
       "out.rb": `
         class Orphan < SomeGem::Base

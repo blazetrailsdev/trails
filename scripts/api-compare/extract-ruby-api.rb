@@ -1024,28 +1024,34 @@ class ApiExtractor
   # Public: invoked by `run` per package and by the extractor unit test.
   public def resolve_aliases!
     all = @classes.merge(@modules)
+    # Candidate table per (fqn, bucket): the bucket's own methods first, then —
+    # second resolution stage — the methods reachable through the ancestors the
+    # extractor recorded (`include`d modules and the superclass chain for
+    # instance methods, `extend`ed modules for class methods). `||=` keeps a
+    # same-bucket definition winning over any inherited one, mirroring Ruby's
+    # method lookup. Built once and reused across passes.
+    tables = {}
     all.each do |fqn, info|
       [:instanceMethods, :classMethods].each do |bucket|
-        methods = info[bucket]
         by_name = {}
-        methods.each { |m| by_name[m[:name]] ||= m }
-        # Second resolution stage: an alias whose target is not defined in this
-        # same bucket may still be reachable through the class's ancestors —
-        # `include`d modules (and inherited superclasses) supply instance
-        # methods, `extend`ed modules supply class methods. Fold those in as
-        # lower-priority candidates so the fixpoint below can use them, without
-        # ever shadowing a same-bucket definition.
-        ancestor_methods(fqn, info, bucket, all).each do |m|
-          by_name[m[:name]] ||= m
-        end
-        # Fixpoint: each non-breaking pass fills at least one previously-empty
-        # alias (filled aliases are skipped on later passes), so the count of
-        # unresolved aliases strictly decreases and the loop always terminates —
-        # no arbitrary iteration cap. Handles alias-of-an-alias chains
-        # regardless of source order.
-        loop do
-          changed = false
-          methods.each do |m|
+        info[bucket].each { |m| by_name[m[:name]] ||= m }
+        ancestor_methods(fqn, info, bucket, all).each { |m| by_name[m[:name]] ||= m }
+        tables[[fqn, bucket]] = by_name
+      end
+    end
+
+    # Fixpoint over ALL buckets at once, not per class: an alias may resolve to
+    # an alias in an ancestor that is itself still unresolved, so a single
+    # hash-ordered sweep would read an empty target and give up. Each
+    # non-breaking pass fills at least one previously-empty alias (filled
+    # aliases are skipped afterwards), so the unresolved count strictly
+    # decreases and the loop always terminates — no arbitrary iteration cap.
+    loop do
+      changed = false
+      all.each do |fqn, info|
+        [:instanceMethods, :classMethods].each do |bucket|
+          by_name = tables[[fqn, bucket]]
+          info[bucket].each do |m|
             next unless m[:notes] == "alias" && m[:alias_target]
             next unless m[:params].nil? || m[:params].empty?
             tgt = by_name[m[:alias_target]]
@@ -1053,9 +1059,14 @@ class ApiExtractor
             m[:params] = tgt[:params].map(&:dup)
             changed = true
           end
-          break unless changed
         end
-        methods.each { |m| m.delete(:alias_target) }
+      end
+      break unless changed
+    end
+
+    all.each_value do |info|
+      [:instanceMethods, :classMethods].each do |bucket|
+        info[bucket].each { |m| m.delete(:alias_target) }
       end
     end
   end
