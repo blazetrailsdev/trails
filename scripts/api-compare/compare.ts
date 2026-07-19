@@ -554,6 +554,8 @@ export function superclassesMatch(
   tsChain: string[],
   tsName: string,
 ): boolean {
+  // `class X < ::Foo` records the absolute marker; TS names never carry it.
+  rubySuper = rubySuper?.replace(/^::/, "") ?? null;
   if (!rubySuper && tsChain.length === 0) return true;
   // Ruby builtins have no faithful TS superclass; accept whatever TS uses.
   if (rubySuper && RUBY_UNEXTENDABLE_BUILTINS.has(rubySuper)) return true;
@@ -621,6 +623,9 @@ export function resolveModuleName(
   contextFqn: string,
   moduleFqnByShort: Map<string, string[]>,
 ): string[] {
+  // A leading `::` is Ruby's absolute-reference marker, not a namespace
+  // qualifier: `include ::Foo` names top-level `Foo` regardless of context.
+  if (incName.startsWith("::")) return [incName.slice(2)];
   if (incName.includes("::")) return [incName];
   const candidates = moduleFqnByShort.get(incName);
   if (!candidates || candidates.length === 0) return [incName];

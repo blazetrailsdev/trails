@@ -332,6 +332,52 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["ActiveRecord::Relation#aka"].params).toEqual(["nested", "other"]);
   });
 
+  it("resolves a leading :: mixin against the top level, skipping lexical scope", () => {
+    // Ruby's `::` forces an absolute lookup, so `include ::Delegation` binds to
+    // top-level `Delegation` even though `ActiveRecord::Delegation` exists and
+    // would win for the unqualified `include Delegation` above.
+    const r = aliasParams({
+      "abs.rb": `
+        module Delegation
+          def target(top_level); end
+        end
+
+        module ActiveRecord
+          module Delegation
+            def target(nested, other); end
+          end
+
+          class Relation
+            include ::Delegation
+            alias :aka :target
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Relation#aka"].params).toEqual(["top_level"]);
+  });
+
+  it("resolves a leading :: superclass against the top level", () => {
+    const r = aliasParams({
+      "abs_sup.rb": `
+        class Base
+          def target(top_level); end
+        end
+
+        module ActiveRecord
+          class Base
+            def target(nested, other); end
+          end
+
+          class Relation < ::Base
+            alias :aka :target
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Relation#aka"].params).toEqual(["top_level"]);
+  });
+
   it("prefers a same-bucket definition over an inherited one", () => {
     const r = aliasParams({
       "shadow.rb": `
