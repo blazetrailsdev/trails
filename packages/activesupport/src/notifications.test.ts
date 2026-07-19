@@ -74,10 +74,14 @@ describe("TimedAndMonotonicTimedSubscriberTest", () => {
   });
 
   it("monotonic subscribe", () => {
-    const events: Event[] = [];
-    Notifications.subscribe("monotonic.event", (e) => events.push(e));
+    let classOfStarted: string | undefined;
+    let classOfFinished: string | undefined;
+    Notifications.monotonicSubscribe("monotonic.event", (_name, started, finished) => {
+      classOfStarted = typeof started;
+      classOfFinished = typeof finished;
+    });
     Notifications.instrument("monotonic.event", {});
-    expect(events[0].duration).toBeGreaterThanOrEqual(0);
+    expect([classOfStarted, classOfFinished]).toEqual(["number", "number"]);
   });
 });
 
@@ -101,20 +105,36 @@ describe("BuildHandleTest", () => {
 });
 
 describe("SubscribedTest", () => {
-  it("subscribed", () => {
-    const events = Notifications.collectEvents("subscribed.event", () => {
-      Notifications.instrument("subscribed.event", { x: 1 });
+  it("subscribed", async () => {
+    const name = "foo";
+    const name2 = name + name;
+    const events: string[] = [];
+    const callback = (e: Event) => events.push(e.name);
+    await Notifications.subscribed(callback, name, () => {
+      Notifications.instrument(name);
+      Notifications.instrument(name2);
+      Notifications.instrument(name);
     });
-    expect(events).toHaveLength(1);
-    expect(events[0].payload.x).toBe(1);
+    expect(events).toEqual([name, name]);
+
+    Notifications.instrument(name);
+    expect(events).toEqual([name, name]);
   });
 
-  it("subscribed all messages", () => {
-    const events = Notifications.collectEvents(null, () => {
-      Notifications.instrument("alpha");
-      Notifications.instrument("beta");
+  it("subscribed all messages", async () => {
+    const name = "foo";
+    const name2 = name + name;
+    const events: string[] = [];
+    const callback = (e: Event) => events.push(e.name);
+    await Notifications.subscribed(callback, () => {
+      Notifications.instrument(name);
+      Notifications.instrument(name2);
+      Notifications.instrument(name);
     });
-    expect(events.length).toBeGreaterThanOrEqual(2);
+    expect(events).toEqual([name, name2, name]);
+
+    Notifications.instrument(name);
+    expect(events).toEqual([name, name2, name]);
   });
 
   it("subscribing to instrumentation while inside it", () => {

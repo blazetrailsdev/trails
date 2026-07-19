@@ -64,14 +64,13 @@ export async function assertQueriesCount(
   fn: () => void | Promise<void>,
 ): Promise<void> {
   const counter = new SQLCounter();
-  const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
-    counter.call(event.name, event.transactionId, event.payload as SqlPayload);
-  });
-  try {
-    await fn();
-  } finally {
-    Notifications.unsubscribe(sub);
-  }
+  await Notifications.subscribed(
+    (event: NotificationEvent) => {
+      counter.call(event.name, event.transactionId, event.payload as SqlPayload);
+    },
+    "sql.active_record",
+    fn,
+  );
   const queries = includeSchema ? counter.logAll : counter.log;
   if (count !== undefined) {
     if (queries.length !== count) {
@@ -111,14 +110,13 @@ export async function assertQueriesMatch(
   fn: () => void | Promise<void>,
 ): Promise<void> {
   const counter = new SQLCounter();
-  const sub = Notifications.subscribe("sql.active_record", (event: NotificationEvent) => {
-    counter.call(event.name, event.transactionId, event.payload as SqlPayload);
-  });
-  try {
-    await fn();
-  } finally {
-    Notifications.unsubscribe(sub);
-  }
+  await Notifications.subscribed(
+    (event: NotificationEvent) => {
+      counter.call(event.name, event.transactionId, event.payload as SqlPayload);
+    },
+    "sql.active_record",
+    fn,
+  );
   const queries = includeSchema ? counter.logAll : counter.log;
   // Reset lastIndex before each test (and after) to mirror Ruby Regexp#=== (always stateless).
   const matched = queries.filter((q) => {

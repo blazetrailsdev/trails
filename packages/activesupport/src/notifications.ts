@@ -27,6 +27,26 @@ export type NotificationSubscriber = { readonly [notificationSubscriberBrand]: t
 export type { NotificationHandle };
 
 /**
+ * A subscriber callback. Mirrors the two block shapes Rails accepts (see
+ * `ActiveSupport::Notifications.subscribe`): a single-arity block receives the
+ * built `Event`, while the five-arity block receives `(name, start, finish, id,
+ * payload)`. The notifier classifies by arity, so `monotonic` subscribers must
+ * be the five-arity form to see monotonic (`number`) start/finish times.
+ */
+export type NotificationCallback =
+  | ((event: Event) => void)
+  | ((
+      name: string,
+      start: Temporal.Instant | number,
+      finish: Temporal.Instant | number,
+      id: string,
+      payload: EventPayload,
+    ) => void);
+
+/** The listener shape the underlying `Fanout` notifier accepts. */
+type FanoutListener = Parameters<Fanout["subscribe"]>[1];
+
+/**
  * Mirrors ActiveSupport::Notifications::Instrumenter — the object Rails reaches
  * via `ActiveSupport::Notifications.instrumenter`.
  */
@@ -66,6 +86,84 @@ export class Notifications {
   ): NotificationSubscriber {
     const sub = this._notifier.subscribe(pattern ?? null, (event: Event) => callback(event));
     return sub as unknown as NotificationSubscriber;
+  }
+
+  /**
+   * monotonicSubscribe — like `subscribe`, but the notifier records the event's
+   * start/finish in monotonic time instead of wall-clock time. Mirrors
+   * `ActiveSupport::Notifications.monotonic_subscribe` (notifications.rb:254):
+   * `notifier.subscribe(pattern, callback, monotonic: true)`. The callback is
+   * forwarded with its arity intact (not wrapped) so a five-arity subscriber is
+   * classified as monotonic-timed and receives `number` start/finish times.
+   */
+  static monotonicSubscribe(callback: NotificationCallback): NotificationSubscriber;
+  static monotonicSubscribe(
+    pattern: string | RegExp | null | undefined,
+    callback: NotificationCallback,
+  ): NotificationSubscriber;
+  static monotonicSubscribe(
+    patternOrCallback: string | RegExp | null | undefined | NotificationCallback,
+    maybeCallback?: NotificationCallback,
+  ): NotificationSubscriber {
+    let pattern: string | RegExp | null;
+    let callback: NotificationCallback;
+    if (typeof patternOrCallback === "function") {
+      pattern = null;
+      callback = patternOrCallback;
+    } else {
+      pattern = patternOrCallback ?? null;
+      callback = maybeCallback!;
+    }
+    const sub = this._notifier.subscribe(pattern, callback as FanoutListener, true);
+    return sub as unknown as NotificationSubscriber;
+  }
+
+  /**
+   * subscribed — subscribe, run `block`, then unsubscribe in a `finally`.
+   * Mirrors `ActiveSupport::Notifications.subscribed` (notifications.rb:258):
+   * `subscribe`, `yield`, `ensure unsubscribe`. `pattern` defaults to all events
+   * (Rails' `pattern = nil`), so it may be omitted. Unlike Rails, `block` may be
+   * async and its result is awaited/returned.
+   */
+  static subscribed<T>(
+    callback: NotificationCallback,
+    block: () => T | Promise<T>,
+    options?: { monotonic?: boolean },
+  ): Promise<T>;
+  static subscribed<T>(
+    callback: NotificationCallback,
+    pattern: string | RegExp | null | undefined,
+    block: () => T | Promise<T>,
+    options?: { monotonic?: boolean },
+  ): Promise<T>;
+  static async subscribed<T>(
+    callback: NotificationCallback,
+    patternOrBlock: string | RegExp | null | undefined | (() => T | Promise<T>),
+    blockOrOptions?: (() => T | Promise<T>) | { monotonic?: boolean },
+    maybeOptions?: { monotonic?: boolean },
+  ): Promise<T> {
+    let pattern: string | RegExp | null;
+    let block: () => T | Promise<T>;
+    let options: { monotonic?: boolean };
+    if (typeof patternOrBlock === "function") {
+      pattern = null;
+      block = patternOrBlock;
+      options = (blockOrOptions as { monotonic?: boolean } | undefined) ?? {};
+    } else {
+      pattern = patternOrBlock ?? null;
+      block = blockOrOptions as () => T | Promise<T>;
+      options = maybeOptions ?? {};
+    }
+    const sub = this._notifier.subscribe(
+      pattern,
+      callback as FanoutListener,
+      options.monotonic ?? false,
+    );
+    try {
+      return await block();
+    } finally {
+      this._notifier.unsubscribe(sub);
+    }
   }
 
   /** Subscribe and automatically unsubscribe after the first matching event. */
@@ -149,6 +247,15 @@ export class Notifications {
     // Deliver the passed payload object itself, not Event#initialize's dup.
     event.payload = resolved;
     event.finish();
+    this._notifier.publishEvent(event);
+  }
+
+  /**
+   * publishEvent — route an already-built `Event` to matching subscribers.
+   * Mirrors `ActiveSupport::Notifications.publish_event` (notifications.rb:~204):
+   * `notifier.publish_event(event)`.
+   */
+  static publishEvent(event: Event): void {
     this._notifier.publishEvent(event);
   }
 
