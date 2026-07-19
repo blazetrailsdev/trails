@@ -73,11 +73,20 @@ interface NamedConnection {
  * `HashConfig` carries. Rails' `config.example.yml` entries are exactly this:
  * an adapter plus discrete host/port/socket/credential keys — never a URL.
  *
- * The credential key is `user`, not Rails' `username`: trails' adapters hand
- * the residual config straight to the `pg` / `mysql2` drivers, which read
- * `user`. A `username` key is silently ignored by both, so the connection would
- * fall back to the OS user rather than failing — verified against a live server.
- * (Teaching the adapters Rails' `username` alias is a separate concern.)
+ * The credential is emitted under BOTH `username` and `user`, because the two
+ * layers that read it disagree — a divergence this config has to straddle, not
+ * create:
+ *
+ *   - `MySQLDatabaseTasks#buildAdapterConfig` / `PostgreSQLDatabaseTasks` read
+ *     Rails' canonical `username` (as `database.yml` spells it).
+ *   - `Mysql2Adapter` / `PostgreSQLAdapter` hand the residual config straight to
+ *     the `mysql2` / `pg` drivers, which read the driver-native `user`.
+ *
+ * The previous `UrlConfig` satisfied both by accident: each layer parsed the
+ * credential out of the URL itself. Emitting only one key silently connects as
+ * the OS user instead of failing — both drivers ignore the key they don't know
+ * (verified against a live server). Converging the adapters onto Rails'
+ * `username` alias would let this drop back to one key; that is its own story.
  *
  * `socket` and `password` are omitted when unset so the drivers apply their
  * own defaults (a literal `undefined` is not the same as absent to mysql2).
@@ -88,6 +97,7 @@ function serverHash(adapter: string, settings: ServerSettings): Record<string, u
     adapter,
     host,
     port,
+    username: user,
     user,
     database,
     ...(password === undefined ? {} : { password }),
