@@ -26,6 +26,7 @@ import { Rating as CanonRating } from "./test-helpers/models/rating.js";
 import { Author as CanonAuthor } from "./test-helpers/models/author.js";
 import { Categorization as CanonCategorization } from "./test-helpers/models/categorization.js";
 import { captureSql } from "./testing/sql-capture.js";
+import { quoteTableName, quoteColumnName } from "./test-helpers/quote-regex.js";
 
 describe("isBlank / isPresent", () => {
   // `developers` is canonical (schema.rb `create_table :developers`) and
@@ -885,10 +886,11 @@ describe("inspect wrapper class name", () => {
 
     // End-to-end: builds rather than raising.
     expect(CpkOrder.all().reverseOrder().toSql()).toContain(`ORDER BY`);
-    // `quote_column_name` wraps the `to_s` in `"` and doubles the interior
-    // quotes, so the inspect-style `["shop_id", "id"]` lands as `[""shop_id""…`.
+    // Assert through the active adapter's quoter rather than hardcoding
+    // double quotes: the inspect-style name is escaped differently per
+    // dialect (MySQL backticks it; SQLite/PG double the interior quotes).
     expect(CpkOrder.all().reverseOrder().toSql()).toContain(
-      `"cpk_orders"."[""shop_id"", ""id""]" DESC`,
+      `${quoteTableName("cpk_orders")}.${quoteColumnName('["shop_id", "id"]')} DESC`,
     );
   });
 
