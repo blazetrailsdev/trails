@@ -119,6 +119,11 @@ export function isMassAssignmentEmpty(attrs: object): boolean {
  * plain hash with a literal `permitted` key from being mistaken for a wrapper.
  */
 function isParamsLikeWrapper(attrs: object): boolean {
+  // `where`/`exists` funnel raw primitives through sanitizeForMassAssignment, and
+  // `Object.getPrototypeOf` box-coerces them (so a number clears the plain-object
+  // gate below) while `in` throws on them outright. A primitive is never a params
+  // wrapper — reject before either check.
+  if (typeof attrs !== "object" || attrs === null) return false;
   const proto = Object.getPrototypeOf(attrs);
   if (proto === Object.prototype || proto === null) return false;
   const wrapper = attrs as PermittedAttributes;
