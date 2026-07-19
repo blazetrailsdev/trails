@@ -207,6 +207,47 @@ describe("TS extractor assertion-count collection", () => {
     expect(counts["shadowed"]).toBe(2);
     expect(counts["outer"]).toBe(1);
   });
+
+  it("still expands an unambiguous helper defined in a sibling scope", () => {
+    const src = `
+      describe("defs", () => {
+        function checkRow() {
+          expect(a).toEqual(1);
+          expect(b).toEqual(2);
+        }
+      });
+      describe("use", () => {
+        it("sibling", () => {
+          checkRow();
+        });
+      });
+    `;
+    // Nothing lexically encloses the call, but the single definition is
+    // unambiguous — the pre-scope flat behavior is preserved.
+    expect(tsAssertionCounts(src)["sibling"]).toBe(2);
+  });
+
+  it("resolves a sub-helper from the calling helper's own scope", () => {
+    const src = `
+      function leaf() {
+        expect(a).toEqual(1);
+      }
+      describe("outer", () => {
+        function leaf() {
+          expect(a).toEqual(1);
+          expect(b).toEqual(2);
+        }
+        function branch() {
+          leaf();
+        }
+        it("nested", () => {
+          branch();
+        });
+      });
+    `;
+    // branch() -> leaf() must pick the suite-local leaf (2), not the file one.
+    expect(tsAssertionCounts(src)["nested"]).toBe(2);
+  });
 });
 
 /** Index a file's extracted tests by description → assertionKinds. */

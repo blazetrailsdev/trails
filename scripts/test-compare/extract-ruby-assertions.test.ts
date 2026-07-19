@@ -243,6 +243,58 @@ describe("Ruby extractor assertion-count collection", () => {
     });
     expect(counts["shadowed"]).toBe(2);
   });
+
+  it("still expands an unambiguous helper defined in an included module", () => {
+    const counts = rubyAssertionCounts({
+      "cases/mixin_test.rb": `
+        module RowAssertions
+          def check_row
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+        end
+
+        class MixinTest < ActiveSupport::TestCase
+          include RowAssertions
+
+          def test_mixed_in
+            check_row
+          end
+        end
+      `,
+    });
+    // The def's scope path is ["RowAssertions"], which does not enclose the
+    // caller — but it is the file's only definition, so the pre-scope flat
+    // behavior is preserved and the mixin's asserts still fold in.
+    expect(counts["mixed in"]).toBe(2);
+  });
+
+  it("resolves a sub-helper from the calling helper's own class scope", () => {
+    const counts = rubyAssertionCounts({
+      "cases/nested_test.rb": `
+        def leaf
+          assert_equal 1, a
+        end
+
+        class NestedTest < ActiveSupport::TestCase
+          def leaf
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+
+          def branch
+            leaf
+          end
+
+          def test_nested
+            branch
+          end
+        end
+      `,
+    });
+    // branch -> leaf must pick the class-local leaf (2), not the file-level one.
+    expect(counts["nested"]).toBe(2);
+  });
 });
 
 // Exercises the Ruby extractor's literal expected-VALUE capture (assertionValues)
