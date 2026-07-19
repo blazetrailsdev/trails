@@ -324,6 +324,28 @@ describe("ReflectionTest", () => {
     expect(reflection.pluralName).toBe("");
   });
 
+  it("nil name derivations coerce like Ruby to_s, not to the string null", () => {
+    // Rails stores `@name = name` but every string derivation interpolates or
+    // calls to_s (reflection.rb:453, :821-825, :829), so nil yields the
+    // empty-name forms. JS template strings would render "null" instead.
+    class NilDerivOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("NilDerivOwner", NilDerivOwner);
+
+    const hasMany = create("hasMany", null, null, {}, NilDerivOwner);
+    expect(hasMany.className).toBe("");
+
+    const belongsTo = create("belongsTo", null, null, {}, NilDerivOwner);
+    expect(belongsTo.className).toBe("");
+    expect(belongsTo.foreignKey).toBe("_id");
+
+    const poly = create("belongsTo", null, null, { polymorphic: true }, NilDerivOwner);
+    expect(poly.foreignType).toBe("_type");
+  });
+
   it("plural_name honors pluralize_table_names", () => {
     // Rails: active_record.pluralize_table_names ? name.to_s.pluralize : name.to_s
     // (reflection.rb:395). We previously pluralized unconditionally.

@@ -602,6 +602,16 @@ export class MacroReflection extends AbstractReflection {
     this.pluralName = activeRecord.pluralizeTableNames ? pluralize(name ?? "") : (name ?? "");
   }
 
+  /**
+   * Ruby's `name.to_s` — nil renders as "". Rails stores `@name = name` but
+   * every string derivation goes through interpolation or `to_s`
+   * (reflection.rb:453, :821-825, :829), so a nil name yields "" / "_id" /
+   * "_type" rather than the literal "null" JS template strings would produce.
+   */
+  protected get nameString(): string {
+    return this.name ?? "";
+  }
+
   equals(other: unknown): boolean {
     if (this === other) return true;
     if (!(other instanceof (this.constructor as typeof MacroReflection))) return false;
@@ -627,7 +637,7 @@ export class MacroReflection extends AbstractReflection {
 
   get className(): string {
     if (this.options.className) return this.options.className as string;
-    return camelize(singularize(this.name));
+    return camelize(singularize(this.nameString));
   }
 
   get klass(): typeof Base {
@@ -716,7 +726,7 @@ export class MacroReflection extends AbstractReflection {
    * Derives class name from association name. Used by `className` getter.
    */
   protected deriveClassName(): string {
-    return camelize(this.name);
+    return camelize(this.nameString);
   }
 
   private normalizeOptions(options: Record<string, unknown>): Record<string, unknown> {
@@ -803,7 +813,7 @@ export class AssociationReflection extends MacroReflection {
       const macro = new.target.name.replace(/Reflection$/, "");
       const macroName = macro.charAt(0).toLowerCase() + macro.slice(1);
       throw new ConfigurationError(
-        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${macroName} :${name}\` ` +
+        `Setting \`queryConstraints:\` option on \`${activeRecord.name}.${macroName} :${name ?? ""}\` ` +
           `is not allowed. To get the same behavior, use the \`foreignKey\` option instead.`,
       );
     }
@@ -848,7 +858,7 @@ export class AssociationReflection extends MacroReflection {
   }
 
   private deriveForeignKey(inferFromInverseOf = true): string {
-    if (this.belongsTo()) return `${underscore(this.name)}_id`;
+    if (this.belongsTo()) return `${underscore(this.nameString)}_id`;
     if (this.options.as) return `${underscore(this.options.as as string)}_id`;
     if (this.options.inverseOf && inferFromInverseOf) {
       const inv = this.inverseOf();
@@ -908,7 +918,9 @@ export class AssociationReflection extends MacroReflection {
   get foreignType(): string | null {
     if (!this.options.polymorphic && !this.options.as) return null;
     if (this.belongsTo())
-      return (this.options.foreignType as string | undefined) ?? `${underscore(this.name)}_type`;
+      return (
+        (this.options.foreignType as string | undefined) ?? `${underscore(this.nameString)}_type`
+      );
     if (this.options.as) {
       return (
         (this.options.foreignType as string | undefined) ??
@@ -1337,9 +1349,9 @@ export class AssociationReflection extends MacroReflection {
   get className(): string {
     if (this.options.className) return this.options.className as string;
     if (this.isCollection()) {
-      return camelize(singularize(this.name));
+      return camelize(singularize(this.nameString));
     }
-    return camelize(this.name);
+    return camelize(this.nameString);
   }
 
   /** @internal */
