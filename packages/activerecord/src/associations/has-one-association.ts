@@ -77,6 +77,15 @@ export class HasOneAssociation extends SingularAssociation {
    *   ergonomic-tradeoff decision to deviate loudly from Rails' legal syntax.
    */
   queueWrite(record: Base | null): void {
+    // Rails' `replace` raises a class mismatch as its very first statement
+    // (has_one_association.rb:59-60), before any load/removal/persist — and so
+    // before the persisted-owner deviation below. That guard is synchronous, so
+    // preserve its ordering even on this non-awaitable path: `firm.account = 1`
+    // must report `AssociationTypeMismatch`, not the awaitable-setter throw.
+    if (record)
+      (this as unknown as { raiseOnTypeMismatchBang(r: Base): void }).raiseOnTypeMismatchBang(
+        record,
+      );
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       throw new HasOnePersistedAssignmentError(this.reflection.name);
     }

@@ -104,6 +104,14 @@ export class HasOneThroughAssociation extends HasOneAssociation {
    * record for the owner's next `save()` to persist).
    */
   override queueWrite(record: Base | null): void {
+    // Preserve Rails' leading synchronous class-mismatch guard
+    // (has_one_association.rb:59-60) before the persisted-owner throw, matching
+    // the base `HasOneAssociation#queueWrite`.
+    if (record) {
+      (this as unknown as { raiseOnTypeMismatchBang(r: Base): void }).raiseOnTypeMismatchBang(
+        record,
+      );
+    }
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       throw new HasOnePersistedAssignmentError(this.reflection.name);
     }

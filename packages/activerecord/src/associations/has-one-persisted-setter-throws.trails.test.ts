@@ -11,7 +11,7 @@
  * no Rails test for this deviation.
  */
 import { describe, it, expect, beforeAll } from "vitest";
-import { registerModel } from "../index.js";
+import { registerModel, AssociationTypeMismatch } from "../index.js";
 import { HasOnePersistedAssignmentError } from "./errors.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Account } from "../test-helpers/models/account.js";
@@ -46,6 +46,16 @@ describe("HasOnePersistedSetterThrows", () => {
     expect(() => {
       firm.account = account;
     }).toThrow(HasOnePersistedAssignmentError);
+  });
+
+  it("native = setter raises the type mismatch before the persisted-owner throw", async () => {
+    // Rails' `replace` raises `AssociationTypeMismatch` as its first line
+    // (has_one_association.rb:59-60), before any other work — the sync guard is
+    // preserved ahead of the persisted-owner deviation.
+    const firm = (await Firm.create({ name: "GlobalMegaCorp" })) as unknown as HasOneOwner;
+    expect(() => {
+      firm.account = 1;
+    }).toThrow(AssociationTypeMismatch);
   });
 
   it("throw message names the association and the awaitable replacement", async () => {
