@@ -280,7 +280,9 @@ interface TimestampInstanceHost {
  * Argument list for `touch_all(*names, time: nil)`. Ruby's trailing keyword
  * becomes an optional trailing options object in TS.
  */
-export type TouchAllArgs = (string | { time?: Temporal.Instant })[];
+export type TouchAllOptions = { time?: Temporal.Instant };
+
+export type TouchAllArgs = string[] | [...names: string[], options: TouchAllOptions];
 
 export function parseTouchAllArgs(args: TouchAllArgs): {
   names: string[];
