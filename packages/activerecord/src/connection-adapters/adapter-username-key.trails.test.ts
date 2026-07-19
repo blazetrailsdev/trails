@@ -23,6 +23,7 @@
  */
 import { describe, expect, it } from "vitest";
 
+import { buildAdapterArg } from "./adapter-args.js";
 import { Mysql2Adapter } from "./mysql2-adapter.js";
 import { PostgreSQLAdapter } from "./postgresql-adapter.js";
 
@@ -82,6 +83,52 @@ describe.each([
 
   it("leaves user absent when neither key is given", () => {
     expect(driverConfigFor({ ...BASE })).not.toHaveProperty("user");
+  });
+});
+
+describe("through buildAdapterArg (the connection-handling path)", () => {
+  // Regression guard for the real failure mode: `connection-handling.ts:923`
+  // builds adapter args via `buildAdapterArg` and spreads them into the
+  // constructor. adapter-args.ts used to strip `username` and remap it itself,
+  // with the opposite precedence — so the constructor mapping never ran on the
+  // path users actually take, and unit tests that construct adapters directly
+  // could not see it. These go through the real path.
+  it("maps username to user for mysql2", () => {
+    const [config] = buildAdapterArg("mysql2", {
+      adapter: "mysql2",
+      database: "d",
+      username: "rails",
+    }) as [Record<string, unknown>];
+    expect(mysqlPoolConfig(config).user).toBe("rails");
+  });
+
+  it("maps username to user for postgresql", () => {
+    const [config] = buildAdapterArg("postgresql", {
+      adapter: "postgresql",
+      database: "d",
+      username: "rails",
+    }) as [Record<string, unknown>];
+    expect(pgClientOptions(config).user).toBe("rails");
+  });
+
+  it("lets username overwrite user end to end", () => {
+    const [config] = buildAdapterArg("postgresql", {
+      adapter: "postgresql",
+      database: "d",
+      username: "rails",
+      user: "driver",
+    }) as [Record<string, unknown>];
+    expect(pgClientOptions(config).user).toBe("rails");
+  });
+
+  it("keeps an explicit user when username is false end to end", () => {
+    const [config] = buildAdapterArg("mysql2", {
+      adapter: "mysql2",
+      database: "d",
+      username: false,
+      user: "driver",
+    }) as [Record<string, unknown>];
+    expect(mysqlPoolConfig(config).user).toBe("driver");
   });
 });
 

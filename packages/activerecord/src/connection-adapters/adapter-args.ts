@@ -190,23 +190,23 @@ export function buildAdapterArg(
     // with the rest of the configuration hash. Forward the URL under the
     // adapter-specific connection key alongside the remaining options instead
     // of dropping them. Pure-URL configs (no extra keys) keep the `[url]` form.
-    const { adapter: _ua, url: _uu, username, ...urlRest } = configuration;
-    if (username === undefined && Object.keys(urlRest).length === 0) {
+    // `username` is deliberately NOT remapped here. Rails maps the credential
+    // inside the adapter constructor (postgresql_adapter.rb:326), so forward
+    // Rails' spelling untouched and let Mysql2Adapter/PostgreSQLAdapter apply
+    // the mapping with Ruby-truthiness precedence. Remapping here as well used
+    // to shadow the constructor entirely — this layer stripped `username`, so
+    // the constructor never saw it — and did so with the wrong precedence.
+    const { adapter: _ua, url: _uu, ...urlRest } = configuration;
+    if (Object.keys(urlRest).length === 0) {
       return [url];
-    }
-    // Apply the same `username` → `user` remap the discrete-field branch does,
-    // so callers passing `username` alongside a URL still reach the driver.
-    if (username !== undefined && urlRest.user === undefined) {
-      urlRest.user = username;
     }
     const urlKey = normalized === "postgresql" ? "connectionString" : "uri";
     return [{ ...urlRest, [urlKey]: url }];
   }
-  const { adapter: _a, url: _u, username, ...rest } = configuration;
+  // As in the URL branch above: `username` passes through under Rails'
+  // spelling and the adapter constructor maps it to the driver-native `user`.
+  const { adapter: _a, url: _u, ...rest } = configuration;
   const adapterConfig: Record<string, unknown> = { ...rest };
-  if (adapterConfig.user === undefined && username !== undefined) {
-    adapterConfig.user = username;
-  }
   // mysql2 uses `socketPath`; database.yml uses `socket`. Normalise here so
   // all callers benefit, not just the DatabaseTasks path.
   if (normalized === "mysql") {
