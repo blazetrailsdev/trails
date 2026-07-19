@@ -10,6 +10,7 @@ import {
   Decryption as DecryptionError,
   Base as BaseEncryptionError,
 } from "./errors.js";
+import { isRubyTruthy } from "../ruby-truthy.js";
 import { NullEncryptor } from "./null-encryptor.js";
 import {
   normalizeEncoding as _normalizeEncoding,
@@ -30,12 +31,6 @@ export function setGlobalPreviousSchemesFn(fn: (scheme: Scheme) => Scheme[]): vo
 Configurable.onConfigure(() => {
   _globalPreviousVersion++;
 });
-
-// Mirrors Ruby truthiness for `@default &&`: only `nil` and `false` are falsey.
-// `""`, `0`, etc. are truthy in Ruby, so they still act as a present default.
-function isRubyTruthy(value: unknown): boolean {
-  return value !== null && value !== undefined && value !== false;
-}
 
 /**
  * An ActiveModel type that encrypts/decrypts attribute values. This is

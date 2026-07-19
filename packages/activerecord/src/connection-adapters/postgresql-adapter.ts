@@ -8,6 +8,7 @@ import {
   runLoadHooks,
 } from "@blazetrails/activesupport";
 import { sql as arelSql, Nodes, Visitors } from "@blazetrails/arel";
+import { isRubyTruthy } from "../ruby-truthy.js";
 import { Result } from "../result.js";
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
 import { TypeMap } from "../type/type-map.js";
@@ -610,8 +611,22 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     const userGetTypeParser = (
       pgConfig.types as { getTypeParser?: (oid: number, format?: string) => unknown } | undefined
     )?.getTypeParser;
+    // postgresql_adapter.rb:322-326 — "Map ActiveRecords param names to PGs."
+    //   conn_params = @config.compact
+    //   conn_params[:user] = conn_params.delete(:username) if conn_params[:username]
+    // The guard is RUBY truthiness, which differs from JS in both directions:
+    // "" is truthy in Ruby (so a blank username maps and overwrites `user`),
+    // while `false` is falsy AND survives `compact` (which drops only nils),
+    // so `username: false` is the one present value that does NOT map.
+    // `isRubyTruthy` encodes exactly that. Without this mapping a Rails-spelled
+    // config connects as the OS user rather than failing, because `pg` reads
+    // the driver-native `user` and ignores unknown keys.
+    const { username: railsUsername, ...pgDriverConfig } = pgConfig as typeof pgConfig & {
+      username?: string;
+    };
     this._pgClientOptions = {
-      ...pgConfig,
+      ...pgDriverConfig,
+      ...(isRubyTruthy(railsUsername) ? { user: railsUsername } : {}),
       types: {
         getTypeParser(oid: number, format?: string): unknown {
           // Our Temporal parsers handle text-format for the 5 datetime OIDs.

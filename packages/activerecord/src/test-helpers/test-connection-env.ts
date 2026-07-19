@@ -185,22 +185,17 @@ export function mysqlSettings(read: EnvReader = getEnv): ServerSettings {
 
 /**
  * Translate {@link ServerSettings} into the key set a `configuration_hash` /
- * driver options object needs, straddling two naming conventions that disagree.
+ * driver options object needs.
  *
- * This is the single place that knows about the straddle:
+ * The credential is Rails' canonical `username` alone (as `database.yml` spells
+ * it): `MySQLDatabaseTasks#buildAdapterConfig` / `PostgreSQLDatabaseTasks` read
+ * it directly, and `Mysql2Adapter` / `PostgreSQLAdapter` map it to the
+ * driver-native `user` when building their driver config.
  *
- *   - **credential** — `MySQLDatabaseTasks#buildAdapterConfig` and
- *     `PostgreSQLDatabaseTasks` read Rails' canonical `username` (as
- *     `database.yml` spells it), while `Mysql2Adapter` / `PostgreSQLAdapter`
- *     forward the residual hash to the `mysql2` / `pg` drivers, which read the
- *     driver-native `user`.
- *   - **socket** — Rails' config key is `socket`; mysql2's driver option is
- *     `socketPath`.
- *
- * Emitting only one spelling of either fails *silently*: both drivers ignore
- * unknown keys, so a `username`-only config connects as the OS user rather than
- * raising (verified against a live server). Converging the adapters onto Rails'
- * spelling would let this collapse to one key each; that is its own story.
+ * The socket still straddles: Rails' config key is `socket`, while mysql2's
+ * driver option is `socketPath`. Emitting only one spelling fails *silently* —
+ * mysql2 ignores unknown keys, so a `socket`-only config falls back to TCP
+ * rather than raising.
  *
  * `password` and the socket keys are omitted when unset so the drivers apply
  * their own defaults — a literal `undefined` is not the same as absent.
@@ -211,7 +206,6 @@ export function driverConfig(settings: ServerSettings): Record<string, unknown> 
     host,
     port,
     username: user,
-    user,
     database,
     ...(password === undefined ? {} : { password }),
     ...(socket === undefined ? {} : { socket, socketPath: socket }),
