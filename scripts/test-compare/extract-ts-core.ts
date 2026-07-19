@@ -36,37 +36,80 @@ function isAssertionCallee(name: string): boolean {
 const MAX_HELPER_DEPTH = 5;
 
 /**
- * Map of same-file non-assertion helper functions — any `function` declaration
- * and any `const foo = (...) => …` / `= function …`, at ANY nesting depth (the
- * walk descends the whole file, not just top-level statements) — to their body
- * node, so a test that delegates its assertions to a helper (e.g. `testCopyTable`)
- * has the helper's asserts folded into its count. The Ruby twin collects
- * same-file `def`s the same way (extract-ruby-tests.rb `collect_helper_defs`).
- *
- * Static and name-keyed on a FLAT map (no lexical-scope tracking) — this mirrors
- * the Ruby side's file-scoped (not per-class) approximation. Consequences:
- * receiver calls (`obj.foo()`) and runtime-dispatched helpers are out of scope,
- * and two same-named helpers in different suites collide (last definition wins),
- * so a call could fold in the wrong body. Acceptable for a report-only count on
- * real test files, where helper names are effectively file-unique.
+ * One same-file helper definition: its body plus the source range of the
+ * lexical scope (the enclosing block / describe callback body, or the file)
+ * that the declaration is visible in.
  */
-type HelperMap = Map<string, ts.Node>;
+interface HelperDef {
+  body: ts.Node;
+  scopeStart: number;
+  scopeEnd: number;
+}
+
+/**
+ * Same-file non-assertion helper functions — any `function` declaration and any
+ * `const foo = (...) => …` / `= function …`, at ANY nesting depth (the walk
+ * descends the whole file, not just top-level statements) — keyed by name, so a
+ * test that delegates its assertions to a helper (e.g. `testCopyTable`) has the
+ * helper's asserts folded into its count. The Ruby twin collects same-file
+ * `def`s the same way (extract-ruby-tests.rb `collect_helper_defs`).
+ *
+ * Resolution is SCOPE-AWARE: each name maps to every definition of it, and
+ * {@link resolveHelper} picks the innermost one whose scope range contains the
+ * call site. Two same-named helpers in different `describe` suites therefore no
+ * longer collide — each suite's tests expand their own. The Ruby side resolves
+ * symmetrically, by innermost enclosing class/module rather than source range.
+ *
+ * Still static: receiver calls (`obj.foo()`) and runtime-dispatched helpers are
+ * out of scope, which is fine for a report-only count.
+ */
+type HelperMap = Map<string, HelperDef[]>;
 
 function collectHelpers(sourceFile: ts.SourceFile): HelperMap {
   const helpers: HelperMap = new Map();
-  const walk = (n: ts.Node) => {
+  const add = (name: string, body: ts.Node, scope: ts.Node) => {
+    const defs = helpers.get(name) ?? [];
+    defs.push({ body, scopeStart: scope.pos, scopeEnd: scope.end });
+    helpers.set(name, defs);
+  };
+  const walk = (n: ts.Node, scope: ts.Node) => {
     if (ts.isFunctionDeclaration(n) && n.name && n.body) {
-      helpers.set(n.name.text, n.body);
+      add(n.name.text, n.body, scope);
     } else if (ts.isVariableDeclaration(n) && ts.isIdentifier(n.name) && n.initializer) {
       const init = n.initializer;
       if ((ts.isArrowFunction(init) || ts.isFunctionExpression(init)) && init.body) {
-        helpers.set(n.name.text, init.body);
+        add(n.name.text, init.body, scope);
       }
     }
-    ts.forEachChild(n, walk);
+    const inner = ts.isBlock(n) || ts.isModuleBlock(n) || ts.isCaseBlock(n) ? n : scope;
+    ts.forEachChild(n, (c) => walk(c, inner));
   };
-  walk(sourceFile);
+  walk(sourceFile, sourceFile);
   return helpers;
+}
+
+/**
+ * The helper definition of `name` visible from a call site at position `pos` —
+ * the innermost enclosing scope wins, so a suite-local helper shadows a
+ * file-level one of the same name.
+ *
+ * When nothing lexically encloses the call site, an UNAMBIGUOUS (single)
+ * definition elsewhere in the file still resolves: the old flat behavior, kept
+ * so a helper reached across sibling scopes (the TS analogue of Ruby's
+ * `include`d-module helpers) keeps folding in. Scope only disambiguates the
+ * genuinely colliding case — several same-named definitions — which is exactly
+ * the wrong-body risk this resolution exists to remove.
+ */
+function resolveHelper(helpers: HelperMap, name: string, pos: number): ts.Node | null {
+  const defs = helpers.get(name);
+  if (!defs || defs.length === 0) return null;
+  let best: HelperDef | null = null;
+  for (const def of defs) {
+    if (pos < def.scopeStart || pos > def.scopeEnd) continue;
+    if (!best || def.scopeStart > best.scopeStart) best = def;
+  }
+  if (best) return best.body;
+  return defs.length === 1 ? defs[0].body : null;
 }
 
 /**
@@ -89,10 +132,13 @@ function countAssertions(
       const name = n.expression.text;
       if (isAssertionCallee(name)) {
         count++;
-      } else if (depth < MAX_HELPER_DEPTH && helpers.has(name) && !visiting.has(name)) {
-        visiting.add(name);
-        count += countAssertions(helpers.get(name)!, helpers, depth + 1, visiting);
-        visiting.delete(name);
+      } else if (depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
+        const body = resolveHelper(helpers, name, n.pos);
+        if (body) {
+          visiting.add(name);
+          count += countAssertions(body, helpers, depth + 1, visiting);
+          visiting.delete(name);
+        }
       }
     }
     ts.forEachChild(n, walk);
@@ -217,12 +263,15 @@ function collectAssertionKinds(
             kinds.push(name);
             values.push(helperCalleeValue(name, n.arguments));
           }
-        } else if (depth < MAX_HELPER_DEPTH && helpers.has(name) && !visiting.has(name)) {
-          visiting.add(name);
-          const sub = collectAssertionKinds(helpers.get(name)!, helpers, depth + 1, visiting);
-          kinds.push(...sub.kinds);
-          values.push(...sub.values);
-          visiting.delete(name);
+        } else if (depth < MAX_HELPER_DEPTH && !visiting.has(name)) {
+          const body = resolveHelper(helpers, name, n.pos);
+          if (body) {
+            visiting.add(name);
+            const sub = collectAssertionKinds(body, helpers, depth + 1, visiting);
+            kinds.push(...sub.kinds);
+            values.push(...sub.values);
+            visiting.delete(name);
+          }
         }
       }
     }

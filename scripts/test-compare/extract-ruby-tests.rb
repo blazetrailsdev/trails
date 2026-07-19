@@ -109,6 +109,9 @@ class TestExtractor
     @current_file = rel_path
     @current_filepath = filepath
     @describe_stack = []
+    # Enclosing class/module names only (the describe_stack also carries block
+    # descriptions) — the scope path helper resolution matches against.
+    @class_stack = []
     @test_cases = []
     @source_lines = source.lines
     @gate_stack = []
@@ -122,14 +125,17 @@ class TestExtractor
     @module_includes = {}
     @module_def_gates = {}
 
-    # Same-file non-assertion helper `def`s, keyed by name → body node, so a test
-    # that delegates its assertions to a helper (e.g. `test_copy_table`,
+    # Same-file non-assertion helper `def`s, keyed by name → list of definitions,
+    # so a test that delegates its assertions to a helper (e.g. `test_copy_table`,
     # `do_dump_index_tests_for_schema`) folds the helper's asserts into its count.
-    # The TS twin collects top-level functions (extract-ts-core.ts collectHelpers).
+    # The TS twin collects same-file functions (extract-ts-core.ts collectHelpers).
     # Pre-collected before walk() so a helper defined below its caller still
-    # resolves. File-scoped (not per-class) — a documented static approximation.
+    # resolves. SCOPE-AWARE: each definition records its enclosing class/module
+    # path and resolve_helper picks the innermost one visible from the call site,
+    # so two same-named helpers in different classes no longer collide. The TS
+    # twin resolves symmetrically, by innermost enclosing source range.
     @helper_defs = {}
-    collect_helper_defs(sexp)
+    collect_helper_defs(sexp, [])
 
     walk(sexp)
 
@@ -242,12 +248,14 @@ class TestExtractor
     return unless name
 
     @describe_stack.push(name)
+    @class_stack.push(name)
     # A class body always emits its `def test_*` directly (even a class nested
     # inside a module is a real test case), so suspend any module collection.
     prev = @module_collect
     @module_collect = nil
     walk_body(node[3] || node[2])
     @module_collect = prev
+    @class_stack.pop
     @describe_stack.pop
   end
 
@@ -259,7 +267,9 @@ class TestExtractor
     name = const_name(node[1])
     prev = @module_collect
     @module_collect = []
+    @class_stack.push(name) if name
     walk_body(node[2])
+    @class_stack.pop if name
     collected = @module_collect
     @module_collect = prev
     if name && !collected.empty?
@@ -877,7 +887,7 @@ class TestExtractor
   # which is what test:compare's assertion-count comparison needs (exact-count
   # parity with the Rails counterpart). See extract-ts-core.ts for the TS twin.
   def count_assertions(node)
-    count_assertions_expanded(node, [], 0)
+    count_assertions_expanded(node, [], 0, @class_stack.dup)
   end
 
   # Recursively count assertion calls, expanding self-calls (fcall/vcall/command,
@@ -886,7 +896,7 @@ class TestExtractor
   # expanded once per call site. `visiting` is the current recursion path (cycle
   # guard); `depth` is bounded by MAX_HELPER_DEPTH. Loops/`yield` are counted
   # statically (as written), not per runtime iteration — matching the TS side.
-  def count_assertions_expanded(node, visiting, depth)
+  def count_assertions_expanded(node, visiting, depth, scope)
     return 0 unless node.is_a?(Array)
 
     count = 0
@@ -894,10 +904,13 @@ class TestExtractor
     if name
       if assertion_method?(name)
         count += 1
-      elsif depth < MAX_HELPER_DEPTH && @helper_defs.key?(name) && !visiting.include?(name)
-        visiting.push(name)
-        count += count_assertions_expanded(@helper_defs[name], visiting, depth + 1)
-        visiting.pop
+      elsif depth < MAX_HELPER_DEPTH && !visiting.include?(name)
+        resolved = resolve_helper(name, scope)
+        if resolved
+          visiting.push(name)
+          count += count_assertions_expanded(resolved[0], visiting, depth + 1, resolved[1])
+          visiting.pop
+        end
       end
     elsif receiver_call_assertion?(node)
       # `x.must_equal y` / `sql.must_be_like %{…}` — receiver-form assertions
@@ -905,7 +918,7 @@ class TestExtractor
       count += 1
     end
 
-    node.each { |child| count += count_assertions_expanded(child, visiting, depth) if child.is_a?(Array) }
+    node.each { |child| count += count_assertions_expanded(child, visiting, depth, scope) if child.is_a?(Array) }
     count
   end
 
@@ -924,16 +937,47 @@ class TestExtractor
     node[3] && assertion_method?(ident_name(node[3]))
   end
 
-  # Collect every same-file `def name` → body node (node[3] is the bodystmt).
-  # Includes `test_*` methods too: a test method is itself a valid helper when
-  # another test delegates to it (e.g. `test_copy_table`).
-  def collect_helper_defs(node)
+  # Collect every same-file `def name` → { scope:, body: } (node[3] is the
+  # bodystmt), where `scope` is the enclosing class/module name path. Includes
+  # `test_*` methods too: a test method is itself a valid helper when another
+  # test delegates to it (e.g. `test_copy_table`).
+  def collect_helper_defs(node, scope)
     return unless node.is_a?(Array)
     if node[0] == :def
       name = ident_name(node[1])
-      @helper_defs[name] = node[3] if name && node[3]
+      if name && node[3]
+        (@helper_defs[name] ||= []) << { scope: scope, body: node[3] }
+      end
+    elsif node[0] == :class || node[0] == :module
+      name = const_name(node[1])
+      inner = name ? scope + [name] : scope
+      node.each { |child| collect_helper_defs(child, inner) if child.is_a?(Array) }
+      return
     end
-    node.each { |child| collect_helper_defs(child) if child.is_a?(Array) }
+    node.each { |child| collect_helper_defs(child, scope) if child.is_a?(Array) }
+  end
+
+  # The definition of `name` visible from a call site inside class/module path
+  # `scope` — the innermost enclosing definition wins, so a class-local helper
+  # shadows a file-level one of the same name. Returns [body, def_scope] or nil.
+  #
+  # When no enclosing definition exists, an UNAMBIGUOUS (single) definition
+  # elsewhere in the file still resolves: the old flat behavior, kept so a helper
+  # defined in a same-file `module` that the test class `include`s keeps folding
+  # in. Scope only disambiguates the genuinely colliding case — several
+  # same-named defs — which is the wrong-body risk this resolution removes.
+  # The TS twin (extract-ts-core.ts resolveHelper) falls back identically.
+  def resolve_helper(name, scope)
+    defs = @helper_defs[name] || []
+    return nil if defs.empty?
+
+    best = nil
+    defs.each do |d|
+      next unless scope[0, d[:scope].length] == d[:scope]
+      best = d if best.nil? || d[:scope].length > best[:scope].length
+    end
+    best ||= defs.first if defs.length == 1
+    best && [best[:body], best[:scope]]
   end
 
   # Raw (non-deduped) list of assertion *kind* tokens (method names) in a test
@@ -949,7 +993,7 @@ class TestExtractor
   def collect_assertion_kinds(node)
     kinds = []
     values = []
-    collect_assertion_kinds_expanded(node, kinds, values, [], 0, nil)
+    collect_assertion_kinds_expanded(node, kinds, values, [], 0, nil, @class_stack.dup)
     [kinds, values]
   end
 
@@ -963,7 +1007,7 @@ class TestExtractor
   # expected value without moving the (lockstep-critical) recording site. The
   # `:command` (`assert_equal 5, foo`) and `:command_call` (`foo.must_equal 5`)
   # forms carry their args on the node directly (node[2] / node[4]).
-  def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args)
+  def collect_assertion_kinds_expanded(node, results, values, visiting, depth, pending_args, scope)
     return unless node.is_a?(Array)
 
     name = self_call_name(node)
@@ -975,10 +1019,13 @@ class TestExtractor
         results << name
         args = node[0] == :command ? node[2] : pending_args
         values << literal_token(expected_arg(args, name))
-      elsif depth < MAX_HELPER_DEPTH && @helper_defs.key?(name) && !visiting.include?(name)
-        visiting.push(name)
-        collect_assertion_kinds_expanded(@helper_defs[name], results, values, visiting, depth + 1, nil)
-        visiting.pop
+      elsif depth < MAX_HELPER_DEPTH && !visiting.include?(name)
+        resolved = resolve_helper(name, scope)
+        if resolved
+          visiting.push(name)
+          collect_assertion_kinds_expanded(resolved[0], results, values, visiting, depth + 1, nil, resolved[1])
+          visiting.pop
+        end
       end
     elsif receiver_call_assertion?(node)
       # `x.must_equal y` / `x.must_equal(y)` — receiver-form assertions (never
@@ -996,11 +1043,11 @@ class TestExtractor
     # callee (node[1]) so the value is available at the recording site, then
     # recurse the args normally. Every other node recurses its children unchanged.
     if node[0] == :method_add_arg && node[1].is_a?(Array) && %i[fcall call].include?(node[1][0])
-      collect_assertion_kinds_expanded(node[1], results, values, visiting, depth, node[2])
-      collect_assertion_kinds_expanded(node[2], results, values, visiting, depth, nil)
+      collect_assertion_kinds_expanded(node[1], results, values, visiting, depth, node[2], scope)
+      collect_assertion_kinds_expanded(node[2], results, values, visiting, depth, nil, scope)
     else
       node.each do |child|
-        collect_assertion_kinds_expanded(child, results, values, visiting, depth, nil) if child.is_a?(Array)
+        collect_assertion_kinds_expanded(child, results, values, visiting, depth, nil, scope) if child.is_a?(Array)
       end
     end
   end

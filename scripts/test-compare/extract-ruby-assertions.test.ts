@@ -191,6 +191,58 @@ describe("Ruby extractor assertion-count collection", () => {
     });
     expect(c["macro body"]).toBe(2);
   });
+
+  it("resolves a same-named helper to the caller's own class, not a sibling's", () => {
+    const counts = rubyAssertionCounts({
+      "cases/shadow_test.rb": `
+        class OneTest < ActiveSupport::TestCase
+          def check_row
+            assert_equal 1, a
+          end
+
+          def test_one
+            check_row
+          end
+        end
+
+        class ThreeTest < ActiveSupport::TestCase
+          def check_row
+            assert_equal 1, a
+            assert_equal 2, b
+            assert_equal 3, c
+          end
+
+          def test_three
+            check_row
+          end
+        end
+      `,
+    });
+    expect(counts["one"]).toBe(1);
+    expect(counts["three"]).toBe(3);
+  });
+
+  it("lets a class-local helper shadow a file-level one of the same name", () => {
+    const counts = rubyAssertionCounts({
+      "cases/outer_test.rb": `
+        def check_row
+          assert_equal 1, a
+        end
+
+        class InnerTest < ActiveSupport::TestCase
+          def check_row
+            assert_equal 1, a
+            assert_equal 2, b
+          end
+
+          def test_shadowed
+            check_row
+          end
+        end
+      `,
+    });
+    expect(counts["shadowed"]).toBe(2);
+  });
 });
 
 // Exercises the Ruby extractor's literal expected-VALUE capture (assertionValues)

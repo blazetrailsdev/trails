@@ -158,6 +158,55 @@ describe("TS extractor assertion-count collection", () => {
     `;
     expect(tsAssertionCounts(src)["lookalikes"]).toBe(1);
   });
+
+  it("resolves a same-named helper to the caller's own suite, not a sibling's", () => {
+    const src = `
+      describe("a", () => {
+        function checkRow() {
+          expect(a).toEqual(1);
+        }
+        it("one", () => {
+          checkRow();
+        });
+      });
+      describe("b", () => {
+        function checkRow() {
+          expect(a).toEqual(1);
+          expect(b).toEqual(2);
+          expect(c).toEqual(3);
+        }
+        it("three", () => {
+          checkRow();
+        });
+      });
+    `;
+    const counts = tsAssertionCounts(src);
+    expect(counts["one"]).toBe(1);
+    expect(counts["three"]).toBe(3);
+  });
+
+  it("lets a suite-local helper shadow a file-level one of the same name", () => {
+    const src = `
+      function checkRow() {
+        expect(a).toEqual(1);
+      }
+      describe("inner", () => {
+        function checkRow() {
+          expect(a).toEqual(1);
+          expect(b).toEqual(2);
+        }
+        it("shadowed", () => {
+          checkRow();
+        });
+      });
+      it("outer", () => {
+        checkRow();
+      });
+    `;
+    const counts = tsAssertionCounts(src);
+    expect(counts["shadowed"]).toBe(2);
+    expect(counts["outer"]).toBe(1);
+  });
 });
 
 /** Index a file's extracted tests by description → assertionKinds. */
