@@ -18,14 +18,7 @@
     "tsFile": "connection-adapters/postgresql/quoting.ts",
     "rubyName": "quote_default_expression",
     "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/quoting.ts",
-    "rubyName": "quote_default_expression",
-    "call": "lookup_cast_type_from_column",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Vetted: ported as `value.includes(\"()\")` (quoting.rb:159). Ruby `include?` maps to the TS candidates `include`/`isInclude`, which JS strings do not have \u2014 `String#includes` is the exact equivalent."
   },
   {
     "package": "activerecord",

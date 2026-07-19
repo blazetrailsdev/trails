@@ -3489,6 +3489,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
           sqlType?: string | null;
           type?: string;
           array?: boolean;
+          oid?: number | null;
+          fmod?: number | null;
           options?: { array?: boolean };
         }
       | undefined;
@@ -3498,24 +3500,31 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // DEFAULT paths (live Column) both fire the array branch.
     const isArray = col?.array === true || col?.options?.array === true;
     const rawSqlType = col?.sqlType ?? col?.type ?? null;
-    // Rails' lookup_cast_type_from_column normalizes formatted SQL types
-    // (`integer` → `int4`, `numeric(10,2)` → `numeric`) before consulting
-    // the OID-keyed type map. Mirror that here so the TypeMapLike passed
-    // to pgQuoteDefaultExpression resolves element subtypes instead of
-    // falling back to ValueType.
-    const tm = this.typeMap;
+    const self = this;
     const lookup = {
-      lookup(sqlType: string): { serialize?(v: unknown): unknown } | null {
-        // Strip a trailing `[]` so an array column's sqlType (e.g.
-        // `integer[]` from ColumnDefinition.typeToSql) resolves to the
-        // element typname via normalizeFormatType + FORMAT_TYPE_ALIASES.
-        // normalizeFormatType deliberately preserves `[]` for the
-        // type-casting path, so the strip happens here at the call site.
-        // Forward the original (`[]`-stripped) sqlType as the third arg
-        // so registerClassWithLimit/Precision factories can recover
-        // limit/precision/scale from `numeric(10,2)` etc.
-        const base = sqlType.replace(/\[\]\s*$/, "");
-        return tm.lookup(normalizeFormatType(base), -1, base) as {
+      lookupCastTypeFromColumn(c: {
+        sqlType?: string | null;
+        oid?: number | null;
+        fmod?: number | null;
+      }): { serialize?(v: unknown): unknown } | null {
+        // A live Column carries an OID, so hand it straight through: Rails
+        // keys the lookup on (oid, fmod, sql_type) (quoting.rb:191), and for
+        // an array column that OID resolves to OID::Array(subtype) — an
+        // array-aware type whose serialize returns ArrayData, which
+        // quoteDefaultExpression handles directly.
+        if (c.oid != null) {
+          return self.lookupCastTypeFromColumn(c) as {
+            serialize?(v: unknown): unknown;
+          } | null;
+        }
+        // No OID means a ColumnDefinition from a DDL path, whose sqlType is
+        // the `[]`-suffixed form typeToSql emitted (`integer[]`). Strip it so
+        // the element typname resolves — normalizeFormatType deliberately
+        // preserves `[]` for the type-casting path, so the strip belongs
+        // here at the call site rather than in the shared helper. The
+        // element subtype is then wrapped in OidArray downstream.
+        const base = (c.sqlType ?? "").replace(/\[\]\s*$/, "");
+        return self.lookupCastTypeFromColumn({ sqlType: base }) as {
           serialize?(v: unknown): unknown;
         } | null;
       },
@@ -3527,6 +3536,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         ? {
             array: isArray,
             sqlType: rawSqlType,
+            oid: col.oid ?? null,
+            fmod: col.fmod ?? null,
             // Rails' uuid branch tests `column.type` (the AR type symbol), not
             // sql_type, so forward it separately from `rawSqlType`.
             type: col.type ?? null,

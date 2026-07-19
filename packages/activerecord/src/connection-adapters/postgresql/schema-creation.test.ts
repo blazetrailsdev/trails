@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
+import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
 import {
   ForeignKeyDefinition,
@@ -109,6 +110,22 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(
       s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, "v")),
     ).toContain("SET DEFAULT");
+  });
+
+  it("visitChangeColumnDefaultDefinition: uuid function default stays bare", () => {
+    // postgresql/quoting.rb:159-160 — a `()`-bearing string default on a
+    // uuid column must reach the DDL as a call, not as `'uuid_generate_v4()'`.
+    const col = new ColumnDefinition("id", "uuid");
+    // The shared stub fakes quoteDefaultExpression; this branch lives in
+    // the real one, so wire that in.
+    const host = s();
+    host.adapter.quoteDefaultExpression = (v: unknown, c: unknown) =>
+      quoteDefaultExpression.call(null as never, v, c as never);
+    expect(
+      host.visitChangeColumnDefaultDefinition(
+        new ChangeColumnDefaultDefinition(col, "uuid_generate_v4()"),
+      ),
+    ).toBe('ALTER COLUMN "id" SET DEFAULT uuid_generate_v4()');
   });
 
   it("visitChangeColumnDefinition: ALTER COLUMN TYPE", () => {
