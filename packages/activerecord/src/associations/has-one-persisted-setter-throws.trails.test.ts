@@ -86,6 +86,14 @@ describe("HasOnePersistedSetterThrows", () => {
     }).toThrow(HasOnePersistedAssignmentError);
   });
 
+  it("has_one_through mass-assignment throws on a persisted owner", async () => {
+    const member = (await Member.create({ name: "Groucho" })) as unknown as HasOneOwner;
+    const club = await Club.create({ name: "Moustache" });
+    expect(() => {
+      member.assignAttributes({ club });
+    }).toThrow(/await owner\.setClub\(x\)/);
+  });
+
   it("native = setter does the in-memory replace on an unpersisted owner", async () => {
     const firm = new Firm({ name: "GlobalMegaCorp" });
     const account = new Account({ credit_limit: 1000 });

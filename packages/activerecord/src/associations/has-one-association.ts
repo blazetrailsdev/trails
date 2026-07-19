@@ -19,31 +19,34 @@ import { polymorphicName } from "../inheritance.js";
  */
 export class HasOneAssociation extends SingularAssociation {
   /**
-   * The record that was displaced by a deferred (non-awaitable) assignment to a
-   * *persisted* owner — recorded by `queueWrite`/mass-assignment and removed
-   * (FK-nullified/destroyed per `:dependent`) by the owner's `save`-time
-   * has_one autosave callback (`autosaveHasOne` → `removeDisplaced`). Rails does
-   * this removal synchronously inside `replace`; the JS property setter cannot
-   * `await`, so we carry the displaced record forward to the single autosave
-   * persistence path rather than running a parallel `persistReplace`.
+   * The record(s) displaced by the sync `build#{name}` / `create#{name}` path
+   * (`setNewRecord`) on a *persisted* owner — recorded there and removed
+   * (FK-nullified/destroyed per `:dependent`) by the owner's `save`-time has_one
+   * autosave callback (`autosaveHasOne` → `removeDisplaced`). Rails does this
+   * removal synchronously inside `replace`; the sync builder cannot `await`, so
+   * we carry the displaced record forward to the single autosave persistence
+   * path rather than running a parallel `persistReplace`.
    *
-   * This is an *ordered collection*, not a single slot: a has_one owner can
-   * displace more than one persisted record before its `save()` drains the
-   * queue (`owner.x = b; owner.x = c` displaces both the original target and
-   * `b`). Rails removes each inline inside `replace`, so every displacement is
+   * The property setter no longer feeds this queue: on a persisted owner it
+   * throws (RFC 0068), so only the build/create path can enqueue here.
+   *
+   * This is an *ordered collection*, not a single slot: repeated builds can
+   * displace more than one persisted record before `save()` drains the queue.
+   * Rails removes each inline inside `replace`, so every displacement is
    * accounted for; we accumulate them and remove all at save time, in
    * displacement order.
    */
   _displacedRecords: Base[] = [];
 
   /**
-   * Set when a deferred assignment displaces an *unloaded* has_one on a persisted
-   * owner: at queue time the current target has not been materialized, so there
-   * is no in-memory `_displacedRecords` entry to remove — but a DB row keyed by the
-   * owner may still exist and must be removed (nullified, or per `:dependent`).
-   * Rails loads the current target synchronously inside `replace`; the JS
-   * property setter cannot `await`, so we defer the load to `removeDisplaced`,
-   * which queries the existing DB-associated record and runs the remove.
+   * Was set when a deferred property-setter assignment displaced an *unloaded*
+   * has_one on a persisted owner (the DB row keyed by the owner still needed
+   * removal). That path is now a throw (RFC 0068), so this field is never set
+   * to `true` any more; the drain branch in `removeDisplaced` is inert. Kept
+   * (rather than removed here) because the whole deferred-displacement machinery
+   * — this field, `_displacedRecords`, `removeDisplaced`, the `autosaveHasOne`
+   * drain — is retired together in a later RFC 0068 story once no caller can
+   * reach the deferral.
    */
   _removeDisplacedFromDb = false;
 
