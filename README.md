@@ -249,11 +249,19 @@ CI runs `test:compare` and `api:compare` on every push to ensure we don't regres
 
 Tests run against all three database backends in CI:
 
-| Backend          | How to run locally                           | Env variable     |
-| ---------------- | -------------------------------------------- | ---------------- |
-| SQLite (default) | `pnpm vitest run`                            | (none)           |
-| PostgreSQL       | `PG_TEST_URL=postgres://... pnpm vitest run` | `PG_TEST_URL`    |
-| MySQL/MariaDB    | `MYSQL_TEST_URL=mysql://... pnpm vitest run` | `MYSQL_TEST_URL` |
+Which backend runs is selected by `ARCONN`, naming a connection exactly as
+Rails' `test/config.yml` does — never by the presence of a connection detail.
+Connection _details_ come from discrete sub-setting env vars.
+
+| Backend          | How to run locally                  | Connection sub-settings                                                               |
+| ---------------- | ----------------------------------- | ------------------------------------------------------------------------------------- |
+| SQLite (default) | `pnpm vitest run`                   | (none)                                                                                |
+| PostgreSQL       | `ARCONN=postgresql pnpm vitest run` | `PGHOST` `PGPORT` `PGUSER` `PGPASSWORD` `PGDATABASE`                                  |
+| MySQL/MariaDB    | `ARCONN=mysql2 pnpm vitest run`     | `MYSQL_HOST` `MYSQL_PORT` `MYSQL_SOCK` `MYSQL_USER` `MYSQL_PASSWORD` `MYSQL_DATABASE` |
+
+Every sub-setting has a working default (`localhost`, the stock port, and the
+`rails_js_test` database), so a local server on default ports needs only
+`ARCONN`. `ARCONN=sqlite3_mem` selects the pure `:memory:` lane.
 
 The `SchemaAdapter` wrapper auto-creates tables from model attribute definitions, so tests don't need manual DDL.
 

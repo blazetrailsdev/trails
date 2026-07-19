@@ -3,14 +3,18 @@ import mysql from "mysql2/promise";
 import { Mysql2Adapter } from "../../connection-adapters/mysql2-adapter.js";
 import { Version } from "../../connection-adapters/abstract-adapter.js";
 import { arunitDatabaseNames } from "../../test-helpers/arunit2-config.js";
+import { mysqlSettings, mysqlUrl } from "../../test-helpers/test-connection-env.js";
 
 // `dbWarningsAction` is a single global setting on the base adapter, so the
 // shared helper toggles it for every adapter (including MySQL). Re-exported
 // here so MySQL adapter tests can keep importing it from this module.
 export { withDbWarningsAction } from "../../test-helpers/with-db-warnings-action.js";
 
-export const MYSQL_TEST_URL =
-  process.env.MYSQL_TEST_URL ?? "mysql://root@localhost:3306/rails_js_test";
+// A *serialization* of the MySQL sub-settings (MYSQL_HOST/MYSQL_PORT/
+// MYSQL_USER/...), not an env var of its own: these adapter suites probe the
+// server directly via describeIfMysql regardless of ARCONN, so they need a URL
+// to hand the driver, but they no longer source one from the environment.
+export const MYSQL_TEST_URL = mysqlUrl();
 
 export { databaseName } from "../../test-helpers/arunit2-config.js";
 
@@ -19,14 +23,15 @@ export { databaseName } from "../../test-helpers/arunit2-config.js";
  * `arunit2` — and reads both names from `ARTest.test_configuration_hashes`.
  * Rails' cross-database-select probe references them by those configured
  * names rather than inventing throwaway databases. trails provisions a single
- * MySQL server (`MYSQL_TEST_URL`), so the names are derived from that config
+ * MySQL server, so the names are derived from its `database` sub-setting
  * by suffixing the primary database (see `arunit2-config`). They are dedicated
  * to the cross-database probe — kept off the shared primary, whose canonical
  * tables parallel test workers create and drop — but config-derived, not
  * invented per call.
  */
-export const { arunit: ARUNIT_DATABASE, arunit2: ARUNIT2_DATABASE } =
-  arunitDatabaseNames(MYSQL_TEST_URL);
+export const { arunit: ARUNIT_DATABASE, arunit2: ARUNIT2_DATABASE } = arunitDatabaseNames(
+  mysqlSettings().database,
+);
 
 let mysqlAvailable = false;
 let mariaDb = false;

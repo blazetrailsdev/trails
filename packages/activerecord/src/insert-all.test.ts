@@ -1242,7 +1242,7 @@ describe("InsertAllTest", () => {
 
   // Rails gates this on current_adapter?(:Mysql2) (insert_all_test.rb) and
   // qualifies the table with `Book.connection_db_config.database`. The
-  // per-worker slot DB suffixed onto MYSQL_TEST_URL (test-setup-worker-db.ts)
+  // per-worker slot DB derived from AR_DB_SLOT (test-setup-worker-db.ts)
   // now surfaces on the db_config hash, so we read it the Rails way.
   it.skipIf(adapterType !== "mysql")("insert all when table name contains database", async () => {
     const databaseName = Book.connectionDbConfig().database;

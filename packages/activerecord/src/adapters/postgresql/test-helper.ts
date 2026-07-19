@@ -4,8 +4,13 @@ import { PostgreSQLAdapter } from "../../connection-adapters/postgresql-adapter.
 import { pgDatetimeConfig } from "../../connection-adapters/postgresql/pg-datetime-config.js";
 import { Notifications, squish } from "@blazetrails/activesupport";
 import type { NotificationSubscriber, NotificationEvent } from "@blazetrails/activesupport";
+import { postgresUrl } from "../../test-helpers/test-connection-env.js";
 
-export const PG_TEST_URL = process.env.PG_TEST_URL ?? "postgres://localhost:5432/rails_js_test";
+// A *serialization* of the PG sub-settings (PGHOST/PGPORT/PGUSER/PGPASSWORD/
+// PGDATABASE), not an env var of its own: these adapter suites probe the server
+// directly via describeIfPg regardless of ARCONN, so they need a URL to hand
+// the driver, but they no longer source one from the environment.
+export const PG_TEST_URL = postgresUrl();
 
 let pgAvailable = false;
 let pgServerVersionNum = 0;

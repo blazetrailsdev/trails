@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import {
-  arunit2Url,
   arunitDatabaseNames,
   databaseName,
   resolveSecondDatabaseConfig,
@@ -18,44 +17,46 @@ describe("arunit2-config", () => {
   });
 
   it("arunitDatabaseNames suffixes the primary database name", () => {
-    expect(arunitDatabaseNames("mysql://root@localhost:3306/rails_js_test")).toEqual({
+    expect(arunitDatabaseNames("rails_js_test")).toEqual({
       arunit: "rails_js_test_arunit",
       arunit2: "rails_js_test_arunit2",
     });
   });
 
-  it("arunit2Url swaps the database while preserving host, port, and credentials", () => {
-    expect(arunit2Url("mysql://root:pw@db.example:3307/rails_js_test")).toBe(
-      "mysql://root:pw@db.example:3307/rails_js_test_arunit2",
+  it("resolves Postgres when ARCONN names the postgresql connection", () => {
+    expect(
+      resolveSecondDatabaseConfig(
+        reader({ ARCONN: "postgresql", PGHOST: "db.example", PGDATABASE: "ar_test" }),
+      ),
+    ).toEqual({
+      adapter: "postgres",
+      config: "postgres://postgres@db.example:5432/ar_test_arunit2",
+    });
+  });
+
+  it("resolves MySQL when ARCONN names the mysql2 connection", () => {
+    expect(resolveSecondDatabaseConfig(reader({ ARCONN: "mysql2" }))).toEqual({
+      adapter: "mysql",
+      config: "mysql://root@localhost:3306/rails_js_test_arunit2",
+    });
+  });
+
+  it("carries the worker isolation slot into the arunit2 database name", () => {
+    expect(resolveSecondDatabaseConfig(reader({ ARCONN: "mysql2", AR_DB_SLOT: "3" })).config).toBe(
+      "mysql://root@localhost:3306/rails_js_test_3_arunit2",
     );
   });
 
-  it("resolves Postgres when PG_TEST_URL is set", () => {
+  it("ignores connection sub-settings when ARCONN does not select that backend", () => {
+    // The whole point of the ARCONN split: a PG host in the environment must
+    // not drag the second database onto Postgres.
     expect(
-      resolveSecondDatabaseConfig(reader({ PG_TEST_URL: "postgres://localhost/ar_test" })),
-    ).toEqual({ adapter: "postgres", config: "postgres://localhost/ar_test_arunit2" });
+      resolveSecondDatabaseConfig(reader({ PGHOST: "db.example", MYSQL_HOST: "mysql.example" }))
+        .adapter,
+    ).toBe("sqlite");
   });
 
-  it("resolves MySQL when MYSQL_TEST_URL is set and PG is not", () => {
-    expect(
-      resolveSecondDatabaseConfig(
-        reader({ MYSQL_TEST_URL: "mysql://root@localhost:3306/rails_js_test" }),
-      ),
-    ).toEqual({ adapter: "mysql", config: "mysql://root@localhost:3306/rails_js_test_arunit2" });
-  });
-
-  it("prefers Postgres over MySQL when both URLs are present", () => {
-    expect(
-      resolveSecondDatabaseConfig(
-        reader({
-          PG_TEST_URL: "postgres://localhost/ar_test",
-          MYSQL_TEST_URL: "mysql://root@localhost:3306/rails_js_test",
-        }),
-      ).adapter,
-    ).toBe("postgres");
-  });
-
-  it("falls back to a separate in-memory SQLite pool with no env URLs", () => {
+  it("falls back to a separate in-memory SQLite pool when ARCONN is unset", () => {
     expect(resolveSecondDatabaseConfig(reader({}))).toEqual({
       adapter: "sqlite",
       config: { adapter: "sqlite3", database: ":memory:", pool: 1 },

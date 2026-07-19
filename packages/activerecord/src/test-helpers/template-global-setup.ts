@@ -33,6 +33,13 @@ import {
   unlinkDbFiles,
 } from "./sqlite-template.js";
 import { slotPoolSize, workerForkCount } from "./ar-db-slots.js";
+import {
+  activeLane,
+  mysqlSettings,
+  mysqlUrl,
+  postgresSettings,
+  postgresUrl,
+} from "./test-connection-env.js";
 
 // ---------------------------------------------------------------------------
 // Shared helpers
@@ -130,11 +137,11 @@ async function pgTerminateConnections(admin: pg.Client, dbName: string): Promise
 }
 
 const pgAdapter: DbTemplateAdapter = {
-  isActive: () => Boolean(process.env.PG_TEST_URL),
+  isActive: () => activeLane() === "postgres",
 
   async provision() {
-    const baseUrl = process.env.PG_TEST_URL!;
-    const baseDb = new URL(baseUrl).pathname.replace(/^\//, "");
+    const baseUrl = postgresUrl();
+    const baseDb = postgresSettings().database;
     const templateDb = `${baseDb}_template`;
 
     const admin = new pg.Client(pgAdminUrl(baseUrl));
@@ -223,12 +230,12 @@ function mysqlConnOpts(url: string): mysql.ConnectionOptions {
 }
 
 const mysqlAdapter: DbTemplateAdapter = {
-  isActive: () => Boolean(process.env.MYSQL_TEST_URL),
+  isActive: () => activeLane() === "mysql",
 
   async provision() {
     const { Mysql2Adapter } = await import("../connection-adapters/mysql2-adapter.js");
-    const baseUrl = process.env.MYSQL_TEST_URL!;
-    const baseDb = new URL(baseUrl).pathname.replace(/^\//, "");
+    const baseUrl = mysqlUrl();
+    const baseDb = mysqlSettings().database;
     const n = slotCount();
 
     // CREATE DATABASE for all slots first (sequential — DDL against the same
