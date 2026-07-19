@@ -140,7 +140,7 @@ describe("UniquenessValidationTest", () => {
   });
 
   // Rails `repair_validations(Topic, Reply)` — clear validators (including the
-  // deferred uniqueness ones) added to Topic/Reply per test so they don't leak.
+  // uniqueness ones) added to Topic/Reply per test so they don't leak.
   afterEach(() => {
     Topic.clearValidatorsBang();
     Reply.clearValidatorsBang();

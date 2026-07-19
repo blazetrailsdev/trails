@@ -45,9 +45,8 @@ Every I/O call in Rails (DB, file system, crypto, HTTP) is synchronous.
 Every equivalent in JavaScript is async. That one fact propagates into
 finders, persistence, validations, callbacks, transactions, uniqueness
 checks, connection management, and even enum bang methods. `isValid()`
-stays synchronous for signature parity with Rails, but DB-backed
-validators (`uniqueness`) collect `Promise`s on
-`record._asyncValidationPromises` for the caller to await.
+returns a `Promise` and the validation chain is awaited, so DB-backed
+validators (`uniqueness`) run inline and callers just `await` the result.
 
 There is no synchronous escape hatch. Browsers and Node both expose DB
 access through async drivers.

@@ -807,9 +807,9 @@ export async function save<T extends SaveRecord>(
   // Resolve `belongs_to ..., default:` blocks before validation. Rails registers
   // these on before_validation (builder/belongs_to.rb#add_default_callbacks) so a
   // required association's presence validation sees the defaulted FK. The block
-  // may be async (e.g. `() => Developer.first()`) and trails' validation chain is
-  // strictly synchronous, so we run it here — an async pre-validation phase —
-  // rather than inside the sync chain. Gated on `validate !== false`: Rails skips
+  // may be async (e.g. `() => Developer.first()`), so on the save path we resolve
+  // it here — a pre-validation pass — before running the chain. Gated on
+  // `validate !== false`: Rails skips
   // perform_validations (and thus every before_validation callback, including
   // this default) when `validate: false` (validations.rb:47-49), so the default
   // must not fire on that path. `_belongsToDefaultsApplied` then suppresses the
@@ -819,11 +819,14 @@ export async function save<T extends SaveRecord>(
     await self._runBelongsToDefaults();
     self._belongsToDefaultsApplied = true;
   }
-  // A `before_validation` that needs async DB work (Rails runs it inside the
-  // save transaction — transactions_test.rb:714) can't await on trails' strict-
-  // sync validation chain, so such a callback defers its thunk here instead of
-  // running inline. Reset the queue before the chain populates it so a prior
-  // save that bailed at validation doesn't leak a stale thunk into this one.
+  // A `before_validation` that needs async DB work should run inside the save
+  // transaction (Rails wraps `super` in `with_transaction_returning_status` and
+  // `perform_validations` runs inside it — transactions.rb:360, validations.rb:47;
+  // transactions_test.rb:714). Trails runs `performValidations` before opening
+  // the save transaction, so such a callback defers its thunk here for `save` to
+  // drain inside the transaction instead of running it during validation. Reset
+  // the queue before the chain populates it so a prior save that bailed at
+  // validation doesn't leak a stale thunk into this one.
   self._beforeValidationSideEffects = [];
   let validationsPassed: boolean;
   try {
@@ -868,15 +871,16 @@ export async function save<T extends SaveRecord>(
       // Validations#save { perform_validations; Persistence#save } }`
       // (transactions.rb:360, validations.rb:47), so `before_validation` runs
       // *inside* the transaction and *before* `valid?`. trails runs
-      // `performValidations` above (outside the transaction, line 778), so the
+      // `performValidations` above (outside the transaction), so the
       // deferred thunk's async body runs here — after the validators, not
       // before. Observable only when a record has BOTH a failing validation and
       // an aborting async `before_validation`: trails reports `errors.any`
       // (validators already ran) where Rails reports none (abort halts first).
       // The four cancellation tests don't hit this (validations pass); the
-      // governing constraint is the strict-sync validation chain — see the
-      // Topic wiring and `validations.ts#isValid`. Tracked for convergence:
-      // RFC 0023 story `save-runs-validations-inside-transaction`.
+      // governing constraint is that `performValidations` runs outside the
+      // transaction — see the Topic wiring and `validations.ts#isValid`. Tracked
+      // for convergence: RFC 0023 story
+      // `save-runs-validations-inside-transaction`.
       const sideEffects = self._beforeValidationSideEffects as Array<() => unknown>;
       for (const thunk of sideEffects) {
         try {

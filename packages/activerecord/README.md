@@ -30,8 +30,8 @@ list, and design principles see the [root README](../../README.md).
 > The single biggest divergence: **JavaScript has no synchronous DB access**, so
 > nearly every method that touches the database is `async` and must be
 > `await`ed. The deviations below — the `Bang` suffix, async
-> singular-association loading, and the sync/async validation split — mostly
-> follow from that one fact.
+> singular-association loading, and the awaited (async) validation chain —
+> mostly follow from that one fact.
 
 ## Install
 

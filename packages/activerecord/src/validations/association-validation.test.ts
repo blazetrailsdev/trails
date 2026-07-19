@@ -8,11 +8,10 @@
  * with `clearValidatorsBang()` in `afterEach` (Topic, Reply, Interest) and
  * `repairValidations(...)` for the block-form cases.
  *
- * trails validations are synchronous, so where Rails appends in-memory
- * associated records (`t.replies << r`) we build them through the real
- * association (no insert on an unsaved/just-built target) or seed the
- * association cache — the behavior under test is the cascading `valid?`, not
- * collection persistence.
+ * Where Rails appends in-memory associated records (`t.replies << r`) we build
+ * them through the real association (no insert on an unsaved/just-built target)
+ * or seed the association cache — the behavior under test is the cascading
+ * `valid?`, not collection persistence.
  */
 import { afterEach, describe, expect, it } from "vitest";
 import { association } from "../associations.js";

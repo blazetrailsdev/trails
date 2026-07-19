@@ -2154,22 +2154,17 @@ describe("PersistenceTest", () => {
   );
 });
 
-// ==========================================================================
-// PersistenceTest — deviation tracked under RFC 0023-surfaced-deviations.
-//   * `update attribute in before validation respects callback chain` calls
-//     `update_attribute` (a DB write) from a `before_validation` callback.
-//     trails validations are sync-only, so an async `beforeValidation` throws
-//     "Async callback on sync chain". Tracked:
-//     rfcs/0023-surfaced-deviations/stories/async-before-validation-sync-chain.md
-// ==========================================================================
 describe("PersistenceTest", () => {
   const Topic = CanonicalTopic;
   fixtures(["topics"]);
 
-  it.skip("update attribute in before validation respects callback chain", async () => {
+  // `update_attribute` is a DB write, so the `before_validation` callback that
+  // calls it is async in trails; the RFC 0063 async validation chain awaits it
+  // (Rails' `set_author_name` is a plain sync method).
+  it("update attribute in before validation respects callback chain", async () => {
     let counter = 0;
     const callOnce = (record: any) => {
-      if (record.savedChangeToAuthorName()) counter += 1;
+      if (record.savedChangeToAuthor_name()) counter += 1;
     };
     class TrackingTopic extends Topic {
       static {
@@ -2181,7 +2176,7 @@ describe("PersistenceTest", () => {
           callOnce(this);
         });
         self.afterUpdate(function (this: any) {
-          if (this.savedChangeToAuthorName()) callOnce(this);
+          if (this.savedChangeToAuthor_name()) callOnce(this);
         });
       }
     }

@@ -136,10 +136,10 @@ if (await post.save()) {
 }
 ```
 
-`isValid()` stays synchronous for signature parity with Rails, but
-DB-backed validators (like `uniqueness`) push their promises onto
-`record._asyncValidationPromises` — `save()` awaits them for you;
-bare `isValid()` callers don't get that for free. See
+`isValid()` returns a `Promise` and the validation chain is awaited, so
+DB-backed validators (like `uniqueness`) run inline: `await record.isValid()`
+and `save()` both see the same result — there is no separate promise queue
+to drain. See
 [Rails deviations: async propagation](./index.md#async-propagation).
 
 ## Keyword args become one options object
