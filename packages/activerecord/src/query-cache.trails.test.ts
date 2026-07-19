@@ -11,6 +11,7 @@ import { Base } from "./base.js";
 import { Task } from "./test-helpers/models/task.js";
 import { Notifications, type NotificationEvent } from "@blazetrails/activesupport";
 import { QueryCache } from "./query-cache.js";
+import { Store } from "./connection-adapters/abstract/query-cache.js";
 
 registerModel(Task as never);
 
@@ -221,5 +222,39 @@ describe("run returns not-already-enabled targets for complete (trails)", () => 
     expect(innerState).toEqual([inner]);
     expect(outer.disabledCount).toBe(1);
     expect(inner.disabledCount).toBe(1);
+  });
+});
+
+// Rails' "query cache lru eviction" test drives `@max_size` through a public
+// per-connection setter that trails does not expose (it stays skipped in the
+// mirrored file). These construct the Store directly to pin the eviction gate
+// `@max_size && @map.size >= @max_size` (query_cache.rb:75): a null max size is
+// unbounded (never evicts), an integer caps the map and evicts the oldest.
+describe("Store max size eviction gate (trails)", () => {
+  const fill = async (store: Store, keys: string[]): Promise<void> => {
+    for (const key of keys) {
+      await store.computeIfAbsent(key, () => Promise.resolve([{ key }]));
+    }
+  };
+
+  it("a null max size is unbounded and never evicts", async () => {
+    const store = new Store(null, null);
+    store.enabled = true;
+    await fill(
+      store,
+      Array.from({ length: 200 }, (_, i) => `k${i}`),
+    );
+    expect(store.size).toBe(200);
+  });
+
+  it("an integer max size caps the map and evicts the oldest entry", async () => {
+    const store = new Store(null, 2);
+    store.enabled = true;
+    await fill(store, ["a", "b", "c"]);
+    expect(store.size).toBe(2);
+    // "a" was the oldest and gets shifted out; "b"/"c" remain.
+    expect(store.get("a")).toBeUndefined();
+    expect(store.get("b")).toEqual([{ key: "b" }]);
+    expect(store.get("c")).toEqual([{ key: "c" }]);
   });
 });
