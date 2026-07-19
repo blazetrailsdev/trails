@@ -96,11 +96,25 @@ export class Notifications {
    * forwarded with its arity intact (not wrapped) so a five-arity subscriber is
    * classified as monotonic-timed and receives `number` start/finish times.
    */
+  static monotonicSubscribe(callback: NotificationCallback): NotificationSubscriber;
   static monotonicSubscribe(
     pattern: string | RegExp | null | undefined,
     callback: NotificationCallback,
+  ): NotificationSubscriber;
+  static monotonicSubscribe(
+    patternOrCallback: string | RegExp | null | undefined | NotificationCallback,
+    maybeCallback?: NotificationCallback,
   ): NotificationSubscriber {
-    const sub = this._notifier.subscribe(pattern ?? null, callback as FanoutListener, true);
+    let pattern: string | RegExp | null;
+    let callback: NotificationCallback;
+    if (typeof patternOrCallback === "function") {
+      pattern = null;
+      callback = patternOrCallback;
+    } else {
+      pattern = patternOrCallback ?? null;
+      callback = maybeCallback!;
+    }
+    const sub = this._notifier.subscribe(pattern, callback as FanoutListener, true);
     return sub as unknown as NotificationSubscriber;
   }
 
