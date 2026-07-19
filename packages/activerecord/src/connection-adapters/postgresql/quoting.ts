@@ -152,7 +152,7 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
 }
 
 export function quoteDefaultExpression(
-  this: QuotingDispatchHost | void,
+  this: QuotingDispatchHost,
   value: unknown,
   column?: DefaultExpressionColumn | null,
   typeMap?: TypeMapLike | null,
@@ -196,11 +196,10 @@ export function quoteDefaultExpression(
       serialized = castType.serialize(value);
     }
   }
-  // `quote` requires a host receiver; thread our own so a receiver-less binary
-  // default reaches PG's bytea `quotedBinary` rather than the abstract
-  // byte-string fallback, and a date default reaches PG's BC-suffixing
-  // `quotedDate` (postgresql/quoting.rb:143) rather than the abstract format.
-  return quote.call(this || { quotedDate, quotedBinary }, serialized);
+  // Rails: `quote(value)` — self-dispatched, so a binary default reaches PG's
+  // bytea `quotedBinary` and a date default PG's BC-suffixing `quotedDate`
+  // (postgresql/quoting.rb:143) rather than the abstract formats.
+  return quote.call(this, serialized);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {

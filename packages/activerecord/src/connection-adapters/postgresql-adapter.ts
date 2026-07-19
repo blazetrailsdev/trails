@@ -3520,7 +3520,8 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         } | null;
       },
     };
-    return pgQuoteDefaultExpression(
+    return pgQuoteDefaultExpression.call(
+      this,
       value,
       col != null
         ? {

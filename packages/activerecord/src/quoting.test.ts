@@ -123,7 +123,7 @@ describe("QuotingTest", () => {
   it("quote table name", () => {
     // Rails: abstract quote_table_name delegates to quote_column_name, which
     // raises NotImplementedError (quoting.rb L66).
-    expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
+    expect(() => quoteTableName.call({}, "foo")).toThrow(NotImplementedError);
   });
 
   it("quote table name for assignment", () => {
@@ -144,7 +144,7 @@ describe("QuotingTest", () => {
     // through it. trails has no module-level dispatch to monkey-patch, so the
     // ported assertion verifies the delegation by its observable effect: the
     // abstract quote_table_name surfaces quote_column_name's NotImplementedError.
-    expect(() => quoteTableName("foo")).toThrow(NotImplementedError);
+    expect(() => quoteTableName.call({}, "foo")).toThrow(NotImplementedError);
   });
   it("quoted timestamp local", () => {
     setDefaultTimezone("local");

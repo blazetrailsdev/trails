@@ -172,7 +172,7 @@ export function quotedBinary(value: Uint8Array | ArrayBuffer | BinaryData): stri
   return `x'${hex}'`;
 }
 
-export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: unknown): string {
+export function quoteDefaultExpression(this: QuotingDispatchHost, value: unknown): string {
   if (value === undefined) return "";
   if (value === null) return "NULL";
   if (typeof value === "function") {
@@ -183,10 +183,10 @@ export function quoteDefaultExpression(this: QuotingDispatchHost | void, value: 
     if (/^\w+\(.*\)$/.test(str)) return `(${str})`;
     return str;
   }
-  // `quote` requires a host receiver; thread our own so date/time defaults reach
-  // SQLite's quotedDate / quotedTime overrides and binary defaults reach its
+  // Rails: `quote(value)` — self-dispatched, so date/time defaults reach
+  // SQLite's quotedDate / quotedTime overrides and binary defaults its
   // `x'..'` quotedBinary (the adapter binds `this`).
-  return quote.call(this || { quotedDate, quotedTime, quotedBinary }, value);
+  return quote.call(this, value);
 }
 
 export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat = false): unknown {

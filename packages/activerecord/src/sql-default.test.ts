@@ -57,46 +57,46 @@ describe("quote", () => {
 
 describe("quoteDefaultExpression", () => {
   it("returns empty string for undefined", () => {
-    expect(quoteDefaultExpression(undefined)).toBe("");
+    expect(quoteDefaultExpression.call({}, undefined)).toBe("");
   });
 
   it("returns DEFAULT NULL for null", () => {
-    expect(quoteDefaultExpression(null)).toBe("NULL");
+    expect(quoteDefaultExpression.call({}, null)).toBe("NULL");
   });
 
   it("returns DEFAULT TRUE/FALSE for booleans", () => {
-    expect(quoteDefaultExpression(true)).toBe("TRUE");
-    expect(quoteDefaultExpression(false)).toBe("FALSE");
+    expect(quoteDefaultExpression.call({}, true)).toBe("TRUE");
+    expect(quoteDefaultExpression.call({}, false)).toBe("FALSE");
   });
 
   it("returns unquoted numbers", () => {
-    expect(quoteDefaultExpression(42)).toBe("42");
+    expect(quoteDefaultExpression.call({}, 42)).toBe("42");
   });
 
   it("quotes regular strings", () => {
-    expect(quoteDefaultExpression("hello")).toBe("'hello'");
+    expect(quoteDefaultExpression.call({}, "hello")).toBe("'hello'");
   });
 
   it("passes through function return values as raw SQL", () => {
-    expect(quoteDefaultExpression(() => "CURRENT_TIMESTAMP")).toBe("CURRENT_TIMESTAMP");
+    expect(quoteDefaultExpression.call({}, () => "CURRENT_TIMESTAMP")).toBe("CURRENT_TIMESTAMP");
   });
 
   it("passes through function calls like now()", () => {
-    expect(quoteDefaultExpression(() => "now()")).toBe("now()");
+    expect(quoteDefaultExpression.call({}, () => "now()")).toBe("now()");
   });
 
   it("passes through SqlLiteral instances as raw SQL", () => {
-    expect(quoteDefaultExpression(new Nodes.SqlLiteral("CURRENT_TIMESTAMP"))).toBe(
+    expect(quoteDefaultExpression.call({}, new Nodes.SqlLiteral("CURRENT_TIMESTAMP"))).toBe(
       "CURRENT_TIMESTAMP",
     );
   });
 
   it("quotes plain string CURRENT_TIMESTAMP as a literal", () => {
-    expect(quoteDefaultExpression("CURRENT_TIMESTAMP")).toBe("'CURRENT_TIMESTAMP'");
+    expect(quoteDefaultExpression.call({}, "CURRENT_TIMESTAMP")).toBe("'CURRENT_TIMESTAMP'");
   });
 
   it("throws TypeError when function returns non-string/non-SqlLiteral", () => {
-    expect(() => quoteDefaultExpression(() => 123)).toThrow(TypeError);
-    expect(() => quoteDefaultExpression(() => undefined)).toThrow(TypeError);
+    expect(() => quoteDefaultExpression.call({}, () => 123)).toThrow(TypeError);
+    expect(() => quoteDefaultExpression.call({}, () => undefined)).toThrow(TypeError);
   });
 });

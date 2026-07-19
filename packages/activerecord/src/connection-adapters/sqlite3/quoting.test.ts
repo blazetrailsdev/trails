@@ -204,30 +204,36 @@ describe("SQLite3::Quoting", () => {
 
   describe("quoteDefaultExpression", () => {
     it("returns empty string for undefined", () => {
-      expect(quoteDefaultExpression(undefined)).toBe("");
+      expect(quoteDefaultExpression.call(HOST, undefined)).toBe("");
     });
 
     it("returns NULL for null", () => {
-      expect(quoteDefaultExpression(null)).toBe("NULL");
+      expect(quoteDefaultExpression.call(HOST, null)).toBe("NULL");
     });
 
     it("wraps function results in parens", () => {
-      expect(quoteDefaultExpression(() => "NOW()")).toBe("(NOW())");
+      expect(quoteDefaultExpression.call(HOST, () => "NOW()")).toBe("(NOW())");
     });
 
     it("returns non-function results as raw SQL", () => {
-      expect(quoteDefaultExpression(() => "CURRENT_TIMESTAMP")).toBe("CURRENT_TIMESTAMP");
+      expect(quoteDefaultExpression.call(HOST, () => "CURRENT_TIMESTAMP")).toBe(
+        "CURRENT_TIMESTAMP",
+      );
     });
 
     it("quotes a binary default through SQLite's quotedBinary", () => {
-      // Receiver-less: the fallback host must still reach the `x'..'` hex form,
-      // not the abstract byte-string fallback. Cover all three shapes that reach
-      // here — the `BinaryData` that `BinaryType#serialize` returns
+      // Binary self-dispatches through the host, so it must reach the `x'..'`
+      // hex form, not the abstract byte-string fallback. Cover all three shapes
+      // that reach here — the `BinaryData` that `BinaryType#serialize` returns
       // (activemodel/.../binary.rb:31), plus the raw `Uint8Array` and bare
       // `ArrayBuffer` a caller may hand to a migration default.
-      expect(quoteDefaultExpression(new Uint8Array([0xde, 0xad]))).toBe("x'dead'");
-      expect(quoteDefaultExpression(new Uint8Array([0xde, 0xad]).buffer)).toBe("x'dead'");
-      expect(quoteDefaultExpression(new BinaryData(new Uint8Array([0xde, 0xad])))).toBe("x'dead'");
+      expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]))).toBe("x'dead'");
+      expect(quoteDefaultExpression.call(HOST, new Uint8Array([0xde, 0xad]).buffer)).toBe(
+        "x'dead'",
+      );
+      expect(quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0xde, 0xad])))).toBe(
+        "x'dead'",
+      );
     });
   });
 
