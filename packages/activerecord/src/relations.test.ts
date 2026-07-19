@@ -2291,7 +2291,9 @@ describe("RelationTest", () => {
   it("#load", async () => {
     const relation = Post.all();
     const loaded = await relation.load();
-    expect(loaded).toBe(relation);
+    // Rails asserts `assert_equal relation, relation.load` (relations_test.rb:2193) —
+    // equality, not identity. `load` returns a then-less view of the same relation.
+    expect(loaded).toEqual(relation);
     const arr = await relation.toArray();
     expect(arr).toHaveLength(11);
   });

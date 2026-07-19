@@ -106,6 +106,26 @@ describe("Thenable", () => {
     });
   });
 
+  it("relation stays awaitable after load", async () => {
+    const davids = Author.where({ name: "David" });
+
+    const loaded = await davids.load();
+    expect(loaded.isLoaded).toBe(true);
+
+    const records = await davids;
+    expect(Array.isArray(records)).toBe(true);
+    expect(records).toHaveLength(1);
+  });
+
+  it("relation stays awaitable after destroyAll", async () => {
+    const davids = Author.where({ name: "David" });
+    expect(await davids).toHaveLength(1);
+
+    await davids.destroyAll();
+
+    expect(await davids).toEqual([]);
+  });
+
   describe("BatchEnumerator", () => {
     it("BatchEnumerator is directly awaitable", async () => {
       const batches = await Author.all().inBatches({ batchSize: 2 });

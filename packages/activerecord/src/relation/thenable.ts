@@ -13,17 +13,35 @@
  * generator or `resolve()` in a Promise does not unwrap it.
  *
  * JavaScript unwraps thenables everywhere in async contexts — yield,
- * return from async functions, Promise.resolve(). This shadows `.then`
- * with `undefined` on the instance to prevent that for objects returned
- * as `this` (load, reload, presence) or yielded (inBatches).
+ * return from async functions, Promise.resolve(). This hides `.then`
+ * to prevent that for objects returned as `this` (load, reload,
+ * presence) or yielded (inBatches).
+ *
+ * The hiding happens on a *view* rather than on the instance itself.
+ * Deleting `.then` in place made the original binding's runtime shape
+ * diverge from its static type: `await rel` after `await rel.load()`
+ * silently resolved to the relation object instead of the records,
+ * with no type error. The view forwards every operation to the target
+ * with `this` bound to the target, so method calls still mutate (and
+ * read) the one underlying relation — Rails' "same object, now loaded"
+ * identity semantics — while leaving the original awaitable.
  */
 export function stripThenable<T extends object>(obj: T): Omit<T, "then"> {
-  Object.defineProperty(obj, "then", {
-    value: undefined,
-    writable: true,
-    configurable: true,
-  });
-  return obj;
+  return new Proxy(obj, {
+    get(target, prop) {
+      if (prop === "then") return undefined;
+      return Reflect.get(target, prop, target);
+    },
+    set(target, prop, value) {
+      return Reflect.set(target, prop, value, target);
+    },
+    has(target, prop) {
+      return prop === "then" ? false : Reflect.has(target, prop);
+    },
+    getOwnPropertyDescriptor(target, prop) {
+      return prop === "then" ? undefined : Reflect.getOwnPropertyDescriptor(target, prop);
+    },
+  }) as Omit<T, "then">;
 }
 
 export function applyThenable(prototype: object, evaluationMethod: string = "toArray"): void {
