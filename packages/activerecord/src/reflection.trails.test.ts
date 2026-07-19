@@ -15,6 +15,7 @@ import {
   belongsToCounterCacheColumn,
   counterCacheColumnOption,
   resolveAliasedColumn,
+  create,
 } from "./reflection.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 
@@ -306,5 +307,40 @@ describe("ReflectionTest", () => {
     expect(resolveAliasedColumn(model, "comments_count")).toBe("legacy_comments_count");
     expect(resolveAliasedColumn(model, "replies_count")).toBe("replies_count");
     expect(resolveAliasedColumn(undefined, "comments_count")).toBe("comments_count");
+  });
+
+  it("create accepts a nil name without a cast", () => {
+    // Rails' Reflection.create tolerates a nil name (reflection_test.rb:126).
+    // TS-only guard: the signature must admit null so callers need no cast.
+    class NilNameOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("NilNameOwner", NilNameOwner);
+    const reflection = create("hasMany", null, null, {}, NilNameOwner);
+    expect(reflection.name).toBeNull();
+    // Ruby's `nil.to_s.pluralize` is "", not a raise.
+    expect(reflection.pluralName).toBe("");
+  });
+
+  it("plural_name honors pluralize_table_names", () => {
+    // Rails: active_record.pluralize_table_names ? name.to_s.pluralize : name.to_s
+    // (reflection.rb:395). We previously pluralized unconditionally.
+    class PluralOwner extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    class SingularOwner extends Base {
+      static pluralizeTableNames = false;
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    registerModel("PluralOwner", PluralOwner);
+    registerModel("SingularOwner", SingularOwner);
+    expect(create("hasMany", "comment", null, {}, PluralOwner).pluralName).toBe("comments");
+    expect(create("hasMany", "comment", null, {}, SingularOwner).pluralName).toBe("comment");
   });
 });
