@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 describe("PostgresTest", () => {
   const users = new Table("users");
@@ -143,7 +144,7 @@ describe("PostgresTest", () => {
 
     it("compileWithBinds uses $N placeholders for Quoted Date values", () => {
       const visitor = new Visitors.PostgreSQLWithBinds();
-      const d = new Date("2020-01-02T12:00:00.000Z");
+      const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
       const node = users.get("created_at").eq(new Nodes.Quoted(d));
       const [sql, binds] = visitor.compileWithBinds(node);
       // Quoted(Date) inlines as a literal — only BindParam/ActiveModel::Attribute produce $N.
@@ -361,7 +362,7 @@ describe("PostgresTest", () => {
       // Rails' type_cast_array sends each element through the same type_cast a
       // scalar takes (`when Date, Time then quoted_date`), so the array element
       // must carry the db form the scalar path emits — not ISO-8601.
-      const d = new Date(Date.UTC(2026, 3, 26, 14, 23, 55));
+      const d = Temporal.Instant.from("2026-04-26T14:23:55Z");
       const scalar = new Visitors.PostgreSQL().compile(users.get("at").eq(d));
       expect(scalar).toContain("'2026-04-26 14:23:55'");
 
@@ -370,13 +371,13 @@ describe("PostgresTest", () => {
     });
 
     it("emits fixed-6 microseconds for a sub-second date array element", () => {
-      const d = new Date(Date.UTC(2026, 3, 26, 14, 23, 55, 123));
+      const d = Temporal.Instant.from("2026-04-26T14:23:55.123Z");
       const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([d]));
       expect(sql).toContain("'{\"2026-04-26 14:23:55.123000\"}'");
     });
 
     it("quotes date elements of a nested array as db dates", () => {
-      const d = new Date(Date.UTC(2026, 3, 26, 14, 23, 55));
+      const d = Temporal.Instant.from("2026-04-26T14:23:55Z");
       const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([[d]]));
       expect(sql).toContain("'{{\"2026-04-26 14:23:55\"}}'");
     });
@@ -471,5 +472,29 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
       const sql = new Visitors.PostgreSQL().compile(node);
       expect(sql).toContain("ESCAPE '!'");
     });
+  });
+});
+
+describe("Temporal array elements", () => {
+  const users = new Table("users");
+
+  // `when Type::Time::Value then quoted_time` (abstract/quoting.rb:102) —
+  // trails' analogue is Temporal.PlainTime, which carries no date to emit.
+  it("quotes a time array element as a db time, matching the scalar path", () => {
+    const t = Temporal.PlainTime.from("14:23:55");
+    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(t))).toContain("'14:23:55'");
+    expect(new Visitors.PostgreSQL().compile(users.get("ats").eq([t]))).toContain("'{14:23:55}'");
+  });
+
+  // `when Date, Time then quoted_date` (:103) for the date-only analogue.
+  it("quotes a date-only array element without a time part", () => {
+    const d = Temporal.PlainDate.from("2026-04-26");
+    expect(new Visitors.PostgreSQL().compile(users.get("ats").eq([d]))).toContain("'{2026-04-26}'");
+  });
+
+  // A JS Date is rejected AR-wide (#939): it must not be claimed as a Time.
+  it("refuses a JS Date rather than formatting it as a Time", () => {
+    const d = new Date("2026-04-26T14:23:55Z");
+    expect(() => new Visitors.PostgreSQL().compile(users.get("at").eq(d))).toThrow(TypeError);
   });
 });
