@@ -198,14 +198,13 @@ export class Attribute extends Node {
 
   in(values: unknown): In {
     if (isSelectManagerLike(values)) return new In(this, values.ast);
-    if (isEnumerable(values)) return new In(this, this.quotedArray([...values]) as unknown as Node);
+    if (isEnumerable(values)) return new In(this, this.quotedArray([...values]));
     return new In(this, this.quotedNode(values));
   }
 
   notIn(values: unknown): NotIn {
     if (isSelectManagerLike(values)) return new NotIn(this, values.ast);
-    if (isEnumerable(values))
-      return new NotIn(this, this.quotedArray([...values]) as unknown as Node);
+    if (isEnumerable(values)) return new NotIn(this, this.quotedArray([...values]));
     return new NotIn(this, this.quotedNode(values));
   }
   between(range: [unknown, unknown]): Node;
