@@ -6,6 +6,12 @@
  * `_attributeDefinitions` map as an OWN property of the subclass, which fooled
  * the copy-on-write guard in `decorateAttributes` — so the subclass decoration
  * landed on the base's definitions and leaked to sibling subclasses.
+ *
+ * The leak only reproduces when the SUBCLASS drives the first reflection of the
+ * STI table (that is the path that installs the base map as an own property), so
+ * this file must own that first reflection — do not add a test above that
+ * reflects `Company` (or another subclass) first, or the guard silently stops
+ * guarding.
  */
 import { describe, it, expect } from "vitest";
 import { Company } from "./test-helpers/models/company.js";
@@ -13,6 +19,13 @@ import { fixtures } from "./test-helpers/fixtures.js";
 
 class NormalizedCompany extends Company {}
 class OtherCompany extends Company {}
+
+const defTypeFor = (klass: typeof Company, name: string) =>
+  (
+    klass as unknown as {
+      _attributeDefinitions: Map<string, { type: { cast(v: unknown): unknown } }>;
+    }
+  )._attributeDefinitions.get(name)!.type;
 
 describe("STI subclass normalizes", () => {
   fixtures([]);
@@ -25,16 +38,9 @@ describe("STI subclass normalizes", () => {
       typeof name === "string" ? name.trim().toUpperCase() : name,
     );
 
-    const defTypeFor = (klass: typeof Company) =>
-      (
-        klass as unknown as {
-          _attributeDefinitions: Map<string, { type: { cast(v: unknown): unknown } }>;
-        }
-      )._attributeDefinitions.get("name")!.type;
-
-    expect(defTypeFor(NormalizedCompany).cast("  acme  ")).toBe("ACME");
-    expect(defTypeFor(Company).cast("  acme  ")).toBe("  acme  ");
-    expect(defTypeFor(OtherCompany).cast("  acme  ")).toBe("  acme  ");
+    expect(defTypeFor(NormalizedCompany, "name").cast("  acme  ")).toBe("ACME");
+    expect(defTypeFor(Company, "name").cast("  acme  ")).toBe("  acme  ");
+    expect(defTypeFor(OtherCompany, "name").cast("  acme  ")).toBe("  acme  ");
 
     expect(NormalizedCompany.new({ name: "  acme  " }).name).toBe("ACME");
     expect(Company.new({ name: "  acme  " }).name).toBe("  acme  ");

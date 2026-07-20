@@ -1201,11 +1201,7 @@ function applyColumnsHash(
         const existing = baseDefs.get(name);
         const subIsUser = (def.userProvided ?? true) === true;
         const baseIsUser = existing ? (existing.userProvided ?? true) === true : false;
-        // `def !== existing` marks an entry the subclass actually declared or
-        // decorated (untouched entries are copied by reference from the base),
-        // so a subclass-only decoration survives even though both sides are
-        // schema-sourced (`userProvided === false`).
-        if (!existing || def !== existing || (subIsUser && !baseIsUser)) {
+        if (!existing || (subIsUser && !baseIsUser)) {
           overlay.set(name, def);
         }
       }
