@@ -9,10 +9,12 @@
  * mirrors transactions_test.rb) so the convention file tracks Rails 1:1.
  */
 import { describe, it, expect, beforeAll, afterEach, afterAll, vi } from "vitest";
+import { throwAbort } from "@blazetrails/activesupport";
 import { Base, transaction } from "./index.js";
 import { NullTransaction } from "./connection-adapters/abstract/transaction.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Reply } from "./test-helpers/models/reply.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractSQLite3Adapter } from "./connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "./connection-adapters/better-sqlite3-adapter.js";
@@ -598,5 +600,32 @@ describe("SchemaAdapter TM delegation", () => {
     expect(testAdapter.inTransaction).toBe(true);
     await testAdapter.rollback();
     expect(testAdapter.inTransaction).toBe(false);
+  });
+});
+
+describe("aborting before_validation halts before the validators run", () => {
+  fixtures({});
+
+  // No Rails counterpart: Rails gets this for free from the module layering
+  // (`Transactions#save { Validations#save { perform_validations; ... } }`), so
+  // there is no test asserting it. trails used to run `performValidations`
+  // outside the save transaction, which made the validators run even when an
+  // aborting `before_validation` should have halted first — leaving errors on a
+  // record Rails leaves clean. This pins the converged ordering.
+  it("leaves no errors when a record is also invalid", async () => {
+    // Reply validates content presence (errorsOnEmptyContent), so this record
+    // is invalid on its own; the aborting hook must halt before that runs.
+    const reply = Reply.new({ title: "a reply", content: "" }) as unknown as {
+      save(): Promise<boolean | undefined>;
+      errors: { any: boolean };
+      beforeValidationForTransaction: () => Promise<void>;
+    };
+    reply.beforeValidationForTransaction = async () => {
+      await Promise.resolve();
+      throwAbort();
+    };
+
+    expect(await reply.save()).toBeFalsy();
+    expect(reply.errors.any).toBe(false);
   });
 });
