@@ -223,6 +223,10 @@ export function applyPendingEncryptions(klass: any): void {
   const pending: PendingEncryption[] | undefined = klass._pendingEncryptions;
   if (!pending || pending.length === 0) return;
 
+  // Copy-on-write so a subclass's pending encryption never mutates an inherited
+  // definitions map. The `decorateAttributes` path does its own copy-on-write
+  // (#4981); this still covers the plain-model branch of registerEncryptedType,
+  // which writes `_attributeDefinitions` directly.
   if (!Object.prototype.hasOwnProperty.call(klass, "_attributeDefinitions")) {
     klass._attributeDefinitions = new Map(klass._attributeDefinitions);
   }
