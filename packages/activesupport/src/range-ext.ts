@@ -70,7 +70,7 @@ const isAsciiAlnum = (c: number): boolean =>
  */
 export function stringSucc(s: string): string {
   if (s.length === 0) return "";
-  const codes = Array.from(s, (ch) => ch.charCodeAt(0));
+  const codes = Array.from(s, (ch) => ch.codePointAt(0) as number);
 
   let lastAlnum = -1;
   for (let i = codes.length - 1; i >= 0; i--) {
@@ -81,11 +81,13 @@ export function stringSucc(s: string): string {
   }
 
   if (lastAlnum === -1) {
-    // No alphanumeric: raw code-unit increment with carry.
+    // No alphanumeric: whole-code-point increment with carry, matching Ruby's
+    // `enc_succ_char`, which advances by encoded character — not by UTF-16
+    // code unit, which would truncate an astral char to its high surrogate.
     let i = codes.length - 1;
     let carry = true;
     while (i >= 0 && carry) {
-      if (codes[i] >= 0xffff) {
+      if (codes[i] >= 0x10ffff) {
         codes[i] = 0;
       } else {
         codes[i]++;
@@ -94,7 +96,7 @@ export function stringSucc(s: string): string {
       i--;
     }
     if (carry) codes.unshift(1);
-    return String.fromCharCode(...codes);
+    return String.fromCodePoint(...codes);
   }
 
   // Carry leftward from the rightmost alphanumeric, wrapping within a class.
@@ -138,7 +140,7 @@ export function stringSucc(s: string): string {
     i--;
   }
   if (carry) codes.splice(overflowPos, 0, overflowChar);
-  return String.fromCharCode(...codes);
+  return String.fromCodePoint(...codes);
 }
 
 const lexCmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);

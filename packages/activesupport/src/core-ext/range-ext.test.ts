@@ -258,6 +258,8 @@ describe("RangeTest", () => {
     // Carry stops at a non-alnum gap into a different class.
     expect(stringSucc("z.9")).toBe("z.10");
     expect(stringSucc("a.z")).toBe("b.a");
+    // Astral (non-alnum) chars succ as whole code points, not UTF-16 units.
+    expect(stringSucc("\u{1F600}")).toBe("\u{1F601}");
   });
 
   it("date time with step", () => {
