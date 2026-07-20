@@ -20,6 +20,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 class NormalizedCompany extends Company {}
 class OtherCompany extends Company {}
 class ReloadedCompany extends Company {}
+class RefreshedCompany extends Company {}
 
 const defTypeFor = (klass: typeof Company, name: string) =>
   (
@@ -65,5 +66,25 @@ describe("STI subclass normalizes", () => {
 
     expect(defTypeFor(ReloadedCompany, "name").cast("  acme  ")).toBe("ACME");
     expect(defTypeFor(Company, "name").cast("  acme  ")).toBe("  acme  ");
+  });
+
+  it("refreshes a subclass overlay whose key set is unchanged after a base reset", async () => {
+    await RefreshedCompany.loadSchema();
+    await Company.loadSchema();
+
+    // Fork an overlay covering every reflected column.
+    RefreshedCompany.normalizes("description", (value: unknown) => value);
+    const defsOf = (klass: typeof Company) =>
+      (klass as unknown as { _attributeDefinitions: Map<string, object> })._attributeDefinitions;
+    expect([...defsOf(Company).keys()].every((k) => defsOf(RefreshedCompany).has(k))).toBe(true);
+
+    // Rails' reset_column_information invalidates the class AND its descendants,
+    // so a subclass must not keep an old overlay merely because it still covers
+    // every key — reflection can change a column's type/default in place.
+    Company.resetColumnInformation();
+    await Company.loadSchema();
+    await RefreshedCompany.loadSchema();
+
+    expect(defsOf(RefreshedCompany).get("name")).toBe(defsOf(Company).get("name"));
   });
 });

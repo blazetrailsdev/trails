@@ -539,6 +539,15 @@ interface SchemaHost {
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
   _virtualAttributesReconciled?: boolean;
+  /**
+   * Bumped whenever this class's reflected attribute definitions are
+   * invalidated or rebuilt. STI subclasses stamp the value they last synced
+   * their overlay against, mirroring Rails' `reset_column_information`
+   * invalidating the class AND its descendants (model_schema.rb).
+   */
+  _schemaRevision?: number;
+  /** Base `_schemaRevision` this subclass's overlay was built from. @internal */
+  _stiOverlaySyncedAt?: number;
   connection: any;
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
@@ -855,6 +864,11 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
   this._virtualAttributesReconciled = false;
+  // Invalidate every STI subclass overlay built from the pre-reset definitions.
+  // The defs Map below is mutated IN PLACE, so neither map identity nor key
+  // coverage can detect that a subclass's overlay is stale — only this counter
+  // can. Mirrors Rails resetting the class and its descendants.
+  this._schemaRevision = (this._schemaRevision ?? 0) + 1;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   // Mirrors Rails reset_column_information's
@@ -903,7 +917,13 @@ export function resetColumnInformation(this: SchemaHost): void {
  * `decorateAttributes` (`hasOwnProperty(this, "_attributeDefinitions")`), so a
  * later `normalizes` would decorate the base's definitions in place.
  */
+const rebuildingOverlays = new WeakSet<object>();
+
 function rebuildStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
+  // Replaying a decorator can re-enter schema loading — the enum decorator calls
+  // `columnForAttribute`, which calls `loadSchema`, which syncs overlays. Without
+  // this guard that cycle recurses until the stack blows.
+  if (rebuildingOverlays.has(sub as object)) return;
   const baseDefs = base._attributeDefinitions;
   const subDefs = sub._attributeDefinitions;
   if (
@@ -931,8 +951,16 @@ function rebuildStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
   // above cannot carry it. Rails re-applies the pending-decorator chain on every
   // rebuild for exactly this reason; replay the subclass's own decorators so the
   // decoration survives reflection and reload.
-  replayOwnPendingDecorators(sub as never, overlay);
+  // Stamp and install BEFORE replaying: a decorator that re-enters `loadSchema`
+  // must see the fresh overlay and a synced stamp, not recurse into another rebuild.
   sub._attributeDefinitions = overlay;
+  sub._stiOverlaySyncedAt = base._schemaRevision ?? 0;
+  rebuildingOverlays.add(sub as object);
+  try {
+    replayOwnPendingDecorators(sub as never, overlay);
+  } finally {
+    rebuildingOverlays.delete(sub as object);
+  }
 }
 
 /**
@@ -941,7 +969,10 @@ function rebuildStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
  * the subclass and would otherwise leave the overlay pinned to stale (or, after
  * a `resetColumnInformation`, missing) definitions.
  *
- * Cheap key-coverage check first so the hot early-return path doesn't allocate.
+ * Staleness is detected by `_schemaRevision`, not by inspecting the maps: a
+ * reset mutates the base's definitions Map IN PLACE, so map identity is stable,
+ * and a re-reflection can change a column's type/default while leaving the key
+ * set identical — so key coverage would wrongly report the overlay as fresh.
  */
 export function syncStiSubclassAttributeDefinitions(host: SchemaHost): void {
   if (!isStiSubclass(host)) return;
@@ -953,14 +984,12 @@ function syncStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
   const subDefs = sub._attributeDefinitions;
   if (!(baseDefs instanceof Map) || !(subDefs instanceof Map) || subDefs === baseDefs) return;
   if (!Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")) return;
-  let covered = true;
-  for (const name of baseDefs.keys()) {
-    if (!subDefs.has(name)) {
-      covered = false;
-      break;
-    }
-  }
-  if (covered) return;
+  // Own-property check: a subclass that never synced would otherwise INHERIT a
+  // stamp through the prototype chain and wrongly skip its first rebuild.
+  const stamped = Object.prototype.hasOwnProperty.call(sub, "_stiOverlaySyncedAt")
+    ? sub._stiOverlaySyncedAt
+    : undefined;
+  if (stamped === (base._schemaRevision ?? 0)) return;
   rebuildStiSubclassOverlay(sub, base);
 }
 
@@ -1262,6 +1291,10 @@ function applyColumnsHash(
   // `columnNames()` partial-load path — are the source of truth here.
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
+
+  // Reflection may change a column's metadata/type/default without changing the
+  // key set, so bump before rebuilding overlays from the new definitions.
+  host._schemaRevision = (host._schemaRevision ?? 0) + 1;
 
   if (originatingHost && originatingHost !== host) {
     rebuildStiSubclassOverlay(originatingHost, host);
