@@ -3,6 +3,9 @@ import { Binary } from "./binary.js";
 import { Cte } from "./cte.js";
 import { SqlLiteral } from "./sql-literal.js";
 import { Attribute } from "../attributes/attribute.js";
+// Cyclic with table.ts (which imports TableAlias); safe because the binding is
+// only dereferenced inside `get()`, never at class-evaluation time.
+import { Table } from "../table.js";
 
 /** Structural view of `TableAlias#relation`.
  *
@@ -64,14 +67,10 @@ export class TableAlias extends Binary {
     return this.name instanceof SqlLiteral ? this.name.value : this.name;
   }
 
-  get(columnName: string): Attribute {
-    // Resolve attribute aliases through the underlying relation's klass, the
-    // same way Table#get does, so `where("clients.new_name": …)` against a
-    // self-join alias still maps `new_name` to the real column.
-    const klass = (this.relation as { klass?: { _attributeAliases?: Record<string, string> } })
-      ?.klass;
-    const resolved = klass?._attributeAliases?.[columnName] ?? columnName;
-    return new Attribute(this, resolved);
+  get(name: string): Attribute {
+    return this.relation instanceof Table
+      ? this.relation.get(name, this)
+      : new Attribute(this, name);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
