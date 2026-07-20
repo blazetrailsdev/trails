@@ -64,6 +64,15 @@ describe("has_one stale target re-fetch", () => {
     // re-fetch, and that re-fetch must win. Guarding on the final state alone
     // silently pins the stale row here (it regressed
     // has-one-through-associations mid-development).
+    //
+    // `Minivan#dashboard` is has_one :through, but the through branches in
+    // `loadHasOne` that return early (`loadHasOneThrough` /
+    // `_loadSingularThroughViaDisableJoinsScope`) are not the ones this shape
+    // takes — it falls through the AssociationScope path and reaches the
+    // guard with `holderLoadedAtStart === true`, which is the arm under test.
+    // A plain has_one cannot stand in here: with `stale_state` nil for
+    // foreign associations, its holder is never stale, so the through owner's
+    // belongs_to key is the only way to reach this arm.
     const minivan = (await Minivan.first()) as Minivan;
     const holder = minivan.association("dashboard");
 

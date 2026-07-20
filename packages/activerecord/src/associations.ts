@@ -1823,6 +1823,21 @@ export async function loadHasOne(
   // set a newer target while we were querying. Leave that target intact and
   // return it. Holders already loaded at entry are the stale-target re-fetch
   // path, which must not be short-circuited.
+  //
+  // Load-bearing assumption: loaded-ness only flips false→true during our await
+  // via an external setter. That is *usually* a reassignment, but not
+  // exclusively — two concurrent cold readers also hit this branch, with the
+  // loser returning the winner's target. Benign, since the winner already ran
+  // the inverse wiring and sync below that the loser now skips; if a future
+  // caller makes those non-idempotent, this branch needs to distinguish the
+  // two cases rather than assuming reassignment.
+  //
+  // Only the singular loaders need this. `loadHasOneThrough` and
+  // `_loadSingularThroughViaDisableJoinsScope` return above without ever
+  // calling `syncToAssociationInstance` on the outer holder, so they have no
+  // writeback to clobber — structurally immune, not a scope cut. (The
+  // AssociationScope through shape does fall through to here, and is what
+  // exercises the `holderLoadedAtStart === true` arm.)
   const holder = record._associationInstances.get(assocName) as
     | { isLoaded?: () => boolean; target?: Base | null }
     | undefined;
