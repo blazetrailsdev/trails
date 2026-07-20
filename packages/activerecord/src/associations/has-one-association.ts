@@ -86,12 +86,15 @@ export class HasOneAssociation extends SingularAssociation {
     // be nullified/removed, rather than silently orphaning it.
     if (!this.loaded) await this.loadTarget();
     const displaced = this.target;
-    // Rails: `return target unless load_target || record` (has_one_association
-    // .rb:61) — with nothing loaded and nothing being assigned there is no work,
-    // and crucially no `self.target =`, so the association stays UNLOADED. The
-    // sync `queueWrite` path could not await the load, so this was previously
-    // approximated by the `changed` gate below, which still fell through to
-    // `replace(null)` and marked the association loaded.
+    // Rails: `return target unless load_target || record`
+    // (has_one_association.rb:61) — nothing associated and nothing being
+    // assigned means no work, so return before the gate and before
+    // `self.target = record`. Note this does NOT leave the association
+    // unloaded: `load_target` calls `loaded!` unconditionally
+    // (association.rb:192), as does the `loadTarget()` above. The old code
+    // reached the same end state by falling through to a `replace(null)` that
+    // happened to be a no-op with a null target; this ports the structure Rails
+    // actually has rather than relying on that coincidence.
     if (!displaced && !record) return;
     // Mirror Rails `replace`'s `assigning_another_record || has_changes_to_save?`
     // gate (:64-65): only touch the DB when the assignment actually changes
