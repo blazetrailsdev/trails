@@ -7015,9 +7015,9 @@ export class Relation<T extends Base> {
     this._seedWherePredicates = [...source._seedWherePredicates];
     // `_delegateToModel` is deliberately NOT copied: Rails' `initialize_copy`
     // (relation.rb:97-100) ends in `reset`, which clears `@delegate_to_model`.
-    // Carrying it onto clones would make every chained call inside a scope body
-    // "already in scope", so `where(a).where(b)` would spawn `model.all` and
-    // silently drop `a`.
+    // Carrying it onto clones would let derived relations report "already in
+    // scope" whenever a current scope is installed, so a chained `where` would
+    // spawn `model.all` and discard the values accumulated so far.
   }
 
   /** @internal */
