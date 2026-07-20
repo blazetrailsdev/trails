@@ -23,9 +23,9 @@ export class PostgreSQL extends ToSql {
   }
 
   protected override visitArelNodesMatches(node: Nodes.Matches, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(node.caseSensitive ? " LIKE " : " ILIKE ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     this.appendEscape(node.escape, collector);
     return collector;
   }
@@ -34,9 +34,9 @@ export class PostgreSQL extends ToSql {
     node: Nodes.DoesNotMatch,
     collector: SQLString,
   ): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(node.caseSensitive ? " NOT LIKE " : " NOT ILIKE ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     this.appendEscape(node.escape, collector);
     return collector;
   }
@@ -104,9 +104,9 @@ export class PostgreSQL extends ToSql {
     node: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" IS NOT DISTINCT FROM ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -114,9 +114,9 @@ export class PostgreSQL extends ToSql {
     node: Nodes.IsDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" IS DISTINCT FROM ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 

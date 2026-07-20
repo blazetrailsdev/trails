@@ -428,7 +428,7 @@ export class Attribute extends Node {
   // -- Math --
   //
   // Mirrors Arel::Math: operands pass through unwrapped. The visitor
-  // renders primitive values via `visitNodeOrValue`.
+  // renders primitive values via `visit` class dispatch.
 
   add(other: unknown): Grouping {
     return new Grouping(new Addition(this, other as NodeOrValue));

@@ -1,5 +1,15 @@
 import { Node } from "../nodes/node.js";
 import { UnsupportedVisitError } from "../errors.js";
+import { rubyClassName } from "./ruby-class.js";
+
+// Rails interpolates `object.class` straight into its "Cannot visit" TypeError
+// (visitor.rb:38). The nearest handle here is the Ruby class the value would
+// have had, falling back to the JS constructor for a real class.
+function describeClass(object: unknown): string {
+  const rubyClass = rubyClassName(object);
+  if (rubyClass !== null) return rubyClass;
+  return (object as { constructor?: { name?: string } })?.constructor?.name ?? typeof object;
+}
 
 /**
  * Opaque dispatch-cache key for a Node subclass.
@@ -28,6 +38,13 @@ const PER_CLASS_CACHE = new WeakMap<VisitorCtor, Map<NodeCtor, string>>();
  * `dispatchCache` (a `Map<NodeCtor, methodName>`), and `visit` looks up the
  * runtime constructor, falling back to the prototype chain (mirroring
  * Ruby's `klass.ancestors` walk).
+ *
+ * Raw JS values reach the same method table. Ruby has a class for every
+ * object, so `visit(1)` is `visit_Integer` and `visit("x")` is `visit_String`
+ * (which aliases to `unsupported` and raises, to_sql.rb:842) — there is no
+ * separate entry point for values. A JS primitive has no such class, so
+ * `rubyClassName` names the Ruby class it would have had and `visit` resolves
+ * that to the matching `visit<Name>` method.
  */
 export abstract class Visitor {
   protected dispatch: Map<NodeCtor, string>;
@@ -36,9 +53,9 @@ export abstract class Visitor {
     this.dispatch = this.getDispatchCache();
   }
 
-  accept<C>(object: Node, collector: C): C;
-  accept(object: Node): unknown;
-  accept(object: Node, collector?: unknown): unknown {
+  accept<C>(object: unknown, collector: C): C;
+  accept(object: unknown): unknown;
+  accept(object: unknown, collector?: unknown): unknown {
     return this.visit(object, collector);
   }
 
@@ -50,13 +67,12 @@ export abstract class Visitor {
     return (this.constructor as VisitorCtor).dispatchCache();
   }
 
-  protected visit<C>(object: Node, collector: C): C;
-  protected visit(object: Node): unknown;
-  protected visit(object: Node, collector?: unknown): unknown {
-    const ctor = object.constructor as NodeCtor;
-    const methodName = this.resolveDispatch(ctor);
+  protected visit<C>(object: unknown, collector: C): C;
+  protected visit(object: unknown): unknown;
+  protected visit(object: unknown, collector?: unknown): unknown {
+    const methodName = this.dispatchMethod(object);
     if (!methodName) {
-      throw new UnsupportedVisitError(`Unknown node type: ${ctor.name}`);
+      throw new UnsupportedVisitError(`Unknown node type: ${describeClass(object)}`);
     }
     const fn = (this as unknown as Record<string, unknown>)[methodName];
     if (typeof fn !== "function") {
@@ -65,10 +81,10 @@ export abstract class Visitor {
       // cache). Distinct from the "no entry at all" case above so the
       // failure mode is unambiguous.
       throw new UnsupportedVisitError(
-        `Dispatch method '${methodName}' is not defined on ${this.constructor.name} for node ${ctor.name}`,
+        `Dispatch method '${methodName}' is not defined on ${this.constructor.name} for node ${describeClass(object)}`,
       );
     }
-    return (fn as (n: Node, c?: unknown) => unknown).call(this, object, collector);
+    return (fn as (n: unknown, c?: unknown) => unknown).call(this, object, collector);
   }
 
   /**
@@ -89,6 +105,25 @@ export abstract class Visitor {
       PER_CLASS_CACHE.set(this, cache);
     }
     return cache;
+  }
+
+  /**
+   * The dispatch method name for `object`, mirroring `dispatch[object.class]`
+   * (visitor.rb:29). Rails reads one runtime class off every object it visits,
+   * nodes and raw values alike; TS has no single such handle, so a real class
+   * resolves through the constructor-keyed cache and a raw JS value resolves
+   * through `rubyClassName` — the name of the Ruby class it would have had.
+   * Both arrive at the same `visit<Name>` method table, so there is no second
+   * entry point for raw values.
+   */
+  private dispatchMethod(object: unknown): string | undefined {
+    const ctor = (object as { constructor?: NodeCtor } | null | undefined)?.constructor;
+    if (ctor) {
+      const byCtor = this.resolveDispatch(ctor);
+      if (byCtor) return byCtor;
+    }
+    const rubyClass = rubyClassName(object);
+    return rubyClass === null ? undefined : `visit${rubyClass}`;
   }
 
   /**

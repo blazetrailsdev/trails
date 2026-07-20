@@ -146,9 +146,9 @@ export class MySQL extends ToSql {
 
   protected override visitArelNodesConcat(node: Nodes.Concat, collector: SQLString): SQLString {
     collector.append(" CONCAT(");
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(", ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     collector.append(") ");
     return collector;
   }
@@ -160,9 +160,9 @@ export class MySQL extends ToSql {
     node: Nodes.IsNotDistinctFrom,
     collector: SQLString,
   ): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" <=> ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -171,9 +171,9 @@ export class MySQL extends ToSql {
     collector: SQLString,
   ): SQLString {
     collector.append("NOT ");
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" <=> ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -181,9 +181,9 @@ export class MySQL extends ToSql {
   // `!~` (which is Postgres). Mirrors Rails MySQL's `infix_value`
   // helper — same shape as visitArelNodesMatches.
   protected override visitArelNodesRegexp(node: Nodes.Regexp, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" REGEXP ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -191,9 +191,9 @@ export class MySQL extends ToSql {
     node: Nodes.NotRegexp,
     collector: SQLString,
   ): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" NOT REGEXP ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -203,7 +203,7 @@ export class MySQL extends ToSql {
   ): SQLString {
     // MySQL has no NULLS FIRST; emulate: col IS NOT NULL, col ASC/DESC
     const ordering = node.expr as Nodes.Ascending | Nodes.Descending;
-    this.visitNodeOrValue(ordering.expr as Nodes.NodeOrValue, collector);
+    this.visit(ordering.expr as Nodes.NodeOrValue, collector);
     collector.append(" IS NOT NULL, ");
     this.visit(ordering, collector);
     return collector;
@@ -215,7 +215,7 @@ export class MySQL extends ToSql {
   ): SQLString {
     // MySQL has no NULLS LAST; emulate: col IS NULL, col ASC/DESC
     const ordering = node.expr as Nodes.Ascending | Nodes.Descending;
-    this.visitNodeOrValue(ordering.expr as Nodes.NodeOrValue, collector);
+    this.visit(ordering.expr as Nodes.NodeOrValue, collector);
     collector.append(" IS NULL, ");
     this.visit(ordering, collector);
     return collector;
