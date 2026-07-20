@@ -88,6 +88,16 @@ export function railsToTrailsRel(railsRel) {
 }
 
 /**
+ * Rails fixture-set names are snake_case (`author_addresses`); trails
+ * declares them camelCase (`authorAddresses`). Without this the rule only
+ * ever matched single-word sets, and every multi-word set was reported
+ * missing even when correctly declared.
+ */
+function camelize(name) {
+  return name.replace(/_([a-z0-9])/g, (_, c) => c.toUpperCase());
+}
+
+/**
  * Returns the subset of `entry.fixtures` that at least one Rails test in
  * `entry.tests` actually dereferences (e.g. `customers(:david)`).
  *
@@ -105,7 +115,7 @@ export function requiredFixtureSets(entry) {
   for (const t of Object.values(entry.tests)) {
     for (const k of Object.keys(t.fixtures ?? {})) referenced.add(k);
   }
-  return (entry.fixtures ?? []).filter((k) => referenced.has(k));
+  return (entry.fixtures ?? []).filter((k) => referenced.has(k)).map(camelize);
 }
 
 /**

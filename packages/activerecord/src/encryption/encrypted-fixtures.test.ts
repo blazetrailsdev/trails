@@ -16,11 +16,27 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
     restoreEncryption?.();
   });
 
-  const { encryptedBooks } = fixtures(["encryptedBooks"]);
+  const { encryptedBooks, encryptedBookThatIgnoresCases } = fixtures([
+    "encryptedBooks",
+    "encryptedBookThatIgnoresCases",
+  ]);
 
   it("fixtures get encrypted automatically", async () => {
     const { EncryptableRecord } = await import("./encryptable-record.js");
     expect(EncryptableRecord.isEncryptedAttribute(encryptedBooks("awdr"), "name")).toBe(true);
+  });
+
+  it("preserved columns due to ignore_case: true gets encrypted automatically", async () => {
+    const { assertEncryptedAttribute } = await import("./test-helpers.js");
+    const { EncryptedBookThatIgnoresCase } =
+      await import("../test-helpers/models/book-encrypted.js");
+    const book = encryptedBookThatIgnoresCases("rfr");
+    expect(book.name).toBe("Ruby for Rails");
+    await assertEncryptedAttribute(book, "name", "Ruby for Rails");
+
+    // Rails writes `find_by_name(...)`; the dynamic finder is not wired on
+    // this model, and it is defined as sugar for the explicit `find_by`.
+    expect(await EncryptedBookThatIgnoresCase.findBy({ name: "Ruby for Rails" })).toBeTruthy();
   });
 });
 

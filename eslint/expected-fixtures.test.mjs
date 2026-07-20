@@ -24,6 +24,7 @@ const {
   default: rule,
   trailsToRailsRel,
   collectUseFixturesKeys,
+  requiredFixtureSets,
 } = await import("./expected-fixtures.mjs");
 
 beforeAll(() => {
@@ -95,6 +96,16 @@ describe("trailsToRailsRel", () => {
   it("returns null for non-activerecord paths", () => {
     expect(trailsToRailsRel("/x/packages/arel/src/foo.test.ts")).toBeNull();
     expect(trailsToRailsRel("/x/random/file.ts")).toBeNull();
+  });
+});
+
+describe("requiredFixtureSets", () => {
+  it("camelizes multi-word Rails fixture-set names to match trails declarations", () => {
+    const entry = {
+      fixtures: ["encrypted_books", "posts", "author_addresses"],
+      tests: { a: { fixtures: { encrypted_books: 1, posts: 1 } } },
+    };
+    expect(requiredFixtureSets(entry)).toEqual(["encryptedBooks", "posts"]);
   });
 });
 
