@@ -137,7 +137,7 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     // NullEncryptor.isBinary() === false gate in encryptAsText. TS strings
     // carry no binary encoding, so this payload is degenerate and the binary
     // gate itself can't be meaningfully driven here — the actual binary-column
-    // encryption path is covered by makeEncryptedBookWithBinary in
+    // encryption path is covered by EncryptedBookWithBinary in
     // encryptable-record.test.ts. This test retains the name-for-name parity
     // and still asserts the create-under-NullEncryptor path doesn't raise.
     await expect(
