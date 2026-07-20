@@ -19,6 +19,30 @@ export class Collector extends DispatchCollector {
     return this.resolvedFormat;
   }
 
+  /**
+   * With format arguments, register `handler` for each named format; with none,
+   * register the catch-all. Mirrors Rails' `send(type, &block)` dispatch, which
+   * routes every named format through `custom`.
+   */
+  override any(...args: (string | FormatHandler | undefined)[]): this {
+    const last = args[args.length - 1];
+    const handler = typeof last === "function" ? (args.pop() as FormatHandler) : undefined;
+    const types = args.filter((arg): arg is string => typeof arg === "string");
+
+    if (types.length > 0) {
+      for (const type of types) {
+        this.custom(type, handler);
+      }
+      return this;
+    }
+    return super.any(handler);
+  }
+
+  /** Alias of {@link any}, mirroring Rails' `alias :all :any`. */
+  all(...args: (string | FormatHandler | undefined)[]): this {
+    return this.any(...args);
+  }
+
   custom(mimeType: string, handler?: FormatHandler): this {
     return this.on(mimeType, handler);
   }

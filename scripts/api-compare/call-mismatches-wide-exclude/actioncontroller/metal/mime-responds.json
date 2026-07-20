@@ -2,6 +2,13 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/mime-responds.ts",
+    "rubyName": "any",
+    "call": "each",
+    "reason": "Ruby `args.each { |type| send(type, &block) }`; the port uses a for-of loop over the format arguments, calling `custom(type, handler)` per Rails' `send` dispatch. The `custom` call is present; only the `each` iteration idiom differs."
+  },
+  {
+    "package": "actioncontroller",
+    "tsFile": "metal/mime-responds.ts",
     "rubyName": "any_response?",
     "call": "fetch",
     "reason": "Ruby `@responses.fetch(format, false)`; the port calls the protected `handlerFor(format)` helper on the ActionDispatch Collector, which does the Map lookup internally. Same semantics, no `fetch` call at this site."
