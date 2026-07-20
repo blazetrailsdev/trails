@@ -2067,7 +2067,7 @@ export function buildFixtureSql(
     const filteredValues: unknown[] = [];
     allColumns.forEach((col, i) => {
       if (row[i] !== DEFAULT_VALUE) {
-        filteredValues.push(row[i] as Nodes.Node);
+        filteredValues.push(row[i]);
         manager.columns.push(table.get(col));
       }
     });
