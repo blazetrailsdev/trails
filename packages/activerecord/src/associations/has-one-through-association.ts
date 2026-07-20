@@ -399,11 +399,10 @@ export class HasOneThroughAssociation extends HasOneAssociation {
     // Rails' `load_target` returning the same object on an already-loaded proxy.
     //
     // We also clear the suppression sentinel we set on the through proxy's
-    // duck-typed `_pendingReplace`: the base `HasOneAssociation` never declares
-    // `_pendingReplace` (its displacement runs inline in the awaitable
-    // `replace`/`detachDisplacedTarget` paths), so its `reset` does not clear the
-    // sentinel — without this it would linger and permanently make
-    // `autosaveHasOne` skip the
+    // duck-typed `_pendingReplace`: the base `HasOneAssociation#reset` clears
+    // only `_displacedRecords` (it never declares `_pendingReplace`, having
+    // converged onto `_displacedRecords` + `autosaveHasOne`), so without this the
+    // sentinel would linger and permanently make `autosaveHasOne` skip the
     // proxy — silently dropping any *later* independent write to
     // `owner.currentMembership` on this same instance. Runs before the `!pending`
     // early return so a reverted build (which nulls `this._pendingReplace`) can't
