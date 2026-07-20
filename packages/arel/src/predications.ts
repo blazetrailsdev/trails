@@ -31,6 +31,41 @@ import {
 } from "./predications-range.js";
 
 /**
+ * Stands in for Rails' `when Arel::SelectManager` arm (predications.rb:65-74
+ * for `in`, 112-121 for `not_in`), duck-typed on the `ast` reader as
+ * `buildQuoted` matches managers (casted.ts:41-44) — a structural check keeps
+ * the runtime import out. The `instanceof Node` half matters: a bare
+ * `"ast" in value` also admits `{ ast: undefined }`, which would build
+ * `In(this, undefined)`.
+ */
+export function isSelectManagerLike(value: unknown): value is { ast: Node } {
+  return (
+    typeof value === "object" && value !== null && (value as { ast?: unknown }).ast instanceof Node
+  );
+}
+
+/**
+ * Stands in for Rails' `when Enumerable` arm. Ruby's `Enumerable` covers Set,
+ * Hash and Range as well as Array, so matching only `Array.isArray` would drop
+ * a Set/Map/generator into the scalar arm and silently cast the container
+ * itself.
+ *
+ * Two deliberate edges:
+ * - JS strings are iterable, but Ruby's String is NOT Enumerable, so they must
+ *   reach `quoted_node`. `typeof value === "object"` excludes them.
+ * - A plain JS object is not iterable, so it reaches `quoted_node` — matching
+ *   `Object.new` at attribute_test.rb:747-757. Note this DIVERGES for a Ruby
+ *   Hash, which IS Enumerable: Rails' `in({a: 1})` takes the `quoted_array`
+ *   arm and expands to `[Casted([:a, 1], self)]`, where this casts the object
+ *   whole. Ruby's Hash maps to a JS Map (iterable, so it expands correctly);
+ *   an object literal is the closer analogue of `Object.new`, so the scalar
+ *   arm is the better of the two readings, not an exact one.
+ */
+export function isEnumerable(value: unknown): value is Iterable<unknown> {
+  return typeof value === "object" && value !== null && Symbol.iterator in value;
+}
+
+/**
  * Host contract for the Predications mixin.
  *
  * Implementors provide `quotedNode(other)` which either type-casts (for
@@ -147,32 +182,23 @@ export const Predications = {
     //   SelectManager → In(self, other.ast)
     //   Enumerable    → In(self, quoted_array(other))
     //   else          → In(self, quoted_node(other))
-    if (Array.isArray(other)) {
+    if (!(other instanceof Node) && isSelectManagerLike(other)) return new In(this, other.ast);
+    if (isEnumerable(other)) {
       // Node[] is valid NodeOrValue for In/NotIn — no cast needed.
       return new In(
         this,
-        other.map((v) => this.quotedNode(v)),
+        [...other].map((v) => this.quotedNode(v)),
       );
-    }
-    // SelectManager/TreeManager-shaped object: only forward `.ast` when
-    // it's actually a Node — anything else falls through to quotedNode
-    // so we don't construct a malformed In with a stray non-Node ast.
-    if (other && typeof other === "object" && !(other instanceof Node) && "ast" in other) {
-      const ast = (other as { ast: unknown }).ast;
-      if (ast instanceof Node) return new In(this, ast);
     }
     return new In(this, this.quotedNode(other));
   },
   notIn(this: Node & PredicationHost, other: unknown[] | { ast: Node } | Node | unknown): NotIn {
-    if (Array.isArray(other)) {
+    if (!(other instanceof Node) && isSelectManagerLike(other)) return new NotIn(this, other.ast);
+    if (isEnumerable(other)) {
       return new NotIn(
         this,
-        other.map((v) => this.quotedNode(v)),
+        [...other].map((v) => this.quotedNode(v)),
       );
-    }
-    if (other && typeof other === "object" && !(other instanceof Node) && "ast" in other) {
-      const ast = (other as { ast: unknown }).ast;
-      if (ast instanceof Node) return new NotIn(this, ast);
     }
     return new NotIn(this, this.quotedNode(other));
   },
