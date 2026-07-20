@@ -416,12 +416,12 @@ function defineStoreAccessorDirtyMethods(
     return dig(prev, key) !== dig(next, key);
   });
   define(`${accessorName}Change`, function (this) {
-    if (!this.attributeChanged(storeAttribute)) return undefined;
+    if (!this.attributeChanged(storeAttribute)) return null;
     const [prev, next] = this.changes[storeAttribute] ?? [undefined, undefined];
     return [dig(prev, key) ?? null, dig(next, key) ?? null];
   });
   define(`${accessorName}Was`, function (this) {
-    if (!this.attributeChanged(storeAttribute)) return undefined;
+    if (!this.attributeChanged(storeAttribute)) return null;
     const [prev] = this.changes[storeAttribute] ?? [undefined];
     return dig(prev, key) ?? null;
   });
@@ -434,12 +434,12 @@ function defineStoreAccessorDirtyMethods(
     return dig(prev, key) !== dig(next, key);
   });
   define(`savedChangeTo${cap}Values`, function (this) {
-    if (!this.savedChangeToAttribute?.(storeAttribute)) return undefined;
+    if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
     const [prev, next] = this.savedChanges?.[storeAttribute] ?? [undefined, undefined];
     return [dig(prev, key) ?? null, dig(next, key) ?? null];
   });
   define(`${accessorName}BeforeLastSave`, function (this) {
-    if (!this.savedChangeToAttribute?.(storeAttribute)) return undefined;
+    if (!this.savedChangeToAttribute?.(storeAttribute)) return null;
     const [prev] = this.savedChanges?.[storeAttribute] ?? [undefined];
     return dig(prev, key) ?? null;
   });
