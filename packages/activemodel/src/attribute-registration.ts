@@ -109,6 +109,25 @@ export function isDecoratorReplay(): boolean {
   return _decoratorReplayDepth > 0;
 }
 
+/**
+ * Run `fn` in decorator-replay context, so `isDecoratorReplay()` reports true.
+ *
+ * Mirrors: the replay performed by
+ * ActiveModel::AttributeRegistration::PendingDecorator#apply_to. Every path that
+ * replays a pending decorator MUST go through this, or decorators gated on
+ * replay context (notably enum's undeclared-type check) silently change behavior.
+ *
+ * @internal
+ */
+function inDecoratorReplay<T>(fn: () => T): T {
+  _decoratorReplayDepth++;
+  try {
+    return fn();
+  } finally {
+    _decoratorReplayDepth--;
+  }
+}
+
 /** @internal Rails-private helper. */
 export class PendingDecorator implements PendingModification {
   constructor(
@@ -121,13 +140,7 @@ export class PendingDecorator implements PendingModification {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      _decoratorReplayDepth++;
-      let newType: Type;
-      try {
-        newType = this.decorator(name, existing.type, host);
-      } finally {
-        _decoratorReplayDepth--;
-      }
+      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }
@@ -398,6 +411,40 @@ function collectPendingModifications(cls: AttributeHostInternals): PendingModifi
 // ---------------------------------------------------------------------------
 // Exported functions
 // ---------------------------------------------------------------------------
+
+/**
+ * Replay a class's OWN pending decorators onto a definitions map.
+ *
+ * Rails rebuilds `_default_attributes` from `columns_hash` and then replays the
+ * pending-modification chain every time
+ * (ActiveModel::AttributeRegistration#_default_attributes), so a decoration
+ * declared on a class survives schema reflection/reload. AR's STI reflection
+ * rebuilds a subclass's `_attributeDefinitions` from the base map, which drops
+ * decorations unless they are replayed — this is that replay, restricted to the
+ * class's OWN decorators because inherited ones are already baked into the base
+ * map by `decorateAttributes`' immediate apply.
+ *
+ * @internal
+ */
+export function replayOwnPendingDecorators(
+  cls: AttributeHostInternals,
+  defs: Map<string, { name: string; type: Type }>,
+): void {
+  if (!Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")) return;
+  for (const mod of cls._pendingAttributeModifications as PendingModification[]) {
+    if (!(mod instanceof PendingDecorator)) continue;
+    const targets = mod.names ?? Array.from(defs.keys());
+    for (const name of targets) {
+      const def = defs.get(name);
+      if (!def) continue;
+      // Same replay context Rails' PendingDecorator#apply_to establishes — this
+      // IS a replay of the pending chain, so decorators gated on
+      // `isDecoratorReplay()` must run here too.
+      const newType = inDecoratorReplay(() => mod.decorator(name, def.type, cls));
+      if (newType) defs.set(name, { ...def, type: newType });
+    }
+  }
+}
 
 /**
  * Push a type declaration onto the pending-modification queue.

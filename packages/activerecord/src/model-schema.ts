@@ -7,6 +7,7 @@ import {
   AttributeSetCoder,
   typeRegistry,
   defineDirtyAttributeMethods,
+  replayOwnPendingDecorators,
   type Type,
 } from "@blazetrails/activemodel";
 import {
@@ -538,6 +539,15 @@ interface SchemaHost {
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
   _virtualAttributesReconciled?: boolean;
+  /**
+   * Bumped whenever this class's reflected attribute definitions are
+   * invalidated or rebuilt. STI subclasses stamp the value they last synced
+   * their overlay against, mirroring Rails' `reset_column_information`
+   * invalidating the class AND its descendants (model_schema.rb).
+   */
+  _schemaRevision?: number;
+  /** Base `_schemaRevision` this subclass's overlay was built from. @internal */
+  _stiOverlaySyncedAt?: number;
   connection: any;
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
@@ -854,6 +864,11 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
   this._virtualAttributesReconciled = false;
+  // Invalidate every STI subclass overlay built from the pre-reset definitions.
+  // The defs Map below is mutated IN PLACE, so neither map identity nor key
+  // coverage can detect that a subclass's overlay is stale — only this counter
+  // can. Mirrors Rails resetting the class and its descendants.
+  this._schemaRevision = (this._schemaRevision ?? 0) + 1;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   // Mirrors Rails reset_column_information's
@@ -886,8 +901,107 @@ export function resetColumnInformation(this: SchemaHost): void {
  * For a full async reflection (fetching from the adapter if the cache
  * isn't populated), call `Base.loadSchema()` (base.ts).
  */
+/**
+ * Rebuild an STI subclass's `_attributeDefinitions` as a per-subclass OVERLAY
+ * over the base's freshly reflected map.
+ *
+ * Rails keeps attribute types per class: `_default_attributes` is memoized per
+ * class, seeded from `columns_hash`, and then replays that class's own pending
+ * modifications (ActiveModel::AttributeRegistration#_default_attributes,
+ * ActiveRecord::Attributes). So a subclass `normalizes` / `attribute` must not
+ * reach the base or its siblings, and must survive a reflection/reload.
+ *
+ * Only applies when the subclass actually forked its map. A subclass that never
+ * declared anything must keep INHERITING the base map: installing the base map
+ * as an own property of the subclass fools the copy-on-write guard in
+ * `decorateAttributes` (`hasOwnProperty(this, "_attributeDefinitions")`), so a
+ * later `normalizes` would decorate the base's definitions in place.
+ */
+const rebuildingOverlays = new WeakSet<object>();
+
+function rebuildStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
+  // Replaying a decorator can re-enter schema loading — the enum decorator calls
+  // `columnForAttribute`, which calls `loadSchema`, which syncs overlays. Without
+  // this guard that cycle recurses until the stack blows.
+  if (rebuildingOverlays.has(sub as object)) return;
+  const baseDefs = base._attributeDefinitions;
+  const subDefs = sub._attributeDefinitions;
+  if (
+    !(baseDefs instanceof Map) ||
+    !(subDefs instanceof Map) ||
+    subDefs === baseDefs ||
+    !Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")
+  ) {
+    return;
+  }
+
+  const overlay = new Map(baseDefs);
+  // Precedence: subclass user-provided entries win over base non-user entries;
+  // otherwise the (reflected) base entry wins.
+  for (const [name, def] of subDefs) {
+    const existing = baseDefs.get(name);
+    const subIsUser = (def.userProvided ?? true) === true;
+    const baseIsUser = existing ? (existing.userProvided ?? true) === true : false;
+    if (!existing || (subIsUser && !baseIsUser)) {
+      overlay.set(name, def);
+    }
+  }
+  // Seeding from the base map drops subclass decorations — a `normalizes`d
+  // schema column is `userProvided: false` on BOTH sides, so the precedence rule
+  // above cannot carry it. Rails re-applies the pending-decorator chain on every
+  // rebuild for exactly this reason; replay the subclass's own decorators so the
+  // decoration survives reflection and reload.
+  // Stamp and install BEFORE replaying: a decorator that re-enters `loadSchema`
+  // must see the fresh overlay and a synced stamp, not recurse into another rebuild.
+  sub._attributeDefinitions = overlay;
+  sub._stiOverlaySyncedAt = base._schemaRevision ?? 0;
+  rebuildingOverlays.add(sub as object);
+  try {
+    replayOwnPendingDecorators(sub as never, overlay);
+  } finally {
+    rebuildingOverlays.delete(sub as object);
+  }
+}
+
+/**
+ * Re-sync a subclass overlay whose base has been re-reflected since it was
+ * built. `_schemaLoaded` lives on the STI base, so `loadSchema` early-returns on
+ * the subclass and would otherwise leave the overlay pinned to stale (or, after
+ * a `resetColumnInformation`, missing) definitions.
+ *
+ * Staleness is detected by `_schemaRevision`, not by inspecting the maps: a
+ * reset mutates the base's definitions Map IN PLACE, so map identity is stable,
+ * and a re-reflection can change a column's type/default while leaving the key
+ * set identical — so key coverage would wrongly report the overlay as fresh.
+ */
+export function syncStiSubclassAttributeDefinitions(host: SchemaHost): void {
+  if (!isStiSubclass(host)) return;
+  syncStiSubclassOverlay(host, getStiBase(host) as SchemaHost);
+}
+
+function syncStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
+  const baseDefs = base._attributeDefinitions;
+  const subDefs = sub._attributeDefinitions;
+  if (!(baseDefs instanceof Map) || !(subDefs instanceof Map) || subDefs === baseDefs) return;
+  if (!Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")) return;
+  // Own-property check: a subclass that never synced would otherwise INHERIT a
+  // stamp through the prototype chain and wrongly skip its first rebuild.
+  const stamped = Object.prototype.hasOwnProperty.call(sub, "_stiOverlaySyncedAt")
+    ? sub._stiOverlaySyncedAt
+    : undefined;
+  if (stamped === (base._schemaRevision ?? 0)) return;
+  rebuildStiSubclassOverlay(sub, base);
+}
+
 export function loadSchema(this: SchemaHost): void {
-  if (this._schemaLoaded) return;
+  if (this._schemaLoaded) {
+    // `_schemaLoaded` lives on the STI base, so a subclass inherits it and
+    // returns here even when the base was reset and re-reflected since the
+    // subclass built its overlay. Re-sync first, or the overlay stays pinned to
+    // the pre-reset definitions forever.
+    syncStiSubclassAttributeDefinitions(this);
+    return;
+  }
 
   // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`.
   // Rails' `table_name` is nil for an abstract class; ours computes an inferred
@@ -1178,32 +1292,12 @@ function applyColumnsHash(
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
 
-  // STI: if the subclass previously forked _attributeDefinitions (via
-  // attribute()/decorateAttributes()/encrypts()), carry its entries
-  // into the shared base map before unifying references — naive
-  // reassignment would silently discard subclass-declared attributes.
-  // Precedence: subclass user-provided entries win over base non-user
-  // entries; otherwise base wins (Rails' STI shares attribute_types,
-  // but subclass declarations extend it).
+  // Reflection may change a column's metadata/type/default without changing the
+  // key set, so bump before rebuilding overlays from the new definitions.
+  host._schemaRevision = (host._schemaRevision ?? 0) + 1;
+
   if (originatingHost && originatingHost !== host) {
-    const baseDefs = host._attributeDefinitions;
-    const subDefs = originatingHost._attributeDefinitions;
-    if (
-      baseDefs instanceof Map &&
-      subDefs instanceof Map &&
-      subDefs !== baseDefs &&
-      Object.prototype.hasOwnProperty.call(originatingHost, "_attributeDefinitions")
-    ) {
-      for (const [name, def] of subDefs) {
-        const existing = baseDefs.get(name);
-        const subIsUser = (def.userProvided ?? true) === true;
-        const baseIsUser = existing ? (existing.userProvided ?? true) === true : false;
-        if (!existing || (subIsUser && !baseIsUser)) {
-          baseDefs.set(name, def);
-        }
-      }
-    }
-    originatingHost._attributeDefinitions = baseDefs;
+    rebuildStiSubclassOverlay(originatingHost, host);
     encryptionHooks.applyPendingEncryptions(originatingHost);
     // Recompute the reflected column set against the subclass's own
     // `ignoredColumns` — an STI subclass may ignore a different set than its
