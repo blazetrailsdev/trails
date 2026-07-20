@@ -12,8 +12,6 @@ import {
   makeEncryptedAuthor,
   makeBookThatWillFailToEncryptName,
   makeEncryptedBookWithBinary,
-  makeEncryptedBookWithSerializedFirstBinary,
-  makeEncryptedBookWithSerializedSecondBinary,
   makeEncryptedBookWithCustomCompressor,
   makeEncryptedTrafficLight,
   makeEncryptedTrafficLightWithStoreState,
@@ -35,6 +33,8 @@ import {
   EncryptedBook,
   EncryptedBookNormalizedFirst,
   EncryptedBookNormalizedSecond,
+  EncryptedBookWithSerializedFirstBinary,
+  EncryptedBookWithSerializedSecondBinary,
 } from "../test-helpers/models/book-encrypted.js";
 import { isEncryptedAttribute } from "../encryption.js";
 import { RecordInvalid } from "../index.js";
@@ -720,22 +720,28 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);
     await assertEncryptedAttribute(await Book.create({ logo: highBytes }), "logo", highBytes);
   });
-  // TRACKED-PENDING-CONVERGENCE (converge-encryption-makefreshmodel-onto-canonical):
-  // These two fixtures ride the canonical `encrypted_books.logo` (binary) column
-  // like Rails, but store a JSON-*text* encrypted message via `_JsonArrayType`
-  // (a string castType, so `isBinary()` is false and the bytea/BLOB round-trip
-  // coercion in EncryptedAttributeType never runs). On PostgreSQL/MariaDB the
-  // driver returns the stored ciphertext as raw bytes and decryption fails with
-  // "hash without payload"; SQLite is loose so it passes. The fix is an impl
-  // change (model `logo` as binary end-to-end, or decode the DB value before the
-  // text serializer) — not a schema fork. Skipped until that lands rather than
-  // reintroducing a bespoke `text` table this convergence exists to remove.
+  // TRACKED-PENDING-CONVERGENCE (serialize-encrypts-decorator-ordering): now
+  // rides the canonical Rails fixtures (reflection-typed binary `logo`, no
+  // bespoke string column), which shows the residual gap is NOT the binary
+  // text-ciphertext round-trip this story closed — that works. It is decorator
+  // ordering: Rails applies pending decorators in declaration order, so
+  // `serialize` + `encrypts` yields EncryptedAttributeType(Serialized(Bytea)).
+  // We replay them reversed AND seed `serialize` from the pre-reflection
+  // ValueType, producing Serialized(non-binary) and a coder that receives raw
+  // bytes. Fixing that is attribute-registration surgery, not an encryption fix.
   it.skip("serialized binary data can be encrypted", async () => {
     const jsonBytes = Array.from({ length: 96 }, (_, i) => String.fromCharCode(i + 32));
-    const Book1 = makeEncryptedBookWithSerializedFirstBinary(await freshAdapter());
-    await assertEncryptedAttribute(await Book1.create({ logo: jsonBytes }), "logo", jsonBytes);
-    const Book2 = makeEncryptedBookWithSerializedSecondBinary(await freshAdapter());
-    await assertEncryptedAttribute(await Book2.create({ logo: jsonBytes }), "logo", jsonBytes);
+    await freshAdapter();
+    await assertEncryptedAttribute(
+      await EncryptedBookWithSerializedFirstBinary.create({ logo: jsonBytes }),
+      "logo",
+      jsonBytes,
+    );
+    await assertEncryptedAttribute(
+      await EncryptedBookWithSerializedSecondBinary.create({ logo: jsonBytes }),
+      "logo",
+      jsonBytes,
+    );
   });
   it("deterministic ciphertexts remain constant", async () => {
     // We need to make sure these don't change or existing apps will stop working.
@@ -784,25 +790,33 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("encrypts normalized data", async () => {
     // Rides EncryptedBookNormalizedFirst/Second (encrypted_books, `name` + `logo`),
-    // mirroring Rails. Rails also passes `logo: "DUNE"` and asserts it normalizes
-    // to "dune", but the encrypted binary `logo` column can't round-trip a text
-    // ciphertext on PG/MariaDB (see the `serialized binary data can be encrypted`
-    // skip). Until that impl gap closes we ride only the `name` half; a persisted
-    // `logo` ciphertext would trip the record's reload, so it stays omitted.
+    // mirroring Rails.
     // Rides the canonical reflection-based `EncryptedBookNormalized{First,Second}`
     // (name obtained via schema reflection, non-null default `<untitled>`), not
     // an explicit `attribute("name", ...)` declaration. Encryption is configured
     // suite-wide before these models load (test-setup-ar.ts), so the bare
     // `encrypts` builds its scheme against real key material.
     await freshAdapter();
-    let book = await EncryptedBookNormalizedFirst.create({ name: "Book" });
-    await assertEncryptedAttribute(book, "name", "book");
-    // TRACKED-PENDING-CONVERGENCE (binary text-ciphertext round-trip):
-    // await assertEncryptedAttribute(book, "logo", "book");
-
-    book = await EncryptedBookNormalizedSecond.create({ name: "Book" });
-    await assertEncryptedAttribute(book, "name", "book");
-    // await assertEncryptedAttribute(book, "logo", "book");
+    await assertEncryptedAttribute(
+      await EncryptedBookNormalizedFirst.create({ name: "Book" }),
+      "name",
+      "book",
+    );
+    await assertEncryptedAttribute(
+      await EncryptedBookNormalizedSecond.create({ name: "Book" }),
+      "name",
+      "book",
+    );
+    await assertEncryptedAttribute(
+      await EncryptedBookNormalizedFirst.create({ logo: "Book" }),
+      "logo",
+      "book",
+    );
+    await assertEncryptedAttribute(
+      await EncryptedBookNormalizedSecond.create({ logo: "Book" }),
+      "logo",
+      "book",
+    );
   });
 
   it("EncryptableRecord.validateEncryptionAllowed throws when encryption is frozen", () => {

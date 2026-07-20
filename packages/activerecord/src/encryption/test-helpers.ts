@@ -20,47 +20,11 @@ import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { clearDefaultKeyProviderCache, type Scheme } from "./scheme.js";
 import { withEncryptionContext, withoutEncryption } from "./context.js";
 import { DecryptionError, EncryptionError } from "./errors.js";
-import { ValueType, BinaryData } from "@blazetrails/activemodel";
+import { BinaryData } from "@blazetrails/activemodel";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
 import type { Encryptor } from "../encryption.js";
 import { MessagePackMessageSerializer } from "./message-pack-message-serializer.js";
-
-// JSON array type: cast/serialize produce a JSON string; deserialize parses it back.
-// Used as the castType for EncryptedBookWithSerialized*Binary factories.
-class _JsonArrayType extends ValueType<unknown> {
-  readonly name = "string";
-  cast(value: unknown): unknown {
-    if (value === null || value === undefined) return null;
-    if (Array.isArray(value)) return value;
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
-    }
-    return value;
-  }
-  serialize(value: unknown): string | null {
-    if (value === null || value === undefined) return null;
-    return JSON.stringify(value);
-  }
-  deserialize(value: unknown): unknown {
-    if (value === null || value === undefined) return null;
-    if (typeof value === "string") {
-      try {
-        return JSON.parse(value);
-      } catch {
-        return value;
-      }
-    }
-    return value;
-  }
-  type(): string {
-    return "string";
-  }
-}
 
 export { withEncryptionContext, withoutEncryption, DecryptionError, EncryptionError };
 
@@ -428,46 +392,6 @@ export function makeEncryptedBookWithBinary(adapter: DatabaseAdapter) {
 }
 
 /**
- * EncryptedBookWithSerializedFirstBinary: logo stores an Array via JSON serialization,
- * then encrypted. Mirrors Rails' EncryptedBookWithSerializedFirstBinary fixture.
- */
-export function makeEncryptedBookWithSerializedFirstBinary(adapter: DatabaseAdapter) {
-  const jsonArrayType = new _JsonArrayType();
-  return class EncryptedBookWithSerializedFirstBinary extends Base {
-    static {
-      this._tableName = "encrypted_books";
-      this.attribute("id", "integer");
-      this.attribute("logo", "string");
-      // Replace string type with JSON-array type via the pending queue so
-      // _defaultAttributes() uses _JsonArrayType as the castType when encrypts wraps it.
-      this.decorateAttributes(["logo"], () => jsonArrayType);
-      this.adapter = adapter;
-      this.encrypts("logo");
-    }
-  } as any;
-}
-
-/**
- * EncryptedBookWithSerializedSecondBinary: logo stores an Array, encrypted.
- * Mirrors Rails' EncryptedBookWithSerializedSecondBinary fixture.
- * Uses JSON array serialization (YAML is not available in TS; both produce
- * equivalent results for the ASCII-only test data).
- */
-export function makeEncryptedBookWithSerializedSecondBinary(adapter: DatabaseAdapter) {
-  const jsonArrayType = new _JsonArrayType();
-  return class EncryptedBookWithSerializedSecondBinary extends Base {
-    static {
-      this._tableName = "encrypted_books";
-      this.attribute("id", "integer");
-      this.attribute("logo", "string");
-      this.decorateAttributes(["logo"], () => jsonArrayType);
-      this.adapter = adapter;
-      this.encrypts("logo");
-    }
-  } as any;
-}
-
-/**
  * EncryptedBookWithBinaryMessagePackSerialized: logo is a binary attribute
  * encrypted with a MessagePack message serializer. Mirrors the fixture class
  * defined inline in encryptable_record_message_pack_serialized_test.rb.
@@ -598,6 +522,12 @@ function _valuesEqual(readValue: unknown, expectedValue: unknown): boolean {
     readValue.every((b, i) => b === expectedValue[i])
   )
     return true;
+  // Ruby has no separate byte-array type: a binary column reads back as a
+  // (binary-encoding) String, so Rails' `assert_equal "book", record.logo`
+  // compares text to it directly. Our BinaryType deserializes to Uint8Array,
+  // so decode Latin-1 (bytes 1:1) to make the same assertion meaningful.
+  if (readValue instanceof Uint8Array && typeof expectedValue === "string")
+    return Buffer.from(readValue).toString("latin1") === expectedValue;
   if (
     Array.isArray(readValue) &&
     Array.isArray(expectedValue) &&
