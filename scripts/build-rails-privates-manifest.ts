@@ -31,6 +31,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
 import { libPathsManifest } from "../vendor/sources.js";
+import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -63,8 +64,7 @@ emitDeprecatedManifest();
 emitCallbackInvocationsManifest();
 
 if (!fs.existsSync(RAILS_API_PATH)) {
-  fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify({ files: {} }, null, 2) + "\n");
+  writeJsonManifest(OUT, { files: {} });
   console.warn(
     `[build-rails-privates-manifest] ${RAILS_API_PATH} missing; wrote empty manifest. ` +
       `Run \`pnpm api:compare\` to regenerate with real data.`,
@@ -223,7 +223,7 @@ const sortedFiles: Record<string, string[]> = {};
 for (const k of Object.keys(manifest.files).sort()) sortedFiles[k] = manifest.files[k];
 const final: Manifest = { files: sortedFiles };
 
-fs.writeFileSync(OUT, JSON.stringify(final, null, 2) + "\n");
+writeJsonManifest(OUT, final);
 const fileCount = Object.keys(final.files).length;
 const fileNames = Object.values(final.files).reduce((n, a) => n + a.length, 0);
 console.log(`Wrote ${OUT} — ${fileCount} files (${fileNames} names)`);
@@ -354,7 +354,7 @@ function emitDeprecatedManifest(): void {
 
   const sorted: Record<string, string[]> = {};
   for (const k of Object.keys(files).sort()) sorted[k] = files[k];
-  fs.writeFileSync(DEPRECATED_OUT, JSON.stringify({ files: sorted }, null, 2) + "\n");
+  writeJsonManifest(DEPRECATED_OUT, { files: sorted });
   const fc = Object.keys(sorted).length;
   const nc = Object.values(sorted).reduce((n, a) => n + a.length, 0);
   console.log(`Wrote ${DEPRECATED_OUT} — ${fc} files (${nc} names)`);
@@ -458,7 +458,7 @@ function emitCallbackInvocationsManifest(): void {
   const sorted: Record<string, string[]> = {};
   for (const k of [...methods.keys()].sort()) sorted[k] = [...methods.get(k)!].sort();
   const manifest: CallbackManifest = { methods: sorted };
-  fs.writeFileSync(CALLBACK_OUT, JSON.stringify(manifest, null, 2) + "\n");
+  writeJsonManifest(CALLBACK_OUT, manifest);
   const mc = Object.keys(sorted).length;
   const ec = Object.values(sorted).reduce((n, a) => n + a.length, 0);
   console.log(`Wrote ${CALLBACK_OUT} — ${mc} methods (${ec} events)`);
