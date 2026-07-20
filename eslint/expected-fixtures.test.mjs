@@ -24,6 +24,7 @@ const {
   default: rule,
   trailsToRailsRel,
   collectUseFixturesKeys,
+  requiredFixtureSets,
 } = await import("./expected-fixtures.mjs");
 
 beforeAll(() => {
@@ -95,6 +96,39 @@ describe("trailsToRailsRel", () => {
   it("returns null for non-activerecord paths", () => {
     expect(trailsToRailsRel("/x/packages/arel/src/foo.test.ts")).toBeNull();
     expect(trailsToRailsRel("/x/random/file.ts")).toBeNull();
+  });
+});
+
+describe("requiredFixtureSets", () => {
+  it("camelizes multi-word Rails fixture-set names to match trails declarations", () => {
+    const entry = {
+      fixtures: ["encrypted_books", "posts", "author_addresses"],
+      tests: { a: { fixtures: { encrypted_books: 1, posts: 1 } } },
+    };
+    expect(requiredFixtureSets(entry)).toEqual(["encryptedBooks", "posts"]);
+  });
+
+  // Namespaced sets (`fixtures :"admin/accounts"`) keep the slash and camelize
+  // each segment, matching the fixtures-registry keys verbatim — see
+  // test-helpers/fixtures-registry.ts "admin/randomlyNamedA9".
+  it("camelizes namespaced fixture-set names segment-wise, preserving the slash", () => {
+    const entry = {
+      fixtures: ["admin/accounts", "admin/randomly_named_a9", "reserved_words/node"],
+      tests: {
+        a: {
+          fixtures: {
+            "admin/accounts": 1,
+            "admin/randomly_named_a9": 1,
+            "reserved_words/node": 1,
+          },
+        },
+      },
+    };
+    expect(requiredFixtureSets(entry)).toEqual([
+      "admin/accounts",
+      "admin/randomlyNamedA9",
+      "reservedWords/node",
+    ]);
   });
 });
 

@@ -1,5 +1,4 @@
 import { Node } from "../nodes/node.js";
-import { UnsupportedVisitError } from "../errors.js";
 import { rubyClassName } from "./ruby-class.js";
 
 // Rails interpolates `object.class` straight into its "Cannot visit" TypeError
