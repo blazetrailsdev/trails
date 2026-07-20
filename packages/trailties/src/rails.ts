@@ -114,19 +114,29 @@ export class Trails {
     return (_backtraceCleaner ??= new BacktraceCleaner());
   }
 
-  /** Rails: `application && application.config.root`. */
+  /** Rails: `application && application.config.root` (`rails.rb:65-67`).
+   * `config.root` is an `attr_reader` (`engine/configuration.rb:8`) seeded from
+   * `find_root(called_from)` at construction (`engine.rb:553`), so an explicit
+   * `config.setRoot(...)` override wins over source discovery. Rails never
+   * synthesizes a cwd here — when neither is resolved it returns nil, so we
+   * return undefined rather than reaching for `Application#resolvedRoot`'s
+   * boot-time cwd fallback. */
   static async root(): Promise<string | undefined> {
-    return Trails.application?.root();
+    const app = Trails.application;
+    if (!app) return undefined;
+    return app.config.root ?? (await app.root());
   }
 
   /** Rails: `application && Pathname.new(application.paths["public"].first)`.
    * Returns null when no app is registered OR when the app's root is still
    * unresolved (Engine.calledFrom unset) — `Path#expanded` throws on a null
-   * root, so we short-circuit before reaching it. */
+   * root, so we short-circuit before reaching it. A `config.setRoot(...)`
+   * override satisfies the guard on its own — the root is known even when
+   * source discovery cannot resolve one. */
   static async publicPath(): Promise<string | null> {
     const app = Trails.application;
     if (!app) return null;
-    if ((await app.root()) === undefined) return null;
+    if (app.config.root === null && (await app.root()) === undefined) return null;
     const paths = await app.paths();
     const expanded = await paths.get("public")?.expanded();
     return expanded?.[0] ?? null;
