@@ -15,6 +15,7 @@ import {
   dispatchQuotedBinary,
   dispatchQuotedDate,
   dispatchQuotedTime,
+  dispatchUnquotedBoolean,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -73,16 +74,15 @@ export function quoteString(value: string): string {
  * `quotedTime`. A host receiver is required — every invocation routes through
  * an adapter via `.call(this, value)`.
  *
- * The boolean, symbol, and string branches stay inline because our abstract
- * `quote` renders those through module-level helpers (TRUE/FALSE,
- * backslash-escaping `quoteString`) rather than dispatching through `this`, so
- * delegating would lose SQLite's overrides (1/0, `''`-only escaping). These are
- * exactly the quoting primitives SQLite3::Quoting overrides. Binary does
- * dispatch through `this`, so `BinaryData` rides the inherited abstract branch.
+ * The symbol and string branches stay inline because our abstract `quote`
+ * renders those through the module-level, backslash-escaping `quoteString`
+ * rather than dispatching through `this`, so delegating would lose SQLite's
+ * `''`-only escaping. Booleans and binary DO dispatch through `this` (mirroring
+ * Rails' `self.quoted_true` / `self.quoted_binary`), so both ride the inherited
+ * abstract branch straight back to SQLite's `quotedTrue` / `quotedBinary`.
  */
 export function quote(this: QuotingDispatchHost, value: unknown): string {
   if (typeof value === "number" && !Number.isFinite(value)) return quoteString(String(value));
-  if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
   if (typeof value === "symbol") {
     if (value.description === undefined) {
       throw new TypeError("can't quote a Symbol without a description");
@@ -198,7 +198,10 @@ export function typeCast(this: QuotingDispatchHost, value: unknown, bindsAsFloat
   // otherwise `LOWER(?)` on a boolean bind would serialize `1.0` / `0.0` and a
   // `case_sensitive: false` uniqueness check on a boolean column would miss
   // collisions (the same divergence the integer branch below fixes).
-  if (typeof value === "boolean") return BigInt(value ? unquotedTrue() : unquotedFalse());
+  // Self-dispatched (rb:98-99) so the pair resolves through SQLite's
+  // `unquotedTrue`/`unquotedFalse` overrides. The BigInt wrapper is why this arm
+  // cannot simply delegate to the abstract `type_cast`: it must stay here.
+  if (typeof value === "boolean") return BigInt(dispatchUnquotedBoolean(this, value));
   if (typeof value === "number") {
     if (!Number.isFinite(value)) return null;
     // better-sqlite3 binds every JS number as SQLITE_FLOAT (there is no

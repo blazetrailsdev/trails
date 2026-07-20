@@ -46,6 +46,14 @@ export interface QuotingDispatchHost {
   quotedBinary?(value: unknown): string;
   /** @internal */
   quoteColumnName?(name: string): string;
+  /** @internal */
+  quotedTrue?(): string;
+  /** @internal */
+  quotedFalse?(): string;
+  /** @internal */
+  unquotedTrue?(): boolean | number;
+  /** @internal */
+  unquotedFalse?(): boolean | number;
 }
 
 type TemporalDateLike =
@@ -109,7 +117,10 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
     if (desc === undefined) throw new TypeError("Cannot quote a Symbol without a description");
     return `'${quoteString(desc)}'`;
   }
-  if (typeof value === "boolean") return value ? quotedTrue() : quotedFalse();
+  // Rails: `when true then quoted_true` / `when false then quoted_false`
+  // (rb:77-78) — self-dispatched, so SQLite's `1`/`0` override applies to the
+  // inherited `quote`. Thread `this` to mirror that.
+  if (typeof value === "boolean") return dispatchQuotedBoolean(this, value);
   if (value === null || value === undefined) return "NULL";
   // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
@@ -172,8 +183,10 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // path for a binary attribute lands here.
   if (typeof value === "symbol") return value.description ?? String(value);
   if (value instanceof BinaryData) return value.bytes;
-  if (value === true) return unquotedTrue();
-  if (value === false) return unquotedFalse();
+  // Rails: `when true then unquoted_true` / `when false then unquoted_false`
+  // (rb:98-99) — self-dispatched, so MySQL's `1`/`0` override applies to the
+  // inherited `type_cast`. Thread `this` to mirror that.
+  if (typeof value === "boolean") return dispatchUnquotedBoolean(this, value);
   if (value === null || value === undefined) return value;
   // Rails: `when BigDecimal then value.to_s("F")` — bound as a fixed-form string.
   if (value instanceof BigDecimal) return value.toString("F");
@@ -508,6 +521,33 @@ export function dispatchQuote(host: QuotingDispatchHost, value: unknown): string
     return host.quote(value);
   }
   return quote.call(host, value);
+}
+
+/**
+ * Dispatch the boolean literals through the host's overrides if it defines
+ * them, else the module-level helpers. Mirrors Rails' `when true then
+ * quoted_true` / `when false then unquoted_false` (abstract/quoting.rb:77-78,
+ * 98-99), which reach the pair through `self` so an adapter's override applies
+ * to the *inherited* `quote` / `type_cast` rather than forcing each adapter to
+ * re-implement the whole boolean arm.
+ * @internal
+ */
+export function dispatchQuotedBoolean(host: QuotingDispatchHost, value: boolean): string {
+  if (value) {
+    return typeof host.quotedTrue === "function" ? host.quotedTrue() : quotedTrue();
+  }
+  return typeof host.quotedFalse === "function" ? host.quotedFalse() : quotedFalse();
+}
+
+/** @internal */
+export function dispatchUnquotedBoolean(
+  host: QuotingDispatchHost,
+  value: boolean,
+): boolean | number {
+  if (value) {
+    return typeof host.unquotedTrue === "function" ? host.unquotedTrue() : unquotedTrue();
+  }
+  return typeof host.unquotedFalse === "function" ? host.unquotedFalse() : unquotedFalse();
 }
 
 /** @internal */

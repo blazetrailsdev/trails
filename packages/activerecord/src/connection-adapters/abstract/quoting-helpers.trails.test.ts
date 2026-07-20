@@ -213,3 +213,32 @@ describe("quote_table_name dispatches through quote_column_name", () => {
     expect(quoteTableName.call(host, "people")).toBe("<<people>>");
   });
 });
+
+describe("boolean literals dispatch through the host", () => {
+  // Rails reaches the pair via self (abstract/quoting.rb:77-78, 98-99), so an
+  // adapter override applies to the *inherited* quote/type_cast. These pin the
+  // dispatch, not just the values: a host that overrides the pair must win.
+  const host = {
+    quotedTrue: () => "1",
+    quotedFalse: () => "0",
+    unquotedTrue: () => 1,
+    unquotedFalse: () => 0,
+  };
+
+  it("routes quote through this.quotedTrue/quotedFalse when present", () => {
+    expect(quote.call(host, true)).toBe("1");
+    expect(quote.call(host, false)).toBe("0");
+  });
+
+  it("routes type_cast through this.unquotedTrue/unquotedFalse when present", () => {
+    expect(typeCast.call(host, true)).toBe(1);
+    expect(typeCast.call(host, false)).toBe(0);
+  });
+
+  it("falls back to the module helpers for a host without the overrides", () => {
+    expect(quote.call({}, true)).toBe("TRUE");
+    expect(quote.call({}, false)).toBe("FALSE");
+    expect(typeCast.call({}, true)).toBe(true);
+    expect(typeCast.call({}, false)).toBe(false);
+  });
+});

@@ -22,6 +22,7 @@ import {
   toBytes,
   dispatchQuotedDate,
   dispatchQuotedTime,
+  dispatchUnquotedBoolean,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -275,8 +276,12 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // arm is inlined: `to_s` on a `Data` is the raw byte string, hence `.bytes`
   // (never `toString()`, which UTF-8-decodes and mangles bytes >= 0x80).
   if (value instanceof BinaryData) return value.bytes;
-  if (value === true) return unquotedTrue();
-  if (value === false) return unquotedFalse();
+  // Rails' MySQL `type_cast` falls through to `super` here, whose boolean arm is
+  // self-dispatched (abstract/quoting.rb:98-99) and lands on MySQL's `1`/`0`
+  // override. This chain does not delegate, so the arm is inlined — but it
+  // dispatches through `this` rather than the module-level pair, so the receiver
+  // decides, as in Rails.
+  if (typeof value === "boolean") return dispatchUnquotedBoolean(this, value);
   if (value === null || value === undefined) return value;
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;

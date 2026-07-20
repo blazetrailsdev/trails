@@ -10,12 +10,21 @@ import {
   castBoundValue,
   columnNameMatcher,
   columnNameWithOrderMatcher,
+  unquotedTrue,
+  unquotedFalse,
 } from "./quoting.js";
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
 // `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
 // the adapter prototype so date/time values reach MySQL's quotedDate override.
-const HOST = Object.create(AbstractMysqlAdapter.prototype) as object;
+// `unquotedTrue`/`unquotedFalse` are assigned as class FIELDS on the adapter
+// (abstract-mysql-adapter.ts:390-391), so they live on instances, not the
+// prototype — `Object.create(prototype)` alone would miss them and the boolean
+// self-dispatch would fall back to the abstract true/false.
+const HOST = Object.assign(Object.create(AbstractMysqlAdapter.prototype) as object, {
+  unquotedTrue,
+  unquotedFalse,
+});
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
