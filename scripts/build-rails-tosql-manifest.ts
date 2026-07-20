@@ -17,11 +17,12 @@
  *
  *   pnpm tsx scripts/build-rails-tosql-manifest.ts
  */
-import { readFile, writeFile, mkdir } from "fs/promises";
+import { readFile } from "fs/promises";
 import { existsSync } from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
+import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -120,8 +121,7 @@ async function main() {
   // `generatedAt` is fixed (not Date.now()) so the committed snapshot is
   // reproducible and only changes when the Rails source does.
   const out = { generatedAt: "vendored", packages };
-  await mkdir(path.dirname(OUT), { recursive: true });
-  await writeFile(OUT, JSON.stringify(out, null, 2) + "\n");
+  writeJsonManifest(OUT, out);
 
   const counts = PACKAGES.map((p) => `${p}: ${packages[p].length}`).join(", ");
   console.log(`Wrote ${OUT} — ${counts}`);

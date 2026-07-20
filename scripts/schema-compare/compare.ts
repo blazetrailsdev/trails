@@ -21,6 +21,7 @@ import type {
 import { columnsOf } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import type { RailsTable } from "./parse-schema-rb.js";
 import { parseSchemaRb, parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
+import { writeJsonManifest } from "../api-compare/write-json-manifest.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
@@ -270,7 +271,7 @@ export async function main(): Promise<void> {
       );
       process.exit(1);
     }
-    await writeFile(BASELINE, `${JSON.stringify(next, null, 2)}\n`, "utf8");
+    writeJsonManifest(BASELINE, next);
     console.log(
       `wrote baseline — ${next.tables.length} tables, ${next.columns.length} columns of known debt`,
     );

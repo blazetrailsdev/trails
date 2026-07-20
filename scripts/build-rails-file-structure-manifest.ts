@@ -22,6 +22,7 @@ import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
+import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -43,7 +44,7 @@ const OUT = path.join(ROOT, "eslint/rails-file-structure-method-order.json");
 
 if (!fs.existsSync(RAILS_API_PATH)) {
   fs.mkdirSync(path.dirname(OUT), { recursive: true });
-  fs.writeFileSync(OUT, JSON.stringify({ files: {} }, null, 2) + "\n");
+  writeJsonManifest(OUT, { files: {} });
   console.warn(
     `[build-rails-file-structure-manifest] ${RAILS_API_PATH} missing; wrote empty manifest. ` +
       `Run \`pnpm api:compare\` to regenerate with real data.`,
@@ -144,7 +145,7 @@ const sortedFiles: Record<string, string[]> = {};
 for (const k of Object.keys(manifest.files).sort()) sortedFiles[k] = manifest.files[k];
 const final: Manifest = { files: sortedFiles };
 
-fs.writeFileSync(OUT, JSON.stringify(final, null, 2) + "\n");
+writeJsonManifest(OUT, final);
 const fileCount = Object.keys(final.files).length;
 const nameCount = Object.values(final.files).reduce((n, a) => n + a.length, 0);
 console.log(`Wrote ${OUT} — ${fileCount} files (${nameCount} ordered names)`);

@@ -10,9 +10,10 @@
  *
  *   pnpm tsx scripts/build-rails-error-manifest.ts
  */
-import { readdir, readFile, writeFile, mkdir } from "fs/promises";
+import { readdir, readFile } from "fs/promises";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -165,8 +166,7 @@ async function main() {
   // `generatedAt` is fixed (not Date.now()) so the committed manifest is
   // reproducible and only changes when the Rails source does.
   const manifest = { generatedAt: "vendored", packages };
-  await mkdir(path.dirname(OUT), { recursive: true });
-  await writeFile(OUT, JSON.stringify(manifest, null, 2) + "\n");
+  writeJsonManifest(OUT, manifest);
 
   const counts = PACKAGES.map((p) => `${p}: ${packages[p].length}`).join(", ");
   console.log(`Wrote ${OUT} — ${counts}`);

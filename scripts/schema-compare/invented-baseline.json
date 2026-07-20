@@ -86,7 +86,5 @@
     "topic2s",
     "values"
   ],
-  "columns": [
-    "admin_users.region_id"
-  ]
+  "columns": ["admin_users.region_id"]
 }
