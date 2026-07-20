@@ -62,10 +62,11 @@ describe("Visitor dispatch", () => {
     expect(FreshVisitor.dispatchCache().get(B)).toBe("visitA");
   });
 
-  it("throws UnsupportedVisitError for nodes with no handler", () => {
+  it("throws TypeError for nodes with no handler", () => {
     const v = new TestVisitor();
-    expect(() => v.accept(new C())).toThrow(UnsupportedVisitError);
-    expect(() => v.accept(new C())).toThrow(/Unknown node type: C/);
+    expect(() => v.accept(new C())).toThrow(TypeError);
+    expect(() => v.accept(new C())).toThrow(/Cannot visit C/);
+    expect(() => v.accept(new C())).not.toThrow(UnsupportedVisitError);
   });
 
   it("distinguishes a mis-registered method from an unknown node type", () => {
@@ -153,7 +154,8 @@ describe("Visitor dispatch", () => {
 
     it("raises when the value's class has no handler", () => {
       class Arbitrary {}
-      expect(() => new ValueVisitor().accept(new Arbitrary())).toThrow(UnsupportedVisitError);
+      expect(() => new ValueVisitor().accept(new Arbitrary())).toThrow(TypeError);
+      expect(() => new ValueVisitor().accept(new Arbitrary())).toThrow(/Cannot visit Arbitrary/);
     });
   });
 

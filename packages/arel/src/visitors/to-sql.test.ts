@@ -467,13 +467,15 @@ describe("the to_sql visitor", () => {
   });
 
   it("unsupported input should raise UnsupportedVisitError", () => {
-    class Unknown extends Nodes.Node {
-      accept<T>(visitor: Nodes.NodeVisitor<T>): T {
-        return visitor.visit(this);
-      }
-    }
-    expect(() => new Visitors.ToSql().compile(new Unknown())).toThrow(
+    // Rails compiles `nil`, whose NilClass handler is aliased to `unsupported`
+    // (to_sql.rb:838) — the UnsupportedVisitError terminal. A class with no
+    // handler at all is the other terminal and raises TypeError
+    // (visitor.rb:38), covered in visitor.test.ts.
+    expect(() => new Visitors.ToSql().compile(null as unknown as Nodes.Node)).toThrow(
       Visitors.UnsupportedVisitError,
+    );
+    expect(() => new Visitors.ToSql().compile(null as unknown as Nodes.Node)).toThrow(
+      /^Unsupported/,
     );
   });
 
@@ -652,7 +654,7 @@ describe("the to_sql visitor", () => {
         ]) {
           expect(() =>
             spy.compile(new Nodes.Equality(attr, value as unknown as Nodes.NodeOrValue)),
-          ).toThrow(Visitors.UnsupportedVisitError);
+          ).toThrow(TypeError);
         }
       });
 
