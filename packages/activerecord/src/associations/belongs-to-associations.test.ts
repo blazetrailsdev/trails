@@ -1473,8 +1473,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((author as any).post!.id).toBe(post.id);
     expect(post.author!.id).toBe(author.id);
 
-    (author as any).post = null;
-    await author.save();
+    await (author as any).setPost(null);
     expect((author as any).post).toBeNull();
 
     await post.update({ title: "The Silmarillion" });

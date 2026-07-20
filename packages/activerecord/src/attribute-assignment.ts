@@ -184,9 +184,11 @@ export function assignAssociationIfMatch(
     return true;
   }
   if (assoc.type === "hasOne") {
-    // has_one's `writer` persists immediately (Rails-faithful, awaitable);
-    // mass-assignment can't await, so queue the change for the owner's next
-    // save() — no floating promise. Mirrors the queue-only property setter.
+    // Mass-assignment can't await, so it shares the native `=` setter's
+    // `queueWrite` dispatch: in-memory replace on an unpersisted owner, and a
+    // throw (`HasOnePersistedAssignmentError`) on a persisted one — Rails
+    // persists a has_one displacement inline at assignment, which needs `await`
+    // in JS. Callers use `await owner.set#{Name}(x)` instead (RFC 0068).
     if (typeof proxy.queueWrite !== "function") return false;
     proxy.queueWrite(value);
     return true;

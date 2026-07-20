@@ -298,6 +298,7 @@ export {
   HasOneThroughNestedAssociationsAreReadonly,
   EagerLoadPolymorphicError,
   DeleteRestrictionError,
+  HasOnePersistedAssignmentError,
 } from "./associations/errors.js";
 export {
   AbstractReflection,
