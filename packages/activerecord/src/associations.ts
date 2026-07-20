@@ -1633,15 +1633,6 @@ export async function loadHasOne(
     return loaded.value;
   }
 
-  // Snapshot for the mid-flight reassignment guard below. Not always false
-  // despite the early return: a *stale* target (`isStaleTarget()`) leaves the
-  // holder loaded while still requiring a re-fetch, and that re-fetch must be
-  // allowed to win.
-  const holderLoadedAtStart =
-    (
-      record._associationInstances.get(assocName) as { isLoaded?: () => boolean } | undefined
-    )?.isLoaded?.() ?? false;
-
   // Strict loading check. Gated by `find_target?`: a new-record owner without
   // the FK present never reaches `find_target` and so never raises.
   if (
@@ -1806,42 +1797,6 @@ export async function loadHasOne(
       });
     }
   }
-
-  // Same mid-flight reassignment clobber the `loadBelongsTo` guard above
-  // closes, reached by the opposite signal. Rails' `find_target` is
-  // synchronous, so it never observes a reassignment mid-load; our loader
-  // awaits DB I/O, so an in-flight reader (`firm.account` accessed but never
-  // awaited) can still be pending when the caller assigns
-  // `firm.association("account").setTarget(other)`. Without this check the
-  // stale queried row wins the post-await `syncToAssociationInstance` and the
-  // assignment silently disappears.
-  //
-  // has_one has no owner-side stale key to snapshot — Rails' `stale_state` is
-  // nil for foreign associations, only `BelongsToAssociation` overrides it —
-  // so the belongs_to FK snapshot does not transfer. A false→true flip in the
-  // holder's loaded-ness across the await is the equivalent signal: something
-  // set a newer target while we were querying. Leave that target intact and
-  // return it. Holders already loaded at entry are the stale-target re-fetch
-  // path, which must not be short-circuited.
-  //
-  // Load-bearing assumption: loaded-ness only flips false→true during our await
-  // via an external setter. That is *usually* a reassignment, but not
-  // exclusively — two concurrent cold readers also hit this branch, with the
-  // loser returning the winner's target. Benign, since the winner already ran
-  // the inverse wiring and sync below that the loser now skips; if a future
-  // caller makes those non-idempotent, this branch needs to distinguish the
-  // two cases rather than assuming reassignment.
-  //
-  // Only the singular loaders need this. `loadHasOneThrough` and
-  // `_loadSingularThroughViaDisableJoinsScope` return above without ever
-  // calling `syncToAssociationInstance` on the outer holder, so they have no
-  // writeback to clobber — structurally immune, not a scope cut. (The
-  // AssociationScope through shape does fall through to here, and is what
-  // exercises the `holderLoadedAtStart === true` arm.)
-  const holder = record._associationInstances.get(assocName) as
-    | { isLoaded?: () => boolean; target?: Base | null }
-    | undefined;
-  if (!holderLoadedAtStart && holder?.isLoaded?.()) return holder.target ?? null;
 
   // Set inverse_of: store reference back to the owner. Resolve via the
   // reflection so automatic_inverse_of also wires the parent.
