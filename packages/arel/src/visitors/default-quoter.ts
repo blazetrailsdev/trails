@@ -48,21 +48,26 @@ type TemporalDateLike =
 function quotedDate(value: TemporalDateLike): string {
   if (value instanceof Temporal.Instant)
     return formatPlainDateTime(value.toZonedDateTimeISO("UTC"));
-  if (value instanceof Temporal.ZonedDateTime) return formatPlainDateTime(value);
+  // Converts rather than reading the wall clock, mirroring the adapter twin's
+  // `value.toInstant()` (connection-adapters/abstract/quoting.ts:591) and Rails'
+  // `value.getutc` (abstract/quoting.rb:186-188).
+  if (value instanceof Temporal.ZonedDateTime)
+    return formatPlainDateTime(value.toInstant().toZonedDateTimeISO("UTC"));
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTime(value);
   if (value instanceof Temporal.PlainDate) {
-    return `${pad(value.year, 4)}-${pad(value.month)}-${pad(value.day)}`;
+    return `${padYear(value.year)}-${pad(value.month)}-${pad(value.day)}`;
   }
   return formatPlainDateTime(withEpochDate(value));
 }
 
 // Mirrors `quoted_time` (abstract/quoting.rb:203): normalise the date to
 // 2000-01-01, then strip the date prefix off `quoted_date`.
-function quotedTime(value: Temporal.PlainTime): string {
+function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
   return quotedDate(withEpochDate(value)).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
 
-function withEpochDate(value: Temporal.PlainTime): Temporal.PlainDateTime {
+function withEpochDate(value: Temporal.PlainTime | Temporal.PlainDateTime): Temporal.PlainDateTime {
+  if (value instanceof Temporal.PlainDateTime) return value.with({ year: 2000, month: 1, day: 1 });
   return new Temporal.PlainDateTime(
     2000,
     1,
@@ -80,6 +85,12 @@ function pad(n: number, width = 2): string {
   return String(n).padStart(width, "0");
 }
 
+// Mirrors `padYear` in connection-adapters/abstract/sql-datetime.ts: a negative
+// year keeps its sign rather than being zero-padded into `"00-1"`.
+function padYear(year: number): string {
+  return year < 0 ? String(year) : String(year).padStart(4, "0");
+}
+
 function formatPlainDateTime(v: {
   year: number;
   month: number;
@@ -92,7 +103,7 @@ function formatPlainDateTime(v: {
 }): string {
   const usec = v.millisecond * 1000 + v.microsecond;
   const frac = usec > 0 ? `.${pad(usec, 6)}` : "";
-  return `${pad(v.year, 4)}-${pad(v.month)}-${pad(v.day)} ${pad(v.hour)}:${pad(v.minute)}:${pad(v.second)}${frac}`;
+  return `${padYear(v.year)}-${pad(v.month)}-${pad(v.day)} ${pad(v.hour)}:${pad(v.minute)}:${pad(v.second)}${frac}`;
 }
 
 // Rails' `when Date, Time` arms (abstract/quoting.rb:85, :103) match Ruby's own

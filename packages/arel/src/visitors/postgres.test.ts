@@ -498,3 +498,31 @@ describe("Temporal array elements", () => {
     expect(() => new Visitors.PostgreSQL().compile(users.get("at").eq(d))).toThrow(TypeError);
   });
 });
+
+describe("quotedDate normalisation", () => {
+  const users = new Table("users");
+
+  // `value.getutc` (abstract/quoting.rb:186-188): a zoned value converts to the
+  // serialization zone rather than emitting its own wall clock.
+  it("converts a zoned value instead of emitting its wall clock", () => {
+    const z = Temporal.Instant.from("2026-04-26T14:23:55Z").toZonedDateTimeISO("America/New_York");
+    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(z))).toContain(
+      "'2026-04-26 14:23:55'",
+    );
+  });
+
+  // Rails' `to_fs(:db)` never emits a zero-padded negative year like "00-1".
+  it("keeps the sign on a negative year", () => {
+    const d = new Temporal.PlainDate(-1, 4, 26);
+    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(d))).toContain("'-1-04-26'");
+  });
+
+  // `quoted_time` normalises via `change(year:, month:, day:)`
+  // (abstract/quoting.rb:203), which accepts a full datetime too.
+  it("strips the date off a datetime routed through quoted_time", () => {
+    const dt = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
+    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(dt))).toContain(
+      "'2026-04-26 14:23:55'",
+    );
+  });
+});
