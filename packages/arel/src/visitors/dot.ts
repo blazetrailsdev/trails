@@ -642,11 +642,21 @@ export class Dot extends Visitor {
       proto = Object.getPrototypeOf(proto)
     ) {
       if (proto === Object.prototype) return true;
-      // A prototype with no `constructor` at all descends from
-      // Object.create(null) — still a record, so keep walking. Only a
-      // constructor naming some *other* class marks a class prototype.
-      const ctor = (proto as { constructor?: unknown }).constructor;
-      if (ctor !== undefined && ctor !== Object) return false;
+      // What marks a *class* prototype is the back-reference: `class C {}`
+      // installs `C.prototype.constructor === C`, so the own `constructor`
+      // is a function pointing back at this very object. Anything else —
+      // absent, a non-function, or a function whose `.prototype` is some
+      // other object — leaves the value a record, so keep walking. A literal
+      // `constructor` key (`{ constructor: "x" }`) fails the identity, and
+      // its name is irrelevant to dispatch anyway: Ruby dispatches by
+      // ancestry (visitor.rb:36-41), so a Hash with a `:constructor` key is
+      // still a Hash and reaches visit_Hash (dot.rb:220).
+      const ctor = Object.getOwnPropertyDescriptor(proto, "constructor")?.value as
+        | { prototype?: unknown }
+        | undefined;
+      if (typeof ctor === "function" && ctor.prototype === proto) {
+        return false;
+      }
     }
     return true;
   }

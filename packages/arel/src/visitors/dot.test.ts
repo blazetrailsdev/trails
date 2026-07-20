@@ -535,6 +535,33 @@ describe("TestDot", () => {
       expect(out).not.toMatch(/-> \d+ \[label="valueBeforeTypeCast"\];/);
     });
 
+    it("a record inheriting a literal constructor key is a Hash", () => {
+      // Dispatch is by ancestry in Ruby (visitor.rb:36-41), so a Hash with a
+      // `:constructor` key still reaches visit_Hash (dot.rb:220) — the key's
+      // *name* is irrelevant. Here the prototype's `constructor` is an
+      // enumerable data key, not the non-enumerable one a `class` installs.
+      const derived: Record<string, unknown> = Object.create({ constructor: "x" });
+      derived.alpha = "A";
+      const out = visitStandalone(derived);
+      expect(out).toMatch(/\d+ \[label="<f0>Hash"\];/);
+      expect(out).toContain('[label="pair_0"]');
+      expect(out).toContain("alpha");
+    });
+
+    it("a class instance with an enumerable constructor member is not a Hash", () => {
+      class Config {
+        alpha = "A";
+      }
+      Object.defineProperty(Config.prototype, "constructor", {
+        value: Config,
+        enumerable: true,
+        writable: true,
+        configurable: true,
+      });
+      // Not a Hash, so it falls to the unknown-class leaf arm (visitor.rb:39).
+      expect(() => visitStandalone(new Config())).toThrow(/Cannot visit Config/);
+    });
+
     it("a Set emits index-labeled edges like an Array", () => {
       // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). A Set is not a
       // Hash (its prototype's ctor is Set), so without a dedicated arm it
