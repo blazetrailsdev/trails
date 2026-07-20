@@ -39,6 +39,12 @@ const NULL_LITERAL = /^null$/i;
  * The `PG::TextEncoder::Array` element rule, shared so the connection-less Arel
  * path and `OID::Array#encode` cannot drift apart again (they did three times:
  * #4867, #4869, #4872). Takes the already-`type_cast`ed element text.
+ *
+ * `delimiter` is `OID::Array`'s, which Rails hands ruby-pg alongside the same
+ * text (`oid/array.rb:15-19`): the `","` default or `";"` for `box[]`. It is
+ * never empty — the type map is the only construction site — so the
+ * `includes(delimiter)` test needs no empty-string guard, exactly as
+ * `OID::Array#parseArray`'s delimiter scan doesn't.
  */
 export function encodeArrayElement(text: string | null, delimiter = ","): string {
   // Rendering nil as the bare `NULL` token is the encoder's job, not
