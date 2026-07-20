@@ -18,12 +18,12 @@ export interface TouchOptions {
 }
 
 /**
- * One argument of Rails' `touch(*names, time: nil)`: a column name, or the
- * trailing keyword hash. Ruby keywords have no TS equivalent, so the hash
- * travels in the same variadic list and is separated out by position-free
- * type check rather than by being pinned to argument 0.
+ * Argument list for Rails' `touch(*names, time: nil)`. Ruby's trailing keyword
+ * becomes an optional trailing options object in TS, mirroring `TouchAllArgs` —
+ * the options object is only valid in last position, so `touch({ time }, "col")`
+ * is a type error just as `touch(time: t, :col)` is a syntax error in Ruby.
  */
-export type TouchArg = string | TouchOptions | undefined;
+export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
 
 /**
  * Update the updated_at timestamp (and optionally other timestamp
@@ -32,7 +32,7 @@ export type TouchArg = string | TouchOptions | undefined;
  *
  * Mirrors: ActiveRecord::Timestamp#touch
  */
-export async function touch(this: Base, ...args: TouchArg[]): Promise<boolean> {
+export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   // Mirrors Rails' NoTouching#touch (`super unless no_touching?`), which is
   // prepended ahead of Persistence#touch: a no_touching block short-circuits
   // the whole method — including the persisted?/readonly? guards below — so a
@@ -49,16 +49,7 @@ export async function touch(this: Base, ...args: TouchArg[]): Promise<boolean> {
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
-  // Mirrors Rails' `touch(*names, time: nil)`: any number of column names plus a
-  // trailing keyword hash. In TS the keyword hash arrives as a plain object in
-  // the argument list, so split the two apart rather than overloading arg 0.
-  const names: string[] = [];
-  let options: TouchOptions | undefined;
-  for (const arg of args) {
-    if (typeof arg === "string") names.push(arg);
-    else if (arg != null) options = arg;
-  }
-  const t = options?.time;
+  const { names, time: t } = parseTouchArgs(args);
   const now =
     t == null
       ? currentTimeFromProperTimezone()
@@ -101,6 +92,21 @@ export async function touch(this: Base, ...args: TouchArg[]): Promise<boolean> {
   return withTransactionReturningStatus.call(this, async () => {
     return touchRow.call(this, touchCols, now);
   }) as Promise<boolean>;
+}
+
+/**
+ * Split `touch(*names, time: nil)` args into the splatted names and the
+ * trailing keyword hash. Mirrors parseTouchArgs' sibling `parseTouchAllArgs`.
+ */
+export function parseTouchArgs(args: TouchArgs): {
+  names: string[];
+  time: Date | Temporal.Instant | null | undefined;
+} {
+  const last = args[args.length - 1];
+  if (last !== undefined && typeof last !== "string") {
+    return { names: args.slice(0, -1) as string[], time: last.time };
+  }
+  return { names: args as string[], time: undefined };
 }
 
 /**
