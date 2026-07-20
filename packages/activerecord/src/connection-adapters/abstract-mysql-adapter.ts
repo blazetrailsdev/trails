@@ -387,8 +387,18 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   override quoteIdentifier = mysqlQuoteIdentifier;
   override quoteTableName = mysqlQuoteTableName;
   override quoteColumnName = mysqlQuoteColumnName;
-  override unquotedTrue = mysqlUnquotedTrue;
-  override unquotedFalse = mysqlUnquotedFalse;
+
+  // Defined as methods, not class fields: Rails declares these with `def`
+  // (`mysql/quoting.rb:72-77`), and the inherited `type_cast` reaches them
+  // through `self`. A field lives on the instance rather than the prototype,
+  // which silently breaks any receiver built from the prototype alone.
+  override unquotedTrue(): number {
+    return mysqlUnquotedTrue();
+  }
+
+  override unquotedFalse(): number {
+    return mysqlUnquotedFalse();
+  }
 
   /** @internal */
   override arelVisitor(): Visitors.ToSql {

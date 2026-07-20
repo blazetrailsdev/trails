@@ -22,7 +22,8 @@ import {
   toBytes,
   dispatchQuotedDate,
   dispatchQuotedTime,
-  dispatchUnquotedBoolean,
+  dispatchUnquotedTrue,
+  dispatchUnquotedFalse,
   type QuotingDispatchHost,
 } from "../abstract/quoting.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -281,7 +282,8 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // override. This chain does not delegate, so the arm is inlined — but it
   // dispatches through `this` rather than the module-level pair, so the receiver
   // decides, as in Rails.
-  if (typeof value === "boolean") return dispatchUnquotedBoolean(this, value);
+  if (typeof value === "boolean")
+    return value ? dispatchUnquotedTrue(this) : dispatchUnquotedFalse(this);
   if (value === null || value === undefined) return value;
   if (typeof value === "number" || typeof value === "bigint") return value;
   if (typeof value === "string") return value;

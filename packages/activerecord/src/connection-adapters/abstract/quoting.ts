@@ -120,7 +120,8 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   // Rails: `when true then quoted_true` / `when false then quoted_false`
   // (rb:77-78) — self-dispatched, so SQLite's `1`/`0` override applies to the
   // inherited `quote`. Thread `this` to mirror that.
-  if (typeof value === "boolean") return dispatchQuotedBoolean(this, value);
+  if (typeof value === "boolean")
+    return value ? dispatchQuotedTrue(this) : dispatchQuotedFalse(this);
   if (value === null || value === undefined) return "NULL";
   // BigDecimals need to be put in a non-normalized (fixed, ".0"-bearing) form
   // and quoted bare — Rails: `when BigDecimal then value.to_s("F")`.
@@ -186,7 +187,8 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // Rails: `when true then unquoted_true` / `when false then unquoted_false`
   // (rb:98-99) — self-dispatched, so MySQL's `1`/`0` override applies to the
   // inherited `type_cast`. Thread `this` to mirror that.
-  if (typeof value === "boolean") return dispatchUnquotedBoolean(this, value);
+  if (typeof value === "boolean")
+    return value ? dispatchUnquotedTrue(this) : dispatchUnquotedFalse(this);
   if (value === null || value === undefined) return value;
   // Rails: `when BigDecimal then value.to_s("F")` — bound as a fixed-form string.
   if (value instanceof BigDecimal) return value.toString("F");
@@ -525,28 +527,32 @@ export function dispatchQuote(host: QuotingDispatchHost, value: unknown): string
 
 /**
  * Dispatch the boolean literals through the host's overrides if it defines
- * them, else the module-level helpers. Mirrors Rails' `when true then
- * quoted_true` / `when false then unquoted_false` (abstract/quoting.rb:77-78,
- * 98-99), which reach the pair through `self` so an adapter's override applies
- * to the *inherited* `quote` / `type_cast` rather than forcing each adapter to
+ * them, else the module-level helpers, so an adapter's override applies to the
+ * *inherited* `quote` / `type_cast` rather than forcing each adapter to
  * re-implement the whole boolean arm.
+ *
+ * One helper per Rails method — `when true then quoted_true` and `when false
+ * then quoted_false` are four distinct `self.` sends (abstract/quoting.rb:77-78,
+ * 98-99) — matching the one-method-per-helper shape of `dispatchQuotedTime` /
+ * `dispatchQuotedBinary` / `dispatchQuotedDate`.
  * @internal
  */
-export function dispatchQuotedBoolean(host: QuotingDispatchHost, value: boolean): string {
-  if (value) {
-    return typeof host.quotedTrue === "function" ? host.quotedTrue() : quotedTrue();
-  }
+export function dispatchQuotedTrue(host: QuotingDispatchHost): string {
+  return typeof host.quotedTrue === "function" ? host.quotedTrue() : quotedTrue();
+}
+
+/** @internal */
+export function dispatchQuotedFalse(host: QuotingDispatchHost): string {
   return typeof host.quotedFalse === "function" ? host.quotedFalse() : quotedFalse();
 }
 
 /** @internal */
-export function dispatchUnquotedBoolean(
-  host: QuotingDispatchHost,
-  value: boolean,
-): boolean | number {
-  if (value) {
-    return typeof host.unquotedTrue === "function" ? host.unquotedTrue() : unquotedTrue();
-  }
+export function dispatchUnquotedTrue(host: QuotingDispatchHost): boolean | number {
+  return typeof host.unquotedTrue === "function" ? host.unquotedTrue() : unquotedTrue();
+}
+
+/** @internal */
+export function dispatchUnquotedFalse(host: QuotingDispatchHost): boolean | number {
   return typeof host.unquotedFalse === "function" ? host.unquotedFalse() : unquotedFalse();
 }
 
