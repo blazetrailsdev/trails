@@ -781,23 +781,14 @@ describe("AttributeTest", () => {
 
   describe("#not_in_any", () => {
     it("should create a Grouping node", () => {
-      expect(
-        users.get("id").notInAny([
-          [1, 2],
-          [3, 4],
-        ]),
-      ).toBeInstanceOf(Nodes.Grouping);
+      // Rails passes bare scalars here (attribute_test.rb:1008); notIn is typed
+      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
+      // (not a cast) so this fails to compile once the signature is widened by
+      // the arel-predications-not-in-expr-type story, forcing this line's removal.
+      // @ts-expect-error -- see above
+      expect(users.get("id").notInAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").notInAny([[1], [2]]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#not_in_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(
@@ -814,12 +805,12 @@ describe("AttributeTest", () => {
 
   describe("#not_in_all", () => {
     it("should create a Grouping node", () => {
-      expect(
-        users.get("id").notInAll([
-          [1, 2],
-          [3, 4],
-        ]),
-      ).toBeInstanceOf(Nodes.Grouping);
+      // Rails passes bare scalars here (attribute_test.rb:1023); notIn is typed
+      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
+      // (not a cast) so this fails to compile once the signature is widened by
+      // the arel-predications-not-in-expr-type story, forcing this line's removal.
+      // @ts-expect-error -- see above
+      expect(users.get("id").notInAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
     it("should generate ANDs in sql", () => {
@@ -909,54 +900,6 @@ describe("AttributeTest", () => {
           .where(users.get("id").notIn([1, 2]))
           .toSql(),
       ).toBe('SELECT * FROM "users" WHERE "users"."id" NOT IN (1, 2)');
-    });
-  });
-
-  describe("#not_in_any", () => {
-    it("should create a Grouping node", () => {
-      // Rails passes bare scalars here (attribute_test.rb:1008); notIn is typed
-      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
-      // (not a cast) so this fails to compile once the signature is widened by
-      // the arel-predications-not-in-expr-type story, forcing this line's removal.
-      // @ts-expect-error -- see above
-      expect(users.get("id").notInAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
-    });
-
-    it("should generate ORs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(
-        users.get("id").notInAny([
-          [1, 2],
-          [3, 4],
-        ]),
-      );
-      expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" NOT IN (1, 2) OR "users"."id" NOT IN (3, 4))',
-      );
-    });
-  });
-
-  describe("#not_in_all", () => {
-    it("should create a Grouping node", () => {
-      // Rails passes bare scalars here (attribute_test.rb:1023); notIn is typed
-      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
-      // (not a cast) so this fails to compile once the signature is widened by
-      // the arel-predications-not-in-expr-type story, forcing this line's removal.
-      // @ts-expect-error -- see above
-      expect(users.get("id").notInAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
-    });
-
-    it("should generate ANDs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(
-        users.get("id").notInAll([
-          [1, 2],
-          [3, 4],
-        ]),
-      );
-      expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" NOT IN (1, 2) AND "users"."id" NOT IN (3, 4))',
-      );
     });
   });
 
