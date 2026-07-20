@@ -97,7 +97,7 @@ export class InsertManager extends TreeManager {
    * Mirrors: Arel::InsertManager#create_values
    */
   createValues(row: unknown[]): ValuesList {
-    return new ValuesList([row as Node[]]);
+    return new ValuesList([row]);
   }
 
   /**
