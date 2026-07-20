@@ -1179,12 +1179,14 @@ function applyColumnsHash(
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
 
   // STI: if the subclass previously forked _attributeDefinitions (via
-  // attribute()/decorateAttributes()/encrypts()), carry its entries
-  // into the shared base map before unifying references — naive
-  // reassignment would silently discard subclass-declared attributes.
-  // Precedence: subclass user-provided entries win over base non-user
-  // entries; otherwise base wins (Rails' STI shares attribute_types,
-  // but subclass declarations extend it).
+  // attribute()/decorateAttributes()/normalizes()/encrypts()), keep that fork
+  // as a per-subclass OVERLAY over the freshly reflected base map instead of
+  // merging it back into the shared map. Rails keeps subclass declarations and
+  // type decorations per-class (`_default_attributes` is memoized per class and
+  // replays only that class's own pending modifications), so a `normalizes` /
+  // `encrypts` on one STI subclass must not decorate the base or its siblings.
+  // Precedence: subclass user-provided entries win over base non-user entries;
+  // otherwise the (reflected) base entry wins.
   if (originatingHost && originatingHost !== host) {
     const baseDefs = host._attributeDefinitions;
     const subDefs = originatingHost._attributeDefinitions;
@@ -1194,16 +1196,27 @@ function applyColumnsHash(
       subDefs !== baseDefs &&
       Object.prototype.hasOwnProperty.call(originatingHost, "_attributeDefinitions")
     ) {
+      const overlay = new Map(baseDefs);
       for (const [name, def] of subDefs) {
         const existing = baseDefs.get(name);
         const subIsUser = (def.userProvided ?? true) === true;
         const baseIsUser = existing ? (existing.userProvided ?? true) === true : false;
-        if (!existing || (subIsUser && !baseIsUser)) {
-          baseDefs.set(name, def);
+        // `def !== existing` marks an entry the subclass actually declared or
+        // decorated (untouched entries are copied by reference from the base),
+        // so a subclass-only decoration survives even though both sides are
+        // schema-sourced (`userProvided === false`).
+        if (!existing || def !== existing || (subIsUser && !baseIsUser)) {
+          overlay.set(name, def);
         }
       }
+      originatingHost._attributeDefinitions = overlay;
     }
-    originatingHost._attributeDefinitions = baseDefs;
+    // No `else` assignment: when the subclass never forked, it must keep
+    // INHERITING the base map. Installing the base map as an own property of
+    // the subclass fools the copy-on-write guard in `decorateAttributes`
+    // (`hasOwnProperty(this, "_attributeDefinitions")`), so a later
+    // `normalizes` / `encrypts` on the subclass would decorate the base's
+    // definitions in place — the leak this branch used to cause.
     encryptionHooks.applyPendingEncryptions(originatingHost);
     // Recompute the reflected column set against the subclass's own
     // `ignoredColumns` — an STI subclass may ignore a different set than its
