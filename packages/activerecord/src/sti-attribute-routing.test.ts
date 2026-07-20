@@ -68,7 +68,7 @@ describe("STI subclass attribute() routing", () => {
     expect(Shape._attributeDefinitions.get("sides")?.type.name).toBe("integer");
   });
 
-  it("STI subclass encrypts() routes pending encryptions to the base", async () => {
+  it("STI subclass encrypts() stays on the subclass, unlike attribute()", async () => {
     const { isEncryptedAttribute } = await import("./encryption.js");
 
     class Animal extends Base {
@@ -80,22 +80,27 @@ describe("STI subclass attribute() routing", () => {
     }
     class Dog extends Animal {
       static {
-        // Pre-PR: encrypts() on subclass would add to Dog._pendingEncryptions
-        // while the attribute def lived on Animal — wrapper never applied.
-        // Post-PR: encrypts() also routes to the STI base.
         this.encrypts("name");
       }
     }
+    class Cat extends Animal {}
 
-    // Pending encryption is recorded on the base, not the subclass.
-    expect(Object.prototype.hasOwnProperty.call(Animal, "_pendingEncryptions")).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(Dog, "_pendingEncryptions")).toBe(false);
+    // Unlike `attribute()` (which writes to the shared base-owned map above),
+    // `encrypts` is per-class in Rails: `encrypted_attributes` is a
+    // `class_attribute` and `encrypt_attribute` calls `decorate_attributes` on
+    // the receiver, while `_default_attributes` replays the superclass's
+    // modifications first and then only the class's OWN pending decorators
+    // (encryption/encryptable_record.rb, activemodel attribute_registration.rb).
+    expect(Object.prototype.hasOwnProperty.call(Dog, "_pendingEncryptions")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(Animal, "_pendingEncryptions")).toBe(false);
 
-    // Both classes observe the encrypted attribute via the shared map.
-    expect(isEncryptedAttribute(Animal, "name")).toBe(true);
+    // The declaring subclass encrypts; the base and its siblings do not.
     expect(isEncryptedAttribute(Dog, "name")).toBe(true);
-    // No fork on the subclass.
-    expect(Dog._attributeDefinitions).toBe(Animal._attributeDefinitions);
+    expect(isEncryptedAttribute(Animal, "name")).toBe(false);
+    expect(isEncryptedAttribute(Cat, "name")).toBe(false);
+
+    // Copy-on-write: the subclass no longer shares the base's definitions map.
+    expect(Dog._attributeDefinitions).not.toBe(Animal._attributeDefinitions);
   });
 
   it("subclass attribute survives schema reflection on the STI base (end-to-end)", async () => {

@@ -1866,16 +1866,7 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Encryption.encrypts
    */
   static encrypts(...args: Array<string | EncryptsOptions>): void {
-    // Route through the STI base for the same reason `attribute()`
-    // does: Rails' `encrypts` lands on the shared attribute_types map.
-    // Without this, a subclass `encrypts()` would record pending
-    // encryptions on the subclass while the attribute def lives on
-    // the base — the type wrapper would never apply, or
-    // `applyPendingEncryptions` would fork `_attributeDefinitions` on
-    // the subclass and reintroduce the shadowing the STI-routing fix
-    // is trying to eliminate.
-    const target = isStiSubclass(this) ? getStiBase(this) : this;
-    encryptionHooks.encrypts(target, ...args);
+    encryptionHooks.encrypts(this, ...args);
   }
 
   /**
