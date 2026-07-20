@@ -2,6 +2,7 @@
 
 import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel, StrictLoadingViolationError } from "./index.js";
+import { resetCallbacks } from "./callbacks.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Developer } from "./test-helpers/models/developer.js";
 import { Ship } from "./test-helpers/models/ship.js";
@@ -117,6 +118,21 @@ describe("strict loading — sync singular reader (Phase R.3)", () => {
     expect(() => (ship as any).developer).not.toThrow();
     expect(((ship as any).developer as Developer).id).toBe(developers("david").id);
     expect(assoc.loaded).toBe(true);
+  });
+
+  it("strict loading raises when a before_destroy callback reads an unloaded belongs_to", async () => {
+    const ship = await Ship.create({ name: "Destroy Ship", developer_id: developers("david").id });
+    ship.strictLoadingBang();
+    let readDeveloper: unknown;
+    await resetCallbacks(Ship, "destroy", async () => {
+      Ship.beforeDestroy((r: any) => {
+        readDeveloper = r.developer;
+      });
+      await expect(ship.destroy()).rejects.toThrow(StrictLoadingViolationError);
+      // The destroy aborted in the preload, before the callback chain ran.
+      expect(readDeveloper).toBeUndefined();
+      expect(await Ship.findBy({ id: ship.id })).not.toBeNull();
+    });
   });
 
   it("ships fixture is linked to developer in the ships fixture", () => {

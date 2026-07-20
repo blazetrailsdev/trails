@@ -65,7 +65,12 @@ import {
   defineDynamicSelectReaders,
   subclassFromAttributesForNew,
 } from "./inheritance.js";
-import { NotImplementedError, RecordNotFound, StaleObjectError } from "./errors.js";
+import {
+  NotImplementedError,
+  RecordNotFound,
+  StaleObjectError,
+  StrictLoadingViolationError,
+} from "./errors.js";
 import {
   AutosaveAssociation,
   reload as _autosaveReload,
@@ -3857,11 +3862,16 @@ export class Base extends Model {
         } else {
           await assoc.loadTarget();
         }
-      } catch {
-        // An unregistered target class, missing FK row, strict-loading
-        // violation, or transient DB error must not abort the destroy. Resolve
-        // the association to `null` so a sync callback that reads it sees `null`
-        // rather than trails' async-reader Promise.
+      } catch (err) {
+        // A strict-loading violation is the record's own configuration talking:
+        // Rails raises when a destroy callback dereferences an unloaded
+        // association on a `strict_loading` record (association.rb#load_target),
+        // so it must propagate rather than be papered over with `null`.
+        if (err instanceof StrictLoadingViolationError) throw err;
+        // An unregistered target class, missing FK row, or transient DB error
+        // must not abort the destroy. Resolve the association to `null` so a
+        // sync callback that reads it sees `null` rather than trails'
+        // async-reader Promise.
         assoc?.setTarget?.(null);
       }
     }
