@@ -12,11 +12,9 @@ function describeClass(object: unknown): string {
 /**
  * Opaque dispatch-cache key for a class the visitor dispatches on.
  *
- * The instance type is `object`, not `Node`: Rails' visitors dispatch on
- * `object.class` and the table is keyed by classes that are not Arel nodes
- * at all — `ActiveModel::Attribute` (to_sql.rb:756), `Set`, `Array`. Naming
- * the constrained `Node` here would be the type surface asserting
- * "impossible" about dispatch Rails does routinely.
+ * The instance type is `object`, not `Node`: Rails dispatches on
+ * `object.class`, and the table is keyed by classes that are not Arel nodes
+ * at all — `ActiveModel::Attribute` (to_sql.rb:756), `Set`.
  *
  * The parameter list is `never[]` (not `unknown[]`) because the dispatch
  * cache never constructs anything — the ctor is used purely as a Map key. TS
