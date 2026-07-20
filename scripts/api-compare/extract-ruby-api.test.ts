@@ -332,6 +332,109 @@ describe("Ruby extractor alias arity resolution", () => {
     expect(r["ActiveRecord::Relation#aka"].params).toEqual(["nested", "other"]);
   });
 
+  it("resolves a leading :: mixin against the top level, skipping lexical scope", () => {
+    // Ruby's `::` forces an absolute lookup, so `include ::Delegation` binds to
+    // top-level `Delegation` even though `ActiveRecord::Delegation` exists and
+    // would win for the unqualified `include Delegation` above.
+    const r = aliasParams({
+      "abs.rb": `
+        module Delegation
+          def target(top_level); end
+        end
+
+        module ActiveRecord
+          module Delegation
+            def target(nested, other); end
+          end
+
+          class Relation
+            include ::Delegation
+            alias :aka :target
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Relation#aka"].params).toEqual(["top_level"]);
+  });
+
+  it("resolves a leading :: on a qualified mixin against the top level", () => {
+    // `::Outer::Mixin` is `const_path_ref(top_const_ref(Outer), Mixin)` — the
+    // `::` sits on the leftmost segment, so absoluteness must be detected
+    // through the qualifier nesting, not just on a bare `::Foo`.
+    const r = aliasParams({
+      "abs_path.rb": `
+        module Outer
+          module Mixin
+            def target(top_level); end
+          end
+        end
+
+        module ActiveRecord
+          module Outer
+            module Mixin
+              def target(nested, other); end
+            end
+          end
+
+          class Relation
+            include ::Outer::Mixin
+            alias :aka :target
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Relation#aka"].params).toEqual(["top_level"]);
+  });
+
+  it("resolves a qualified mixin without :: lexically", () => {
+    // The same shape as above minus the `::` — `const_path_ref(var_ref(Outer),
+    // Mixin)` must still prefer the lexically nearer definition.
+    const r = aliasParams({
+      "rel_path.rb": `
+        module Outer
+          module Mixin
+            def target(top_level); end
+          end
+        end
+
+        module ActiveRecord
+          module Outer
+            module Mixin
+              def target(nested, other); end
+            end
+          end
+
+          class Relation
+            include Outer::Mixin
+            alias :aka :target
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Relation#aka"].params).toEqual(["nested", "other"]);
+  });
+
+  it("resolves a leading :: superclass against the top level", () => {
+    const r = aliasParams({
+      "abs_sup.rb": `
+        class Base
+          def target(top_level); end
+        end
+
+        module ActiveRecord
+          class Base
+            def target(nested, other); end
+          end
+
+          class Relation < ::Base
+            alias :aka :target
+          end
+        end
+      `,
+    });
+    expect(r["ActiveRecord::Relation#aka"].params).toEqual(["top_level"]);
+  });
+
   it("prefers a same-bucket definition over an inherited one", () => {
     const r = aliasParams({
       "shadow.rb": `

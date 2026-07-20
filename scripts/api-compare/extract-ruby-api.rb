@@ -515,7 +515,7 @@ class ApiExtractor
     name = const_name(node[1])
     return unless name
 
-    superclass = const_name(node[2]) if node[2]
+    superclass = qualified_const_name(node[2]) if node[2]
 
     @namespace_stack.push(name)
     @visibility_stack.push(:public)
@@ -814,7 +814,7 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    names = extract_const_args(args)
+    names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
   end
@@ -824,7 +824,7 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    names = extract_const_args_from_paren(args)
+    names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:includes] << mod_name }
     (@include_groups[[fqn, :includes]] ||= []) << names if names.any?
   end
@@ -834,7 +834,7 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    names = extract_const_args(args)
+    names = extract_const_args(args, keep_absolute: true)
     names.each { |mod_name| target[:extends] << mod_name }
     (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
   end
@@ -844,7 +844,7 @@ class ApiExtractor
     target = @classes[fqn] || @modules[fqn]
     return unless target
 
-    names = extract_const_args_from_paren(args)
+    names = extract_const_args_from_paren(args, keep_absolute: true)
     names.each { |mod_name| target[:extends] << mod_name }
     (@include_groups[[fqn, :extends]] ||= []) << names if names.any?
   end
@@ -1121,18 +1121,19 @@ class ApiExtractor
   # finds `ActiveRecord::Delegation`.
   def lookup_ancestor(name, from_fqn, all)
     return nil unless name
+
+    # A leading `::` forces an absolute lookup: Ruby skips every lexical scope
+    # and resolves against the top level only, so `include ::Foo` inside
+    # `A::B` binds to `::Foo` even when `A::Foo` exists.
+    if name.start_with?("::")
+      absolute = name.delete_prefix("::")
+      return all[absolute] ? [absolute, all[absolute]] : nil
+    end
+
     # Resolved lexically — innermost enclosing scope outwards, top level LAST.
     # Checking `all[name]` up front would bind `include Delegation` inside
     # `ActiveRecord::Relation` to a top-level `::Delegation` in preference to
     # `ActiveRecord::Delegation`, which is the opposite of Ruby's rule.
-    #
-    # A leading `::` should strictly force the absolute lookup, but `const_name`
-    # normalizes `::Foo` to `Foo` before it reaches the recorded `includes`, so
-    # absoluteness isn't observable here; such a reference falls back to lexical
-    # order. Vendored Rails has no `include ::Foo` / `extend ::Foo` anywhere
-    # under `*/lib`, so nothing is misresolved today — teaching the extractor to
-    # preserve `::` would change emitted manifest values for every include and
-    # belongs in its own change.
     parts = from_fqn.split("::")
     while parts.any?
       candidate = (parts + [name]).join("::")
@@ -1909,28 +1910,58 @@ class ApiExtractor
     end
   end
 
-  def extract_const_args(args)
+  def extract_const_args(args, keep_absolute: false)
     results = []
     return results unless args.is_a?(Array)
-    traverse_for_consts(args, results)
+    traverse_for_consts(args, results, keep_absolute: keep_absolute)
     results
   end
 
-  def extract_const_args_from_paren(args)
+  def extract_const_args_from_paren(args, keep_absolute: false)
     results = []
     return results unless args.is_a?(Array)
-    traverse_for_consts(args, results)
+    traverse_for_consts(args, results, keep_absolute: keep_absolute)
     results
   end
 
-  def traverse_for_consts(node, results)
+  # `keep_absolute` preserves the leading `::` of an absolute reference
+  # (`include ::Foo`) so `lookup_ancestor` can honour Ruby's rule that `::`
+  # bypasses lexical scope. Off by default: other callers key into hashes of
+  # bare constant names and must keep seeing `Foo`.
+  def traverse_for_consts(node, results, keep_absolute: false)
     return unless node.is_a?(Array)
     case node[0]
     when :const_path_ref, :@const, :var_ref, :top_const_ref, :const_ref
-      name = const_name(node)
+      name = keep_absolute ? qualified_const_name(node) : const_name(node)
       results << name if name
     else
-      node.each { |child| traverse_for_consts(child, results) }
+      node.each { |child| traverse_for_consts(child, results, keep_absolute: keep_absolute) }
+    end
+  end
+
+  # `const_name` with a leading `::` restored when the reference was written
+  # absolutely — `::Foo` and `::A::B` both keep the marker; `A::B` does not.
+  def qualified_const_name(node)
+    name = const_name(node)
+    return nil unless name
+    absolute_const_ref?(node) ? "::#{name}" : name
+  end
+
+  # True when the leftmost element of a constant reference is `::`. Ripper
+  # nests the qualifier leftwards, so `::A::B` is
+  # `const_path_ref(top_const_ref(A), B)` and the relative `A::B` is
+  # `const_path_ref(var_ref(A), B)` — recursing on node[1] separates them.
+  # (`:top_const_path_ref` is not a Ripper event; `Ripper::PARSER_EVENTS`
+  # defines only `:top_const_ref` and `:top_const_field`.)
+  def absolute_const_ref?(node)
+    return false unless node.is_a?(Array)
+    case node[0]
+    when :top_const_ref
+      true
+    when :const_path_ref, :var_ref, :const_ref
+      absolute_const_ref?(node[1])
+    else
+      false
     end
   end
 

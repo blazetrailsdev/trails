@@ -241,6 +241,11 @@ describe("superclassesMatch", () => {
     expect(superclassesMatch(null, [], "Anything")).toBe(true);
   });
 
+  it("matches a `< ::Foo` absolute super against the plain ts name", () => {
+    // TS names never carry Ruby's absolute marker, so it is stripped first.
+    expect(superclassesMatch("::Binary", ["Binary"], "Cte")).toBe(true);
+  });
+
   it("flags ruby super with empty ts chain", () => {
     expect(superclassesMatch("Foo", [], "Anything")).toBe(false);
   });
@@ -691,6 +696,17 @@ describe("resolveModuleName", () => {
   it("passes through already-qualified names without consulting the map", () => {
     // Early return fires on "::" — byShort is irrelevant for pre-qualified names.
     expect(resolveModuleName("Foo::Bar", "Baz::Qux", new Map())).toEqual(["Foo::Bar"]);
+  });
+
+  it("strips a leading :: and resolves top-level, ignoring nearer candidates", () => {
+    // `include ::Foo` is absolute: it must not bind to the lexically nearer
+    // `Z::Foo` the unqualified form would pick.
+    const byShort = new Map([["Foo", ["Z::Foo", "Foo"]]]);
+    expect(resolveModuleName("::Foo", "Z::Bar", byShort)).toEqual(["Foo"]);
+  });
+
+  it("strips a leading :: from a qualified absolute name", () => {
+    expect(resolveModuleName("::Foo::Bar", "Baz::Qux", new Map())).toEqual(["Foo::Bar"]);
   });
 
   it("returns all candidates when context has no prefix match", () => {
