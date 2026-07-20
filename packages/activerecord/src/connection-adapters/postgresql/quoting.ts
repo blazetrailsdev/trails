@@ -245,6 +245,13 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
     // Rails: `when OID::Array::Data then encode_array(value)`.
     return encodeArray.call(this, value);
   }
+  // A bare JS Array has no Ruby analogue at this position — Rails only ever
+  // reaches `type_cast` with an `OID::Array::Data`, which carries the encoder
+  // `encode_array` needs. Ours arrive unwrapped on the `execute(sql, binds)`
+  // path, where node-postgres does the array encoding itself, so pass them
+  // through rather than raising "can't cast Array". Same unwrapped-analogue
+  // reasoning as the ArrayBuffer-view arm in the abstract chain (#4868).
+  if (Array.isArray(value)) return value;
   if (value instanceof Range) {
     return encodeRange.call(this, value);
   }
