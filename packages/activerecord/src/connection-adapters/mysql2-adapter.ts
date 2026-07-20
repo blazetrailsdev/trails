@@ -46,7 +46,6 @@ import {
   type Mysql2RawResult,
 } from "./mysql2/database-statements.js";
 import {
-  typeCastedBinds,
   temporalToBindString,
   transactionIsolationLevels,
 } from "./abstract/database-statements.js";
@@ -663,7 +662,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       sql: driverSql,
       name: name ?? "SQL",
       binds: driverBinds,
-      type_casted_binds: typeCastedBinds(driverBinds),
+      type_casted_binds: this.typeCastedBinds(driverBinds) ?? driverBinds,
       connection: this,
       row_count: 0,
       transaction: txPublicQuery.isOpen() ? txPublicQuery : null,
@@ -1018,7 +1017,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       sql: driverSql,
       name,
       binds: driverBinds,
-      type_casted_binds: typeCastedBinds(driverBinds),
+      type_casted_binds: this.typeCastedBinds(driverBinds) ?? driverBinds,
       connection: this,
       row_count: 0,
       transaction: txPublicExec.isOpen() ? txPublicExec : null,
@@ -1067,7 +1066,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
       sql: driverSql,
       name,
       binds: driverBinds,
-      type_casted_binds: typeCastedBinds(driverBinds),
+      type_casted_binds: this.typeCastedBinds(driverBinds) ?? driverBinds,
       connection: this,
       row_count: 0,
       transaction: txPublicMut.isOpen() ? txPublicMut : null,
@@ -1250,7 +1249,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         sql: driverSql,
         name,
         binds: driverBinds,
-        type_casted_binds: typeCastedBinds(driverBinds),
+        type_casted_binds: this.typeCastedBinds(driverBinds) ?? driverBinds,
         connection: this,
         row_count: 0,
         transaction: txPublicInt.isOpen() ? txPublicInt : null,

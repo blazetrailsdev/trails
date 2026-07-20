@@ -2,7 +2,7 @@ import { describe, it, expect } from "vitest";
 import { BinaryData } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
-import { typeCastedBinds } from "./connection-adapters/abstract/database-statements.js";
+import { Base } from "./base.js";
 
 /**
  * Trails-only: no Rails counterpart. `BinaryType#serialize` returns a
@@ -33,15 +33,19 @@ describe("binary bind round-trip", () => {
 });
 
 describe("binary type_casted_binds payload", () => {
-  it("unwraps Type::Binary::Data for subscribers", () => {
+  fixtures({});
+
+  it("unwraps Type::Binary::Data for subscribers", async () => {
     // `type_casted_binds` feeds the sql.active_record payload that LogSubscriber
     // renders. Rails type_casts every bind, so a Data shows as its byte string
-    // (abstract/quoting.rb:96). Ours does not route through typeCast — that is
-    // the wider type_casted_binds story — so this guards the one unwrap that
-    // keeps the wrapper from rendering as "[object Object]" in query logs.
+    // (abstract/quoting.rb:96), and we now self-dispatch through the adapter's
+    // `type_cast`, so this guards the unwrap that keeps the wrapper from
+    // rendering as "[object Object]" in query logs.
     const bytes = new Uint8Array([0xde, 0xad]);
-    const out = typeCastedBinds([{ valueForDatabase: new BinaryData(bytes) }]);
+    const conn = await Base.connection;
+    const out = conn.typeCastedBinds([{ valueForDatabase: new BinaryData(bytes) }])!;
     expect(String(out[0])).not.toBe("[object Object]");
-    expect(out[0]).toEqual(bytes);
+    // PG's type_cast returns a Buffer (bytea); normalize before comparing bytes.
+    expect(new Uint8Array(out[0] as Uint8Array)).toEqual(bytes);
   });
 });

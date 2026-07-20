@@ -1,0 +1,50 @@
+import { describe, it, expect } from "vitest";
+import { Notifications, NotificationEvent as Event } from "@blazetrails/activesupport";
+import { Base } from "./base.js";
+import { fixtures } from "./test-helpers/fixtures.js";
+import { Task } from "./test-helpers/models/task.js";
+
+/**
+ * Trails-only: no Rails counterpart. Rails cannot regress this — it has exactly
+ * one `type_casted_binds` (abstract/quoting.rb:224) and both the uncached
+ * (`log`, abstract_adapter.rb:1134) and cached (`cache_notification_info`,
+ * query_cache.rb:311) producers reach it through `self`. trails grew a second,
+ * standalone implementation that never reached the adapter's `type_cast`, so
+ * the two payloads could disagree per adapter. This pins them equal.
+ */
+describe("sql.active_record type_casted_binds", () => {
+  fixtures({});
+
+  it("carries equal values on the cached and uncached paths", async () => {
+    const conn = await Base.connection;
+    const task = await Task.create({ starting: null, ending: null });
+    const events: Record<string, unknown>[] = [];
+    const sub = Notifications.subscribe("sql.active_record", (e: Event) =>
+      events.push(e.payload as Record<string, unknown>),
+    );
+
+    try {
+      await conn.cache(async () => {
+        await Task.find(task.id);
+        await Task.find(task.id);
+      });
+    } finally {
+      Notifications.unsubscribe(sub);
+    }
+
+    const captured = events
+      .filter((p) => /FROM\s+.?tasks.?/i.test(String(p.sql ?? "")))
+      .map((p) => {
+        const casted = p.type_casted_binds;
+        return typeof casted === "function" ? casted() : casted;
+      });
+
+    // Two events for the same query: the first executes, the second is served
+    // from the query cache.
+    expect(captured.length).toBe(2);
+    expect(captured[1]).toEqual(captured[0]);
+    // ...and that the shared value is the adapter-dispatched one, so neither
+    // path can drift back onto a standalone helper that skips `typeCast`.
+    expect(captured[0]).toEqual(conn.typeCastedBinds([task.id]));
+  });
+});

@@ -788,6 +788,13 @@ export class AbstractAdapter implements Quoting {
   }
 
   /**
+   * Assigned by `include(AbstractAdapter, QuotingMixin)` below; declared here so
+   * payload producers can self-dispatch it (Rails' single `type_casted_binds`,
+   * abstract/quoting.rb:224) and pick up an adapter's `typeCast` override.
+   */
+  declare typeCastedBinds: (binds: unknown[] | null | undefined) => unknown[] | undefined;
+
+  /**
    * Default identifier and bool-literal quoting — delegates to the
    * abstract quoting module. Concrete adapters override the dialect-
    * specific methods (PG/SQLite double-quote vs. MySQL backtick;

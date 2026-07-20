@@ -638,8 +638,16 @@ function typeCastedBinds(
   binds: unknown[] | null | undefined,
 ): unknown[] | undefined {
   return binds?.map((value: any) => {
-    if (value instanceof ModelAttribute) {
-      return this.typeCast(value.valueForDatabase);
+    // Attribute detection is duck-typed rather than `instanceof ModelAttribute`:
+    // when the dep tree resolves two copies of `@blazetrails/activemodel` the
+    // instanceof check silently misses and the raw Attribute object reaches
+    // `typeCast`, which throws "can't cast Attribute".
+    if (
+      value instanceof ModelAttribute ||
+      (value && typeof value === "object" && "valueForDatabase" in value)
+    ) {
+      const vfd = value.valueForDatabase;
+      return this.typeCast(typeof vfd === "function" ? value.valueForDatabase() : vfd);
     }
     return this.typeCast(value);
   });

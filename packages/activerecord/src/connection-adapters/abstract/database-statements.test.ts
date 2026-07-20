@@ -25,7 +25,6 @@ import {
   emptyInsertStatementValue,
   sanitizeLimit,
   withYamlFallback,
-  typeCastedBinds,
   highPrecisionCurrentTimestamp,
   markTransactionWrittenIfWrite,
   isTransactionOpen,
@@ -461,22 +460,6 @@ describe("DatabaseStatements", () => {
       expect(withYamlFallback(instant)).toBe(instant);
       const pdt = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
       expect(withYamlFallback(pdt)).toBe(pdt);
-    });
-
-    it("typeCastedBinds converts Temporal values in valueForDatabase() results to SQL strings", () => {
-      const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
-      const attrLike = { valueForDatabase: () => instant };
-      expect(typeCastedBinds([attrLike])).toEqual(["2026-04-26 14:23:55.123456"]);
-    });
-
-    it("typeCastedBinds converts Temporal values in { value } bind objects to SQL strings", () => {
-      const date = Temporal.PlainDate.from("2026-04-26");
-      const bindLike = { value: date };
-      expect(typeCastedBinds([bindLike])).toEqual(["2026-04-26"]);
-    });
-
-    it("typeCastedBinds passes non-Temporal primitives through unchanged", () => {
-      expect(typeCastedBinds([42, "hello", null])).toEqual([42, "hello", null]);
     });
 
     it("high precision current timestamp returns Arel SQL literal", () => {
