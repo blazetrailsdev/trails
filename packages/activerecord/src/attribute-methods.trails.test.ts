@@ -94,10 +94,10 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Topic.hasAttribute("replies_count")).toBe(false);
   });
 
-  it("prefers a real attribute over the camelCase alias bridge", () => {
-    // The snake_case bridge must not hijack a name the model really owns: with
-    // both a real `new_name` column and an unrelated `newName` alias, Rails
-    // resolves `new_name` to its own column, so trails must too.
+  it("prefers a real class attribute over the camelCase alias bridge", () => {
+    // The bridge must not hijack a name the model really owns: with both a real
+    // `new_name` column and an unrelated `newName` alias, Rails resolves
+    // `new_name` to its own column, so trails must too.
     class Topic extends Base {
       static {
         this.attribute("name", "string");
@@ -105,9 +105,28 @@ describe("AttributeMethodsTest (trails)", () => {
         this.aliasAttribute("newName", "name");
       }
     }
+    expect(Topic.hasAttribute("new_name")).toBe(true);
     const t = new Topic({ name: "a", new_name: "b" });
     expect(t.readAttribute("new_name")).toBe("b");
     expect(t.readAttribute("newName")).toBe("a");
+  });
+
+  it("prefers a loaded attribute over the camelCase alias bridge", () => {
+    // Rails' instance has_attribute? checks the loaded @attributes
+    // (attribute_methods.rb:316-319), which can hold names the class does not
+    // declare — a projected `SELECT COUNT(*) AS comments_count`, say. Such a
+    // name must resolve to the loaded value, not to an unrelated
+    // `commentsCount` alias, so the bridge has to run after the exact lookup.
+    class Topic extends Base {
+      static {
+        this.attribute("legacy_comments_count", "integer");
+        this.aliasAttribute("commentsCount", "legacy_comments_count");
+      }
+    }
+    const t = Topic.instantiate({ legacy_comments_count: 7, comments_count: 42 });
+    expect(t.hasAttribute("comments_count")).toBe(true);
+    expect(t.readAttribute("comments_count")).toBe(42);
+    expect(t.readAttribute("commentsCount")).toBe(7);
   });
 
   it("readonly attributes are not updated after create", async () => {

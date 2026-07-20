@@ -649,18 +649,33 @@ export function defineDirtyAttributeMethods(prototype: object, attrName: string)
  * the same key whether the caller passed `nickname` or `name`.
  */
 export function resolveAliasName(host: AttributeMethodHost, name: string): string {
-  const aliases = host._attributeAliases;
-  // Rails: `attribute_aliases[attr_name] || attr_name`.
-  const exact = aliases?.[name];
-  if (exact !== undefined) return exact;
+  // Rails: `attribute_aliases[attr_name] || attr_name`. Exact lookup only —
+  // read/write paths must not second-guess the name the caller supplied.
+  return host._attributeAliases?.[name] ?? name;
+}
 
-  // Trails stores alias keys camelCase (`newName`, `commentsCount`) while
-  // callers often pass the snake_case column name (`new_name`,
-  // `comments_count`); Rails needs no such bridge because its alias keys are
-  // already in the same convention as its column names. Defer to a real
-  // attribute of that exact name first, so a model that happens to own BOTH a
-  // `new_name` column and an unrelated `newName` alias still resolves
-  // `new_name` to its own column, the way Rails would.
-  if (host._attributeDefinitions?.has(name)) return name;
-  return aliases?.[camelize(name, "lower")] ?? name;
+/**
+ * Trails-only convention bridge for `resolveAliasName`.
+ *
+ * Trails stores alias KEYS camelCase (`newName`, `commentsCount`) while derived
+ * names — counter-cache columns, DB column names — are snake_case (`new_name`,
+ * `comments_count`). Rails needs no such bridge: its alias keys are already in
+ * the same convention as its column names, so a plain
+ * `attribute_aliases[attr_name]` hit suffices.
+ *
+ * This is a *fallback* and deliberately NOT folded into `resolveAliasName`.
+ * Callers must first establish that `name` is not itself a real attribute of
+ * the relevant set, because the camelized key is a guess: a record loaded with
+ * a projected `comments_count` (say `SELECT COUNT(*) AS comments_count`) owns
+ * that name outright and must never be redirected to an unrelated
+ * `commentsCount` alias. Which set is "relevant" differs by caller — the class
+ * attribute set for `has_attribute?` at class level, the loaded `@attributes`
+ * at instance level (attribute_methods.rb:316-319) — so the check belongs at
+ * the call site, not here.
+ *
+ * @internal
+ */
+export function resolveAliasNameBridged(host: AttributeMethodHost, name: string): string {
+  const aliases = host._attributeAliases;
+  return aliases?.[name] ?? aliases?.[camelize(name, "lower")] ?? name;
 }

@@ -4,7 +4,11 @@
  * Mirrors: ActiveRecord::AttributeMethods
  */
 import { isBlank } from "@blazetrails/activesupport";
-import { MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
+import {
+  MissingAttributeError,
+  resolveAliasName,
+  resolveAliasNameBridged,
+} from "@blazetrails/activemodel";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
 import {
   attributeForInspect as _attrForInspect,
@@ -80,15 +84,16 @@ interface AttributeAccessorHost {
  * Mirrors: ActiveRecord::AttributeMethods#has_attribute?
  */
 export function hasAttribute(this: AttributeRecord, name: string): boolean {
-  // Rails `has_attribute?` resolves attribute_aliases before hitting the
-  // attribute set (active_record/attribute_methods.rb).
-  const resolved = resolveAliasName(
-    (this as unknown as { constructor: unknown }).constructor as Parameters<
-      typeof resolveAliasName
-    >[0],
-    name,
-  );
-  return this._attributes.has(resolved);
+  // Rails: `attr_name = self.class.attribute_aliases[attr_name] || attr_name`
+  // then `@attributes.key?(attr_name)` (attribute_methods.rb:316-319).
+  const ctor = (this as unknown as { constructor: unknown }).constructor as Parameters<
+    typeof resolveAliasName
+  >[0];
+  if (this._attributes.has(resolveAliasName(ctor, name))) return true;
+  // Trails-only camelCase alias-key bridge. Applied last, so a name the loaded
+  // attribute set actually owns — e.g. a projected `comments_count` — is never
+  // redirected to an unrelated `commentsCount` alias.
+  return this._attributes.has(resolveAliasNameBridged(ctor, name));
 }
 
 /**
