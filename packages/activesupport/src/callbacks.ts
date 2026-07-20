@@ -844,17 +844,9 @@ export class CallbackSequence {
     target: object,
     block: (() => unknown) | undefined,
     opts: RunCallbacksOptions & { strict: "sync" },
-  ): boolean;
-  invoke(
-    target: object,
-    block?: () => unknown,
-    opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean>;
-  invoke(
-    target: object,
-    block?: () => unknown,
-    opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean> {
+  ): unknown;
+  invoke(target: object, block?: () => unknown, opts?: RunCallbacksOptions): unknown;
+  invoke(target: object, block?: () => unknown, opts?: RunCallbacksOptions): unknown {
     const chainName = this._callbackChain?.name ?? "";
     const env: FilterEnvironment = { target, halted: false, value: undefined };
 
@@ -888,9 +880,7 @@ export class CallbackSequence {
     block: (() => unknown) | undefined,
     opts: RunCallbacksOptions | undefined,
     chainName: string,
-  ): boolean | Promise<boolean> {
-    let reachedFinal = false;
-
+  ): unknown {
     // Final sequence: env.value = !halted && (!block || yield); then invoke_after.
     const runFinal = (current: CallbackSequence): void | Promise<void> => {
       if (env.halted) {
@@ -905,12 +895,10 @@ export class CallbackSequence {
         }
         return Promise.resolve(y).then((v) => {
           env.value = v;
-          reachedFinal = true;
           return current.invokeAfter(env, opts, chainName);
         });
       }
       env.value = y;
-      reachedFinal = true;
       return current.invokeAfter(env, opts, chainName);
     };
 
@@ -1024,8 +1012,8 @@ export class CallbackSequence {
     };
 
     const result = runSeq(this);
-    if (isThenable(result)) return Promise.resolve(result).then(() => reachedFinal);
-    return reachedFinal;
+    if (isThenable(result)) return Promise.resolve(result).then(() => env.value);
+    return env.value;
   }
 
   private _finishFinal(
@@ -1033,7 +1021,7 @@ export class CallbackSequence {
     block: (() => unknown) | undefined,
     opts: RunCallbacksOptions | undefined,
     chainName: string,
-  ): boolean | Promise<boolean> {
+  ): unknown {
     // Rails: env.value = !env.halted && (!block_given? || yield)
     if (env.halted) {
       env.value = false;
@@ -1050,14 +1038,14 @@ export class CallbackSequence {
       return Promise.resolve(y).then((v) => {
         env.value = v;
         const afterDone = this.invokeAfter(env, opts, chainName);
-        if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => true);
-        return true;
+        if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => env.value);
+        return env.value;
       });
     }
     env.value = y;
     const afterDone = this.invokeAfter(env, opts, chainName);
-    if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => true);
-    return true;
+    if (isThenable(afterDone)) return Promise.resolve(afterDone).then(() => env.value);
+    return env.value;
   }
 
   // Back-reference set by CallbackChain.compile() for invoke() convenience
@@ -1375,29 +1363,30 @@ export namespace Callbacks {
     name: string,
     block: (() => unknown) | undefined,
     opts: RunCallbacksOptions & { strict: "sync" },
-  ): boolean;
+  ): unknown;
   export function runCallbacks(
     target: object,
     name: string,
     block?: () => unknown,
     opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean>;
+  ): unknown;
   export function runCallbacks(
     target: object,
     name: string,
     block?: () => unknown,
     opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean> {
+  ): unknown {
     const chains = getCallbackChains(target);
     const chain = chains.get(name);
     if (!chain) {
+      // Rails: `yield if block_given?` — the block's value, not a boolean.
       const r = block?.();
-      if (!isThenable(r)) return true;
+      if (!isThenable(r)) return r;
       if (opts?.strict === "sync") {
         swallowRejection(r);
         throw new Error("Async block on chain with no callbacks");
       }
-      return Promise.resolve(r).then(() => true);
+      return r;
     }
     const sequence = chain.compile();
     return sequence.invoke(target, block, opts);
@@ -1440,19 +1429,19 @@ export function runCallbacks(
   name: string,
   block: (() => unknown) | undefined,
   opts: RunCallbacksOptions & { strict: "sync" },
-): boolean;
+): unknown;
 export function runCallbacks(
   target: object,
   name: string,
   block?: () => unknown,
   opts?: RunCallbacksOptions,
-): boolean | Promise<boolean>;
+): unknown;
 export function runCallbacks(
   target: object,
   name: string,
   block?: () => unknown,
   opts?: RunCallbacksOptions,
-): boolean | Promise<boolean> {
+): unknown {
   return Callbacks.runCallbacks(target, name, block, opts);
 }
 
@@ -1512,17 +1501,9 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       name: string,
       block: (() => unknown) | undefined,
       opts: RunCallbacksOptions & { strict: "sync" },
-    ): boolean;
-    runCallbacks(
-      name: string,
-      block?: () => unknown,
-      opts?: RunCallbacksOptions,
-    ): boolean | Promise<boolean>;
-    runCallbacks(
-      name: string,
-      block?: () => unknown,
-      opts?: RunCallbacksOptions,
-    ): boolean | Promise<boolean> {
+    ): unknown;
+    runCallbacks(name: string, block?: () => unknown, opts?: RunCallbacksOptions): unknown;
+    runCallbacks(name: string, block?: () => unknown, opts?: RunCallbacksOptions): unknown {
       return runCallbacks(this, name, block, opts);
     }
 

@@ -299,7 +299,7 @@ export function createOrUpdate(this: any): Promise<boolean> {
 export async function _createRecord(this: any): Promise<boolean> {
   // Rails: _run_create_callbacks { super } — returns whether callbacks completed.
   const ctor = this.constructor;
-  return runAllCallbacks(ctor.prototype, "create", this, async () => {
+  return !!(await runAllCallbacks(ctor.prototype, "create", this, async () => {
     if (!this._performInsert) throw new Error("_performInsert not implemented");
     // Reinstate constructor-assigned attrs as dirty vs schema defaults BEFORE the
     // insert. Rails new records are dirty from construction, so partial_inserts'
@@ -326,7 +326,9 @@ export async function _createRecord(this: any): Promise<boolean> {
     this._previouslyNewRecord = true;
     this._newRecord = false;
     this.changesApplied();
-  });
+    // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
+    return true;
+  }));
 }
 
 /** @internal */
@@ -335,7 +337,7 @@ export async function _updateRecord(this: any): Promise<boolean> {
   // record_update_timestamps writes updated_at/updated_on when @_touch_record
   // and should_record_timestamps? are true, then yields to the actual update.
   const ctor = this.constructor;
-  return runAllCallbacks(ctor.prototype, "update", this, async () => {
+  return !!(await runAllCallbacks(ctor.prototype, "update", this, async () => {
     // Mirror record_update_timestamps: write timestamp columns before the update
     // when the model has record_timestamps enabled and has changes to save.
     // Mirror record_update_timestamps: use _skipTouch (Rails' @_touch_record flag)
@@ -379,5 +381,7 @@ export async function _updateRecord(this: any): Promise<boolean> {
     }
     this._previouslyNewRecord = false;
     this.changesApplied();
-  });
+    // Rails' block is `super`, whose truthy return becomes run_callbacks' value.
+    return true;
+  }));
 }

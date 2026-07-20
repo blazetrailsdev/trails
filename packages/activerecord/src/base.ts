@@ -3979,6 +3979,9 @@ export class Base extends Model {
       // caches intact: loaded associations stay readable on a destroyed record
       // exactly as in Rails (and as `Core#freeze` already documents).
       this.freeze();
+      // Rails' `_run_destroy_callbacks { super }` block value is truthy; only a
+      // halted chain yields false (run_callbacks returns env.value).
+      return true;
     });
 
     if (!destroyResult) return false;

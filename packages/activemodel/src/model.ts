@@ -1890,8 +1890,11 @@ export class Model {
     this._validationContext = normalized;
 
     try {
+      // Rails: `run_validations!` is the block, and its truthy return becomes
+      // run_callbacks' value; `false` here means the chain halted.
       const completed = await runAllCallbacks(ctor.prototype, "validation", this, async () => {
         await this.runValidationsBang();
+        return true;
       });
       if (!completed) return false;
       return this.errors.empty;
@@ -2609,17 +2612,9 @@ export class Model {
     event: string,
     block: () => unknown,
     opts: RunCallbacksOptions & { strict: "sync" },
-  ): boolean;
-  runCallbacks(
-    event: string,
-    block: () => unknown,
-    opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean>;
-  runCallbacks(
-    event: string,
-    block: () => unknown,
-    opts?: RunCallbacksOptions,
-  ): boolean | Promise<boolean> {
+  ): unknown;
+  runCallbacks(event: string, block: () => unknown, opts?: RunCallbacksOptions): unknown;
+  runCallbacks(event: string, block: () => unknown, opts?: RunCallbacksOptions): unknown {
     return runAllCallbacks((this.constructor as typeof Model).prototype, event, this, block, opts);
   }
 }

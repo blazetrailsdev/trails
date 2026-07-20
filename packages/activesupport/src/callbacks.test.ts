@@ -285,6 +285,7 @@ describe("Callbacks", () => {
 
       const result = runCallbacks(target, "save", () => {
         target.log.push("block");
+        return true;
       });
 
       expect(result).toBe(true);
@@ -318,7 +319,9 @@ describe("Callbacks", () => {
       const result = runCallbacks(target, "save", () => {
         target.log.push("block");
       });
-      expect(result).toBe(false);
+      // Rails: an around that never yields leaves env.value unset, and
+      // run_callbacks returns env.value — nil, not false.
+      expect(result).toBeUndefined();
       expect(target.log).toEqual(["around"]);
     });
 
@@ -1491,18 +1494,22 @@ describe("UsingObjectTest", () => {
     save(u);
     expect(u.record).toEqual(["around before", "yielded", "around after"]);
   });
+  // Mirrors Rails CustomScopeObject#save, whose run_callbacks block ends in
+  // "CallbackResult" — run_callbacks returns env.value, i.e. the block's value.
+  const customScopeSave = (u: { record: string[] }) =>
+    runCallbacks(u, "save", () => {
+      u.record.push("yielded");
+      return "CallbackResult";
+    });
+
   it("customized object", () => {
     const u = customScopeObject();
-    save(u);
+    customScopeSave(u);
     expect(u.record).toEqual(["before save", "yielded"]);
   });
   it("block result is returned", () => {
-    const target = { result: "" };
-    defineCallbacks(target, "save");
-    runCallbacks(target, "save", () => {
-      target.result = "done";
-    });
-    expect(target.result).toBe("done");
+    const u = customScopeObject();
+    expect(customScopeSave(u)).toBe("CallbackResult");
   });
 });
 
@@ -1894,7 +1901,10 @@ describe("Callbacks — async propagation", () => {
     defineCallbacks(t, "save");
     setCallback(t, "save", "before", (x: any) => x.log.push("b"));
     setCallback(t, "save", "after", (x: any) => x.log.push("a"));
-    const r = runCallbacks(t, "save", () => t.log.push("block"));
+    const r = runCallbacks(t, "save", () => {
+      t.log.push("block");
+      return true;
+    });
     expect(r).toBe(true);
     expect(typeof (r as any)?.then).toBe("undefined");
     expect(t.log).toEqual(["b", "block", "a"]);
