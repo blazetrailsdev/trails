@@ -7,6 +7,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Nodes } from "@blazetrails/arel";
 import { fixtures } from "../test-helpers/fixtures.js";
+import { ArgumentError } from "@blazetrails/activemodel";
+import { Post } from "../test-helpers/models/post.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { initializeAssociations } from "../associations.js";
 
@@ -101,5 +103,61 @@ describe("update_all value substitution", () => {
     );
 
     expect(sql).toContain("(UPPER(title))");
+  });
+});
+
+/**
+ * TS-only coverage for the empty-updates path of `touch_all` / `update_counters`
+ * (relation.rb:926-944, 969-971). Neither method guards a blank hash: both hand
+ * it to `update_all`, whose first line raises `ArgumentError` (relation.rb:589)
+ * — before the `none?` check on the next line, so a `none` relation raises too.
+ *
+ * `posts` has no `updated_at`/`updated_on`, so `touch_attributes_with_time`
+ * returns `{}` for `Post`.
+ */
+describe("touch_all / update_counters with empty updates", () => {
+  const { topics } = fixtures(["posts", "topics"]);
+
+  it("touch_all raises when the model has no timestamp columns", async () => {
+    await expect(Post.all().touchAll()).rejects.toThrow(
+      new ArgumentError("Empty list of attributes to change"),
+    );
+  });
+
+  it("touch_all raises on a none relation, since the blank check precedes none?", async () => {
+    await expect(Post.none().touchAll()).rejects.toThrow(
+      new ArgumentError("Empty list of attributes to change"),
+    );
+  });
+
+  it("update_counters raises on an empty counters hash", async () => {
+    await expect(Post.all().updateCounters({})).rejects.toThrow(
+      new ArgumentError("Empty list of attributes to change"),
+    );
+  });
+
+  it("update_counters raises on a none relation with an empty counters hash", async () => {
+    await expect(Post.none().updateCounters({})).rejects.toThrow(
+      new ArgumentError("Empty list of attributes to change"),
+    );
+  });
+
+  it("update_counters with touch: [] raises when there are no timestamp columns", async () => {
+    // `touch: []` is truthy in Ruby too, so Rails calls
+    // touch_attributes_with_time with no names; on a model without
+    // updated_at/updated_on that yields {} and update_all raises.
+    await expect(Post.all().updateCounters({}, { touch: [] })).rejects.toThrow(
+      new ArgumentError("Empty list of attributes to change"),
+    );
+  });
+
+  it("update_counters still updates when only the touch option contributes columns", async () => {
+    const first = topics("first");
+    const before = await Topic.find(first.id);
+    const count = await Topic.where({ id: first.id }).updateCounters({}, { touch: true });
+
+    expect(count).toBe(1);
+    const after = await Topic.find(first.id);
+    expect(after.readAttribute("updated_at")).not.toEqual(before.readAttribute("updated_at"));
   });
 });

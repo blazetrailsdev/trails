@@ -3953,10 +3953,9 @@ export class Relation<T extends Base> {
       updates[col] = new Nodes.Quoted(touchedAt);
     }
 
-    // Deviation: Rails passes the empty hash straight to update_all, which
-    // raises ArgumentError (relation.rb:589). Tracked by the
-    // `touch-all-update-counters-empty-updates-raise` story.
-    if (Object.keys(updates).length === 0) return 0;
+    // No empty-updates guard: Rails passes the hash straight to update_all,
+    // which raises ArgumentError on a blank hash (relation.rb:589) — before
+    // its `none?` check, so a `none` relation raises too.
 
     return this.updateAll(updates);
   }
@@ -6114,11 +6113,8 @@ export class Relation<T extends Base> {
       }
     }
 
-    // Nothing to update (e.g. `updateCounters({})` or
-    // `updateCounters({}, { touch: [] })`) — skip updateAll, which would
-    // otherwise build an UPDATE with no SET clause and produce invalid SQL.
-    if (Object.keys(updates).length === 0) return 0;
-
+    // No empty-updates guard: Rails ends in a bare `update_all updates`
+    // (relation.rb:943), which raises ArgumentError on a blank hash.
     return this.updateAll(updates);
   }
 
