@@ -68,9 +68,17 @@ const isAsciiAlnum = (c: number): boolean =>
  * `"99".succ == "100"`). Strings with no alphanumeric increment by raw code
  * unit instead (`"<<".succ == "<="`).
  */
+/** Inclusive [min, max] code-point bounds of the UTF-8 width encoding `cp`. */
+function utf8WidthBounds(cp: number): [number, number] {
+  if (cp < 0x80) return [0x00, 0x7f];
+  if (cp < 0x800) return [0x80, 0x7ff];
+  if (cp < 0x10000) return [0x800, 0xffff];
+  return [0x10000, 0x10ffff];
+}
+
 export function stringSucc(s: string): string {
   if (s.length === 0) return "";
-  const codes = Array.from(s, (ch) => ch.charCodeAt(0));
+  const codes = Array.from(s, (ch) => ch.codePointAt(0) as number);
 
   let lastAlnum = -1;
   for (let i = codes.length - 1; i >= 0; i--) {
@@ -81,20 +89,31 @@ export function stringSucc(s: string): string {
   }
 
   if (lastAlnum === -1) {
-    // No alphanumeric: raw code-unit increment with carry.
+    // No alphanumeric: whole-code-point increment with carry, matching Ruby's
+    // `enc_succ_char`, which advances by encoded character — not by UTF-16
+    // code unit, which would truncate an astral char to its high surrogate.
     let i = codes.length - 1;
     let carry = true;
     while (i >= 0 && carry) {
-      if (codes[i] >= 0xffff) {
-        codes[i] = 0;
+      const [min, max] = utf8WidthBounds(codes[i]);
+      if (codes[i] >= max) {
+        // `enc_succ_char` reports NEIGHBOR_WRAPPED whenever the successor's
+        // encoded length would differ (string.c: `l != len`), so a character
+        // at the top of its UTF-8 width wraps to that width's *minimum* and
+        // carries — `"\u{FFFF}".succ.codepoints == [0x1, 0x800]`, not
+        // [0x10000]. The carry then prepends U+0001 below.
+        codes[i] = min;
       } else {
         codes[i]++;
+        // Surrogates are not valid characters; `enc_succ_char` skips past
+        // them to the next valid one rather than emitting an unpaired half.
+        if (codes[i] >= 0xd800 && codes[i] <= 0xdfff) codes[i] = 0xe000;
         carry = false;
       }
       i--;
     }
     if (carry) codes.unshift(1);
-    return String.fromCharCode(...codes);
+    return String.fromCodePoint(...codes);
   }
 
   // Carry leftward from the rightmost alphanumeric, wrapping within a class.
@@ -138,7 +157,7 @@ export function stringSucc(s: string): string {
     i--;
   }
   if (carry) codes.splice(overflowPos, 0, overflowChar);
-  return String.fromCharCode(...codes);
+  return String.fromCodePoint(...codes);
 }
 
 const lexCmp = (a: string, b: string): number => (a < b ? -1 : a > b ? 1 : 0);
