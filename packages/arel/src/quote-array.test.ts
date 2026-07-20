@@ -61,11 +61,13 @@ describe("quoteArrayLiteral", () => {
   // (`abstract/quoting.rb:103`), which on this path is the caller's
   // `formatElement` hook — never a bare ISO-8601 string, a format no Rails
   // path emits.
+  // A hookless caller has no `quoted_date` to route through, so the value is
+  // not castable — asserted here rather than re-asserting the hook path, which
+  // `formatElement` > "quotes a formatted element whose content needs it"
+  // already covers with this same Date.
   it("handles Date values with toISOString", () => {
     const d = new Date("2026-03-26T12:00:00.000Z");
-    expect(quoteArrayLiteral([d], defaultQuoter, () => "2026-03-26 12:00:00")).toBe(
-      '{"2026-03-26 12:00:00"}',
-    );
+    expect(() => quoteArrayLiteral([d], defaultQuoter)).toThrow(new TypeError("can't cast Time"));
   });
 
   it("handles empty arrays", () => {

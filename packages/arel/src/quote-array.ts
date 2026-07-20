@@ -78,8 +78,8 @@ function typeCastArrayElement(
   // analogue — JS strings are already the wrapped form — so the arm is the
   // other two. `String(data)` is `Data#to_s`: its `toString()` decodes bytes.
   if (value instanceof BinaryData) return String(value);
-  // `when Symbol ... then value.to_s` (`abstract/quoting.rb:95-96`). Ruby's
-  // `Symbol#to_s` is the bare name, which `description` is the analogue of.
+  // Same arm: Ruby's `Symbol#to_s` is the bare name, which `description` is
+  // the analogue of.
   if (typeof value === "symbol") return value.description ?? "";
   // `else raise TypeError, "can't cast #{value.class.name}"`
   // (`abstract/quoting.rb:105`). Everything Rails' closed set does not name
