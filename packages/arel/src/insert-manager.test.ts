@@ -6,19 +6,17 @@ describe("InsertManagerTest", () => {
   const posts = new Table("posts");
   describe("insert", () => {
     it("can create a ValuesList node", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.ast.columns = [users.get("name"), users.get("age")];
-      // Rails' create_values_list carries RAW row values (`%w{ a b }`,
-      // insert_manager_test.rb:10); the visitor quotes them (to_sql.rb:112).
-      // A Quoted row would hit `quote()` and raise TypeError in Rails.
-      mgr.values = new Nodes.ValuesList([
-        ["dean", 30],
-        ["sam", 25],
+      const manager = new InsertManager();
+      const values = manager.createValuesList([
+        ["a", "b"],
+        ["c", "d"],
       ]);
-      expect(mgr.toSql()).toBe(
-        `INSERT INTO "users" ("name", "age") VALUES ('dean', 30), ('sam', 25)`,
-      );
+
+      expect(values).toBeInstanceOf(Nodes.ValuesList);
+      expect(values.rows).toEqual([
+        ["a", "b"],
+        ["c", "d"],
+      ]);
     });
 
     it("allows sql literals", () => {
@@ -108,6 +106,15 @@ describe("InsertManagerTest", () => {
     });
   });
 
+  describe("columns", () => {
+    it("converts to sql", () => {
+      const manager = new InsertManager();
+      manager.into(users);
+      manager.columns.push(users.get("id"));
+      expect(manager.toSql()).toBe(`INSERT INTO "users" ("id")`);
+    });
+  });
+
   describe("values", () => {
     it("converts to sql", () => {
       const im = new InsertManager();
@@ -166,22 +173,6 @@ describe("InsertManagerTest", () => {
       mgr.into(users);
       mgr.insert([[users.get("name"), null]]);
       expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name") VALUES (NULL)`);
-    });
-
-    it("can create a ValuesList node", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.ast.columns = [users.get("name"), users.get("age")];
-      // Rails' create_values_list carries RAW row values (`%w{ a b }`,
-      // insert_manager_test.rb:10); the visitor quotes them (to_sql.rb:112).
-      // A Quoted row would hit `quote()` and raise TypeError in Rails.
-      mgr.values = new Nodes.ValuesList([
-        ["dean", 30],
-        ["sam", 25],
-      ]);
-      expect(mgr.toSql()).toBe(
-        `INSERT INTO "users" ("name", "age") VALUES ('dean', 30), ('sam', 25)`,
-      );
     });
   });
 
