@@ -109,14 +109,14 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "connected?",
     "call": "any?",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Verified equivalent (bucket b)."
+    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "connected?",
     "call": "synchronize",
-    "reason": "Ruby guards the body with Mutex#synchronize; trails is single-threaded and has no mutex, so the port has no analogue call. Verified equivalent (bucket b), not an omission."
+    "reason": "Ruby guards the body with Mutex#synchronize; trails is single-threaded and has no mutex, so the port has no analogue call. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
   },
   {
     "package": "activerecord",

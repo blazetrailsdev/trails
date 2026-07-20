@@ -15,15 +15,8 @@ import { UnknownFormat } from "./exceptions.js";
 export { type FormatHandler };
 
 export class Collector extends DispatchCollector {
-  private _anyResponse = false;
-
   get format(): string | null {
     return this.resolvedFormat;
-  }
-
-  override any(handler?: FormatHandler): this {
-    this._anyResponse = true;
-    return super.any(handler);
   }
 
   custom(mimeType: string, handler?: FormatHandler): this {
@@ -31,7 +24,7 @@ export class Collector extends DispatchCollector {
   }
 
   isAnyResponse(): boolean {
-    return this._anyResponse;
+    return !this.handlerFor(this.format) && this.hasAnyHandler;
   }
 
   negotiateFormat(request: { accept?: string; format?: string }): string | null {

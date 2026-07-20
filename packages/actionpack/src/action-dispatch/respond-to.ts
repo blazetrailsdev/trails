@@ -68,6 +68,16 @@ export class Collector {
     return this;
   }
 
+  /** The handler registered for `format`, if any. */
+  protected handlerFor(format: string | null): FormatHandler | undefined {
+    return format === null ? undefined : this.handlers.get(format);
+  }
+
+  /** Whether a catch-all (`any`) handler has been registered. */
+  protected get hasAnyHandler(): boolean {
+    return this.anyHandler !== null;
+  }
+
   /** Register a variant handler within the current format. */
   variant(name: string | string[], handler?: FormatHandler): this {
     const names = Array.isArray(name) ? name : [name];

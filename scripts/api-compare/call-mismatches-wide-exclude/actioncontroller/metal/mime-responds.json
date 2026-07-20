@@ -2,30 +2,9 @@
   {
     "package": "actioncontroller",
     "tsFile": "metal/mime-responds.ts",
-    "rubyName": "any",
-    "call": "custom",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
-    "rubyName": "any",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
     "rubyName": "any_response?",
     "call": "fetch",
-    "reason": "Real divergence, NOT a value-accessor read: trails' `isAnyResponse()` returns a boolean flag set in `any()`, while Rails computes `!@responses.fetch(format, false) && @responses[Mime::ALL]`. Tracked by story converge-mime-responds-any-response."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
-    "rubyName": "any_response?",
-    "call": "format",
-    "reason": "Real divergence, NOT a value-accessor read: trails' `isAnyResponse()` returns a boolean flag set in `any()`, while Rails computes `!@responses.fetch(format, false) && @responses[Mime::ALL]`. Tracked by story converge-mime-responds-any-response."
+    "reason": "Ruby `@responses.fetch(format, false)`; the port calls the protected `handlerFor(format)` helper on the ActionDispatch Collector, which does the Map lookup internally. Same semantics, no `fetch` call at this site."
   },
   {
     "package": "actioncontroller",
