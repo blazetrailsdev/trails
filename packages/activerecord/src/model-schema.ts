@@ -1,6 +1,7 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
+import { resolveAliasNameIn } from "@blazetrails/activemodel";
 import {
   Attribute,
   AttributeSetBuilder,
@@ -229,7 +230,10 @@ export function columnNames(this: typeof Base): string[] {
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#has_attribute?
  */
 export function hasAttributeDefinition(this: typeof Base, name: string): boolean {
-  return this._attributeDefinitions.has(name);
+  // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
+  // (attribute_methods.rb:256) before checking `attribute_types`.
+  const defs = this._attributeDefinitions;
+  return defs.has(resolveAliasNameIn(this as never, defs, String(name)));
 }
 
 /**

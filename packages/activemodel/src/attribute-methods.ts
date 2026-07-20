@@ -7,6 +7,8 @@
  * In TS, the exported functions use `this: AttributeMethodHost` so they can
  * be assigned directly to Model's static side — no delegation wrappers needed.
  */
+import { camelize } from "@blazetrails/activesupport";
+
 export interface AttributeMethods {
   hasAttribute(name: string): boolean;
   attributePresent(name: string): boolean;
@@ -647,6 +649,45 @@ export function defineDirtyAttributeMethods(prototype: object, attrName: string)
  * the same key whether the caller passed `nickname` or `name`.
  */
 export function resolveAliasName(host: AttributeMethodHost, name: string): string {
-  const aliased = host._attributeAliases?.[name];
-  return aliased ?? name;
+  // Rails: `attribute_aliases[attr_name] || attr_name`. Exact lookup only —
+  // read/write paths must not second-guess the name the caller supplied.
+  return host._attributeAliases?.[name] ?? name;
+}
+
+/**
+ * `resolveAliasName` plus the trails-only camelCase-key bridge, resolved
+ * against a caller-supplied attribute set.
+ *
+ * Trails stores alias KEYS camelCase (`newName`, `commentsCount`) while derived
+ * names — counter-cache columns, DB column names — are snake_case (`new_name`,
+ * `comments_count`). Rails needs no such bridge: its alias keys are already in
+ * the same convention as its column names, so the plain
+ * `attribute_aliases[attr_name] || attr_name` step suffices everywhere it uses
+ * one (attribute_methods.rb:316-319, read.rb:31-34, write.rb:31-34).
+ *
+ * Because the camelized key is a *guess*, it is applied only after `present`
+ * has been consulted: a name the relevant set already owns — a record loaded
+ * with a projected `SELECT COUNT(*) AS comments_count`, say — must never be
+ * redirected to an unrelated `commentsCount` alias. `present` is the set that
+ * defines ownership for the calling surface: the class attribute set for
+ * class-level `has_attribute?`, the loaded `@attributes` for the instance form
+ * and for `read_attribute` / `write_attribute`.
+ *
+ * Rails applies one identical resolution step across all of those surfaces, so
+ * trails routes them all through this single function — sharing the bridge
+ * keeps them coherent, i.e. never `has_attribute?` true while `read_attribute`
+ * returns nil for the same name.
+ *
+ * @internal
+ */
+export function resolveAliasNameIn(
+  host: AttributeMethodHost,
+  present: { has(name: string): boolean } | undefined,
+  name: string,
+): string {
+  const aliases = host?._attributeAliases;
+  const exact = aliases?.[name];
+  if (exact !== undefined) return exact;
+  if (present?.has(name)) return name;
+  return aliases?.[camelize(name, "lower")] ?? name;
 }

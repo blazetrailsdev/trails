@@ -23,6 +23,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType, Type } from "@blazetrails/activemodel";
 import { CpkBook } from "./test-helpers/models/cpk.js";
+import { Company as CanonicalCompany } from "./test-helpers/models/company.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -2089,6 +2090,26 @@ describe("BasicsTest", () => {
     const p = await Post.create({ title: "saved" });
     const d = p.dup();
     expect(d.isNewRecord()).toBe(true);
+  });
+
+  it("has attribute", async () => {
+    await CanonicalCompany.loadSchema();
+    expect(CanonicalCompany.hasAttribute("id")).toBe(true);
+    expect(CanonicalCompany.hasAttribute("type")).toBe(true);
+    expect(CanonicalCompany.hasAttribute("name")).toBe(true);
+    expect(CanonicalCompany.hasAttribute("new_name")).toBe(true);
+    expect(CanonicalCompany.hasAttribute("metadata")).toBe(true);
+    expect(CanonicalCompany.hasAttribute("lastname")).toBe(false);
+    expect(CanonicalCompany.hasAttribute("age")).toBe(false);
+
+    const company = CanonicalCompany.new();
+    expect(company.hasAttribute("id")).toBe(true);
+    expect(company.hasAttribute("type")).toBe(true);
+    expect(company.hasAttribute("name")).toBe(true);
+    expect(company.hasAttribute("new_name")).toBe(true);
+    expect(company.hasAttribute("metadata")).toBe(true);
+    expect(company.hasAttribute("lastname")).toBe(false);
+    expect(company.hasAttribute("age")).toBe(false);
   });
 
   it("bignum", async () => {

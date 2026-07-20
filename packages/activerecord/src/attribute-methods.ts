@@ -4,7 +4,7 @@
  * Mirrors: ActiveRecord::AttributeMethods
  */
 import { isBlank } from "@blazetrails/activesupport";
-import { MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
+import { MissingAttributeError, resolveAliasNameIn } from "@blazetrails/activemodel";
 import { formatForInspect as _formatForInspect } from "./attribute-inspection.js";
 import {
   attributeForInspect as _attrForInspect,
@@ -75,20 +75,37 @@ interface AttributeAccessorHost {
 }
 
 /**
+ * Instance-level alias resolution, resolved against the record's loaded
+ * attribute set.
+ *
+ * Rails runs one identical `attribute_aliases[name] || name` step in
+ * `has_attribute?` (attribute_methods.rb:316-319), `read_attribute`
+ * (read.rb:31-34) and `write_attribute` (write.rb:31-34). Trails needs an extra
+ * camelCase-key bridge on top (see `resolveAliasNameIn`), so all three route
+ * through here rather than resolving independently — otherwise the bridge could
+ * report an attribute present while reads and writes went somewhere else.
+ *
+ * @internal
+ */
+export function recordAliasName(
+  record: { _attributes?: { has(name: string): boolean } },
+  name: string,
+): string {
+  const ctor = (record as unknown as { constructor: unknown }).constructor as Parameters<
+    typeof resolveAliasNameIn
+  >[0];
+  return resolveAliasNameIn(ctor, record._attributes, name);
+}
+
+/**
  * Check whether an attribute exists on a record.
  *
  * Mirrors: ActiveRecord::AttributeMethods#has_attribute?
  */
 export function hasAttribute(this: AttributeRecord, name: string): boolean {
-  // Rails `has_attribute?` resolves attribute_aliases before hitting the
-  // attribute set (active_record/attribute_methods.rb).
-  const resolved = resolveAliasName(
-    (this as unknown as { constructor: unknown }).constructor as Parameters<
-      typeof resolveAliasName
-    >[0],
-    name,
-  );
-  return this._attributes.has(resolved);
+  // Rails: `attr_name = self.class.attribute_aliases[attr_name] || attr_name`
+  // then `@attributes.key?(attr_name)` (attribute_methods.rb:316-319).
+  return this._attributes.has(recordAliasName(this, name));
 }
 
 /**
@@ -628,18 +645,14 @@ export function attributeForInspect(this: InstanceMethodHost, attr: string): str
   return _attrForInspect.call(this as any, attr);
 }
 
-/** Mirrors: ActiveRecord::AttributeMethods#read_attribute */
+/** Mirrors: ActiveRecord::AttributeMethods#read_attribute (read.rb:31-34) */
 export function readAttribute(this: InstanceMethodHost, name: string): unknown {
-  const aliases = (this.constructor as any)?._attributeAliases ?? {};
-  const resolved = (aliases[name] as string | undefined) ?? name;
-  return this._readAttribute(resolved);
+  return this._readAttribute(recordAliasName(this, name));
 }
 
-/** Mirrors: ActiveRecord::AttributeMethods#write_attribute */
+/** Mirrors: ActiveRecord::AttributeMethods#write_attribute (write.rb:31-34) */
 export function writeAttribute(this: InstanceMethodHost, name: string, value: unknown): void {
-  const aliases = (this.constructor as any)?._attributeAliases ?? {};
-  const resolved = (aliases[name] as string | undefined) ?? name;
-  _writeAttribute.call(this as any, resolved, value);
+  _writeAttribute.call(this as any, recordAliasName(this, name), value);
 }
 
 /** Mirrors: ActiveRecord::AttributeMethods#query_attribute */

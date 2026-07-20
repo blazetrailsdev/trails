@@ -78,6 +78,79 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(t.hasAttribute("missing")).toBe(false);
   });
 
+  it("resolves snake_case lookups against camelCase alias keys", () => {
+    // Trails stores alias keys camelCase while derived names (counter-cache
+    // columns, DB column names) are snake_case; Rails needs no such bridge
+    // because its alias keys already match its column naming.
+    class Topic extends Base {
+      static {
+        this.attribute("legacy_comments_count", "integer");
+        this.aliasAttribute("commentsCount", "legacy_comments_count");
+      }
+    }
+    expect(Topic.hasAttribute("commentsCount")).toBe(true);
+    expect(Topic.hasAttribute("comments_count")).toBe(true);
+    expect(Topic.hasAttribute("legacy_comments_count")).toBe(true);
+    expect(Topic.hasAttribute("replies_count")).toBe(false);
+  });
+
+  it("prefers a real class attribute over the camelCase alias bridge", () => {
+    // The bridge must not hijack a name the model really owns: with both a real
+    // `new_name` column and an unrelated `newName` alias, Rails resolves
+    // `new_name` to its own column, so trails must too.
+    class Topic extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("new_name", "string");
+        this.aliasAttribute("newName", "name");
+      }
+    }
+    expect(Topic.hasAttribute("new_name")).toBe(true);
+    const t = new Topic({ name: "a", new_name: "b" });
+    expect(t.readAttribute("new_name")).toBe("b");
+    expect(t.readAttribute("newName")).toBe("a");
+  });
+
+  it("resolves the camelCase bridge identically for has/read/write", () => {
+    // Rails runs one identical alias step in has_attribute?
+    // (attribute_methods.rb:316-319), read_attribute (read.rb:31-34) and
+    // write_attribute (write.rb:31-34). The trails bridge must be shared by all
+    // three, or an attribute can report present while reads return nil.
+    class Topic extends Base {
+      static {
+        this.attribute("legacy_comments_count", "integer");
+        this.aliasAttribute("commentsCount", "legacy_comments_count");
+      }
+    }
+    const t = Topic.instantiate({ legacy_comments_count: 7 });
+    expect(t.hasAttribute("comments_count")).toBe(true);
+    expect(t.readAttribute("comments_count")).toBe(7);
+    t.writeAttribute("comments_count", 9);
+    expect(t.readAttribute("legacy_comments_count")).toBe(9);
+  });
+
+  it("prefers a loaded attribute over the camelCase alias bridge", () => {
+    // Rails' instance has_attribute? checks the loaded @attributes
+    // (attribute_methods.rb:316-319), which can hold names the class does not
+    // declare — a projected `SELECT COUNT(*) AS comments_count`, say. Such a
+    // name must resolve to the loaded value, not to an unrelated
+    // `commentsCount` alias, so the bridge has to run after the exact lookup.
+    class Topic extends Base {
+      static {
+        this.attribute("legacy_comments_count", "integer");
+        this.aliasAttribute("commentsCount", "legacy_comments_count");
+      }
+    }
+    const t = Topic.instantiate({ legacy_comments_count: 7, comments_count: 42 });
+    expect(t.hasAttribute("comments_count")).toBe(true);
+    expect(t.readAttribute("comments_count")).toBe(42);
+    expect(t.readAttribute("commentsCount")).toBe(7);
+    // The write path must agree with the read path about which one it means.
+    t.writeAttribute("comments_count", 43);
+    expect(t.readAttribute("comments_count")).toBe(43);
+    expect(t.readAttribute("legacy_comments_count")).toBe(7);
+  });
+
   it("readonly attributes are not updated after create", async () => {
     // Rails raises ReadonlyAttributeError on a persisted-record write to an
     // attr_readonly column (readonly_attributes.rb line 49). The test name's
