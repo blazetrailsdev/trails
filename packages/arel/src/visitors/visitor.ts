@@ -78,9 +78,14 @@ export abstract class Visitor {
     if (typeof fn !== "function") {
       // Cache hit but the instance has no such method — almost always a
       // mis-registration (a typo'd method name landed in the dispatch
-      // cache). Distinct from the "no entry at all" case above so the
-      // failure mode is unambiguous.
-      throw new UnsupportedVisitError(
+      // cache). This is a visitor bug, not an unvisitable value, so it is
+      // a plain Error rather than an UnsupportedVisitError (matching the
+      // same check in to-sql.ts:479). Subclasses that translate the
+      // "no entry at all" case into their own error — Dot re-raises it as
+      // Rails' `TypeError, "Cannot visit ..."` (visitor.rb:39) — must not
+      // swallow this one, or a typo'd registration masquerades as an
+      // unvisitable value.
+      throw new Error(
         `Dispatch method '${methodName}' is not defined on ${this.constructor.name} for node ${describeClass(object)}`,
       );
     }

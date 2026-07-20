@@ -282,6 +282,22 @@ describe("TestDot", () => {
       );
     });
 
+    it("a mis-registered dispatch method is not reported as an unvisitable value", () => {
+      // Dot translates the base visitor's "no handler at all" error into
+      // Rails' `TypeError, "Cannot visit ..."` (visitor.rb:39). That must not
+      // also swallow the base visitor's *other* error — a typo'd method name
+      // in the dispatch table — or a Dot registration bug is indistinguishable
+      // from a value Rails genuinely cannot visit.
+      class Weird extends Nodes.Unary {}
+      const v = new Visitors.Dot();
+      (v as unknown as { dispatch: Map<unknown, string> }).dispatch.set(Weird, "visitTypoed");
+      type Internals = { visit(o: unknown): void };
+      v.compile(new Nodes.SqlLiteral("seed"));
+      expect(() => (v as unknown as Internals).visit(new Weird(null))).toThrow(
+        /Dispatch method 'visitTypoed' is not defined on Dot/,
+      );
+    });
+
     it("Temporal values reach visit_Date / visit_Time instead of raising", () => {
       // Temporal is this codebase's Time/Date analogue, so these have a
       // visitable Rails ancestor and must not hit the TypeError arm.

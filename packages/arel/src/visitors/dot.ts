@@ -2,6 +2,7 @@ import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
+import { UnsupportedVisitError } from "../errors.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
@@ -495,34 +496,32 @@ export class Dot extends Visitor {
       this.seen.set(seenKey, node);
     }
     this.nodes.push(node);
-    const temporalClass = temporalClassName(object);
     this.withNode(node, () => {
-      if (this.isPrimitive(object)) {
-        this.visitString(object);
-      } else if (Array.isArray(object)) {
-        this.visitArray(object);
-      } else if (object instanceof Set) {
-        // Rails: `alias :visit_Set :visit_Array` (dot.rb:231). Without this
-        // arm a Set reaches no handler and falls to the leaf below.
-        this.visitSet(object);
-      } else if (temporalClass === "Date") {
-        this.visitDate(object);
-      } else if (temporalClass === "DateTime") {
-        this.visitDateTime(object);
-      } else if (temporalClass !== null) {
-        this.visitTime(object);
-      } else if (object instanceof Node) {
-        super.visit(object);
-      } else if (this.isActiveModelAttribute(object)) {
-        // Mirrors Rails' `visit_ActiveModel_Attribute` (dot.rb:216), which
-        // Ruby reaches by class dispatch — including via the ancestor walk in
-        // visitor.rb:36-41, so every Attribute subclass lands here too.
-        this.visitActiveModelAttribute(object);
-      } else if (this.isHash(object)) {
+      // Residue over the shared class dispatch: `rubyClassName` names a value
+      // `Hash` only when its prototype is Object.prototype, but Ruby's
+      // ancestor walk (visitor.rb:36-41) reaches `visit_Hash` for any Hash
+      // descendant — in JS, any record derived from a plain record (isHash).
+      if (this.isHash(object)) {
         this.visitHash(object as Record<string, unknown>);
-      } else {
-        // visitor.rb:39 — no ancestor answered the dispatch.
-        throw new TypeError(`Cannot visit ${this.classNameOf(object)}`);
+        return;
+      }
+      try {
+        super.visit(object);
+      } catch (e) {
+        // visitor.rb:39 — no ancestor answered the dispatch. Dot has always
+        // reported that as Ruby's TypeError with the value's class name.
+        //
+        // `cause` has no counterpart in `raise TypeError, "Cannot visit ..."`
+        // because Ruby chains the active exception into `#cause` implicitly;
+        // JS does not, so passing it is what keeps the two equivalent. It is
+        // also required here by the `preserve-caught-error` lint rule. The
+        // class and message still match visitor.rb:39 exactly.
+        if (e instanceof UnsupportedVisitError) {
+          throw new TypeError(`Cannot visit ${this.classNameOf(object)}`, { cause: e });
+        }
+        // A mis-registered dispatch method (a plain Error from visitor.ts) is
+        // a bug in this visitor, not an unvisitable value — never relabel it.
+        throw e;
       }
     });
     return undefined;
@@ -608,24 +607,6 @@ export class Dot extends Visitor {
    */
   protected visitArelNodesOptimizerHints(o: Nodes.OptimizerHints): void {
     this.visitEdge(o, "hints");
-  }
-
-  private isPrimitive(o: unknown): boolean {
-    if (o === null || o === undefined) return true;
-    const t = typeof o;
-    return (
-      t === "string" ||
-      t === "number" ||
-      t === "boolean" ||
-      t === "bigint" ||
-      t === "symbol" ||
-      // boundary: Arel dot-graph leaf detection includes legacy Date values.
-      o instanceof Date
-    );
-  }
-
-  private isActiveModelAttribute(o: unknown): o is ModelAttribute {
-    return o instanceof ModelAttribute;
   }
 
   /**
@@ -750,6 +731,12 @@ export class Dot extends Visitor {
     reg(Nodes.BindParam, "visitArelNodesBindParam");
     reg(Nodes.Comment, "visitArelNodesComment");
     reg(Nodes.Case, "visitArelNodesCase");
+    // Non-Arel classes Rails dispatches on too: `visit_ActiveModel_Attribute`
+    // (dot.rb:216) and `alias :visit_Set :visit_Array` (dot.rb:231). Neither
+    // has a Ruby-class name `rubyClassName` can synthesize, so both go in the
+    // ctor-keyed table (the prototype walk covers Attribute subclasses).
+    reg(ModelAttribute as unknown as NodeCtor, "visitActiveModelAttribute");
+    reg(Set as unknown as NodeCtor, "visitSet");
     // Quoted, True, False, BoundSqlLiteral, Fragments don't extend any
     // ancestor with a useful Dot handler — register explicitly as leaves.
     reg(Nodes.Quoted, "visitNoEdges");
