@@ -547,12 +547,6 @@ export class Attribute extends Node {
     return new Extract([this], field);
   }
 
-  // -- Null handling --
-
-  coalesce(...others: unknown[]): NamedFunction {
-    return new NamedFunction("COALESCE", [this, ...others.map(buildQuoted)]);
-  }
-
   // -- Distinct From --
 
   isDistinctFrom(other: unknown): IsDistinctFrom {

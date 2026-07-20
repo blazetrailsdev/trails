@@ -1274,16 +1274,6 @@ describe("AttributeTest", () => {
     expect(sql).toContain("UPPER");
   });
 
-  it("coalesce", () => {
-    const name = users.get("name");
-    const fn = name.coalesce("Unknown");
-    const mgr = new SelectManager(users);
-    mgr.project(fn);
-    const sql = mgr.toSql();
-    expect(sql).toContain("COALESCE");
-    expect(sql).toContain("'Unknown'");
-  });
-
   it("generates LENGTH()", () => {
     const node = users.attr("name").length();
     expect(visitor.compile(node)).toBe('LENGTH("users"."name")');

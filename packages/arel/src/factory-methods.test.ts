@@ -55,6 +55,7 @@ describe("TestFactoryMethods", () => {
     const fn = users.coalesce(users.get("name"), new Nodes.Quoted("default"));
     expect(fn).toBeInstanceOf(Nodes.NamedFunction);
     expect(fn.name).toBe("COALESCE");
+    expect(new Visitors.ToSql().compile(fn)).toBe('COALESCE("users"."name", \'default\')');
   });
 
   it("cast", () => {
