@@ -8,6 +8,7 @@
 import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
 import { UnknownPrimaryKey } from "../errors.js";
+import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
  * Shared scope option validation — called eagerly from validatesUniqueness (declaration time)
@@ -346,7 +347,10 @@ async function isCoveredByUniqueIndex(
 async function tableIndexes(
   klass: any,
 ): Promise<{ unique?: boolean; where?: string | null; columns?: unknown }[]> {
-  const adapter = klass?.connection;
+  // Prefer the transaction-pinned connection: inside transactional fixtures the
+  // pinned connection is the only one that sees uncommitted DDL, so a cold cache
+  // must introspect through it or it reflects the wrong index list.
+  const adapter = threadedConnectionFor(klass) ?? klass?.connection;
   const cache = adapter?.schemaCache;
   const tableName = klass?.tableName;
   if (!cache || typeof cache.indexes !== "function" || !tableName) return [];
