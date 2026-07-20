@@ -661,19 +661,19 @@ export class Dot extends Visitor {
       proto = Object.getPrototypeOf(proto)
     ) {
       if (proto === Object.prototype) return true;
-      // A prototype with no own `constructor` descends from
-      // Object.create(null) — still a record, so keep walking. What marks a
-      // *class* prototype is not the mere presence of the key but the
-      // back-reference: `class C {}` installs `C.prototype.constructor === C`
-      // with `C.prototype === proto`. A record carrying a literal
-      // `constructor` key (`{ constructor: "x" }`) fails that identity, and
-      // its name is irrelevant to dispatch — Ruby dispatches by ancestry
-      // (visitor.rb:36-41), so a Hash with a `:constructor` key is still a
-      // Hash and reaches visit_Hash (dot.rb:220).
+      // What marks a *class* prototype is the back-reference: `class C {}`
+      // installs `C.prototype.constructor === C`, so the own `constructor`
+      // is a function pointing back at this very object. Anything else —
+      // absent, a non-function, or a function whose `.prototype` is some
+      // other object — leaves the value a record, so keep walking. A literal
+      // `constructor` key (`{ constructor: "x" }`) fails the identity, and
+      // its name is irrelevant to dispatch anyway: Ruby dispatches by
+      // ancestry (visitor.rb:36-41), so a Hash with a `:constructor` key is
+      // still a Hash and reaches visit_Hash (dot.rb:220).
       const ctor = Object.getOwnPropertyDescriptor(proto, "constructor")?.value as
         | { prototype?: unknown }
         | undefined;
-      if (typeof ctor === "function" && ctor.prototype === proto && ctor !== Object) {
+      if (typeof ctor === "function" && ctor.prototype === proto) {
         return false;
       }
     }
