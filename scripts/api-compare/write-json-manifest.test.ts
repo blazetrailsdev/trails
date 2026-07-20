@@ -67,6 +67,19 @@ describe("writeJsonManifest", () => {
     expect(fs.existsSync(out)).toBe(true);
   });
 
+  // Regression: `prettier --stdin-filepath` consults .gitignore AND
+  // .prettierignore, and for a matched path echoes stdin back unformatted with
+  // exit 0. Several manifests are gitignored, so a helper that honoured the
+  // ignore files would be a silent no-op exactly where the trap lives.
+  it("formats even when the target path is ignored by prettier/git", () => {
+    const dir = path.dirname(tmpManifest());
+    fs.writeFileSync(path.join(dir, ".prettierignore"), "*.json\n");
+    fs.writeFileSync(path.join(dir, ".gitignore"), "*.json\n");
+    const out = path.join(dir, "ignored.json");
+    writeJsonManifest(out, SAMPLE);
+    expect(fs.readFileSync(out, "utf8")).not.toBe(JSON.stringify(SAMPLE, null, 2) + "\n");
+  });
+
   it("round-trips to the same data", () => {
     const out = tmpManifest();
     writeJsonManifest(out, SAMPLE);
@@ -83,11 +96,12 @@ describe("manifest emitters", () => {
       "build-rails-tosql-manifest.ts",
       "build-rails-error-manifest.ts",
       "build-rails-file-structure-manifest.ts",
+      "schema-compare/compare.ts",
     ];
     for (const name of emitters) {
       const src = fs.readFileSync(path.join(REPO_ROOT, "scripts", name), "utf8");
       expect(src, `${name} must emit via writeJsonManifest`).not.toMatch(
-        /write(File|FileSync)\s*\(\s*[A-Z_]*OUT[A-Z_]*\s*,/,
+        /write(File|FileSync)\s*\(\s*(BASELINE|[A-Z_]*OUT[A-Z_]*)\s*,/,
       );
     }
   });

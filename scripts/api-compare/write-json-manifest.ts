@@ -27,11 +27,19 @@ import { fileURLToPath } from "url";
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PRETTIER_BIN = path.join(REPO_ROOT, "node_modules/.bin/prettier");
 
+// `--stdin-filepath` consults --ignore-path (default: .gitignore AND
+// .prettierignore) and, for a matched path, echoes stdin back UNFORMATTED and
+// exits 0 — a silent no-op, not an error. Several manifests are gitignored and
+// one was .prettierignore'd, so without this bypass the helper would quietly
+// do nothing for them and the churn trap would stay armed. Emitted manifests
+// are always formatted, regardless of what ignores them elsewhere.
+const IGNORE_BYPASS = ["--ignore-path", "/dev/null"];
+
 export function writeJsonManifest(outPath: string, data: unknown): void {
   const raw = JSON.stringify(data, null, 2) + "\n";
   let formatted: string;
   try {
-    formatted = execFileSync(PRETTIER_BIN, ["--stdin-filepath", outPath], {
+    formatted = execFileSync(PRETTIER_BIN, IGNORE_BYPASS.concat("--stdin-filepath", outPath), {
       input: raw,
       encoding: "utf8",
       maxBuffer: 64 * 1024 * 1024,

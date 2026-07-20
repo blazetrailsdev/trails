@@ -4,11 +4,7 @@
       "unsignedDecimal",
       "unsignedFloat"
     ],
-    "packages/activerecord/src/connection-handling.ts": [
-      "connection"
-    ],
-    "packages/activesupport/src/core-ext/benchmark.ts": [
-      "ms"
-    ]
+    "packages/activerecord/src/connection-handling.ts": ["connection"],
+    "packages/activesupport/src/core-ext/benchmark.ts": ["ms"]
   }
 }
