@@ -104,6 +104,14 @@ export class UniquenessValidator extends EachValidator {
   private _klass: any;
 
   /**
+   * Memoized list of attribute names covered by a unique index — Rails' `@covered`
+   * in `covered_by_unique_index?`, computed once per validator instance across
+   * all of its `attributes`.
+   * @internal
+   */
+  _covered: string[] | null = null;
+
+  /**
    * Mirrors: ActiveRecord::Validations::UniquenessValidator#initialize
    *
    * Validates options: :conditions must be callable, :scope must be
@@ -166,7 +174,7 @@ export class UniquenessValidator extends EachValidator {
 
     if (
       record.isPersisted?.() &&
-      !isValidationNeeded(modelClass, record, attribute, this.options)
+      !(await isValidationNeeded(this, modelClass, record, attribute, this.options))
     ) {
       return;
     }
@@ -258,24 +266,21 @@ function findFinderClassFor(record: any, klassOption: any): any {
 }
 
 /**
- * Returns true if uniqueness must consult the database. Rails additionally
- * short-circuits to `false` when the value/scope columns haven't changed
- * AND a unique index already covers them; in Trails that branch is
- * effectively disabled because `isCoveredByUniqueIndex` always returns
- * false (the schema-cache index lookup is async and can't safely run from
- * this synchronous path — see the helper's comment). The other gates
- * (conditions/caseSensitive option, dirty/null checks) match Rails.
+ * Returns true if uniqueness must consult the database: when the :conditions
+ * or :caseSensitive option is set, when any of the value/scope columns changed
+ * or is null, or when no unique index already covers them.
  *
  * Mirrors: ActiveRecord::Validations::UniquenessValidator#validation_needed?
  *
  * @internal
  */
-function isValidationNeeded(
+async function isValidationNeeded(
+  validator: UniquenessValidator,
   klass: any,
   record: any,
   attribute: string,
   options: Record<string, unknown>,
-): boolean {
+): Promise<boolean> {
   if (options.conditions || Object.prototype.hasOwnProperty.call(options, "caseSensitive")) {
     return true;
   }
@@ -290,7 +295,7 @@ function isValidationNeeded(
     (a) => dirty?.attributeChanged?.(a) || record.readAttribute?.(a) == null,
   );
   if (anyChangedOrNull) return true;
-  return !isCoveredByUniqueIndex(klass, record, attribute, scope, options);
+  return !(await isCoveredByUniqueIndex(validator, klass, record, attribute, scope));
 }
 
 /**
@@ -302,21 +307,54 @@ function isValidationNeeded(
  *
  * @internal
  */
-function isCoveredByUniqueIndex(
-  _klass: any,
-  _record: any,
-  _attribute: string,
-  _scope: string[],
-  _options: Record<string, unknown>,
-): boolean {
-  // Rails reads `klass.schema_cache.indexes(klass.table_name)` synchronously,
-  // but Trails' SchemaCache#indexes is async (requires a pool + I/O) and this
-  // helper is synchronous. Conservatively return false so uniqueness always
-  // performs the existence check — correct, just skips the Rails optimization
-  // that drops a redundant SELECT when the DB already enforces uniqueness via a
-  // unique index. (The validation chain itself is async now, so awaiting the
-  // index lookup is a possible future optimization.)
-  return false;
+async function isCoveredByUniqueIndex(
+  validator: UniquenessValidator,
+  klass: any,
+  record: any,
+  attribute: string,
+  scope: string[],
+): Promise<boolean> {
+  if (validator._covered == null) {
+    const indexes = await tableIndexes(klass);
+    const covered: string[] = [];
+    for (const attr of (validator.attributes ?? []).map((a: unknown) => String(a))) {
+      const attributes = resolveAttributes(record, [...scope, attr]);
+      const isCovered = indexes.some((index) => {
+        if (!index.unique || index.where != null) return false;
+        // Rails' `(Array(index.columns) - attributes).empty?` — an expression
+        // index stores a String rather than a column list, which `Array()`
+        // wraps as a single (never-matching) entry.
+        const columns = Array.isArray(index.columns) ? index.columns : [index.columns];
+        return columns.every((c) => attributes.includes(String(c)));
+      });
+      if (isCovered) covered.push(attr);
+    }
+    validator._covered = covered;
+  }
+  return validator._covered.includes(String(attribute));
+}
+
+/**
+ * Reads the model's index list off the schema cache — Rails'
+ * `klass.schema_cache.indexes(klass.table_name)`. Trails' SchemaCache#indexes
+ * is async and pool-scoped, so the pool is threaded through explicitly; the
+ * lookup is cache-backed, so a warm cache costs no query (the whole point of
+ * the optimization is to avoid one).
+ *
+ * @internal
+ */
+async function tableIndexes(
+  klass: any,
+): Promise<{ unique?: boolean; where?: string | null; columns?: unknown }[]> {
+  const adapter = klass?.connection;
+  const cache = adapter?.schemaCache;
+  const tableName = klass?.tableName;
+  if (!cache || typeof cache.indexes !== "function" || !tableName) return [];
+  return (await cache.indexes(adapter.pool ?? adapter, tableName)) as {
+    unique?: boolean;
+    where?: string | null;
+    columns?: unknown;
+  }[];
 }
 
 /**
