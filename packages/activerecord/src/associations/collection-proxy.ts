@@ -748,6 +748,40 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
+   * The none-short-circuit chokepoint (see `Relation#_isEmptyRelation`), overridden
+   * so mutation terminals invoked on the PROXY itself resolve a stale new-owner
+   * `1=0` seed once the owner is saved. `updateAll`/`touchAll`/`updateCounters`
+   * have no `CollectionProxy` override — they run `Relation`'s with `this` = the
+   * proxy — and `deleteAll`'s diverged branch calls `super.deleteAll()` on the
+   * proxy; all reach this before building SQL. Rebasing here (mirroring the
+   * `AssociationRelation` override) gives the mutation side the same rebase that
+   * reads already get through `_finderScope`, from one place.
+   */
+  _isEmptyRelation(): boolean {
+    this._maybeRebaseProxySeed();
+    return super._isEmptyRelation();
+  }
+
+  /**
+   * @internal Rebase this proxy in place when it still carries a stale new-owner
+   * `1=0` seed and the owner has since been saved (so `scope()` resolves a real
+   * FK). Mirrors `_finderScope`'s rebase, but mutates `this` — a mutation
+   * terminal runs against the proxy's own relation state, so the resolved FK
+   * must land there. Clears the seed marker so it runs exactly once.
+   */
+  private _maybeRebaseProxySeed(): void {
+    if (!this._seededNoneNewOwner) return;
+    const fresh = this.scope() as unknown as { _isNone: boolean };
+    if (fresh._isNone) return;
+    rebaseNewOwnerSeed(
+      this as unknown as Parameters<typeof rebaseNewOwnerSeed>[0],
+      fresh as unknown,
+      this._seedWherePredicates,
+    );
+    this._seededNoneNewOwner = false;
+  }
+
+  /**
    * Shared execution core for `toArray()` and `load()`. Routes both the
    * unmutated and mutated (whereBang / orderBang / ...) proxy through a
    * single `loadHasMany` call. When the proxy state has diverged from the

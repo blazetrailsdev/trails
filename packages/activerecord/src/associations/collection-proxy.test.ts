@@ -843,6 +843,68 @@ describe("CollectionProxy — mutated finder requery on stale new-owner seed", (
   });
 });
 
+// The mutation terminals invoked on the PROXY itself (not a spawned relation)
+// route through `Relation`'s implementations with `this` = the proxy — and
+// `deleteAll`'s diverged branch calls `super.deleteAll()` on the proxy — so
+// they hit the base `_isEmptyRelation()` chokepoint on the proxy. The
+// `CollectionProxy#_isEmptyRelation` override rebases the stale new-owner
+// `1=0` seed there, giving the mutation side the same rebase reads already
+// get through `_finderScope`.
+describe("CollectionProxy — mutation terminals invoked on the proxy itself on stale new-owner seed", () => {
+  fixtures(["authors", "posts"]);
+
+  it("resolves the persisted FK on updateAll/updateCounters invoked on the proxy after save", async () => {
+    const author = new Author({ name: "Proxy Mutation One" });
+    const posts = association<Post>(author, "posts") as any;
+
+    await author.save();
+    const authorId = author.id as number;
+    const mine = await Post.create({ title: "mine", body: "1", author_id: authorId });
+    // A post belonging to a DIFFERENT author proves the rebuilt scope still
+    // constrains to this owner's FK, not a bare `updateAll` over the table.
+    const otherAuthor = await Author.create({ name: "Someone Else" });
+    const theirs = await Post.create({ title: "theirs", body: "2", author_id: otherAuthor.id });
+
+    expect(await posts.updateCounters({ tags_count: 1 })).toBe(1);
+    expect((await Post.find(mine.id)).tags_count).toBe(1);
+    expect((await Post.find(theirs.id)).tags_count).toBe(0);
+
+    expect(await posts.updateAll({ body: "updated" })).toBe(1);
+    expect((await Post.find(mine.id)).body).toBe("updated");
+    expect((await Post.find(theirs.id)).body).toBe("2");
+  });
+
+  it("resolves the persisted FK on the diverged deleteAll branch invoked on the proxy after save", async () => {
+    const author = new Author({ name: "Proxy Mutation Two" });
+    const posts = association<Post>(author, "posts") as any;
+    // Diverge the proxy in place while the owner is new so its base is the
+    // stale `1=0` seed and `deleteAll` takes the `super.deleteAll()` branch.
+    posts.whereBang({ title: "drop" });
+
+    await author.save();
+    const authorId = author.id as number;
+    const dropped = await Post.create({ title: "drop", body: "1", author_id: authorId });
+    const kept = await Post.create({ title: "keep", body: "2", author_id: authorId });
+
+    expect(await posts.deleteAll()).toBe(1);
+    expect(await Post.where({ author_id: authorId }).pluck("id")).toEqual([kept.id]);
+    expect(await Post.exists(dropped.id)).toBe(false);
+  });
+
+  it("resolves the persisted FK on touchAll invoked on the proxy after save", async () => {
+    const ship = new Ship({ name: "Proxy Mutation Three" });
+    const parts = association<ShipPart>(ship, "parts") as any;
+
+    await ship.save();
+    const shipId = ship.id as number;
+    const stale = "2000-01-01T00:00:00Z";
+    const mast = await ShipPart.create({ name: "mast", ship_id: shipId, updated_at: stale });
+
+    expect(await parts.touchAll()).toBe(1);
+    expect(String((await ShipPart.find(mast.id)).updated_at)).not.toBe(stale);
+  });
+});
+
 // The in-memory `CollectionProxy#find` path (loaded `inverse_of` collection,
 // scanned in memory) must emit the identical not-found message as the SQL
 // `performFind` path — Rails routes both through

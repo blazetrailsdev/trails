@@ -6303,13 +6303,8 @@ export class Relation<T extends Base> {
    * (`owner.things.where(...)`) resolves the persisted FK once the owner is
    * saved — mirroring Rails' CollectionProxy delegating every query to
    * `association.scope`, rather than each terminal carrying its own rebase hook.
-   *
-   * Note the scope of that override: `CollectionProxy` extends `Relation`, not
-   * `AssociationRelation`, and does not override this, so mutation terminals
-   * invoked on the PROXY itself (`owner.things.updateAll(...)`) still see the
-   * raw `_isNone`. Reads dodge this via `CollectionProxy#_finderScope`; the
-   * mutation side has no equivalent. Tracked by the
-   * `rebase-new-owner-seed-for-collection-proxy-mutations` story.
+   * `CollectionProxy` overrides this too, so mutation terminals invoked on the
+   * PROXY itself (`owner.things.updateAll(...)`) rebase the same way.
    *
    * @internal
    */
