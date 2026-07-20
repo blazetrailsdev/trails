@@ -1,4 +1,9 @@
-import { BinaryData, BinaryType } from "@blazetrails/activemodel";
+import {
+  BinaryData,
+  BinaryType,
+  DateInfinity,
+  DateNegativeInfinity,
+} from "@blazetrails/activemodel";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { describe, expect, it } from "vitest";
 import { Data as ArrayData, Array as OidArray } from "./oid/array.js";
@@ -382,6 +387,23 @@ describe("PostgreSQL quoting", () => {
     // — dispatching through PG's BC-aware quoted_date. Threading `this` reaches it.
     const v = Temporal.PlainDate.from("-000043-03-15");
     expect(quoteFn.call({ quotedDate }, v)).toBe("'0044-03-15 BC'");
+  });
+
+  it("typeCast passes the infinity sentinels through without raising", () => {
+    // Trails-only: no Rails counterpart — Ruby has no equivalent of these
+    // sentinels, and Rails' `type_cast` never sees one.
+    //
+    // The `type_casted_binds` sweep put `typeCast` AHEAD of `_bindForPg` on
+    // every PG bind path, which would matter if the sentinels were opaque
+    // objects needing a dedicated arm. They are not: `DateInfinity` IS
+    // `Number.POSITIVE_INFINITY` (activemodel type/internal/sentinels.ts), so
+    // they match the numeric arm and are returned identically, reaching
+    // `_bindForPg` → `temporalToBindString(v, "postgres")` exactly as before.
+    // (On the typed path `OID::Date#serialize` has already mapped them to the
+    // "infinity" wire string, so this is belt-and-braces.)
+    expect(() => typeCast(DateInfinity)).not.toThrow();
+    expect(typeCast(DateInfinity)).toBe(DateInfinity);
+    expect(typeCast(DateNegativeInfinity)).toBe(DateNegativeInfinity);
   });
 
   it("typeCast(new Date()) throws — Date is no longer accepted", () => {
