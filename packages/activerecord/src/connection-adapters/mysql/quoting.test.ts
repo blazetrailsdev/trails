@@ -14,7 +14,8 @@ import {
 import { AbstractMysqlAdapter } from "../abstract-mysql-adapter.js";
 
 // `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
-// the adapter prototype so date/time values reach MySQL's quotedDate override.
+// the adapter prototype so date/time values reach MySQL's quotedDate override
+// and booleans reach its unquotedTrue/unquotedFalse.
 const HOST = Object.create(AbstractMysqlAdapter.prototype) as object;
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);

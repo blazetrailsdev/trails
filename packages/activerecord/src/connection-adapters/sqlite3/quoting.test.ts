@@ -13,14 +13,28 @@ import {
   quoteDefaultExpression,
   quotedDate,
   quotedTime,
+  quotedTrue,
+  quotedFalse,
+  unquotedTrue,
+  unquotedFalse,
   typeCast as typeCastFn,
 } from "./quoting.js";
 
 // `quote` / `typeCast` require a host receiver (no receiver-less dispatch); bind
 // SQLite's quotedDate / quotedTime so date/time literals keep the 2000-01-01
 // prefix on times, and quotedBinary so binary self-dispatch reaches SQLite's
-// `x'..'` hex form — the same overrides AbstractSQLite3Adapter supplies.
-const HOST = { quotedDate, quotedTime, quotedBinary };
+// `x'..'` hex form, and the boolean pair so the inherited abstract boolean arm
+// self-dispatches back to SQLite's 1/0 — the same overrides
+// AbstractSQLite3Adapter supplies.
+const HOST = {
+  quotedDate,
+  quotedTime,
+  quotedBinary,
+  quotedTrue,
+  quotedFalse,
+  unquotedTrue,
+  unquotedFalse,
+};
 const quote = (value: unknown): string => quoteFn.call(HOST, value);
 const typeCast = (value: unknown): unknown => typeCastFn.call(HOST, value);
 
