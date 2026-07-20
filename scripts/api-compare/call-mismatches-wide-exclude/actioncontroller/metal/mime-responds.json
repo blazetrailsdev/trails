@@ -3,29 +3,15 @@
     "package": "actioncontroller",
     "tsFile": "metal/mime-responds.ts",
     "rubyName": "any",
-    "call": "custom",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
-    "rubyName": "any",
     "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "reason": "Ruby `args.each { |type| send(type, &block) }`; the port uses a for-of loop over the format arguments, calling `custom(type, handler)` per Rails' `send` dispatch. The `custom` call is present; only the `each` iteration idiom differs."
   },
   {
     "package": "actioncontroller",
     "tsFile": "metal/mime-responds.ts",
     "rubyName": "any_response?",
     "call": "fetch",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
-  },
-  {
-    "package": "actioncontroller",
-    "tsFile": "metal/mime-responds.ts",
-    "rubyName": "any_response?",
-    "call": "format",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Ruby `@responses.fetch(format, false)`; the port calls the protected `handlerFor(format)` helper on the ActionDispatch Collector, which does the Map lookup internally. Same semantics, no `fetch` call at this site."
   },
   {
     "package": "actioncontroller",
