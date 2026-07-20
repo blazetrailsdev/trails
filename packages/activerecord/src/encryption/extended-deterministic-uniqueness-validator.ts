@@ -46,13 +46,17 @@ export class ExtendedDeterministicUniquenessValidator {
     // EncryptedUniquenessValidator skips the extra previous-scheme query in
     // that case to avoid duplicate errors and redundant DB round-trips.
     const validator = new EUV();
+    // `original` (UniquenessValidator#validateEach) is async — it awaits the
+    // `SELECT 1 ... WHERE attr = ?` round-trip. The wrapper must return that
+    // promise so the validation chain awaits it; dropping it leaves the query
+    // in flight and its errors land on the record at an arbitrary later tick.
     UniquenessValidator.prototype.validateEach = function (
       this: unknown,
       record: any,
       attribute: string,
       value: unknown,
     ) {
-      validator.validateEach(original.bind(this), record, attribute, value);
+      return validator.validateEach(original.bind(this), record, attribute, value);
     };
   }
 
@@ -79,13 +83,13 @@ export class ExtendedDeterministicUniquenessValidator {
  * Mirrors: ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidator::EncryptedUniquenessValidator
  */
 export class EncryptedUniquenessValidator {
-  validateEach(
-    originalValidateEach: (record: any, attribute: string, value: unknown) => void,
+  async validateEach(
+    originalValidateEach: (record: any, attribute: string, value: unknown) => unknown,
     record: any,
     attribute: string,
     value: unknown,
-  ): void {
-    originalValidateEach(record, attribute, value);
+  ): Promise<void> {
+    await originalValidateEach(record, attribute, value);
 
     const klass = record.constructor;
     const deterministicAttrs = EncryptableRecord.deterministicEncryptedAttributes(klass);
@@ -101,9 +105,7 @@ export class EncryptedUniquenessValidator {
     if (!ExtendedDeterministicQueries.installed) {
       const prevCiphertexts = encryptedType.previousTypes.map((pt) => pt.serialize(value));
       if (prevCiphertexts.length > 0) {
-        withoutEncryption(() => {
-          originalValidateEach(record, attribute, prevCiphertexts);
-        });
+        await withoutEncryption(() => originalValidateEach(record, attribute, prevCiphertexts));
       }
     }
   }

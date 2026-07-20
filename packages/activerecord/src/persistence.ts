@@ -6,7 +6,6 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { isAbortSignal } from "@blazetrails/activesupport";
 import {
   ArgumentError,
   sanitizeForMassAssignment,
@@ -822,99 +821,69 @@ export async function save<T extends SaveRecord>(
     this.constructor,
     true,
   );
-  // Mirrors the Rails module layering: ActiveRecord::Validations#save! runs
-  // `perform_validations` first and only on success calls super →
-  // Persistence#save! → create_or_update, where the readonly/destroyed guards
-  // live. So validations run *before* the guards: a record that is both
-  // destroyed and invalid raises RecordInvalid (validations first), not
-  // RecordNotSaved.
   const self = this as any;
-  // Resolve `belongs_to ..., default:` blocks before validation. Rails registers
-  // these on before_validation (builder/belongs_to.rb#add_default_callbacks) so a
-  // required association's presence validation sees the defaulted FK. The block
-  // may be async (e.g. `() => Developer.first()`), so on the save path we resolve
-  // it here — a pre-validation pass — before running the chain. Gated on
-  // `validate !== false`: Rails skips
-  // perform_validations (and thus every before_validation callback, including
-  // this default) when `validate: false` (validations.rb:47-49), so the default
-  // must not fire on that path. `_belongsToDefaultsApplied` then suppresses the
-  // in-chain before_validation callback so the block runs exactly once per save
-  // (it would otherwise re-fire when the pre-pass left the reader nil).
-  if (options?.validate !== false && typeof self._runBelongsToDefaults === "function") {
-    await self._runBelongsToDefaults();
-    self._belongsToDefaultsApplied = true;
-  }
-  // A `before_validation` that needs async DB work should run inside the save
-  // transaction (Rails wraps `super` in `with_transaction_returning_status` and
-  // `perform_validations` runs inside it — transactions.rb:360, validations.rb:47;
-  // transactions_test.rb:714). Trails runs `performValidations` before opening
-  // the save transaction, so such a callback defers its thunk here for `save` to
-  // drain inside the transaction instead of running it during validation. Reset
-  // the queue before the chain populates it so a prior save that bailed at
-  // validation doesn't leak a stale thunk into this one.
-  self._beforeValidationSideEffects = [];
-  let validationsPassed: boolean;
-  try {
-    validationsPassed = await performValidations.call(this, options);
-  } finally {
-    // Clear even if a validation callback throws, so a later standalone
-    // `valid?` on this instance still fires the belongs_to default.
-    self._belongsToDefaultsApplied = false;
-  }
-  if (!validationsPassed) return false;
-  // Mirrors ActiveRecord::Persistence#create_or_update: readonly raises first,
-  // then `return false if destroyed?`. `save` returns false (it does not raise)
-  // for a destroyed record; `save!` turns that false into
-  // RecordNotSaved("Failed to save the record").
-  if (this._readonly) {
-    throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
-  }
-  if (this._destroyed) {
-    return false;
-  }
-
-  self._skipTouch = options?.touch === false;
   const ctor = this.constructor;
 
-  // Auto-set STI type column on new records
-  if (this._newRecord && isStiSubclass(ctor)) {
-    const col = getInheritanceColumn(getStiBase(ctor));
-    if (col && !this._readAttribute(col)) {
-      this._attributes.set(col, this.constructor.name);
-    }
-  }
-
-  // Mirrors: ActiveRecord::Transactions#save
+  // Mirrors the full Rails module layering: `Transactions#save {
+  // Validations#save { perform_validations; Persistence#save → create_or_update
+  // } }` (transactions.rb:360, validations.rb:47). Two orderings fall out of it,
+  // and both are load-bearing:
+  //
+  //  1. `perform_validations` — and every `before_validation` it runs — is
+  //     *inside* the transaction, so a cancelling filter's DB write rolls back
+  //     with it and a `throw :abort` halts before the validators ever run (no
+  //     errors recorded). transactions_test.rb:714.
+  //  2. Validations run *before* the readonly/destroyed guards, which live in
+  //     `create_or_update`. So a record that is both destroyed and invalid
+  //     raises RecordInvalid, not RecordNotSaved.
   try {
     return (await withTransactionReturningStatus.call(self, async () => {
-      // Drain deferred `before_validation` side effects inside the transaction
-      // so a cancelling filter's DB write (`Book.create`) rolls back with it.
-      // A drained thunk that `throw :abort`s halts the save (status false →
-      // Rollback), matching Rails' halted validation callback.
-      //
-      // ORDERING DEVIATION: Rails layers save as `Transactions#save {
-      // Validations#save { perform_validations; Persistence#save } }`
-      // (transactions.rb:360, validations.rb:47), so `before_validation` runs
-      // *inside* the transaction and *before* `valid?`. trails runs
-      // `performValidations` above (outside the transaction), so the
-      // deferred thunk's async body runs here — after the validators, not
-      // before. Observable only when a record has BOTH a failing validation and
-      // an aborting async `before_validation`: trails reports `errors.any`
-      // (validators already ran) where Rails reports none (abort halts first).
-      // The four cancellation tests don't hit this (validations pass); the
-      // governing constraint is that `performValidations` runs outside the
-      // transaction — see the Topic wiring and `validations.ts#isValid`. Tracked
-      // for convergence: RFC 0023 story
-      // `save-runs-validations-inside-transaction`.
-      const sideEffects = self._beforeValidationSideEffects as Array<() => unknown>;
-      for (const thunk of sideEffects) {
-        try {
-          await thunk();
-        } catch (e) {
-          if (isAbortSignal(e)) return false;
-          throw e;
+      // Resolve `belongs_to ..., default:` blocks before validation. Rails
+      // registers these on before_validation
+      // (builder/belongs_to.rb#add_default_callbacks) so a required
+      // association's presence validation sees the defaulted FK. The block may
+      // be async (e.g. `() => Developer.first()`), so on the save path we
+      // resolve it here — a pre-validation pass — before running the chain.
+      // Gated on `validate !== false`: Rails skips perform_validations (and thus
+      // every before_validation callback, including this default) when
+      // `validate: false` (validations.rb:47-49), so the default must not fire
+      // on that path. `_belongsToDefaultsApplied` then suppresses the in-chain
+      // before_validation callback so the block runs exactly once per save (it
+      // would otherwise re-fire when the pre-pass left the reader nil).
+      if (options?.validate !== false && typeof self._runBelongsToDefaults === "function") {
+        await self._runBelongsToDefaults();
+        self._belongsToDefaultsApplied = true;
+      }
+      let validationsPassed: boolean;
+      try {
+        validationsPassed = await performValidations.call(this, options);
+      } finally {
+        // Clear even if a validation callback throws, so a later standalone
+        // `valid?` on this instance still fires the belongs_to default.
+        self._belongsToDefaultsApplied = false;
+      }
+      if (!validationsPassed) return false;
+      // Mirrors ActiveRecord::Persistence#create_or_update: readonly raises
+      // first, then `return false if destroyed?`. `save` returns false (it does
+      // not raise) for a destroyed record; `save!` turns that false into
+      // RecordNotSaved("Failed to save the record"). See ordering (2) above.
+      if (this._readonly) {
+        throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
+      }
+      if (this._destroyed) {
+        return false;
+      }
+
+      self._skipTouch = options?.touch === false;
+
+      // Auto-set STI type column on new records
+      if (this._newRecord && isStiSubclass(ctor)) {
+        const col = getInheritanceColumn(getStiBase(ctor));
+        if (col && !this._readAttribute(col)) {
+          this._attributes.set(col, this.constructor.name);
         }
       }
+
       return self.createOrUpdate();
     })) as boolean | undefined;
   } catch (e) {

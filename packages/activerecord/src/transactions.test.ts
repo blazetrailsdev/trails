@@ -615,10 +615,8 @@ describe("TransactionTest", () => {
   // before-filter. The canonical Topic `before_save_for_transaction` runs on the
   // async save-callback chain (the wrapper returns the hook's Promise so it is
   // awaited inside the save transaction). `before_validation_for_transaction`
-  // runs during `performValidations`, which trails invokes outside the save
-  // transaction, so the Topic wrapper defers its thunk into
-  // `_beforeValidationSideEffects`, which `save` drains inside the transaction
-  // (persistence.ts). In both paths the `throw :abort`
+  // runs during `performValidations`, which `save` invokes inside the same
+  // transaction (persistence.ts). In both paths the `throw :abort`
   // halts the save (status false → Rollback), rolling back `Book.create`.
   for (const filter of ["validation", "save"] as const) {
     const hook =

@@ -20,7 +20,7 @@ const encryptorB: EncryptorLike = {
 };
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest", () => {
-  it("validateEach calls originalValidateEach for current and previous scheme ciphertexts", () => {
+  it("validateEach calls originalValidateEach for current and previous scheme ciphertexts", async () => {
     const prevScheme = new Scheme({ deterministic: true, encryptor: encryptorB });
     const type = new EncryptedAttributeType({
       scheme: new Scheme({
@@ -41,7 +41,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
       calls.push({ attribute, value, encryptionDisabled: isEncryptionDisabled() });
     };
 
-    new EncryptedUniquenessValidator().validateEach(
+    await new EncryptedUniquenessValidator().validateEach(
       originalValidateEach,
       record,
       "email",
@@ -58,7 +58,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     expect(calls[1].encryptionDisabled).toBe(true);
   });
 
-  it("validateEach skips non-deterministic attributes", () => {
+  it("validateEach skips non-deterministic attributes", async () => {
     const type = new EncryptedAttributeType({
       scheme: new Scheme({ deterministic: false, encryptor: encryptorA }),
     });
@@ -71,7 +71,12 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicUniquenessValidatorTest
     const calls: unknown[] = [];
     const originalValidateEach = (_r: any, _a: string, value: unknown) => calls.push(value);
 
-    new EncryptedUniquenessValidator().validateEach(originalValidateEach, record, "body", "hello");
+    await new EncryptedUniquenessValidator().validateEach(
+      originalValidateEach,
+      record,
+      "body",
+      "hello",
+    );
 
     expect(calls).toHaveLength(1);
   });
