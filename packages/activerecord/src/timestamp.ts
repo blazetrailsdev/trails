@@ -13,6 +13,18 @@ import { withTransactionReturningStatus } from "./transactions.js";
  * Mirrors: ActiveRecord::Timestamp
  */
 
+export interface TouchOptions {
+  time?: Date | Temporal.Instant | null;
+}
+
+/**
+ * Argument list for Rails' `touch(*names, time: nil)`. Ruby's trailing keyword
+ * becomes an optional trailing options object in TS, mirroring `TouchAllArgs` —
+ * the options object is only valid in last position, so `touch({ time }, "col")`
+ * is a type error just as `touch(time: t, :col)` is a syntax error in Ruby.
+ */
+export type TouchArgs = string[] | [...names: string[], options: TouchOptions];
+
 /**
  * Update the updated_at timestamp (and optionally other timestamp
  * columns) without changing other attributes. Skips validations
@@ -20,11 +32,7 @@ import { withTransactionReturningStatus } from "./transactions.js";
  *
  * Mirrors: ActiveRecord::Timestamp#touch
  */
-export async function touch(
-  this: Base,
-  optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
-  ...rest: string[]
-): Promise<boolean> {
+export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   // Mirrors Rails' NoTouching#touch (`super unless no_touching?`), which is
   // prepended ahead of Persistence#touch: a no_touching block short-circuits
   // the whole method — including the persisted?/readonly? guards below — so a
@@ -41,20 +49,13 @@ export async function touch(
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
-  let time: Temporal.Instant;
-  let names: string[];
-  if (typeof optionsOrName === "string") {
-    time = currentTimeFromProperTimezone();
-    names = [optionsOrName, ...rest];
-  } else if (optionsOrName?.time != null) {
-    const t = optionsOrName.time;
-    time = t instanceof Temporal.Instant ? t : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
-    names = rest;
-  } else {
-    time = currentTimeFromProperTimezone();
-    names = rest;
-  }
-  const now = time;
+  const { names, time: t } = parseTouchArgs(args);
+  const now =
+    t == null
+      ? currentTimeFromProperTimezone()
+      : t instanceof Temporal.Instant
+        ? t
+        : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
   const aliases: Record<string, string> = (ctor as any)._attributeAliases ?? {};
   const resolvedNames = names.map((name) => aliases[name] ?? name);
 
@@ -91,6 +92,21 @@ export async function touch(
   return withTransactionReturningStatus.call(this, async () => {
     return touchRow.call(this, touchCols, now);
   }) as Promise<boolean>;
+}
+
+/**
+ * Split `touch(*names, time: nil)` args into the splatted names and the
+ * trailing keyword hash. Mirrors parseTouchArgs' sibling `parseTouchAllArgs`.
+ */
+export function parseTouchArgs(args: TouchArgs): {
+  names: string[];
+  time: Date | Temporal.Instant | null | undefined;
+} {
+  const last = args[args.length - 1];
+  if (last !== undefined && typeof last !== "string") {
+    return { names: args.slice(0, -1) as string[], time: last.time };
+  }
+  return { names: args as string[], time: undefined };
 }
 
 /**

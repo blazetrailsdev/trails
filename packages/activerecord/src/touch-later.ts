@@ -5,6 +5,7 @@ import {
   timestampAttributesForUpdateInModel,
   currentTimeFromProperTimezone,
 } from "./timestamp.js";
+import { parseTouchArgs, type TouchArgs } from "./timestamp.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { reflectOnAllAssociations } from "./reflection.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -105,30 +106,27 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
  *
  * Mirrors: ActiveRecord::TouchLater#touch
  */
-export async function touch(
-  this: Base,
-  optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
-  ...rest: string[]
-): Promise<boolean> {
+export async function touch(this: Base, ...args: TouchArgs): Promise<boolean> {
   const self = this as any;
   if (self._deferTouchAttrs?.length) {
     const deferredAttrs = self._deferTouchAttrs as string[];
     const deferredTime = self._touchTime as Temporal.Instant | null;
-    const names: string[] = typeof optionsOrName === "string" ? [optionsOrName, ...rest] : rest;
+    const { names, time } = parseTouchArgs(args);
+    // Mirrors touch_later.rb:38-44 `names |= @_defer_touch_attrs; super(*names,
+    // time: time)` — the caller's `time:` governs; the deferred @_touch_time is
+    // deliberately NOT substituted when the caller passed none.
     const merged: string[] = [...new Set([...names, ...deferredAttrs])];
     self._deferTouchAttrs = null;
     self._touchTime = null;
     try {
-      return typeof optionsOrName === "object" && optionsOrName != null
-        ? await timestampTouch.call(this, optionsOrName, ...merged)
-        : await timestampTouch.call(this, ...merged);
+      return await timestampTouch.call(this, ...merged, { time });
     } catch (error) {
       self._deferTouchAttrs = deferredAttrs;
       self._touchTime = deferredTime;
       throw error;
     }
   }
-  return timestampTouch.call(this, optionsOrName, ...rest);
+  return timestampTouch.call(this, ...args);
 }
 
 /**
@@ -183,7 +181,7 @@ export async function touchDeferredAttributes(this: Base): Promise<void> {
   // mirrors touch_later.rb where @_defer_touch_attrs/@_touch_time are cleared
   // only after the super call succeeds.
   try {
-    await timestampTouch.call(this, { time }, ...deferredAttrs);
+    await timestampTouch.call(this, ...deferredAttrs, { time });
   } catch (error) {
     self._deferTouchAttrs = deferredAttrs;
     self._touchTime = time;
