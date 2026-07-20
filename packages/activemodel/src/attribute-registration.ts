@@ -109,6 +109,25 @@ export function isDecoratorReplay(): boolean {
   return _decoratorReplayDepth > 0;
 }
 
+/**
+ * Run `fn` in decorator-replay context, so `isDecoratorReplay()` reports true.
+ *
+ * Mirrors: the replay performed by
+ * ActiveModel::AttributeRegistration::PendingDecorator#apply_to. Every path that
+ * replays a pending decorator MUST go through this, or decorators gated on
+ * replay context (notably enum's undeclared-type check) silently change behavior.
+ *
+ * @internal
+ */
+function inDecoratorReplay<T>(fn: () => T): T {
+  _decoratorReplayDepth++;
+  try {
+    return fn();
+  } finally {
+    _decoratorReplayDepth--;
+  }
+}
+
 /** @internal Rails-private helper. */
 export class PendingDecorator implements PendingModification {
   constructor(
@@ -121,13 +140,7 @@ export class PendingDecorator implements PendingModification {
     const targets = this.names ?? attributeSet.keys();
     for (const name of targets) {
       const existing = attributeSet.getAttribute(name);
-      _decoratorReplayDepth++;
-      let newType: Type;
-      try {
-        newType = this.decorator(name, existing.type, host);
-      } finally {
-        _decoratorReplayDepth--;
-      }
+      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
       if (newType) {
         attributeSet.set(name, existing.withType(newType));
       }
@@ -424,7 +437,10 @@ export function replayOwnPendingDecorators(
     for (const name of targets) {
       const def = defs.get(name);
       if (!def) continue;
-      const newType = mod.decorator(name, def.type, cls);
+      // Same replay context Rails' PendingDecorator#apply_to establishes — this
+      // IS a replay of the pending chain, so decorators gated on
+      // `isDecoratorReplay()` must run here too.
+      const newType = inDecoratorReplay(() => mod.decorator(name, def.type, cls));
       if (newType) defs.set(name, { ...def, type: newType });
     }
   }

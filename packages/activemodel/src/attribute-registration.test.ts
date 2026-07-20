@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Model, Types, ValueType } from "./index.js";
+import { Model, Types, ValueType, isDecoratorReplay, replayOwnPendingDecorators } from "./index.js";
 
 describe("AttributeRegistrationTest", () => {
   it("attributes can be registered", () => {
@@ -373,5 +373,29 @@ describe("AttributeRegistrationTest", () => {
     Base.attribute("new_attr", "integer", { default: 7 });
 
     expect((Leaf as any)._defaultAttributes().getAttribute("new_attr").value).toBe(7);
+  });
+
+  it("replaying pending decorators establishes decorator-replay context", () => {
+    // Mirrors ActiveModel::AttributeRegistration::PendingDecorator#apply_to,
+    // which is what makes `isDecoratorReplay()` true. Decorators gated on replay
+    // context (enum's undeclared-type check) change behavior without this.
+    const seen: boolean[] = [];
+    class MyModel extends Model {
+      static {
+        this.attribute("title", "string");
+        this.decorateAttributes(["title"], (_name, type) => {
+          seen.push(isDecoratorReplay());
+          return type;
+        });
+      }
+    }
+
+    const defs = new Map(
+      (MyModel as unknown as { _attributeDefinitions: Map<string, never> })._attributeDefinitions,
+    );
+    seen.length = 0;
+    replayOwnPendingDecorators(MyModel as never, defs as never);
+
+    expect(seen).toEqual([true]);
   });
 });
