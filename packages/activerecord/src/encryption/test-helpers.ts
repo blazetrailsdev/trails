@@ -384,8 +384,10 @@ export function makeEncryptedBookWithBinaryMessagePackSerialized(adapter: Databa
   return class EncryptedBookWithBinaryMessagePackSerialized extends Base {
     static {
       this._tableName = "encrypted_books";
-      this.attribute("id", "integer");
-      this.attribute("logo", "binary");
+      // No declared `logo`/`id` type — Rails' inline fixture
+      // (encryptable_record_message_pack_serialized_test.rb:37-41) declares
+      // none either, so `logo` reflects as binary from the column. A declared
+      // type here would mask a reflection regression.
       this.adapter = adapter;
       this.encrypts("logo", { messageSerializer: new MessagePackMessageSerializer() });
     }
@@ -460,6 +462,27 @@ export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
 // ─── Assertion helpers ────────────────────────────────────────────────────────
 
 /**
+ * Whether `attrName` is backed by a binary column, walking the decorator chain
+ * to find out. The attribute's outermost type is whatever `normalizes` /
+ * `encrypts` / `serialize` wrapped it in, and none of those are themselves
+ * binary (Rails' `EncryptedAttributeType` is a plain `Type::Value` too) — only
+ * the innermost column type is. `normalizes` + `encrypts` on a binary column
+ * nests two deep, so unwrap until a link reports binary or the chain ends.
+ *
+ * @internal
+ */
+function _isBinaryAttribute(model: any, attrName: string): boolean {
+  let type = model._attributes?.getAttribute?.(attrName)?.type;
+  const seen = new Set<unknown>();
+  while (type != null && !seen.has(type)) {
+    if (type.isBinary?.() === true) return true;
+    seen.add(type);
+    type = type.castType ?? type.subtype;
+  }
+  return false;
+}
+
+/**
  * Mirrors Rails' assert_encrypted_attribute.
  * Checks that the actual DB-bound value is ciphertext (≠ plaintext) and
  * that reading the attribute returns the expected plaintext. For persisted
@@ -479,7 +502,11 @@ export async function assertEncryptedAttribute(
   }
 }
 
-function _valuesEqual(readValue: unknown, expectedValue: unknown): boolean {
+function _valuesEqual(
+  readValue: unknown,
+  expectedValue: unknown,
+  isBinaryAttribute = false,
+): boolean {
   if (readValue === expectedValue) return true;
   if (
     readValue instanceof Temporal.Instant &&
@@ -510,7 +537,13 @@ function _valuesEqual(readValue: unknown, expectedValue: unknown): boolean {
   // (binary-encoding) String, so Rails' `assert_equal "book", record.logo`
   // compares text to it directly. Our BinaryType deserializes to Uint8Array,
   // so decode Latin-1 (bytes 1:1) to make the same assertion meaningful.
-  if (readValue instanceof Uint8Array && typeof expectedValue === "string")
+  //
+  // Gated on the attribute's declared type, NOT on `readValue` being a
+  // Uint8Array: keying off the runtime shape would extend Rails' laxity to
+  // every attribute, so a *string* column that wrongly read back as bytes
+  // would silently pass. Rails earns the laxity only where the column really
+  // is binary, so we spend it only there too.
+  if (isBinaryAttribute && readValue instanceof Uint8Array && typeof expectedValue === "string")
     return Buffer.from(readValue).toString("latin1") === expectedValue;
   if (
     Array.isArray(readValue) &&
@@ -537,7 +570,7 @@ function _assertEncryptedAttributeOnModel(
   expectedValue: unknown,
 ): void {
   const readValue = model[attrName];
-  if (!_valuesEqual(readValue, expectedValue)) {
+  if (!_valuesEqual(readValue, expectedValue, _isBinaryAttribute(model, attrName))) {
     throw new Error(
       `assertEncryptedAttribute: expected ${attrName} to equal ` +
         `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
@@ -601,7 +634,7 @@ export function assertNotEncryptedAttribute(
   expectedValue: unknown,
 ): void {
   const readValue = model[attrName];
-  if (!_valuesEqual(readValue, expectedValue)) {
+  if (!_valuesEqual(readValue, expectedValue, _isBinaryAttribute(model, attrName))) {
     throw new Error(
       `assertNotEncryptedAttribute: expected ${attrName} to read as ` +
         `${JSON.stringify(expectedValue)}, got ${JSON.stringify(readValue)}`,
