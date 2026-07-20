@@ -18,14 +18,14 @@
     "tsFile": "metal/mime-responds.ts",
     "rubyName": "any_response?",
     "call": "fetch",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Real divergence, NOT a value-accessor read: trails' `isAnyResponse()` returns a boolean flag set in `any()`, while Rails computes `!@responses.fetch(format, false) && @responses[Mime::ALL]`. Tracked by story converge-mime-responds-any-response."
   },
   {
     "package": "actioncontroller",
     "tsFile": "metal/mime-responds.ts",
     "rubyName": "any_response?",
     "call": "format",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body — these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Real divergence, NOT a value-accessor read: trails' `isAnyResponse()` returns a boolean flag set in `any()`, while Rails computes `!@responses.fetch(format, false) && @responses[Mime::ALL]`. Tracked by story converge-mime-responds-any-response."
   },
   {
     "package": "actioncontroller",

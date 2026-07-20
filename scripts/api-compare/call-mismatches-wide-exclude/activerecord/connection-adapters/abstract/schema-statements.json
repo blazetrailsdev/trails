@@ -550,7 +550,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "extract_new_default_value",
     "call": "has_key?",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body \u2014 these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Verified equivalent (bucket b)."
   },
   {
     "package": "activerecord",
@@ -620,7 +620,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "foreign_keys_enabled?",
     "call": "fetch",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body \u2014 these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Verified equivalent (bucket b)."
   },
   {
     "package": "activerecord",
@@ -809,7 +809,7 @@
     "tsFile": "connection-adapters/abstract/schema-statements.ts",
     "rubyName": "options_include_default?",
     "call": "include?",
-    "reason": "Newly gate-subject after value-accessor read-crediting (credit-value-accessor-reads-in-wide-call-gate): extractCalls now credits property READS, so this method's previously-empty call set became non-empty and the wide gate now applies to it. The specific missing call may be a genuine value-accessor read OR an ordinary Ruby method send that merely co-occurs in the body \u2014 these were baselined in bulk, NOT individually vetted, pending per-cluster burndown review."
+    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Verified equivalent (bucket b)."
   },
   {
     "package": "activerecord",
