@@ -9,6 +9,7 @@ import {
   type SqliteOpenConfig,
   type SqliteStatement,
 } from "../sqlite-adapter.js";
+import { statementIsReader } from "./statement-reader.js";
 
 // Minimal subset of the expo-sqlite public API used by this driver.
 // Kept inline so typecheck passes without installing the optional package.
@@ -68,15 +69,6 @@ function expandBinds(binds: SqliteBinds | undefined): unknown[] | Record<string,
 }
 
 /** @internal */
-function isReader(sql: string): boolean {
-  const upper = sql.trimStart().toUpperCase();
-  return (
-    /^(SELECT|WITH|EXPLAIN|VALUES|TABLE)\b/.test(upper) ||
-    (/^PRAGMA\b/.test(upper) && !upper.includes("="))
-  );
-}
-
-/** @internal */
 class ExpoSqliteStatement implements SqliteStatement {
   readonly reader: boolean;
 
@@ -84,7 +76,7 @@ class ExpoSqliteStatement implements SqliteStatement {
     private readonly stmt: ExpoSQLiteStatement,
     sql: string,
   ) {
-    this.reader = isReader(sql);
+    this.reader = statementIsReader(sql);
   }
 
   async run(binds?: SqliteBinds): Promise<RunResult> {

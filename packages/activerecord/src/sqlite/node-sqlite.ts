@@ -12,6 +12,7 @@ import {
   type SyncSqliteConnection,
   type SyncSqliteStatement,
 } from "../sqlite-adapter.js";
+import { statementIsReader } from "./statement-reader.js";
 import { resolveUriDatabasePath } from "./sqlite-uri.js";
 
 // Soft-load: Node 22.5+ only. Sync via createRequire so the module stays sync.
@@ -40,11 +41,17 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
 
   constructor(private readonly stmt: import("node:sqlite").StatementSync) {
     stmt.setAllowBareNamedParameters(true); // allow { name: val } to bind $name
-    const sql = stmt.sourceSQL.trimStart().toUpperCase();
-    // PRAGMA without `=` returns rows; PRAGMA with `=` is a write. Matches better-sqlite3.
-    this.reader =
-      /^(SELECT|WITH|EXPLAIN|VALUES|TABLE)\b/.test(sql) ||
-      (/^PRAGMA\b/.test(sql) && !sql.includes("="));
+    // Rails branches .all()/.run() on stmt.column_count.zero?; node:sqlite exposes
+    // the same information via columns(). Using it (rather than a leading-keyword
+    // regex) is what makes `INSERT ... RETURNING` classify as row-returning.
+    // Older node:sqlite builds throw from columns() on a non-reader statement.
+    let columnCount: number;
+    try {
+      columnCount = stmt.columns().length;
+    } catch {
+      columnCount = 0;
+    }
+    this.reader = columnCount > 0 || statementIsReader(stmt.sourceSQL);
   }
 
   private call<T>(method: string, binds: SqliteBinds | undefined): T {
