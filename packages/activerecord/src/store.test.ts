@@ -106,10 +106,8 @@ describe("StoreTest", () => {
   it("new record and no accessors changes", () => {
     const user = new AdminUser();
     expect((user as any).colorChanged()).toBe(false);
-    // trails: colorWas/colorChange return undefined (not null) when the attribute
-    // has never been set; Rails returns nil. Tracked for convergence.
-    // expect((user as any).colorWas()).toBeNull();
-    // expect((user as any).colorChange()).toBeNull();
+    expect((user as any).colorWas()).toBeNull();
+    expect((user as any).colorChange()).toBeNull();
 
     user.color = "red";
     expect((user as any).colorChanged()).toBe(true);
@@ -170,7 +168,7 @@ describe("StoreTest", () => {
     expect((john as any).partner_nameChanged()).toBe(true);
 
     await john.save();
-    expect((john as any).partner_nameChange()).toBeUndefined();
+    expect((john as any).partner_nameChange()).toBeNull();
     expect((john as any).savedChangeToPartner_name()).toBe(true);
     expect((john as any).savedChangeToPartner_nameValues()).toEqual(["Dallas", "Lena"]);
     expect((john as any).partner_nameBeforeLastSave()).toBe("Dallas");
@@ -182,7 +180,7 @@ describe("StoreTest", () => {
     expect((john as any).enableFriendRequestsChanged()).toBe(true);
 
     await john.save();
-    expect((john as any).enableFriendRequestsChange()).toBeUndefined();
+    expect((john as any).enableFriendRequestsChange()).toBeNull();
     expect((john as any).savedChangeToEnableFriendRequests()).toBe(true);
     expect((john as any).savedChangeToEnableFriendRequestsValues()).toEqual([null, true]);
     (john as any).enableFriendRequests = false;
