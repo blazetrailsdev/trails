@@ -2,6 +2,8 @@ import { describe, it, expect } from "vitest";
 import { quoteArrayLiteral } from "./quote-array.js";
 import { defaultQuoter } from "./visitors/default-quoter.js";
 import { BinaryData } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 describe("quoteArrayLiteral", () => {
   it("formats simple string arrays", () => {
@@ -96,7 +98,18 @@ describe("quoteArrayLiteral", () => {
     });
 
     it("raises on a function", () => {
-      expect(() => quoteArrayLiteral([() => 1], defaultQuoter)).toThrow(TypeError);
+      expect(() => quoteArrayLiteral([() => 1], defaultQuoter)).toThrow(
+        new TypeError("can't cast Function"),
+      );
+    });
+
+    // Trails' `Type::Time::Value` analogue: `quoted_time` is a connection
+    // self-dispatch (`abstract/quoting.rb:102`) and `ArelConnection` has no
+    // such method, so it must arrive pre-formatted via `formatElement`.
+    it("raises on a Temporal value no formatElement hook claimed", () => {
+      expect(() => quoteArrayLiteral([Temporal.PlainTime.from("12:00")], defaultQuoter)).toThrow(
+        TypeError,
+      );
     });
   });
 
@@ -104,6 +117,12 @@ describe("quoteArrayLiteral", () => {
   // value.to_s` (`abstract/quoting.rb:95-96`).
   it("casts a Type::Binary::Data to its byte string", () => {
     expect(quoteArrayLiteral([new BinaryData("hi")], defaultQuoter)).toBe("{hi}");
+  });
+
+  // `when BigDecimal then value.to_s("F")` (`abstract/quoting.rb:99`) — the
+  // fixed form, not the default `to_s`.
+  it("casts a BigDecimal to its non-normalized fixed form", () => {
+    expect(quoteArrayLiteral([new BigDecimal("1.5")], defaultQuoter)).toBe("{1.5}");
   });
 
   // `when nil, Numeric, String then value` plus `when Symbol ... value.to_s`

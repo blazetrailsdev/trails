@@ -1,6 +1,7 @@
 import type { ArelConnection } from "./visitors/connection.js";
 import { rubyClassName } from "./visitors/ruby-class.js";
 import { BinaryData } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
 
 /** The slice of the connection an array element's `type_cast` needs. */
 export type ArrayElementQuoter = Pick<ArelConnection, "unquotedTrue" | "unquotedFalse">;
@@ -79,21 +80,43 @@ function typeCastArrayElement(
   // other two. `String(data)` is `Data#to_s`: its `toString()` decodes bytes.
   if (value instanceof BinaryData) return String(value);
   // Same arm: Ruby's `Symbol#to_s` is the bare name, which `description` is
-  // the analogue of.
+  // the analogue of. Ruby has no descriptionless Symbol, so the `?? ""` is
+  // unreachable by construction (only `Symbol()` produces it here) rather than
+  // a port of an empty-name arm.
   if (typeof value === "symbol") return value.description ?? "";
+  // `when BigDecimal then value.to_s("F")` (`abstract/quoting.rb:99`) — the
+  // non-normalized fixed form, not the default `to_s`. Same arm as the sibling
+  // port in
+  // packages/activerecord/src/connection-adapters/abstract/quoting.ts:194.
+  if (value instanceof BigDecimal) return value.toString("F");
   // `else raise TypeError, "can't cast #{value.class.name}"`
   // (`abstract/quoting.rb:105`). Everything Rails' closed set does not name
-  // raises here rather than being JSON- or String-encoded — including the
-  // Date/Time arm, which reaches `type_cast` only through `quoted_date` and so
-  // is served by `formatElement` above (the only caller,
-  // `postgresqlDefaultQuoter.quote`, passes it). A value that gets past that
-  // hook has no `quoted_date` to route through and is not castable.
+  // raises here rather than being JSON- or String-encoded.
+  //
+  // That includes the two remaining arms, `when Type::Time::Value then
+  // quoted_time` and `when Date, Time then quoted_date` (`:102-103`), which are
+  // self-dispatches onto the connection. `ArelConnection` (visitors/
+  // connection.ts) carries no `quotedDate`/`quotedTime` to dispatch onto —
+  // Rails' Arel does no value formatting, so those live on the adapter — which
+  // is exactly what `formatElement` exists to supply: the only caller,
+  // `postgresqlDefaultQuoter.quote` (visitors/default-quoter.ts:231), routes
+  // date-likes through its `quotedDate` before the value reaches here. A
+  // Temporal value (trails' `Type::Time::Value` analogue) has no `toISOString`
+  // and so is NOT covered by that hook; it raises here rather than silently
+  // encoding, which is what the pre-convergence fallback did to it (an object
+  // with no `toISOString` fell to `JSON.stringify`, i.e. `{}`). Giving the
+  // connection-less quoter a real `quotedTime` is adapter work, not this
+  // function's.
   throw new TypeError(`can't cast ${rubyClassName(value) ?? classNameOf(value)}`);
 }
 
+// Rails is unconditionally `value.class.name`. `constructor.name` is the
+// analogue; the `"Object"` last resort is for a null-prototype object, which
+// has no constructor — and is unreachable here because `rubyClassName` already
+// claims those as `Hash`. It exists so the template can never read `undefined`.
 function classNameOf(value: unknown): string {
   const named = (value as { constructor?: { name?: unknown } })?.constructor?.name;
-  return typeof named === "string" && named !== "" ? named : String(typeof value);
+  return typeof named === "string" && named !== "" ? named : "Object";
 }
 
 /**
