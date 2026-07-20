@@ -11,7 +11,6 @@ import {
   makeEncryptedBookThatIgnoresCase,
   makeEncryptedAuthor,
   makeBookThatWillFailToEncryptName,
-  makeEncryptedBookWithBinary,
   makeEncryptedBookWithCustomCompressor,
   makeEncryptedTrafficLight,
   makeEncryptedTrafficLightWithStoreState,
@@ -33,6 +32,7 @@ import {
   EncryptedBook,
   EncryptedBookNormalizedFirst,
   EncryptedBookNormalizedSecond,
+  EncryptedBookWithBinary,
   EncryptedBookWithSerializedFirstBinary,
   EncryptedBookWithSerializedSecondBinary,
 } from "../test-helpers/models/book-encrypted.js";
@@ -707,14 +707,16 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("binary data can be encrypted", async () => {
-    const Book = makeEncryptedBookWithBinary(await freshAdapter());
+    await freshAdapter();
+    const Book = EncryptedBookWithBinary as any;
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
     expect((await Book.create({ logo: allBytes })).logo).toEqual(allBytes);
     expect((await Book.create({ logo: null })).logo).toBeNull();
     expect((await Book.create({ logo: new Uint8Array(0) })).logo).toEqual(new Uint8Array(0));
   });
   it("binary data can be encrypted uncompressed", async () => {
-    const Book = makeEncryptedBookWithBinary(await freshAdapter());
+    await freshAdapter();
+    const Book = EncryptedBookWithBinary as any;
     const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
     const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
     await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);

@@ -376,22 +376,6 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
 }
 
 /**
- * EncryptedBookWithBinary: logo is a binary attribute, encrypted.
- * Mirrors Rails' EncryptedBookWithBinary fixture (book_encrypted.rb).
- */
-export function makeEncryptedBookWithBinary(adapter: DatabaseAdapter) {
-  return class EncryptedBookWithBinary extends Base {
-    static {
-      this._tableName = "encrypted_books";
-      this.attribute("id", "integer");
-      this.attribute("logo", "binary");
-      this.adapter = adapter;
-      this.encrypts("logo");
-    }
-  } as any;
-}
-
-/**
  * EncryptedBookWithBinaryMessagePackSerialized: logo is a binary attribute
  * encrypted with a MessagePack message serializer. Mirrors the fixture class
  * defined inline in encryptable_record_message_pack_serialized_test.rb.
