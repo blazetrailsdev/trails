@@ -88,9 +88,17 @@ export function stringSucc(s: string): string {
     let carry = true;
     while (i >= 0 && carry) {
       if (codes[i] >= 0x10ffff) {
-        codes[i] = 0;
+        // Ruby zeroes the wrapped character's bytes and then advances to the
+        // next *valid* character of that encoded width (string.c
+        // `enc_succ_char` / `str_succ`), so a wrapped 4-byte UTF-8 char lands
+        // on U+10000 — `"\u{10FFFF}".succ.codepoints == [0x1, 0x10000]`, not
+        // [0x1, 0x0].
+        codes[i] = 0x10000;
       } else {
         codes[i]++;
+        // Surrogates are not valid characters; `enc_succ_char` skips past
+        // them to the next valid one rather than emitting an unpaired half.
+        if (codes[i] >= 0xd800 && codes[i] <= 0xdfff) codes[i] = 0xe000;
         carry = false;
       }
       i--;

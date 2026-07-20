@@ -260,6 +260,7 @@ describe("RangeTest", () => {
     expect(stringSucc("a.z")).toBe("b.a");
     // Astral (non-alnum) chars succ as whole code points, not UTF-16 units.
     expect(stringSucc("\u{1F600}")).toBe("\u{1F601}");
+    expect(Array.from(stringSucc("\u{10FFFF}"), (c) => c.codePointAt(0))).toEqual([0x1, 0x10000]);
   });
 
   it("date time with step", () => {
