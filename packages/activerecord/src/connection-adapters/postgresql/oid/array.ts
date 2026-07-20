@@ -163,6 +163,10 @@ export class Array extends ValueType<unknown> {
     return this.subtype.cast(value);
   }
 
+  // Stands in for Rails' `@pg_encoder = PG::TextEncoder::Array.new(...)`
+  // (`oid/array.rb:19`), which is the ruby-pg C extension, not Rails code. The
+  // element rule is shared with the connection-less Arel quoter so the two
+  // renderings of a PG array literal cannot drift.
   encode(values: readonly unknown[]): string {
     const items = values.map((value) => {
       if (value == null) return encodeArrayElement(null, this.delimiter);
