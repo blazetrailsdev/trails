@@ -196,6 +196,19 @@ export class Attribute extends Node {
     return new NotRegexp(this, this.quotedNode(pattern), caseSensitive);
   }
 
+  // DEVIATION: Rails' Attribute has no `in`/`not_in` of its own — it
+  // `include Arel::Predications` (attribute.rb:5-12) and inherits them. These
+  // bodies are byte-identical to Predications.in/notIn and look like dead
+  // duplication, but they are NOT deletable today: this class does not mix in
+  // Predications (there is no `include(...)` call in this file — it only
+  // `.call`s two private helpers, see groupingAny/groupingAll below), so
+  // deleting them removes the methods outright rather than falling through to
+  // the mixin. Verified: with both removed the attributes suite fails with
+  // `attribute.in is not a function`.
+  //
+  // Converging means making Attribute actually include the mixin, which
+  // touches every predication method here — tracked as story
+  // `arel-attribute-include-predications-mixin` (RFC 0066).
   in(values: unknown): In {
     if (isSelectManagerLike(values)) return new In(this, values.ast);
     if (isEnumerable(values)) return new In(this, this.quotedArray([...values]));

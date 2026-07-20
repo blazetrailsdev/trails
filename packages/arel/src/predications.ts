@@ -185,7 +185,6 @@ export const Predications = {
     //   Enumerable    → In(self, quoted_array(other))
     //   else          → In(self, quoted_node(other))
     if (isSelectManagerLike(other)) return new In(this, other.ast);
-    // Node[] is valid NodeOrValue for In/NotIn — no cast needed.
     if (isEnumerable(other)) return new In(this, this.quotedArray([...other]));
     return new In(this, this.quotedNode(other));
   },
