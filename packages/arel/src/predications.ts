@@ -75,6 +75,8 @@ export function isEnumerable(value: unknown): value is Iterable<unknown> {
 export interface PredicationHost {
   /** @internal */
   quotedNode(other: unknown): Node;
+  /** @internal */
+  quotedArray(others: unknown[]): Node[];
 }
 
 function groupedAny(nodes: Node[]): Grouping {
@@ -177,29 +179,19 @@ export const Predications = {
     return new NotRegexp(this, this.quotedNode(pattern), caseSensitive);
   },
 
-  in(this: Node & PredicationHost, other: unknown[] | { ast: Node } | Node | unknown): In {
+  in(this: Node & PredicationHost, other: unknown): In {
     // Mirrors Arel::Predications#in:
     //   SelectManager → In(self, other.ast)
     //   Enumerable    → In(self, quoted_array(other))
     //   else          → In(self, quoted_node(other))
-    if (!(other instanceof Node) && isSelectManagerLike(other)) return new In(this, other.ast);
-    if (isEnumerable(other)) {
-      // Node[] is valid NodeOrValue for In/NotIn — no cast needed.
-      return new In(
-        this,
-        [...other].map((v) => this.quotedNode(v)),
-      );
-    }
+    if (isSelectManagerLike(other)) return new In(this, other.ast);
+    // Node[] is valid NodeOrValue for In/NotIn — no cast needed.
+    if (isEnumerable(other)) return new In(this, this.quotedArray([...other]));
     return new In(this, this.quotedNode(other));
   },
-  notIn(this: Node & PredicationHost, other: unknown[] | { ast: Node } | Node | unknown): NotIn {
-    if (!(other instanceof Node) && isSelectManagerLike(other)) return new NotIn(this, other.ast);
-    if (isEnumerable(other)) {
-      return new NotIn(
-        this,
-        [...other].map((v) => this.quotedNode(v)),
-      );
-    }
+  notIn(this: Node & PredicationHost, other: unknown): NotIn {
+    if (isSelectManagerLike(other)) return new NotIn(this, other.ast);
+    if (isEnumerable(other)) return new NotIn(this, this.quotedArray([...other]));
     return new NotIn(this, this.quotedNode(other));
   },
 
