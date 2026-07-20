@@ -41,6 +41,9 @@ export interface RelationLike {
   typeCastForDatabase: (attrName: string, value: unknown) => unknown;
   typeForAttribute: (name: string) => unknown;
   isAbleToTypeCast: () => boolean;
+  // Attribute#lower delegates here (`relation.lower self`), so every relation
+  // that carries attributes must surface FactoryMethods#lower.
+  lower: (column: unknown) => NamedFunction;
 }
 
 /**
@@ -70,10 +73,10 @@ export class Attribute extends Node {
     return this.relation.typeForAttribute(this.name);
   }
 
-  // -- String functions --
-
+  // Mirrors: Arel::Attributes::Attribute#lower — `relation.lower self`. The
+  // LOWER() node is built by FactoryMethods#lower on the relation, not here.
   lower(): NamedFunction {
-    return new NamedFunction("LOWER", [this]);
+    return this.relation.lower(this);
   }
 
   typeCastForDatabase(value: unknown): unknown {

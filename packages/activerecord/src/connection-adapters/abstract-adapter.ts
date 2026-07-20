@@ -1978,7 +1978,7 @@ export class AbstractAdapter implements Quoting {
   ): Nodes.Node | Promise<Nodes.Node> {
     // Default: canPerformCaseInsensitiveComparisonFor returns true, so always LOWER.
     // Adapters that need async column inspection (e.g. PG) override this whole method.
-    return attribute.lower().eq((attribute.relation as any).lower(value));
+    return attribute.lower().eq(attribute.relation.lower(value));
   }
 
   /** @internal */
