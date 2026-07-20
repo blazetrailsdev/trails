@@ -516,13 +516,4 @@ describe("quotedDate normalisation", () => {
     const d = new Temporal.PlainDate(-1, 4, 26);
     expect(new Visitors.PostgreSQL().compile(users.get("at").eq(d))).toContain("'-1-04-26'");
   });
-
-  // `quoted_time` normalises via `change(year:, month:, day:)`
-  // (abstract/quoting.rb:203), which accepts a full datetime too.
-  it("strips the date off a datetime routed through quoted_time", () => {
-    const dt = Temporal.PlainDateTime.from("2026-04-26T14:23:55");
-    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(dt))).toContain(
-      "'2026-04-26 14:23:55'",
-    );
-  });
 });

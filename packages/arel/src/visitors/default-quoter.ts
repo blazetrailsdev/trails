@@ -60,8 +60,11 @@ function quotedDate(value: TemporalDateLike): string {
   return formatPlainDateTime(withEpochDate(value));
 }
 
-// Mirrors `quoted_time` (abstract/quoting.rb:203): normalise the date to
-// 2000-01-01, then strip the date prefix off `quoted_date`.
+// Mirrors `quoted_time` (abstract/quoting.rb:203). The `PlainDateTime` half of
+// the signature is unreachable from `quoteScalar`, which gates on `PlainTime`
+// per Rails' `Type::Time::Value` arm (:102); it is carried to match the adapter
+// twin's signature (connection-adapters/abstract/quoting.ts:44) and Rails'
+// `change(year:, month:, day:)`, which takes any datetime. Normalise the date to 2000-01-01, then strip the date prefix off `quoted_date`.
 function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
   return quotedDate(withEpochDate(value)).replace(/^\d{4}-\d{2}-\d{2} /, "");
 }
