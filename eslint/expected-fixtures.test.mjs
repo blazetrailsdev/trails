@@ -107,6 +107,29 @@ describe("requiredFixtureSets", () => {
     };
     expect(requiredFixtureSets(entry)).toEqual(["encryptedBooks", "posts"]);
   });
+
+  // Namespaced sets (`fixtures :"admin/accounts"`) keep the slash and camelize
+  // each segment, matching the fixtures-registry keys verbatim — see
+  // test-helpers/fixtures-registry.ts "admin/randomlyNamedA9".
+  it("camelizes namespaced fixture-set names segment-wise, preserving the slash", () => {
+    const entry = {
+      fixtures: ["admin/accounts", "admin/randomly_named_a9", "reserved_words/node"],
+      tests: {
+        a: {
+          fixtures: {
+            "admin/accounts": 1,
+            "admin/randomly_named_a9": 1,
+            "reserved_words/node": 1,
+          },
+        },
+      },
+    };
+    expect(requiredFixtureSets(entry)).toEqual([
+      "admin/accounts",
+      "admin/randomlyNamedA9",
+      "reservedWords/node",
+    ]);
+  });
 });
 
 describe("collectUseFixturesKeys", () => {
