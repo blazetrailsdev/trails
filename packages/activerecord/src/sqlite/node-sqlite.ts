@@ -40,11 +40,10 @@ class NodeSqliteStatement implements SqliteStatement, SyncSqliteStatement {
 
   constructor(private readonly stmt: import("node:sqlite").StatementSync) {
     stmt.setAllowBareNamedParameters(true); // allow { name: val } to bind $name
-    const sql = stmt.sourceSQL.trimStart().toUpperCase();
-    // PRAGMA without `=` returns rows; PRAGMA with `=` is a write. Matches better-sqlite3.
-    this.reader =
-      /^(SELECT|WITH|EXPLAIN|VALUES|TABLE)\b/.test(sql) ||
-      (/^PRAGMA\b/.test(sql) && !sql.includes("="));
+    // Rails branches .all()/.run() on stmt.column_count.zero?; node:sqlite exposes
+    // the same count via columns(). Using it rather than a leading-keyword regex
+    // is what makes `INSERT ... RETURNING` classify as row-returning.
+    this.reader = stmt.columns().length > 0;
   }
 
   private call<T>(method: string, binds: SqliteBinds | undefined): T {
