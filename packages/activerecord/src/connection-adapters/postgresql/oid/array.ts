@@ -6,6 +6,7 @@
  */
 
 import { ValueType } from "@blazetrails/activemodel";
+import { encodeArrayElement } from "@blazetrails/arel";
 
 function stableStringify(value: unknown): string {
   try {
@@ -164,23 +165,9 @@ export class Array extends ValueType<unknown> {
 
   encode(values: readonly unknown[]): string {
     const items = values.map((value) => {
-      if (value == null) return "NULL";
+      if (value == null) return encodeArrayElement(null, this.delimiter);
       if (globalThis.Array.isArray(value)) return this.encode(value);
-
-      const str = String(value);
-      if (
-        str === "" ||
-        str.toUpperCase() === "NULL" ||
-        str.includes(this.delimiter) ||
-        str.includes('"') ||
-        str.includes("\\") ||
-        str.includes("{") ||
-        str.includes("}") ||
-        /\s/.test(str)
-      ) {
-        return `"${str.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
-      }
-      return str;
+      return encodeArrayElement(String(value), this.delimiter);
     });
     return `{${items.join(this.delimiter)}}`;
   }

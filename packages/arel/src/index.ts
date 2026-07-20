@@ -11,6 +11,7 @@ import { TreeManager } from "./tree-manager.js";
 export { TreeManager };
 export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { relationName } from "./attributes/attribute.js";
+export { encodeArrayElement } from "./quote-array.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
 import { registerNodeDeps, setToSqlVisitor } from "./nodes/node.js";
