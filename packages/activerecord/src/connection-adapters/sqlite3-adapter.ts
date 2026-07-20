@@ -65,7 +65,6 @@ import {
   runLoadHooks,
   trailsRoot,
 } from "@blazetrails/activesupport";
-import { typeCastedBinds } from "./abstract/database-statements.js";
 import {
   returningColumnValues as sqliteReturningColumnValues,
   buildTruncateStatement as sqliteBuildTruncateStatement,
@@ -487,7 +486,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       sql,
       name,
       binds,
-      type_casted_binds: typeCastedBinds(binds),
+      type_casted_binds: this.typeCastedBinds(binds) ?? [],
       connection: this,
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
@@ -818,7 +817,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       sql: processed,
       name: name ?? "SQL",
       binds,
-      type_casted_binds: typeCastedBinds(binds ?? []),
+      type_casted_binds: this.typeCastedBinds(binds ?? []) ?? [],
       connection: this,
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,

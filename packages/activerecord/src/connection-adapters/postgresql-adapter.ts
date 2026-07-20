@@ -83,7 +83,6 @@ import {
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
   transactionIsolationLevels,
-  typeCastedBinds,
   preprocessQuery,
   temporalToBindString,
   extractTableRefFromInsertSql,
@@ -1087,7 +1086,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Type-cast bind objects (QueryAttribute) → primitives, then run each
     // through `_bindForPg` for Temporal / BinaryData normalization before
     // pg sees them.
-    const bindArray = typeCastedBinds(binds).map((v) => this._bindForPg(v));
+    const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
     const txPublicQuery = this.currentTransaction().userTransaction;
@@ -1738,7 +1737,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     name: string,
     binds: unknown[],
   ): Promise<Result> {
-    const bindArray = typeCastedBinds(binds).map((v) => this._bindForPg(v));
+    const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, bindArray);
     this._noticeReceiverSqlWarnings = [];
     const payload: Record<string, unknown> = {
@@ -1824,7 +1823,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // Type-cast bind objects (QueryAttribute) → primitives via `value_for_database`,
     // then run each through `_bindForPg` for Temporal / BinaryData normalization —
     // mirrors `type_casted_binds` and the execQuery path.
-    const bindArray = typeCastedBinds(binds).map((v) => this._bindForPg(v));
+    const bindArray = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
     const rewritten = this.rewriteBinds(sql, bindArray);
     // payload.sql is the rewritten SQL (`$1` not `?`) so ExplainSubscriber
     // stores something that can be re-EXPLAIN'd on the same adapter
@@ -1924,7 +1923,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     // mirrors `type_casted_binds`. Without the typeCastedBinds unwrap, an INSERT
     // routed through executeMutation would bind a raw QueryAttribute to pg.
     const originalBinds = binds;
-    binds = typeCastedBinds(binds).map((v) => this._bindForPg(v));
+    binds = (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v));
     const pgSql = this.rewriteBinds(sql, binds);
     this._noticeReceiverSqlWarnings = [];
     // payload.sql records the rewritten SQL — ExplainSubscriber captures
@@ -2331,7 +2330,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       // matching Rails internal_execute(sql, name, binds). Transaction-control
       // callers pass none, keeping their byte-identical no-bind path (no rewrite).
       const hasBinds = binds.length > 0;
-      const bindArray = hasBinds ? typeCastedBinds(binds).map((v) => this._bindForPg(v)) : [];
+      const bindArray = hasBinds
+        ? (this.typeCastedBinds(binds) ?? []).map((v) => this._bindForPg(v))
+        : [];
       const runSql = hasBinds ? this.rewriteBinds(sql, bindArray) : sql;
       // A bound query here is the exec_insert RETURNING read-back; mirror
       // _instrumentedQueryOnClient by resetting the notice buffer up front and

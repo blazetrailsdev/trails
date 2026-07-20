@@ -19,7 +19,6 @@ import {
 import {
   Attribute as ModelAttribute,
   RangeError as ActiveModelRangeError,
-  BinaryData,
 } from "@blazetrails/activemodel";
 import { Notifications, BigDecimal } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
@@ -98,6 +97,13 @@ export function inspectExplainOption(o: unknown): string {
  */
 export interface DatabaseStatementsHost {
   preparedStatements?: boolean;
+  /**
+   * Mixed in from `Quoting` — the single Rails `type_casted_binds`
+   * (quoting.rb:224). Payload producers must reach it through `this` so the
+   * adapter's `type_cast` override applies.
+   * @internal
+   */
+  typeCastedBinds?(binds: unknown[] | null | undefined): unknown[] | undefined;
   execute?(sql: string, binds?: unknown[], name?: string | null): Promise<unknown>;
   selectAll?(
     sql: string,
@@ -1264,9 +1270,11 @@ export function withYamlFallback(value: unknown): unknown {
  * reject raw Temporal objects; this shim converts them at the bind boundary.
  * Returns the value unchanged when it is not a Temporal type.
  *
- * Called directly by the PostgreSQL adapter bind paths (with adapter="postgres"
- * for infinity sentinel handling) and indirectly by all adapters via
- * `typeCastedBinds` (notification payloads, no adapter arg).
+ * Called directly by the PostgreSQL/MySQL adapter bind paths (with an adapter
+ * argument for infinity sentinels and dialect-specific datetime literals) and by
+ * `Base.quoteSqlValue`. It is NOT a `type_casted_binds` producer: that slot goes
+ * through the adapter-dispatched `Quoting#typeCastedBinds` (quoting.rb:224),
+ * whose Temporal handling is `typeCast`'s own `quotedDate`/`quotedTime`.
  */
 export function temporalToBindString(
   value: unknown,
@@ -1329,39 +1337,6 @@ export function highPrecisionCurrentTimestamp(): Nodes.SqlLiteral {
 }
 
 /**
- * Extract database-cast primitive values from a bind array for the
- * `type_casted_binds` slot on `sql.active_record` payloads — matches
- * Rails' `type_casted_binds` contract: subscribers (LogSubscriber,
- * QueryCache, etc) see the primitive values that were actually sent to
- * the driver, not the Attribute / bind objects used to build the query.
- *
- * Mirrors: ActiveRecord::ConnectionAdapters::AbstractAdapter#type_casted_binds
- */
-export function typeCastedBinds(binds: unknown[] | undefined): unknown[] {
-  return (binds ?? []).map((b: any) => {
-    // Rails: `ActiveModel::Attribute === value ? type_cast(value.value_for_database) : type_cast(value)`
-    // valueForDatabase is a getter on real Attribute instances; handle both getter and
-    // function-style mocks by checking presence with "in" then calling if it's a function.
-    let v: unknown;
-    if (b && typeof b === "object" && "valueForDatabase" in b) {
-      const vfd = b.valueForDatabase;
-      v = typeof vfd === "function" ? b.valueForDatabase() : vfd;
-    } else {
-      v = b && typeof b === "object" && "value" in b ? b.value : b;
-    }
-    // Rails' `type_cast` renders a `Type::Binary::Data` as its byte string
-    // (abstract/quoting.rb:96). This function does not route through `typeCast`
-    // — converging that is the wider `type_casted_binds` story, and doing it
-    // wholesale changes unrelated types (e.g. SQLite integer binds become
-    // BigInt) — so unwrap just the binary wrapper. Without it a subscriber sees
-    // the `Data` object and LogSubscriber renders "[object Object]" where Rails
-    // shows the bytes.
-    if (v instanceof BinaryData) v = v.bytes;
-    return temporalToBindString(v);
-  });
-}
-
-/**
  * Wraps query execution in a `sql.active_record` instrumentation event,
  * mirroring Rails' `AbstractAdapter#log`.
  */
@@ -1380,7 +1355,11 @@ async function logSql<T>(
     sql,
     name,
     binds: bindArray,
-    type_casted_binds: typeCastedBinds(bindArray),
+    // `?? []` (never `?? bindArray`) so a host that somehow lacks the mixin
+    // emits an empty slot rather than silently reinstating the raw-uncast-binds
+    // divergence this file's `typeCastedBinds` sweep removed — Attribute objects
+    // in the payload would reach LogSubscriber as "[object Object]".
+    type_casted_binds: host.typeCastedBinds?.(bindArray) ?? [],
     connection: host,
     row_count: 0,
   };
@@ -1863,7 +1842,9 @@ export async function rawExecute(
   materializeTransactions = true,
   batch = false,
 ): Promise<unknown> {
-  const tcBinds = typeCastedBinds(binds ?? []);
+  // `?? []` rather than the raw binds: an adapter missing the mixin should fail
+  // loudly at the driver, not bind Attribute objects.
+  const tcBinds = this.typeCastedBinds?.(binds ?? []) ?? [];
   return (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
     (this as any).performQuery(conn, sql, binds ?? [], tcBinds, { prepare, batch }),
   );
