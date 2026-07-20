@@ -113,7 +113,7 @@ export class Application extends Engine {
     // (rails.rb:65-67). The getter prefers `config.root` so a later
     // `config.setRoot(...)` (e.g. in an initializer) stays visible; `bootRoot`
     // is the discovered/cwd fallback for before any explicit override.
-    const bootRoot = await this.requireRoot();
+    const bootRoot = await this.resolvedRoot();
     setTrailsRoot(() => this.config.root ?? bootRoot);
     this.runInitializers(group, this);
     this._initialized = true;
@@ -150,7 +150,7 @@ export class Application extends Engine {
   async credentials(): Promise<EncryptedFile> {
     if (this._credentials) return this._credentials;
     const c = this.config.credentials;
-    const def = await defaultCredentialPaths(await this.requireRoot());
+    const def = await defaultCredentialPaths(await this.resolvedRoot());
     return (this._credentials = await this.encrypted(c.contentPath ?? def.contentPath, {
       keyPath: c.keyPath ?? def.keyPath,
     }));
@@ -163,7 +163,7 @@ export class Application extends Engine {
     opts: { keyPath?: string; envKey?: string } = {},
   ): Promise<EncryptedFile> {
     const p = await getPathAsync();
-    const root = await this.requireRoot();
+    const root = await this.resolvedRoot();
     return new EncryptedFile({
       contentPath: p.resolve(root, contentPath),
       keyPath: p.resolve(root, opts.keyPath ?? "config/master.key"),
@@ -177,10 +177,10 @@ export class Application extends Engine {
     if (name !== "database") {
       throw new Error(`configFor: only "database" is supported in trailties (got "${name}").`);
     }
-    return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.requireRoot());
+    return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.resolvedRoot());
   }
 
-  private async requireRoot(): Promise<string> {
+  async resolvedRoot(): Promise<string> {
     // Mirrors Rails' `Rails.root` (`application.config.root`): an explicit
     // `config.root=` override wins, then the discovered source root, then cwd.
     return this.config.root ?? (await this.root()) ?? (await getFsAsync()).cwd();

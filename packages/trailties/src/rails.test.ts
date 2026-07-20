@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it } from "vitest";
-import { EnvironmentInquirer, NullLogger, setEnv } from "@blazetrails/activesupport";
+import { EnvironmentInquirer, NullLogger, setEnv, trailsRoot } from "@blazetrails/activesupport";
 import { Trails, _resetTrailsEnv } from "./rails.js";
 import { Application } from "./application.js";
 import { BacktraceCleaner } from "./backtrace-cleaner.js";
@@ -134,6 +134,34 @@ describe("Trails", () => {
 
   it("Trails.root resolves to undefined when no app is registered", async () => {
     expect(await Trails.root()).toBeUndefined();
+  });
+
+  it("Trails.root reflects a config.setRoot override, not the discovered source root", async () => {
+    class RootApp extends Application {}
+    Application.register(RootApp);
+    const app = RootApp.instance();
+    app.root = async () => "/discovered/source";
+    app.config.setRoot("/srv/override");
+    expect(await Trails.root()).toBe("/srv/override");
+  });
+
+  it("Trails.root falls back to the discovered root when config.root is unset", async () => {
+    class DiscoveredApp extends Application {}
+    Application.register(DiscoveredApp);
+    const app = DiscoveredApp.instance();
+    app.root = async () => "/discovered/source";
+    expect(await Trails.root()).toBe("/discovered/source");
+  });
+
+  it("Trails.root agrees with the trailsRoot seam", async () => {
+    class SeamApp extends Application {}
+    Application.register(SeamApp);
+    const app = SeamApp.instance();
+    app.root = async () => "/discovered/source";
+    await Trails.initialize();
+    app.config.setRoot("/srv/override");
+    expect(await Trails.root()).toBe(trailsRoot());
+    expect(trailsRoot()).toBe("/srv/override");
   });
 
   it("Trails.initialized() is false before initialize, true after", async () => {

@@ -114,9 +114,12 @@ export class Trails {
     return (_backtraceCleaner ??= new BacktraceCleaner());
   }
 
-  /** Rails: `application && application.config.root`. */
+  /** Rails: `application && application.config.root`. Reads the app's
+   * resolved root — an explicit `config.setRoot(...)` override wins over
+   * Engine source discovery — so this agrees with the `trailsRoot()` seam
+   * published by `Application#initialize`. */
   static async root(): Promise<string | undefined> {
-    return Trails.application?.root();
+    return Trails.application?.resolvedRoot();
   }
 
   /** Rails: `application && Pathname.new(application.paths["public"].first)`.
