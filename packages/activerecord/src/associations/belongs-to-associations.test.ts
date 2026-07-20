@@ -1820,12 +1820,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((await (lastComment as any).loadBelongsTo("post"))!.id).toBe(post.id);
   });
 
-  // SKIP (RFC 0063): flipping `save` to await the async validation chain
-  // reorders the `belongs_to touch: true` + autosave callbacks so the parent
-  // holder's target is reloaded stale before `saveBelongsToAssociation`
-  // propagates the FK, dropping `parent_id` from `previousChanges`. Tracked:
-  // 0063-async-validation-chain/fix-async-validation-touch-autosave-reorder.
-  it.skip("tracking change from one persisted record to another", async () => {
+  it("tracking change from one persisted record to another", async () => {
     const node = nodes("child_one_of_a");
     expect(node.parent).not.toBeNull();
     expect((node as any).parentChanged?.()).toBeFalsy();
@@ -1840,9 +1835,7 @@ describe("BelongsToAssociationsTest", () => {
     expect((node as any).parentPreviouslyChanged?.()).toBeTruthy();
   });
 
-  // SKIP (RFC 0063): same touch/autosave reorder as the test above. Tracked:
-  // 0063-async-validation-chain/fix-async-validation-touch-autosave-reorder.
-  it.skip("tracking change from persisted record to new record", async () => {
+  it("tracking change from persisted record to new record", async () => {
     const node = nodes("child_one_of_a");
     expect(node.parent).not.toBeNull();
 

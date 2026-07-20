@@ -1507,6 +1507,14 @@ export async function loadBelongsTo(
     const v = record._readAttribute(fk);
     if (v === null || v === undefined) return null;
   }
+  // The staleness key mirrors Rails' `stale_state`: the FK column(s), plus the
+  // `foreign_type` for a polymorphic belongs_to
+  // (belongs_to_polymorphic_association.rb:43-46), so a reassignment that keeps
+  // the same id but changes the target class is still detected below.
+  const staleCols = options.polymorphic
+    ? [...fkColsForCheck, options.foreignType ?? `${underscore(assocName)}_type`]
+    : fkColsForCheck;
+  const staleSnapshot = staleCols.map((col) => record._readAttribute(col));
 
   let result: Base | null;
   if (reflection) {
@@ -1552,6 +1560,27 @@ export async function loadBelongsTo(
         [primaryKey as string]: record._readAttribute(foreignKey),
       });
     }
+  }
+
+  // Rails' `find_target` is synchronous, so it never observes the owner's
+  // foreign key change mid-load. Our loader awaits DB I/O: an in-flight reader
+  // query (e.g. `node.parent` accessed but never awaited) can still be pending
+  // when the caller synchronously reassigns the association
+  // (`node.parent = other`) with a new FK. Once RFC 0063 made `save` genuinely
+  // await the validation chain, that window widened enough for the stale query
+  // to resolve mid-save and `syncToAssociationInstance` clobber the
+  // freshly-assigned holder target with the old record — dropping the FK change
+  // from `previousChanges`. If the owner's stale key moved off the snapshot we
+  // queried, the fetched record is stale: leave the holder's newer target
+  // intact and return it instead of the stale row.
+  const fkMovedDuringLoad = staleCols.some(
+    (col, i) => record._readAttribute(col) !== staleSnapshot[i],
+  );
+  if (fkMovedDuringLoad) {
+    const holder = record._associationInstances.get(assocName) as
+      | { isLoaded?: () => boolean; target?: Base | null }
+      | undefined;
+    if (holder?.isLoaded?.()) return holder.target ?? null;
   }
 
   // Set inverse_of: store reference back to the owner. Resolve via the
