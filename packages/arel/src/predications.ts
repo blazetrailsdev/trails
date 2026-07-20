@@ -36,11 +36,15 @@ import {
  * `buildQuoted` matches managers (casted.ts:41-44) — a structural check keeps
  * the runtime import out. The `instanceof Node` half matters: a bare
  * `"ast" in value` also admits `{ ast: undefined }`, which would build
- * `In(this, undefined)`.
+ * `In(this, undefined)`. A `Node` is excluded: it is the `else`-arm value
+ * itself, not a manager wrapping one.
  */
 export function isSelectManagerLike(value: unknown): value is { ast: Node } {
   return (
-    typeof value === "object" && value !== null && (value as { ast?: unknown }).ast instanceof Node
+    typeof value === "object" &&
+    value !== null &&
+    !(value instanceof Node) &&
+    (value as { ast?: unknown }).ast instanceof Node
   );
 }
 
@@ -53,13 +57,17 @@ export function isSelectManagerLike(value: unknown): value is { ast: Node } {
  * Two deliberate edges:
  * - JS strings are iterable, but Ruby's String is NOT Enumerable, so they must
  *   reach `quoted_node`. `typeof value === "object"` excludes them.
- * - A plain JS object is not iterable, so it reaches `quoted_node` — matching
- *   `Object.new` at attribute_test.rb:747-757. Note this DIVERGES for a Ruby
- *   Hash, which IS Enumerable: Rails' `in({a: 1})` takes the `quoted_array`
- *   arm and expands to `[Casted([:a, 1], self)]`, where this casts the object
- *   whole. Ruby's Hash maps to a JS Map (iterable, so it expands correctly);
- *   an object literal is the closer analogue of `Object.new`, so the scalar
- *   arm is the better of the two readings, not an exact one.
+ * - **A plain JS object casts whole rather than expanding.** Ruby's Hash IS
+ *   Enumerable, so Rails' `in({a: 1})` takes the `quoted_array` arm and
+ *   expands to `[Casted([:a, 1], self)]`. There is no single JS value that is
+ *   both the Hash analogue and the `Object.new` analogue, so the two Ruby arms
+ *   are split across two JS types: a `Map` is the Hash analogue and is
+ *   iterable, so it expands through this guard exactly as Ruby's Hash does; an
+ *   object literal is the `Object.new` analogue and correctly reaches
+ *   `quoted_node` (attribute_test.rb:747-757). Passing an object literal to
+ *   `in` / `notIn` therefore casts the container — use a `Map` to get Ruby
+ *   Hash pair-expansion. This is a decided split, not an accident; both arms
+ *   are pinned by tests.
  */
 export function isEnumerable(value: unknown): value is Iterable<unknown> {
   return typeof value === "object" && value !== null && Symbol.iterator in value;

@@ -596,19 +596,21 @@ export class Attribute extends Node {
     return new Overlaps(this, this.quotedNode(other));
   }
 
+  // Rails' Attribute inherits this from Predications via `include`
+  // (attribute.rb:8); there is exactly one `quoted_array`
+  // (predications.rb:227-229). Delegate rather than reimplement, matching the
+  // other inherited-helper shims above. `this` is threaded through, so the
+  // elements still route via this class's `quotedNode` — the hook subclasses
+  // override — keeping every element on the same path as a scalar RHS.
+  quotedArray(others: unknown[]): Node[] {
+    return Predications.quotedArray.call(this, others);
+  }
+
   /**
    * Apply a window to this expression.
    *
    * Mirrors: `OVER` support on Arel expressions.
    */
-  // Mirrors Arel::Predications#quoted_array — `others.map { |v| quoted_node(v) }`
-  // (predications.rb:227-229). Delegates to `quotedNode` rather than calling
-  // `buildQuoted` directly: `quoted_node` is the hook subclasses override, so
-  // routing through it keeps every element on the same path as a scalar RHS.
-  quotedArray(others: unknown[]): Node[] {
-    return others.map((v) => this.quotedNode(v));
-  }
-
   over(window?: Window | NamedWindow | string | null): Over {
     if (!window) return new Over(this, null);
     if (typeof window === "string") return new Over(this, new SqlLiteral(window));

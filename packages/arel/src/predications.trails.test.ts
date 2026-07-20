@@ -32,6 +32,15 @@ describe("PredicationsMixin in/notIn Enumerable arm", () => {
       );
     });
 
+    // The Hash half of the decided split (see isEnumerable in predications.ts):
+    // a Map is the Ruby Hash analogue, so the Map ITSELF expands into pairs the
+    // way Rails' `in({a: 1})` does — not just an iterator taken off it.
+    it("expands a Map into pairs, matching Ruby's Enumerable Hash", () => {
+      const node = expr();
+      const map = new Map<string, number>([["a", 1]]);
+      expect(node.in(map)).toEqual(new Nodes.In(node, [new Nodes.Quoted(["a", 1])]));
+    });
+
     it("casts a non-iterable object through the scalar arm", () => {
       const node = expr();
       const randomObject = {};
