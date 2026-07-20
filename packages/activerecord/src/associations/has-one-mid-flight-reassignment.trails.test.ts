@@ -30,6 +30,17 @@
  *
  * A sound fix needs the holder to distinguish "our own load's writeback" from
  * "someone else's set" — a load-generation token, not an inferred signal.
+ *
+ * Note there are TWO writebacks on this path, and a fix must cover both: the
+ * inner loader's `syncToAssociationInstance` (`associations.ts:1838`) and the
+ * instance wrapper's own `setTarget` (`associations/instance-methods.ts:176`),
+ * which re-syncs unconditionally after the inner call returns. Guarding only
+ * the inner one leaves the clobber reachable.
+ *
+ * The race is driven through the public reader (`firm.account`, a Promise-
+ * returning getter that routes to `loadHasOne`) rather than the internal
+ * `record.loadHasOne("account")`, so the repro keeps exercising whatever path
+ * the accessor actually takes.
  */
 import { describe, expect, test } from "vitest";
 
@@ -44,7 +55,7 @@ describe("has_one mid-flight reassignment", () => {
     const firm = (await Firm.first()) as Firm;
     const other = await Account.create({ credit_limit: 42 });
 
-    const inFlight = firm.loadHasOne("account");
+    const inFlight = firm.account;
     firm.association("account").setTarget(other);
 
     await inFlight;
@@ -56,7 +67,7 @@ describe("has_one mid-flight reassignment", () => {
     const firm = (await Firm.first()) as Firm;
     const other = await Account.create({ credit_limit: 42 });
 
-    const inFlight = firm.loadHasOne("account");
+    const inFlight = firm.account;
     firm.association("account").setTarget(other);
 
     expect(await inFlight).toBe(other);
@@ -65,7 +76,7 @@ describe("has_one mid-flight reassignment", () => {
   test.skip("an assignment to null is not resurrected by the in-flight reader", async () => {
     const firm = (await Firm.first()) as Firm;
 
-    const inFlight = firm.loadHasOne("account");
+    const inFlight = firm.account;
     firm.association("account").setTarget(null);
 
     expect(await inFlight).toBeNull();
