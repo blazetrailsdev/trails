@@ -60,3 +60,21 @@ describe("Collector#any", () => {
     expect(collector.isAnyResponse()).toBe(false);
   });
 });
+
+describe("Collector#custom", () => {
+  it("keeps the first registration for a format", () => {
+    const collector = new Collector();
+    collector.html(() => "first");
+    collector.any("html", () => "second");
+
+    expect(collector.negotiate({ format: "html" })?.handler()).toBe("first");
+  });
+
+  it("keeps the first registration across repeated custom calls", () => {
+    const collector = new Collector();
+    collector.custom("html", () => "first");
+    collector.custom("html", () => "second");
+
+    expect(collector.negotiate({ format: "html" })?.handler()).toBe("first");
+  });
+});

@@ -47,6 +47,17 @@ export class Collector extends DispatchCollector {
     return this.on(mimeType, handler);
   }
 
+  /**
+   * First registration wins, mirroring Rails' `@responses[mime_type] ||= ...`
+   * in `custom` (mime_responds.rb:271). Every format method funnels through
+   * `custom` in Rails (abstract_controller/collector.rb:9-15), so the
+   * first-wins rule covers `format.html` as well as explicit `custom` calls.
+   */
+  override on(format: string, handler?: FormatHandler): this {
+    if (this.handlerFor(format)) return this;
+    return super.on(format, handler);
+  }
+
   isAnyResponse(): boolean {
     return !this.handlerFor(this.format) && this.hasAnyHandler;
   }
