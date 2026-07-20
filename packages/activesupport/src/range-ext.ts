@@ -68,6 +68,14 @@ const isAsciiAlnum = (c: number): boolean =>
  * `"99".succ == "100"`). Strings with no alphanumeric increment by raw code
  * unit instead (`"<<".succ == "<="`).
  */
+/** Inclusive [min, max] code-point bounds of the UTF-8 width encoding `cp`. */
+function utf8WidthBounds(cp: number): [number, number] {
+  if (cp < 0x80) return [0x00, 0x7f];
+  if (cp < 0x800) return [0x80, 0x7ff];
+  if (cp < 0x10000) return [0x800, 0xffff];
+  return [0x10000, 0x10ffff];
+}
+
 export function stringSucc(s: string): string {
   if (s.length === 0) return "";
   const codes = Array.from(s, (ch) => ch.codePointAt(0) as number);
@@ -87,13 +95,14 @@ export function stringSucc(s: string): string {
     let i = codes.length - 1;
     let carry = true;
     while (i >= 0 && carry) {
-      if (codes[i] >= 0x10ffff) {
-        // Ruby zeroes the wrapped character's bytes and then advances to the
-        // next *valid* character of that encoded width (string.c
-        // `enc_succ_char` / `str_succ`), so a wrapped 4-byte UTF-8 char lands
-        // on U+10000 — `"\u{10FFFF}".succ.codepoints == [0x1, 0x10000]`, not
-        // [0x1, 0x0].
-        codes[i] = 0x10000;
+      const [min, max] = utf8WidthBounds(codes[i]);
+      if (codes[i] >= max) {
+        // `enc_succ_char` reports NEIGHBOR_WRAPPED whenever the successor's
+        // encoded length would differ (string.c: `l != len`), so a character
+        // at the top of its UTF-8 width wraps to that width's *minimum* and
+        // carries — `"\u{FFFF}".succ.codepoints == [0x1, 0x800]`, not
+        // [0x10000]. The carry then prepends U+0001 below.
+        codes[i] = min;
       } else {
         codes[i]++;
         // Surrogates are not valid characters; `enc_succ_char` skips past
