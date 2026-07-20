@@ -116,7 +116,8 @@ jobs:
           # actionpack/actionview/activerecord/rack/activesupport, so any of
           # their workspace upstreams also flips this on.
           TRAILTIES_PKGS_RE='^packages/(trailties|actionpack|actionview|activerecord|arel|activemodel|activesupport|globalid|rack|did-you-mean|trails-tsc)/'
-          # trails_tsc_affected gates the virtualized DX type tests.
+          # trails_tsc_affected gates the virtualized DX type tests, the
+          # blocking trails-tsc-tests job, and trails-tsc-coverage.
           # Workspace consumers of @blazetrails/trails-tsc today: activerecord
           # (tsc-wrapper + type-virtualization) and scripts/guides-typecheck;
           # AR consumption is the reason trails-tsc is also in AR_PKGS_RE.
