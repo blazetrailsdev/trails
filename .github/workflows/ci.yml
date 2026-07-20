@@ -511,12 +511,30 @@ jobs:
           github.event.pull_request.user.login == 'deanmarano' }}
         run: |
           set -euo pipefail
+          # A transient GitHub API 5xx must not red this step: the only signal
+          # a maintainer sees is the step name, which reads as "attribution
+          # found" when nothing is wrong. Retry, then fail with an explicit
+          # "API unreachable" message that can't be mistaken for a real hit.
+          ghApiRetry() {
+            local attempt
+            for attempt in 1 2 3 4; do
+              if gh api "$@"; then
+                return 0
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                echo "gh api failed (attempt $attempt/4); retrying in $((attempt * 5))s..." >&2
+                sleep "$((attempt * 5))"
+              fi
+            done
+            echo "::error::GitHub API unreachable after 4 attempts — this is an infrastructure failure, NOT a Claude attribution violation. Re-run this job." >&2
+            return 1
+          }
           # Fetch the *live* body rather than reading the event payload. The
           # PR triggers don't include `edited`, so a body edit won't re-fire
           # CI — but a manual job re-run hits the API fresh and will see the
           # fix. Reading the payload would replay the stale original body and
           # leave the check permanently red.
-          body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
+          body=$(ghApiRetry "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
           if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
             echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
             exit 1
@@ -531,6 +549,22 @@ jobs:
           github.event.pull_request.user.login == 'deanmarano' }}
         run: |
           set -euo pipefail
+          # See the body guard above: retry transient API failures so a 5xx
+          # can't masquerade as an attribution hit.
+          ghApiRetry() {
+            local attempt
+            for attempt in 1 2 3 4; do
+              if gh api "$@"; then
+                return 0
+              fi
+              if [ "$attempt" -lt 4 ]; then
+                echo "gh api failed (attempt $attempt/4); retrying in $((attempt * 5))s..." >&2
+                sleep "$((attempt * 5))"
+              fi
+            done
+            echo "::error::GitHub API unreachable after 4 attempts — this is an infrastructure failure, NOT a Claude attribution violation. Re-run this job." >&2
+            return 1
+          }
           # Scan every commit message on the PR, not just the PR body. The body
           # check above misses `Co-authored-by:` trailers that live in commits —
           # and GitHub's squash-merge auto-aggregates those branch-commit
@@ -542,12 +576,12 @@ jobs:
           # closed in that case rather than passing on a partial scan — this repo
           # squashes and has a 500-LOC ceiling, so 250 commits never happens
           # legitimately; if it does, squash/rebase before re-running.
-          count=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
+          count=$(ghApiRetry "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
           if [ "$count" -gt 250 ]; then
             echo "::error::PR has $count commits, exceeding the 250-commit API scan cap. Squash or rebase the branch so commit messages can be fully scanned, then re-run this job."
             exit 1
           fi
-          messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
+          messages=$(ghApiRetry --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
           if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
             echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
             exit 1
