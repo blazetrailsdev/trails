@@ -24,6 +24,7 @@ import {
   introspectIndexes,
   introspectPrimaryKey,
 } from "../../../../packages/activerecord/src/schema-introspection.js";
+import { getFsAsync } from "@blazetrails/activesupport";
 import { canonicalize } from "./canonicalize.js";
 import type { NativeDump, NativeColumn, NativeIndex } from "./canonicalize.js";
 
@@ -58,6 +59,10 @@ async function main(): Promise<void> {
   const fixtureDirAbs = resolve(fixtureDir);
   const outPathAbs = resolve(outPath);
 
+  // The sync node fs auto-register relies on `require`, which is absent under
+  // pure ESM; awaiting the async path registers the adapter up front.
+  await getFsAsync();
+
   const tmpDir = mkdtempSync(join(tmpdir(), "parity-node-"));
   const dbPath = join(tmpDir, "schema.db");
 
@@ -72,8 +77,9 @@ async function main(): Promise<void> {
     }
 
     // 2. Connect via trails adapter
-    // Pass dbPath directly — adapterNameFromUrl recognises .db extension as sqlite.
-    await Base.establishConnection(dbPath);
+    // A bare path is treated as a configuration name, not a URL, so pass an
+    // explicit hash config.
+    await Base.establishConnection({ adapter: "sqlite3", database: dbPath });
     const adapter = Base.adapter;
 
     // 3. Introspect tables, columns, indexes

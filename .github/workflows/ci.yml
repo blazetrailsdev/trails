@@ -1314,7 +1314,7 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - name: Build dependency packages for trails introspection
-        run: pnpm --filter @blazetrails/arel --filter @blazetrails/activesupport --filter @blazetrails/activemodel --filter @blazetrails/globalid build
+        run: pnpm --filter "@blazetrails/activerecord^..." build
       - name: Run trails-side dump
         run: pnpm tsx scripts/parity/run.ts --side=trails
       - uses: actions/upload-artifact@v4
