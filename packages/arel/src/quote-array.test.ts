@@ -1,6 +1,9 @@
 import { describe, it, expect } from "vitest";
 import { quoteArrayLiteral } from "./quote-array.js";
 import { defaultQuoter } from "./visitors/default-quoter.js";
+import { BinaryData } from "@blazetrails/activemodel";
+import { BigDecimal } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 describe("quoteArrayLiteral", () => {
   it("formats simple string arrays", () => {
@@ -56,9 +59,17 @@ describe("quoteArrayLiteral", () => {
     });
   });
 
+  // `type_cast` reaches a Date/Time only through `quoted_date`
+  // (`abstract/quoting.rb:103`), which on this path is the caller's
+  // `formatElement` hook — never a bare ISO-8601 string, a format no Rails
+  // path emits.
+  // A hookless caller has no `quoted_date` to route through, so the value is
+  // not castable — asserted here rather than re-asserting the hook path, which
+  // `formatElement` > "quotes a formatted element whose content needs it"
+  // already covers with this same Date.
   it("handles Date values with toISOString", () => {
     const d = new Date("2026-03-26T12:00:00.000Z");
-    expect(quoteArrayLiteral([d], defaultQuoter)).toBe(`{${d.toISOString()}}`);
+    expect(() => quoteArrayLiteral([d], defaultQuoter)).toThrow(new TypeError("can't cast Time"));
   });
 
   it("handles empty arrays", () => {
@@ -67,11 +78,59 @@ describe("quoteArrayLiteral", () => {
 
   it("handles objects with toISOString", () => {
     const obj = { toISOString: () => "2026-01-01T00:00:00Z" };
-    expect(quoteArrayLiteral([obj], defaultQuoter)).toBe("{2026-01-01T00:00:00Z}");
+    expect(() => quoteArrayLiteral([obj], defaultQuoter)).toThrow(new TypeError("can't cast Time"));
   });
 
   it("handles bigint values inside objects", () => {
-    expect(quoteArrayLiteral([{ id: 42n }], defaultQuoter)).toBe('{"{\\"id\\":\\"42\\"}"}');
+    expect(() => quoteArrayLiteral([{ id: 42n }], defaultQuoter)).toThrow(
+      new TypeError("can't cast Hash"),
+    );
+  });
+
+  // `else raise TypeError, "can't cast #{value.class.name}"`
+  // (`abstract/quoting.rb:105`) — the closed set's terminal arm.
+  describe("raises TypeError on a value type_cast does not name", () => {
+    it("raises on a class instance", () => {
+      class Point {}
+      expect(() => quoteArrayLiteral([new Point()], defaultQuoter)).toThrow(
+        new TypeError("can't cast Point"),
+      );
+    });
+
+    it("raises on a function", () => {
+      expect(() => quoteArrayLiteral([() => 1], defaultQuoter)).toThrow(
+        new TypeError("can't cast Function"),
+      );
+    });
+
+    // Trails' `Type::Time::Value` analogue: `quoted_time` is a connection
+    // self-dispatch (`abstract/quoting.rb:102`) and `ArelConnection` has no
+    // such method, so it must arrive pre-formatted via `formatElement`.
+    it("raises on a Temporal value no formatElement hook claimed", () => {
+      expect(() => quoteArrayLiteral([Temporal.PlainTime.from("12:00")], defaultQuoter)).toThrow(
+        TypeError,
+      );
+    });
+  });
+
+  // `when Symbol, ActiveSupport::Multibyte::Chars, Type::Binary::Data then
+  // value.to_s` (`abstract/quoting.rb:95-96`).
+  it("casts a Type::Binary::Data to its byte string", () => {
+    expect(quoteArrayLiteral([new BinaryData("hi")], defaultQuoter)).toBe("{hi}");
+  });
+
+  // `when BigDecimal then value.to_s("F")` (`abstract/quoting.rb:99`) — the
+  // fixed form, not the default `to_s`.
+  it("casts a BigDecimal to its non-normalized fixed form", () => {
+    expect(quoteArrayLiteral([new BigDecimal("1.5")], defaultQuoter)).toBe("{1.5}");
+  });
+
+  // `when nil, Numeric, String then value` plus `when Symbol ... value.to_s`
+  // (`abstract/quoting.rb:95-101`).
+  it("casts the scalar arms type_cast names", () => {
+    expect(quoteArrayLiteral([1, 42n, "a", null, Symbol("sym")], defaultQuoter)).toBe(
+      "{1,42,a,NULL,sym}",
+    );
   });
 
   // Each expectation below was captured from `PG::TextEncoder::Array#encode`,

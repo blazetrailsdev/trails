@@ -223,6 +223,18 @@ export const postgresqlDefaultQuoter: ArelConnection = {
       return `'${String(value)}'`;
     }
     if (Array.isArray(value)) {
+      // A Temporal element — trails' `Time` analogue — is NOT claimed by
+      // `isDateLike` (Temporal exposes no `toISOString`) and so hits
+      // `type_cast`'s terminal raise. That is unreachable for a real
+      // `timestamp[]`: this host serves only the connection-less
+      // `new PostgreSQL()` debug path, and every adapter construction site
+      // passes a real connection (postgresql-adapter.ts `arelVisitor`,
+      // insert-all.ts:786-788), whose own `type_cast_array` → `type_cast`
+      // (connection-adapters/postgresql/quoting.ts:445-449) owns the
+      // Temporal arms and never reaches `quoteArrayLiteral`. Routing Temporal
+      // through a `quotedTime` here needs a `quoted_time` on `ArelConnection`,
+      // which Rails puts on the adapter, not on Arel.
+      //
       // formatElement keeps #4867's fix alive on this path: a date element gets
       // the same `quoted_date` form the scalar path emits, mirroring Rails'
       // `type_cast_array` → `type_cast` → `when Date, Time then quoted_date`
