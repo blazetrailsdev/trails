@@ -19,6 +19,7 @@ import { fixtures } from "./test-helpers/fixtures.js";
 
 class NormalizedCompany extends Company {}
 class OtherCompany extends Company {}
+class ReloadedCompany extends Company {}
 
 const defTypeFor = (klass: typeof Company, name: string) =>
   (
@@ -44,5 +45,25 @@ describe("STI subclass normalizes", () => {
 
     expect(NormalizedCompany.new({ name: "  acme  " }).name).toBe("ACME");
     expect(Company.new({ name: "  acme  " }).name).toBe("  acme  ");
+  });
+
+  it("keeps the subclass decoration across a schema reset and re-reflection", async () => {
+    await ReloadedCompany.loadSchema();
+    await Company.loadSchema();
+
+    ReloadedCompany.normalizes("name", (name: unknown) =>
+      typeof name === "string" ? name.trim().toUpperCase() : name,
+    );
+    expect(defTypeFor(ReloadedCompany, "name").cast("  acme  ")).toBe("ACME");
+
+    // Rails re-seeds `_default_attributes` from `columns_hash` and replays the
+    // pending-decorator chain on every rebuild, so reflection must not revert
+    // (or drop) the subclass's decorated definition.
+    ReloadedCompany.resetColumnInformation();
+    await Company.loadSchema();
+    await ReloadedCompany.loadSchema();
+
+    expect(defTypeFor(ReloadedCompany, "name").cast("  acme  ")).toBe("ACME");
+    expect(defTypeFor(Company, "name").cast("  acme  ")).toBe("  acme  ");
   });
 });

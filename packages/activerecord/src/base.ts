@@ -1354,6 +1354,11 @@ export class Base extends Model {
       state._schemaLoadPromise = undefined;
       throw e;
     }
+    // An STI subclass INHERITS the base's `_schemaLoadPromise`, so it awaits the
+    // base's load and `applyColumnsHash` never runs with this subclass as the
+    // originating host. Re-sync its overlay here, or a subclass that forked
+    // `_attributeDefinitions` stays pinned to pre-reflection definitions.
+    ModelSchema.syncStiSubclassAttributeDefinitions(this as never);
   }
 
   /**

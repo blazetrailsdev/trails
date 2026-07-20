@@ -400,6 +400,37 @@ function collectPendingModifications(cls: AttributeHostInternals): PendingModifi
 // ---------------------------------------------------------------------------
 
 /**
+ * Replay a class's OWN pending decorators onto a definitions map.
+ *
+ * Rails rebuilds `_default_attributes` from `columns_hash` and then replays the
+ * pending-modification chain every time
+ * (ActiveModel::AttributeRegistration#_default_attributes), so a decoration
+ * declared on a class survives schema reflection/reload. AR's STI reflection
+ * rebuilds a subclass's `_attributeDefinitions` from the base map, which drops
+ * decorations unless they are replayed — this is that replay, restricted to the
+ * class's OWN decorators because inherited ones are already baked into the base
+ * map by `decorateAttributes`' immediate apply.
+ *
+ * @internal
+ */
+export function replayOwnPendingDecorators(
+  cls: AttributeHostInternals,
+  defs: Map<string, { name: string; type: Type }>,
+): void {
+  if (!Object.prototype.hasOwnProperty.call(cls, "_pendingAttributeModifications")) return;
+  for (const mod of cls._pendingAttributeModifications as PendingModification[]) {
+    if (!(mod instanceof PendingDecorator)) continue;
+    const targets = mod.names ?? Array.from(defs.keys());
+    for (const name of targets) {
+      const def = defs.get(name);
+      if (!def) continue;
+      const newType = mod.decorator(name, def.type, cls);
+      if (newType) defs.set(name, { ...def, type: newType });
+    }
+  }
+}
+
+/**
  * Push a type declaration onto the pending-modification queue.
  * Called internally by attribute() implementations.
  *
