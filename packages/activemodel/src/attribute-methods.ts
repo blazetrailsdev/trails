@@ -655,27 +655,39 @@ export function resolveAliasName(host: AttributeMethodHost, name: string): strin
 }
 
 /**
- * Trails-only convention bridge for `resolveAliasName`.
+ * `resolveAliasName` plus the trails-only camelCase-key bridge, resolved
+ * against a caller-supplied attribute set.
  *
  * Trails stores alias KEYS camelCase (`newName`, `commentsCount`) while derived
  * names — counter-cache columns, DB column names — are snake_case (`new_name`,
  * `comments_count`). Rails needs no such bridge: its alias keys are already in
- * the same convention as its column names, so a plain
- * `attribute_aliases[attr_name]` hit suffices.
+ * the same convention as its column names, so the plain
+ * `attribute_aliases[attr_name] || attr_name` step suffices everywhere it uses
+ * one (attribute_methods.rb:316-319, read.rb:31-34, write.rb:31-34).
  *
- * This is a *fallback* and deliberately NOT folded into `resolveAliasName`.
- * Callers must first establish that `name` is not itself a real attribute of
- * the relevant set, because the camelized key is a guess: a record loaded with
- * a projected `comments_count` (say `SELECT COUNT(*) AS comments_count`) owns
- * that name outright and must never be redirected to an unrelated
- * `commentsCount` alias. Which set is "relevant" differs by caller — the class
- * attribute set for `has_attribute?` at class level, the loaded `@attributes`
- * at instance level (attribute_methods.rb:316-319) — so the check belongs at
- * the call site, not here.
+ * Because the camelized key is a *guess*, it is applied only after `present`
+ * has been consulted: a name the relevant set already owns — a record loaded
+ * with a projected `SELECT COUNT(*) AS comments_count`, say — must never be
+ * redirected to an unrelated `commentsCount` alias. `present` is the set that
+ * defines ownership for the calling surface: the class attribute set for
+ * class-level `has_attribute?`, the loaded `@attributes` for the instance form
+ * and for `read_attribute` / `write_attribute`.
+ *
+ * Rails applies one identical resolution step across all of those surfaces, so
+ * trails routes them all through this single function — sharing the bridge
+ * keeps them coherent, i.e. never `has_attribute?` true while `read_attribute`
+ * returns nil for the same name.
  *
  * @internal
  */
-export function resolveAliasNameBridged(host: AttributeMethodHost, name: string): string {
-  const aliases = host._attributeAliases;
-  return aliases?.[name] ?? aliases?.[camelize(name, "lower")] ?? name;
+export function resolveAliasNameIn(
+  host: AttributeMethodHost,
+  present: { has(name: string): boolean } | undefined,
+  name: string,
+): string {
+  const aliases = host?._attributeAliases;
+  const exact = aliases?.[name];
+  if (exact !== undefined) return exact;
+  if (present?.has(name)) return name;
+  return aliases?.[camelize(name, "lower")] ?? name;
 }

@@ -111,6 +111,24 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(t.readAttribute("newName")).toBe("a");
   });
 
+  it("resolves the camelCase bridge identically for has/read/write", () => {
+    // Rails runs one identical alias step in has_attribute?
+    // (attribute_methods.rb:316-319), read_attribute (read.rb:31-34) and
+    // write_attribute (write.rb:31-34). The trails bridge must be shared by all
+    // three, or an attribute can report present while reads return nil.
+    class Topic extends Base {
+      static {
+        this.attribute("legacy_comments_count", "integer");
+        this.aliasAttribute("commentsCount", "legacy_comments_count");
+      }
+    }
+    const t = Topic.instantiate({ legacy_comments_count: 7 });
+    expect(t.hasAttribute("comments_count")).toBe(true);
+    expect(t.readAttribute("comments_count")).toBe(7);
+    t.writeAttribute("comments_count", 9);
+    expect(t.readAttribute("legacy_comments_count")).toBe(9);
+  });
+
   it("prefers a loaded attribute over the camelCase alias bridge", () => {
     // Rails' instance has_attribute? checks the loaded @attributes
     // (attribute_methods.rb:316-319), which can hold names the class does not
@@ -127,6 +145,10 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(t.hasAttribute("comments_count")).toBe(true);
     expect(t.readAttribute("comments_count")).toBe(42);
     expect(t.readAttribute("commentsCount")).toBe(7);
+    // The write path must agree with the read path about which one it means.
+    t.writeAttribute("comments_count", 43);
+    expect(t.readAttribute("comments_count")).toBe(43);
+    expect(t.readAttribute("legacy_comments_count")).toBe(7);
   });
 
   it("readonly attributes are not updated after create", async () => {

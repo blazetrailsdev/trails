@@ -68,6 +68,7 @@ import {
   attributeMethodAffix,
   aliasAttribute,
   resolveAliasName,
+  resolveAliasNameIn,
   undefineAttributeMethods,
   attributeMissing,
   attributeAliases,
@@ -1669,8 +1670,10 @@ export class Model {
 
   readAttribute(name: string): unknown {
     // Rails resolves alias_attribute names in `read_attribute`
-    // (attribute_aliases[name] || name); `_read_attribute` skips it.
-    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    // (attribute_aliases[name] || name, read.rb:31-34); `_read_attribute`
+    // skips it. Resolved against the loaded attribute set so the trails
+    // camelCase-key bridge cannot displace a name the record already owns.
+    const resolved = resolveAliasNameIn(this.constructor as typeof Model, this._attributes, name);
     if (!this._attributes.has(resolved)) {
       return null;
     }
@@ -1712,8 +1715,10 @@ export class Model {
 
   writeAttribute(name: string, value: unknown): void {
     // Alias-resolve on the public write path; aliased writes land on the
-    // canonical attribute's dirty state (Rails `write_attribute`).
-    const resolved = resolveAliasName(this.constructor as typeof Model, name);
+    // canonical attribute's dirty state (Rails `write_attribute`,
+    // write.rb:31-34). Resolved against the loaded attribute set to stay
+    // coherent with `readAttribute` / `hasAttribute`.
+    const resolved = resolveAliasNameIn(this.constructor as typeof Model, this._attributes, name);
     this._writeAttribute(resolved, value);
   }
 
@@ -1790,8 +1795,8 @@ export class Model {
    */
   hasAttribute(name: string): boolean {
     const ctor = this.constructor as typeof Model;
-    const resolved = resolveAliasName(ctor, name);
-    return ctor._attributeDefinitions.has(resolved);
+    const defs = ctor._attributeDefinitions;
+    return defs.has(resolveAliasNameIn(ctor, defs, name));
   }
 
   /**

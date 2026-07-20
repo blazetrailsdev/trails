@@ -11,7 +11,7 @@ export {
   MissingAttributeError,
   AttributeMethodPattern,
   resolveAliasName,
-  resolveAliasNameBridged,
+  resolveAliasNameIn,
   AttrNames,
   defineDirtyAttributeMethods,
 } from "./attribute-methods.js";

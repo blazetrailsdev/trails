@@ -1,5 +1,5 @@
 import type { Base } from "./base.js";
-import { Model, MissingAttributeError, resolveAliasName } from "@blazetrails/activemodel";
+import { Model, MissingAttributeError, resolveAliasNameIn } from "@blazetrails/activemodel";
 import { ActiveRecordError } from "./errors.js";
 import { raiseOnAssignToAttrReadonly, setRaiseOnAssignToAttrReadonly } from "./ar-config.js";
 
@@ -121,7 +121,7 @@ export function writeAttribute(this: Base, name: string, value: unknown): void {
   // Rails' `write_attribute` resolves `attribute_aliases[name]` before the
   // chain runs, so HasReadonlyAttributes' check sees the canonical name and
   // writing via an alias cannot bypass readonly enforcement.
-  let canonical = resolveAliasName(ctor, String(name));
+  let canonical = resolveAliasNameIn(ctor, this._attributes, String(name));
   // Rails `write_attribute` remaps the `id` literal to the primary key before
   // `write_from_user` (write.rb:35: `name = @primary_key if name == "id" &&
   // @primary_key`), where `@primary_key` is `klass.primary_key` (core.rb:844).

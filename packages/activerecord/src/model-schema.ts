@@ -1,7 +1,7 @@
 import type { Base } from "./base.js";
 import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { pluralize, underscore } from "@blazetrails/activesupport";
-import { resolveAliasNameBridged } from "@blazetrails/activemodel";
+import { resolveAliasNameIn } from "@blazetrails/activemodel";
 import {
   Attribute,
   AttributeSetBuilder,
@@ -231,11 +231,9 @@ export function columnNames(this: typeof Base): string[] {
  */
 export function hasAttributeDefinition(this: typeof Base, name: string): boolean {
   // Rails: `attr_name = attribute_aliases[attr_name] || attr_name`
-  // (attribute_methods.rb:256) before checking `attribute_types`. A real
-  // attribute of that exact name wins over the trails camelCase bridge.
-  const attrName = String(name);
-  if (this._attributeDefinitions.has(attrName)) return true;
-  return this._attributeDefinitions.has(resolveAliasNameBridged(this as never, attrName));
+  // (attribute_methods.rb:256) before checking `attribute_types`.
+  const defs = this._attributeDefinitions;
+  return defs.has(resolveAliasNameIn(this as never, defs, String(name)));
 }
 
 /**
