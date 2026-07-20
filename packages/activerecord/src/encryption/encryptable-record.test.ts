@@ -708,7 +708,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("binary data can be encrypted", async () => {
     await freshAdapter();
-    const Book = EncryptedBookWithBinary as any;
+    const Book = EncryptedBookWithBinary;
     const allBytes = Uint8Array.from({ length: 256 }, (_, i) => i);
     expect((await Book.create({ logo: allBytes })).logo).toEqual(allBytes);
     expect((await Book.create({ logo: null })).logo).toBeNull();
@@ -716,7 +716,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
   it("binary data can be encrypted uncompressed", async () => {
     await freshAdapter();
-    const Book = EncryptedBookWithBinary as any;
+    const Book = EncryptedBookWithBinary;
     const lowBytes = Uint8Array.from({ length: 128 }, (_, i) => i);
     const highBytes = Uint8Array.from({ length: 128 }, (_, i) => i + 128);
     await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);
