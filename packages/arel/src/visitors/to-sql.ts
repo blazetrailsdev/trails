@@ -2133,24 +2133,19 @@ export class ToSql extends Visitor {
 
   /**
    * Mirrors Rails' `right.nil?` guard in the equality visitors: a nil right
-   * emits `IS NULL` rather than `= ?`. Beyond an explicit `Quoted(null)`, a
-   * bind attribute answers `nil?` true when it *serializes* to nil (a
-   * null-mapped or unknown enum label, or a normalizer that blanks the value),
-   * so honour a duck-typed `isNil()` on the right node too.
+   * emits `IS NULL` rather than `= ?`. Ruby needs no type switch here because
+   * every wrapper defines `nil?` as `value.nil?` — Casted (casted.rb:15),
+   * Quoted (casted.rb:41), BindParam (bind_param.rb:23-25) — so the single
+   * polymorphic call covers explicit nils and binds that *serialize* to nil (a
+   * null-mapped or unknown enum label, or a normalizer that blanks the value).
    */
   protected rightIsNull(right: unknown): boolean {
-    // Rails tests `right.nil?` (to_sql.rb:649), which is true for a bare nil
-    // and for the two wrappers that define `nil?` as `value.nil?` — Casted
-    // (casted.rb:15) and Quoted (casted.rb:41). A bare null therefore renders
-    // IS NULL and never reaches the raw-value dispatch, even though
-    // visit_NilClass is aliased to `unsupported` for the paths that do reach
-    // it.
+    // A raw nil that never got wrapped has no `isNil()` to dispatch to; Ruby's
+    // `nil.nil?` is just true. A bare null therefore renders IS NULL and never
+    // reaches the raw-value dispatch, even though visit_NilClass is aliased to
+    // `unsupported` for the paths that do reach it.
     if (right === null || right === undefined) return true;
-    if (right instanceof Nodes.Quoted && right.value === null) return true;
-    if (right instanceof Nodes.Casted && right.value === null) return true;
-    // A bound scalar arrives wrapped in a BindParam whose `isNil()` delegates
-    // to its wrapped value (bind_param.rb:23-25) — so a raw-null bind or an
-    // enum/normalized bind that serializes to nil is caught.
+    // Everything else answers Rails' `right.nil?` (to_sql.rb:649) duck-typed.
     const maybe = right as { isNil?: () => boolean };
     return typeof maybe?.isNil === "function" && maybe.isNil();
   }
