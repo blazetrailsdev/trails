@@ -7,6 +7,8 @@
  * In TS, the exported functions use `this: AttributeMethodHost` so they can
  * be assigned directly to Model's static side — no delegation wrappers needed.
  */
+import { camelize } from "@blazetrails/activesupport";
+
 export interface AttributeMethods {
   hasAttribute(name: string): boolean;
   attributePresent(name: string): boolean;
@@ -647,6 +649,11 @@ export function defineDirtyAttributeMethods(prototype: object, attrName: string)
  * the same key whether the caller passed `nickname` or `name`.
  */
 export function resolveAliasName(host: AttributeMethodHost, name: string): string {
-  const aliased = host._attributeAliases?.[name];
-  return aliased ?? name;
+  const aliases = host._attributeAliases;
+  // Rails: `attribute_aliases[attr_name] || attr_name`. Trails stores alias
+  // keys camelCase (`newName`, `commentsCount`) while callers often pass the
+  // snake_case column name (`new_name`, `comments_count`), so normalize the
+  // lookup key — Rails gets this for free because its alias keys are already
+  // in the same convention as its column names.
+  return aliases?.[name] ?? aliases?.[camelize(name, "lower")] ?? name;
 }
