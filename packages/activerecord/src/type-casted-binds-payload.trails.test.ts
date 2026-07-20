@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Notifications, NotificationEvent as Event } from "@blazetrails/activesupport";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Base } from "./base.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Task } from "./test-helpers/models/task.js";
@@ -49,5 +50,23 @@ describe("sql.active_record type_casted_binds", () => {
     // legitimately differ in what reaches the slot (MySQL reports the driver
     // binds, which are empty for an interpolated statement).
     expect(captured).toEqual(taskEvents.map((p) => conn.typeCastedBinds(p.binds as unknown[])));
+  });
+
+  it("routes Temporal binds through the adapter's quoted_date", async () => {
+    // The deleted standalone helper converted Temporal values with
+    // `temporalToBindString`. Rails has no such helper: `type_cast` dispatches
+    // Date/Time through `self.quoted_date` (abstract/quoting.rb:103-104), so the
+    // adapter's own override is what fills the slot. This pins that the
+    // conversion survived the sweep, and that it is the adapter's format —
+    // PG suffixes " BC" for year <= 0, MySQL caps fractional seconds at 6.
+    const conn = (await Base.connection) as unknown as {
+      typeCastedBinds(binds: unknown[]): unknown[];
+      quotedDate(value: unknown): string;
+    };
+    const instant = Temporal.Instant.from("2026-04-26T14:23:55.123456Z");
+
+    expect(conn.typeCastedBinds([instant])).toEqual([conn.quotedDate(instant)]);
+    // Not merely passed through as a Temporal object — drivers reject those.
+    expect(typeof conn.typeCastedBinds([instant])[0]).toBe("string");
   });
 });
