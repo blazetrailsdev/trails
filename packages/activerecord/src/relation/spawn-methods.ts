@@ -17,9 +17,14 @@ interface SpawnRelation<T = unknown> {
  * Create a fresh copy of this relation.
  *
  * Mirrors: ActiveRecord::SpawnMethods#spawn —
- * `already_in_scope?(model.scope_registry) ? model.all : clone`. Inside a scope
- * body the receiver *is* the model's current scope, so Rails re-derives it with
- * `model.all` (which re-applies the default scope) rather than cloning.
+ * `already_in_scope?(model.scope_registry) ? model.all : clone`. When the
+ * receiver is the model's current scope *and* is running as a scope body, the
+ * relation is re-derived from `model.all` rather than cloned.
+ *
+ * Note the `model.all` arm does not fire during ordinary named-scope use:
+ * `_exec_scope` nils the current scope for the body's duration, so the two
+ * conditions of `already_in_scope?` do not normally coincide. It is kept for
+ * fidelity with `spawn_methods.rb:9-11`.
  */
 export function performSpawn<T extends SpawnRelation<T>>(this: T): T {
   return this._isAlreadyInScope(this._modelClass.scopeRegistry())
