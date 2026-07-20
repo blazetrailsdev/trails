@@ -510,9 +510,17 @@ export class Dot extends Visitor {
       } catch (e) {
         // visitor.rb:39 — no ancestor answered the dispatch. Dot has always
         // reported that as Ruby's TypeError with the value's class name.
+        //
+        // `cause` has no counterpart in `raise TypeError, "Cannot visit ..."`
+        // because Ruby chains the active exception into `#cause` implicitly;
+        // JS does not, so passing it is what keeps the two equivalent. It is
+        // also required here by the `preserve-caught-error` lint rule. The
+        // class and message still match visitor.rb:39 exactly.
         if (e instanceof UnsupportedVisitError) {
           throw new TypeError(`Cannot visit ${this.classNameOf(object)}`, { cause: e });
         }
+        // A mis-registered dispatch method (a plain Error from visitor.ts) is
+        // a bug in this visitor, not an unvisitable value — never relabel it.
         throw e;
       }
     });
