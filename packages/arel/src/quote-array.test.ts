@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { quoteArrayLiteral } from "./quote-array.js";
 import { defaultQuoter } from "./visitors/default-quoter.js";
+import { BinaryData } from "@blazetrails/activemodel";
 
 describe("quoteArrayLiteral", () => {
   it("formats simple string arrays", () => {
@@ -95,6 +96,12 @@ describe("quoteArrayLiteral", () => {
     it("raises on a function", () => {
       expect(() => quoteArrayLiteral([() => 1], defaultQuoter)).toThrow(TypeError);
     });
+  });
+
+  // `when Symbol, ActiveSupport::Multibyte::Chars, Type::Binary::Data then
+  // value.to_s` (`abstract/quoting.rb:95-96`).
+  it("casts a Type::Binary::Data to its byte string", () => {
+    expect(quoteArrayLiteral([new BinaryData("hi")], defaultQuoter)).toBe("{hi}");
   });
 
   // `when nil, Numeric, String then value` plus `when Symbol ... value.to_s`

@@ -1,5 +1,6 @@
 import type { ArelConnection } from "./visitors/connection.js";
 import { rubyClassName } from "./visitors/ruby-class.js";
+import { BinaryData } from "@blazetrails/activemodel";
 
 /** The slice of the connection an array element's `type_cast` needs. */
 export type ArrayElementQuoter = Pick<ArelConnection, "unquotedTrue" | "unquotedFalse">;
@@ -72,6 +73,11 @@ function typeCastArrayElement(
   // Ruby has no fixnum/bignum split at this layer — a bigint is Numeric too.
   if (typeof value === "bigint") return String(value);
   if (typeof value === "string") return value;
+  // `when Symbol, ActiveSupport::Multibyte::Chars, Type::Binary::Data then
+  // value.to_s` (`abstract/quoting.rb:95-96`). `Multibyte::Chars` has no trails
+  // analogue — JS strings are already the wrapped form — so the arm is the
+  // other two. `String(data)` is `Data#to_s`: its `toString()` decodes bytes.
+  if (value instanceof BinaryData) return String(value);
   // `when Symbol ... then value.to_s` (`abstract/quoting.rb:95-96`). Ruby's
   // `Symbol#to_s` is the bare name, which `description` is the analogue of.
   if (typeof value === "symbol") return value.description ?? "";
