@@ -821,34 +821,35 @@ export async function save<T extends SaveRecord>(
     this.constructor,
     true,
   );
-  // Mirrors the Rails module layering: ActiveRecord::Validations#save! runs
-  // `perform_validations` first and only on success calls super →
-  // Persistence#save! → create_or_update, where the readonly/destroyed guards
-  // live. So validations run *before* the guards: a record that is both
-  // destroyed and invalid raises RecordInvalid (validations first), not
-  // RecordNotSaved.
   const self = this as any;
-  // Resolve `belongs_to ..., default:` blocks before validation. Rails registers
-  // these on before_validation (builder/belongs_to.rb#add_default_callbacks) so a
-  // required association's presence validation sees the defaulted FK. The block
-  // may be async (e.g. `() => Developer.first()`), so on the save path we resolve
-  // it here — a pre-validation pass — before running the chain. Gated on
-  // `validate !== false`: Rails skips
-  // perform_validations (and thus every before_validation callback, including
-  // this default) when `validate: false` (validations.rb:47-49), so the default
-  // must not fire on that path. `_belongsToDefaultsApplied` then suppresses the
-  // in-chain before_validation callback so the block runs exactly once per save
-  // (it would otherwise re-fire when the pre-pass left the reader nil).
   const ctor = this.constructor;
 
-  // Mirrors: ActiveRecord::Transactions#save wrapping `Validations#save`, so
-  // `perform_validations` — and every `before_validation` callback it runs —
-  // executes *inside* the save transaction (transactions.rb:360,
-  // validations.rb:47; transactions_test.rb:714). A cancelling filter's DB write
-  // therefore rolls back with the transaction, and a `throw :abort` halts before
-  // the validators ever run (so no errors are recorded).
+  // Mirrors the full Rails module layering: `Transactions#save {
+  // Validations#save { perform_validations; Persistence#save → create_or_update
+  // } }` (transactions.rb:360, validations.rb:47). Two orderings fall out of it,
+  // and both are load-bearing:
+  //
+  //  1. `perform_validations` — and every `before_validation` it runs — is
+  //     *inside* the transaction, so a cancelling filter's DB write rolls back
+  //     with it and a `throw :abort` halts before the validators ever run (no
+  //     errors recorded). transactions_test.rb:714.
+  //  2. Validations run *before* the readonly/destroyed guards, which live in
+  //     `create_or_update`. So a record that is both destroyed and invalid
+  //     raises RecordInvalid, not RecordNotSaved.
   try {
     return (await withTransactionReturningStatus.call(self, async () => {
+      // Resolve `belongs_to ..., default:` blocks before validation. Rails
+      // registers these on before_validation
+      // (builder/belongs_to.rb#add_default_callbacks) so a required
+      // association's presence validation sees the defaulted FK. The block may
+      // be async (e.g. `() => Developer.first()`), so on the save path we
+      // resolve it here — a pre-validation pass — before running the chain.
+      // Gated on `validate !== false`: Rails skips perform_validations (and thus
+      // every before_validation callback, including this default) when
+      // `validate: false` (validations.rb:47-49), so the default must not fire
+      // on that path. `_belongsToDefaultsApplied` then suppresses the in-chain
+      // before_validation callback so the block runs exactly once per save (it
+      // would otherwise re-fire when the pre-pass left the reader nil).
       if (options?.validate !== false && typeof self._runBelongsToDefaults === "function") {
         await self._runBelongsToDefaults();
         self._belongsToDefaultsApplied = true;
@@ -865,7 +866,7 @@ export async function save<T extends SaveRecord>(
       // Mirrors ActiveRecord::Persistence#create_or_update: readonly raises
       // first, then `return false if destroyed?`. `save` returns false (it does
       // not raise) for a destroyed record; `save!` turns that false into
-      // RecordNotSaved("Failed to save the record").
+      // RecordNotSaved("Failed to save the record"). See ordering (2) above.
       if (this._readonly) {
         throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
       }
