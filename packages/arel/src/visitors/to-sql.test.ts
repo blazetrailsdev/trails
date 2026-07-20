@@ -1134,7 +1134,7 @@ describe("the to_sql visitor", () => {
     // it at runtime, which is what this asserts.
     const node = new Nodes.Assignment(
       users.get("name"),
-      AMAttribute.fromUser("name", "x", new ValueType()) as unknown as Nodes.NodeOrValue,
+      AMAttribute.fromUser("name", "x", new ValueType()),
     );
     expect(new Visitors.ToSql().compile(node)).toBe('"users"."name" = ?');
   });

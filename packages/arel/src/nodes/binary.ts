@@ -1,3 +1,4 @@
+import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -7,8 +8,16 @@ import { Not } from "./unary.js";
 import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
 
+// Rails admits an `ActiveModel::Attribute` as a first-class AST occupant by
+// class, unwrapped: `build_quoted` returns one straight into the AST
+// (casted.rb:50), Assignment visits one on its right (to_sql.rb:631),
+// ValuesList accepts one (to_sql.rb:110), and there is a
+// `visit_ActiveModel_Attribute` (to_sql.rb:756). Ruby duck-types past this;
+// naming it here is what keeps the node slots honest instead of forcing an
+// `as unknown as Node` escape at every port.
 export type NodeOrValue =
   | Node
+  | ModelAttribute
   | string
   | number
   | boolean

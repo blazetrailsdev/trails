@@ -564,7 +564,7 @@ export class ToSql extends Visitor {
     // visits (visitor.rb:29-30) and to_sql.rb:756 defines a handler for it,
     // so ValuesList/Assignment's visit branch resolves here rather than
     // raising UnsupportedVisitError.
-    reg(ModelAttribute as unknown as NodeCtor, "visitActiveModelAttribute");
+    reg(ModelAttribute, "visitActiveModelAttribute");
     reg(Nodes.Fragments, "visitArelNodesFragments");
     // Functions
     reg(Nodes.NamedFunction, "visitArelNodesNamedFunction");
@@ -1234,7 +1234,7 @@ export class ToSql extends Visitor {
     // `instanceof Node` covers rb:631's `Arel::Attributes::Attribute` arm too —
     // Arel's Attribute extends Node here (attributes/attribute.ts).
     if (node.right instanceof Node || isActiveModelAttribute(node.right)) {
-      this.visit(node.right as unknown as Node, collector);
+      this.visit(node.right, collector);
     } else {
       collector.append(this.quote(node.right));
     }

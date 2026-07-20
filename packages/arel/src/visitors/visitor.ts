@@ -1,4 +1,3 @@
-import { Node } from "../nodes/node.js";
 import { rubyClassName } from "./ruby-class.js";
 
 // Rails interpolates `object.class` straight into its "Cannot visit" TypeError
@@ -11,16 +10,22 @@ function describeClass(object: unknown): string {
 }
 
 /**
- * Opaque dispatch-cache key for a Node subclass.
+ * Opaque dispatch-cache key for a class the visitor dispatches on.
+ *
+ * The instance type is `object`, not `Node`: Rails' visitors dispatch on
+ * `object.class` and the table is keyed by classes that are not Arel nodes
+ * at all — `ActiveModel::Attribute` (to_sql.rb:756), `Set`, `Array`. Naming
+ * the constrained `Node` here would be the type surface asserting
+ * "impossible" about dispatch Rails does routinely.
  *
  * The parameter list is `never[]` (not `unknown[]`) because the dispatch
- * cache never constructs nodes — the ctor is used purely as a Map key. TS
+ * cache never constructs anything — the ctor is used purely as a Map key. TS
  * is contravariant in constructor parameter types, so `never[]` is the
  * only signature that accepts ctors of arbitrary arity (e.g.
  * `Binary(left, right)`, `BoundSqlLiteral(sql, binds)`). `unknown[]` would
  * reject any ctor with a more-specific parameter type.
  */
-export type NodeCtor = abstract new (...args: never[]) => Node;
+export type NodeCtor = abstract new (...args: never[]) => object;
 type VisitorCtor = typeof Visitor;
 
 const PER_CLASS_CACHE = new WeakMap<VisitorCtor, Map<NodeCtor, string>>();
