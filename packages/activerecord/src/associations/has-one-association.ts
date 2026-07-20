@@ -18,46 +18,8 @@ import { polymorphicName } from "../inheritance.js";
  * Mirrors: ActiveRecord::Associations::HasOneAssociation
  */
 export class HasOneAssociation extends SingularAssociation {
-  /**
-   * The record(s) displaced by the sync `build#{name}` / `create#{name}` path
-   * (`setNewRecord`) on a *persisted* owner — recorded there and removed
-   * (FK-nullified/destroyed per `:dependent`) by the owner's `save`-time has_one
-   * autosave callback (`autosaveHasOne` → `removeDisplaced`). Rails does this
-   * removal synchronously inside `replace`; the sync builder cannot `await`, so
-   * we carry the displaced record forward to the single autosave persistence
-   * path rather than running a parallel `persistReplace`.
-   *
-   * The property setter no longer feeds this queue: on a persisted owner it
-   * throws (RFC 0068), so only the build/create path can enqueue here.
-   *
-   * This is an *ordered collection*, not a single slot: repeated builds can
-   * displace more than one persisted record before `save()` drains the queue.
-   * Rails removes each inline inside `replace`, so every displacement is
-   * accounted for; we accumulate them and remove all at save time, in
-   * displacement order.
-   */
-  _displacedRecords: Base[] = [];
-
-  /**
-   * Was set when a deferred property-setter assignment displaced an *unloaded*
-   * has_one on a persisted owner (the DB row keyed by the owner still needed
-   * removal). That path is now a throw (RFC 0068), so this field is never set
-   * to `true` any more; the drain branch in `removeDisplaced` is inert. Kept
-   * (rather than removed here) because the whole deferred-displacement machinery
-   * — this field, `_displacedRecords`, `removeDisplaced`, the `autosaveHasOne`
-   * drain — is retired together in a later RFC 0068 story once no caller can
-   * reach the deferral.
-   */
-  _removeDisplacedFromDb = false;
-
   constructor(owner: Base, definition: AssociationDefinition) {
     super(owner, definition);
-  }
-
-  override reset(): void {
-    super.reset();
-    this._displacedRecords = [];
-    this._removeDisplacedFromDb = false;
   }
 
   /**
@@ -124,14 +86,19 @@ export class HasOneAssociation extends SingularAssociation {
     // be nullified/removed, rather than silently orphaning it.
     if (!this.loaded) await this.loadTarget();
     const displaced = this.target;
+    // Rails: `return target unless load_target || record` (has_one_association
+    // .rb:61) — with nothing loaded and nothing being assigned there is no work,
+    // and crucially no `self.target =`, so the association stays UNLOADED. The
+    // sync `queueWrite` path could not await the load, so this was previously
+    // approximated by the `changed` gate below, which still fell through to
+    // `replace(null)` and marked the association loaded.
+    if (!displaced && !record) return;
     // Mirror Rails `replace`'s `assigning_another_record || has_changes_to_save?`
     // gate (:64-65): only touch the DB when the assignment actually changes
     // something, so a no-op re-assignment (e.g. `writer(null)` with no target)
     // opens no transaction. `hasChangesToSave` is a getter, read (not called)
-    // per #4900. The `?.` stands in for Rails' `return target unless
-    // load_target || record` (:62): with both sides nil `sameRecord` is true
-    // and this short-circuits to undefined, which is falsy — exactly where
-    // Rails would have returned.
+    // per #4900. The `?.` is now just nil-safety on `record`; Rails' `return
+    // target unless load_target || record` is ported as the early return above.
     const changed = !sameRecord(displaced, record) || record?.hasChangesToSave === true;
     if (changed) {
       // Rails: `save &&= owner.persisted?` (:66) — a new owner does not gate the
@@ -186,61 +153,6 @@ export class HasOneAssociation extends SingularAssociation {
     // repeat of the in-transaction work) and, for `record === null`, clears the
     // inverse on the now-removed displaced record.
     this.replace(record);
-  }
-
-  /**
-   * Remove the record displaced by a deferred assignment to a persisted owner.
-   * Called by the has_one autosave callback (`autosaveHasOne`) before persisting
-   * the new target — the deferred analog of the `remove_target!` Rails runs
-   * inside `HasOneAssociation#replace`.
-   */
-  async removeDisplaced(): Promise<void> {
-    // Drain the whole collection, removing each displaced record in
-    // displacement order (Rails removes each inline inside `replace`).
-    const queued = this._displacedRecords;
-    this._displacedRecords = [];
-    for (const record of queued) {
-      await this.removeOne(record);
-    }
-    let displaced: Base | null = null;
-    if (this._removeDisplacedFromDb) {
-      // Unloaded property-setter replace: materialize the existing DB-associated
-      // record now (the owner still keys the pre-replace row, since the new
-      // target has not been persisted yet) so its `:dependent` remove runs.
-      // Mirrors Rails' synchronous `load_target` inside `replace`. `replace`
-      // already cached the new (unsaved) target, so clear it around the find to
-      // force a DB query instead of returning that cached record.
-      this._removeDisplacedFromDb = false;
-      const savedTarget = this.target;
-      const savedLoaded = this.loaded;
-      this.target = null;
-      this.loaded = false;
-      let found: Base | null = null;
-      try {
-        found = await this.doAsyncFindTarget();
-      } finally {
-        this.target = savedTarget;
-        this.loaded = savedLoaded;
-      }
-      if (found && !sameRecord(found, savedTarget)) displaced = found;
-    }
-    if (displaced) await this.removeOne(displaced);
-  }
-
-  /**
-   * Run `remove_target!` for a single displaced record, honoring the
-   * reflection's `:dependent` (delete/destroy/else-nullify). Temporarily sets
-   * `target` to the displaced record so `removeTargetBang` acts on it, then
-   * restores the current target.
-   */
-  private async removeOne(displaced: Base): Promise<void> {
-    const currentTarget = this.target;
-    this.target = displaced;
-    try {
-      await removeTargetBang(this, (this.reflection.options.dependent as string) ?? "");
-    } finally {
-      this.target = currentTarget;
-    }
   }
 
   /**
@@ -544,11 +456,10 @@ export class HasOneAssociation extends SingularAssociation {
    * `save = false` gates only `transaction_if(save)` (:68) and `if save &&
    * !record.save` (:75) — `remove_target!` (:69) runs regardless, so building
    * over an existing target still nullifies the displaced record's foreign key
-   * and clears its inverse. We run that in-memory half here and hand the
-   * displaced record to `removeDisplaced` (the owner's `autosaveHasOne`) for the
-   * DB half — `build` is synchronous and cannot await a save. Only a *persisted*
-   * displaced record has a row to remove, so a transient in-memory target is not
-   * queued (matching `queueWrite`).
+   * and clears its inverse. We run that in-memory half here; the DB half runs in
+   * the awaitable `build#{name}` / `create#{name}` accessors via
+   * `detachDisplacedTarget`, which is the real port of `remove_target!` inside
+   * `replace`. `setNewRecord` itself is synchronous and cannot await a save.
    */
   protected override setNewRecord(record: Base): void {
     const displaced = this.target;
@@ -564,7 +475,6 @@ export class HasOneAssociation extends SingularAssociation {
       this.nullifyOwnerAttributes(displaced);
       this.removeInverseInstance(displaced);
     }
-    this._displacedRecords.push(displaced);
   }
 
   private nullifyOwnerAttributes(record: Base): void {

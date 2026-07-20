@@ -171,3 +171,31 @@ describe("polymorphic has_one set#{Name} awaitable accessor", () => {
     expect(sponsor.sponsorable_type).toBe("Member");
   });
 });
+
+describe("has_one replace with no loaded target and no record", () => {
+  // Rails' `return target unless load_target || record`
+  // (has_one_association.rb:61): assigning nil to a has_one with nothing
+  // associated returns early, before the `assigning_another_record ||
+  // has_changes_to_save?` gate and before `self.target = record`. Note the
+  // association still ends up LOADED — Rails' `load_target` calls `loaded!`
+  // unconditionally (association.rb:192) — so the early return is about doing
+  // no work, not about staying unloaded.
+  const { companies } = fixtures(["companies", "accounts"]);
+
+  beforeAll(() => {
+    registerModel(Firm);
+    registerModel(Account);
+  });
+
+  it("is a no-op that leaves the association empty", async () => {
+    void companies;
+    const firm = (await Firm.create({ name: "no account" })) as Base;
+
+    await set(firm).setAccount(null);
+
+    expect(await (firm as unknown as { account: Promise<Base | null> }).account).toBe(null);
+    expect(await Account.where({ firm_id: (firm as unknown as { id: number }).id }).count()).toBe(
+      0,
+    );
+  });
+});
