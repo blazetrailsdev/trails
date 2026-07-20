@@ -102,6 +102,61 @@ describe("Visitor dispatch", () => {
     expect(TestVisitor.dispatchCache().has(C)).toBe(false);
   });
 
+  describe("raw values dispatch on their Ruby class", () => {
+    // Rails' `visit` reads `object.class` for every object (visitor.rb:29), so
+    // raw values and nodes share one method table and one entry point — there
+    // is no separate raw-value path. These pin that the same `accept` that
+    // dispatches a Node also resolves a bare JS value to `visit<RubyClass>`.
+    class ValueVisitor extends Visitor {
+      visitInteger(o: number | bigint): string {
+        return `Integer:${o}`;
+      }
+      visitString(o: string): string {
+        return `String:${o}`;
+      }
+      visitFloat(o: number): string {
+        return `Float:${o}`;
+      }
+      visitTrueClass(): string {
+        return "TrueClass";
+      }
+      visitFalseClass(): string {
+        return "FalseClass";
+      }
+      visitNilClass(): string {
+        return "NilClass";
+      }
+      visitHash(): string {
+        return "Hash";
+      }
+      visitTime(): string {
+        return "Time";
+      }
+    }
+
+    it.each([
+      [1, "Integer:1"],
+      // Ruby has no fixnum/bignum split at this layer — both are Integer.
+      [10n, "Integer:10"],
+      // Ruby splits Integer from Float; a non-integral number is a Float.
+      [1.5, "Float:1.5"],
+      ["x", "String:x"],
+      [true, "TrueClass"],
+      [false, "FalseClass"],
+      [null, "NilClass"],
+      [undefined, "NilClass"],
+      [{ a: 1 }, "Hash"],
+      [new Date("2024-01-01T00:00:00Z"), "Time"],
+    ])("dispatches %o through visit", (value, expected) => {
+      expect(new ValueVisitor().accept(value)).toBe(expected);
+    });
+
+    it("raises when the value's class has no handler", () => {
+      class Arbitrary {}
+      expect(() => new ValueVisitor().accept(new Arbitrary())).toThrow(UnsupportedVisitError);
+    });
+  });
+
   it("a subclass override of the visit method dispatches polymorphically", () => {
     class Sub extends TestVisitor {
       override visitA(_n: A): string {

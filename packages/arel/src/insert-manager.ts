@@ -49,7 +49,7 @@ export class InsertManager extends TreeManager {
    * Mirrors: Arel::InsertManager#select — stores the manager itself
    * rather than unwrapping to its inner `.ast`. The visitor handles
    * either shape (raw Node or SelectManager-shaped duck-type) via
-   * `visitNodeOrValue`.
+   * `visit`.
    */
   select(selectManager: InsertSelectSource): this {
     this.ast.select = selectManager;

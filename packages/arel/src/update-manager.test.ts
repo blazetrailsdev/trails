@@ -120,7 +120,7 @@ describe("UpdateManagerTest", () => {
     });
 
     // Mirrors Rails: values pass through raw (no Quoted wrap); the
-    // visitor's `visitNodeOrValue` quotes primitives.
+    // visitor's `visit` class dispatch quotes primitives.
     it("stores the raw value on the Assignment (no Quoted wrap)", () => {
       const mgr = new UpdateManager();
       mgr.table(users);

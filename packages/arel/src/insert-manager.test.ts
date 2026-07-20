@@ -251,7 +251,7 @@ describe("InsertManagerTest", () => {
 
   // Mirrors Rails: `InsertManager#select` stores the manager itself
   // (insert_manager.rb), not its inner `.ast`. The visitor handles
-  // the SelectManager-shaped duck-type via `visitNodeOrValue`.
+  // the SelectManager-shaped duck-type via `visit`.
   describe("select (Rails parity)", () => {
     it("stores the SelectManager itself on ast.select", () => {
       const mgr = new InsertManager(users);

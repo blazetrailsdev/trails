@@ -17,7 +17,6 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 export { UnsupportedVisitError };
 
 import { defaultQuoter } from "./default-quoter.js";
-import { temporalClassName, temporalTag, type TemporalClassName } from "../temporal-tag.js";
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
@@ -51,8 +50,8 @@ export function resolveValueForDatabase(value: unknown): unknown {
 // -- Raw-value dispatch helpers --
 //
 // Rails dispatches a raw value on its Ruby class (visitor.rb:29-30). These map
-// each JS analogue onto the class Rails would pick, so `visitNodeOrValue` can
-// hand off to the matching visit_* method.
+// each JS analogue onto the class Rails would pick; the mapping itself lives
+// in `rubyClassName` (ruby-class.ts), which `Visitor#visit` consults.
 
 // The analogue of Rails' `ActiveModel::Attribute` case in the ValuesList /
 // Assignment visitors (to_sql.rb:110, 632). Rails dispatches on the class, and
@@ -62,37 +61,6 @@ export function resolveValueForDatabase(value: unknown): unknown {
 // rb:110's narrow `when` requires.
 function isActiveModelAttribute(v: unknown): boolean {
   return v instanceof ModelAttribute;
-}
-
-// The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
-// Object.prototype (or null). Anything else is an instance of some other class
-// and dispatches on that class in Rails, not on Hash.
-function isPlainObject(v: unknown): boolean {
-  if (typeof v !== "object" || v === null) return false;
-  const proto = Object.getPrototypeOf(v);
-  return proto === Object.prototype || proto === null;
-}
-
-// The Ruby class Rails would dispatch a date/time value on, all three of which
-// Rails aliases to `unsupported` (to_sql.rb:836-844). Temporal is the Time/Date
-// analogue in this codebase and Temporal types expose no `toISOString`, so they
-// match on their tag via the shared whitelist; a JS Date (or any toISOString
-// duck-type) is an instant-in-time and maps to Time.
-//
-// Only the whitelisted tags answer: `Duration`, `PlainYearMonth` and
-// `PlainMonthDay` have no Ruby analogue and so fall through to the same
-// no-visitable-ancestor path an arbitrary object takes, rather than being
-// mislabelled as a Time.
-function dateTimeClassName(v: unknown): TemporalClassName | null {
-  const temporalClass = temporalClassName(v);
-  if (temporalClass !== null) return temporalClass;
-  if (temporalTag(v) !== null) return null;
-  const isInstantDuckType =
-    typeof v === "object" &&
-    v !== null &&
-    "toISOString" in v &&
-    typeof (v as { toISOString: unknown }).toISOString === "function";
-  return isInstantDuckType ? "Time" : null;
 }
 
 // Rails' UnsupportedVisitError message interpolates `object.class.name`
@@ -331,14 +299,14 @@ export class ToSql extends Visitor {
 
     // Mirrors Rails: prefer `node.values` when both are present
     // (insert_statement.rb / to_sql.rb pattern). Routes through
-    // `visitNodeOrValue` so a SelectManager-shaped duck-type (the form
+    // `visit` so a SelectManager-shaped duck-type (the form
     // `InsertManager#select` stores) lands in `visitArelSelectManager`.
     if (node.values) {
       collector.append(" ");
       this.visit(node.values, collector);
     } else if (node.select) {
       collector.append(" ");
-      this.visitNodeOrValue(node.select as Nodes.NodeOrValue, collector);
+      this.visit(node.select as Nodes.NodeOrValue, collector);
     }
 
     return collector;
@@ -769,9 +737,9 @@ export class ToSql extends Visitor {
   // -- Filter --
 
   private visitArelNodesFilter(node: Nodes.Filter, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" FILTER (WHERE ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     collector.append(")");
     return collector;
   }
@@ -820,10 +788,10 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesOver(node: Nodes.Over, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" OVER ");
     if (node.right) {
-      this.visitNodeOrValue(node.right, collector);
+      this.visit(node.right, collector);
     } else {
       collector.append("()");
     }
@@ -1005,7 +973,7 @@ export class ToSql extends Visitor {
   }
 
   private visitArelNodesBetween(node: Nodes.Between, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" BETWEEN ");
     if (node.right instanceof Nodes.And) {
       const and = node.right;
@@ -1013,7 +981,7 @@ export class ToSql extends Visitor {
       collector.append(" AND ");
       this.visit(and.children[1], collector);
     } else {
-      this.visitNodeOrValue(node.right, collector);
+      this.visit(node.right, collector);
     }
     return collector;
   }
@@ -1057,17 +1025,17 @@ export class ToSql extends Visitor {
   // -- Matches with ESCAPE --
 
   protected visitArelNodesMatches(node: Nodes.Matches, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" LIKE ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     this.appendEscape(node.escape, collector);
     return collector;
   }
 
   protected visitArelNodesDoesNotMatch(node: Nodes.DoesNotMatch, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" NOT LIKE ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     this.appendEscape(node.escape, collector);
     return collector;
   }
@@ -1183,8 +1151,8 @@ export class ToSql extends Visitor {
         return collector;
       }
     }
-    this.visitNodeOrValue(node.left, collector);
-    // Duck-type check for SelectManager subquery - visitNodeOrValue wraps it in parens
+    this.visit(node.left, collector);
+    // Duck-type check for SelectManager subquery - visit wraps it in parens
     if (
       values &&
       typeof values === "object" &&
@@ -1193,7 +1161,7 @@ export class ToSql extends Visitor {
       "toSql" in (values as unknown as Record<string, unknown>)
     ) {
       collector.append(" IN ");
-      this.visitNodeOrValue(values, collector);
+      this.visit(values, collector);
       return collector;
     }
     collector.append(" IN (");
@@ -1203,7 +1171,7 @@ export class ToSql extends Visitor {
         this.visit(values[i], collector);
       }
     } else {
-      this.visitNodeOrValue(values, collector);
+      this.visit(values, collector);
     }
     collector.append(")");
     return collector;
@@ -1222,7 +1190,7 @@ export class ToSql extends Visitor {
         return collector;
       }
     }
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     if (Array.isArray(values)) {
       collector.append(" NOT IN (");
       for (let i = 0; i < values.length; i++) {
@@ -1232,7 +1200,7 @@ export class ToSql extends Visitor {
       collector.append(")");
     } else {
       collector.append(" NOT IN (");
-      this.visitNodeOrValue(values, collector);
+      this.visit(values, collector);
       collector.append(")");
     }
     return collector;
@@ -1259,7 +1227,7 @@ export class ToSql extends Visitor {
   private visitArelNodesAssignment(node: Nodes.Assignment, collector: SQLString): SQLString {
     // Column-name unqualification is the responsibility of `UnqualifiedColumn`,
     // which `UpdateManager#set` wraps each LHS in.
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" = ");
     // Mirrors Rails (to_sql.rb:630-641): a Node/Attribute right is visited; a
     // raw value is quoted directly rather than dispatched through `visit`.
@@ -1280,13 +1248,13 @@ export class ToSql extends Visitor {
       return collector.append("1=0");
     }
     if (this.rightIsNull(node.right)) {
-      this.visitNodeOrValue(node.left, collector);
+      this.visit(node.left, collector);
       collector.append(" IS NULL");
       return collector;
     }
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" = ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -1295,7 +1263,7 @@ export class ToSql extends Visitor {
     collector: SQLString,
   ): SQLString {
     if (this.rightIsNull(node.right)) {
-      this.visitNodeOrValue(node.left, collector);
+      this.visit(node.left, collector);
       collector.append(" IS NULL");
       return collector;
     }
@@ -1307,7 +1275,7 @@ export class ToSql extends Visitor {
     collector: SQLString,
   ): SQLString {
     if (this.rightIsNull(node.right)) {
-      this.visitNodeOrValue(node.left, collector);
+      this.visit(node.left, collector);
       collector.append(" IS NOT NULL");
       return collector;
     }
@@ -1319,20 +1287,20 @@ export class ToSql extends Visitor {
       return collector.append("1=1");
     }
     if (this.rightIsNull(node.right)) {
-      this.visitNodeOrValue(node.left, collector);
+      this.visit(node.left, collector);
       collector.append(" IS NOT NULL");
       return collector;
     }
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" != ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
   private visitArelNodesAs(node: Nodes.As, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" AS ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -1359,16 +1327,16 @@ export class ToSql extends Visitor {
   // Mirrors Rails: visit_Arel_Nodes_When (to_sql.rb).
   protected visitArelNodesWhen(node: Nodes.When, collector: SQLString): SQLString {
     collector.append("WHEN ");
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" THEN ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
   // Mirrors Rails: visit_Arel_Nodes_Else (to_sql.rb).
   protected visitArelNodesElse(node: Nodes.Else, collector: SQLString): SQLString {
     collector.append("ELSE ");
-    this.visitNodeOrValue(node.expr as Nodes.NodeOrValue, collector);
+    this.visit(node.expr as Nodes.NodeOrValue, collector);
     return collector;
   }
 
@@ -1519,7 +1487,7 @@ export class ToSql extends Visitor {
    * as well as `number`: Ruby's `Integer` is arbitrary-precision and Arel has
    * no separate bignum visitor, so both JS numeric types land here.
    *
-   * Callers: `visitNodeOrValue` routes every `bigint` here, and every
+   * Callers: `Visitor#visit` routes every `bigint` here, and every
    * *integral* `number` — the `Number.isInteger` split mirrors Ruby's
    * Integer-vs-Float, so a `1.5` reaches `visitFloat` and raises (rb:839) as
    * it does in Rails.
@@ -1545,7 +1513,7 @@ export class ToSql extends Visitor {
   // `UnsupportedVisitError`. TS has no method-alias, so each delegates to
   // the shared helper. Each keeps the Rails `(o, collector)` shape.
   //
-  // `visitNodeOrValue` dispatches raw values onto these, so the unsupported
+  // `Visitor#visit` class-dispatches raw values onto these, so the unsupported
   // contract is enforced on the one path that can reach it — they are not
   // documentation-only. The exception is the Ruby-specific string classes
   // (Multibyte::Chars, StringInquirer), which have no JS analogue to dispatch
@@ -1627,9 +1595,9 @@ export class ToSql extends Visitor {
     node: Nodes.InfixOperation,
     collector: SQLString,
   ): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(` ${node.operator} `);
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -1651,13 +1619,13 @@ export class ToSql extends Visitor {
    * Mirrors Rails: `visit_Array` (to_sql.rb:858). Rails delegates to
    * `inject_join` which calls `visit` on each element; in Ruby `visit` of
    * a primitive routes through `visit_Integer`/`visit_String`/etc. Trails
-   * doesn't dispatch on JS primitives — `visitNodeOrValue` is the
+   * doesn't dispatch on JS primitives — `rubyClassName` (ruby-class.ts) is the
    * equivalent path that handles both Node and non-Node entries.
    */
   protected visitArray(items: ReadonlyArray<Nodes.NodeOrValue>, collector: SQLString): SQLString {
     items.forEach((item, i) => {
       if (i > 0) collector.append(", ");
-      this.visitNodeOrValue(item, collector);
+      this.visit(item, collector);
     });
     return collector;
   }
@@ -1996,9 +1964,9 @@ export class ToSql extends Visitor {
   }
 
   protected visitBinaryOp(node: Nodes.Binary, op: string, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(` ${op} `);
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -2066,9 +2034,9 @@ export class ToSql extends Visitor {
   // -- Concat --
 
   protected visitArelNodesConcat(node: Nodes.Concat, collector: SQLString): SQLString {
-    this.visitNodeOrValue(node.left, collector);
+    this.visit(node.left, collector);
     collector.append(" || ");
-    this.visitNodeOrValue(node.right, collector);
+    this.visit(node.right, collector);
     return collector;
   }
 
@@ -2134,71 +2102,6 @@ export class ToSql extends Visitor {
   }
 
   // -- Helpers --
-
-  protected visitNodeOrValue(v: Nodes.NodeOrValue, collector: SQLString): SQLString {
-    // Duck-type check for SelectManager (not a Node, but has ast/toSql).
-    // Delegates to visitArelSelectManager — the Rails-named visitor for
-    // a bare SelectManager — so the wrapping behavior lives in one place.
-    if (v !== null && v !== undefined && typeof v === "object" && "ast" in v && "toSql" in v) {
-      return this.visitArelSelectManager(v as unknown as { ast: Node }, collector);
-    }
-    if (Array.isArray(v)) {
-      // Mirrors Rails: `visit_Array` (to_sql.rb) — primitives and Nodes in
-      // arrays both flow through here, joined by ", ".
-      return this.visitArray(v, collector);
-    }
-    if (v instanceof Node) {
-      // Duck-type check to avoid circular dependency (SelectManager → ToSql → SelectManager)
-      if ("ast" in v && "toSql" in v) {
-        return this.visitArelSelectManager(v as unknown as { ast: Node }, collector);
-      }
-      return this.visit(v, collector);
-    }
-    // Raw-value dispatch — trails' stand-in for Rails' `visit` class dispatch
-    // on a stray Ruby value. Rails renders exactly ONE raw scalar here,
-    // Integer, via `visit_Integer` (to_sql.rb:824-826). NilClass (rb:841),
-    // String (rb:842), Float (rb:839), TrueClass (rb:845), FalseClass
-    // (rb:838), Date (rb:836), Time (rb:844), BigDecimal (rb:834), Symbol
-    // (rb:843) and Hash (rb:840) all alias to `unsupported` and raise
-    // (rb:828-845); the branches below dispatch to those ports so the anchor
-    // is structural rather than a comment that can drift.
-    //
-    // Note to_sql.rb:87-90 (`visit_Arel_Nodes_Casted`) is the *other* value
-    // path, the one that routes through quote(); it is ported in
-    // `visitArelNodesCasted` and is what ActiveRecord actually uses, so
-    // nothing on the AR-facing path reaches this dispatch.
-    if (typeof v === "number") {
-      // Ruby splits Integer (renders) from Float (raises); `Number.isInteger`
-      // is that split. A non-finite number is never integral, so it lands on
-      // the Float branch and raises, as Rails' Float does.
-      return Number.isInteger(v) ? this.visitInteger(v, collector) : this.visitFloat(v, collector);
-    }
-    if (typeof v === "bigint") {
-      // Ruby has no fixnum/bignum distinction at this layer — both are
-      // Integer, so a bigint renders bare via visit_Integer.
-      return this.visitInteger(v, collector);
-    }
-    if (v === null || v === undefined) return this.visitNilClass(v, collector);
-    if (typeof v === "string") return this.visitString(v, collector);
-    if (typeof v === "boolean") {
-      return v ? this.visitTrueClass(v, collector) : this.visitFalseClass(v, collector);
-    }
-    if (typeof v === "symbol") return this.visitSymbol(v, collector);
-    switch (dateTimeClassName(v)) {
-      case "Date":
-        return this.visitDate(v, collector);
-      case "DateTime":
-        return this.visitDateTime(v, collector);
-      case "Time":
-        return this.visitTime(v, collector);
-    }
-    if (isPlainObject(v)) return this.visitHash(v, collector);
-    // Rails dispatches on the object's actual class (visitor.rb:29-30), so an
-    // arbitrary object never reaches visit_Hash — it finds no handler and
-    // raises. Going straight to `unsupported` keeps the reported class honest
-    // rather than mislabelling it as a Hash.
-    return this.unsupported(v, collector);
-  }
 
   /**
    * Mirrors `to_sql.rb#unboundable?` (to_sql.rb:905-907), returning the sign

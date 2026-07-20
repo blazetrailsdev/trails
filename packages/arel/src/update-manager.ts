@@ -49,7 +49,7 @@ export class UpdateManager extends TreeManager {
   set(values: UpdateValues): this {
     // Mirrors Arel::UpdateManager#set (update_manager.rb): pairs become
     // `Assignment(UnqualifiedColumn(col), value)` with the value passed
-    // through raw — the visitor's `visitNodeOrValue` dispatch quotes
+    // through raw — the visitor's `visit` class dispatch quotes
     // primitives. The `UnqualifiedColumn` wrapper strips the table
     // qualifier so the visitor does not need an `_inUpdateSet` mode flag.
     if (typeof values === "string") {

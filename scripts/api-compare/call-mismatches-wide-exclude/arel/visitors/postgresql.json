@@ -9,36 +9,8 @@
   {
     "package": "arel",
     "tsFile": "visitors/postgresql.ts",
-    "rubyName": "visit_Arel_Nodes_DoesNotMatch",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/postgresql.ts",
-    "rubyName": "visit_Arel_Nodes_IsDistinctFrom",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/postgresql.ts",
-    "rubyName": "visit_Arel_Nodes_IsNotDistinctFrom",
-    "call": "visit",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/postgresql.ts",
     "rubyName": "visit_Arel_Nodes_Matches",
     "call": "infix_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/postgresql.ts",
-    "rubyName": "visit_Arel_Nodes_Matches",
-    "call": "visit",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

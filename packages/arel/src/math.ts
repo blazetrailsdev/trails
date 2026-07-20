@@ -21,7 +21,7 @@ import type { NodeOrValue } from "./nodes/binary.js";
  * bitwise operators wrap in Grouping so precedence is preserved when the
  * result is further chained; `*` and `/` do not — same as Rails. The
  * right-hand operand is passed through raw (Rails does not pre-quote);
- * the visitor renders primitive values via `visitNodeOrValue`.
+ * the visitor renders primitive values via `visit` class dispatch.
  */
 export const Math = {
   add(this: Node, other: unknown): Grouping {
