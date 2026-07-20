@@ -164,6 +164,14 @@ describe("Trails", () => {
     expect(trailsRoot()).toBe("/srv/override");
   });
 
+  it("Trails.root stays undefined when neither config.root nor discovery resolve (Rails returns nil, not cwd)", async () => {
+    class NoRootApp extends Application {}
+    Application.register(NoRootApp);
+    const app = NoRootApp.instance();
+    app.root = async () => undefined;
+    expect(await Trails.root()).toBeUndefined();
+  });
+
   it("Trails.publicPath honors a config.setRoot override when discovery is unresolved", async () => {
     class OverriddenPubApp extends Application {}
     Application.register(OverriddenPubApp);

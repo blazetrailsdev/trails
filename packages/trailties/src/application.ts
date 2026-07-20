@@ -180,9 +180,13 @@ export class Application extends Engine {
     return loadDatabaseConfig(opts.env ?? resolveEnv(), await this.resolvedRoot());
   }
 
+  /** Boot-time root resolution for callers that need a concrete path
+   * (credentials, `configFor`, the `trailsRoot()` seam): explicit
+   * `config.root=` override, then the discovered source root, then cwd.
+   * The cwd tail is a trails addition with no Rails counterpart — Rails'
+   * `config.root` is a plain reader that stays nil. `Trails.root()` is the
+   * Rails-faithful accessor and deliberately does NOT use this. */
   async resolvedRoot(): Promise<string> {
-    // Mirrors Rails' `Rails.root` (`application.config.root`): an explicit
-    // `config.root=` override wins, then the discovered source root, then cwd.
     return this.config.root ?? (await this.root()) ?? (await getFsAsync()).cwd();
   }
 }
