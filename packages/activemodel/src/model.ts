@@ -2608,12 +2608,6 @@ export class Model {
 
   // -- Callbacks helper for subclasses --
 
-  runCallbacks(
-    event: string,
-    block: () => unknown,
-    opts: RunCallbacksOptions & { strict: "sync" },
-  ): unknown;
-  runCallbacks(event: string, block: () => unknown, opts?: RunCallbacksOptions): unknown;
   runCallbacks(event: string, block: () => unknown, opts?: RunCallbacksOptions): unknown {
     return runAllCallbacks((this.constructor as typeof Model).prototype, event, this, block, opts);
   }

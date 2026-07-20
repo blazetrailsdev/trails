@@ -840,12 +840,6 @@ export class CallbackSequence {
     }
   }
 
-  invoke(
-    target: object,
-    block: (() => unknown) | undefined,
-    opts: RunCallbacksOptions & { strict: "sync" },
-  ): unknown;
-  invoke(target: object, block?: () => unknown, opts?: RunCallbacksOptions): unknown;
   invoke(target: object, block?: () => unknown, opts?: RunCallbacksOptions): unknown {
     const chainName = this._callbackChain?.name ?? "";
     const env: FilterEnvironment = { target, halted: false, value: undefined };
@@ -872,8 +866,8 @@ export class CallbackSequence {
    * with the continuation as their block (`expand_call_template` + `send`), and
    * running each `invoke_after` as the recursion unwinds. Async is threaded with
    * the same fire-and-forget / awaited-rescue semantics the retired
-   * `_runAroundAndAfter` provided. Returns whether the final block executed
-   * without the chain halting.
+   * `_runAroundAndAfter` provided. Returns `env.value` — Rails' invoke_sequence
+   * Proc ends in `break env.value`.
    */
   private _invokeAround(
     env: FilterEnvironment,
@@ -1361,18 +1355,6 @@ export namespace Callbacks {
   export function runCallbacks(
     target: object,
     name: string,
-    block: (() => unknown) | undefined,
-    opts: RunCallbacksOptions & { strict: "sync" },
-  ): unknown;
-  export function runCallbacks(
-    target: object,
-    name: string,
-    block?: () => unknown,
-    opts?: RunCallbacksOptions,
-  ): unknown;
-  export function runCallbacks(
-    target: object,
-    name: string,
     block?: () => unknown,
     opts?: RunCallbacksOptions,
   ): unknown {
@@ -1424,18 +1406,6 @@ export function resetCallbacks(target: object, name: string): void {
   Callbacks.resetCallbacks(target, name);
 }
 
-export function runCallbacks(
-  target: object,
-  name: string,
-  block: (() => unknown) | undefined,
-  opts: RunCallbacksOptions & { strict: "sync" },
-): unknown;
-export function runCallbacks(
-  target: object,
-  name: string,
-  block?: () => unknown,
-  opts?: RunCallbacksOptions,
-): unknown;
 export function runCallbacks(
   target: object,
   name: string,
@@ -1497,12 +1467,6 @@ export function CallbacksMixin<TBase extends new (...args: any[]) => object>(Bas
       resetCallbacks(this.prototype, name);
     }
 
-    runCallbacks(
-      name: string,
-      block: (() => unknown) | undefined,
-      opts: RunCallbacksOptions & { strict: "sync" },
-    ): unknown;
-    runCallbacks(name: string, block?: () => unknown, opts?: RunCallbacksOptions): unknown;
     runCallbacks(name: string, block?: () => unknown, opts?: RunCallbacksOptions): unknown {
       return runCallbacks(this, name, block, opts);
     }
