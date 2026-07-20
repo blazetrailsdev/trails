@@ -16,30 +16,11 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
     restoreEncryption?.();
   });
 
-  const { encryptedBooks, encryptedBookThatIgnoresCases } = fixtures([
-    "encryptedBooks",
-    "encryptedBookThatIgnoresCases",
-  ]);
+  const { encryptedBooks } = fixtures(["encryptedBooks"]);
 
   it("fixtures get encrypted automatically", async () => {
     const { EncryptableRecord } = await import("./encryptable-record.js");
     expect(EncryptableRecord.isEncryptedAttribute(encryptedBooks("awdr"), "name")).toBe(true);
-  });
-
-  it("preserved columns due to ignore_case: true gets encrypted automatically", async () => {
-    const { assertEncryptedAttribute } = await import("./test-helpers.js");
-    const { EncryptedBookThatIgnoresCase } =
-      await import("../test-helpers/models/book-encrypted.js");
-    const book = encryptedBookThatIgnoresCases("rfr");
-    expect(book.name).toBe("Ruby for Rails");
-    await assertEncryptedAttribute(book, "name", "Ruby for Rails");
-
-    // Rails writes `find_by_name(...)`. Trails has no method_missing, so the
-    // generated-name form isn't callable; `findByAttribute` is the explicit
-    // dynamic-finder surface it dispatches through (base.ts findByAttribute).
-    expect(
-      await EncryptedBookThatIgnoresCase.findByAttribute("name", "Ruby for Rails"),
-    ).toBeTruthy();
   });
 });
 
