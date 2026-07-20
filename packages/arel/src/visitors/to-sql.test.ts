@@ -1261,8 +1261,8 @@ describe("the to_sql visitor", () => {
   });
 
   it("should visit named functions", () => {
-    const sql = new Visitors.ToSql().compile(users.get("name").upper());
-    expect(sql).toContain("UPPER");
+    const fn = new Nodes.NamedFunction("omg", [star]);
+    expect(new Visitors.ToSql().compile(fn)).toBe("omg(*)");
   });
 
   it("should visit string subclass", () => {

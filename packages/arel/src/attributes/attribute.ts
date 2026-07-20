@@ -185,56 +185,6 @@ export class Attribute extends Node {
     return new Avg([this]);
   }
 
-  upper(): NamedFunction {
-    return new NamedFunction("UPPER", [this]);
-  }
-
-  length(): NamedFunction {
-    return new NamedFunction("LENGTH", [this]);
-  }
-
-  trim(): NamedFunction {
-    return new NamedFunction("TRIM", [this]);
-  }
-
-  ltrim(): NamedFunction {
-    return new NamedFunction("LTRIM", [this]);
-  }
-
-  rtrim(): NamedFunction {
-    return new NamedFunction("RTRIM", [this]);
-  }
-
-  substring(start: number, length?: number): NamedFunction {
-    const args: Node[] = [this, buildQuoted(start)];
-    if (length !== undefined) args.push(buildQuoted(length));
-    return new NamedFunction("SUBSTRING", args);
-  }
-
-  replace(from: string, to: string): NamedFunction {
-    return new NamedFunction("REPLACE", [this, buildQuoted(from), buildQuoted(to)]);
-  }
-
-  // -- Math functions --
-
-  abs(): NamedFunction {
-    return new NamedFunction("ABS", [this]);
-  }
-
-  round(precision?: number): NamedFunction {
-    const args: Node[] = [this];
-    if (precision !== undefined) args.push(buildQuoted(precision));
-    return new NamedFunction("ROUND", args);
-  }
-
-  ceil(): NamedFunction {
-    return new NamedFunction("CEIL", [this]);
-  }
-
-  floor(): NamedFunction {
-    return new NamedFunction("FLOOR", [this]);
-  }
-
   // -- Extract --
 
   extract(field: string): Extract {
