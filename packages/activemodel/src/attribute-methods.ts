@@ -650,10 +650,17 @@ export function defineDirtyAttributeMethods(prototype: object, attrName: string)
  */
 export function resolveAliasName(host: AttributeMethodHost, name: string): string {
   const aliases = host._attributeAliases;
-  // Rails: `attribute_aliases[attr_name] || attr_name`. Trails stores alias
-  // keys camelCase (`newName`, `commentsCount`) while callers often pass the
-  // snake_case column name (`new_name`, `comments_count`), so normalize the
-  // lookup key — Rails gets this for free because its alias keys are already
-  // in the same convention as its column names.
-  return aliases?.[name] ?? aliases?.[camelize(name, "lower")] ?? name;
+  // Rails: `attribute_aliases[attr_name] || attr_name`.
+  const exact = aliases?.[name];
+  if (exact !== undefined) return exact;
+
+  // Trails stores alias keys camelCase (`newName`, `commentsCount`) while
+  // callers often pass the snake_case column name (`new_name`,
+  // `comments_count`); Rails needs no such bridge because its alias keys are
+  // already in the same convention as its column names. Defer to a real
+  // attribute of that exact name first, so a model that happens to own BOTH a
+  // `new_name` column and an unrelated `newName` alias still resolves
+  // `new_name` to its own column, the way Rails would.
+  if (host._attributeDefinitions?.has(name)) return name;
+  return aliases?.[camelize(name, "lower")] ?? name;
 }

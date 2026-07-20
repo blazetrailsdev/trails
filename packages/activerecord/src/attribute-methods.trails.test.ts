@@ -78,6 +78,38 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(t.hasAttribute("missing")).toBe(false);
   });
 
+  it("resolves snake_case lookups against camelCase alias keys", () => {
+    // Trails stores alias keys camelCase while derived names (counter-cache
+    // columns, DB column names) are snake_case; Rails needs no such bridge
+    // because its alias keys already match its column naming.
+    class Topic extends Base {
+      static {
+        this.attribute("legacy_comments_count", "integer");
+        this.aliasAttribute("commentsCount", "legacy_comments_count");
+      }
+    }
+    expect(Topic.hasAttribute("commentsCount")).toBe(true);
+    expect(Topic.hasAttribute("comments_count")).toBe(true);
+    expect(Topic.hasAttribute("legacy_comments_count")).toBe(true);
+    expect(Topic.hasAttribute("replies_count")).toBe(false);
+  });
+
+  it("prefers a real attribute over the camelCase alias bridge", () => {
+    // The snake_case bridge must not hijack a name the model really owns: with
+    // both a real `new_name` column and an unrelated `newName` alias, Rails
+    // resolves `new_name` to its own column, so trails must too.
+    class Topic extends Base {
+      static {
+        this.attribute("name", "string");
+        this.attribute("new_name", "string");
+        this.aliasAttribute("newName", "name");
+      }
+    }
+    const t = new Topic({ name: "a", new_name: "b" });
+    expect(t.readAttribute("new_name")).toBe("b");
+    expect(t.readAttribute("newName")).toBe("a");
+  });
+
   it("readonly attributes are not updated after create", async () => {
     // Rails raises ReadonlyAttributeError on a persisted-record write to an
     // attr_readonly column (readonly_attributes.rb line 49). The test name's
