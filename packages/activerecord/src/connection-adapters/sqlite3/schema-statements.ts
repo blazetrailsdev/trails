@@ -108,10 +108,8 @@ const INDEX_ON_REGEX =
 export async function indexes(adapter: DatabaseAdapter, tableName: string): Promise<unknown[]> {
   const { schema, bare } = splitTableName(tableName);
   const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
-  const rows = (await adapter.execute(
+  const rows = (await adapter.schemaQuery(
     `PRAGMA ${pragmaPrefix}index_list(${quoteColumnName(bare)})`,
-    [],
-    "SCHEMA",
   )) as Array<{ name: string; unique: number; origin: string }>;
   const sqliteMaster = schema ? `${quoteColumnName(schema)}.sqlite_master` : "sqlite_master";
   const result: Array<{
@@ -130,12 +128,10 @@ export async function indexes(adapter: DatabaseAdapter, tableName: string): Prom
     // Locate the index SQL across the main/attached schema and the temp
     // schema (temp-table indexes live only in sqlite_temp_master), so their
     // WHERE clauses are not silently dropped.
-    const idxSqlRows = (await adapter.execute(
+    const idxSqlRows = (await adapter.schemaQuery(
       `SELECT sql FROM ${sqliteMaster} WHERE name = ${quoteStringLiteral(idx.name)} AND type = 'index' ` +
         `UNION ALL ` +
         `SELECT sql FROM sqlite_temp_master WHERE name = ${quoteStringLiteral(idx.name)} AND type = 'index'`,
-      [],
-      "SCHEMA",
     )) as Array<{ sql: string | null }>;
     const indexSql = idxSqlRows[0]?.sql ?? null;
     const match = indexSql ? INDEX_ON_REGEX.exec(indexSql) : null;
@@ -145,10 +141,8 @@ export async function indexes(adapter: DatabaseAdapter, tableName: string): Prom
 
     // index_info takes the bare index name; the schema qualifier, if any,
     // comes before the PRAGMA keyword — same shape as above.
-    const cols = (await adapter.execute(
+    const cols = (await adapter.schemaQuery(
       `PRAGMA ${pragmaPrefix}index_info(${quoteColumnName(idx.name)})`,
-      [],
-      "SCHEMA",
     )) as Array<{ name: string | null; seqno: number }>;
     const columnNames = cols.sort((a, b) => a.seqno - b.seqno).map((c) => c.name);
 

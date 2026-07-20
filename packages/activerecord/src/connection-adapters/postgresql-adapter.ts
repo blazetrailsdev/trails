@@ -71,7 +71,7 @@ import {
 } from "../errors.js";
 import { AbstractAdapter, RAW_CONNECTION_DEPRECATION_MESSAGE } from "./abstract-adapter.js";
 import { deprecator } from "../deprecator.js";
-import { dirtiesQueryCache, dirtiesQueryCacheExceptSchema } from "./abstract/query-cache.js";
+import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cache.js";
 import { PostgreSQLSchemaStatements } from "./postgresql/schema-statements-class.js";
 import type { JoinTableOptions } from "./abstract/schema-statements.js";
 import {
@@ -5475,10 +5475,11 @@ const FORMAT_TYPE_ALIASES: Record<string, string> = {
 // through the wired `execute`, as in Rails), and reads route through
 // `internalExecQuery` (never tripping the wrapper).
 dirtiesQueryCache(PostgreSQLAdapter, "execInsert", "rollbackDbTransaction", "rollbackToSavepoint");
-// Schema reflection reuses the wrapped `execute`/`exec_query` with name
-// "SCHEMA" (Rails routes it through the unwrapped `internal_exec_query`), so
-// use the schema-aware variant here — those reflection reads must not dirty.
-dirtiesQueryCacheExceptSchema(PostgreSQLAdapter, "execQuery", "execute");
+// Snapshot the unwrapped `execute` first: schema reflection routes through it
+// (via schemaQuery) so it never trips the dirtying wrapper, mirroring Rails'
+// `internal_exec_query`.
+captureUnwrappedExecute(PostgreSQLAdapter);
+dirtiesQueryCache(PostgreSQLAdapter, "execQuery", "execute");
 
 // Mirrors `ActiveSupport.run_load_hooks(:active_record_postgresqladapter, self)`
 // at the bottom of Rails' postgresql_adapter.rb — lets railtie initializers

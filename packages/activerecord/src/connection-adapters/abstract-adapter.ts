@@ -44,6 +44,7 @@ import {
   checkVersion as checkVersionMixin,
   makeCachedSelectAll,
   dirtiesQueryCache,
+  UNWRAPPED_EXECUTE,
   type QueryCacheHost,
   QueryCache as QueryCacheMixin,
 } from "./abstract/query-cache.js";
@@ -889,19 +890,18 @@ export class AbstractAdapter implements Quoting {
    * pattern in SchemaStatements / SchemaCache.
    */
   schemaQuery(sql: string, binds: unknown[] = []): Promise<Record<string, unknown>[]> {
-    const execute = (
-      this as unknown as {
-        execute?: (
-          sql: string,
-          binds?: unknown[],
-          name?: string,
-        ) => Promise<Record<string, unknown>[]>;
-      }
-    ).execute;
-    if (typeof execute !== "function") {
+    // Prefer the snapshot taken before `dirtiesQueryCache` wired `execute`, so
+    // reflection runs the same body without the cache-clearing wrapper — Rails'
+    // `internal_exec_query` / `exec_query` split. Adapters that were never wired
+    // (test doubles) fall back to `execute`, which is unwrapped for them anyway.
+    const self = this as unknown as Record<string, unknown>;
+    const unwrapped = (self[UNWRAPPED_EXECUTE] ?? self.execute) as
+      | ((sql: string, binds?: unknown[], name?: string) => Promise<Record<string, unknown>[]>)
+      | undefined;
+    if (typeof unwrapped !== "function") {
       throw new Error("schemaQuery requires the adapter to implement execute()");
     }
-    return execute.call(this, sql, binds, "SCHEMA");
+    return unwrapped.call(this, sql, binds, "SCHEMA");
   }
 
   // --- QueryCache mixin (mirrors ActiveRecord::ConnectionAdapters::QueryCache) ---
