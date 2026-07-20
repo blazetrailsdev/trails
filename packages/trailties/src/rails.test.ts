@@ -164,6 +164,15 @@ describe("Trails", () => {
     expect(trailsRoot()).toBe("/srv/override");
   });
 
+  it("Trails.publicPath honors a config.setRoot override when discovery is unresolved", async () => {
+    class OverriddenPubApp extends Application {}
+    Application.register(OverriddenPubApp);
+    const app = OverriddenPubApp.instance();
+    app.root = async () => undefined;
+    app.config.setRoot("/srv/override");
+    expect(await Trails.publicPath()).toBe("/srv/override/public");
+  });
+
   it("Trails.initialized() is false before initialize, true after", async () => {
     class InitApp extends Application {}
     Application.register(InitApp);
