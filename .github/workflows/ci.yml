@@ -869,6 +869,32 @@ jobs:
           if-no-files-found: warn
           retention-days: 14
 
+  trails-tsc-tests:
+    name: trails-tsc Tests
+    needs: changes
+    # Gated like trails-tsc-coverage below: trails-tsc is the covered source and
+    # tse-compiler is what its tests exercise.
+    if: >-
+      needs.changes.outputs.docs_only != 'true' &&
+      (needs.changes.outputs.trails_tsc_affected == 'true' ||
+       needs.changes.outputs.tse_compiler_affected == 'true')
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v5
+      - uses: ./.github/actions/setup-pnpm
+      - run: pnpm install --frozen-lockfile --prefer-offline
+      # Blocking gate for trails-tsc's runtime unit tests. Deliberately plain:
+      # no --coverage, so the v8 instrumentation that pegs a worker long enough
+      # to trip vitest's `onTaskUpdate` worker-RPC timeout is absent, and
+      # dangerouslyIgnoreUnhandledErrors (gated on TRAILS_TSC_COVERAGE in
+      # vitest.config.ts) stays OFF — an unhandled error is real signal here.
+      # TRAILS_TEST_FORKS=1 removes fork contention and --test-timeout=60000
+      # absorbs the heavy tsc compiles these tests drive.
+      - run: pnpm vitest run packages/trails-tsc --test-timeout=60000
+        env:
+          TRAILS_TEST_FORKS: "1"
+
   trails-tsc-coverage:
     name: trails-tsc Coverage (reporting-only)
     needs: changes
@@ -1482,6 +1508,7 @@ jobs:
       - guides-typecheck
       - leaf-tests
       - virtualized-dx-type-tests
+      - trails-tsc-tests
       - unit-tests
       - actionpack-tests
       - trailties-tests
@@ -1603,6 +1630,12 @@ jobs:
                   # Legitimate skip when website_affected is false AND no
                   # website/release label opted the job in.
                   if [ "$WEBSITE_AFFECTED" = "false" ] && [ "$WEBSITE_LABEL" != "true" ]; then
+                    continue
+                  fi
+                  ;;
+                trails-tsc-tests)
+                  # Legitimate skip when neither trails-tsc nor tse-compiler changed.
+                  if [ "$TRAILS_TSC_AFFECTED" = "false" ] && [ "$TSE_COMPILER_AFFECTED" = "false" ]; then
                     continue
                   fi
                   ;;
