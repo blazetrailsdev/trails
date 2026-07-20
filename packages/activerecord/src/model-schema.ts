@@ -1123,12 +1123,23 @@ function reflectedTypeForColumn(
  * time in `columnsHash()` (filters the returned hash), but it cannot
  * retroactively remove a prototype accessor already defined on the
  * base — a consequence of TypeScript not having Ruby's method_missing.
- * Subclass `attribute()` and `encrypts()` calls route through the STI
- * base (see base.ts), so those specific flows don't create forked-map
- * shadowing. Other decorators that mutate `_attributeDefinitions`
- * directly on the calling class may still fork until they're routed
- * through the same shared owner — add them to the STI redirect list
- * in base.ts when they're introduced.
+ * Subclass `attribute()` calls route through the STI base (see base.ts),
+ * so that flow doesn't create forked-map shadowing.
+ *
+ * `encrypts()` does NOT: it is per-class, like `normalizes`. Rails mutates
+ * the receiver's `encrypted_attributes` `class_attribute` and calls
+ * `encrypt_attribute`/`decorate_attributes` on that class
+ * (encryption/encryptable_record.rb), and `_default_attributes` replays the
+ * superclass's modifications before only the class's own pending decorators
+ * (activemodel attribute_registration.rb). So a subclass `encrypts` must
+ * decorate the subclass alone.
+ *
+ * Per-class decorators are therefore EXPECTED to fork the map:
+ * `decorateAttributes` copy-on-writes it onto the calling class and
+ * `rebuildStiSubclassOverlay` keeps the subclass overlay in sync with the
+ * base. Do not add new decorators to the STI redirect list to avoid that
+ * fork — routing a per-class decorator to the base is what leaked the
+ * decorated type onto the base and its siblings.
  */
 function applyColumnsHash(
   host: SchemaHost,
