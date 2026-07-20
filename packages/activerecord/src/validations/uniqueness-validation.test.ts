@@ -8,13 +8,14 @@
  * issues the existence check and returns `false` on a collision, matching
  * Rails' `valid?` before any save.
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { makeRange } from "@blazetrails/activesupport";
 import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
 import { Reply, UniqueReply, SillyUniqueReply } from "../test-helpers/models/reply.js";
@@ -740,42 +741,70 @@ describe("UniquenessValidationTest", () => {
 });
 
 describe("UniquenessValidationWithIndexTest", () => {
-  fixtures(["topics"]);
+  fixtures(["topics"], { useTransactionalTests: false });
 
-  afterEach(() => {
-    Topic.clearValidatorsBang();
+  beforeAll(() => {
+    registerModel("Topic", Topic);
+    registerModel("Event", Event);
+    registerModel("Keyboard", Keyboard);
   });
 
-  // The Rails counterparts assert query *counts* against a unique index (an
-  // index-aware skip optimization trails does not model). The converted bodies
-  // verify the same uniqueness behavior the index protects.
+  beforeEach(async () => {
+    // Rails' `@connection.schema_cache.clear!` — the index list for `topics` must
+    // go cold between tests so each test's freshly added index is reflected.
+    const connection = Base.connection;
+    connection.schemaCache.clearDataSourceCacheBang(connection.pool ?? connection, "topics");
+    await Topic.deleteAll();
+    await Event.deleteAll();
+  });
+
+  afterEach(async () => {
+    Topic.clearValidatorsBang();
+    await Base.connection.removeIndex("topics", { name: "topics_index", ifExists: true });
+  });
 
   it("new record", async () => {
     Topic.validatesUniqueness("title");
+    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+
     const t = new Topic({ title: "abc" });
-    expect(await t.save()).toBe(true);
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("changing non unique attribute", async () => {
     Topic.validatesUniqueness("title");
+    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+
     const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("author_name", "John");
-    expect(await t.save()).toBe(true);
+    await assertNoQueries(false, async () => {
+      await t.isValid();
+    });
   });
 
   it("changing unique attribute", async () => {
     Topic.validatesUniqueness("title");
-    await Topic.createBang({ title: "abc" });
-    const t = await Topic.createBang({ title: "original" });
-    t.writeAttribute("title", "abc");
-    expect(await t.save()).toBe(false);
+    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("title", "abc v2");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("changing non unique attribute and unique attribute is nil", async () => {
     Topic.validatesUniqueness("title");
-    const t = await Topic.createBang({ title: null });
+    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({});
+    expect(t.readAttribute("title")).toBeNull();
     t.writeAttribute("author_name", "John");
-    expect(await t.save()).toBe(true);
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("conditions", async () => {
@@ -784,57 +813,98 @@ describe("UniquenessValidationWithIndexTest", () => {
         return this.whereNot({ author_name: null });
       },
     });
-    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
     t.writeAttribute("title", "abc v2");
-    expect(await t.save()).toBe(true);
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("case sensitive", async () => {
     Topic.validatesUniqueness("title", { caseSensitive: true });
-    await Topic.createBang({ title: "abc" });
-    const t2 = new Topic({ title: "abc" });
-    expect(await t2.save()).toBe(false);
-    const t3 = new Topic({ title: "ABC" });
-    expect(await t3.save()).toBe(true);
+    await Base.connection.addIndex("topics", "title", { unique: true, name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("title", "abc v2");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
-  it("partial index", async () => {
+  // Rails `skip unless @connection.supports_partial_index?` — MySQL is the only
+  // adapter whose `supportsPartialIndex()` is false, and the vitest lint rule
+  // forbids a runtime conditional inside the test body.
+  it.skipIf(adapterType === "mysql")("partial index", async () => {
     Topic.validatesUniqueness("title");
-    await Topic.createBang({ title: "abc", approved: true });
-    const t2 = new Topic({ title: "abc", approved: false });
-    expect(await t2.save()).toBe(false);
+    await Base.connection.addIndex("topics", "title", {
+      unique: true,
+      where: "approved",
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("author_name", "John");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("non unique index", async () => {
     Topic.validatesUniqueness("title");
-    await Topic.createBang({ title: "abc" });
-    const t2 = new Topic({ title: "abc" });
-    expect(await t2.save()).toBe(false);
+    await Base.connection.addIndex("topics", "title", { name: "topics_index" });
+
+    const t = await Topic.createBang({ title: "abc" });
+    t.writeAttribute("author_name", "John");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("scope", async () => {
     Topic.validatesUniqueness("title", { scope: "author_name" });
-    await Topic.createBang({ title: "abc", author_name: "John" });
+    await Base.connection.addIndex("topics", ["author_name", "title"], {
+      unique: true,
+      name: "topics_index",
+    });
 
-    const t2 = new Topic({ title: "abc", author_name: "Amy" });
-    expect(await t2.save()).toBe(true);
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+    await assertNoQueries(false, async () => {
+      await t.isValid();
+    });
 
-    const t3 = new Topic({ title: "abc", author_name: "John" });
-    expect(await t3.save()).toBe(false);
+    t.writeAttribute("author_name", "Amy");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("uniqueness on relation", async () => {
-    const e1 = await Event.create({ title: "e-abc" });
-    const e2 = await Event.create({ title: "e-cde" });
+    // Rails declares `validates_uniqueness_of :event` here and clears it in the
+    // ensure block; trails' TopicWithEvent carries the declaration on the class,
+    // so redeclaring would run the validator twice (and clearing it would strip
+    // it for the rest of the file).
+    await Base.connection.addIndex("topics", "parent_id", {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const e1 = await Event.createBang({ title: "abc" });
+    const e2 = await Event.createBang({ title: "cde" });
     const t = await TopicWithEvent.createBang({ parent_id: (e1 as any).id });
     try {
       t.writeAttribute("content", "hello world");
-      expect(await t.save()).toBe(true);
+      await assertNoQueries(false, async () => {
+        await t.isValid();
+      });
 
       t.writeAttribute("parent_id", (e2 as any).id);
-      expect(await t.save()).toBe(true);
+      await assertQueriesCount(1, false, async () => {
+        await t.isValid();
+      });
     } finally {
-      TopicWithEvent.clearValidatorsBang();
       await Event.deleteAll();
     }
   });
@@ -844,29 +914,56 @@ describe("UniquenessValidationWithIndexTest", () => {
     await LessonWithUniqKeyboard.createBang({ name: "Keyboard #1" });
 
     const another = new LessonWithUniqKeyboard({ name: "Keyboard #1" });
-    expect(await another.save()).toBe(false);
+    expect(await another.isValid()).toBe(false);
     expect(another.errors.get("keyboard")).toEqual(["has already been taken"]);
   });
 
   it("index of sublist of columns", async () => {
     Topic.validatesUniqueness("title", { scope: "author_name" });
-    await Topic.createBang({ title: "abc", author_name: "John" });
-    const t2 = new Topic({ title: "abc", author_name: "John" });
-    expect(await t2.save()).toBe(false);
+    await Base.connection.addIndex("topics", "author_name", {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+    await assertNoQueries(false, async () => {
+      await t.isValid();
+    });
+
+    t.writeAttribute("author_name", "Amy");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it("index of columns list and extra columns", async () => {
     Topic.validatesUniqueness("title");
-    await Topic.createBang({ title: "abc", author_name: "John" });
-    const t2 = new Topic({ title: "abc", author_name: "Amy" });
-    expect(await t2.save()).toBe(false);
+    await Base.connection.addIndex("topics", ["title", "author_name"], {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 
   it.skipIf(adapterType !== "postgres")("expression index", async () => {
     Topic.validatesUniqueness("title");
-    await Topic.createBang({ title: "abc", author_name: "John" });
-    const t2 = new Topic({ title: "abc", author_name: "John" });
-    expect(await t2.save()).toBe(false);
+    await Base.connection.addIndex("topics", "LOWER(title)", {
+      unique: true,
+      name: "topics_index",
+    });
+
+    const t = await Topic.createBang({ title: "abc", author_name: "John" });
+    t.writeAttribute("content", "hello world");
+
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 });
 

@@ -5,11 +5,15 @@
  * gate it exactly like any other validator (the sibling deviation
  * `async-validations-honor-validation-context`).
  */
-import { describe, it, expect, beforeAll, afterEach } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { StrictValidationFailed } from "@blazetrails/activemodel";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
+import { newRawTestAdapter } from "../test-adapter.js";
+import type { TestDatabaseAdapter } from "../test-adapter.js";
+import { rebuildCanonicalTables } from "../test-helpers/canonical-schema.js";
+import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 
 describe("UniquenessValidationContextTest", () => {
   fixtures(["topics"]);
@@ -71,5 +75,50 @@ describe("UniquenessValidationContextTest", () => {
 
     const unique = new Topic({ title: "strict-unique" });
     expect(await unique.isValid()).toBe(true);
+  });
+});
+
+describe("UniquenessCoveredByUniqueIndexAdapterResolutionTest", () => {
+  // A model whose adapter is assigned directly (rather than leased from a pool)
+  // carries a NullPool. `covered_by_unique_index?` must still see the table's
+  // indexes: resolving the schema-cache target as `pool ?? adapter` hands the
+  // raw cache the NullPool, which exposes neither `withConnection` nor
+  // `indexes`, so the lookup quietly yields `[]` and the optimization silently
+  // stays off for every directly-assigned model. Rails has no counterpart —
+  // its `klass.schema_cache` is always pool-resolved.
+  let adapter: TestDatabaseAdapter;
+
+  class DirectTopic extends Topic {
+    static _tableName = "topics";
+  }
+
+  beforeAll(async () => {
+    adapter = newRawTestAdapter();
+    await rebuildCanonicalTables(adapter, ["topics"]);
+    await adapter.addIndex("topics", "title", { unique: true, name: "topics_direct_index" });
+    (DirectTopic as unknown as { _adapter: TestDatabaseAdapter })._adapter = adapter;
+  });
+
+  afterAll(async () => {
+    await adapter.disconnect?.();
+  });
+
+  it("skips the existence check for a directly assigned adapter", async () => {
+    DirectTopic.clearValidatorsBang();
+    DirectTopic.validatesUniqueness("title");
+
+    const t = await DirectTopic.createBang({ title: "direct-abc" });
+    t.writeAttribute("author_name", "John");
+
+    // title is unchanged and covered by a unique index, so no SELECT is issued.
+    await assertNoQueries(false, async () => {
+      await t.isValid();
+    });
+
+    // A changed title still consults the database.
+    t.writeAttribute("title", "direct-abc v2");
+    await assertQueriesCount(1, false, async () => {
+      await t.isValid();
+    });
   });
 });
