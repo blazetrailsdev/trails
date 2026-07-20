@@ -734,7 +734,10 @@ export function wrapWithScopeProxy<T extends object>(rel: T): T {
       if (modelClass._scopes.has(prop)) {
         return (...args: any[]) => {
           const scopeFn = modelClass._scopes.get(prop)!;
-          const result = scopeFn(target, ...args);
+          // Rails named.rb:175 — `all._exec_scope(*args, &body)`, not a bare
+          // call: `_exec_scope` is what marks the relation delegate-to-model
+          // and nils the current scope for the duration of the body.
+          const result = target._execScope(scopeFn, ...args);
           const extensions = modelClass._scopeExtensions?.get(prop);
           if (extensions && result && typeof result === "object") {
             // Register the extension as a module on the relation (mirrors Ruby's
