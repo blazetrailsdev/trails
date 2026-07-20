@@ -914,8 +914,9 @@ describe("AttributeTest", () => {
 
   describe("#not_in_any", () => {
     it("should create a Grouping node", () => {
-      // Rails passes bare scalars here (attribute_test.rb:1008/1023); the element
-      // type is unknown[] because each is forwarded to notIn.
+      // Rails passes bare scalars here (attribute_test.rb:1008). The cast is needed
+      // only because our notIn is typed notIn(o: unknown[]) while Rails' not_in
+      // takes any expr; see the arel-predications-not-in-expr-type story.
       expect(users.get("id").notInAny([1, 2] as unknown as unknown[][])).toBeInstanceOf(
         Nodes.Grouping,
       );
@@ -937,8 +938,9 @@ describe("AttributeTest", () => {
 
   describe("#not_in_all", () => {
     it("should create a Grouping node", () => {
-      // Rails passes bare scalars here (attribute_test.rb:1008/1023); the element
-      // type is unknown[] because each is forwarded to notIn.
+      // Rails passes bare scalars here (attribute_test.rb:1023). The cast is needed
+      // only because our notIn is typed notIn(o: unknown[]) while Rails' not_in
+      // takes any expr; see the arel-predications-not-in-expr-type story.
       expect(users.get("id").notInAll([1, 2] as unknown as unknown[][])).toBeInstanceOf(
         Nodes.Grouping,
       );
