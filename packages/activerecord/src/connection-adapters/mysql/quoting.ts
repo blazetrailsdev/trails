@@ -277,6 +277,13 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // arm is inlined: `to_s` on a `Data` is the raw byte string, hence `.bytes`
   // (never `toString()`, which UTF-8-decodes and mangles bytes >= 0x80).
   if (value instanceof BinaryData) return value.bytes;
+  // Same rb:96 position, same reason as the abstract chain: an ArrayBuffer view
+  // has no Ruby analogue (#4868), and mysql2's binary binds arrive as a bare
+  // Uint8Array rather than a `Data`, so without this arm they reach the raise
+  // below with "can't cast Uint8Array".
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
   // Rails' MySQL `type_cast` falls through to `super` here, whose boolean arm is
   // self-dispatched (abstract/quoting.rb:98-99) and lands on MySQL's `1`/`0`
   // override. This chain does not delegate, so the arm is inlined — but it

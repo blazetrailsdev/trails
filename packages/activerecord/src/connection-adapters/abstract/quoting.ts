@@ -184,6 +184,14 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // path for a binary attribute lands here.
   if (typeof value === "symbol") return value.description ?? String(value);
   if (value instanceof BinaryData) return value.bytes;
+  // ArrayBuffer views have no Ruby analogue (#4868): Rails only ever sees a
+  // `Type::Binary::Data` here. `quote` already normalizes a view to bytes at the
+  // rb:83 position; `type_cast` must do the same at rb:96, or a bare Uint8Array
+  // bind (MySQL's binary driver binds are not `Data`-wrapped) falls through to
+  // the raise below with "can't cast Uint8Array".
+  if (ArrayBuffer.isView(value)) {
+    return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
+  }
   // Rails: `when true then unquoted_true` / `when false then unquoted_false`
   // (rb:98-99) — self-dispatched, so MySQL's `1`/`0` override applies to the
   // inherited `type_cast`. Thread `this` to mirror that.

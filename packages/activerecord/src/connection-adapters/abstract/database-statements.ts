@@ -1355,6 +1355,8 @@ async function logSql<T>(
     sql,
     name,
     binds: bindArray,
+    // `?? bindArray` covers only bare test stubs that omit the mixin; every real
+    // adapter inherits it from AbstractAdapter.
     type_casted_binds: host.typeCastedBinds?.(bindArray) ?? bindArray,
     connection: host,
     row_count: 0,

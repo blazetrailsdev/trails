@@ -32,19 +32,22 @@ describe("sql.active_record type_casted_binds", () => {
       Notifications.unsubscribe(sub);
     }
 
-    const captured = events
-      .filter((p) => /FROM\s+.?tasks.?/i.test(String(p.sql ?? "")))
-      .map((p) => {
-        const casted = p.type_casted_binds;
-        return typeof casted === "function" ? casted() : casted;
-      });
+    const taskEvents = events.filter((p) => /FROM\s+.?tasks.?/i.test(String(p.sql ?? "")));
+    const captured = taskEvents.map((p) => {
+      const casted = p.type_casted_binds;
+      return typeof casted === "function" ? casted() : casted;
+    });
 
     // Two events for the same query: the first executes, the second is served
     // from the query cache.
     expect(captured.length).toBe(2);
     expect(captured[1]).toEqual(captured[0]);
-    // ...and that the shared value is the adapter-dispatched one, so neither
-    // path can drift back onto a standalone helper that skips `typeCast`.
-    expect(captured[0]).toEqual(conn.typeCastedBinds([task.id]));
+    // ...and that each payload's casted slot is exactly what the adapter's own
+    // `typeCastedBinds` yields for that payload's `binds`, so neither path can
+    // drift back onto a standalone helper that skips `typeCast`. Compared
+    // against the event's own binds rather than a literal `[task.id]`: adapters
+    // legitimately differ in what reaches the slot (MySQL reports the driver
+    // binds, which are empty for an interpolated statement).
+    expect(captured).toEqual(taskEvents.map((p) => conn.typeCastedBinds(p.binds as unknown[])));
   });
 });
