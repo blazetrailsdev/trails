@@ -251,6 +251,7 @@ import * as _AssocInstance from "./associations/instance-methods.js";
 import { argumentError } from "./relation/query-methods.js";
 import {
   ScopeRegistry,
+  scopeRegistry as _scopeRegistry,
   scopeAttributes,
   defaultScopeOverride as _defaultScopeOverride,
   populateWithCurrentScopeAttributes as _populateWithCurrentScopeAttributes,
@@ -2243,6 +2244,11 @@ export class Base extends Model {
   static get currentScope(): any | null {
     return ScopeRegistry.currentScope(this);
   }
+
+  /**
+   * Mirrors: ActiveRecord::Scoping::ClassMethods#scope_registry
+   */
+  static scopeRegistry = _scopeRegistry;
 
   // -- Finders (class methods) --
 

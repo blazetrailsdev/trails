@@ -9,15 +9,27 @@ import { argumentError } from "./query-methods.js";
 
 interface SpawnRelation<T = unknown> {
   _clone(): T;
+  _isAlreadyInScope(registry: unknown): boolean;
+  _modelClass: { all(): T; scopeRegistry(): unknown };
 }
 
 /**
  * Create a fresh copy of this relation.
  *
- * Mirrors: ActiveRecord::SpawnMethods#spawn
+ * Mirrors: ActiveRecord::SpawnMethods#spawn —
+ * `already_in_scope?(model.scope_registry) ? model.all : clone`. When the
+ * receiver is the model's current scope *and* is running as a scope body, the
+ * relation is re-derived from `model.all` rather than cloned.
+ *
+ * Note the `model.all` arm does not fire during ordinary named-scope use:
+ * `_exec_scope` nils the current scope for the body's duration, so the two
+ * conditions of `already_in_scope?` do not normally coincide. It is kept for
+ * fidelity with `spawn_methods.rb:9-11`.
  */
 export function performSpawn<T extends SpawnRelation<T>>(this: T): T {
-  return this._clone();
+  return this._isAlreadyInScope(this._modelClass.scopeRegistry())
+    ? this._modelClass.all()
+    : this._clone();
 }
 
 /**

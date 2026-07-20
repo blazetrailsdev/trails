@@ -474,6 +474,10 @@ export class Relation<T extends Base> {
   // Tri-state (Rails `@values.fetch(:skip_query_cache, nil)`): `undefined` = unset.
   private _skipQueryCache: boolean | undefined = undefined;
   private _loaded = false;
+  // Rails `@delegate_to_model` (relation.rb:90) — true only while a scope body
+  // runs via `_exec_scope`, which is what makes `already_in_scope?` (and hence
+  // `spawn`'s `model.all` branch) reachable at all.
+  private _delegateToModel = false;
   private _records: T[] = [];
   /**
    * Per-record loader block, run on each freshly instantiated record BEFORE
@@ -2080,6 +2084,7 @@ export class Relation<T extends Base> {
    */
   reset(): this {
     this._loaded = false;
+    this._delegateToModel = false;
     this._records = [];
     this._cacheKeys = undefined;
     this._cacheVersions = undefined;
@@ -6601,10 +6606,16 @@ export class Relation<T extends Base> {
     const registry = ScopeRegistry.instance();
 
     // Rails: global_scope? && all_queries == false → raise.
-    if (registry.globalCurrentScope(modelClass, true) && allQueries === false) {
+    if (this.isGlobalScope(registry) && allQueries === false) {
       throw new ArgumentError(
         "Scoping is set to apply to all queries and cannot be unset in a nested block.",
       );
+    }
+
+    // Rails: `elsif already_in_scope?(registry) then yield` — the receiver is
+    // already installed as the current scope, so re-installing it is a no-op.
+    if (this._isAlreadyInScope(registry)) {
+      return await callback();
     }
 
     const prev = registry.currentScope(modelClass, true);
@@ -7002,6 +7013,11 @@ export class Relation<T extends Base> {
     this._skipQueryCache = source._skipQueryCache;
     this._seededNoneNewOwner = source._seededNoneNewOwner;
     this._seedWherePredicates = [...source._seedWherePredicates];
+    // `_delegateToModel` is deliberately NOT copied: Rails' `initialize_copy`
+    // (relation.rb:97-100) ends in `reset`, which clears `@delegate_to_model`.
+    // Carrying it onto clones would let derived relations report "already in
+    // scope" whenever a current scope is installed, so a chained `where` would
+    // spawn `model.all` and discard the values accumulated so far.
   }
 
   /** @internal */
@@ -7011,8 +7027,24 @@ export class Relation<T extends Base> {
     return wrapWithScopeProxy(rel);
   }
 
-  _execScope(fn: (...args: unknown[]) => unknown, ...args: unknown[]): Relation<T> {
-    return (fn.call(this, ...args) || this) as Relation<T>;
+  /**
+   * Run a named-scope body with this relation as the receiver.
+   *
+   * Rails `instance_exec`s the body against the relation; trails scope bodies
+   * instead take the relation as their first argument, so it is passed
+   * explicitly here — the `|| self` fallback and the scope-registry threading
+   * are otherwise identical.
+   *
+   * Mirrors: ActiveRecord::Relation#_exec_scope
+   */
+  _execScope(fn: (rel: Relation<T>, ...args: unknown[]) => unknown, ...args: unknown[]): unknown {
+    this._delegateToModel = true;
+    const registry = ScopeRegistry.instance();
+    try {
+      return this._scoping(null, registry, () => fn(this, ...args) || this);
+    } finally {
+      this._delegateToModel = false;
+    }
   }
 
   protected loadRecords(records: T[]): void {
@@ -7020,8 +7052,12 @@ export class Relation<T extends Base> {
     this._loaded = true;
   }
 
-  private isAlreadyInScope(registry: any): boolean {
-    return !!registry?.currentScope?.(this._modelClass, true);
+  // Mirrors relation.rb:1337-1339 — the `@delegate_to_model` guard is what
+  // narrows this to "receiver is the current scope inside a scope body";
+  // without it every relation under any `scoping {}` block would qualify.
+  /** @internal */
+  _isAlreadyInScope(registry: any): boolean {
+    return this._delegateToModel && !!registry?.currentScope?.(this._modelClass, true);
   }
 
   private isGlobalScope(registry: any): boolean {
