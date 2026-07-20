@@ -22,8 +22,7 @@ import { withTransactionReturningStatus } from "./transactions.js";
  */
 export async function touch(
   this: Base,
-  optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
-  ...rest: string[]
+  ...args: (string | { time?: Date | Temporal.Instant | null } | undefined)[]
 ): Promise<boolean> {
   // Mirrors Rails' NoTouching#touch (`super unless no_touching?`), which is
   // prepended ahead of Persistence#touch: a no_touching block short-circuits
@@ -41,20 +40,22 @@ export async function touch(
     throw new ReadOnlyRecord(`${this.constructor.name} is marked as readonly`);
   }
 
-  let time: Temporal.Instant;
-  let names: string[];
-  if (typeof optionsOrName === "string") {
-    time = currentTimeFromProperTimezone();
-    names = [optionsOrName, ...rest];
-  } else if (optionsOrName?.time != null) {
-    const t = optionsOrName.time;
-    time = t instanceof Temporal.Instant ? t : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
-    names = rest;
-  } else {
-    time = currentTimeFromProperTimezone();
-    names = rest;
+  // Mirrors Rails' `touch(*names, time: nil)`: any number of column names plus a
+  // trailing keyword hash. In TS the keyword hash arrives as a plain object in
+  // the argument list, so split the two apart rather than overloading arg 0.
+  const names: string[] = [];
+  let options: { time?: Date | Temporal.Instant | null } | undefined;
+  for (const arg of args) {
+    if (typeof arg === "string") names.push(arg);
+    else if (arg != null) options = arg;
   }
-  const now = time;
+  const t = options?.time;
+  const now =
+    t == null
+      ? currentTimeFromProperTimezone()
+      : t instanceof Temporal.Instant
+        ? t
+        : Temporal.Instant.fromEpochMilliseconds(t.getTime()); // boundary: accepts JS Date from touch(time:) callers
   const aliases: Record<string, string> = (ctor as any)._attributeAliases ?? {};
   const resolvedNames = names.map((name) => aliases[name] ?? name);
 

@@ -6,7 +6,7 @@
  */
 import { describe, it, expect, beforeEach, afterEach } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import { travel, travelBack, travelTo } from "@blazetrails/activesupport";
+import { travel, travelBack } from "@blazetrails/activesupport";
 import { Base, MigrationContext, registerModel } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import {
@@ -178,14 +178,7 @@ describe("TimestampTest", () => {
     const previouslyUpdatedAt2 = developer.legacy_updated_at as Temporal.Instant;
     const previousCreatedAt = developer.legacy_created_at as Temporal.Instant;
     const newTime = new Date(Date.UTC(2015, 1, 16, 4, 54, 0)); // Time.utc(2015, 2, 16, 4, 54, 0)
-    // Rails: @developer.touch(:created_at, time: new_time) — touch a named attr with given time.
-    // trails touch() doesn't support (name, {time}) — travel to the target time instead.
-    travelTo(newTime);
-    try {
-      await developer.touch("legacy_created_at");
-    } finally {
-      travelBack();
-    }
+    await developer.touch("legacy_created_at", { time: newTime });
 
     expect(developer.legacy_created_at).not.toEqual(previousCreatedAt);
     expect(developer.legacy_updated_at).not.toEqual(previouslyUpdatedAt2);

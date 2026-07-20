@@ -107,28 +107,26 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
  */
 export async function touch(
   this: Base,
-  optionsOrName?: { time?: Date | Temporal.Instant | null } | string,
-  ...rest: string[]
+  ...args: (string | { time?: Date | Temporal.Instant | null } | undefined)[]
 ): Promise<boolean> {
   const self = this as any;
   if (self._deferTouchAttrs?.length) {
     const deferredAttrs = self._deferTouchAttrs as string[];
     const deferredTime = self._touchTime as Temporal.Instant | null;
-    const names: string[] = typeof optionsOrName === "string" ? [optionsOrName, ...rest] : rest;
+    const names = args.filter((a): a is string => typeof a === "string");
+    const options = args.filter((a) => typeof a === "object" && a != null);
     const merged: string[] = [...new Set([...names, ...deferredAttrs])];
     self._deferTouchAttrs = null;
     self._touchTime = null;
     try {
-      return typeof optionsOrName === "object" && optionsOrName != null
-        ? await timestampTouch.call(this, optionsOrName, ...merged)
-        : await timestampTouch.call(this, ...merged);
+      return await timestampTouch.call(this, ...merged, ...options);
     } catch (error) {
       self._deferTouchAttrs = deferredAttrs;
       self._touchTime = deferredTime;
       throw error;
     }
   }
-  return timestampTouch.call(this, optionsOrName, ...rest);
+  return timestampTouch.call(this, ...args);
 }
 
 /**
