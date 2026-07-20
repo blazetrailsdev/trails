@@ -9,6 +9,7 @@ import { EachValidator, ArgumentError } from "@blazetrails/activemodel";
 import { isBlank } from "@blazetrails/activesupport";
 import { UnknownPrimaryKey } from "../errors.js";
 import { threadedConnectionFor } from "../connection-handling.js";
+import { realPool } from "../connection-adapters/abstract/connection-pool.js";
 
 /**
  * Shared scope option validation — called eagerly from validatesUniqueness (declaration time)
@@ -337,10 +338,21 @@ async function isCoveredByUniqueIndex(
 
 /**
  * Reads the model's index list off the schema cache — Rails'
- * `klass.schema_cache.indexes(klass.table_name)`. Trails' SchemaCache#indexes
- * is async and pool-scoped, so the pool is threaded through explicitly; the
- * lookup is cache-backed, so a warm cache costs no query (the whole point of
- * the optimization is to avoid one).
+ * `klass.schema_cache.indexes(klass.table_name)`. Trails' equivalent is async,
+ * so this awaits; the lookup is cache-backed, so a warm cache costs no query
+ * (the whole point of the optimization is to avoid one).
+ *
+ * Reads the raw `SchemaCache` rather than the Rails-shaped one-arg
+ * `schemaCacheBound`: `addIndex` invalidates only the raw cache
+ * (`adapter.schemaCache.clearDataSourceCacheBang`), so the bound reflection can
+ * serve a stale, pre-index list and silently keep the optimization off after a
+ * migration adds the covering index.
+ *
+ * The pool target must be `realPool(pool) ?? adapter`, NOT `pool ?? adapter`: a
+ * directly assigned adapter carries a NullPool, which exposes neither
+ * `withConnection` nor `indexes`, so the cache would introspect the NullPool and
+ * quietly yield `[]` — leaving covered_by_unique_index? permanently false for
+ * every such model.
  *
  * @internal
  */
@@ -351,14 +363,14 @@ async function tableIndexes(
   // pinned connection is the only one that sees uncommitted DDL, so a cold cache
   // must introspect through it or it reflects the wrong index list.
   const adapter = threadedConnectionFor(klass) ?? klass?.connection;
-  const cache = adapter?.schemaCache;
   const tableName = klass?.tableName;
-  if (!cache || typeof cache.indexes !== "function" || !tableName) return [];
-  return (await cache.indexes(adapter.pool ?? adapter, tableName)) as {
-    unique?: boolean;
-    where?: string | null;
-    columns?: unknown;
-  }[];
+  if (!adapter || !tableName) return [];
+
+  type Index = { unique?: boolean; where?: string | null; columns?: unknown };
+
+  const cache = adapter.schemaCache;
+  if (!cache || typeof cache.indexes !== "function") return [];
+  return (await cache.indexes(realPool(adapter.pool) ?? adapter, tableName)) as Index[];
 }
 
 /**
