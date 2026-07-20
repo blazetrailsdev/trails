@@ -1,4 +1,5 @@
 import type { ArelConnection } from "./visitors/connection.js";
+import { rubyClassName } from "./visitors/ruby-class.js";
 
 /** The slice of the connection an array element's `type_cast` needs. */
 export type ArrayElementQuoter = Pick<ArelConnection, "unquotedTrue" | "unquotedFalse">;
@@ -68,25 +69,25 @@ function typeCastArrayElement(
   // override the pair to 1/0.
   if (typeof value === "boolean")
     return String(value ? connection.unquotedTrue() : connection.unquotedFalse());
-  // boundary: defensive Date formatting for caller-supplied array literals.
-  // Duck-typed rather than `instanceof Date` so cross-realm dates and Temporal
-  // land here too; a real Date satisfies it, so it needs no arm of its own.
-  if (
-    typeof value === "object" &&
-    "toISOString" in value &&
-    typeof (value as { toISOString: unknown }).toISOString === "function"
-  ) {
-    return (value as { toISOString: () => string }).toISOString();
-  }
-  if (typeof value === "object") {
-    const replacer = (_k: string, val: unknown) => (typeof val === "bigint" ? val.toString() : val);
-    try {
-      return JSON.stringify(value, replacer) ?? String(value);
-    } catch {
-      return String(value);
-    }
-  }
-  return String(value);
+  // Ruby has no fixnum/bignum split at this layer — a bigint is Numeric too.
+  if (typeof value === "bigint") return String(value);
+  if (typeof value === "string") return value;
+  // `when Symbol ... then value.to_s` (`abstract/quoting.rb:95-96`). Ruby's
+  // `Symbol#to_s` is the bare name, which `description` is the analogue of.
+  if (typeof value === "symbol") return value.description ?? "";
+  // `else raise TypeError, "can't cast #{value.class.name}"`
+  // (`abstract/quoting.rb:105`). Everything Rails' closed set does not name
+  // raises here rather than being JSON- or String-encoded — including the
+  // Date/Time arm, which reaches `type_cast` only through `quoted_date` and so
+  // is served by `formatElement` above (the only caller,
+  // `postgresqlDefaultQuoter.quote`, passes it). A value that gets past that
+  // hook has no `quoted_date` to route through and is not castable.
+  throw new TypeError(`can't cast ${rubyClassName(value) ?? classNameOf(value)}`);
+}
+
+function classNameOf(value: unknown): string {
+  const named = (value as { constructor?: { name?: unknown } })?.constructor?.name;
+  return typeof named === "string" && named !== "" ? named : String(typeof value);
 }
 
 /**

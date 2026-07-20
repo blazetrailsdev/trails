@@ -56,9 +56,15 @@ describe("quoteArrayLiteral", () => {
     });
   });
 
+  // `type_cast` reaches a Date/Time only through `quoted_date`
+  // (`abstract/quoting.rb:103`), which on this path is the caller's
+  // `formatElement` hook — never a bare ISO-8601 string, a format no Rails
+  // path emits.
   it("handles Date values with toISOString", () => {
     const d = new Date("2026-03-26T12:00:00.000Z");
-    expect(quoteArrayLiteral([d], defaultQuoter)).toBe(`{${d.toISOString()}}`);
+    expect(quoteArrayLiteral([d], defaultQuoter, () => "2026-03-26 12:00:00")).toBe(
+      '{"2026-03-26 12:00:00"}',
+    );
   });
 
   it("handles empty arrays", () => {
@@ -67,11 +73,36 @@ describe("quoteArrayLiteral", () => {
 
   it("handles objects with toISOString", () => {
     const obj = { toISOString: () => "2026-01-01T00:00:00Z" };
-    expect(quoteArrayLiteral([obj], defaultQuoter)).toBe("{2026-01-01T00:00:00Z}");
+    expect(() => quoteArrayLiteral([obj], defaultQuoter)).toThrow(new TypeError("can't cast Time"));
   });
 
   it("handles bigint values inside objects", () => {
-    expect(quoteArrayLiteral([{ id: 42n }], defaultQuoter)).toBe('{"{\\"id\\":\\"42\\"}"}');
+    expect(() => quoteArrayLiteral([{ id: 42n }], defaultQuoter)).toThrow(
+      new TypeError("can't cast Hash"),
+    );
+  });
+
+  // `else raise TypeError, "can't cast #{value.class.name}"`
+  // (`abstract/quoting.rb:105`) — the closed set's terminal arm.
+  describe("raises TypeError on a value type_cast does not name", () => {
+    it("raises on a class instance", () => {
+      class Point {}
+      expect(() => quoteArrayLiteral([new Point()], defaultQuoter)).toThrow(
+        new TypeError("can't cast Point"),
+      );
+    });
+
+    it("raises on a function", () => {
+      expect(() => quoteArrayLiteral([() => 1], defaultQuoter)).toThrow(TypeError);
+    });
+  });
+
+  // `when nil, Numeric, String then value` plus `when Symbol ... value.to_s`
+  // (`abstract/quoting.rb:95-101`).
+  it("casts the scalar arms type_cast names", () => {
+    expect(quoteArrayLiteral([1, 42n, "a", null, Symbol("sym")], defaultQuoter)).toBe(
+      "{1,42,a,NULL,sym}",
+    );
   });
 
   // Each expectation below was captured from `PG::TextEncoder::Array#encode`,
