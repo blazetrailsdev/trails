@@ -72,7 +72,11 @@ export abstract class Visitor {
   protected visit(object: unknown, collector?: unknown): unknown {
     const methodName = this.dispatchMethod(object);
     if (!methodName) {
-      throw new UnsupportedVisitError(`Unknown node type: ${describeClass(object)}`);
+      // Rails' second failure terminal: no handler on the class or any of its
+      // ancestors falls out of `rescue NoMethodError` as a TypeError
+      // (visitor.rb:38), distinct from a class whose handler is aliased to
+      // `unsupported` and raises UnsupportedVisitError (to_sql.rb:828).
+      throw new TypeError(`Cannot visit ${describeClass(object)}`);
     }
     const fn = (this as unknown as Record<string, unknown>)[methodName];
     if (typeof fn !== "function") {
