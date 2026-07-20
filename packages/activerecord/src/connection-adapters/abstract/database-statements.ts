@@ -2064,7 +2064,7 @@ export function buildFixtureSql(
     // Single-row: strip DEFAULT columns so the DB fills them from its own
     // defaults, matching Rails' single-row optimisation exactly.
     const row = valuesList[0];
-    const filteredValues: Nodes.Node[] = [];
+    const filteredValues: unknown[] = [];
     allColumns.forEach((col, i) => {
       if (row[i] !== DEFAULT_VALUE) {
         filteredValues.push(row[i] as Nodes.Node);
@@ -2074,7 +2074,7 @@ export function buildFixtureSql(
     manager.values = manager.createValues(filteredValues);
   } else {
     allColumns.forEach((col) => manager.columns.push(table.get(col)));
-    manager.values = manager.createValuesList(valuesList as Nodes.Node[][]);
+    manager.values = manager.createValuesList(valuesList);
   }
 
   // Compile via the adapter's Arel visitor when available (matches Rails'
