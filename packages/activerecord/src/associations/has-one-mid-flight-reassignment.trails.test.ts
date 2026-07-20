@@ -3,11 +3,18 @@
  * clobbers a target that was reassigned while the reader query was still in
  * flight.
  *
- * Rails' `find_target` (`associations/association.rb:194`) is synchronous, so
- * it can never observe a reassignment mid-load. Our loader awaits DB I/O,
- * which opens the window: an in-flight reader (`firm.account` accessed but
- * never awaited) can still be pending when the caller sets a new target, and
- * the stale queried row then wins the writeback.
+ * Rails' `find_target`
+ * (`vendor/rails/activerecord/lib/active_record/associations/association.rb:248`)
+ * never observes a reassignment mid-load. It is synchronous on its default
+ * arm; it does take `async: false` and returns `scope.load_async.then(&:to_a)`
+ * when asked, but that promise still resolves into `target` under the same
+ * `load_target` call, so there is no window in which a caller can reassign
+ * between the query and the writeback. Do not dismiss the premise on spotting
+ * that `async:` parameter.
+ *
+ * Our loader awaits DB I/O and does open that window: an in-flight reader
+ * (`firm.account` accessed but never awaited) can still be pending when the
+ * caller sets a new target, and the stale queried row then wins the writeback.
  *
  * These are `skip`ped because the bug is still OPEN — the fix is not
  * implementable with the holder bookkeeping we have today, and the naive guard
@@ -17,7 +24,7 @@
  * - `loadBelongsTo`'s guard (#4919) keys on the *owner's* stale key (FK +
  *   `foreign_type`), which is independent of holder bookkeeping. has_one has
  *   no owner-side stale key — Rails' `stale_state` is non-nil only on
- *   `BelongsToAssociation` (`associations/belongs_to_association.rb:126`) —
+ *   `BelongsToAssociation` (`belongs_to_association.rb:164`) —
  *   so that approach does not transfer.
  * - Keying on a false→true flip in holder loaded-ness looks equivalent but is
  *   not: the association machinery marks holders loaded mid-await on its own
@@ -32,8 +39,10 @@
  * "someone else's set" — a load-generation token, not an inferred signal.
  *
  * Note there are TWO writebacks on this path, and a fix must cover both: the
- * inner loader's `syncToAssociationInstance` (`associations.ts:1838`) and the
- * instance wrapper's own `setTarget` (`associations/instance-methods.ts:176`),
+ * inner loader's `syncToAssociationInstance`
+ * (`packages/activerecord/src/associations.ts:1808`) and the instance
+ * wrapper's own `setTarget`
+ * (`packages/activerecord/src/associations/instance-methods.ts:176`),
  * which re-syncs unconditionally after the inner call returns. Guarding only
  * the inner one leaves the clobber reachable.
  *
