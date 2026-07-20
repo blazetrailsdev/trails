@@ -34,9 +34,12 @@ describe("ActiveRecord::Encryption::EncryptableFixtureTest", () => {
     expect(book.name).toBe("Ruby for Rails");
     await assertEncryptedAttribute(book, "name", "Ruby for Rails");
 
-    // Rails writes `find_by_name(...)`; the dynamic finder is not wired on
-    // this model, and it is defined as sugar for the explicit `find_by`.
-    expect(await EncryptedBookThatIgnoresCase.findBy({ name: "Ruby for Rails" })).toBeTruthy();
+    // Rails writes `find_by_name(...)`. Trails has no method_missing, so the
+    // generated-name form isn't callable; `findByAttribute` is the explicit
+    // dynamic-finder surface it dispatches through (base.ts findByAttribute).
+    expect(
+      await EncryptedBookThatIgnoresCase.findByAttribute("name", "Ruby for Rails"),
+    ).toBeTruthy();
   });
 });
 
