@@ -516,7 +516,7 @@ jobs:
           # CI — but a manual job re-run hits the API fresh and will see the
           # fix. Reading the payload would replay the stale original body and
           # leave the check permanently red.
-          body=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
+          body=$(scripts/ci/gh-api-retry.sh "repos/$REPO/pulls/$PR_NUMBER" --jq '.body // ""')
           if printf '%s' "$body" | grep -qiE "$ATTRIBUTION_RE"; then
             echo "::error::PR body contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines (see CLAUDE.md), then re-run this job."
             exit 1
@@ -531,6 +531,8 @@ jobs:
           github.event.pull_request.user.login == 'deanmarano' }}
         run: |
           set -euo pipefail
+          # See the body guard above: retry transient API failures so a 5xx
+          # can't masquerade as an attribution hit.
           # Scan every commit message on the PR, not just the PR body. The body
           # check above misses `Co-authored-by:` trailers that live in commits —
           # and GitHub's squash-merge auto-aggregates those branch-commit
@@ -542,12 +544,12 @@ jobs:
           # closed in that case rather than passing on a partial scan — this repo
           # squashes and has a 500-LOC ceiling, so 250 commits never happens
           # legitimately; if it does, squash/rebase before re-running.
-          count=$(gh api "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
+          count=$(scripts/ci/gh-api-retry.sh "repos/$REPO/pulls/$PR_NUMBER" --jq '.commits')
           if [ "$count" -gt 250 ]; then
             echo "::error::PR has $count commits, exceeding the 250-commit API scan cap. Squash or rebase the branch so commit messages can be fully scanned, then re-run this job."
             exit 1
           fi
-          messages=$(gh api --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
+          messages=$(scripts/ci/gh-api-retry.sh --paginate "repos/$REPO/pulls/$PR_NUMBER/commits" --jq '.[].commit.message')
           if printf '%s' "$messages" | grep -qiE "$ATTRIBUTION_RE"; then
             echo "::error::A commit message contains Claude attribution. Remove 'Generated with Claude Code' / 'Co-Authored-By: Claude' / Anthropic attribution lines from your commits (see CLAUDE.md) — note that squash-merge folds commit trailers into main — then re-run this job."
             exit 1
