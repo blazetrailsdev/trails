@@ -5,6 +5,7 @@ import {
   timestampAttributesForUpdateInModel,
   currentTimeFromProperTimezone,
 } from "./timestamp.js";
+import type { TouchArg } from "./timestamp.js";
 import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { reflectOnAllAssociations } from "./reflection.js";
 import { BelongsTo as BelongsToBuilder } from "./associations/builder/belongs-to.js";
@@ -105,16 +106,15 @@ export async function touchLater(this: Base, ...names: string[]): Promise<void> 
  *
  * Mirrors: ActiveRecord::TouchLater#touch
  */
-export async function touch(
-  this: Base,
-  ...args: (string | { time?: Date | Temporal.Instant | null } | undefined)[]
-): Promise<boolean> {
+export async function touch(this: Base, ...args: TouchArg[]): Promise<boolean> {
   const self = this as any;
   if (self._deferTouchAttrs?.length) {
     const deferredAttrs = self._deferTouchAttrs as string[];
     const deferredTime = self._touchTime as Temporal.Instant | null;
     const names = args.filter((a): a is string => typeof a === "string");
     const options = args.filter((a) => typeof a === "object" && a != null);
+    // Deferred attrs merge with the caller's names; the caller's `time:` (if
+    // any) still governs, matching Rails' single flushing touch call.
     const merged: string[] = [...new Set([...names, ...deferredAttrs])];
     self._deferTouchAttrs = null;
     self._touchTime = null;

@@ -13,6 +13,18 @@ import { withTransactionReturningStatus } from "./transactions.js";
  * Mirrors: ActiveRecord::Timestamp
  */
 
+export interface TouchOptions {
+  time?: Date | Temporal.Instant | null;
+}
+
+/**
+ * One argument of Rails' `touch(*names, time: nil)`: a column name, or the
+ * trailing keyword hash. Ruby keywords have no TS equivalent, so the hash
+ * travels in the same variadic list and is separated out by position-free
+ * type check rather than by being pinned to argument 0.
+ */
+export type TouchArg = string | TouchOptions | undefined;
+
 /**
  * Update the updated_at timestamp (and optionally other timestamp
  * columns) without changing other attributes. Skips validations
@@ -20,10 +32,7 @@ import { withTransactionReturningStatus } from "./transactions.js";
  *
  * Mirrors: ActiveRecord::Timestamp#touch
  */
-export async function touch(
-  this: Base,
-  ...args: (string | { time?: Date | Temporal.Instant | null } | undefined)[]
-): Promise<boolean> {
+export async function touch(this: Base, ...args: TouchArg[]): Promise<boolean> {
   // Mirrors Rails' NoTouching#touch (`super unless no_touching?`), which is
   // prepended ahead of Persistence#touch: a no_touching block short-circuits
   // the whole method — including the persisted?/readonly? guards below — so a
@@ -44,7 +53,7 @@ export async function touch(
   // trailing keyword hash. In TS the keyword hash arrives as a plain object in
   // the argument list, so split the two apart rather than overloading arg 0.
   const names: string[] = [];
-  let options: { time?: Date | Temporal.Instant | null } | undefined;
+  let options: TouchOptions | undefined;
   for (const arg of args) {
     if (typeof arg === "string") names.push(arg);
     else if (arg != null) options = arg;
