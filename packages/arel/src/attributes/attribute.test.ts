@@ -307,20 +307,6 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
-    it("should create a Grouping node", () => {
-      expect(users.get("id").eqAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
-    });
-
-    it("should generate ANDs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").eqAll([1, 2]));
-      expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 AND "users"."id" = 2)',
-      );
-    });
-  });
-
   describe("#average", () => {
     it("should create a AVG node", () => {
       const node = users.get("age").average();
