@@ -642,7 +642,7 @@ function cacheNotificationInfo(
     // Lazy, mirroring Rails' `-> { type_casted_binds(binds) }` (query_cache.rb:311):
     // self-dispatched so the adapter's `type_cast` override applies here exactly
     // as it does on the uncached `log` path.
-    type_casted_binds: () => this.typeCastedBinds?.(binds) ?? binds,
+    type_casted_binds: () => this.typeCastedBinds?.(binds) ?? [],
     name,
     connection: this,
     cached: true,

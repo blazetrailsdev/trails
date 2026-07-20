@@ -281,6 +281,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // has no Ruby analogue (#4868), and mysql2's binary binds arrive as a bare
   // Uint8Array rather than a `Data`, so without this arm they reach the raise
   // below with "can't cast Uint8Array".
+  if (value instanceof Uint8Array) return value;
   if (ArrayBuffer.isView(value)) {
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   }

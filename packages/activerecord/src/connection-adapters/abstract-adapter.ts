@@ -791,6 +791,12 @@ export class AbstractAdapter implements Quoting {
    * Assigned by `include(AbstractAdapter, QuotingMixin)` below; declared here so
    * payload producers can self-dispatch it (Rails' single `type_casted_binds`,
    * abstract/quoting.rb:224) and pick up an adapter's `typeCast` override.
+   *
+   * Rails marks `type_casted_binds` `private` (quoting.rb:223). TS has no
+   * equivalent for a mixed-in member that adapters must still dispatch through
+   * `this`, so it is public on the class but flagged `@internal` — it is not
+   * part of the supported surface.
+   * @internal
    */
   declare typeCastedBinds: (binds: unknown[] | null | undefined) => unknown[] | undefined;
 

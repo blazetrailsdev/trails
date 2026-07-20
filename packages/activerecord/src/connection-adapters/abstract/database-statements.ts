@@ -1355,9 +1355,11 @@ async function logSql<T>(
     sql,
     name,
     binds: bindArray,
-    // `?? bindArray` covers only bare test stubs that omit the mixin; every real
-    // adapter inherits it from AbstractAdapter.
-    type_casted_binds: host.typeCastedBinds?.(bindArray) ?? bindArray,
+    // `?? []` (never `?? bindArray`) so a host that somehow lacks the mixin
+    // emits an empty slot rather than silently reinstating the raw-uncast-binds
+    // divergence this file's `typeCastedBinds` sweep removed — Attribute objects
+    // in the payload would reach LogSubscriber as "[object Object]".
+    type_casted_binds: host.typeCastedBinds?.(bindArray) ?? [],
     connection: host,
     row_count: 0,
   };
@@ -1840,7 +1842,9 @@ export async function rawExecute(
   materializeTransactions = true,
   batch = false,
 ): Promise<unknown> {
-  const tcBinds = this.typeCastedBinds?.(binds ?? []) ?? binds ?? [];
+  // `?? []` rather than the raw binds: an adapter missing the mixin should fail
+  // loudly at the driver, not bind Attribute objects.
+  const tcBinds = this.typeCastedBinds?.(binds ?? []) ?? [];
   return (this as any).withRawConnection({ allowRetry, materializeTransactions }, (conn: unknown) =>
     (this as any).performQuery(conn, sql, binds ?? [], tcBinds, { prepare, batch }),
   );

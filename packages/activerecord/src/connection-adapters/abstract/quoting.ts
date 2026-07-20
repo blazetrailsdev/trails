@@ -189,6 +189,7 @@ export function typeCast(this: QuotingDispatchHost, value: unknown): unknown {
   // rb:83 position; `type_cast` must do the same at rb:96, or a bare Uint8Array
   // bind (MySQL's binary driver binds are not `Data`-wrapped) falls through to
   // the raise below with "can't cast Uint8Array".
+  if (value instanceof Uint8Array) return value;
   if (ArrayBuffer.isView(value)) {
     return new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
   }

@@ -89,10 +89,14 @@ describe("cacheNotificationInfo payload (trails)", () => {
     const casted = (payload.type_casted_binds as () => unknown[])();
     expect(casts).toBe(1);
     // The slot is filled by the adapter-dispatched `typeCastedBinds`
-    // (abstract/quoting.rb:224), so the cast is the adapter's own: SQLite's
-    // `type_cast` returns BigInt for whole numbers to force SQLITE_INTEGER
-    // binding, while PG/MySQL return the Number. Compare against that rather
-    // than a literal so this stays adapter-independent.
+    // (abstract/quoting.rb:224), so the exact JS type is the adapter's own:
+    // SQLite's `type_cast` returns BigInt for whole numbers to force
+    // SQLITE_INTEGER binding, while PG/MySQL return the Number. Pin the numeric
+    // *value* (adapter-independent) rather than only comparing against
+    // `typeCastedBinds` again, which would pass even if the cast were wrong on
+    // both sides.
+    expect(casted).toHaveLength(1);
+    expect(Number(casted[0])).toBe(1);
     expect(casted).toEqual(connection.typeCastedBinds([1]));
   });
 

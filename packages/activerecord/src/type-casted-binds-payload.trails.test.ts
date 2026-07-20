@@ -50,6 +50,14 @@ describe("sql.active_record type_casted_binds", () => {
     // legitimately differ in what reaches the slot (MySQL reports the driver
     // binds, which are empty for an interpolated statement).
     expect(captured).toEqual(taskEvents.map((p) => conn.typeCastedBinds(p.binds as unknown[])));
+    // The comparison above pins dispatch; this pins that the slot actually
+    // holds cast primitives. An un-cast Attribute would satisfy the equality
+    // (both sides would be wrong) but fails here, and is exactly what
+    // LogSubscriber renders as "[object Object]".
+    for (const value of captured.flat()) {
+      expect(value).not.toHaveProperty("valueForDatabase");
+      expect(["number", "bigint", "string", "boolean"]).toContain(typeof value);
+    }
   });
 
   it("routes Temporal binds through the adapter's quoted_date", async () => {

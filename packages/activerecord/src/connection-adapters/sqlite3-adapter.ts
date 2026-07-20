@@ -486,7 +486,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       sql,
       name,
       binds,
-      type_casted_binds: this.typeCastedBinds(binds) ?? binds,
+      type_casted_binds: this.typeCastedBinds(binds) ?? [],
       connection: this,
       row_count: 0,
       transaction: txPublic.isOpen() ? txPublic : null,
