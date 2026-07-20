@@ -1,5 +1,9 @@
 import { describe, it, expect } from "vitest";
 import type { SqliteConnection, SqliteDriver } from "../sqlite-adapter.js";
+import type { AbstractSQLite3Adapter } from "../connection-adapters/sqlite3-adapter.js";
+import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
+import { LibSQLAdapter } from "../connection-adapters/libsql-adapter.js";
+import { NodeSQLiteAdapter } from "../connection-adapters/node-sqlite-adapter.js";
 import { statementIsReader } from "./statement-reader.js";
 import { betterSqlite3Driver } from "./better-sqlite3.js";
 import { libsqlDriver } from "./libsql.js";
@@ -48,6 +52,37 @@ describe.each(drivers)("SqliteStatement#reader — %s", (_name, driver, availabl
       expect(rows[0]?.["id"]).toBe(1);
     } finally {
       await conn.close();
+    }
+  });
+});
+
+const adapters: [string, () => AbstractSQLite3Adapter, boolean][] = [
+  ["better-sqlite3", () => new BetterSQLite3Adapter(":memory:"), true],
+  ["libsql", () => new LibSQLAdapter(":memory:"), true],
+  ["node-sqlite", () => new NodeSQLiteAdapter(":memory:"), isNodeSqliteAvailable],
+];
+
+// `execute` (via `_performQuery`) still drops RETURNING rows on EVERY driver,
+// because that path gates rows on `stmt.reader && !isWriteQuery(sql)` — a
+// trails invention; Rails branches on `column_count.zero?` alone. Removing the
+// isWrite gate would cost `executeMutation` the atomic RunResult rowid that PR
+// 4893 introduced, so it is tracked separately as
+// sqlite-perform-query-iswrite-gate-drops-returning-rows.
+describe.each(adapters)("SQLite3Adapter RETURNING rows — %s", (_name, build, available) => {
+  it.skipIf(!available)("internalExecQuery returns the RETURNING rows", async () => {
+    const adapter = build();
+    try {
+      await adapter.execute("CREATE TABLE widgets (id INTEGER PRIMARY KEY, name TEXT NOT NULL)");
+
+      const result = await adapter.internalExecQuery(
+        "INSERT INTO widgets (name) VALUES ('gear') RETURNING id, name",
+      );
+      expect(result.columns).toEqual(["id", "name"]);
+      expect(result.rows).toHaveLength(1);
+      expect(result.rows[0]?.[1]).toBe("gear");
+    } finally {
+      await adapter.execute('DROP TABLE IF EXISTS "widgets"');
+      await adapter.close();
     }
   });
 });
