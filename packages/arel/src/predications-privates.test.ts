@@ -48,6 +48,7 @@ describe("Predications.isInfinity / isUnboundable / isOpenEnded", () => {
   // class including Predications would — isOpenEnded dispatches through `this`.
   const host = {
     quotedNode: (v: unknown): Nodes.Node => v as Nodes.Node,
+    quotedArray: (vs: unknown[]): Nodes.Node[] => vs as Nodes.Node[],
     isInfinity(this: unknown, v: unknown): 1 | -1 | 0 {
       return Predications.isInfinity.call(this as never, v);
     },
