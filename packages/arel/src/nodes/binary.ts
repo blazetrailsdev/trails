@@ -1,3 +1,4 @@
+import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -7,8 +8,12 @@ import { Not } from "./unary.js";
 import { Grouping } from "./grouping.js";
 import type { Cte } from "./cte.js";
 
+// `ModelAttribute` is not an Arel node but occupies node slots in Rails:
+// `build_quoted` returns one unwrapped into the AST (casted.rb:50), and both
+// Assignment (to_sql.rb:631) and ValuesList (to_sql.rb:110) accept one.
 export type NodeOrValue =
   | Node
+  | ModelAttribute
   | string
   | number
   | boolean

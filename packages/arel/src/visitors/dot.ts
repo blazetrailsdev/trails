@@ -745,8 +745,8 @@ export class Dot extends Visitor {
     // (dot.rb:216) and `alias :visit_Set :visit_Array` (dot.rb:231). Neither
     // has a Ruby-class name `rubyClassName` can synthesize, so both go in the
     // ctor-keyed table (the prototype walk covers Attribute subclasses).
-    reg(ModelAttribute as unknown as NodeCtor, "visitActiveModelAttribute");
-    reg(Set as unknown as NodeCtor, "visitSet");
+    reg(ModelAttribute, "visitActiveModelAttribute");
+    reg(Set, "visitSet");
     // Quoted, True, False, BoundSqlLiteral, Fragments don't extend any
     // ancestor with a useful Dot handler — register explicitly as leaves.
     reg(Nodes.Quoted, "visitNoEdges");
