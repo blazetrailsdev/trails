@@ -1,9 +1,11 @@
+import { SQLString } from "../collectors/sql-string.js";
+
 /**
  * The `engine` `Node#toSql()` / `TreeManager#toSql()` compile through — Rails'
  * `ActiveRecord::Base`, duck-typed here so arel does not import activerecord.
  */
 export interface ArelEngine {
-  connection: { visitor: { compile(node: Node): string } };
+  connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } };
 }
 
 /** Backing store for `Arel::Table.engine`. It lives here, not in table.ts,
@@ -47,12 +49,12 @@ export abstract class Node {
   /**
    * Mirrors: Arel::Nodes::Node#to_sql (arel/nodes/node.rb:148-153).
    *
-   * Rails writes `engine.with_connection { |c| c.visitor.accept(self, ...) }`.
-   * trails' `withConnection` is async (per-checkout `verifyBang` is awaited —
-   * see ConnectionPool#checkout), and `to_sql` is synchronous in Rails and at
-   * all 600+ call sites here, so this uses the synchronous `engine.connection`
-   * lease instead. Same visitor, same connection; it just skips the async
-   * per-checkout verify. Tracked with the other sync-lease residuals by
+   * Deviation: `engine.connection` in place of Rails'
+   * `engine.with_connection { |c| ... }`. trails' `withConnection` is async
+   * (per-checkout `verifyBang` is awaited — see ConnectionPool#checkout) and
+   * `to_sql` is synchronous at all 600+ call sites, so this takes the sync
+   * `engine.connection` lease. Same visitor and connection; it skips only the
+   * async per-checkout verify, the residual tracked by
    * `connection-pool-pinned-sync-checkout-per-checkout-verify`.
    */
   toSql(engine: ArelEngine | null = _engine.current): string {
@@ -62,7 +64,8 @@ export abstract class Node {
           "Set it to your ActiveRecord base class, or pass an engine to toSql().",
       );
     }
-    return engine.connection.visitor.compile(this);
+    const collector = new SQLString();
+    return engine.connection.visitor.accept(this, collector).value;
   }
 
   fetchAttribute(_block?: (attr: Node) => unknown): unknown {
