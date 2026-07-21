@@ -151,10 +151,8 @@ export class SelectManager extends TreeManager {
    */
   on(...exprs: (Node | string | null | undefined)[]): this {
     const joins = this.core.source.right;
-    if (joins.length > 0) {
-      const lastJoin = joins[joins.length - 1];
-      (lastJoin as unknown as { right: Node | null }).right = new On(this.collapse(exprs));
-    }
+    const lastJoin = joins[joins.length - 1] as unknown as { right: Node | null };
+    lastJoin.right = new On(this.collapse(exprs));
     return this;
   }
 
@@ -449,10 +447,7 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  // Mirrors Arel::SelectManager#collapse (private). Compacts an array
-  // of expressions, wraps bare strings as SqlLiteral (Rails: `Arel.sql`),
-  // and folds them into a single Node — either the single remaining
-  // expr or an `And` of all of them.
+  // Mirrors Arel::SelectManager#collapse (select_manager.rb:256-268).
   protected collapse(exprs: unknown[]): Node {
     const filtered = exprs
       .filter((e) => e !== null && e !== undefined)
