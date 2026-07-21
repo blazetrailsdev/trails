@@ -334,5 +334,12 @@
     "rubyName": "raise_record_not_found_exception!",
     "call": "wrap",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation/finder-methods.ts",
+    "rubyName": "raise_record_not_found_exception!",
+    "call": "where_sql",
+    "reason": "Satisfied by a different path: Rails builds the condition string with `arel.where_sql(model)` (finder_methods.rb:418); trails routes it through the `_conditionsClause()` host method instead. Newly visible (not newly broken) because #5037 gave Arel's whereSql a connection parameter; the divergent indirection pre-dates it."
   }
 ]
