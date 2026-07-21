@@ -208,7 +208,10 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
       // instance distinction the manifest needs (`static name` vs `name`).
       // Bucketing by `file` happens below, after ordering; the merge is a total
       // order on `line`, so each file's slice is still ascending.
-      for (const m of mergeBySourceLine(tagStatic(host.instanceMethods, false), tagStatic(host.classMethods, true))) {
+      for (const m of mergeBySourceLine(
+        tagStatic(host.instanceMethods, false),
+        tagStatic(host.classMethods, true),
+      )) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, className);
@@ -222,7 +225,10 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
       // Modules port to top-level functions, which have no staticness — every
       // entry stays bare regardless of whether Ruby declared it on the module
       // or its singleton.
-      for (const m of mergeBySourceLine(tagStatic(host.instanceMethods, false), tagStatic(host.classMethods, true))) {
+      for (const m of mergeBySourceLine(
+        tagStatic(host.instanceMethods, false),
+        tagStatic(host.classMethods, true),
+      )) {
         const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
         pushMethod(b.names, b.seen, m.name, false);
       }
