@@ -57,12 +57,18 @@ export type NodeOrValue =
   // direct-dispatch path, which this slot never takes. Assignment is the sole
   // justifying slot; see the ValuesList caveat in the header comment.
   | boolean
-  // The five Temporal types to-sql.ts actually visits and quotes (see
-  // TEMPORAL_CLASS_NAMES in temporal-tag.ts). Duration/PlainYearMonth/
-  // PlainMonthDay are deliberately absent: Rails has no visitor for them.
-  // JS `Date` is absent too — it is rejected AR-wide (Temporal is the `Time`
-  // analogue), and Rails aliases `visit_Date` to `unsupported`
-  // (to_sql.rb:836), so a `Date` in a node slot can only ever raise.
+  // Temporal is justified by a quoting slot, not a rendering visitor — the
+  // same shape as `boolean` above. `UpdateManager#set` carries a raw temporal
+  // into an Assignment, which quotes a non-Node right rather than visiting it
+  // (to_sql.rb:637-639), so it renders. The `visit_Date`/`visit_DateTime`/
+  // `visit_Time` aliases (to_sql.rb:836/837/844) govern only direct dispatch,
+  // which this slot never takes: a bare temporal handed straight to `visit`
+  // (e.g. as an `Equality` right) does raise, and to-sql.test.ts pins that.
+  //
+  // Duration/PlainYearMonth/PlainMonthDay are deliberately absent: they have no
+  // Ruby analogue at all (see TEMPORAL_CLASS_NAMES in temporal-tag.ts). JS
+  // `Date` is absent because it is rejected AR-wide — Temporal is the `Time`
+  // analogue here.
   | Temporal.Instant
   | Temporal.ZonedDateTime
   | Temporal.PlainDateTime
