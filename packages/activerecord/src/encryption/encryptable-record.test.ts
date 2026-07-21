@@ -722,16 +722,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     await assertEncryptedAttribute(await Book.create({ logo: lowBytes }), "logo", lowBytes);
     await assertEncryptedAttribute(await Book.create({ logo: highBytes }), "logo", highBytes);
   });
-  // TRACKED-PENDING-CONVERGENCE (serialize-encrypts-decorator-ordering): now
-  // rides the canonical Rails fixtures (reflection-typed binary `logo`, no
-  // bespoke string column), which shows the residual gap is NOT the binary
-  // text-ciphertext round-trip this story closed — that works. It is decorator
-  // ordering: Rails applies pending decorators in declaration order, so
-  // `serialize` + `encrypts` yields EncryptedAttributeType(Serialized(Bytea)).
-  // We replay them reversed AND seed `serialize` from the pre-reflection
-  // ValueType, producing Serialized(non-binary) and a coder that receives raw
-  // bytes. Fixing that is attribute-registration surgery, not an encryption fix.
-  it.skip("serialized binary data can be encrypted", async () => {
+  it("serialized binary data can be encrypted", async () => {
     const jsonBytes = Array.from({ length: 96 }, (_, i) => String.fromCharCode(i + 32));
     await freshAdapter();
     await assertEncryptedAttribute(

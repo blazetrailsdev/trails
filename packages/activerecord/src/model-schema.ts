@@ -1213,7 +1213,8 @@ function applyColumnsHash(
       continue;
     }
 
-    let type = reflectedTypeForColumn(host, adapter, name, column);
+    const reflectedColumnType = reflectedTypeForColumn(host, adapter, name, column);
+    let type = reflectedColumnType;
 
     // Preserve encryption wrappers across schema reflection. Both
     // EncryptedAttributeType variants implement `WrappedType`; any
@@ -1232,6 +1233,14 @@ function applyColumnsHash(
     host._attributeDefinitions.set(name, {
       name,
       type,
+      // The BARE reflected `type_for_column` result, before the wrapper
+      // preservation above re-applies any decoration already baked into
+      // `type`. Rails seeds `_default_attributes` from `type_for_column`
+      // (attributes.rb:241-245) and lets the pending-decorator queue do ALL
+      // the wrapping; seeding from the decorated `type` instead double-applies
+      // every decorator that also lives in the queue — e.g. `serialize` +
+      // `encrypts` on one column yields Encrypted(Serialized(Encrypted(...))).
+      reflectedColumnType,
       defaultValue,
       userProvided: false,
       source: "schema",
