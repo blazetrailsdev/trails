@@ -103,12 +103,26 @@ describe("parseSource", () => {
   it("does not treat a local `fixtures =` assignment as a declaration", () => {
     const src = [
       "class T < ActiveRecord::TestCase",
+      "  fixtures :topics",
       "  def test_omap_fixtures",
       '    fixtures = ActiveRecord::FixtureSet.new(nil, "categories", Category, FIXTURES_ROOT + "/categories_ordered")',
       "  end",
+      "  def test_create",
+      "    fixtures = ActiveRecord::FixtureSet.create_fixtures(FIXTURES_ROOT, :collections, collections: Course)",
+      "  end",
+      "  def test_nil",
+      "    fixtures = nil",
+      "  end",
+      "  def test_hash",
+      "    fixtures = {",
+      '      "one" => { "id" => 1 },',
+      "    }",
+      "  end",
       "end",
     ].join("\n");
-    expect(parseSource(src).fixtures).toEqual([]);
+    // Only the real declaration survives: no "/categories_ordered", "FixtureSet",
+    // or "collections" leaking in from the local variables.
+    expect(parseSource(src).fixtures).toEqual(["topics"]);
   });
 
   it("does not treat hash-syntax keys as fixture accessors", () => {

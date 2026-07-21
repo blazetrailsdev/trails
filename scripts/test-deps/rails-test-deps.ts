@@ -36,9 +36,12 @@ export interface FileDeps {
 }
 
 const REQUIRE_RE = /^\s*require\s+["']models\/([^"']+)["']/;
-// `(?!=)` rejects the local assignment `fixtures = ActiveRecord::FixtureSet.new(...)`,
-// which otherwise parses as a declaration and emits junk names (e.g. "/categories_ordered").
-const FIXTURES_START_RE = /^\s*fixtures\s+(?!=[^=])(.+)$/;
+// A real declaration's argument list always opens with a symbol or a string
+// (`fixtures :all`, `fixtures :a, :b`, `fixtures :"admin/accounts"`, `fixtures "warehouse-things"`).
+// Requiring that rejects the local variable `fixtures = ActiveRecord::FixtureSet.new(...)`,
+// which otherwise parsed as a declaration and emitted junk names ("FixtureSet",
+// "collections", "virtual_columns", and the leading-slash "/categories_ordered").
+const FIXTURES_START_RE = /^\s*fixtures\s+((?::|["']).+)$/;
 const SET_FIXTURE_CLASS_RE = /^\s*set_fixture_class\s+(.+)$/;
 const SYM_OR_STR = /(?::([a-zA-Z_]\w*)|["']([^"']+)["'])/g;
 const PAIR_RE = /([a-zA-Z_]\w*)\s*:\s*([A-Z][\w:]*)/g;
