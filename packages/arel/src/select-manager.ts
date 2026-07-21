@@ -11,6 +11,7 @@ import { OuterJoin } from "./nodes/outer-join.js";
 import { RightOuterJoin } from "./nodes/right-outer-join.js";
 import { FullOuterJoin } from "./nodes/full-outer-join.js";
 import { StringJoin } from "./nodes/string-join.js";
+import { EmptyJoinError } from "./errors.js";
 import { Union, UnionAll, Intersect, Except } from "./nodes/binary.js";
 import { With, WithRecursive } from "./nodes/with.js";
 import { TableAlias } from "./nodes/table-alias.js";
@@ -196,30 +197,54 @@ export class SelectManager extends TreeManager {
    * INNER JOIN.
    */
   join(
-    table: Node | string,
+    table: Node | string | null | undefined,
     klassOrCondition?: (new (left: Node, right: Node | null) => Join) | Node,
   ): this {
-    const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
+    if (table == null) return this;
+
+    // Rails' signature is `join(relation, klass = Nodes::InnerJoin)` and it
+    // always passes `nil` as create_join's constraint. The second arg here is
+    // overloaded to also accept an ON predicate — a pre-existing trails
+    // extension several activerecord callers rely on positionally (e.g.
+    // query-methods.ts's `manager.join(tableNode, onNode)`), where Rails would
+    // chain `.on(...)`. Narrowing that surface is a separate change.
+    let klass: new (left: Node, right: Node | null) => Join = InnerJoin;
+    let constraint: Node | null = null;
     if (klassOrCondition && typeof klassOrCondition === "function" && klassOrCondition.prototype) {
-      const JoinClass = klassOrCondition as new (left: Node, right: Node | null) => Join;
-      this.core.source.right.push(new JoinClass(tableNode, null));
+      klass = klassOrCondition as new (left: Node, right: Node | null) => Join;
     } else if (klassOrCondition instanceof Node) {
-      const onNode = new On(klassOrCondition);
-      this.core.source.right.push(new InnerJoin(tableNode, onNode));
-    } else {
-      this.core.source.right.push(new InnerJoin(tableNode, null));
+      constraint = klassOrCondition;
     }
+
+    const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
+
+    // Rails: `case relation when String, Nodes::SqlLiteral` (select_manager.rb:105-109).
+    // SqlLiteral subclasses String in Ruby, so both arms share the emptiness
+    // check and the StringJoin promotion.
+    if (typeof table === "string" || table instanceof SqlLiteral) {
+      const text = typeof table === "string" ? table : table.value;
+      if (text.length === 0) throw new EmptyJoinError();
+      klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
+    }
+
+    this.core.source.right.push(this.createJoin(tableNode, constraint, klass));
     return this;
   }
 
   /**
    * LEFT OUTER JOIN.
    */
-  outerJoin(table: Node | string, onCondition?: Node): this {
-    const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
-    const onNode = onCondition ? new On(onCondition) : null;
-    this.core.source.right.push(new OuterJoin(tableNode, onNode));
-    return this;
+  outerJoin(table: Node | string | null | undefined, onCondition?: Node): this {
+    // Rails: `outer_join(relation) = join(relation, Nodes::OuterJoin)`
+    // (select_manager.rb:115-117). The onCondition arg is a trails extension
+    // used by callers that would otherwise chain `.on(...)`.
+    if (onCondition) {
+      if (table == null) return this;
+      const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
+      this.core.source.right.push(this.createJoin(tableNode, onCondition, OuterJoin));
+      return this;
+    }
+    return this.join(table, OuterJoin);
   }
 
   /**

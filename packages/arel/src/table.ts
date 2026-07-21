@@ -79,7 +79,7 @@ export class Table extends Node {
     // check and the StringJoin promotion.
     if (typeof relation === "string" || relation instanceof SqlLiteral) {
       const text = typeof relation === "string" ? relation : relation.value;
-      if (text.length === 0) throw new EmptyJoinError("EmptyJoinError");
+      if (text.length === 0) throw new EmptyJoinError();
       klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
     }
 

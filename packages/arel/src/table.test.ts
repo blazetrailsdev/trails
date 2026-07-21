@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, sql, star, SelectManager, Nodes, Visitors } from "./index.js";
+import { Table, sql, star, SelectManager, Nodes, Visitors, EmptyJoinError } from "./index.js";
 
 describe("TableTest", () => {
   const users = new Table("users");
@@ -65,7 +65,7 @@ describe("TableTest", () => {
       });
 
       it("raises EmptyJoinError on empty", () => {
-        expect(() => users.join("")).toThrow("EmptyJoinError");
+        expect(() => users.join("")).toThrow(EmptyJoinError);
       });
 
       it("takes a second argument for join type", () => {
