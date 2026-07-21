@@ -307,20 +307,6 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#eq_all", () => {
-    it("should create a Grouping node", () => {
-      expect(users.get("id").eqAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
-    });
-
-    it("should generate ANDs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").eqAll([1, 2]));
-      expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 AND "users"."id" = 2)',
-      );
-    });
-  });
-
   describe("#average", () => {
     it("should create a AVG node", () => {
       const node = users.get("age").average();
@@ -404,12 +390,6 @@ describe("AttributeTest", () => {
       const node = users.get("name").eq(null);
       expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
     });
-
-    it("should handle nil", () => {
-      const relation = new Table("users");
-      const node = relation.get("id").eq(null);
-      expect(new Visitors.ToSql().compile(node)).toContain("IS NULL");
-    });
   });
 
   describe("#matches_any", () => {
@@ -436,13 +416,6 @@ describe("AttributeTest", () => {
   });
 
   describe("#matches_all", () => {
-    it("should not eat input", () => {
-      const input = [1, 2, 3];
-      const copy = [...input];
-      users.get("id").eqAny(input);
-      expect(input).toEqual(copy);
-    });
-
     it("should create a Grouping node", () => {
       expect(users.get("name").matchesAll(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
@@ -453,13 +426,6 @@ describe("AttributeTest", () => {
       expect(mgr.toSql()).toBe(
         `SELECT "users"."id" FROM "users" WHERE ("users"."name" LIKE '%foo%' AND "users"."name" LIKE '%bar%')`,
       );
-    });
-
-    it("should not eat input", () => {
-      const input = [1, 2, 3];
-      const copy = [...input];
-      users.get("id").eqAll(input);
-      expect(input).toEqual(copy);
     });
   });
 
@@ -801,23 +767,14 @@ describe("AttributeTest", () => {
 
   describe("#not_in_any", () => {
     it("should create a Grouping node", () => {
-      expect(
-        users.get("id").notInAny([
-          [1, 2],
-          [3, 4],
-        ]),
-      ).toBeInstanceOf(Nodes.Grouping);
+      // Rails passes bare scalars here (attribute_test.rb:1008); notIn is typed
+      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
+      // (not a cast) so this fails to compile once the signature is widened by
+      // the arel-predications-not-in-expr-type story, forcing this line's removal.
+      // @ts-expect-error -- see above
+      expect(users.get("id").notInAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").notInAny([[1], [2]]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#not_in_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(
@@ -834,12 +791,12 @@ describe("AttributeTest", () => {
 
   describe("#not_in_all", () => {
     it("should create a Grouping node", () => {
-      expect(
-        users.get("id").notInAll([
-          [1, 2],
-          [3, 4],
-        ]),
-      ).toBeInstanceOf(Nodes.Grouping);
+      // Rails passes bare scalars here (attribute_test.rb:1023); notIn is typed
+      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
+      // (not a cast) so this fails to compile once the signature is widened by
+      // the arel-predications-not-in-expr-type story, forcing this line's removal.
+      // @ts-expect-error -- see above
+      expect(users.get("id").notInAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
     it("should generate ANDs in sql", () => {
@@ -934,56 +891,15 @@ describe("AttributeTest", () => {
 
   describe("#eq_all", () => {
     it("should create a Grouping node", () => {
-      const left = users.get("age").between(18, 30);
-      const right = users.get("age").between(40, 50);
-      const node = new Nodes.Grouping(new Nodes.Or(left, right));
-      expect(node).toBeInstanceOf(Nodes.Grouping);
-    });
-  });
-
-  describe("#not_in_any", () => {
-    it("should generate ORs in sql", () => {
-      const left = users.get("age").between(18, 30);
-      const right = users.get("age").between(40, 50);
-      const node = new Nodes.Grouping(new Nodes.Or(left, right));
-      const visitor = new Visitors.ToSql();
-      const result = visitor.compile(node);
-      expect(result).toContain("OR");
-      expect(result).toContain("BETWEEN");
-    });
-  });
-
-  describe("#eq_all", () => {
-    it("should create a Grouping node", () => {
-      const left = users.get("age").between(18, 65);
-      const right = users.get("score").between(1, 100);
-      const node = new Nodes.Grouping(new Nodes.And([left, right]));
-      expect(node).toBeInstanceOf(Nodes.Grouping);
+      expect(users.get("id").eqAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
     it("should generate ANDs in sql", () => {
-      const left = users.get("tags").contains("a");
-      const right = users.get("tags").contains("b");
-      const node = new Nodes.And([left, right]);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(node)).toContain("AND");
-    });
-
-    it("should create a Grouping node", () => {
-      const left = users.get("age").notBetween(18, 30);
-      const right = users.get("age").notBetween(40, 50);
-      const node = new Nodes.Grouping(new Nodes.Or(left, right));
-      expect(node).toBeInstanceOf(Nodes.Grouping);
-    });
-
-    it("should generate ANDs in sql", () => {
-      const left = users.get("age").between(18, 65);
-      const right = users.get("score").between(1, 100);
-      const node = new Nodes.Grouping(new Nodes.And([left, right]));
-      const visitor = new Visitors.ToSql();
-      const result = visitor.compile(node);
-      expect(result).toContain("AND");
-      expect(result).toContain("BETWEEN");
+      const mgr = users.project(users.get("id"));
+      mgr.where(users.get("id").eqAll([1, 2]));
+      expect(mgr.toSql()).toBe(
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 AND "users"."id" = 2)',
+      );
     });
   });
 
