@@ -38,9 +38,12 @@ export interface FileDeps {
 const REQUIRE_RE = /^\s*require\s+["']models\/([^"']+)["']/;
 // A real declaration's argument list always opens with a symbol or a string
 // (`fixtures :all`, `fixtures :a, :b`, `fixtures :"admin/accounts"`, `fixtures "warehouse-things"`).
-// Requiring that rejects the local variable `fixtures = ActiveRecord::FixtureSet.new(...)`,
-// which otherwise parsed as a declaration and emitted junk names ("FixtureSet",
-// "collections", "virtual_columns", and the leading-slash "/categories_ordered").
+// Requiring that rejects the local variable `fixtures = ActiveRecord::FixtureSet...`,
+// which otherwise parsed as a declaration and emitted junk names — SYM_OR_STR pulls
+// "FixtureSet" out of the `::` and the set name out of the argument list:
+//   fixtures_test.rb:573      -> "FixtureSet", "/categories_ordered"
+//   fixtures_test.rb:377      -> "FixtureSet", "collections"
+//   virtual_column_test.rb:109 -> "FixtureSet", "virtual_columns"  (sqlite3 + postgresql)
 const FIXTURES_START_RE = /^\s*fixtures\s+((?::|["']).+)$/;
 const SET_FIXTURE_CLASS_RE = /^\s*set_fixture_class\s+(.+)$/;
 const SYM_OR_STR = /(?::([a-zA-Z_]\w*)|["']([^"']+)["'])/g;
@@ -162,6 +165,12 @@ export function parseSource(src: string): FileDeps {
     // A namespaced set `admin/accounts` is dereferenced as `admin_accounts(:david)`.
     // Key the results by the DECLARED name so consumers can intersect the two
     // (eslint/expected-fixtures.mjs) instead of silently dropping every namespaced set.
+    // Collisions are last-write-wins. Declaring both `:"admin/accounts"` and
+    // `:admin_accounts` would drop the first from `tests.*.fixtures` silently, but
+    // Rails cannot reach that state — both generate the same `admin_accounts`
+    // accessor method, so the second definition wins there too and the pair is
+    // unusable. The vendored corpus has zero collisions; not worth a merge that
+    // would fold two distinct sets' records into one bucket.
     const accessorToDeclared = new Map<string, string>();
     for (const n of fxSet) {
       const accessor = n.replace(/\//g, "_").replace(/[^\w-]/g, "");
