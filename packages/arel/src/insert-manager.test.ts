@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Table, sql, InsertManager, Nodes } from "./index.js";
 
 describe("InsertManagerTest", () => {
@@ -191,7 +192,7 @@ describe("InsertManagerTest", () => {
 
     it("inserts time", () => {
       const mgr = new InsertManager(users);
-      const at = new Date(2020, 0, 2, 12, 34, 56);
+      const at = Temporal.PlainDateTime.from("2020-01-02T12:34:56");
       mgr.insert([[users.get("created_at"), at]]);
       expect(mgr.toSql()).toContain("2020-01-02");
     });

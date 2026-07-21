@@ -68,8 +68,8 @@ describe("quoteArrayLiteral", () => {
   // `formatElement` > "quotes a formatted element whose content needs it"
   // already covers with this same Date.
   it("handles Date values with toISOString", () => {
-    const d = new Date("2026-03-26T12:00:00.000Z");
-    expect(() => quoteArrayLiteral([d], defaultQuoter)).toThrow(new TypeError("can't cast Time"));
+    const d = Temporal.Instant.from("2026-03-26T12:00:00.000Z");
+    expect(() => quoteArrayLiteral([d], defaultQuoter)).toThrow(TypeError);
   });
 
   it("handles empty arrays", () => {
@@ -77,7 +77,9 @@ describe("quoteArrayLiteral", () => {
   });
 
   it("handles objects with toISOString", () => {
-    const obj = { toISOString: () => "2026-01-01T00:00:00Z" };
+    // A JS Date is not claimed as a Time (rejected AR-wide, #939), so it takes
+    // `type_cast`'s terminal raise like any other unnamed class.
+    const obj = new Date("2026-01-01T00:00:00Z");
     expect(() => quoteArrayLiteral([obj], defaultQuoter)).toThrow(new TypeError("can't cast Time"));
   });
 
@@ -200,7 +202,7 @@ describe("quoteArrayLiteral", () => {
 
   describe("formatElement", () => {
     it("quotes a formatted element whose content needs it", () => {
-      const d = new Date("2026-03-26T12:00:00.000Z");
+      const d = Temporal.Instant.from("2026-03-26T12:00:00.000Z");
       expect(quoteArrayLiteral([d], defaultQuoter, () => "2026-03-26 12:00:00")).toBe(
         '{"2026-03-26 12:00:00"}',
       );

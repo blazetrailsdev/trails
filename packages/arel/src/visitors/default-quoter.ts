@@ -1,6 +1,7 @@
 import type { ArelConnection } from "./connection.js";
 import { quoteSchemaQualifiedName } from "./split-schema-qualified-name.js";
 import { quoteArrayLiteral } from "../quote-array.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 // Standalone comment sanitize for connection-less `Node#toSql()` (debug aid):
 // strips block-comment delimiters (leaving `--` alone, like Rails' abstract
@@ -14,7 +15,14 @@ function defaultSanitizeAsSqlComment(value: string): string {
     .trim();
 }
 
-// Formats a date-like value as a SQL datetime string matching Rails'
+type TemporalDateLike =
+  | Temporal.Instant
+  | Temporal.ZonedDateTime
+  | Temporal.PlainDateTime
+  | Temporal.PlainDate
+  | Temporal.PlainTime;
+
+// Formats a date/time value as a SQL datetime string matching Rails'
 // AbstractAdapter#quoted_date. Returns the BARE form, as Rails does
 // (`result = value.to_fs(:db)` plus the %06d usec suffix,
 // abstract/quoting.rb:184-198) — callers add their own quoting
@@ -25,21 +33,94 @@ function defaultSanitizeAsSqlComment(value: string): string {
 // timezone-aware version in
 // packages/activerecord/src/connection-adapters/abstract/quoting.ts; this copy
 // only serves the connection-less `Node#toSql()` debug path.
-function quotedDate(d: { toISOString(): string }): string {
-  const match = d.toISOString().match(/^(\d{4}-\d{2}-\d{2})T(\d{2}:\d{2}:\d{2})(?:\.(\d+))?Z?$/);
-  if (!match) return d.toISOString();
-  const [, date, time, frac] = match;
-  // Normalise to exactly 6 digits: pad short fractions, truncate long ones.
-  const micros = frac ? parseInt((frac + "000000").slice(0, 6), 10) : 0;
-  return micros > 0 ? `${date} ${time}.${String(micros).padStart(6, "0")}` : `${date} ${time}`;
+//
+// `quoted_date`/`quoted_time` deliberately stay OFF `ArelConnection`: Rails puts
+// them on the adapter (`ConnectionAdapters::Quoting`), and Arel reaches them only
+// indirectly through `@connection.quote`. Adding them to the Arel-facing subset
+// would invent a self-dispatch Rails does not have, so this host formats
+// inline instead — as it already does for every other value-formatting decision
+// on the connection-less path.
+//
+// Deviation: Rails' `quoted_date` is timezone-aware via
+// `ActiveRecord.default_timezone`; that setting lives in activerecord, which arel
+// must not depend on. Instant/ZonedDateTime are therefore rendered in UTC here.
+// Real adapters (which own the setting) never reach this host.
+function quotedDate(value: TemporalDateLike): string {
+  if (value instanceof Temporal.Instant)
+    return formatPlainDateTime(value.toZonedDateTimeISO("UTC"));
+  // Converts rather than reading the wall clock, mirroring the adapter twin's
+  // `value.toInstant()` (connection-adapters/abstract/quoting.ts:591) and Rails'
+  // `value.getutc` (abstract/quoting.rb:186-188).
+  if (value instanceof Temporal.ZonedDateTime)
+    return formatPlainDateTime(value.toInstant().toZonedDateTimeISO("UTC"));
+  if (value instanceof Temporal.PlainDateTime) return formatPlainDateTime(value);
+  if (value instanceof Temporal.PlainDate) {
+    return `${padYear(value.year)}-${pad(value.month)}-${pad(value.day)}`;
+  }
+  return formatPlainDateTime(withEpochDate(value));
 }
 
-function isDateLike(value: unknown): value is { toISOString(): string } {
+// Mirrors `quoted_time` (abstract/quoting.rb:203). The `PlainDateTime` half of
+// the signature is unreachable from `quoteScalar`, which gates on `PlainTime`
+// per Rails' `Type::Time::Value` arm (:102); it is carried to match the adapter
+// twin's signature (connection-adapters/abstract/quoting.ts:44) and Rails'
+// `change(year:, month:, day:)`, which takes any datetime. Normalise the date to 2000-01-01, then strip the date prefix off `quoted_date`.
+function quotedTime(value: Temporal.PlainTime | Temporal.PlainDateTime): string {
+  return quotedDate(withEpochDate(value)).replace(/^\d{4}-\d{2}-\d{2} /, "");
+}
+
+function withEpochDate(value: Temporal.PlainTime | Temporal.PlainDateTime): Temporal.PlainDateTime {
+  if (value instanceof Temporal.PlainDateTime) return value.with({ year: 2000, month: 1, day: 1 });
+  return new Temporal.PlainDateTime(
+    2000,
+    1,
+    1,
+    value.hour,
+    value.minute,
+    value.second,
+    value.millisecond,
+    value.microsecond,
+    value.nanosecond,
+  );
+}
+
+function pad(n: number, width = 2): string {
+  return String(n).padStart(width, "0");
+}
+
+// Mirrors `padYear` in connection-adapters/abstract/sql-datetime.ts: a negative
+// year keeps its sign rather than being zero-padded into `"00-1"`.
+function padYear(year: number): string {
+  return year < 0 ? String(year) : String(year).padStart(4, "0");
+}
+
+function formatPlainDateTime(v: {
+  year: number;
+  month: number;
+  day: number;
+  hour: number;
+  minute: number;
+  second: number;
+  millisecond: number;
+  microsecond: number;
+}): string {
+  const usec = v.millisecond * 1000 + v.microsecond;
+  const frac = usec > 0 ? `.${pad(usec, 6)}` : "";
+  return `${padYear(v.year)}-${pad(v.month)}-${pad(v.day)} ${pad(v.hour)}:${pad(v.minute)}:${pad(v.second)}${frac}`;
+}
+
+// Rails' `when Date, Time` arms (abstract/quoting.rb:85, :103) match Ruby's own
+// time types; trails' analogue is Temporal, not JS `Date`, which is rejected
+// AR-wide (#939). A JS `Date` is refused here for the same reason the adapter
+// refuses it (connection-adapters/abstract/quoting.ts), rather than being
+// silently formatted as if it were a Time.
+function isTemporalDateLike(value: unknown): value is TemporalDateLike {
   return (
-    typeof value === "object" &&
-    value !== null &&
-    "toISOString" in value &&
-    typeof (value as { toISOString: unknown }).toISOString === "function"
+    value instanceof Temporal.Instant ||
+    value instanceof Temporal.ZonedDateTime ||
+    value instanceof Temporal.PlainDateTime ||
+    value instanceof Temporal.PlainDate ||
+    value instanceof Temporal.PlainTime
   );
 }
 
@@ -61,7 +142,14 @@ function quoteScalar(this: ArelConnection, value: unknown): string {
         : new Uint8Array(value.buffer, value.byteOffset, value.byteLength);
     return this.quotedBinary(bytes);
   }
-  if (isDateLike(value)) return `'${quotedDate(value).replace(/'/g, "''")}'`;
+  if (value instanceof Temporal.PlainTime) return `'${quotedTime(value).replace(/'/g, "''")}'`;
+  if (isTemporalDateLike(value)) return `'${quotedDate(value).replace(/'/g, "''")}'`;
+  // boundary: the JS Date is matched only to refuse it, per #939.
+  if (value instanceof Date) {
+    throw new TypeError(
+      "quote: JS Date is not accepted — use a Temporal type (Instant, PlainDateTime, etc.)",
+    );
+  }
   if (typeof value === "object") {
     const proto = Object.getPrototypeOf(value);
     const hasCustomToString =
@@ -223,25 +311,19 @@ export const postgresqlDefaultQuoter: ArelConnection = {
       return `'${String(value)}'`;
     }
     if (Array.isArray(value)) {
-      // A Temporal element — trails' `Time` analogue — is NOT claimed by
-      // `isDateLike` (Temporal exposes no `toISOString`) and so hits
-      // `type_cast`'s terminal raise. That is unreachable for a real
-      // `timestamp[]`: this host serves only the connection-less
-      // `new PostgreSQL()` debug path, and every adapter construction site
-      // passes a real connection (postgresql-adapter.ts `arelVisitor`,
-      // insert-all.ts:786-788), whose own `type_cast_array` → `type_cast`
-      // (connection-adapters/postgresql/quoting.ts:445-449) owns the
-      // Temporal arms and never reaches `quoteArrayLiteral`. Routing Temporal
-      // through a `quotedTime` here needs a `quoted_time` on `ArelConnection`,
-      // which Rails puts on the adapter, not on Arel.
-      //
       // formatElement keeps #4867's fix alive on this path: a date element gets
       // the same `quoted_date` form the scalar path emits, mirroring Rails'
-      // `type_cast_array` → `type_cast` → `when Date, Time then quoted_date`
-      // (abstract/quoting.rb:94-107). quoteArrayLiteral applies the `"..."`
-      // quoting, so the hook returns the bare form.
+      // `type_cast_array` → `type_cast` → `when Type::Time::Value then quoted_time` /
+      // `when Date, Time then quoted_date` (abstract/quoting.rb:94-107).
+      // quoteArrayLiteral applies the `"..."` quoting, so the hook returns the
+      // bare form. A JS `Date` is deliberately NOT claimed (rejected AR-wide,
+      // #939) and falls through to `type_cast`'s terminal raise.
       const literal = quoteArrayLiteral(value, this, (v) =>
-        isDateLike(v) ? quotedDate(v) : undefined,
+        v instanceof Temporal.PlainTime
+          ? quotedTime(v)
+          : isTemporalDateLike(v)
+            ? quotedDate(v)
+            : undefined,
       );
       return `'${literal.replace(/'/g, "''")}'`;
     }
