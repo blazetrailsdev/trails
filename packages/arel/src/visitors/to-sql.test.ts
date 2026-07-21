@@ -614,20 +614,10 @@ describe("the to_sql visitor", () => {
         };
         const attr = new Table("users").get("id");
         expect(() =>
-          spy.compile(
-            new Nodes.Equality(
-              attr,
-              Temporal.Instant.from("2026-04-30T12:34:56Z") as unknown as Nodes.NodeOrValue,
-            ),
-          ),
+          spy.compile(new Nodes.Equality(attr, Temporal.Instant.from("2026-04-30T12:34:56Z"))),
         ).toThrow(Visitors.UnsupportedVisitError);
         expect(() =>
-          spy.compile(
-            new Nodes.Equality(
-              attr,
-              Temporal.PlainDate.from("2026-04-30") as unknown as Nodes.NodeOrValue,
-            ),
-          ),
+          spy.compile(new Nodes.Equality(attr, Temporal.PlainDate.from("2026-04-30"))),
         ).toThrow(Visitors.UnsupportedVisitError);
         expect(seen).toEqual(["Time", "Date"]);
       });
@@ -653,6 +643,9 @@ describe("the to_sql visitor", () => {
           Temporal.PlainMonthDay.from("04-30"),
         ]) {
           expect(() =>
+            // The cast is the point: these three Temporal types are
+            // deliberately outside NodeOrValue, and this asserts the runtime
+            // raises for anyone who reaches them anyway.
             spy.compile(new Nodes.Equality(attr, value as unknown as Nodes.NodeOrValue)),
           ).toThrow(TypeError);
         }
@@ -672,7 +665,7 @@ describe("the to_sql visitor", () => {
           spy.compile(
             new Nodes.Equality(
               new Table("users").get("id"),
-              Temporal.PlainDateTime.from("2026-04-30T12:34:56") as unknown as Nodes.NodeOrValue,
+              Temporal.PlainDateTime.from("2026-04-30T12:34:56"),
             ),
           ),
         ).toThrow(Visitors.UnsupportedVisitError);
