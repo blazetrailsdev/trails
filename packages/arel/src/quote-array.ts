@@ -26,13 +26,10 @@ export type FormatArrayElement = (value: unknown) => string | undefined;
 //
 // ruby-pg reads the delimiter from `this->delimiter`, which Rails threads in
 // via `OID::Array#initialize(subtype, delimiter = ",")` (`oid/array.rb:15`).
-// It is hardcoded here because there is nothing to thread: Rails' PG `quote`
-// only encodes an `OID::Array::Data` (`postgresql/quoting.rb:117`) and sends a
-// bare `::Array` to `super`, which raises TypeError — whereas this function is
-// reached with a bare JS array, carrying no subtype and so no delimiter. `,`
-// is the default and the only reachable value on this path, not a
-// simplification of a parameter we could honour.
-const ELEMENT_NEEDS_QUOTING = /[{},"\\ \t\n\r\v\f]/;
+// `OID::Array#encode` threads its own; the connection-less Arel path is reached
+// with a bare JS array carrying no subtype, so it passes the `,` default —
+// the only reachable value there.
+const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
 // `/i` on a non-unicode pattern folds ASCII only, mirroring pg's
 // `pg_strcasecmp(ptr, "NULL")`; `toUpperCase()` would be a Unicode-aware fold,
 // a wider net than pg casts. The difference is unobservable by construction —
@@ -41,13 +38,29 @@ const ELEMENT_NEEDS_QUOTING = /[{},"\\ \t\n\r\v\f]/;
 // it's the exact mirror, not because a collision is reachable.
 const NULL_LITERAL = /^null$/i;
 
-function encodeArrayElement(text: string | null): string {
+/**
+ * The `PG::TextEncoder::Array` element rule, shared so the connection-less Arel
+ * path and `OID::Array#encode` cannot drift apart again (they did three times:
+ * #4867, #4869, #4872). Takes the already-`type_cast`ed element text.
+ *
+ * `delimiter` is `OID::Array`'s, which Rails hands ruby-pg alongside the same
+ * text (`oid/array.rb:15-19`): the `","` default or `";"` for `box[]`. It is
+ * never empty — the type map is the only construction site — so the
+ * `includes(delimiter)` test needs no empty-string guard, exactly as
+ * `OID::Array#parseArray`'s delimiter scan doesn't.
+ */
+export function encodeArrayElement(text: string | null, delimiter = ","): string {
   // Rendering nil as the bare `NULL` token is the encoder's job, not
   // `type_cast`'s — the latter returns nil unchanged (`when nil, Numeric,
   // String then value`, `abstract/quoting.rb:101`). Keeping the split here is
   // what makes the `"NULL"` string quotable while real nil stays bare.
   if (text === null) return "NULL";
-  if (text === "" || NULL_LITERAL.test(text) || ELEMENT_NEEDS_QUOTING.test(text)) {
+  if (
+    text === "" ||
+    NULL_LITERAL.test(text) ||
+    text.includes(delimiter) ||
+    STRUCTURAL_CHARS.test(text)
+  ) {
     return `"${text.replace(/\\/g, "\\\\").replace(/"/g, '\\"')}"`;
   }
   return text;
