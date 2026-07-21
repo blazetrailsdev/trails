@@ -7,7 +7,11 @@ import { ScopeRegistry } from "../scoping.js";
 import { getDjasScopeBuilder, getAssociationRelationFactory } from "./_scope-slots.js";
 import { validateReflectionValidity } from "./validate-through-reflection.js";
 import { camelize, singularize, underscore } from "@blazetrails/activesupport";
-import { AssociationTypeMismatch, NameError } from "../errors.js";
+import {
+  AssociationTargetReplacedDuringLoad,
+  AssociationTypeMismatch,
+  NameError,
+} from "../errors.js";
 
 /**
  * Base class for all association proxies. An Association wraps a single
@@ -66,17 +70,6 @@ export class Association {
    * @internal
    */
   _loaderWritebackSuppressed = 0;
-  /**
-   * Counts *wholesale* target replacements — `setTarget` calls, and only
-   * those. A loader snapshots it before awaiting and compares afterwards to
-   * tell "someone replaced my target while I was in flight" (skip the
-   * writeback) from "the collection mutated its own target during this load"
-   * (dirty targets, in-memory built/pushed records, target merging — all of
-   * which assign `this.target` in place and must still be merged with the
-   * freshly loaded rows). A bare generation counter conflates the two.
-   * @internal
-   */
-  _setTargetCount = 0;
 
   private _staleState: unknown = undefined;
   /**
@@ -201,8 +194,19 @@ export class Association {
   }
 
   setTarget(target: Base | Base[] | null): void {
+    // Refuse the race rather than silently picking a winner. `find_target` is
+    // synchronous in Rails (association.rb:248) so this cannot arise there;
+    // ours awaits, and an assignment landing inside that window used to be
+    // silently clobbered by the load. `_loaderWritebackSuppressed` is what
+    // makes this safe to raise on: the loader's own writeback bails before
+    // reaching here, so only a genuine external replacement trips it.
+    if (this._loaderWritebackSuppressed) {
+      throw new AssociationTargetReplacedDuringLoad(
+        `Cannot replace the target of association \`${this.reflection.name}\` while a load for it is still in flight. ` +
+          `Await the load (or the reader) before assigning.`,
+      );
+    }
     this.target = target;
-    this._setTargetCount++;
     this.loadedBang();
   }
 
@@ -461,10 +465,7 @@ export class Association {
       if (result !== null) this.setStrictLoading(result as Base);
       // Deliberately a direct assignment, not `setTarget`: this is the loader
       // storing what it just fetched, not a caller replacing the target, so it
-      // must not bump `_setTargetCount`. Routing it through `setTarget` would
-      // make every load look like a wholesale replacement to a concurrent
-      // load's guard. (Only `CollectionAssociation#loadTarget` reads the
-      // counter today; the singular path keeps the invariant honest anyway.)
+      // must not trip `setTarget`'s in-flight guard.
       this.target = result;
     }
   }
