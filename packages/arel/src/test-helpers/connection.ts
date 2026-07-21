@@ -45,6 +45,11 @@ export const testConnection: ArelConnection = defaultQuoter;
  * @internal
  */
 export const fakeRecordConnection: ArelConnection = {
+  // FakeRecord defines none of `quoted_true`/`quoted_false`/`quoted_binary` — in
+  // Ruby the visitor simply never calls them on this double, since `quote` claims
+  // booleans first (fake_record.rb:75-78). `ArelConnection` is a TS interface, so
+  // they must be present; the spread supplies them rather than inventing values.
+  // They stay unreachable for booleans for the same reason they are in Rails.
   ...defaultQuoter,
 
   quoteTableName(name: string): string {
