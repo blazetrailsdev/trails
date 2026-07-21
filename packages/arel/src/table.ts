@@ -69,7 +69,7 @@ export class Table extends Node {
     relation: Node | string | null,
     klass?: new (left: Node, right: Node | null) => Join,
   ): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     if (relation === null) return manager;
     if (typeof relation === "string" && relation.trim() === "") {
       throw new EmptyJoinError("EmptyJoinError");
@@ -84,7 +84,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#outer_join
    */
   outerJoin(relation: Node | string): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     manager.outerJoin(relation);
     return manager;
   }
@@ -95,7 +95,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#group
    */
   group(...columns: (Node | string)[]): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     manager.group(...columns);
     return manager;
   }
@@ -106,7 +106,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#order
    */
   order(...exprs: Node[]): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     manager.order(...exprs);
     return manager;
   }
@@ -117,13 +117,13 @@ export class Table extends Node {
    * Mirrors: Arel::Table#where
    */
   where(condition: Node): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     manager.where(condition);
     return manager;
   }
 
   project(...projections: (Node | string)[]): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     if (projections.length > 0) {
       manager.project(...projections);
     }
@@ -136,7 +136,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#take
    */
   take(amount: number): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     manager.take(amount);
     return manager;
   }
@@ -147,7 +147,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#skip
    */
   skip(amount: number): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     manager.skip(amount);
     return manager;
   }
@@ -158,7 +158,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#having
    */
   having(expr: Node): SelectManager {
-    const manager = new SelectManager(this);
+    const manager = this.from();
     manager.having(expr);
     return manager;
   }
