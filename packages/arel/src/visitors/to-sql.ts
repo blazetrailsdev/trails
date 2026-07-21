@@ -66,6 +66,19 @@ function isActiveModelAttribute(v: unknown): boolean {
 // Rails' UnsupportedVisitError message interpolates `object.class.name`
 // (to_sql.rb:5-8). `null`/`undefined` have no constructor; Ruby's analogue for
 // both is NilClass.
+//
+// Folding `undefined` in here is deliberate, and survives `undefined` being
+// dropped from `NodeOrValue` (binary.ts). The two are complementary rather than
+// contradictory: the union declines to *declare* `undefined` a legal slot
+// occupant, while this normalizes one that arrives anyway. It can still arrive,
+// because `math.ts` / `attribute.ts` / `update-manager.ts` launder values into
+// slots via `as NodeOrValue` casts from `unknown`. The primary normalization is
+// `rubyClassName` (ruby-class.ts:32), which maps `undefined` to `"NilClass"` at
+// the dispatch boundary so it routes to `visitNilClass`; this helper and
+// `rubyInspect` below just keep the downstream message consistent with that.
+// Removing them would be strictly less faithful — an `undefined` would read its
+// `.constructor` off nothing and surface as a "Cannot visit" TypeError instead
+// of Rails' NilClass UnsupportedVisitError.
 function constructorName(v: unknown): string {
   if (v === null || v === undefined) return "NilClass";
   return (v as { constructor?: { name?: string } }).constructor?.name ?? typeof v;
