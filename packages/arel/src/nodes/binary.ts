@@ -1,4 +1,5 @@
 import type { Attribute as ModelAttribute } from "@blazetrails/activemodel";
+import type { Temporal } from "@blazetrails/activesupport/temporal";
 import { Node, NodeVisitor } from "./node.js";
 import { NodeExpression } from "./node-expression.js";
 import { SqlLiteral } from "./sql-literal.js";
@@ -18,7 +19,17 @@ export type NodeOrValue =
   | number
   | boolean
   | bigint
-  | Date
+  // The five Temporal types to-sql.ts actually visits and quotes (see
+  // TEMPORAL_CLASS_NAMES in temporal-tag.ts). Duration/PlainYearMonth/
+  // PlainMonthDay are deliberately absent: Rails has no visitor for them.
+  // JS `Date` is absent too — it is rejected AR-wide (Temporal is the `Time`
+  // analogue), and Rails aliases `visit_Date` to `unsupported`
+  // (to_sql.rb:836), so a `Date` in a node slot can only ever raise.
+  | Temporal.Instant
+  | Temporal.ZonedDateTime
+  | Temporal.PlainDateTime
+  | Temporal.PlainDate
+  | Temporal.PlainTime
   | Node[]
   | null
   | undefined;
