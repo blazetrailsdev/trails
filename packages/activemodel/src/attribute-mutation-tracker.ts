@@ -150,6 +150,10 @@ export class AttributeMutationTracker {
 export class ForcedMutationTracker extends AttributeMutationTracker {
   private finalizedChanges: Record<string, [unknown, unknown]> | null = null;
 
+  changedInPlace(_name: string): boolean {
+    return false;
+  }
+
   changeToAttribute(name: string): [unknown, unknown] | null {
     if (
       this.finalizedChanges &&
@@ -158,10 +162,6 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
       return [...this.finalizedChanges[name]];
     }
     return super.changeToAttribute(name);
-  }
-
-  changedInPlace(_name: string): boolean {
-    return false;
   }
 
   forgetChange(name: string): void {
@@ -181,6 +181,10 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
     this.forcedChanges.set(name, cloneValue(value));
   }
 
+  finalizeChanges(): void {
+    this.finalizedChanges = this.changes();
+  }
+
   protected override attrNames(): string[] {
     return Array.from(this.forcedChanges.keys());
   }
@@ -192,10 +196,6 @@ export class ForcedMutationTracker extends AttributeMutationTracker {
   /** @internal */
   protected override typeCast(_name: string, value: unknown): unknown {
     return value;
-  }
-
-  finalizeChanges(): void {
-    this.finalizedChanges = this.changes();
   }
 }
 
@@ -233,11 +233,11 @@ export class NullMutationTracker {
     return false;
   }
 
-  forgetChange(_name: string): void {}
-
   originalValue(_name: string): unknown {
     return undefined;
   }
+
+  forgetChange(_name: string): void {}
   forceChange(_name: string): void {}
   finalizeChanges(): void {}
 }

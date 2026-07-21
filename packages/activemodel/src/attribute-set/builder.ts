@@ -125,19 +125,6 @@ export class LazyAttributeHash {
     this.delegate = delegateHash;
   }
 
-  isKey(key: string): boolean {
-    return this.has(key);
-  }
-
-  keys(): string[] {
-    const allKeys = new Set([
-      ...this.delegate.keys(),
-      ...Object.keys(this.values),
-      ...this.types.keys(),
-    ]);
-    return [...allKeys];
-  }
-
   /**
    * Return a new map applying `fn` to each materialized Attribute.
    *
@@ -190,6 +177,10 @@ export class LazyAttributeHash {
       if (!drop.has(name)) result.set(name, attr);
     }
     return result;
+  }
+
+  isKey(key: string): boolean {
+    return this.has(key);
   }
 
   deepDup(): LazyAttributeHash {
@@ -263,6 +254,15 @@ export class LazyAttributeHash {
    */
   assignDefaultValue(name: string): Attribute {
     return this.assignDefault(name);
+  }
+
+  keys(): string[] {
+    const allKeys = new Set([
+      ...this.delegate.keys(),
+      ...Object.keys(this.values),
+      ...this.types.keys(),
+    ]);
+    return [...allKeys];
   }
 
   get(name: string): Attribute {

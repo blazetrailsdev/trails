@@ -103,10 +103,6 @@ export class Quoted extends Unary {
     super(value);
   }
 
-  get value(): unknown {
-    return this.expr;
-  }
-
   valueForDatabase(): unknown {
     return this.value;
   }
@@ -138,6 +134,10 @@ export class Quoted extends Unary {
     if (this.value === -Infinity) return -1;
     const v = this.value as { isInfinite?: () => 1 | -1 | false } | null | undefined;
     return typeof v?.isInfinite === "function" ? v.isInfinite() : false;
+  }
+
+  get value(): unknown {
+    return this.expr;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

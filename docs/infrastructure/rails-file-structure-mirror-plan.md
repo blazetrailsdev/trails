@@ -5,6 +5,19 @@ Status: planning. The `method-order` slice landed in
 the remaining sibling rules and packages are future work per the wave
 plan below.
 
+**Enforcement model (updated).** The `method-order` manifest is keyed
+**per container** — `classes[Name]` for each class body plus `functions`
+for the file's top-level functions — not a single flat per-file list. A
+flat list collapsed multiple classes in one file with overlapping member
+names into one order (e.g. `casted.rb`'s `Casted` and `Quoted`, whose
+`value_before_type_cast` / `value_for_database` appear in opposite order);
+per-class keying lets each express its own Rails order. The rule goes
+**live only in the `rails-comparison` CI job**, which builds the
+(gitignored) manifest after extracting `rails-api.json`, mirroring the
+`rails-private-jsdoc` step. The standalone `Lint` job has no manifest and
+intentionally no-ops, so the pre-commit auto-fix cannot silently reorder
+files outside a staged change's intent.
+
 `scripts/api-compare/` validates that **methods exist** at the right
 Rails-mirroring file paths. It does **not** validate **structure within a file**
 — definition order, module nesting, public/private grouping, position of

@@ -10,11 +10,50 @@ const MANIFEST_PATH = path.join(__dirname, "rails-file-structure-method-order.js
 
 const hadExisting = fs.existsSync(MANIFEST_PATH);
 const original = hadExisting ? fs.readFileSync(MANIFEST_PATH, "utf8") : null;
+// Order data is keyed per container: `classes[Name]` per class, `functions`
+// for top-level functions. `fixture-class.ts` gives the same order to every
+// class name the tests use (X / A / B / Outer); `fixture-multi.ts` gives two
+// classes OPPOSITE orders to exercise per-class keying (the casted.rb
+// Casted/Quoted case a flat per-file list could not express).
+const sharedClassOrder = ["first", "second", "third"];
 const fixture = {
   files: {
-    "packages/arel/src/fixture-class.ts": ["first", "second", "third"],
-    "packages/arel/src/fixture-fns.ts": ["alpha", "beta", "gamma"],
-    "packages/arel/src/fixture-mixed.ts": ["one", "two"],
+    "packages/arel/src/fixture-class.ts": {
+      classes: {
+        X: sharedClassOrder,
+        A: sharedClassOrder,
+        B: sharedClassOrder,
+        Outer: sharedClassOrder,
+      },
+      functions: [],
+    },
+    "packages/arel/src/fixture-fns.ts": {
+      classes: {},
+      functions: ["alpha", "beta", "gamma"],
+    },
+    "packages/arel/src/fixture-multi.ts": {
+      classes: { Casted: ["before", "database"], Quoted: ["database", "before"] },
+      functions: [],
+    },
+    // Bucket key `Integer` (the Rails constant) has no class named `Integer`;
+    // the 1:1 rename fallback pairs it with the sole class body (`IntegerType`).
+    "packages/arel/src/fixture-rename.ts": {
+      classes: { Integer: sharedClassOrder },
+      functions: [],
+    },
+    // Two buckets, neither exact-matching a class name → ambiguous, so the
+    // fallback must NOT pair; both classes stay unordered.
+    "packages/arel/src/fixture-ambiguous.ts": {
+      classes: { Foo: sharedClassOrder, Bar: sharedClassOrder },
+      functions: [],
+    },
+    // Single 1/1 unmatched shape, but the bucket name is neither a substring of
+    // the TS class name nor vice versa → no identity evidence, so the fallback
+    // must NOT pair (guards a TS-only helper class from a never-ported bucket).
+    "packages/arel/src/fixture-noevidence.ts": {
+      classes: { Zzz: sharedClassOrder },
+      functions: [],
+    },
   },
 };
 function restoreManifest() {
@@ -31,6 +70,10 @@ process.on("exit", restoreManifest);
 const classFile = path.join(REPO_ROOT, "packages/arel/src/fixture-class.ts");
 const fnFile = path.join(REPO_ROOT, "packages/arel/src/fixture-fns.ts");
 const unlistedFile = path.join(REPO_ROOT, "packages/arel/src/fixture-unlisted.ts");
+const multiFile = path.join(REPO_ROOT, "packages/arel/src/fixture-multi.ts");
+const renameFile = path.join(REPO_ROOT, "packages/arel/src/fixture-rename.ts");
+const ambiguousFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ambiguous.ts");
+const noEvidenceFile = path.join(REPO_ROOT, "packages/arel/src/fixture-noevidence.ts");
 
 const tester = new RuleTester({
   languageOptions: {
@@ -86,6 +129,35 @@ try {
           `  second() {}\n` +
           `  third() {}\n` +
           `}\n`,
+      },
+      // Per-class keying: two classes in one file with members sharing
+      // names but in OPPOSITE Rails order. A flat per-file list forced one
+      // order on both (the casted.rb bug); per-class keying lets each pass
+      // in its own order. Here `Casted` wants before→database and `Quoted`
+      // wants database→before, and both are already correct.
+      {
+        filename: multiFile,
+        code:
+          `class Casted {\n  before() {}\n  database() {}\n}\n` +
+          `class Quoted {\n  database() {}\n  before() {}\n}\n`,
+      },
+      // Ambiguity guard: two manifest buckets, neither matching a class
+      // name by exact spelling. The 1:1 rename fallback only fires when
+      // exactly one bucket AND one class remain unmatched, so here it must
+      // NOT pair — both classes stay unordered even though out of order.
+      {
+        filename: ambiguousFile,
+        code:
+          `class Xyz {\n  third() {}\n  first() {}\n}\n` +
+          `class Zzz {\n  third() {}\n  first() {}\n}\n`,
+      },
+      // Identity guard: exactly one class body and one bucket unmatched, but
+      // `Zzz` is not a substring of `Helper` (nor vice versa). No evidence they
+      // are the same entity → the 1/1 fallback must NOT pair, so the class
+      // stays unordered even though its members are out of manifest order.
+      {
+        filename: noEvidenceFile,
+        code: `class Helper {\n  third() {}\n  first() {}\n}\n`,
       },
       // Class nested inside a function body is not reordered. If we
       // also reordered the outer function (it has 0 siblings here so
@@ -294,6 +366,29 @@ try {
         output:
           `class A {\n  first() {}\n  second() {}\n}\n` +
           `class B {\n  second() {}\n  third() {}\n}\n`,
+      },
+      // Per-class keying, both classes out of order: `Casted` reorders to
+      // before→database while `Quoted` reorders to database→before, from the
+      // same file. Impossible with a flat per-file list.
+      {
+        filename: multiFile,
+        code:
+          `class Casted {\n  database() {}\n  before() {}\n}\n` +
+          `class Quoted {\n  before() {}\n  database() {}\n}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output:
+          `class Casted {\n  before() {}\n  database() {}\n}\n` +
+          `class Quoted {\n  database() {}\n  before() {}\n}\n`,
+      },
+      // Rename fallback: the manifest bucket is keyed `Integer` (the Rails
+      // constant) but trails named the class `IntegerType`. With one bucket
+      // and one class both unmatched, the 1:1 fallback pairs them and the
+      // class is reordered to the bucket's Rails order.
+      {
+        filename: renameFile,
+        code: `class IntegerType {\n  third() {}\n  first() {}\n  second() {}\n}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `class IntegerType {\n  first() {}\n  second() {}\n  third() {}\n}\n`,
       },
       // Section header separated by one blank line travels with the
       // next method.

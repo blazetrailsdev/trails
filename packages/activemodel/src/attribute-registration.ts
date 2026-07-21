@@ -104,70 +104,6 @@ export class PendingDefault implements PendingModification {
  */
 let _decoratorReplayDepth = 0;
 
-/** True while a PendingDecorator is replaying during materialization. @internal */
-export function isDecoratorReplay(): boolean {
-  return _decoratorReplayDepth > 0;
-}
-
-/**
- * Run `fn` in decorator-replay context, so `isDecoratorReplay()` reports true.
- *
- * Mirrors: the replay performed by
- * ActiveModel::AttributeRegistration::PendingDecorator#apply_to. Every path that
- * replays a pending decorator MUST go through this, or decorators gated on
- * replay context (notably enum's undeclared-type check) silently change behavior.
- *
- * @internal
- */
-function inDecoratorReplay<T>(fn: () => T): T {
-  _decoratorReplayDepth++;
-  try {
-    return fn();
-  } finally {
-    _decoratorReplayDepth--;
-  }
-}
-
-/** @internal Rails-private helper. */
-export class PendingDecorator implements PendingModification {
-  constructor(
-    readonly names: string[] | null,
-    readonly decorator: AttributeDecorator,
-  ) {}
-
-  /** @internal */
-  applyTo(attributeSet: AttributeSet, host?: unknown): void {
-    const targets = this.names ?? attributeSet.keys();
-    for (const name of targets) {
-      const existing = attributeSet.getAttribute(name);
-      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
-      if (newType) {
-        attributeSet.set(name, existing.withType(newType));
-      }
-    }
-  }
-}
-
-// ---------------------------------------------------------------------------
-// Subclass registry
-// Mirrors: ActiveSupport::DescendantsTracker used by reset_default_attributes
-// ---------------------------------------------------------------------------
-
-/**
- * Register cls as a direct subclass of its prototype-chain superclass so
- * resetDefaultAttributes() can cascade to it.
- *
- * Delegates to DescendantsTracker (WeakRef-backed, dedup'd) — the same
- * infrastructure Rails uses via ActiveSupport::DescendantsTracker. Rails
- * registers via the `inherited` hook; we register lazily on the first
- * _defaultAttributes() call instead (same effect: only classes that have
- * a cache worth invalidating are tracked).
- *
- * Mirrors: ActiveSupport::DescendantsTracker registration triggered by
- * Class.inherited in Rails.
- */
-type HostAsClass = new (...args: unknown[]) => unknown;
-
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#decorate_attributes
  *
@@ -225,6 +161,46 @@ export function _defaultAttributes(this: AttributeHostInternals): AttributeSet {
   }
   return this._cachedDefaultAttributes;
 }
+
+/** @internal Rails-private helper. */
+export class PendingDecorator implements PendingModification {
+  constructor(
+    readonly names: string[] | null,
+    readonly decorator: AttributeDecorator,
+  ) {}
+
+  /** @internal */
+  applyTo(attributeSet: AttributeSet, host?: unknown): void {
+    const targets = this.names ?? attributeSet.keys();
+    for (const name of targets) {
+      const existing = attributeSet.getAttribute(name);
+      const newType = inDecoratorReplay(() => this.decorator(name, existing.type, host));
+      if (newType) {
+        attributeSet.set(name, existing.withType(newType));
+      }
+    }
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Subclass registry
+// Mirrors: ActiveSupport::DescendantsTracker used by reset_default_attributes
+// ---------------------------------------------------------------------------
+
+/**
+ * Register cls as a direct subclass of its prototype-chain superclass so
+ * resetDefaultAttributes() can cascade to it.
+ *
+ * Delegates to DescendantsTracker (WeakRef-backed, dedup'd) — the same
+ * infrastructure Rails uses via ActiveSupport::DescendantsTracker. Rails
+ * registers via the `inherited` hook; we register lazily on the first
+ * _defaultAttributes() call instead (same effect: only classes that have
+ * a cache worth invalidating are tracked).
+ *
+ * Mirrors: ActiveSupport::DescendantsTracker registration triggered by
+ * Class.inherited in Rails.
+ */
+type HostAsClass = new (...args: unknown[]) => unknown;
 
 /**
  * Mirrors: ActiveModel::AttributeRegistration::ClassMethods#attribute_types
@@ -381,6 +357,30 @@ export function hookAttributeType(
   type: Type,
 ): Type {
   return type;
+}
+
+/** True while a PendingDecorator is replaying during materialization. @internal */
+export function isDecoratorReplay(): boolean {
+  return _decoratorReplayDepth > 0;
+}
+
+/**
+ * Run `fn` in decorator-replay context, so `isDecoratorReplay()` reports true.
+ *
+ * Mirrors: the replay performed by
+ * ActiveModel::AttributeRegistration::PendingDecorator#apply_to. Every path that
+ * replays a pending decorator MUST go through this, or decorators gated on
+ * replay context (notably enum's undeclared-type check) silently change behavior.
+ *
+ * @internal
+ */
+function inDecoratorReplay<T>(fn: () => T): T {
+  _decoratorReplayDepth++;
+  try {
+    return fn();
+  } finally {
+    _decoratorReplayDepth--;
+  }
 }
 
 export function registerWithSuperclass(cls: AttributeHostInternals): void {
