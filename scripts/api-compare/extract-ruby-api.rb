@@ -423,6 +423,14 @@ class ApiExtractor
     # method carries a position. Without it `class << self` blocks placed above
     # the instance methods (e.g. active_model/attribute.rb:7-24) can't be
     # interleaved back into Rails source order by manifest consumers.
+    #
+    # INVARIANT: a recorder must read `@current_line` BEFORE walking children.
+    # This is set on the way IN and never restored on the way OUT, so after a
+    # nested walk it holds the deepest line last visited, not the line of the
+    # construct being recorded. Every recorder today satisfies this (process_def
+    # /process_defs use non-walking helpers for deps/calls/digest; the
+    # process_command and method_add_block codegen recorders all fire before
+    # descending) — keep it that way, or capture the line into a local first.
     line = first_line(node)
     @current_line = line if line
 
@@ -1860,17 +1868,26 @@ class ApiExtractor
 
   # ---- Helpers ----
 
-  # Earliest source line under `node`. Ripper's scanner events carry a
+  # Earliest source line under `node`. Ripper's SCANNER events carry a
   # `[lineno, column]` tuple as their last element (e.g.
   # `[:@ident, "from_database", [7, 8]]`); parser events don't, so recurse
   # until one turns up.
+  #
+  # The scanner-event gate (`:@`-prefixed head) is what makes this exact rather
+  # than a guess: shape alone ("last element is a 2-Integer array") would also
+  # match any parser event that happened to end in one, and silently yield a
+  # line from the wrong subtree. Only scanner events ever carry positions, so
+  # checking the head costs nothing and removes the ambiguity.
   def first_line(node)
     return nil unless node.is_a?(Array)
 
-    tail = node.last
-    if tail.is_a?(Array) && tail.length == 2 &&
-       tail[0].is_a?(Integer) && tail[1].is_a?(Integer)
-      return tail[0]
+    head = node[0]
+    if head.is_a?(Symbol) && head.to_s.start_with?("@")
+      tail = node.last
+      if tail.is_a?(Array) && tail.length == 2 &&
+         tail[0].is_a?(Integer) && tail[1].is_a?(Integer)
+        return tail[0]
+      end
     end
 
     node.each do |child|
