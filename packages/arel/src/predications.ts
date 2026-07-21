@@ -87,6 +87,33 @@ export interface PredicationHost {
   quotedArray(others: unknown[]): Node[];
 }
 
+/**
+ * The two private folders from Arel::Predications (grouping_any /
+ * grouping_all). Declared structurally so the *_any/*_all variants can
+ * name them in their `this` types without referring to `Predications`
+ * while it is still being defined.
+ *
+ * Mirrors the real signatures below, closure arm included -- a host typed
+ * through this interface keeps the closure form. The assertion after the
+ * mixin pins the two declarations together so they cannot drift.
+ */
+export interface GroupingFolders {
+  /** @internal */
+  groupingAny<T extends PredicationHost>(
+    this: T,
+    methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping;
+  /** @internal */
+  groupingAll<T extends PredicationHost>(
+    this: T,
+    methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping;
+}
+
 function groupedAny(nodes: Node[]): Grouping {
   // Rails' `Or.inject` on [] returns nil; the visitor renders that as
   // `NULL`. Preserve three-valued semantics (NULL is *not* the same as
@@ -261,71 +288,140 @@ export const Predications = {
 
   // -- _any / _all variants --
 
-  eqAny(this: PredicationHost & { eq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.eq(o)));
+  eqAny(
+    this: PredicationHost & GroupingFolders & { eq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAny("eq", others);
   },
-  eqAll(this: PredicationHost & { eq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.eq(o)));
+  eqAll(
+    this: PredicationHost & GroupingFolders & { eq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    // predications.rb:34 folds `quoted_array(others)`, not the bare array --
+    // uniquely among the *_all variants. `eq` re-quotes via quoted_node, which
+    // passes Nodes through untouched, so the pre-quoting is idempotent for
+    // plain values; keep it anyway so a host with a custom quotedNode sees the
+    // same input Rails gives it.
+    return this.groupingAll("eq", this.quotedArray(others));
   },
-  notEqAny(this: PredicationHost & { notEq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.notEq(o)));
+  notEqAny(
+    this: PredicationHost & GroupingFolders & { notEq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAny("notEq", others);
   },
-  notEqAll(this: PredicationHost & { notEq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.notEq(o)));
+  notEqAll(
+    this: PredicationHost & GroupingFolders & { notEq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAll("notEq", others);
   },
-  gtAny(this: PredicationHost & { gt(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.gt(o)));
+  gtAny(
+    this: PredicationHost & GroupingFolders & { gt(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAny("gt", others);
   },
-  gtAll(this: PredicationHost & { gt(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.gt(o)));
+  gtAll(
+    this: PredicationHost & GroupingFolders & { gt(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAll("gt", others);
   },
-  gteqAny(this: PredicationHost & { gteq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.gteq(o)));
+  gteqAny(
+    this: PredicationHost & GroupingFolders & { gteq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAny("gteq", others);
   },
-  gteqAll(this: PredicationHost & { gteq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.gteq(o)));
+  gteqAll(
+    this: PredicationHost & GroupingFolders & { gteq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAll("gteq", others);
   },
-  ltAny(this: PredicationHost & { lt(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.lt(o)));
+  ltAny(
+    this: PredicationHost & GroupingFolders & { lt(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAny("lt", others);
   },
-  ltAll(this: PredicationHost & { lt(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.lt(o)));
+  ltAll(
+    this: PredicationHost & GroupingFolders & { lt(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAll("lt", others);
   },
-  lteqAny(this: PredicationHost & { lteq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.lteq(o)));
+  lteqAny(
+    this: PredicationHost & GroupingFolders & { lteq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAny("lteq", others);
   },
-  lteqAll(this: PredicationHost & { lteq(o: unknown): Node }, others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.lteq(o)));
+  lteqAll(
+    this: PredicationHost & GroupingFolders & { lteq(o: unknown): Node },
+    others: unknown[],
+  ): Grouping {
+    return this.groupingAll("lteq", others);
   },
-  matchesAny(this: PredicationHost & { matches(o: string): Node }, others: string[]): Grouping {
-    return groupedAny(others.map((o) => this.matches(o)));
+  matchesAny(
+    this: PredicationHost & GroupingFolders & { matches(o: string): Node },
+    others: string[],
+    escape: string | Node | null = null,
+    caseSensitive = false,
+  ): Grouping {
+    return this.groupingAny("matches", others, escape, caseSensitive);
   },
-  matchesAll(this: PredicationHost & { matches(o: string): Node }, others: string[]): Grouping {
-    return groupedAll(others.map((o) => this.matches(o)));
+  matchesAll(
+    this: PredicationHost & GroupingFolders & { matches(o: string): Node },
+    others: string[],
+    escape: string | Node | null = null,
+    caseSensitive = false,
+  ): Grouping {
+    return this.groupingAll("matches", others, escape, caseSensitive);
   },
   doesNotMatchAny(
-    this: PredicationHost & { doesNotMatch(o: string): Node },
+    this: PredicationHost & GroupingFolders & { doesNotMatch(o: string): Node },
     others: string[],
+    escape: string | Node | null = null,
   ): Grouping {
-    return groupedAny(others.map((o) => this.doesNotMatch(o)));
+    // predications.rb:155-161 forwards only `escape` -- unlike matches_*_any,
+    // it does not thread case_sensitive, so does_not_match's own default wins.
+    return this.groupingAny("doesNotMatch", others, escape);
   },
   doesNotMatchAll(
-    this: PredicationHost & { doesNotMatch(o: string): Node },
+    this: PredicationHost & GroupingFolders & { doesNotMatch(o: string): Node },
     others: string[],
+    escape: string | Node | null = null,
   ): Grouping {
-    return groupedAll(others.map((o) => this.doesNotMatch(o)));
+    // predications.rb:155-161 forwards only `escape` -- unlike matches_*_any,
+    // it does not thread case_sensitive, so does_not_match's own default wins.
+    return this.groupingAll("doesNotMatch", others, escape);
   },
-  inAny(this: PredicationHost & { in(o: unknown[]): Node }, others: unknown[][]): Grouping {
-    return groupedAny(others.map((o) => this.in(o)));
+  inAny(
+    this: PredicationHost & GroupingFolders & { in(o: unknown[]): Node },
+    others: unknown[][],
+  ): Grouping {
+    return this.groupingAny("in", others);
   },
-  inAll(this: PredicationHost & { in(o: unknown[]): Node }, others: unknown[][]): Grouping {
-    return groupedAll(others.map((o) => this.in(o)));
+  inAll(
+    this: PredicationHost & GroupingFolders & { in(o: unknown[]): Node },
+    others: unknown[][],
+  ): Grouping {
+    return this.groupingAll("in", others);
   },
-  notInAny(this: PredicationHost & { notIn(o: unknown[]): Node }, others: unknown[][]): Grouping {
-    return groupedAny(others.map((o) => this.notIn(o)));
+  notInAny(
+    this: PredicationHost & GroupingFolders & { notIn(o: unknown[]): Node },
+    others: unknown[][],
+  ): Grouping {
+    return this.groupingAny("notIn", others);
   },
-  notInAll(this: PredicationHost & { notIn(o: unknown[]): Node }, others: unknown[][]): Grouping {
-    return groupedAll(others.map((o) => this.notIn(o)));
+  notInAll(
+    this: PredicationHost & GroupingFolders & { notIn(o: unknown[]): Node },
+    others: unknown[][],
+  ): Grouping {
+    return this.groupingAll("notIn", others);
   },
   when(this: Node & PredicationHost, right: unknown): Case {
     return new Case(this).when(this.quotedNode(right));
@@ -344,9 +440,8 @@ export const Predications = {
   },
 
   // -- Rails-private helpers (mixed in alongside the public API for
-  //    surface fidelity; not referenced internally because the existing
-  //    *_any/*_all impls call the file-level groupedAny/groupedAll
-  //    above with already-built nodes). --
+  //    surface fidelity; the *_any/*_all variants above delegate here,
+  //    mirroring predications.rb:231-241). --
 
   // Mirrors Arel::Predications#grouping_any(method_id, others, *extras)
   // — calls `this[methodId](expr, ...extras)` on each value and folds
@@ -412,3 +507,12 @@ export const Predications = {
     return isNilBound(value) || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== 0;
   },
 };
+
+// Pins GroupingFolders (above) against the real folder implementations. The
+// interface exists only because the *_any/*_all variants cannot name
+// `Predications` while it is still being defined; this assertion makes the two
+// declarations fail to compile if they ever disagree, so the second
+// declaration cannot become the kind of drifting duplicate this file just
+// removed from the *_any/*_all fold paths.
+const _groupingFoldersMatchImplementation: GroupingFolders = Predications;
+void _groupingFoldersMatchImplementation;
