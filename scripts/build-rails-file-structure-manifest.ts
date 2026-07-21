@@ -68,6 +68,11 @@ interface RubyEntity {
   instanceMethods?: RubyMethod[];
   classMethods?: RubyMethod[];
 }
+type TaggedMethod = RubyMethod & { isStatic: boolean };
+// Attach staticness to each method so it survives the source-line merge — the
+// manifest needs to know whether the interleaved entry was a class method.
+const tagStatic = (methods: RubyMethod[] = [], isStatic: boolean): TaggedMethod[] =>
+  methods.map((m) => ({ ...m, isStatic }));
 
 const railsApi = JSON.parse(fs.readFileSync(RAILS_API_PATH, "utf8"));
 
@@ -121,13 +126,23 @@ const ORDER_ONLY_CANDIDATES: Record<string, string[]> = {
 // alternate spelling becomes "unmapped" and skips ordering. The rule filters
 // each container's expected names to those actually present, so emitting both
 // is a safe no-op for whichever spelling wasn't used.
-const pushMethod = (list: string[], seen: Set<string>, name: string) => {
+// `isStatic` records whether the Ruby method was a CLASS method, emitted as a
+// `static ` prefix on the manifest entry. Without it, a Ruby class that defines
+// both `def foo` and `def self.foo` — or a TS class that adds an instance member
+// alongside a real Rails class method — collapses to ONE expected slot, and the
+// rule moves whichever member it happens to match. `Arel::Table` is the live
+// case: `engine` exists only as a class-level `attr_accessor` (table.rb:9), but
+// trails also has an invented instance `get engine()`; a bare `engine` entry let
+// that invention be repositioned against the class accessor's slot. Entries in
+// the `functions` bucket stay bare — top-level functions have no staticness.
+const pushMethod = (list: string[], seen: Set<string>, name: string, isStatic: boolean) => {
   const candidates = rubyMethodToTs(name) ?? ORDER_ONLY_CANDIDATES[name];
   if (!candidates || candidates.length === 0) return;
   for (const ts of candidates) {
-    if (seen.has(ts)) continue;
-    seen.add(ts);
-    list.push(ts);
+    const entry = isStatic ? `static ${ts}` : ts;
+    if (seen.has(entry)) continue;
+    seen.add(entry);
+    list.push(entry);
   }
 };
 
@@ -188,23 +203,28 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
       if (!host.file) continue;
       const className = host.fqn.split("::").pop() ?? host.fqn;
       // Order by source line rather than appending classMethods after
-      // instanceMethods — see mergeBySourceLine for why. Bucketing by `file`
-      // happens below, after ordering; the merge is a total order on `line`, so
-      // each file's slice is still ascending.
-      for (const m of mergeBySourceLine(host.instanceMethods, host.classMethods)) {
+      // instanceMethods — see mergeBySourceLine for why. Tag each method with
+      // `isStatic` BEFORE merging so the interleaved order keeps the class-vs-
+      // instance distinction the manifest needs (`static name` vs `name`).
+      // Bucketing by `file` happens below, after ordering; the merge is a total
+      // order on `line`, so each file's slice is still ascending.
+      for (const m of mergeBySourceLine(tagStatic(host.instanceMethods, false), tagStatic(host.classMethods, true))) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, className);
-        pushMethod(b.names, b.seen, m.name);
+        pushMethod(b.names, b.seen, m.name, m.isStatic);
       }
     }
   };
   const visitModules = (entities: Record<string, RubyEntity>) => {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
-      for (const m of mergeBySourceLine(host.instanceMethods, host.classMethods)) {
+      // Modules port to top-level functions, which have no staticness — every
+      // entry stays bare regardless of whether Ruby declared it on the module
+      // or its singleton.
+      for (const m of mergeBySourceLine(tagStatic(host.instanceMethods, false), tagStatic(host.classMethods, true))) {
         const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
-        pushMethod(b.names, b.seen, m.name);
+        pushMethod(b.names, b.seen, m.name, false);
       }
     }
   };
