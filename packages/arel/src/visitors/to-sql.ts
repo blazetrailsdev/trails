@@ -727,7 +727,7 @@ export class ToSql extends Visitor {
       this.injectJoin(node.orders, ", ", collector);
     }
     if (node.framing) {
-      collector.append(" ");
+      if (node.partitions.length > 0 || node.orders.length > 0) collector.append(" ");
       this.visit(node.framing, collector);
     }
     collector.append(")");

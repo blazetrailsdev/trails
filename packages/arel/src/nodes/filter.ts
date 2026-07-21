@@ -1,22 +1,22 @@
 import { Node } from "./node.js";
 import { Binary } from "./binary.js";
-import { SqlLiteral } from "./sql-literal.js";
-import { Over } from "./over.js";
 
 /**
  * Filter — FILTER (WHERE ...) clause for aggregate functions.
  *
- * Mirrors: Arel::Nodes::Filter (extends Binary)
+ * Mirrors: Arel::Nodes::Filter (extends Binary), which includes
+ * Arel::WindowPredications (filter.rb:6). Runtime mixin wiring lives in
+ * ../index.ts.
  */
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Filter extends Binary {
   constructor(left: Node, right: Node) {
     super(left, right);
   }
-
-  over(windowOrName?: Node | string): Over {
-    if (typeof windowOrName === "string") {
-      return new Over(this, new SqlLiteral(`"${windowOrName}"`));
-    }
-    return new Over(this, windowOrName ?? null);
-  }
 }
+
+type _WindowPredications = import("../window-predications.js").WindowPredicationsModule;
+
+/* eslint-disable-next-line @typescript-eslint/no-empty-object-type,
+   @typescript-eslint/no-unsafe-declaration-merging */
+export interface Filter extends _WindowPredications {}

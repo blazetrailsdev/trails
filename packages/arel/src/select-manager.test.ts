@@ -1242,9 +1242,8 @@ describe("SelectManagerTest", () => {
   describe("group", () => {
     it("takes an attribute", () => {
       const mgr = new SelectManager(users);
-      mgr.project(users.get("id").over(mgr.window("w")));
-      const sql = mgr.toSql();
-      expect(sql).toContain("OVER");
+      mgr.group(users.get("id"));
+      expect(mgr.toSql()).toBe('SELECT FROM "users" GROUP BY "users"."id"');
     });
 
     it("makes strings literals", () => {
@@ -1258,46 +1257,42 @@ describe("SelectManagerTest", () => {
   describe("window definition", () => {
     it("takes an order", () => {
       const mgr = new SelectManager(users);
-      mgr.project(users.get("id").over(mgr.window("w").order(users.get("id").asc())));
-      expect(mgr.toSql()).toContain("ORDER BY");
+      mgr.window("a_window").order(users.get("foo").asc());
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" WINDOW "a_window" AS (ORDER BY "users"."foo" ASC)',
+      );
     });
 
     it("takes an order with multiple columns", () => {
       const mgr = new SelectManager(users);
-      mgr.project(
-        users
-          .get("id")
-          .over(mgr.window("w").order(users.get("id").asc(), users.get("name").desc())),
+      mgr.window("a_window").order(users.get("foo").asc(), users.get("bar").desc());
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" WINDOW "a_window" AS (ORDER BY "users"."foo" ASC, "users"."bar" DESC)',
       );
-      const sql = mgr.toSql();
-      expect(sql).toContain("ORDER BY");
-      expect(sql).toContain(",");
     });
 
     it("takes a partition", () => {
       const mgr = new SelectManager(users);
-      mgr.project(users.get("id").over(mgr.window("w").partition(users.get("name"))));
-      expect(mgr.toSql()).toContain("PARTITION BY");
+      mgr.window("a_window").partition(users.get("bar"));
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" WINDOW "a_window" AS (PARTITION BY "users"."bar")',
+      );
     });
 
     it("takes a partition with multiple columns", () => {
       const mgr = new SelectManager(users);
-      mgr.project(
-        users.get("id").over(mgr.window("w").partition(users.get("name"), users.get("age"))),
+      mgr.window("a_window").partition(users.get("bar"), users.get("baz"));
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" WINDOW "a_window" AS (PARTITION BY "users"."bar", "users"."baz")',
       );
-      const sql = mgr.toSql();
-      expect(sql).toContain("PARTITION BY");
-      expect(sql).toContain(",");
     });
 
     it("takes a range frame, unbounded following", () => {
       const mgr = new SelectManager(users);
-      mgr.project(users.get("id"));
-      const win = mgr.window("w");
-      win.frame(new Nodes.Range(new Nodes.Following()));
-      const sql = mgr.toSql();
-      expect(sql).toContain("RANGE");
-      expect(sql).toContain("UNBOUNDED FOLLOWING");
+      mgr.window("a_window").range(new Nodes.Following());
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" WINDOW "a_window" AS (RANGE UNBOUNDED FOLLOWING)',
+      );
     });
   });
 
