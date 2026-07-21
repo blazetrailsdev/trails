@@ -30,9 +30,14 @@ export abstract class Node {
     return new _registry.Not!(this);
   }
 
-  toSql(): string {
+  // Mirrors `to_sql(engine = Table.engine)` (arel/nodes/node.rb:148-153): Rails
+  // resolves a connection off the engine and hands it to the visitor. trails has
+  // no `Table.engine` (arel must not depend on activerecord), so the connection
+  // itself is the parameter and the connection-less default stands in for the
+  // engine default.
+  toSql(connection?: import("../visitors/connection.js").ArelConnection): string {
     assertRegistered("ToSql");
-    return new _registry.ToSql!().compile(this);
+    return new _registry.ToSql!(connection).compile(this);
   }
 
   fetchAttribute(_block?: (attr: Node) => unknown): unknown {

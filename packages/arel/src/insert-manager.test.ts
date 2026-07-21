@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Table, sql, InsertManager, Nodes } from "./index.js";
+import { fakeRecordConnection } from "./test-helpers/connection.js";
 
 describe("InsertManagerTest", () => {
   const users = new Table("users");
@@ -59,12 +60,7 @@ describe("InsertManagerTest", () => {
     it("inserts false", () => {
       const mgr = new InsertManager();
       mgr.insert([[users.get("bool"), false]]);
-      // Rails asserts VALUES ('f'): that rendering comes from the Arel suite's
-      // FakeRecord connection double (test/cases/arel/support/fake_record.rb:79-80),
-      // not from any adapter — SQLite quotes false as 0, the abstract adapter as
-      // FALSE. We have no FakeRecord port, so toSql() renders via the
-      // connection-less default quoter.
-      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("bool") VALUES (FALSE)`);
+      expect(mgr.toSql(fakeRecordConnection)).toBe(`INSERT INTO "users" ("bool") VALUES ('f')`);
     });
 
     it("inserts null", () => {

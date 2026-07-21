@@ -1,5 +1,6 @@
 import type { ArelConnection } from "../visitors/connection.js";
 import { defaultQuoter } from "../visitors/default-quoter.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
 /**
  * Explicit connections for Arel visitor construction in tests.
@@ -27,3 +28,89 @@ import { defaultQuoter } from "../visitors/default-quoter.js";
  * @internal
  */
 export const testConnection: ArelConnection = defaultQuoter;
+
+// Stands in for a method FakeRecord does not define. Rails gets this for free —
+// an undefined method on the double raises NoMethodError — so raising here is the
+// faithful behaviour, and it turns any future reachability into a loud failure
+// naming the method rather than silent default-quoter output.
+function unreachableOnFakeRecord(name: string): () => never {
+  return () => {
+    throw new Error(
+      `${name} is not defined on FakeRecord: Rails' Arel visitor never calls it on this double. ` +
+        `Reaching it means the visitor diverged from Rails — fix the visitor, not this double.`,
+    );
+  };
+}
+
+/**
+ * Port of the Arel suite's `FakeRecord::Connection` quoting
+ * (`test/cases/arel/support/fake_record.rb:55-90`).
+ *
+ * Rails' Arel tests run against this double, not against an adapter, which is
+ * why their expected SQL embeds `'t'`/`'f'` for booleans — a rendering no real
+ * adapter produces (SQLite quotes `0`, the abstract adapter `FALSE`). Porting it
+ * is what makes those assertions reachable verbatim instead of weakened.
+ *
+ * Only the quoting surface is ported: the rest of `FakeRecord` (schema cache,
+ * `Table.engine` wiring) exists to satisfy Rails' `engine.with_connection`
+ * indirection, which trails' explicit-connection `toSql(connection)` replaces.
+ *
+ * @internal
+ */
+export const fakeRecordConnection: ArelConnection = {
+  // FakeRecord defines ONLY the methods Rails' visitor actually calls on it —
+  // no `quoted_true`/`quoted_false`/`quoted_binary`/`quote_string`/`unquoted_*`.
+  // `ArelConnection` is a TS interface so they must exist; they raise rather than
+  // borrowing `defaultQuoter`, which would (a) re-anchor this double on the
+  // connection-less quoter RFC 0007 is deleting and (b) silently emit adapter
+  // renderings (`TRUE`) from a double whose entire purpose is to emit `'t'`.
+  // Verified unreachable, not merely unused: the ToSql visitor calls none of them
+  // (they appear nowhere in visitors/to-sql.ts), and `unquotedTrue`/`unquotedFalse`
+  // are reached only via quoteArrayLiteral (quote-array.ts:86), which only the PG
+  // quoter's own `quote` override calls — an override this double replaces.
+  quoteString: unreachableOnFakeRecord("quoteString"),
+  quotedBinary: unreachableOnFakeRecord("quotedBinary"),
+  quotedTrue: unreachableOnFakeRecord("quotedTrue"),
+  quotedFalse: unreachableOnFakeRecord("quotedFalse"),
+  unquotedTrue: unreachableOnFakeRecord("unquotedTrue"),
+  unquotedFalse: unreachableOnFakeRecord("unquotedFalse"),
+
+  quoteTableName(name: string): string {
+    return `"${name}"`;
+  },
+
+  quoteColumnName(name: string): string {
+    return `"${name}"`;
+  },
+
+  // fake_record.rb:71-87. Note the `else` arm escapes `'` as `\'`, not `''`.
+  quote(thing: unknown): string {
+    if (thing === true) return "'t'";
+    if (thing === false) return "'f'";
+    // Ruby has one nil; JS has two nullish values. `undefined` joins the NULL arm
+    // rather than falling to `else` (which would emit `'undefined'` as a string)
+    // because the sibling quoters treat the pair alike (default-quoter.ts
+    // `quoteScalar`). Letting it stringify here would make this double the only
+    // quoter in the package that renders a nullish as a quoted literal.
+    if (thing === null || thing === undefined) return "NULL";
+    if (typeof thing === "number" || typeof thing === "bigint") return String(thing);
+    if (thing instanceof Temporal.PlainDate) {
+      return `'${String(thing.year).padStart(4, "0")}-${String(thing.month).padStart(2, "0")}-${String(thing.day).padStart(2, "0")}'`;
+    }
+    if (thing instanceof Temporal.PlainDateTime) {
+      const p = (n: number): string => String(n).padStart(2, "0");
+      return `'${String(thing.year).padStart(4, "0")}-${p(thing.month)}-${p(thing.day)} ${p(thing.hour)}:${p(thing.minute)}:${p(thing.second)}'`;
+    }
+    return `'${String(thing).replace(/'/g, "\\'")}'`;
+  },
+
+  // fake_record.rb:63-65 — the comment is returned unchanged.
+  sanitizeAsSqlComment(value: string): string {
+    return value;
+  },
+
+  // fake_record.rb:90-92.
+  castBoundValue(value: unknown): unknown {
+    return value;
+  },
+};
