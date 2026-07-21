@@ -26,6 +26,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
 import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { mergeBySourceLine } from "./api-compare/source-order.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -130,22 +131,6 @@ const pushMethod = (list: string[], seen: Set<string>, name: string) => {
   }
 };
 
-// An entity's methods in Rails SOURCE order, rather than instanceMethods then
-// classMethods. A `class << self` block at the TOP of a Rails file
-// (active_model/attribute.rb:7-24 defines from_database/from_user/… before
-// `initialize` at :33) would otherwise be demanded LAST, inverting Rails order.
-// Methods without a `line` (a rails-api.json predating the field) sort last,
-// reproducing the historical instance-then-class append.
-const orderBySourceLine = (host: RubyEntity): RubyMethod[] =>
-  [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])]
-    .map((m, i) => ({ m, i }))
-    .sort((a, b) => {
-      const al = a.m.line ?? Infinity;
-      const bl = b.m.line ?? Infinity;
-      return al === bl ? a.i - b.i : al - bl;
-    })
-    .map(({ m }) => m);
-
 // A TS container: `{ file, key }` where `key` is a class name or the sentinel
 // `FUNCTIONS_KEY` for the file's top-level functions. Ruby methods are bucketed
 // per (rubyFile, container) so each class keeps its own dedup scope.
@@ -202,7 +187,11 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
       const className = host.fqn.split("::").pop() ?? host.fqn;
-      for (const m of orderBySourceLine(host)) {
+      // Order by source line rather than appending classMethods after
+      // instanceMethods — see mergeBySourceLine for why. Bucketing by `file`
+      // happens below, after ordering; the merge is a total order on `line`, so
+      // each file's slice is still ascending.
+      for (const m of mergeBySourceLine(host.instanceMethods, host.classMethods)) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, className);
@@ -213,7 +202,7 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
   const visitModules = (entities: Record<string, RubyEntity>) => {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
-      for (const m of orderBySourceLine(host)) {
+      for (const m of mergeBySourceLine(host.instanceMethods, host.classMethods)) {
         const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
         pushMethod(b.names, b.seen, m.name);
       }
