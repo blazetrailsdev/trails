@@ -29,6 +29,19 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
  */
 export const testConnection: ArelConnection = defaultQuoter;
 
+// Stands in for a method FakeRecord does not define. Rails gets this for free —
+// an undefined method on the double raises NoMethodError — so raising here is the
+// faithful behaviour, and it turns any future reachability into a loud failure
+// naming the method rather than silent default-quoter output.
+function unreachableOnFakeRecord(name: string): () => never {
+  return () => {
+    throw new Error(
+      `${name} is not defined on FakeRecord: Rails' Arel visitor never calls it on this double. ` +
+        `Reaching it means the visitor diverged from Rails — fix the visitor, not this double.`,
+    );
+  };
+}
+
 /**
  * Port of the Arel suite's `FakeRecord::Connection` quoting
  * (`test/cases/arel/support/fake_record.rb:55-90`).
@@ -45,12 +58,22 @@ export const testConnection: ArelConnection = defaultQuoter;
  * @internal
  */
 export const fakeRecordConnection: ArelConnection = {
-  // FakeRecord defines none of `quoted_true`/`quoted_false`/`quoted_binary` — in
-  // Ruby the visitor simply never calls them on this double, since `quote` claims
-  // booleans first (fake_record.rb:75-78). `ArelConnection` is a TS interface, so
-  // they must be present; the spread supplies them rather than inventing values.
-  // They stay unreachable for booleans for the same reason they are in Rails.
-  ...defaultQuoter,
+  // FakeRecord defines ONLY the methods Rails' visitor actually calls on it —
+  // no `quoted_true`/`quoted_false`/`quoted_binary`/`quote_string`/`unquoted_*`.
+  // `ArelConnection` is a TS interface so they must exist; they raise rather than
+  // borrowing `defaultQuoter`, which would (a) re-anchor this double on the
+  // connection-less quoter RFC 0007 is deleting and (b) silently emit adapter
+  // renderings (`TRUE`) from a double whose entire purpose is to emit `'t'`.
+  // Verified unreachable, not merely unused: the ToSql visitor calls none of them
+  // (they appear nowhere in visitors/to-sql.ts), and `unquotedTrue`/`unquotedFalse`
+  // are reached only via quoteArrayLiteral (quote-array.ts:86), which only the PG
+  // quoter's own `quote` override calls — an override this double replaces.
+  quoteString: unreachableOnFakeRecord("quoteString"),
+  quotedBinary: unreachableOnFakeRecord("quotedBinary"),
+  quotedTrue: unreachableOnFakeRecord("quotedTrue"),
+  quotedFalse: unreachableOnFakeRecord("quotedFalse"),
+  unquotedTrue: unreachableOnFakeRecord("unquotedTrue"),
+  unquotedFalse: unreachableOnFakeRecord("unquotedFalse"),
 
   quoteTableName(name: string): string {
     return `"${name}"`;
@@ -64,6 +87,11 @@ export const fakeRecordConnection: ArelConnection = {
   quote(thing: unknown): string {
     if (thing === true) return "'t'";
     if (thing === false) return "'f'";
+    // Ruby has one nil; JS has two nullish values. `undefined` joins the NULL arm
+    // rather than falling to `else` (which would emit `'undefined'` as a string)
+    // because the sibling quoters treat the pair alike (default-quoter.ts
+    // `quoteScalar`). Letting it stringify here would make this double the only
+    // quoter in the package that renders a nullish as a quoted literal.
     if (thing === null || thing === undefined) return "NULL";
     if (typeof thing === "number" || typeof thing === "bigint") return String(thing);
     if (thing instanceof Temporal.PlainDate) {
