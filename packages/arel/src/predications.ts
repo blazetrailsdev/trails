@@ -80,34 +80,38 @@ export function isEnumerable(value: unknown): value is Iterable<unknown> {
  * Attribute) or plain-wraps (for NodeExpression / InfixOperation) — same
  * role Rails' private `quoted_node` method plays inside Predications.
  */
-/**
- * The two private folders from Arel::Predications (grouping_any /
- * grouping_all). Declared structurally so the *_any/*_all variants can
- * name them in their `this` types without referring to `Predications`
- * while it is still being defined.
- */
-export interface GroupingFolders {
-  /** @internal */
-  groupingAny(
-    this: PredicationHost,
-    methodId: string,
-    others: unknown[],
-    ...extras: unknown[]
-  ): Grouping;
-  /** @internal */
-  groupingAll(
-    this: PredicationHost,
-    methodId: string,
-    others: unknown[],
-    ...extras: unknown[]
-  ): Grouping;
-}
-
 export interface PredicationHost {
   /** @internal */
   quotedNode(other: unknown): Node;
   /** @internal */
   quotedArray(others: unknown[]): Node[];
+}
+
+/**
+ * The two private folders from Arel::Predications (grouping_any /
+ * grouping_all). Declared structurally so the *_any/*_all variants can
+ * name them in their `this` types without referring to `Predications`
+ * while it is still being defined.
+ *
+ * Mirrors the real signatures below, closure arm included -- a host typed
+ * through this interface keeps the closure form. The assertion after the
+ * mixin pins the two declarations together so they cannot drift.
+ */
+export interface GroupingFolders {
+  /** @internal */
+  groupingAny<T extends PredicationHost>(
+    this: T,
+    methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping;
+  /** @internal */
+  groupingAll<T extends PredicationHost>(
+    this: T,
+    methodId: string | ((this: T, expr: unknown, ...extras: unknown[]) => Node),
+    others: unknown[],
+    ...extras: unknown[]
+  ): Grouping;
 }
 
 function groupedAny(nodes: Node[]): Grouping {
@@ -503,3 +507,12 @@ export const Predications = {
     return isNilBound(value) || this.isInfinity(value) !== 0 || this.isUnboundable(value) !== 0;
   },
 };
+
+// Pins GroupingFolders (above) against the real folder implementations. The
+// interface exists only because the *_any/*_all variants cannot name
+// `Predications` while it is still being defined; this assertion makes the two
+// declarations fail to compile if they ever disagree, so the second
+// declaration cannot become the kind of drifting duplicate this file just
+// removed from the *_any/*_all fold paths.
+const _groupingFoldersMatchImplementation: GroupingFolders = Predications;
+void _groupingFoldersMatchImplementation;
