@@ -2321,7 +2321,7 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
     // node; `.in([1, 2])` instead wraps each value in a Casted node via
     // `quotedNode`, which is the to_sql.rb:87-90 path and does route through
     // quote(). InfixOperation carries the raw value through unwrapped.
-    const sql = new RecordingToSql().compile(
+    const sql = new RecordingToSql(testConnection).compile(
       new Nodes.InfixOperation(
         "+",
         new Nodes.InfixOperation("+", users.get("id"), 1),
@@ -2343,7 +2343,7 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
         return super.quote(value);
       }
     }
-    new RecordingToSql().compile(users.get("id").in([1, 2]));
+    new RecordingToSql(testConnection).compile(users.get("id").in([1, 2]));
     expect(quoted).toEqual([1, 2]);
   });
 });

@@ -1,9 +1,5 @@
 import type { ArelConnection } from "../visitors/connection.js";
-import {
-  defaultQuoter,
-  mysqlDefaultQuoter,
-  postgresqlDefaultQuoter,
-} from "../visitors/default-quoter.js";
+import { defaultQuoter } from "../visitors/default-quoter.js";
 
 /**
  * Explicit connections for Arel visitor construction in tests.
@@ -31,9 +27,3 @@ import {
  * @internal
  */
 export const testConnection: ArelConnection = defaultQuoter;
-
-/** MySQL-dialect test connection. See {@link testConnection}. @internal */
-export const mysqlTestConnection: ArelConnection = mysqlDefaultQuoter;
-
-/** PostgreSQL-dialect test connection. See {@link testConnection}. @internal */
-export const postgresqlTestConnection: ArelConnection = postgresqlDefaultQuoter;
