@@ -152,6 +152,17 @@ describe("Visitor dispatch", () => {
       expect(new ValueVisitor().accept(value)).toBe(expected);
     });
 
+    it.each([
+      // Rails' `visit` walks object.class.ancestors (visitor.rb:36-41), so any
+      // record derived from a plain record reaches visit_Hash on every visitor,
+      // not just Dot. These are the JS analogues of `class MyHash < Hash`.
+      ["record derived from a plain record", Object.create({ inherited: "x" })],
+      ["record derived from a null-prototype record", Object.create(Object.create(null))],
+      ["record inheriting a literal constructor key", Object.create({ constructor: "x" })],
+    ])("classifies a %s as Hash on a non-Dot visitor", (_label, value) => {
+      expect(new ValueVisitor().accept(value)).toBe("Hash");
+    });
+
     it("raises when the value's class has no handler", () => {
       class Arbitrary {}
       expect(() => new ValueVisitor().accept(new Arbitrary())).toThrow(TypeError);

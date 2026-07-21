@@ -6,6 +6,7 @@ import { UnsupportedVisitError } from "../errors.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
+import { isHashAnalogue } from "./ruby-class.js";
 
 type AppendableCollector = { append(s: string): unknown; value: string };
 
@@ -497,14 +498,6 @@ export class Dot extends Visitor {
     }
     this.nodes.push(node);
     this.withNode(node, () => {
-      // Residue over the shared class dispatch: `rubyClassName` names a value
-      // `Hash` only when its prototype is Object.prototype, but Ruby's
-      // ancestor walk (visitor.rb:36-41) reaches `visit_Hash` for any Hash
-      // descendant — in JS, any record derived from a plain record (isHash).
-      if (this.isHash(object)) {
-        this.visitHash(object as Record<string, unknown>);
-        return;
-      }
       try {
         super.visit(object);
       } catch (e) {
@@ -610,67 +603,15 @@ export class Dot extends Visitor {
   }
 
   /**
-   * The trails analogue of Ruby's `o.is_a?(Hash)`.
-   *
-   * Rails' `Visitor#visit` (visitor.rb:36-41) walks `object.class.ancestors`
-   * for a visitable class, so `class MyHash < Hash` reaches `visit_Hash`
-   * while `class Config < Object` finds no handler and raises TypeError.
-   * JS has no Hash class — the object literal *is* the Hash — so the
-   * equivalent of that ancestor split is whether the prototype chain is
-   * made only of plain objects:
-   *
-   *   - `{ a: 1 }` and `Object.create(null)` are Hashes;
-   *   - `Object.create({ a: 1 })` is the JS way to derive a record from
-   *     another record — Ruby's `MyHash < Hash` — so it's a Hash too;
-   *   - a class instance (including `class Config extends Object`) has a
-   *     prototype whose `constructor` is that class, which is Ruby's
-   *     `Config < Object`: no ancestor handler, so it does not route here.
-   *
-   * `visitHash` reads `Object.entries`, which sees only own enumerable
-   * string keys — inherited and symbol keys are not walked, matching the
-   * fields Rails' `each_with_index` over a Hash would yield for the
-   * derived record's own pairs.
-   */
-  private isHash(o: unknown): boolean {
-    if (!o || typeof o !== "object") return false;
-    if (Array.isArray(o)) return false;
-    // Node covers Table (which extends Node).
-    if (o instanceof Node) return false;
-    for (
-      let proto = Object.getPrototypeOf(o);
-      proto !== null;
-      proto = Object.getPrototypeOf(proto)
-    ) {
-      if (proto === Object.prototype) return true;
-      // What marks a *class* prototype is the back-reference: `class C {}`
-      // installs `C.prototype.constructor === C`, so the own `constructor`
-      // is a function pointing back at this very object. Anything else —
-      // absent, a non-function, or a function whose `.prototype` is some
-      // other object — leaves the value a record, so keep walking. A literal
-      // `constructor` key (`{ constructor: "x" }`) fails the identity, and
-      // its name is irrelevant to dispatch anyway: Ruby dispatches by
-      // ancestry (visitor.rb:36-41), so a Hash with a `:constructor` key is
-      // still a Hash and reaches visit_Hash (dot.rb:220).
-      const ctor = Object.getOwnPropertyDescriptor(proto, "constructor")?.value as
-        | { prototype?: unknown }
-        | undefined;
-      if (typeof ctor === "function" && ctor.prototype === proto) {
-        return false;
-      }
-    }
-    return true;
-  }
-
-  /**
    * Rails: `o.class.name`. We use the JS ctor name for objects and emit
    * Rails-style class names for primitives and nil values — `String`,
    * `Integer`, `Float`, `TrueClass`, `FalseClass`, `NilClass`, `Symbol`,
    * `Time` — so leaf nodes match Rails' shape.
    *
-   * Values matching the Hash analogue (see isHash) are named `Hash` rather
+   * Values matching the Hash analogue (see isHashAnalogue) are named `Hash` rather
    * than JS's ctor name `Object`. Rails labels the node `o.class.name`
    * (dot.rb:253), so a *named* Hash subclass would be "MyHash" — but no
-   * value reaching this arm can supply such a name: isHash admits only
+   * value reaching this arm can supply such a name: isHashAnalogue admits only
    * object literals, `Object.create(null)`, and records derived from those,
    * every one of which reports a ctor name of `Object`. Class instances,
    * the only objects with a distinct ctor name, are Ruby's `Config < Object`
@@ -688,7 +629,7 @@ export class Dot extends Visitor {
     if (o instanceof Date) return "Time";
     const temporalClass = temporalClassName(o);
     if (temporalClass) return temporalClass;
-    if (this.isHash(o)) return "Hash";
+    if (isHashAnalogue(o)) return "Hash";
     const ctor = (o as { constructor?: { name?: string } }).constructor;
     return ctor?.name ?? "Object";
   }

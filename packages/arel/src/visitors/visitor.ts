@@ -128,8 +128,13 @@ export abstract class Visitor {
    * entry point for raw values.
    */
   private dispatchMethod(object: unknown): string | undefined {
+    // A record can carry a non-function `constructor` — an inherited literal
+    // key (`Object.create({ constructor: "x" })`) — which is not a dispatch
+    // class. Only a real constructor function keys the ctor cache; anything
+    // else falls through to `rubyClassName`, where the ancestor walk still
+    // classifies the record as a Hash.
     const ctor = (object as { constructor?: NodeCtor } | null | undefined)?.constructor;
-    if (ctor) {
+    if (typeof ctor === "function") {
       const byCtor = this.resolveDispatch(ctor);
       if (byCtor) return byCtor;
     }
