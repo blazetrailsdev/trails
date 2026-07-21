@@ -996,7 +996,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   ): Promise<Nodes.Node> {
     const column = await this.columnForAttribute(attribute);
     if (column && (await this.canPerformCaseInsensitiveComparisonFor(column))) {
-      return attribute.lower().eq((attribute.relation as any).lower(value));
+      return attribute.lower().eq(attribute.relation.lower(value));
     }
     return attribute.eq(value);
   }

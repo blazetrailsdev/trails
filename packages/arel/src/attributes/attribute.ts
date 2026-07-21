@@ -41,6 +41,9 @@ export interface RelationLike {
   typeCastForDatabase: (attrName: string, value: unknown) => unknown;
   typeForAttribute: (name: string) => unknown;
   isAbleToTypeCast: () => boolean;
+  // Attribute#lower delegates here (`relation.lower self`), so every relation
+  // that carries attributes must surface FactoryMethods#lower.
+  lower: (column: unknown) => NamedFunction;
 }
 
 /**
@@ -70,10 +73,10 @@ export class Attribute extends Node {
     return this.relation.typeForAttribute(this.name);
   }
 
-  // -- String functions --
-
+  // Mirrors: Arel::Attributes::Attribute#lower — `relation.lower self`. The
+  // LOWER() node is built by FactoryMethods#lower on the relation, not here.
   lower(): NamedFunction {
-    return new NamedFunction("LOWER", [this]);
+    return this.relation.lower(this);
   }
 
   typeCastForDatabase(value: unknown): unknown {
@@ -183,56 +186,6 @@ export class Attribute extends Node {
 
   average(): Avg {
     return new Avg([this]);
-  }
-
-  upper(): NamedFunction {
-    return new NamedFunction("UPPER", [this]);
-  }
-
-  length(): NamedFunction {
-    return new NamedFunction("LENGTH", [this]);
-  }
-
-  trim(): NamedFunction {
-    return new NamedFunction("TRIM", [this]);
-  }
-
-  ltrim(): NamedFunction {
-    return new NamedFunction("LTRIM", [this]);
-  }
-
-  rtrim(): NamedFunction {
-    return new NamedFunction("RTRIM", [this]);
-  }
-
-  substring(start: number, length?: number): NamedFunction {
-    const args: Node[] = [this, buildQuoted(start)];
-    if (length !== undefined) args.push(buildQuoted(length));
-    return new NamedFunction("SUBSTRING", args);
-  }
-
-  replace(from: string, to: string): NamedFunction {
-    return new NamedFunction("REPLACE", [this, buildQuoted(from), buildQuoted(to)]);
-  }
-
-  // -- Math functions --
-
-  abs(): NamedFunction {
-    return new NamedFunction("ABS", [this]);
-  }
-
-  round(precision?: number): NamedFunction {
-    const args: Node[] = [this];
-    if (precision !== undefined) args.push(buildQuoted(precision));
-    return new NamedFunction("ROUND", args);
-  }
-
-  ceil(): NamedFunction {
-    return new NamedFunction("CEIL", [this]);
-  }
-
-  floor(): NamedFunction {
-    return new NamedFunction("FLOOR", [this]);
   }
 
   // -- Extract --
