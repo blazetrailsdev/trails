@@ -42,8 +42,12 @@ import {
 import { Result } from "../../result.js";
 import { queryTransformers, type QueryTransformer } from "../../query-transformers.js";
 import type { Quoting } from "./quoting-interface.js";
+import { fixtures } from "../../test-helpers/use-fixtures.js";
 
 describe("DatabaseStatements", () => {
+  // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
+  // so these Arel assertions need a connection, as Rails' do via helper.rb.
+  fixtures({});
   describe("toSql", () => {
     it("returns string SQL unchanged", () => {
       expect(toSql("SELECT 1")).toBe("SELECT 1");

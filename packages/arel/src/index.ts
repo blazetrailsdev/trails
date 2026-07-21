@@ -9,6 +9,7 @@ export { UpdateManager } from "./update-manager.js";
 export { DeleteManager } from "./delete-manager.js";
 import { TreeManager } from "./tree-manager.js";
 export { TreeManager };
+export type { ArelEngine } from "./nodes/node.js";
 export { ArelError, EmptyJoinError, BindError } from "./errors.js";
 export { relationName } from "./attributes/attribute.js";
 // Deliberate: no Arel counterpart in Rails — ruby-pg owns this encoder, and
@@ -21,19 +22,17 @@ export { relationName } from "./attributes/attribute.js";
 export { encodeArrayElement } from "./quote-array.js";
 
 import { SqlLiteral } from "./nodes/sql-literal.js";
-import { registerNodeDeps, setToSqlVisitor } from "./nodes/node.js";
-export { setToSqlVisitor };
+import { registerNodeDeps } from "./nodes/node.js";
 import { Not } from "./nodes/unary.js";
 import { Grouping } from "./nodes/grouping.js";
 import { Or } from "./nodes/or.js";
 import { And } from "./nodes/and.js";
-import { ToSql } from "./visitors/to-sql.js";
 import { registerBinaryInversions, _registerCteFactory } from "./nodes/binary.js";
 import { Equality } from "./nodes/equality.js";
 import { In } from "./nodes/in.js";
 import { Cte } from "./nodes/cte.js";
 
-registerNodeDeps({ Not, Grouping, Or, And, ToSql });
+registerNodeDeps({ Not, Grouping, Or, And });
 registerBinaryInversions({ Equality, In });
 _registerCteFactory((name, relation) => new Cte(name, relation));
 

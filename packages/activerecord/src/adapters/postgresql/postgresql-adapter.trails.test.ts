@@ -849,7 +849,9 @@ describeIfPg("PostgreSQLAdapter", () => {
 
     it("highPrecisionCurrentTimestamp returns CURRENT_TIMESTAMP literal", () => {
       const ts = adapter.highPrecisionCurrentTimestamp();
-      expect(ts.toSql()).toBe("CURRENT_TIMESTAMP");
+      // `to_sql` compiles through an engine's connection (arel/nodes/node.rb:148-153);
+      // this suite builds its adapter directly rather than through Base's pool.
+      expect(ts.toSql({ connection: adapter })).toBe("CURRENT_TIMESTAMP");
     });
 
     it("setConstraints ALL DEFERRED executes without error", async () => {

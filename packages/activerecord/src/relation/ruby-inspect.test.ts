@@ -6,8 +6,12 @@ import {
   inspectArelValue,
   inspectOrderClause,
 } from "./ruby-inspect.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 describe("rubyInspect", () => {
+  // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
+  // so these Arel assertions need a connection, as Rails' do via helper.rb.
+  fixtures({});
   it("renders nil / undefined as 'nil'", () => {
     expect(rubyInspect(null)).toBe("nil");
     expect(rubyInspect(undefined)).toBe("nil");
