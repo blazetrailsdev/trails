@@ -23,6 +23,8 @@ import { Account } from "../test-helpers/models/account.js";
 import { Client, Firm } from "../test-helpers/models/company.js";
 import { Member } from "../test-helpers/models/member.js";
 import { Club } from "../test-helpers/models/club.js";
+import { Tagging } from "../test-helpers/models/tagging.js";
+import { Post } from "../test-helpers/models/post.js";
 
 describe("has_one mid-flight reassignment", () => {
   fixtures(["companies", "accounts", "members", "memberships", "clubs"]);
@@ -113,5 +115,23 @@ describe("belongs_to mid-flight reassignment", () => {
     client.association("firm").setTarget(other);
 
     expect(client.association("firm").target).toBe(other);
+  });
+});
+
+describe("polymorphic belongs_to mid-flight reassignment", () => {
+  fixtures(["taggings", "posts"]);
+
+  it("replacing a polymorphic target mid-load raises", async () => {
+    // `BelongsToPolymorphicAssociation` overrides `doAsyncFindTarget`, so it
+    // must arm the same guard its parent does — otherwise the polymorphic
+    // subclass stays silently clobberable while plain belongs_to raises.
+    const tagging = (await Tagging.first()) as Tagging;
+    const other = (await Post.first()) as Post;
+
+    const inFlight = tagging.association("taggable").loadTarget();
+    expect(() => tagging.association("taggable").setTarget(other)).toThrow(
+      AssociationTargetReplacedDuringLoad,
+    );
+    await inFlight;
   });
 });

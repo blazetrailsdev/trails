@@ -163,7 +163,16 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
-    return loadBelongsTo(this.owner, this.reflection.name, this.reflection.options);
+    // This override exists for the polymorphic type resolution above; it must
+    // still arm the mid-load-replacement guard its parent does, or a `setTarget`
+    // on a polymorphic belongs_to mid-load is silently clobbered while the plain
+    // one raises. See `Association#_loaderWritebackSuppressed`.
+    this._loaderWritebackSuppressed++;
+    try {
+      return await loadBelongsTo(this.owner, this.reflection.name, this.reflection.options);
+    } finally {
+      this._loaderWritebackSuppressed--;
+    }
   }
 
   /**
