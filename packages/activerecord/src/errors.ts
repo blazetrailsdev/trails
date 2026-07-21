@@ -187,6 +187,27 @@ export class RecordNotFound extends ActiveRecordError {
   }
 }
 
+/**
+ * Raised when an association's target is replaced while a load for that same
+ * association is still in flight.
+ *
+ * **trails-only — no Rails analogue, deliberately.** Rails cannot reach this
+ * state: `Association#find_target`
+ * (activerecord/lib/active_record/associations/association.rb:248) is
+ * synchronous, so nothing can touch the holder between issuing the query and
+ * assigning its result. Our loader awaits, which opens a window in which an
+ * assignment and a load both claim the target. There is no correct silent
+ * winner — discarding the assignment loses a caller's explicit intent, and
+ * discarding the load hides that a query was wasted — so trails refuses the
+ * race instead of resolving it. Await the load before assigning.
+ */
+export class AssociationTargetReplacedDuringLoad extends ActiveRecordError {
+  constructor(message?: string) {
+    super(message);
+    this.name = "AssociationTargetReplacedDuringLoad";
+  }
+}
+
 export class RecordNotSaved extends ActiveRecordError {
   readonly record?: object;
 

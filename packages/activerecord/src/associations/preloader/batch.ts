@@ -109,7 +109,9 @@ export class Batch {
       try {
         const association = (record as any).association(branch.association);
         if (!association.isLoaded()) {
-          association.setTarget(null);
+          // Loader writeback (preload miss) — must not trip the in-flight
+          // guard. See Association#_setTargetFromLoader.
+          association._setTargetFromLoader(null);
           association._loadedFromPreload = true;
         }
       } catch {

@@ -108,7 +108,17 @@ export class HasManyAssociation extends CollectionAssociation {
   }
 
   protected override async doAsyncFindTarget(): Promise<Base[]> {
-    return loadHasMany(this.owner, this.reflection.name, this.reflection.options);
+    // Every caller of doAsyncFindTarget assigns the returned records into
+    // this holder itself, so loadHasMany's tail writeback into the same
+    // holder is redundant — and, because it lands mid-await, clobbers any
+    // reassignment made while the query was in flight. See
+    // `_loaderWritebackSuppressed`.
+    this._loaderWritebackSuppressed++;
+    try {
+      return await loadHasMany(this.owner, this.reflection.name, this.reflection.options);
+    } finally {
+      this._loaderWritebackSuppressed--;
+    }
   }
 
   protected override setOwnerAttributes(record: Base): void {

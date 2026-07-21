@@ -59,7 +59,7 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
       // without re-marking loaded.
       instance.target = (cached.target as Base | Base[] | null) ?? null;
     } else {
-      instance.setTarget((cached.target as Base | Base[] | null) ?? null);
+      instance._setTargetFromLoader((cached.target as Base | Base[] | null) ?? null);
     }
     return;
   }
@@ -69,7 +69,7 @@ function syncAssociationInstance(this: Base, name: string, instance: Association
   // a miss, matching `Association#doFindTarget`'s cache semantics.
   const preloaded = _preloadedHolderTarget(this, name);
   if (preloaded) {
-    instance.setTarget(preloaded.value as any);
+    instance._setTargetFromLoader(preloaded.value as any);
   }
 }
 
@@ -157,7 +157,9 @@ export async function loadBelongsTo(this: Base, name: string): Promise<Base | nu
   const result = await bypassStrictLoading.call(this, () =>
     _loadBelongsToOnce(this, name, (assocDef.options ?? {}) as any),
   );
-  association.call(this, name).setTarget(result as any);
+  // Loader writeback: this is the tail of this function's own query, not a
+  // caller replacing the target. See Association#_setTargetFromLoader.
+  association.call(this, name)._setTargetFromLoader(result as any);
   return result as Base | null;
 }
 
@@ -173,7 +175,9 @@ export async function loadHasOne(this: Base, name: string): Promise<Base | null>
   const result = await bypassStrictLoading.call(this, () =>
     _loadHasOneOnce(this, name, (assocDef.options ?? {}) as any),
   );
-  association.call(this, name).setTarget(result as any);
+  // Loader writeback: this is the tail of this function's own query, not a
+  // caller replacing the target. See Association#_setTargetFromLoader.
+  association.call(this, name)._setTargetFromLoader(result as any);
   return result as Base | null;
 }
 

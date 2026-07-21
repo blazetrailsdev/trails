@@ -19,10 +19,13 @@ export function seedAssociationCache(record: Base, name: string, target: unknown
   try {
     const assoc = (
       record as unknown as {
-        association(n: string): { setTarget(t: unknown): void; _explicitTarget: boolean };
+        association(n: string): {
+          _setTargetFromLoader(t: unknown): void;
+          _explicitTarget: boolean;
+        };
       }
     ).association(name);
-    assoc.setTarget(target);
+    assoc._setTargetFromLoader(target);
     assoc._explicitTarget = true;
     return;
   } catch {
