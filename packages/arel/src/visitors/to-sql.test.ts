@@ -1922,8 +1922,11 @@ describe("the to_sql visitor", () => {
       const v = new NumberedVisitor();
       const collector = new Collectors.SQLString();
       (
-        v as unknown as { visitActiveModelAttribute(o: unknown, c: unknown): void }
-      ).visitActiveModelAttribute({ value: "x" }, collector);
+        v as unknown as { visitActiveModelAttribute(o: AMAttribute, c: Collectors.SQLString): void }
+      ).visitActiveModelAttribute(
+        AMAttribute.fromDatabase("name", "x", new StringType()),
+        collector,
+      );
       // bindIndex starts at 1; the block receives 1, so `$1`
       expect(collector.value).toBe("$1");
     });
