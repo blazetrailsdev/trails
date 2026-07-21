@@ -12,12 +12,30 @@ import type { Cte } from "./cte.js";
 // `ModelAttribute` is not an Arel node but occupies node slots in Rails:
 // `build_quoted` returns one unwrapped into the AST (casted.rb:50), and both
 // Assignment (to_sql.rb:631) and ValuesList (to_sql.rb:110) accept one.
+//
+// This union types what may *occupy* a Binary slot, which in Rails is a
+// strictly wider set than what `ToSql` can *visit*. Most scalar visitors are
+// aliased to `unsupported` (to_sql.rb:832-845), yet Rails still constructs and
+// compares nodes holding those scalars — so an arm here is justified by a
+// Rails construction site, not by a rendering visitor. Each non-Node arm below
+// names one.
 export type NodeOrValue =
   | Node
   | ModelAttribute
+  // Rails puts bare Strings in both slots: `Cte#initialize` stores the CTE
+  // name as `@left` (cte.rb:10-12), `TableAlias` the alias name as `@right`
+  // (table_alias.rb), and Rails' own tests build `Equality.new("foo", "bar")`
+  // (test/cases/arel/nodes/binary_test.rb:11). Visiting one still raises —
+  // `visit_String` is aliased to `unsupported` (to_sql.rb:842) — because these
+  // slots are read structurally (`o.name`) and quoted, never visited.
   | string
+  // The one scalar Rails actually renders: `visit_Integer` is a real visitor
+  // (to_sql.rb:824-826). `bigint` rides along because Ruby's Integer is
+  // arbitrary-precision with no separate bignum visitor. TS cannot split
+  // integral from fractional `number`, so a non-integral one is admitted here
+  // and raises at visit time via `visitFloat` (`visit_Float` → `unsupported`,
+  // to_sql.rb:839), matching Rails.
   | number
-  | boolean
   | bigint
   // The five Temporal types to-sql.ts actually visits and quotes (see
   // TEMPORAL_CLASS_NAMES in temporal-tag.ts). Duration/PlainYearMonth/
@@ -31,8 +49,20 @@ export type NodeOrValue =
   | Temporal.PlainDate
   | Temporal.PlainTime
   | Node[]
-  | null
-  | undefined;
+  // `nil` is a structural slot value in Rails, and every visitor that can meet
+  // one guards first: `JoinSource#initialize(single_source, joinop = [])` takes
+  // a nil source and `visit_Arel_Nodes_JoinSource` tests `if o.left`
+  // (join_source.rb:11, to_sql.rb:510); `Join` defaults `right` to nil; and
+  // `Equality`/`NotEqual` with a nil right render `IS NULL` / `IS NOT NULL`
+  // rather than visiting it. So `visit_NilClass` being aliased to
+  // `unsupported` (to_sql.rb:841) is not reachable from these slots.
+  //
+  // `boolean` and `undefined` are deliberately absent. `visit_TrueClass` /
+  // `visit_FalseClass` are aliased to `unsupported` (to_sql.rb:845, :838) and
+  // Rails has no construction site putting a bare true/false in a node slot —
+  // callers wrap in `Casted`/`BindParam`, or use `Nodes::True`/`Nodes::False`.
+  // `undefined` has no Ruby analogue at all; `null` is the sole nil.
+  | null;
 
 export const ATTRIBUTE_BRAND = Symbol.for("arel.Attribute");
 
