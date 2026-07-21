@@ -573,12 +573,20 @@ export class CollectionAssociation extends Association {
         // and the loaded rows are discarded. See `_setTargetCount`.
         const setTargetCountAtEntry = this._setTargetCount;
         const found = await this.doAsyncFindTarget();
-        if (this._setTargetCount !== setTargetCountAtEntry) return this.target;
+        const replacedMidLoad = this._setTargetCount !== setTargetCountAtEntry;
         if (found !== undefined && found !== null && Array.isArray(found)) {
           // Rails applies set_strict_loading per record in find_target's DB
           // execute block — only freshly loaded records, never cached ones.
+          // It runs unconditionally on load (association.rb:270), so it must
+          // happen even when the merge below is skipped: the rows we drop can
+          // still be reachable through the inverse instances wired into them
+          // during instantiation.
           for (const record of found) this.setStrictLoading(record);
-          this.target = this.mergeTargetLists(found, this.target);
+          // A wholesale `setTarget` landed while we were awaiting — the
+          // assignment wins and the loaded rows are discarded. Falls through
+          // to `loadedBang()` rather than returning early, so the loaded flag
+          // and stale state are refreshed on exactly one path.
+          if (!replacedMidLoad) this.target = this.mergeTargetLists(found, this.target);
         }
       }
     }

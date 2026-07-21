@@ -12,6 +12,8 @@
  */
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
+import { loadHasMany } from "../associations.js";
+import type { Base } from "../base.js";
 import { Firm, Client } from "../test-helpers/models/company.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
@@ -28,6 +30,38 @@ describe("has_many mid-flight reassignment", () => {
     await inFlight;
 
     expect(firm.association("clients").target).toEqual([other]);
+    // The guard path falls through to loadedBang() rather than returning
+    // early, so the holder is loaded on exactly one exit path.
+    expect(firm.association("clients").isLoaded()).toBe(true);
+  });
+
+  it("a sibling load landing mid-await does not discard the loaded rows", async () => {
+    // `_loaderWritebackSuppressed` is scoped to this holder for the whole
+    // window, so a sibling loader's `syncToAssociationInstance` writeback is
+    // swallowed rather than counted as a wholesale replacement — the guard
+    // must not mistake it for a user reassignment and drop the DB rows.
+    const firm = (await Firm.first()) as Firm;
+    const persisted = await Client.where({ firm_id: firm.id });
+    expect(persisted.length).toBeGreaterThan(0);
+
+    const inFlight = firm.association("clients").loadTarget();
+    await loadHasMany(firm, "clients", {});
+    const loaded = (await inFlight) as Base[];
+
+    expect(loaded.length).toBe(persisted.length);
+  });
+
+  it("concurrent loads on the same holder do not drop rows", async () => {
+    const firm = (await Firm.first()) as Firm;
+    const persisted = await Client.where({ firm_id: firm.id });
+
+    const [a, b] = (await Promise.all([
+      firm.association("clients").loadTarget(),
+      firm.association("clients").loadTarget(),
+    ])) as [Base[], Base[]];
+
+    expect(a.length).toBe(persisted.length);
+    expect(b.length).toBe(persisted.length);
   });
 
   it("a target assigned mid-load survives on a has_many :through", async () => {

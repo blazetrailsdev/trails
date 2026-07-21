@@ -459,6 +459,12 @@ export class Association {
       // Rails applies set_strict_loading per record in find_target's DB
       // execute block — only freshly loaded records, never cached ones.
       if (result !== null) this.setStrictLoading(result as Base);
+      // Deliberately a direct assignment, not `setTarget`: this is the loader
+      // storing what it just fetched, not a caller replacing the target, so it
+      // must not bump `_setTargetCount`. Routing it through `setTarget` would
+      // make every load look like a wholesale replacement to a concurrent
+      // load's guard. (Only `CollectionAssociation#loadTarget` reads the
+      // counter today; the singular path keeps the invariant honest anyway.)
       this.target = result;
     }
   }
