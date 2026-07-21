@@ -283,11 +283,12 @@ describe("TestDot", () => {
     });
 
     it("a mis-registered dispatch method is not reported as an unvisitable value", () => {
-      // Dot translates the base visitor's "no handler at all" error into
-      // Rails' `TypeError, "Cannot visit ..."` (visitor.rb:39). That must not
-      // also swallow the base visitor's *other* error — a typo'd method name
-      // in the dispatch table — or a Dot registration bug is indistinguishable
-      // from a value Rails genuinely cannot visit.
+      // The base visitor's "no handler at all" arm already raises Rails'
+      // `TypeError, "Cannot visit ..."` (visitor.rb:39) directly, and Dot lets
+      // it propagate unchanged. That must not be confused with the base
+      // visitor's *other* error — a typo'd method name in the dispatch table —
+      // or a Dot registration bug is indistinguishable from a value Rails
+      // genuinely cannot visit.
       class Weird extends Nodes.Unary {}
       const v = new Visitors.Dot();
       (v as unknown as { dispatch: Map<unknown, string> }).dispatch.set(Weird, "visitTypoed");
