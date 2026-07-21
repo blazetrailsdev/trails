@@ -27,8 +27,8 @@ describe("Arel::Nodes::OverTest", () => {
     it("should reference the window definition by name", () => {
       const count = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
       const filter = new Nodes.Filter(count, users.get("active").eq(true));
-      const over = filter.over("w");
-      expect(over).toBeInstanceOf(Nodes.Over);
+      const sql = new Visitors.ToSql().compile(filter.over("w"));
+      expect(sql).toBe('COUNT(*) FILTER (WHERE "users"."active" = TRUE) OVER "w"');
     });
   });
 
@@ -70,9 +70,8 @@ describe("Arel::Nodes::OverTest", () => {
 
   describe("with literal", () => {
     it("should reference the window definition by name", () => {
-      const over = new Nodes.Over(users.get("id").count(), new Nodes.SqlLiteral("foo"));
-      const sql = new Visitors.ToSql().compile(over);
-      expect(sql).toContain("OVER foo");
+      const sql = new Visitors.ToSql().compile(users.get("id").count().over("foo"));
+      expect(sql).toBe('COUNT("users"."id") OVER "foo"');
     });
   });
 });

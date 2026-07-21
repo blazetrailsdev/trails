@@ -75,9 +75,10 @@ describe("WindowPredications.over (mixed into Function)", () => {
   });
 
   it("with a string emits OVER <name> as a raw SQL fragment", () => {
-    // A bare string window name must render as SQL (`OVER w`), not as a
-    // quoted value (`OVER 'w'`) — the latter is invalid SQL.
-    expect(compile(sum.over("w"))).toBe("SUM(col) OVER w");
+    // Rails quotes a bare string window name as an identifier
+    // (to_sql.rb:306-307); only a SqlLiteral renders as a raw fragment.
+    expect(compile(sum.over("w"))).toBe('SUM(col) OVER "w"');
+    expect(compile(sum.over(new Nodes.SqlLiteral("w")))).toBe("SUM(col) OVER w");
   });
 
   it("NamedFunction#over with a NamedWindow doubles embedded quotes in the name", () => {

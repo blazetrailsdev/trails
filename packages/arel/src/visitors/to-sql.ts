@@ -790,10 +790,16 @@ export class ToSql extends Visitor {
   private visitArelNodesOver(node: Nodes.Over, collector: SQLString): SQLString {
     this.visit(node.left, collector);
     collector.append(" OVER ");
-    if (node.right) {
-      this.visit(node.right, collector);
-    } else {
+    if (!node.right) {
       collector.append("()");
+    } else if (typeof node.right === "string") {
+      // Rails' `when String, Symbol` arm quotes a bare window name as an
+      // identifier (to_sql.rb:306-307). A SqlLiteral right, by contrast,
+      // renders bare — `over("foo")` is `OVER "foo"` but
+      // `over(Arel.sql("foo"))` is `OVER foo`.
+      collector.append(this.quoteColumnName(node.right));
+    } else {
+      this.visit(node.right, collector);
     }
     return collector;
   }
