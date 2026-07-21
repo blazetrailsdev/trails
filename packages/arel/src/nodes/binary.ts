@@ -24,7 +24,7 @@ export type NodeOrValue =
   // PlainMonthDay are deliberately absent: Rails has no visitor for them.
   // JS `Date` is absent too — it is rejected AR-wide (Temporal is the `Time`
   // analogue), and Rails aliases `visit_Date` to `unsupported`
-  // (to_sql.rb:918), so a `Date` in a node slot can only ever raise.
+  // (to_sql.rb:836), so a `Date` in a node slot can only ever raise.
   | Temporal.Instant
   | Temporal.ZonedDateTime
   | Temporal.PlainDateTime
