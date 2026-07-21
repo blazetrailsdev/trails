@@ -108,7 +108,15 @@ describe("Visitor dispatch", () => {
     // raw values and nodes share one method table and one entry point — there
     // is no separate raw-value path. These pin that the same `accept` that
     // dispatches a Node also resolves a bare JS value to `visit<RubyClass>`.
+    // A real class registered in the ctor-keyed dispatch cache. A Hash whose
+    // `constructor` property happens to point here must still dispatch as Hash,
+    // not be hijacked onto this handler.
+    class Registered {}
+
     class ValueVisitor extends Visitor {
+      visitRegistered(): string {
+        return "Registered";
+      }
       visitInteger(o: number | bigint): string {
         return `Integer:${o}`;
       }
@@ -132,6 +140,9 @@ describe("Visitor dispatch", () => {
       }
       visitTime(): string {
         return "Time";
+      }
+      static {
+        this.dispatchCache().set(Registered, "visitRegistered");
       }
     }
 
@@ -160,6 +171,28 @@ describe("Visitor dispatch", () => {
       ["record derived from a null-prototype record", Object.create(Object.create(null))],
       ["record inheriting a literal constructor key", Object.create({ constructor: "x" })],
     ])("classifies a %s as Hash on a non-Dot visitor", (_label, value) => {
+      expect(new ValueVisitor().accept(value)).toBe("Hash");
+    });
+
+    it.each([
+      // Rails reads `object.class` (visitor.rb:28) before it looks inside, and a
+      // Hash's `:constructor` key can't change its class. A JS record's
+      // `constructor` — whether an own data key on a null-prototype record or an
+      // inherited one — must not hijack dispatch to that (registered) ctor's
+      // handler; the record is a Hash and routes to visit_Hash regardless.
+      [
+        "own constructor key pointing at a registered ctor",
+        (() => {
+          const h: Record<string, unknown> = Object.create(null);
+          h.constructor = Registered;
+          return h;
+        })(),
+      ],
+      [
+        "inherited constructor key pointing at a registered ctor",
+        Object.create({ constructor: Registered }),
+      ],
+    ])("a Hash whose %s still dispatches as Hash", (_label, value) => {
       expect(new ValueVisitor().accept(value)).toBe("Hash");
     });
 

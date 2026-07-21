@@ -1,4 +1,4 @@
-import { rubyClassName } from "./ruby-class.js";
+import { isHashAnalogue, rubyClassName } from "./ruby-class.js";
 
 // Rails interpolates `object.class` straight into its "Cannot visit" TypeError
 // (visitor.rb:38). The nearest handle here is the Ruby class the value would
@@ -128,15 +128,21 @@ export abstract class Visitor {
    * entry point for raw values.
    */
   private dispatchMethod(object: unknown): string | undefined {
-    // A record can carry a non-function `constructor` — an inherited literal
-    // key (`Object.create({ constructor: "x" })`) — which is not a dispatch
-    // class. Only a real constructor function keys the ctor cache; anything
-    // else falls through to `rubyClassName`, where the ancestor walk still
-    // classifies the record as a Hash.
-    const ctor = (object as { constructor?: NodeCtor } | null | undefined)?.constructor;
-    if (typeof ctor === "function") {
-      const byCtor = this.resolveDispatch(ctor);
-      if (byCtor) return byCtor;
+    // Rails reads `object.class` (visitor.rb:28) — an intrinsic that a Hash's
+    // contents can't shadow — before it ever looks inside. A JS record's
+    // `constructor` is not that intrinsic: it can be an own or inherited data
+    // key (`Object.create(null)` then `h.constructor = Set`, or
+    // `Object.create({ constructor: Set })`), which would wrongly route the
+    // record to that ctor's handler instead of `visit_Hash`. So the
+    // ctor-cache path is for genuine class instances only; a Hash analogue
+    // skips it and is classified by `rubyClassName`'s ancestor walk, exactly
+    // as Ruby dispatches every Hash descendant to `visit_Hash`.
+    if (!isHashAnalogue(object)) {
+      const ctor = (object as { constructor?: NodeCtor } | null | undefined)?.constructor;
+      if (typeof ctor === "function") {
+        const byCtor = this.resolveDispatch(ctor);
+        if (byCtor) return byCtor;
+      }
     }
     const rubyClass = rubyClassName(object);
     return rubyClass === null ? undefined : `visit${rubyClass}`;
