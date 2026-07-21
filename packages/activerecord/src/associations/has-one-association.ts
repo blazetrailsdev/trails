@@ -447,7 +447,17 @@ export class HasOneAssociation extends SingularAssociation {
   }
 
   protected override async doAsyncFindTarget(): Promise<Base | null> {
-    return loadHasOne(this.owner, this.reflection.name, this.reflection.options);
+    // `loadHasOne`'s tail writeback lands in this holder mid-await, so a target
+    // replaced while the query is in flight would be silently clobbered. Arm
+    // the same guard has_many uses (`CollectionAssociation#doAsyncFindTarget`):
+    // suppress the loader's own writeback and let `setTarget` refuse the race.
+    // See `Association#_loaderWritebackSuppressed`.
+    this._loaderWritebackSuppressed++;
+    try {
+      return await loadHasOne(this.owner, this.reflection.name, this.reflection.options);
+    } finally {
+      this._loaderWritebackSuppressed--;
+    }
   }
 
   private foreignKeyColumns(): string[] {
