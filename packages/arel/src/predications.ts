@@ -294,7 +294,12 @@ export const Predications = {
     this: PredicationHost & GroupingFolders & { eq(o: unknown): Node },
     others: unknown[],
   ): Grouping {
-    return this.groupingAll("eq", others);
+    // predications.rb:34 folds `quoted_array(others)`, not the bare array --
+    // uniquely among the *_all variants. `eq` re-quotes via quoted_node, which
+    // passes Nodes through untouched, so the pre-quoting is idempotent for
+    // plain values; keep it anyway so a host with a custom quotedNode sees the
+    // same input Rails gives it.
+    return this.groupingAll("eq", this.quotedArray(others));
   },
   notEqAny(
     this: PredicationHost & GroupingFolders & { notEq(o: unknown): Node },
@@ -359,26 +364,36 @@ export const Predications = {
   matchesAny(
     this: PredicationHost & GroupingFolders & { matches(o: string): Node },
     others: string[],
+    escape: string | Node | null = null,
+    caseSensitive = false,
   ): Grouping {
-    return this.groupingAny("matches", others);
+    return this.groupingAny("matches", others, escape, caseSensitive);
   },
   matchesAll(
     this: PredicationHost & GroupingFolders & { matches(o: string): Node },
     others: string[],
+    escape: string | Node | null = null,
+    caseSensitive = false,
   ): Grouping {
-    return this.groupingAll("matches", others);
+    return this.groupingAll("matches", others, escape, caseSensitive);
   },
   doesNotMatchAny(
     this: PredicationHost & GroupingFolders & { doesNotMatch(o: string): Node },
     others: string[],
+    escape: string | Node | null = null,
   ): Grouping {
-    return this.groupingAny("doesNotMatch", others);
+    // predications.rb:155-161 forwards only `escape` -- unlike matches_*_any,
+    // it does not thread case_sensitive, so does_not_match's own default wins.
+    return this.groupingAny("doesNotMatch", others, escape);
   },
   doesNotMatchAll(
     this: PredicationHost & GroupingFolders & { doesNotMatch(o: string): Node },
     others: string[],
+    escape: string | Node | null = null,
   ): Grouping {
-    return this.groupingAll("doesNotMatch", others);
+    // predications.rb:155-161 forwards only `escape` -- unlike matches_*_any,
+    // it does not thread case_sensitive, so does_not_match's own default wins.
+    return this.groupingAll("doesNotMatch", others, escape);
   },
   inAny(
     this: PredicationHost & GroupingFolders & { in(o: unknown[]): Node },

@@ -2,13 +2,6 @@
   {
     "package": "arel",
     "tsFile": "predications.ts",
-    "rubyName": "eq_all",
-    "call": "quoted_array",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "predications.ts",
     "rubyName": "grouping_all",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

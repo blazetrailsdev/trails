@@ -49,6 +49,26 @@ describe("Predications.groupingAny / groupingAll", () => {
     expect(attr.eqAll([])).toEqual(all);
   });
 
+  it("threads *extras through to the dispatched predicate", () => {
+    // predications.rb:139-145 forwards escape + case_sensitive to matches,
+    // and 155-161 forwards only escape to does_not_match. The extras arm of
+    // grouping_any exists for exactly these four callers, so pin that the
+    // arguments actually reach the built node.
+    const attr = users.attr("name");
+
+    // matches.rb:11 stores `escape && build_quoted(escape)`, so the arrival
+    // shape is a Quoted, not the bare string.
+    const m = attr.matchesAny(["a%"], "!", true).expr as Nodes.Matches;
+    expect(m.escape).toEqual(new Nodes.Quoted("!"));
+    expect(m.caseSensitive).toBe(true);
+
+    // does_not_match_any passes no case_sensitive, so the predicate default
+    // (false) must win rather than escape leaking into that slot.
+    const d = attr.doesNotMatchAny(["a%"], "!").expr as Nodes.DoesNotMatch;
+    expect(d.escape).toEqual(new Nodes.Quoted("!"));
+    expect(d.caseSensitive).toBe(false);
+  });
+
   it("groupingAny throws a clear TypeError when the method-id isn't callable", () => {
     // Regression for the dispatch-safety concern: a typo in the
     // method-id should fail loudly, not blow up with "Cannot read

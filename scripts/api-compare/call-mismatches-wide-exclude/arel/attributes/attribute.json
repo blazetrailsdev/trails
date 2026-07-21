@@ -2,13 +2,6 @@
   {
     "package": "arel",
     "tsFile": "attributes/attribute.ts",
-    "rubyName": "eq_all",
-    "call": "quoted_array",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
     "rubyName": "grouping_all",
     "call": "new",
     "reason": "Satisfied by a different path: Attribute now `include`s the Predications mixin (attribute.rb:7), so grouping_any/grouping_all resolve to predications.ts, whose bodies delegate to the file-level groupedAny/groupedAll helpers that do the `new Grouping`. The construction Rails inlines happens one call deeper, not in the mapped body."
