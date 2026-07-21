@@ -36,7 +36,9 @@ export interface FileDeps {
 }
 
 const REQUIRE_RE = /^\s*require\s+["']models\/([^"']+)["']/;
-const FIXTURES_START_RE = /^\s*fixtures\s+(.+)$/;
+// `(?!=)` rejects the local assignment `fixtures = ActiveRecord::FixtureSet.new(...)`,
+// which otherwise parses as a declaration and emits junk names (e.g. "/categories_ordered").
+const FIXTURES_START_RE = /^\s*fixtures\s+(?!=[^=])(.+)$/;
 const SET_FIXTURE_CLASS_RE = /^\s*set_fixture_class\s+(.+)$/;
 const SYM_OR_STR = /(?::([a-zA-Z_]\w*)|["']([^"']+)["'])/g;
 const PAIR_RE = /([a-zA-Z_]\w*)\s*:\s*([A-Z][\w:]*)/g;
@@ -154,11 +156,15 @@ export function parseSource(src: string): FileDeps {
   deps.fixtures = [...fxSet].sort();
 
   if (fxSet.size > 0 && testRanges.length > 0) {
-    const fxAlt = [...fxSet]
-      .map((n) => n.replace(/[^\w-]/g, ""))
-      .filter((n) => n.length > 0)
-      .map((n) => n.replace(/-/g, "\\-"))
-      .join("|");
+    // A namespaced set `admin/accounts` is dereferenced as `admin_accounts(:david)`.
+    // Key the results by the DECLARED name so consumers can intersect the two
+    // (eslint/expected-fixtures.mjs) instead of silently dropping every namespaced set.
+    const accessorToDeclared = new Map<string, string>();
+    for (const n of fxSet) {
+      const accessor = n.replace(/\//g, "_").replace(/[^\w-]/g, "");
+      if (accessor.length > 0) accessorToDeclared.set(accessor, n);
+    }
+    const fxAlt = [...accessorToDeclared.keys()].map((n) => n.replace(/-/g, "\\-")).join("|");
     const callRe = new RegExp(`\\b(${fxAlt})\\s*\\(`, "g");
     for (const r of testRanges) {
       const body = lines.slice(r.start, r.end).join("\n");
@@ -166,7 +172,7 @@ export function parseSource(src: string): FileDeps {
       for (const m of body.matchAll(callRe)) {
         const records = collectRecordArgs(body, m.index! + m[0].length - 1);
         if (records.length === 0) continue;
-        const bucket = (used[m[1]] ??= new Set());
+        const bucket = (used[accessorToDeclared.get(m[1]) ?? m[1]] ??= new Set());
         for (const rec of records) bucket.add(rec);
       }
       if (Object.keys(used).length === 0) continue;
