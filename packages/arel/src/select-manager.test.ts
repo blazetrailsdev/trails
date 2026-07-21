@@ -147,16 +147,15 @@ describe("SelectManagerTest", () => {
       it("converts to sqlliterals", () => {
         const right = users.alias();
         const mgr = users.from();
-        mgr.join(right).on(new Nodes.SqlLiteral("omg"));
-        expect(mgr.toSql()).toContain("omg");
+        mgr.join(right).on("omg");
+        expect(mgr.toSql()).toBe('SELECT FROM "users" INNER JOIN "users" "users_2" ON omg');
       });
 
       it("converts to sqlliterals with multiple items", () => {
         const right = users.alias();
         const mgr = users.from();
-        mgr.join(right).on(new Nodes.SqlLiteral("omg"), new Nodes.SqlLiteral("123"));
-        expect(mgr.toSql()).toContain("omg");
-        expect(mgr.toSql()).toContain("123");
+        mgr.join(right).on("omg", "123");
+        expect(mgr.toSql()).toBe('SELECT FROM "users" INNER JOIN "users" "users_2" ON omg AND 123');
       });
     });
   });

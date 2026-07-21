@@ -32,7 +32,7 @@ import { On } from "./nodes/unary.js";
 export interface FactoryMethodsModule {
   createTrue(): True;
   createFalse(): False;
-  createTableAlias(relation: Node, name: string): TableAlias;
+  createTableAlias(relation: Node, name: string | SqlLiteral): TableAlias;
   createJoin(
     to: Node,
     constraint?: Node | null,
@@ -56,7 +56,7 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new False();
   },
 
-  createTableAlias(relation: Node, name: string): TableAlias {
+  createTableAlias(relation: Node, name: string | SqlLiteral): TableAlias {
     return new TableAlias(relation, name);
   },
 
@@ -71,7 +71,7 @@ export const FactoryMethods: FactoryMethodsModule = {
 
   createStringJoin(to: string | Node): StringJoin {
     const node = typeof to === "string" ? new SqlLiteral(to) : to;
-    return new StringJoin(node, null);
+    return this.createJoin(node, null, StringJoin) as StringJoin;
   },
 
   createAnd(clauses: Node[]): And {

@@ -23,7 +23,6 @@ import type { UpdateValues } from "./crud.js";
 import { Comment } from "./nodes/comment.js";
 import { Lateral } from "./nodes/unary.js";
 import { And } from "./nodes/and.js";
-import { Grouping } from "./nodes/grouping.js";
 import { JoinSource } from "./nodes/join-source.js";
 import { InsertManager } from "./insert-manager.js";
 
@@ -59,6 +58,11 @@ export class SelectManager extends TreeManager {
    */
   set limit(value: number | Node | null) {
     this.take(value);
+  }
+
+  /** @internal */
+  get taken(): Limit["expr"] | null {
+    return this.limit;
   }
 
   /**
@@ -111,7 +115,10 @@ export class SelectManager extends TreeManager {
    * Mirrors: Arel::SelectManager#as
    */
   as(alias: string): TableAlias {
-    return new TableAlias(new Grouping(this.ast), new SqlLiteral(alias, { retryable: true }));
+    return this.createTableAlias(
+      this.grouping(this.ast),
+      new SqlLiteral(alias, { retryable: true }),
+    );
   }
 
   /**
@@ -142,16 +149,10 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#on
    */
-  on(...exprs: Node[]): this {
+  on(...exprs: (Node | string | null | undefined)[]): this {
     const joins = this.core.source.right;
-    if (joins.length > 0) {
-      const lastJoin = joins[joins.length - 1];
-      if (exprs.length === 1) {
-        (lastJoin as unknown as { right: Node | null }).right = new On(exprs[0]);
-      } else {
-        (lastJoin as unknown as { right: Node | null }).right = new On(new And(exprs));
-      }
-    }
+    const lastJoin = joins[joins.length - 1] as unknown as { right: Node | null };
+    lastJoin.right = new On(this.collapse(exprs));
     return this;
   }
 
@@ -377,6 +378,11 @@ export class SelectManager extends TreeManager {
     return new Except(this.ast, otherAst);
   }
 
+  /** @internal */
+  minus(other: SelectManager | SelectStatement): Node {
+    return this.except(other);
+  }
+
   /**
    * Wrap the AST in a LATERAL subquery.
    *
@@ -441,12 +447,7 @@ export class SelectManager extends TreeManager {
     return this;
   }
 
-  // Mirrors Arel::SelectManager#collapse (private). Compacts an array
-  // of expressions, wraps bare strings as SqlLiteral (Rails: `Arel.sql`),
-  // and folds them into a single Node — either the single remaining
-  // expr or an `And` of all of them. Rails uses this from `on(*exprs)`
-  // and similar multi-arg condition methods. Trails' single-arg `where`
-  // / `on` shapes don't reach for it internally; surfaced for parity.
+  // Mirrors Arel::SelectManager#collapse (select_manager.rb:256-268).
   protected collapse(exprs: unknown[]): Node {
     const filtered = exprs
       .filter((e) => e !== null && e !== undefined)
@@ -504,18 +505,8 @@ export class SelectManager extends TreeManager {
     return new UnionAll(this.ast, otherAst);
   }
 
-  /** @internal */
-  minus(other: SelectManager | SelectStatement): Node {
-    return this.except(other);
-  }
-
   get joinSourceCount(): number {
     return this.core.source.right.length;
-  }
-
-  /** @internal */
-  get taken(): Limit["expr"] | null {
-    return this.limit;
   }
 
   /**

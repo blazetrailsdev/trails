@@ -3,6 +3,9 @@ import { EmptyJoinError } from "./errors.js";
 import { Node, NodeVisitor } from "./nodes/node.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
+import { OuterJoin } from "./nodes/outer-join.js";
+import { SqlLiteral } from "./nodes/sql-literal.js";
+import { StringJoin } from "./nodes/string-join.js";
 import type { Join } from "./nodes/binary.js";
 import { TableAlias } from "./nodes/table-alias.js";
 
@@ -66,16 +69,21 @@ export class Table extends Node {
    * Mirrors: Arel::Table#join
    */
   join(
-    relation: Node | string | null,
-    klass?: new (left: Node, right: Node | null) => Join,
+    relation: Node | string | null | undefined,
+    klass: new (left: Node, right: Node | null) => Join = InnerJoin,
   ): SelectManager {
-    const manager = new SelectManager(this);
-    if (relation === null) return manager;
-    if (typeof relation === "string" && relation.trim() === "") {
-      throw new EmptyJoinError("EmptyJoinError");
+    if (relation == null) return this.from();
+
+    // Rails: `case relation when String, Nodes::SqlLiteral` (table.rb:41-45).
+    // SqlLiteral subclasses String in Ruby, so both arms share the emptiness
+    // check and the StringJoin promotion.
+    if (typeof relation === "string" || relation instanceof SqlLiteral) {
+      const text = typeof relation === "string" ? relation : relation.value;
+      if (text.length === 0) throw new EmptyJoinError("EmptyJoinError");
+      klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
     }
-    manager.join(relation, klass);
-    return manager;
+
+    return this.from().join(relation, klass);
   }
 
   /**
@@ -84,9 +92,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#outer_join
    */
   outerJoin(relation: Node | string): SelectManager {
-    const manager = new SelectManager(this);
-    manager.outerJoin(relation);
-    return manager;
+    return this.join(relation, OuterJoin);
   }
 
   /**
@@ -95,9 +101,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#group
    */
   group(...columns: (Node | string)[]): SelectManager {
-    const manager = new SelectManager(this);
-    manager.group(...columns);
-    return manager;
+    return this.from().group(...columns);
   }
 
   /**
@@ -106,9 +110,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#order
    */
   order(...exprs: Node[]): SelectManager {
-    const manager = new SelectManager(this);
-    manager.order(...exprs);
-    return manager;
+    return this.from().order(...exprs);
   }
 
   /**
@@ -117,17 +119,11 @@ export class Table extends Node {
    * Mirrors: Arel::Table#where
    */
   where(condition: Node): SelectManager {
-    const manager = new SelectManager(this);
-    manager.where(condition);
-    return manager;
+    return this.from().where(condition);
   }
 
   project(...projections: (Node | string)[]): SelectManager {
-    const manager = new SelectManager(this);
-    if (projections.length > 0) {
-      manager.project(...projections);
-    }
-    return manager;
+    return this.from().project(...projections);
   }
 
   /**
@@ -136,9 +132,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#take
    */
   take(amount: number): SelectManager {
-    const manager = new SelectManager(this);
-    manager.take(amount);
-    return manager;
+    return this.from().take(amount);
   }
 
   /**
@@ -147,9 +141,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#skip
    */
   skip(amount: number): SelectManager {
-    const manager = new SelectManager(this);
-    manager.skip(amount);
-    return manager;
+    return this.from().skip(amount);
   }
 
   /**
@@ -158,9 +150,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#having
    */
   having(expr: Node): SelectManager {
-    const manager = new SelectManager(this);
-    manager.having(expr);
-    return manager;
+    return this.from().having(expr);
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
