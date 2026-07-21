@@ -179,7 +179,7 @@ describe("between / notBetween self-dispatch (mirror Rails' implicit self)", () 
   // exactly as open_ended? (255-257) calls infinity? / unboundable? on self — so
   // an including class that overrides one is honored by the decision tree too.
   class OverridingAttribute extends Nodes.Attribute {
-    protected override isInfinity(_value: unknown): 1 | -1 | 0 {
+    override isInfinity(_value: unknown): 1 | -1 | 0 {
       return 1;
     }
   }

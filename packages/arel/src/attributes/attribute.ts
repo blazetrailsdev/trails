@@ -1,48 +1,16 @@
+import { include, type Included } from "@blazetrails/activesupport";
 import { Node, NodeVisitor } from "../nodes/node.js";
-import { isEnumerable, isSelectManagerLike } from "../predications.js";
-import {
-  NotEqual,
-  GreaterThan,
-  GreaterThanOrEqual,
-  LessThan,
-  LessThanOrEqual,
-  As,
-  ATTRIBUTE_BRAND,
-} from "../nodes/binary.js";
-import { Equality } from "../nodes/equality.js";
-import { Matches, DoesNotMatch } from "../nodes/matches.js";
-import { In } from "../nodes/in.js";
-import { NotIn } from "../nodes/binary.js";
-import {
-  Addition,
-  Subtraction,
-  Multiplication,
-  Division,
-  Concat,
-  Contains,
-  Overlaps,
-} from "../nodes/infix-operation.js";
+import { As, ATTRIBUTE_BRAND } from "../nodes/binary.js";
+import { Addition, Subtraction, Multiplication, Division } from "../nodes/infix-operation.js";
 import { Count } from "../nodes/count.js";
 import { Sum, Max, Min, Avg } from "../nodes/function.js";
 import { Ascending } from "../nodes/ascending.js";
 import { Descending } from "../nodes/descending.js";
 import { buildQuoted } from "../nodes/casted.js";
-import {
-  parseRange,
-  betweenFromRange,
-  notBetweenFromRange,
-  type RangeHost,
-  type RangePredicates,
-} from "../predications-range.js";
 import { Grouping } from "../nodes/grouping.js";
-import { And } from "../nodes/and.js";
-import { Or } from "../nodes/or.js";
 import { SqlLiteral } from "../nodes/sql-literal.js";
 import { NamedFunction } from "../nodes/named-function.js";
 import { Extract } from "../nodes/extract.js";
-import { Regexp as RegexpNode, NotRegexp } from "../nodes/regexp.js";
-import { IsDistinctFrom, IsNotDistinctFrom } from "../nodes/binary.js";
-import { Case } from "../nodes/case.js";
 import {
   BitwiseAnd,
   BitwiseOr,
@@ -54,22 +22,7 @@ import { BitwiseNot } from "../nodes/unary-operation.js";
 import type { NodeOrValue } from "../nodes/binary.js";
 import { Over } from "../nodes/over.js";
 import { NamedWindow, Window } from "../nodes/window.js";
-import { Predications, type PredicationHost } from "../predications.js";
-
-/**
- * Combines multiple nodes with OR, wrapped in a Grouping.
- */
-function groupedAny(nodes: Node[]): Grouping {
-  const combined = nodes.reduce((left, right) => new Or([left, right]));
-  return new Grouping(combined);
-}
-
-/**
- * Combines multiple nodes with AND, wrapped in a Grouping.
- */
-function groupedAll(nodes: Node[]): Grouping {
-  return new Grouping(new And(nodes));
-}
+import { Predications } from "../predications.js";
 
 /**
  * Attribute — represents a column on a table.
@@ -101,6 +54,7 @@ export function relationName(name: string | SqlLiteral): string {
   return name instanceof SqlLiteral ? name.value : name;
 }
 
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Attribute extends Node {
   readonly [ATTRIBUTE_BRAND] = true;
   readonly relation: RelationLike;
@@ -140,257 +94,6 @@ export class Attribute extends Node {
    */
   quotedNode(value: unknown): Node {
     return buildQuoted(value, this);
-  }
-
-  // -- Predicates --
-
-  eq(other: unknown): Equality {
-    return new Equality(this, this.quotedNode(other));
-  }
-
-  notEq(other: unknown): NotEqual {
-    return new NotEqual(this, this.quotedNode(other));
-  }
-
-  gt(other: unknown): GreaterThan {
-    return new GreaterThan(this, this.quotedNode(other));
-  }
-
-  gteq(other: unknown): GreaterThanOrEqual {
-    return new GreaterThanOrEqual(this, this.quotedNode(other));
-  }
-
-  lt(other: unknown): LessThan {
-    return new LessThan(this, this.quotedNode(other));
-  }
-
-  lteq(other: unknown): LessThanOrEqual {
-    return new LessThanOrEqual(this, this.quotedNode(other));
-  }
-
-  matches(
-    pattern: string | { ast: Node },
-    escape: string | Node | null = null,
-    caseSensitive = false,
-  ): Matches {
-    const right =
-      typeof pattern === "string" ? this.quotedNode(pattern) : (pattern as { ast: Node }).ast;
-    return new Matches(this, right, escape, caseSensitive);
-  }
-
-  doesNotMatch(
-    pattern: string | { ast: Node },
-    escape: string | Node | null = null,
-    caseSensitive = false,
-  ): DoesNotMatch {
-    const right =
-      typeof pattern === "string" ? this.quotedNode(pattern) : (pattern as { ast: Node }).ast;
-    return new DoesNotMatch(this, right, escape, caseSensitive);
-  }
-
-  matchesRegexp(pattern: string, caseSensitive = true): RegexpNode {
-    return new RegexpNode(this, this.quotedNode(pattern), caseSensitive);
-  }
-
-  doesNotMatchRegexp(pattern: string, caseSensitive = true): NotRegexp {
-    return new NotRegexp(this, this.quotedNode(pattern), caseSensitive);
-  }
-
-  // DEVIATION: Rails' Attribute has no `in`/`not_in` of its own — it
-  // `include Arel::Predications` (attribute.rb:5-12) and inherits them. These
-  // bodies are byte-identical to Predications.in/notIn and look like dead
-  // duplication, but they are NOT deletable today: this class does not mix in
-  // Predications (there is no `include(...)` call in this file — it only
-  // `.call`s two private helpers, see groupingAny/groupingAll below), so
-  // deleting them removes the methods outright rather than falling through to
-  // the mixin. Verified: with both removed the attributes suite fails with
-  // `attribute.in is not a function`.
-  //
-  // Converging means making Attribute actually include the mixin, which
-  // touches every predication method here — tracked as story
-  // `arel-attribute-include-predications-mixin` (RFC 0066).
-  in(values: unknown): In {
-    if (isSelectManagerLike(values)) return new In(this, values.ast);
-    if (isEnumerable(values)) return new In(this, this.quotedArray([...values]));
-    return new In(this, this.quotedNode(values));
-  }
-
-  notIn(values: unknown): NotIn {
-    if (isSelectManagerLike(values)) return new NotIn(this, values.ast);
-    if (isEnumerable(values)) return new NotIn(this, this.quotedArray([...values]));
-    return new NotIn(this, this.quotedNode(values));
-  }
-  between(range: [unknown, unknown]): Node;
-  between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
-  between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-
-  between(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
-    return betweenFromRange(this.asRangeHost(), parseRange(beginOrRange, end, excludeEnd));
-  }
-  notBetween(range: [unknown, unknown]): Node;
-  notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
-  notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
-
-  notBetween(beginOrRange: unknown, end?: unknown, excludeEnd?: boolean): Node {
-    return notBetweenFromRange(this.asRangeHost(), parseRange(beginOrRange, end, excludeEnd));
-  }
-
-  /**
-   * `between` / `notBetween` dispatch `infinity?` / `unboundable?` /
-   * `open_ended?` on self (predications.rb:38-51). This class has all three, but
-   * as `protected` — a compile-time visibility rule that keeps it from being
-   * assignable to the public `RangePredicates`. The runtime dispatch is real, so
-   * subclass overrides are honored.
-   */
-  private asRangeHost(): RangeHost & RangePredicates {
-    return this as unknown as RangeHost & RangePredicates;
-  }
-
-  // -- _any / _all variants --
-
-  eqAny(others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.eq(o)));
-  }
-
-  eqAll(others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.eq(o)));
-  }
-
-  notEqAny(others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.notEq(o)));
-  }
-
-  notEqAll(others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.notEq(o)));
-  }
-
-  gtAny(others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.gt(o)));
-  }
-
-  gtAll(others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.gt(o)));
-  }
-
-  gteqAny(others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.gteq(o)));
-  }
-
-  gteqAll(others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.gteq(o)));
-  }
-
-  ltAny(others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.lt(o)));
-  }
-
-  ltAll(others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.lt(o)));
-  }
-
-  lteqAny(others: unknown[]): Grouping {
-    return groupedAny(others.map((o) => this.lteq(o)));
-  }
-
-  lteqAll(others: unknown[]): Grouping {
-    return groupedAll(others.map((o) => this.lteq(o)));
-  }
-
-  matchesAny(others: string[]): Grouping {
-    return groupedAny(others.map((o) => this.matches(o)));
-  }
-
-  matchesAll(others: string[]): Grouping {
-    return groupedAll(others.map((o) => this.matches(o)));
-  }
-
-  doesNotMatchAny(others: string[]): Grouping {
-    return groupedAny(others.map((o) => this.doesNotMatch(o)));
-  }
-
-  doesNotMatchAll(others: string[]): Grouping {
-    return groupedAll(others.map((o) => this.doesNotMatch(o)));
-  }
-
-  inAny(others: unknown[][]): Grouping {
-    return groupedAny(others.map((o) => this.in(o)));
-  }
-
-  inAll(others: unknown[][]): Grouping {
-    return groupedAll(others.map((o) => this.in(o)));
-  }
-
-  notInAny(others: unknown[][]): Grouping {
-    return groupedAny(others.map((o) => this.notIn(o)));
-  }
-
-  notInAll(others: unknown[][]): Grouping {
-    return groupedAll(others.map((o) => this.notIn(o)));
-  }
-
-  // -- Rails-private helpers (mirror Arel::Predications) --
-  //
-  // Rails' Attribute inherits these from Predications via `include`.
-  // Trails' Attribute has hand-rolled public predicates (so the include
-  // chain isn't wired) — these methods delegate to the canonical
-  // Predications impls so there's a single source of truth and
-  // behavior stays in lockstep. Marked `protected` (matching the
-  // visibility of HomogeneousIn#ivars / SelectManager#collapse) since
-  // they exist for Rails-fidelity / api:compare privates coverage,
-  // not as a public API surface.
-
-  protected groupingAny(
-    methodId: string | ((this: Attribute, expr: unknown, ...extras: unknown[]) => Node),
-    others: unknown[],
-    ...extras: unknown[]
-  ): Grouping {
-    return Predications.groupingAny.call<
-      Attribute,
-      [typeof methodId, unknown[], ...unknown[]],
-      Grouping
-    >(this, methodId, others, ...extras);
-  }
-
-  protected groupingAll(
-    methodId: string | ((this: Attribute, expr: unknown, ...extras: unknown[]) => Node),
-    others: unknown[],
-    ...extras: unknown[]
-  ): Grouping {
-    return Predications.groupingAll.call<
-      Attribute,
-      [typeof methodId, unknown[], ...unknown[]],
-      Grouping
-    >(this, methodId, others, ...extras);
-  }
-
-  // infinity? / unboundable? / open_ended? reach Attribute through
-  // `include Arel::Predications` (attribute.rb:8) rather than being defined in
-  // attribute.rb, so api:compare maps them onto this file. They delegate to the
-  // Predications mixin, which in turn delegates to the single implementation in
-  // predications-range.ts — the same one `between` / `notBetween` above use, so
-  // routing a range through these can no longer diverge from the real decision
-  // tree the way the old `isUnboundable` stub silently did.
-
-  protected isInfinity(value: unknown): 1 | -1 | 0 {
-    return Predications.isInfinity.call(this, value);
-  }
-
-  protected isUnboundable(value: unknown): 1 | -1 | 0 {
-    return Predications.isUnboundable.call(this, value);
-  }
-
-  protected isOpenEnded(value: unknown): boolean {
-    // Cast widens this' protected isInfinity/isUnboundable to the public shape
-    // Predications.isOpenEnded's `this` requires. Dispatch still goes through
-    // `this` at runtime, so subclass overrides are honored — as in Ruby, where
-    // open_ended? calls infinity? / unboundable? on self.
-    return Predications.isOpenEnded.call(
-      this as unknown as PredicationHost & {
-        isInfinity(value: unknown): 1 | -1 | 0;
-        isUnboundable(value: unknown): 1 | -1 | 0;
-      },
-      value,
-    );
   }
 
   // -- Ordering --
@@ -508,14 +211,6 @@ export class Attribute extends Node {
     return new NamedFunction("SUBSTRING", args);
   }
 
-  // Mirrors: Arel::Predications#concat — `Nodes::Concat.new self, other`,
-  // i.e. SQL `||` infix concatenation. (The previous implementation built
-  // a `CONCAT(...)` NamedFunction call, which was Trails-specific and
-  // varied by dialect; the `||` form is what Rails emits.)
-  concat(other: Node): Concat {
-    return new Concat(this, other);
-  }
-
   replace(from: string, to: string): NamedFunction {
     return new NamedFunction("REPLACE", [this, buildQuoted(from), buildQuoted(to)]);
   }
@@ -547,65 +242,6 @@ export class Attribute extends Node {
     return new Extract([this], field);
   }
 
-  // -- Distinct From --
-
-  isDistinctFrom(other: unknown): IsDistinctFrom {
-    return new IsDistinctFrom(this, buildQuoted(other));
-  }
-
-  isNotDistinctFrom(other: unknown): IsNotDistinctFrom {
-    return new IsNotDistinctFrom(this, buildQuoted(other));
-  }
-
-  // -- Case --
-
-  /**
-   * Start a CASE expression on this attribute.
-   *
-   * Mirrors: Arel::Attributes::Attribute#when
-   */
-  when(value: unknown): Case {
-    return new Case(this).when(buildQuoted(value));
-  }
-
-  // -- PostgreSQL array operators --
-
-  /**
-   * PostgreSQL @> (contains) operator.
-   *
-   * Mirrors: Arel::Predications#contains — `Arel::Nodes::Contains.new self, quoted_node(other)`.
-   * Returns the dedicated `Contains` subclass (rather than a generic
-   * `InfixOperation("@>", ...)`) so `instanceof` checks line up. Routes
-   * through `this.quotedNode` so a scalar RHS gets the column-aware
-   * `Casted` wrapping (matching how Rails' `quoted_node` carries the
-   * attribute as type-cast context).
-   */
-  contains(other: unknown): Contains {
-    return new Contains(this, this.quotedNode(other));
-  }
-
-  /**
-   * PostgreSQL && (overlaps) operator.
-   *
-   * Mirrors: Arel::Predications#overlaps — `Arel::Nodes::Overlaps.new self, quoted_node(other)`.
-   * Routes through `this.quotedNode` (rather than the bare `buildQuoted`)
-   * so a scalar RHS gets the column-aware `Casted` wrapping. Same fidelity
-   * fix as `contains`.
-   */
-  overlaps(other: unknown): Overlaps {
-    return new Overlaps(this, this.quotedNode(other));
-  }
-
-  // Rails' Attribute inherits this from Predications via `include`
-  // (attribute.rb:8); there is exactly one `quoted_array`
-  // (predications.rb:227-229). Delegate rather than reimplement, matching the
-  // other inherited-helper shims above. `this` is threaded through, so the
-  // elements still route via this class's `quotedNode` — the hook subclasses
-  // override — keeping every element on the same path as a scalar RHS.
-  quotedArray(others: unknown[]): Node[] {
-    return Predications.quotedArray.call(this, others);
-  }
-
   /**
    * Apply a window to this expression.
    *
@@ -622,3 +258,37 @@ export class Attribute extends Node {
     return visitor.visit(this);
   }
 }
+
+// Mirrors `include Arel::Predications` (attribute.rb:7). Every predication —
+// eq/notEq/in/notIn/matches/between/*_any/*_all and the private
+// quoted_array / grouping_any / infinity? helpers — comes from the mixin and
+// dispatches back through this class's `quotedNode`, which is the only piece
+// Attribute supplies (the type-casting variant).
+//
+// `between` / `notBetween` are re-declared rather than inherited from
+// `Included<>`: the mixin types them with an overload set, and `Included<>`'s
+// signature inference keeps only the last overload.
+// eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
+export interface Attribute extends Omit<
+  Included<typeof Predications>,
+  "between" | "notBetween" | "isInfinity" | "isUnboundable" | "isOpenEnded"
+> {
+  // Declared as methods (not the property signatures `Included<>` produces) so
+  // a subclass can `override` them — the self-dispatch predications.rb:38-51
+  // relies on.
+
+  /** @internal */
+  isInfinity(value: unknown): 1 | -1 | 0;
+  /** @internal */
+  isUnboundable(value: unknown): 1 | -1 | 0;
+  /** @internal */
+  isOpenEnded(value: unknown): boolean;
+  between(range: readonly [unknown, unknown]): Node;
+  between(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+  between(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
+  notBetween(range: readonly [unknown, unknown]): Node;
+  notBetween(rangeObj: { begin: unknown; end: unknown; excludeEnd?: boolean }): Node;
+  notBetween(begin: unknown, end: unknown, excludeEnd?: boolean): Node;
+}
+
+include(Attribute, Predications);

@@ -2,90 +2,6 @@
   {
     "package": "arel",
     "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "and",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "eq",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "gteq",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "in",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "infinity?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "lt",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "lteq",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "not_in",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "open_ended?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "quoted_node",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "between",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
     "rubyName": "does_not_match_all",
     "call": "grouping_all",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -117,6 +33,20 @@
     "rubyName": "eq_any",
     "call": "grouping_any",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "arel",
+    "tsFile": "attributes/attribute.ts",
+    "rubyName": "grouping_all",
+    "call": "new",
+    "reason": "Satisfied by a different path: Attribute now `include`s the Predications mixin (attribute.rb:7), so grouping_any/grouping_all resolve to predications.ts, whose bodies delegate to the file-level groupedAny/groupedAll helpers that do the `new Grouping`. The construction Rails inlines happens one call deeper, not in the mapped body."
+  },
+  {
+    "package": "arel",
+    "tsFile": "attributes/attribute.ts",
+    "rubyName": "grouping_any",
+    "call": "new",
+    "reason": "Satisfied by a different path: Attribute now `include`s the Predications mixin (attribute.rb:7), so grouping_any/grouping_all resolve to predications.ts, whose bodies delegate to the file-level groupedAny/groupedAll helpers that do the `new Grouping`. The construction Rails inlines happens one call deeper, not in the mapped body."
   },
   {
     "package": "arel",
@@ -158,20 +88,6 @@
     "tsFile": "attributes/attribute.ts",
     "rubyName": "in_any",
     "call": "grouping_any",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "is_distinct_from",
-    "call": "quoted_node",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "is_not_distinct_from",
-    "call": "quoted_node",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -219,69 +135,6 @@
   {
     "package": "arel",
     "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "gt",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "gteq",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "in",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "infinity?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "lt",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "not_in",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "open_ended?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "or",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "not_between",
-    "call": "unboundable?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
     "rubyName": "not_eq_all",
     "call": "grouping_all",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -305,13 +158,6 @@
     "tsFile": "attributes/attribute.ts",
     "rubyName": "not_in_any",
     "call": "grouping_any",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "attributes/attribute.ts",
-    "rubyName": "when",
-    "call": "quoted_node",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
