@@ -767,11 +767,6 @@ describe("AttributeTest", () => {
 
   describe("#not_in_any", () => {
     it("should create a Grouping node", () => {
-      // Rails passes bare scalars here (attribute_test.rb:1008); notIn is typed
-      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
-      // (not a cast) so this fails to compile once the signature is widened by
-      // the arel-predications-not-in-expr-type story, forcing this line's removal.
-      // @ts-expect-error -- see above
       expect(users.get("id").notInAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
@@ -791,11 +786,6 @@ describe("AttributeTest", () => {
 
   describe("#not_in_all", () => {
     it("should create a Grouping node", () => {
-      // Rails passes bare scalars here (attribute_test.rb:1023); notIn is typed
-      // notIn(o: unknown[]) while Rails' not_in takes any expr. ts-expect-error
-      // (not a cast) so this fails to compile once the signature is widened by
-      // the arel-predications-not-in-expr-type story, forcing this line's removal.
-      // @ts-expect-error -- see above
       expect(users.get("id").notInAll([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 

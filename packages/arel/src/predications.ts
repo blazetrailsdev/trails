@@ -400,26 +400,26 @@ export const Predications = {
     return this.groupingAll("doesNotMatch", others, escape);
   },
   inAny(
-    this: PredicationHost & GroupingFolders & { in(o: unknown[]): Node },
-    others: unknown[][],
+    this: PredicationHost & GroupingFolders & { in(o: unknown): Node },
+    others: unknown[],
   ): Grouping {
     return this.groupingAny("in", others);
   },
   inAll(
-    this: PredicationHost & GroupingFolders & { in(o: unknown[]): Node },
-    others: unknown[][],
+    this: PredicationHost & GroupingFolders & { in(o: unknown): Node },
+    others: unknown[],
   ): Grouping {
     return this.groupingAll("in", others);
   },
   notInAny(
-    this: PredicationHost & GroupingFolders & { notIn(o: unknown[]): Node },
-    others: unknown[][],
+    this: PredicationHost & GroupingFolders & { notIn(o: unknown): Node },
+    others: unknown[],
   ): Grouping {
     return this.groupingAny("notIn", others);
   },
   notInAll(
-    this: PredicationHost & GroupingFolders & { notIn(o: unknown[]): Node },
-    others: unknown[][],
+    this: PredicationHost & GroupingFolders & { notIn(o: unknown): Node },
+    others: unknown[],
   ): Grouping {
     return this.groupingAll("notIn", others);
   },
