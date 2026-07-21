@@ -17,13 +17,20 @@ import type { Cte } from "./cte.js";
 // wider set than what `ToSql` can *visit*. Most scalar visitors are aliased to
 // `unsupported` (to_sql.rb:832-845), so it is tempting to read that alias list
 // as the set of types to exclude here. That inference is wrong: a slot value
-// only reaches `visit` if the enclosing visitor sends it there, and the two
-// visitors that carry raw values do not. Both `visit_Arel_Nodes_Assignment`
-// (to_sql.rb:629-641) and `visit_Arel_Nodes_ValuesList` (to_sql.rb:100-118)
-// `case` on the value and route anything that is not a Node/Attribute to
-// `quote(value)` — never to `visit`. So an arm below is justified by either a
-// Rails *quoting* slot or a real rendering visitor, and the `unsupported`
-// aliases only govern values that reach dispatch directly.
+// only reaches `visit` if the enclosing visitor sends it there, and the visitor
+// that carries raw values into a slot this union types does not.
+// `visit_Arel_Nodes_Assignment` (to_sql.rb:629-641) `case`s on the value and
+// routes anything that is not a Node/Attribute to `quote(o.right)` — never to
+// `visit`. So an arm below is justified by either a Rails *quoting* slot or a
+// real rendering visitor, and the `unsupported` aliases only govern values that
+// reach dispatch directly.
+//
+// `visit_Arel_Nodes_ValuesList` (to_sql.rb:100-118) has the identical
+// quote-don't-visit shape and is cited below only as corroborating evidence for
+// that Rails semantic — NOT as a slot this union types. `ValuesList` extends
+// Unary and stores `rows: unknown[][]` in the expr slot (values-list.ts:10-17),
+// and this union's array arm is `Node[]`, so no ValuesList row is typed by
+// `NodeOrValue`.
 export type NodeOrValue =
   | Node
   | ModelAttribute
@@ -41,13 +48,14 @@ export type NodeOrValue =
   // (`visit_Float` → `unsupported`, to_sql.rb:839), matching Rails.
   | number
   | bigint
-  // Booleans reach a slot through `UpdateManager#set` (`update-manager.ts`) and
-  // `InsertManager#values`, whose values are user-supplied and passed through
-  // raw exactly as Rails passes them. They render rather than raise, because
-  // Assignment and ValuesList quote a non-Node right instead of visiting it
-  // (to_sql.rb:637-639, :111-112) — `UPDATE "users" SET "admin" = TRUE`. The
-  // `visit_TrueClass`/`visit_FalseClass` aliases (to_sql.rb:845, :838) govern
-  // only the direct-dispatch path, which these slots never take.
+  // Booleans reach a slot through `UpdateManager#set` (update-manager.ts),
+  // whose values are user-supplied and passed through raw exactly as Rails
+  // passes them. They render rather than raise, because Assignment quotes a
+  // non-Node right instead of visiting it (to_sql.rb:637-639) —
+  // `UPDATE "users" SET "admin" = TRUE`. The `visit_TrueClass`/
+  // `visit_FalseClass` aliases (to_sql.rb:845, :838) govern only the
+  // direct-dispatch path, which this slot never takes. Assignment is the sole
+  // justifying slot; see the ValuesList caveat in the header comment.
   | boolean
   // The five Temporal types to-sql.ts actually visits and quotes (see
   // TEMPORAL_CLASS_NAMES in temporal-tag.ts). Duration/PlainYearMonth/
