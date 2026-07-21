@@ -567,7 +567,13 @@ export class CollectionAssociation extends Association {
       if (cached !== undefined && Array.isArray(cached)) {
         this.target = this.mergeTargetLists(cached, this.target);
       } else {
+        // Rails' find_target is synchronous, so nothing can replace the
+        // target between the query and the merge below. Ours awaits: if a
+        // wholesale `setTarget` landed in that window, the assignment wins
+        // and the loaded rows are discarded. See `_setTargetCount`.
+        const setTargetCountAtEntry = this._setTargetCount;
         const found = await this.doAsyncFindTarget();
+        if (this._setTargetCount !== setTargetCountAtEntry) return this.target;
         if (found !== undefined && found !== null && Array.isArray(found)) {
           // Rails applies set_strict_loading per record in find_target's DB
           // execute block — only freshly loaded records, never cached ones.

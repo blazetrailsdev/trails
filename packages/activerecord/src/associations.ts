@@ -1293,7 +1293,11 @@ async function _loadSingularThroughViaDisableJoinsScope(
  * Sync loaded result to the association instance if one exists.
  */
 function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
-  record._associationInstances.get(assocName)?.setTarget(result as Base | Base[] | null);
+  const holder = record._associationInstances.get(assocName) as
+    | { setTarget(t: Base | Base[] | null): void; _loaderWritebackSuppressed?: number }
+    | undefined;
+  if (!holder || holder._loaderWritebackSuppressed) return;
+  holder.setTarget(result as Base | Base[] | null);
 }
 
 /**

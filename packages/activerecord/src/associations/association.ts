@@ -48,6 +48,35 @@ export class Association {
   /** True after asyncLoadTarget() completes a full DB load — signals the dotted
    *  collection proxy that it can hydrate from this instance's target. */
   _loadedViaAsync = false;
+  /**
+   * Nonzero while THIS holder is itself driving a loader (`loadHasMany` &c.)
+   * through `doAsyncFindTarget`, so the loader's own `setTarget` writeback
+   * into this holder must be skipped — the driving caller assigns the result
+   * itself the moment its `await` resumes.
+   *
+   * Rails needs no such flag: `Association#find_target`
+   * (association.rb:248) is synchronous, so nothing can touch the holder
+   * between issuing the query and assigning the result. Ours awaits, and an
+   * assignment landing in that window (`firm.association("clients")
+   * .setTarget([other])`) was silently clobbered by the loader's redundant
+   * writeback. Suppressing the writeback keys off the loader/driver relation
+   * itself rather than on any observed holder state, so a collection that
+   * legitimately mutates its own target mid-load (dirty targets, in-memory
+   * built/pushed records, target merging) is unaffected.
+   * @internal
+   */
+  _loaderWritebackSuppressed = 0;
+  /**
+   * Counts *wholesale* target replacements — `setTarget` calls, and only
+   * those. A loader snapshots it before awaiting and compares afterwards to
+   * tell "someone replaced my target while I was in flight" (skip the
+   * writeback) from "the collection mutated its own target during this load"
+   * (dirty targets, in-memory built/pushed records, target merging — all of
+   * which assign `this.target` in place and must still be merged with the
+   * freshly loaded rows). A bare generation counter conflates the two.
+   * @internal
+   */
+  _setTargetCount = 0;
 
   private _staleState: unknown = undefined;
   /**
@@ -173,6 +202,7 @@ export class Association {
 
   setTarget(target: Base | Base[] | null): void {
     this.target = target;
+    this._setTargetCount++;
     this.loadedBang();
   }
 
