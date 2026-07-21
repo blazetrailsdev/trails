@@ -1,4 +1,6 @@
 import type { ArelConnection } from "../visitors/connection.js";
+import type { ArelEngine } from "../nodes/node.js";
+import { ToSql } from "../visitors/to-sql.js";
 import { defaultQuoter } from "../visitors/default-quoter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
@@ -51,9 +53,8 @@ function unreachableOnFakeRecord(name: string): () => never {
  * adapter produces (SQLite quotes `0`, the abstract adapter `FALSE`). Porting it
  * is what makes those assertions reachable verbatim instead of weakened.
  *
- * Only the quoting surface is ported: the rest of `FakeRecord` (schema cache,
- * `Table.engine` wiring) exists to satisfy Rails' `engine.with_connection`
- * indirection, which trails' explicit-connection `toSql(connection)` replaces.
+ * Only the quoting surface is ported; `FakeRecord`'s schema cache is not. The
+ * `Table.engine` wiring IS needed — see `fakeRecordEngine` below.
  *
  * @internal
  */
@@ -113,4 +114,25 @@ export const fakeRecordConnection: ArelConnection = {
   castBoundValue(value: unknown): unknown {
     return value;
   },
+};
+
+/**
+ * Port of `FakeRecord::Base` as an Arel engine (`fake_record.rb:125-139`).
+ *
+ * Rails' `Arel::Test#setup` does `Arel::Table.engine = FakeRecord::Base.new`
+ * (`test/cases/arel/helper.rb:19-20`), and `FakeRecord::Connection#initialize`
+ * builds its visitor as `Arel::Visitors::ToSql.new(self)` (`fake_record.rb:36`)
+ * — so the double's `'t'`/`'f'` quoting is what the whole suite compiles
+ * through. trails is not there yet: `test-setup-engine.ts` still installs a
+ * generic `ToSql` suite-wide, because switching the default would change the
+ * expected SQL of every boolean assertion at once. Tracked by story
+ * `arel-suite-engine-is-fake-record-base`.
+ *
+ * Until then this is opt-in, for the cases whose Rails counterpart asserts a
+ * FakeRecord rendering.
+ *
+ * @internal
+ */
+export const fakeRecordEngine: ArelEngine = {
+  connection: { visitor: new ToSql(fakeRecordConnection) },
 };
