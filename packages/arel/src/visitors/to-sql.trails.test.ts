@@ -118,11 +118,22 @@ describe("ToSql quoted_date timezone", () => {
     expect(compile()).toBe("'2020-01-02 12:00:00'");
   });
 
-  it("renders an instant in the local zone when default_timezone is :local", () => {
-    setDefaultTimezone("local");
-    const expected = instant.toZonedDateTimeISO(Temporal.Now.timeZoneId());
-    expect(compile()).toBe(
-      `'${expected.toPlainDateTime().toString({ smallestUnit: "second" }).replace("T", " ")}'`,
-    );
-  });
+  // Skipped rather than run vacuously when the host zone IS UTC: there the
+  // :local rendering is byte-identical to the :utc one, so the assertion would
+  // pass against the pre-fix hardcoded-UTC baseline and guard nothing. Pinning
+  // the zone would mean setting process.env.TZ, which this repo forbids, so the
+  // gap is made visible in the run output instead of silently passing.
+  it.skipIf(Temporal.Now.timeZoneId() === "UTC")(
+    "renders an instant in the local zone when default_timezone is :local",
+    () => {
+      setDefaultTimezone("local");
+      const expected = instant.toZonedDateTimeISO(Temporal.Now.timeZoneId());
+      const sql = compile();
+      expect(sql).toBe(
+        `'${expected.toPlainDateTime().toString({ smallestUnit: "second" }).replace("T", " ")}'`,
+      );
+      // The point of the test: :local must not render as :utc did.
+      expect(sql).not.toBe("'2020-01-02 12:00:00'");
+    },
+  );
 });
