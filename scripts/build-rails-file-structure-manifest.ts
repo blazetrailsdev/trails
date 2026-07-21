@@ -59,6 +59,7 @@ interface RubyMethod {
   name: string;
   visibility: "public" | "private" | "protected";
   file?: string;
+  line?: number;
 }
 interface RubyEntity {
   fqn: string;
@@ -129,6 +130,22 @@ const pushMethod = (list: string[], seen: Set<string>, name: string) => {
   }
 };
 
+// An entity's methods in Rails SOURCE order, rather than instanceMethods then
+// classMethods. A `class << self` block at the TOP of a Rails file
+// (active_model/attribute.rb:7-24 defines from_database/from_user/… before
+// `initialize` at :33) would otherwise be demanded LAST, inverting Rails order.
+// Methods without a `line` (a rails-api.json predating the field) sort last,
+// reproducing the historical instance-then-class append.
+const orderBySourceLine = (host: RubyEntity): RubyMethod[] =>
+  [...(host.instanceMethods ?? []), ...(host.classMethods ?? [])]
+    .map((m, i) => ({ m, i }))
+    .sort((a, b) => {
+      const al = a.m.line ?? Infinity;
+      const bl = b.m.line ?? Infinity;
+      return al === bl ? a.i - b.i : al - bl;
+    })
+    .map(({ m }) => m);
+
 // A TS container: `{ file, key }` where `key` is a class name or the sentinel
 // `FUNCTIONS_KEY` for the file's top-level functions. Ruby methods are bucketed
 // per (rubyFile, container) so each class keeps its own dedup scope.
@@ -185,13 +202,7 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
       const className = host.fqn.split("::").pop() ?? host.fqn;
-      for (const m of host.instanceMethods ?? []) {
-        const file = m.file ?? host.file;
-        noteClass(file, className, host.fqn);
-        const b = bucketFor(file, className);
-        pushMethod(b.names, b.seen, m.name);
-      }
-      for (const m of host.classMethods ?? []) {
+      for (const m of orderBySourceLine(host)) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, className);
@@ -202,11 +213,7 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
   const visitModules = (entities: Record<string, RubyEntity>) => {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
-      for (const m of host.instanceMethods ?? []) {
-        const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
-        pushMethod(b.names, b.seen, m.name);
-      }
-      for (const m of host.classMethods ?? []) {
+      for (const m of orderBySourceLine(host)) {
         const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
         pushMethod(b.names, b.seen, m.name);
       }
