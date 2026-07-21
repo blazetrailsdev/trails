@@ -311,9 +311,11 @@ export function validOptions(): string[] {
 }
 
 // Post-commit flush for association instances that still queue a deferred
-// `_pendingReplace` — collection associations (has_many / HABTM,
-// CollectionAssociation#persistReplace). Neither singular has_one path relies on
-// this any more: the direct has_one converged onto
+// `_pendingReplace`. Collection associations no longer do: their persisted-owner
+// assignment throws (`CollectionPersistedAssignmentError`) and the awaitable
+// `CollectionAssociation#writer` persists inline, so there is nothing left to
+// defer (RFC 0068). Neither singular has_one path relies on
+// this any more either: the direct has_one converged onto
 // `autosaveHasOne` -> `removeDisplaced`, and has_one *through* onto
 // `autosaveHasOne` -> `persistThroughRecord` (Rails' `save_has_one_association`
 // through arm), both of which run during the save and clear their markers, so by

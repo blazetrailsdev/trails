@@ -96,7 +96,10 @@ describe("resetScope on owner save", () => {
       resetCount++;
       return original();
     };
-    (author as any).posts = [];
+    // Build rather than assign: `author.posts = []` on a persisted owner now
+    // throws (RFC 0068), and an unsaved child is what makes the owner's save
+    // reach saveCollectionAssociation at all.
+    (author as any).posts.build({ title: "t", body: "b" });
     await author.save();
     expect(resetCount).toBeGreaterThan(0);
   });

@@ -1811,7 +1811,9 @@ describe("BelongsToAssociationsTest", () => {
 
   it("assigning an association doesn't result in duplicate objects", async () => {
     const post = await Post.create({ title: "title", body: "body" });
-    (post as any).comments = [post.comments.build({ body: "body" })];
+    // Rails' `post.comments = [...]` persists the replacement at assignment;
+    // that needs `await` in JS, so the `=` setter throws (RFC 0068).
+    await post.comments.replace([post.comments.build({ body: "body" })]);
     await post.save();
 
     expect(await post.comments.size()).toBe(1);

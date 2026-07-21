@@ -1093,7 +1093,9 @@ describe("HasManyThroughAssociationsTest", () => {
     const tag = await (post as any).tags.create({ name: "doomed" });
     await tag.taggedPosts.push(await Post.find(posts("thinking").id));
 
-    tag.taggedPosts = [];
+    // Rails' `tag.tagged_posts = []` persists the replacement at assignment;
+    // that needs `await` in JS, so the `=` setter throws (RFC 0068).
+    await tag.taggedPosts.replace([]);
     await post.reload();
 
     expect(post.tags_count).toBe(await (post as any).taggings.count());
@@ -2288,15 +2290,18 @@ describe("HasManyThroughAssociationsTest", () => {
     const author = await Author.create({ name: "Bill" });
     const general = await Category.find(categories("general").id);
 
-    await author.update({
-      specialCategoriesWithConditionIds: [general.id],
-      nonspecialCategoriesWithConditionIds: [general.id],
-    });
+    // Rails assigns these ids through `update`, which persists the replacement
+    // inline. Mass-assignment cannot `await`, so the collection arm throws and
+    // callers use the awaitable `idsWriter` instead (RFC 0068).
+    const idsWriterFor = (name: string) =>
+      author.association(name) as unknown as { idsWriter(ids: unknown[]): Promise<void> };
+    await idsWriterFor("specialCategoriesWithConditions").idsWriter([general.id]);
+    await idsWriterFor("nonspecialCategoriesWithConditions").idsWriter([general.id]);
 
     expect(await (author as any).specialCategoriesWithConditionIds).toEqual([general.id]);
     expect(await (author as any).nonspecialCategoriesWithConditionIds).toEqual([general.id]);
 
-    await author.update({ nonspecialCategoriesWithConditionIds: [] });
+    await idsWriterFor("nonspecialCategoriesWithConditions").idsWriter([]);
     await author.reload();
 
     expect(await (author as any).specialCategoriesWithConditionIds).toEqual([general.id]);

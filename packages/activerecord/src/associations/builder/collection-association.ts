@@ -144,15 +144,31 @@ export class CollectionAssociation extends Association {
   }
 
   static override defineWriters(mixin: object, name: string): void {
-    super.defineWriters(mixin, name);
     if (!mixin || typeof mixin !== "object") return;
+    // Skip `super.defineWriters` for the main name: the base installs a setter
+    // calling the association's `writer`, which for collections is now
+    // awaitable (it persists inline on a persisted owner). A JS property
+    // setter cannot `await`, so route to `queueWrite` — in-memory replace on
+    // an unpersisted owner, `CollectionPersistedAssignmentError` on a
+    // persisted one, whose message names the awaitable replacement
+    // (`await owner.#{name}.replace([...])`). RFC 0068.
+    const nameDescriptor = Object.getOwnPropertyDescriptor(mixin, name);
+    if (!nameDescriptor || nameDescriptor.configurable) {
+      Object.defineProperty(mixin, name, {
+        get: nameDescriptor?.get,
+        set(this: AssociationInstanceHost, records: unknown) {
+          (this.association(name) as any).queueWrite(records);
+        },
+        configurable: true,
+      });
+    }
     const idsName = `${singularize(name)}Ids`;
     const existing = Object.getOwnPropertyDescriptor(mixin, idsName);
     if (existing && !existing.configurable) return;
     Object.defineProperty(mixin, idsName, {
       get: existing?.get,
       set(this: AssociationInstanceHost, ids: unknown) {
-        return (this.association(name) as any).idsWriter(ids);
+        return (this.association(name) as any).queueIdsWrite(ids);
       },
       configurable: true,
     });
