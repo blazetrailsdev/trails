@@ -499,10 +499,7 @@ async function autosaveHasOne(record: Base, assoc: AssociationDefinition): Promi
   // `persistReplace` — nullifies/destroys it, mirroring the `remove_target!`
   // Rails runs synchronously inside `HasOneAssociation#replace`. Runs before the
   // `!child` bail so assigning nil (`owner.account = null`) still removes it.
-  if (
-    typeof inst?.removeDisplaced === "function" &&
-    ((inst?._displacedRecords?.length ?? 0) > 0 || inst?._removeDisplacedFromDb)
-  ) {
+  if (typeof inst?.removeDisplaced === "function" && (inst?._displacedRecords?.length ?? 0) > 0) {
     await inst.removeDisplaced();
   }
 

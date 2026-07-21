@@ -10,7 +10,7 @@
  * Rails reaches that path through the synchronous `=` setter, which in JS
  * cannot await, so these assertions have no verbatim Rails test to mirror.
  */
-import { describe, it, expect, beforeAll } from "vitest";
+import { describe, it, expect, beforeAll, vi } from "vitest";
 import {
   registerModel,
   enableSti,
@@ -169,5 +169,40 @@ describe("polymorphic has_one set#{Name} awaitable accessor", () => {
     expect(sponsor.isPersisted()).toBe(true);
     expect(sponsor.sponsorable_id).toBe(Number((member as unknown as { id: number }).id));
     expect(sponsor.sponsorable_type).toBe("Member");
+  });
+});
+
+describe("has_one replace with no loaded target and no record", () => {
+  // Rails' `return target unless load_target || record`
+  // (has_one_association.rb:61): assigning nil to a has_one with nothing
+  // associated returns early, before the `assigning_another_record ||
+  // has_changes_to_save?` gate and before `self.target = record`.
+  //
+  // The association still ends up LOADED either way — `load_target` calls
+  // `loaded!` unconditionally (association.rb:192) — and a `replace(null)` over
+  // a null target is itself a no-op, so the end state is identical with or
+  // without the early return. The only way to pin the ported structure is to
+  // assert `replace` is never reached, which is what this does.
+  fixtures(["companies", "accounts"]);
+
+  beforeAll(() => {
+    registerModel(Firm);
+    registerModel(Account);
+  });
+
+  it("returns before reaching replace, leaving the association empty", async () => {
+    const firm = (await Firm.create({ name: "no account" })) as Base;
+    const assoc = (
+      firm as unknown as { association(n: string): { replace(r: unknown): void } }
+    ).association("account");
+    const replace = vi.spyOn(assoc, "replace");
+
+    await set(firm).setAccount(null);
+
+    expect(replace).not.toHaveBeenCalled();
+    expect(await (firm as unknown as { account: Promise<Base | null> }).account).toBe(null);
+    expect(await Account.where({ firm_id: (firm as unknown as { id: number }).id }).count()).toBe(
+      0,
+    );
   });
 });
