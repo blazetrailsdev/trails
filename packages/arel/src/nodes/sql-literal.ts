@@ -15,16 +15,16 @@ export class SqlLiteral extends Node {
   readonly value: string;
   retryableFlag = false;
 
+  get retryable(): boolean {
+    return this.retryableFlag;
+  }
+
   constructor(value: string, options?: { retryable?: boolean }) {
     super();
     this.value = value;
     if (options?.retryable) {
       this.retryableFlag = true;
     }
-  }
-
-  get retryable(): boolean {
-    return this.retryableFlag;
   }
 
   fetchAttribute(_block?: (attr: Node) => unknown): unknown {

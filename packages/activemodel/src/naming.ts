@@ -100,6 +100,68 @@ export class ModelName {
   private _humanFallback: string;
   private _klass: ModelLike | null;
 
+  get cacheKey(): string {
+    return this.collection;
+  }
+
+  /**
+   * Mirrors Rails `@name.match?(regexp)`. Returns whether the class
+   * name matches the given regex (boolean — this is `match?` semantic,
+   * not the integer position that Ruby `=~` returns).
+   *
+   * Preserves `pattern.lastIndex` so repeated calls with `/g` or `/y`
+   * regexes stay stable — `RegExp.prototype.test` advances `lastIndex`
+   * on stateful flags, but Ruby `match?` is stateless.
+   */
+  match(pattern: unknown): boolean {
+    if (!(pattern instanceof RegExp)) {
+      throw new ArgumentError("ModelName#match requires a RegExp");
+    }
+    const savedLastIndex = pattern.lastIndex;
+    try {
+      return pattern.test(this.name);
+    } finally {
+      pattern.lastIndex = savedLastIndex;
+    }
+  }
+
+  // ---------------------------------------------------------------------------
+  // String-ness — Rails `ActiveModel::Name < String` (naming.rb:10, :151-152):
+  //   include Comparable
+  //   delegate :==, :===, :<=>, :=~, :"!~", :eql?, :match?, :to_s,
+  //            :to_str, :as_json, to: :name
+  //
+  // JS can't overload operators, so we expose methods + the one coercion
+  // hook JS does have: `Symbol.toPrimitive`. That covers IMPLICIT string
+  // coercion only — `String(modelName)`, template literals, `modelName +
+  // ""`, and loose `==` against a string. It does NOT trigger on strict
+  // `===` / `Object.is` / matchers that use strict identity without
+  // coercion; for those, callers use `mn.name` or `mn.equals(other)`.
+  // ---------------------------------------------------------------------------
+
+  /**
+   * Mirrors Rails `to_s` / `to_str` delegated to `@name`
+   * (naming.rb:131-152). Rails' `@name` is the full constant path
+   * (`"Blog::Post"`). TS class names carry no `::`, so we reconstruct the
+   * qualified path from the namespace segments in the constructor; `toString`
+   * returns that full path (`"Blog::Post"`) to match Rails.
+   */
+  toString(): string {
+    return this.name;
+  }
+
+  /**
+   * Mirrors Rails `@name.as_json` — `String#as_json` just returns the
+   * string (and accepts an ignored `options` Hash). Returns `this.name`
+   * as-is; accepts (but ignores) an options argument so callers match
+   * Rails' signature and the rest of this codebase's `asJson(options?)`
+   * conventions. Lets `JSON.stringify(mn)` emit the plain class name
+   * rather than `{}` / the object form.
+   */
+  asJson(_options?: unknown): string {
+    return this.name;
+  }
+
   /**
    * Construct a ModelName.
    *
@@ -217,68 +279,6 @@ export class ModelName {
     if (uncountable) routeKey = `${routeKey}_index`;
     this.routeKey = routeKey;
     this.singularRouteKey = singularize(this.routeKey);
-  }
-
-  get cacheKey(): string {
-    return this.collection;
-  }
-
-  /**
-   * Mirrors Rails `@name.match?(regexp)`. Returns whether the class
-   * name matches the given regex (boolean — this is `match?` semantic,
-   * not the integer position that Ruby `=~` returns).
-   *
-   * Preserves `pattern.lastIndex` so repeated calls with `/g` or `/y`
-   * regexes stay stable — `RegExp.prototype.test` advances `lastIndex`
-   * on stateful flags, but Ruby `match?` is stateless.
-   */
-  match(pattern: unknown): boolean {
-    if (!(pattern instanceof RegExp)) {
-      throw new ArgumentError("ModelName#match requires a RegExp");
-    }
-    const savedLastIndex = pattern.lastIndex;
-    try {
-      return pattern.test(this.name);
-    } finally {
-      pattern.lastIndex = savedLastIndex;
-    }
-  }
-
-  // ---------------------------------------------------------------------------
-  // String-ness — Rails `ActiveModel::Name < String` (naming.rb:10, :151-152):
-  //   include Comparable
-  //   delegate :==, :===, :<=>, :=~, :"!~", :eql?, :match?, :to_s,
-  //            :to_str, :as_json, to: :name
-  //
-  // JS can't overload operators, so we expose methods + the one coercion
-  // hook JS does have: `Symbol.toPrimitive`. That covers IMPLICIT string
-  // coercion only — `String(modelName)`, template literals, `modelName +
-  // ""`, and loose `==` against a string. It does NOT trigger on strict
-  // `===` / `Object.is` / matchers that use strict identity without
-  // coercion; for those, callers use `mn.name` or `mn.equals(other)`.
-  // ---------------------------------------------------------------------------
-
-  /**
-   * Mirrors Rails `to_s` / `to_str` delegated to `@name`
-   * (naming.rb:131-152). Rails' `@name` is the full constant path
-   * (`"Blog::Post"`). TS class names carry no `::`, so we reconstruct the
-   * qualified path from the namespace segments in the constructor; `toString`
-   * returns that full path (`"Blog::Post"`) to match Rails.
-   */
-  toString(): string {
-    return this.name;
-  }
-
-  /**
-   * Mirrors Rails `@name.as_json` — `String#as_json` just returns the
-   * string (and accepts an ignored `options` Hash). Returns `this.name`
-   * as-is; accepts (but ignores) an options argument so callers match
-   * Rails' signature and the rest of this codebase's `asJson(options?)`
-   * conventions. Lets `JSON.stringify(mn)` emit the plain class name
-   * rather than `{}` / the object form.
-   */
-  asJson(_options?: unknown): string {
-    return this.name;
   }
 
   /** Implicit coercion hook so `String(mn)`, `"${mn}"`, `mn + ""` all work. */

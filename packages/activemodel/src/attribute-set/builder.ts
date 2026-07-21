@@ -111,20 +111,6 @@ export class LazyAttributeHash {
   private additionalTypes: Map<string, Type>;
   private defaultAttributes: Map<string, Attribute>;
 
-  constructor(
-    types: Map<string, Type>,
-    values: Record<string, unknown>,
-    additionalTypes: Map<string, Type> = new Map(),
-    defaultAttributes: Map<string, Attribute> = new Map(),
-    delegateHash: Map<string, Attribute> = new Map(),
-  ) {
-    this.types = types;
-    this.values = values;
-    this.additionalTypes = additionalTypes;
-    this.defaultAttributes = defaultAttributes;
-    this.delegate = delegateHash;
-  }
-
   /**
    * Return a new map applying `fn` to each materialized Attribute.
    *
@@ -177,6 +163,20 @@ export class LazyAttributeHash {
       if (!drop.has(name)) result.set(name, attr);
     }
     return result;
+  }
+
+  constructor(
+    types: Map<string, Type>,
+    values: Record<string, unknown>,
+    additionalTypes: Map<string, Type> = new Map(),
+    defaultAttributes: Map<string, Attribute> = new Map(),
+    delegateHash: Map<string, Attribute> = new Map(),
+  ) {
+    this.types = types;
+    this.values = values;
+    this.additionalTypes = additionalTypes;
+    this.defaultAttributes = defaultAttributes;
+    this.delegate = delegateHash;
   }
 
   isKey(key: string): boolean {
