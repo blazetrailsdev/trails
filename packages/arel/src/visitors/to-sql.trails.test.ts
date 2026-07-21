@@ -78,3 +78,25 @@ describe("ToSql Array-named identifiers", () => {
     expect(new Visitors.MySQL().compile(cte)).toContain('`["a", "b"]` AS ');
   });
 });
+
+describe("ToSql raw scalars in quoting slots", () => {
+  const users = new Table("users");
+
+  // Regression guard for the `NodeOrValue` union. Rails' Assignment and
+  // ValuesList visitors `case` on the value and send anything that is not a
+  // Node/Attribute to `quote(value)` rather than `visit` (to_sql.rb:637-639,
+  // :111-112). That is why a bare boolean renders here even though
+  // `visit_TrueClass`/`visit_FalseClass` are aliased to `unsupported`
+  // (to_sql.rb:845, :838) — the alias governs direct dispatch, which these
+  // slots never reach. Dropping `boolean` from the union on the strength of
+  // that alias alone would contradict this behaviour.
+  it("quotes a bare boolean in an Assignment right instead of raising", () => {
+    const node = new Nodes.Assignment(users.get("admin"), true);
+    expect(new Visitors.ToSql().compile(node)).toBe('"users"."admin" = TRUE');
+  });
+
+  it("quotes a bare string in an Assignment right instead of raising", () => {
+    const node = new Nodes.Assignment(users.get("name"), "x");
+    expect(new Visitors.ToSql().compile(node)).toBe('"users"."name" = \'x\'');
+  });
+});

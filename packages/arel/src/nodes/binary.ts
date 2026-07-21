@@ -13,30 +13,42 @@ import type { Cte } from "./cte.js";
 // `build_quoted` returns one unwrapped into the AST (casted.rb:50), and both
 // Assignment (to_sql.rb:631) and ValuesList (to_sql.rb:110) accept one.
 //
-// This union types what may *occupy* a Binary slot, which in Rails is a
-// strictly wider set than what `ToSql` can *visit*. Most scalar visitors are
-// aliased to `unsupported` (to_sql.rb:832-845), yet Rails still constructs and
-// compares nodes holding those scalars — so an arm here is justified by a
-// Rails construction site, not by a rendering visitor. Each non-Node arm below
-// names one.
+// This union types what may *occupy* a node slot, which in Rails is a strictly
+// wider set than what `ToSql` can *visit*. Most scalar visitors are aliased to
+// `unsupported` (to_sql.rb:832-845), so it is tempting to read that alias list
+// as the set of types to exclude here. That inference is wrong: a slot value
+// only reaches `visit` if the enclosing visitor sends it there, and the two
+// visitors that carry raw values do not. Both `visit_Arel_Nodes_Assignment`
+// (to_sql.rb:629-641) and `visit_Arel_Nodes_ValuesList` (to_sql.rb:100-118)
+// `case` on the value and route anything that is not a Node/Attribute to
+// `quote(value)` — never to `visit`. So an arm below is justified by either a
+// Rails *quoting* slot or a real rendering visitor, and the `unsupported`
+// aliases only govern values that reach dispatch directly.
 export type NodeOrValue =
   | Node
   | ModelAttribute
-  // Rails puts bare Strings in both slots: `Cte#initialize` stores the CTE
-  // name as `@left` (cte.rb:10-12), `TableAlias` the alias name as `@right`
-  // (table_alias.rb), and Rails' own tests build `Equality.new("foo", "bar")`
-  // (test/cases/arel/nodes/binary_test.rb:11). Visiting one still raises —
-  // `visit_String` is aliased to `unsupported` (to_sql.rb:842) — because these
-  // slots are read structurally (`o.name`) and quoted, never visited.
+  // Rails puts bare Strings in node slots structurally: `Cte#initialize` stores
+  // the CTE name as `@left` (cte.rb:10-12), `TableAlias` the alias name as
+  // `@right` (table_alias.rb), and Rails' own tests build
+  // `Equality.new("foo", "bar")` (test/cases/arel/nodes/binary_test.rb:11).
+  // These are read as `o.name` and quoted, so `visit_String` → `unsupported`
+  // (to_sql.rb:842) is not reachable from them.
   | string
-  // The one scalar Rails actually renders: `visit_Integer` is a real visitor
-  // (to_sql.rb:824-826). `bigint` rides along because Ruby's Integer is
-  // arbitrary-precision with no separate bignum visitor. TS cannot split
-  // integral from fractional `number`, so a non-integral one is admitted here
-  // and raises at visit time via `visitFloat` (`visit_Float` → `unsupported`,
-  // to_sql.rb:839), matching Rails.
+  // `visit_Integer` is a real rendering visitor (to_sql.rb:824-826). `bigint`
+  // rides along because Ruby's Integer is arbitrary-precision with no separate
+  // bignum visitor. TS cannot split integral from fractional `number`, so a
+  // non-integral one is admitted here and raises at visit time via `visitFloat`
+  // (`visit_Float` → `unsupported`, to_sql.rb:839), matching Rails.
   | number
   | bigint
+  // Booleans reach a slot through `UpdateManager#set` (`update-manager.ts`) and
+  // `InsertManager#values`, whose values are user-supplied and passed through
+  // raw exactly as Rails passes them. They render rather than raise, because
+  // Assignment and ValuesList quote a non-Node right instead of visiting it
+  // (to_sql.rb:637-639, :111-112) — `UPDATE "users" SET "admin" = TRUE`. The
+  // `visit_TrueClass`/`visit_FalseClass` aliases (to_sql.rb:845, :838) govern
+  // only the direct-dispatch path, which these slots never take.
+  | boolean
   // The five Temporal types to-sql.ts actually visits and quotes (see
   // TEMPORAL_CLASS_NAMES in temporal-tag.ts). Duration/PlainYearMonth/
   // PlainMonthDay are deliberately absent: Rails has no visitor for them.
@@ -57,11 +69,11 @@ export type NodeOrValue =
   // rather than visiting it. So `visit_NilClass` being aliased to
   // `unsupported` (to_sql.rb:841) is not reachable from these slots.
   //
-  // `boolean` and `undefined` are deliberately absent. `visit_TrueClass` /
-  // `visit_FalseClass` are aliased to `unsupported` (to_sql.rb:845, :838) and
-  // Rails has no construction site putting a bare true/false in a node slot —
-  // callers wrap in `Casted`/`BindParam`, or use `Nodes::True`/`Nodes::False`.
-  // `undefined` has no Ruby analogue at all; `null` is the sole nil.
+  // `undefined` is deliberately absent — the one arm this union drops. Ruby has
+  // no analogue for it, so no Rails slot can hold one and no citation could
+  // justify it; `null` is the sole nil, matching `visit_NilClass` being the
+  // sole nil visitor. Admitting both let a JS-ism stand in for `nil` in a slot
+  // whose Rails counterpart has exactly one.
   | null;
 
 export const ATTRIBUTE_BRAND = Symbol.for("arel.Attribute");
