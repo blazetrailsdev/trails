@@ -106,10 +106,9 @@ export abstract class Visitor {
       // mis-registration (a typo'd method name landed in the dispatch
       // cache). This is a visitor bug, not an unvisitable value, so it is
       // a plain Error rather than an UnsupportedVisitError (matching the
-      // same check in to-sql.ts:479). Subclasses that translate the
-      // "no entry at all" case into their own error — Dot re-raises it as
-      // Rails' `TypeError, "Cannot visit ..."` (visitor.rb:39) — must not
-      // swallow this one, or a typo'd registration masquerades as an
+      // same check in to-sql.ts:479). This must stay distinct from the
+      // no-handler terminal above (Rails' `TypeError, "Cannot visit ..."`,
+      // visitor.rb:38), or a typo'd registration masquerades as an
       // unvisitable value.
       throw new Error(
         `Dispatch method '${methodName}' is not defined on ${this.constructor.name} for node ${describeClass(object)}`,
