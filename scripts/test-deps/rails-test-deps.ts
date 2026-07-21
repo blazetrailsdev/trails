@@ -36,7 +36,16 @@ export interface FileDeps {
 }
 
 const REQUIRE_RE = /^\s*require\s+["']models\/([^"']+)["']/;
-const FIXTURES_START_RE = /^\s*fixtures\s+(.+)$/;
+// A real declaration's argument list always opens with a symbol or a string
+// (`fixtures :all`, `fixtures :a, :b`, `fixtures :"admin/accounts"`, `fixtures "warehouse-things"`).
+// Requiring that rejects the local variable `fixtures = ActiveRecord::FixtureSet...`,
+// which otherwise parsed as a declaration and emitted junk names — SYM_OR_STR pulls
+// "FixtureSet" out of the `::` and the set name out of the argument list:
+//   fixtures_test.rb:573      -> "FixtureSet", "/categories_ordered"
+//   fixtures_test.rb:377      -> "FixtureSet", "collections"
+//   sqlite3/virtual_column_test.rb:109    -> "FixtureSet", "virtual_columns"
+//   postgresql/virtual_column_test.rb:85  -> "FixtureSet", "virtual_columns"
+const FIXTURES_START_RE = /^\s*fixtures\s+((?::|["']).+)$/;
 const SET_FIXTURE_CLASS_RE = /^\s*set_fixture_class\s+(.+)$/;
 const SYM_OR_STR = /(?::([a-zA-Z_]\w*)|["']([^"']+)["'])/g;
 const PAIR_RE = /([a-zA-Z_]\w*)\s*:\s*([A-Z][\w:]*)/g;
@@ -154,11 +163,21 @@ export function parseSource(src: string): FileDeps {
   deps.fixtures = [...fxSet].sort();
 
   if (fxSet.size > 0 && testRanges.length > 0) {
-    const fxAlt = [...fxSet]
-      .map((n) => n.replace(/[^\w-]/g, ""))
-      .filter((n) => n.length > 0)
-      .map((n) => n.replace(/-/g, "\\-"))
-      .join("|");
+    // A namespaced set `admin/accounts` is dereferenced as `admin_accounts(:david)`.
+    // Key the results by the DECLARED name so consumers can intersect the two
+    // (eslint/expected-fixtures.mjs) instead of silently dropping every namespaced set.
+    // Collisions are last-write-wins. Declaring both `:"admin/accounts"` and
+    // `:admin_accounts` would drop the first from `tests.*.fixtures` silently, but
+    // Rails cannot reach that state — both generate the same `admin_accounts`
+    // accessor method, so the second definition wins there too and the pair is
+    // unusable. The vendored corpus has zero collisions; not worth a merge that
+    // would fold two distinct sets' records into one bucket.
+    const accessorToDeclared = new Map<string, string>();
+    for (const n of fxSet) {
+      const accessor = n.replace(/\//g, "_").replace(/[^\w-]/g, "");
+      if (accessor.length > 0) accessorToDeclared.set(accessor, n);
+    }
+    const fxAlt = [...accessorToDeclared.keys()].map((n) => n.replace(/-/g, "\\-")).join("|");
     const callRe = new RegExp(`\\b(${fxAlt})\\s*\\(`, "g");
     for (const r of testRanges) {
       const body = lines.slice(r.start, r.end).join("\n");
@@ -166,7 +185,7 @@ export function parseSource(src: string): FileDeps {
       for (const m of body.matchAll(callRe)) {
         const records = collectRecordArgs(body, m.index! + m[0].length - 1);
         if (records.length === 0) continue;
-        const bucket = (used[m[1]] ??= new Set());
+        const bucket = (used[accessorToDeclared.get(m[1]) ?? m[1]] ??= new Set());
         for (const rec of records) bucket.add(rec);
       }
       if (Object.keys(used).length === 0) continue;

@@ -86,6 +86,45 @@ describe("parseSource", () => {
     expect(parseSource(src).tests).toEqual({});
   });
 
+  it("keys a namespaced set's dereferences by its declared name", () => {
+    const src = [
+      "class T < ActiveRecord::TestCase",
+      '  fixtures :"admin/accounts"',
+      "  def test_namespaced",
+      "    admin_accounts(:david)",
+      "  end",
+      "end",
+    ].join("\n");
+    const deps = parseSource(src);
+    expect(deps.fixtures).toEqual(["admin/accounts"]);
+    expect(deps.tests.test_namespaced.fixtures).toEqual({ "admin/accounts": ["david"] });
+  });
+
+  it("does not treat a local `fixtures =` assignment as a declaration", () => {
+    const src = [
+      "class T < ActiveRecord::TestCase",
+      "  fixtures :topics",
+      "  def test_omap_fixtures",
+      '    fixtures = ActiveRecord::FixtureSet.new(nil, "categories", Category, FIXTURES_ROOT + "/categories_ordered")',
+      "  end",
+      "  def test_create",
+      "    fixtures = ActiveRecord::FixtureSet.create_fixtures(FIXTURES_ROOT, :collections, collections: Course)",
+      "  end",
+      "  def test_nil",
+      "    fixtures = nil",
+      "  end",
+      "  def test_hash",
+      "    fixtures = {",
+      '      "one" => { "id" => 1 },',
+      "    }",
+      "  end",
+      "end",
+    ].join("\n");
+    // Only the real declaration survives: no "/categories_ordered", "FixtureSet",
+    // or "collections" leaking in from the local variables.
+    expect(parseSource(src).fixtures).toEqual(["topics"]);
+  });
+
   it("does not treat hash-syntax keys as fixture accessors", () => {
     const src = [
       "class T < ActiveRecord::TestCase",
