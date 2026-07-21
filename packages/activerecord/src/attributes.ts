@@ -41,6 +41,13 @@ interface AttributeDefinition {
    * defs from ones reflected against this class's own table.
    */
   reflectedTable?: string;
+  /**
+   * The bare `type_for_column` result for this column, before any decoration
+   * was baked into `type`. `_defaultAttributes` seeds from this so the
+   * pending-decorator replay is the ONLY thing that wraps — mirroring Rails,
+   * which seeds from `type_for_column` (attributes.rb:241-245).
+   */
+  reflectedColumnType?: Type;
 }
 
 /**
@@ -197,7 +204,12 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
       const source = def.source ?? (def.userProvided === false ? "schema" : "user");
       const column = columns[name];
       if (source === "schema") {
-        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue ?? null, def.type));
+        // Seed from the BARE reflected column type, not `def.type` — trails
+        // eagerly bakes decorations into `def.type` (a back-compat convenience
+        // Rails lacks), and phase 2 replays those same decorators, so seeding
+        // from `def.type` applies each one twice.
+        const seedType = def.reflectedColumnType ?? def.type;
+        attrMap.set(name, Attribute.fromDatabase(name, def.defaultValue ?? null, seedType));
       } else if (column !== undefined) {
         // User type-override on a real DB column (e.g. enum, serialize,
         // normalizes, encryption): seed with the REFLECTED column type, not the
@@ -210,8 +222,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
         // `reflectedColumnType` is stashed by applyColumnsHash (model-schema.ts)
         // where the adapter is in hand; fall back to the def's own type before
         // the schema has reflected.
-        const seedType =
-          (def as { reflectedColumnType?: typeof def.type }).reflectedColumnType ?? def.type;
+        const seedType = def.reflectedColumnType ?? def.type;
         attrMap.set(name, Attribute.fromDatabase(name, column.default ?? null, seedType));
       } else if (def.defaultValue != null) {
         const base = Attribute.withCastValue(name, null, def.type);
