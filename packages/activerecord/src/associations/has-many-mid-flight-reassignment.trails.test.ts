@@ -13,9 +13,11 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Firm, Client } from "../test-helpers/models/company.js";
+import { Author } from "../test-helpers/models/author.js";
+import { Comment } from "../test-helpers/models/comment.js";
 
 describe("has_many mid-flight reassignment", () => {
-  fixtures(["companies"]);
+  fixtures(["companies", "authors", "posts", "comments"]);
 
   it("a target assigned while the load is in flight is not clobbered by the load", async () => {
     const firm = (await Firm.first()) as Firm;
@@ -26,5 +28,18 @@ describe("has_many mid-flight reassignment", () => {
     await inFlight;
 
     expect(firm.association("clients").target).toEqual([other]);
+  });
+
+  it("a target assigned mid-load survives on a has_many :through", async () => {
+    // HasManyThroughAssociation inherits doAsyncFindTarget from
+    // HasManyAssociation, so it must inherit the guard with it.
+    const author = (await Author.first()) as Author;
+    const other = (await Comment.first()) as Comment;
+
+    const inFlight = author.association("comments").loadTarget();
+    author.association("comments").setTarget([other]);
+    await inFlight;
+
+    expect(author.association("comments").target).toEqual([other]);
   });
 });
