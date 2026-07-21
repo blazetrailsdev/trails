@@ -1204,12 +1204,7 @@ function applyColumnsHash(
       // (the adapter is in hand) via the SAME `type_for_column` pipeline the
       // non-user schema path uses — immutable-string conversion +
       // `hook_attribute_type` (attributes.rb:301-302, model_schema.rb:622-629).
-      (existing as { reflectedColumnType?: Type }).reflectedColumnType = reflectedTypeForColumn(
-        host,
-        adapter,
-        name,
-        column,
-      );
+      existing.reflectedColumnType = reflectedTypeForColumn(host, adapter, name, column);
       continue;
     }
 

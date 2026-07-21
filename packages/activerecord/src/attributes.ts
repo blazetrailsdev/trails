@@ -222,8 +222,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
         // `reflectedColumnType` is stashed by applyColumnsHash (model-schema.ts)
         // where the adapter is in hand; fall back to the def's own type before
         // the schema has reflected.
-        const seedType =
-          (def as { reflectedColumnType?: typeof def.type }).reflectedColumnType ?? def.type;
+        const seedType = def.reflectedColumnType ?? def.type;
         attrMap.set(name, Attribute.fromDatabase(name, column.default ?? null, seedType));
       } else if (def.defaultValue != null) {
         const base = Attribute.withCastValue(name, null, def.type);
