@@ -32,6 +32,23 @@ describe("Predications.groupingAny / groupingAll", () => {
     expect(out).toBeInstanceOf(Nodes.Grouping);
   });
 
+  it("folds an empty `others` to Grouping(NULL) / Grouping(And([]))", () => {
+    // Pins the empty-array edge across the *_any/*_all → groupingAny/groupingAll
+    // rerouting: Ruby's `Or.inject` on [] returns nil (rendered `NULL`), and an
+    // empty `And` renders `()`. Both must survive the delegation unchanged,
+    // since `NULL OR FALSE` is NULL while `FALSE OR FALSE` is FALSE.
+    const attr = users.attr("id");
+    const any = Predications.groupingAny.call(attr, "eq", []);
+    expect(any.expr).toBeInstanceOf(Nodes.SqlLiteral);
+    expect((any.expr as Nodes.SqlLiteral).value).toBe("NULL");
+    expect(attr.eqAny([])).toEqual(any);
+
+    const all = Predications.groupingAll.call(attr, "eq", []);
+    expect(all.expr).toBeInstanceOf(Nodes.And);
+    expect((all.expr as Nodes.And).children).toHaveLength(0);
+    expect(attr.eqAll([])).toEqual(all);
+  });
+
   it("groupingAny throws a clear TypeError when the method-id isn't callable", () => {
     // Regression for the dispatch-safety concern: a typo in the
     // method-id should fail loudly, not blow up with "Cannot read
