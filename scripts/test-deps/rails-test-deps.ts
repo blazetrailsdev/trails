@@ -43,7 +43,8 @@ const REQUIRE_RE = /^\s*require\s+["']models\/([^"']+)["']/;
 // "FixtureSet" out of the `::` and the set name out of the argument list:
 //   fixtures_test.rb:573      -> "FixtureSet", "/categories_ordered"
 //   fixtures_test.rb:377      -> "FixtureSet", "collections"
-//   virtual_column_test.rb:109 -> "FixtureSet", "virtual_columns"  (sqlite3 + postgresql)
+//   sqlite3/virtual_column_test.rb:109    -> "FixtureSet", "virtual_columns"
+//   postgresql/virtual_column_test.rb:85  -> "FixtureSet", "virtual_columns"
 const FIXTURES_START_RE = /^\s*fixtures\s+((?::|["']).+)$/;
 const SET_FIXTURE_CLASS_RE = /^\s*set_fixture_class\s+(.+)$/;
 const SYM_OR_STR = /(?::([a-zA-Z_]\w*)|["']([^"']+)["'])/g;
