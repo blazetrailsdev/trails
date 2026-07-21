@@ -58,16 +58,19 @@ describe("InsertManagerTest", () => {
 
     it("inserts false", () => {
       const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([[users.get("active"), false]]);
-      expect(mgr.toSql()).toContain("FALSE");
+      mgr.insert([[users.get("bool"), false]]);
+      // Rails asserts VALUES ('f'): that rendering comes from the Arel suite's
+      // FakeRecord connection double (test/cases/arel/support/fake_record.rb:79-80),
+      // not from any adapter — SQLite quotes false as 0, the abstract adapter as
+      // FALSE. We have no FakeRecord port, so toSql() renders via the
+      // connection-less default quoter.
+      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("bool") VALUES (FALSE)`);
     });
 
     it("inserts null", () => {
       const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([[users.get("name"), null]]);
-      expect(mgr.toSql()).toBe('INSERT INTO "users" ("name") VALUES (NULL)');
+      mgr.insert([[users.get("id"), null]]);
+      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("id") VALUES (NULL)`);
     });
 
     it("takes a list of lists", () => {
@@ -168,28 +171,12 @@ describe("InsertManagerTest", () => {
     expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name", "age") VALUES ('dean', 30)`);
   });
 
-  describe("insert", () => {
-    it("inserts null", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([[users.get("name"), null]]);
-      expect(mgr.toSql()).toBe(`INSERT INTO "users" ("name") VALUES (NULL)`);
-    });
-  });
-
   it("returns empty array before insert", () => {
     const manager = new InsertManager();
     expect(manager.columns).toEqual([]);
   });
 
   describe("insert", () => {
-    it("inserts false", () => {
-      const mgr = new InsertManager();
-      mgr.into(users);
-      mgr.insert([[users.get("active"), false]]);
-      expect(mgr.toSql()).toContain("FALSE");
-    });
-
     it("inserts time", () => {
       const mgr = new InsertManager(users);
       const at = Temporal.PlainDateTime.from("2020-01-02T12:34:56");
