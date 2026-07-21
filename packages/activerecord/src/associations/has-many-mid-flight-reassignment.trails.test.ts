@@ -11,6 +11,7 @@
  * it: previously the load clobbered the assignment with no diagnostic.
  */
 import { describe, it, expect } from "vitest";
+import { readdir, readFile } from "node:fs/promises";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { loadHasMany } from "../associations.js";
 import { Preloader } from "./preloader.js";
@@ -128,6 +129,36 @@ describe("has_many mid-flight reassignment", () => {
 
     // The non-racing owner in the same batch still got its target.
     expect(other.association("clients").isLoaded()).toBe(true);
+  });
+
+  it("no internal caller reaches setTarget — every loader writeback is exempt", async () => {
+    // Three review rounds found the same defect in different files: an
+    // internal loader calling `setTarget`, which now raises and aborts its
+    // batch. Enumerating by hand kept missing sites, so pin the invariant
+    // instead — `setTarget` is the caller-facing API (guarded), and every
+    // internal writeback goes through `_setTargetFromLoader`.
+    const root = new URL("../", import.meta.url);
+    const offenders: string[] = [];
+
+    const walk = async (dir: URL): Promise<void> => {
+      for (const entry of await readdir(dir, { withFileTypes: true })) {
+        const child = new URL(`${entry.name}${entry.isDirectory() ? "/" : ""}`, dir);
+        if (entry.isDirectory()) {
+          if (entry.name !== "node_modules") await walk(child);
+          continue;
+        }
+        if (!entry.name.endsWith(".ts") || entry.name.includes(".test.")) continue;
+        const source = await readFile(child, "utf8");
+        source.split("\n").forEach((line, i) => {
+          if (!line.includes(".setTarget(")) return;
+          if (line.trimStart().startsWith("*") || line.trimStart().startsWith("//")) return;
+          offenders.push(`${entry.name}:${i + 1}`);
+        });
+      }
+    };
+    await walk(root);
+
+    expect(offenders).toEqual([]);
   });
 
   it("replacing a has_many :through target mid-load raises", async () => {

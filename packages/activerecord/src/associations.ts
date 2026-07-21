@@ -513,10 +513,10 @@ export function _cacheSingularTarget(record: Base, assocName: string, target: Ba
   // a minimal loaded holder keyed by the name for ad-hoc inverses. Surfaced
   // through `Base#_associationCache`.
   const existing = record._associationInstances.get(assocName) as
-    | { setTarget(t: unknown): void; _explicitTarget?: boolean }
+    | { _setTargetFromLoader(t: unknown): void; _explicitTarget?: boolean }
     | undefined;
   if (existing) {
-    existing.setTarget(target);
+    existing._setTargetFromLoader(target);
     existing._explicitTarget = true;
   } else {
     record._associationInstances.set(assocName, {
@@ -1294,10 +1294,10 @@ async function _loadSingularThroughViaDisableJoinsScope(
  */
 function syncToAssociationInstance(record: Base, assocName: string, result: unknown): void {
   const holder = record._associationInstances.get(assocName) as
-    | { setTarget(t: Base | Base[] | null): void; _loaderWritebackSuppressed?: number }
+    | { _setTargetFromLoader(t: Base | Base[] | null): void; _loaderWritebackSuppressed?: number }
     | undefined;
   if (!holder || holder._loaderWritebackSuppressed) return;
-  holder.setTarget(result as Base | Base[] | null);
+  holder._setTargetFromLoader(result as Base | Base[] | null);
 }
 
 /**
