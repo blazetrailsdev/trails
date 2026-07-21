@@ -2,7 +2,9 @@
  * Trails-specific ToSql tests: no like-named Rails test exists in
  * arel/test/visitors/test_to_sql.rb.
  */
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
+import { setDefaultTimezone } from "@blazetrails/activemodel";
 import * as Nodes from "../nodes/index.js";
 import * as Visitors from "./index.js";
 import { Table } from "../table.js";
@@ -97,5 +99,30 @@ describe("ToSql raw scalars in quoting slots", () => {
   it("quotes a bare string in an Assignment right instead of raising", () => {
     const node = new Nodes.Assignment(users.get("name"), "x");
     expect(new Visitors.ToSql().compile(node)).toBe('"users"."name" = \'x\'');
+  });
+});
+
+// Rails' `quoted_date` (abstract/quoting.rb:184-192) converts an instant with
+// `value.getutc` or `value.getlocal` depending on `ActiveRecord.default_timezone`.
+// The connection-less debug quoter reaches the same setting through activemodel's
+// `configuredTimezone()`, so it agrees with the adapter twin's
+// `defaultSqlTimezone()` instead of hardcoding UTC.
+describe("ToSql quoted_date timezone", () => {
+  const instant = Temporal.Instant.from("2020-01-02T12:00:00Z");
+  const compile = () => new Visitors.ToSql().compile(new Nodes.Quoted(instant));
+
+  afterEach(() => setDefaultTimezone("utc"));
+
+  it("renders an instant in UTC when default_timezone is :utc", () => {
+    setDefaultTimezone("utc");
+    expect(compile()).toBe("'2020-01-02 12:00:00'");
+  });
+
+  it("renders an instant in the local zone when default_timezone is :local", () => {
+    setDefaultTimezone("local");
+    const expected = instant.toZonedDateTimeISO(Temporal.Now.timeZoneId());
+    expect(compile()).toBe(
+      `'${expected.toPlainDateTime().toString({ smallestUnit: "second" }).replace("T", " ")}'`,
+    );
   });
 });

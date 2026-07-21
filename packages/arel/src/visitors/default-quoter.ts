@@ -2,6 +2,7 @@ import type { ArelConnection } from "./connection.js";
 import { quoteSchemaQualifiedName } from "./split-schema-qualified-name.js";
 import { quoteArrayLiteral } from "../quote-array.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { configuredTimezone } from "@blazetrails/activemodel";
 
 // Standalone comment sanitize for connection-less `Node#toSql()` (debug aid):
 // strips block-comment delimiters (leaving `--` alone, like Rails' abstract
@@ -41,18 +42,21 @@ type TemporalDateLike =
 // inline instead — as it already does for every other value-formatting decision
 // on the connection-less path.
 //
-// Deviation: Rails' `quoted_date` is timezone-aware via
-// `ActiveRecord.default_timezone`; that setting lives in activerecord, which arel
-// must not depend on. Instant/ZonedDateTime are therefore rendered in UTC here.
-// Real adapters (which own the setting) never reach this host.
+// Timezone-aware like Rails' `quoted_date` (abstract/quoting.rb:184-192):
+// `value.getutc` when `default_timezone == :utc`, `value.getlocal` otherwise.
+// The setting is reached through activemodel's `configuredTimezone()` — arel
+// already depends on activemodel, and activerecord's `setDefaultTimezone` keeps
+// activemodel's copy in lockstep, so this host and the adapter twin's
+// `defaultSqlTimezone()` (connection-adapters/abstract/sql-datetime.ts:23-25)
+// always agree without arel depending on activerecord.
 function quotedDate(value: TemporalDateLike): string {
   if (value instanceof Temporal.Instant)
-    return formatPlainDateTime(value.toZonedDateTimeISO("UTC"));
+    return formatPlainDateTime(value.toZonedDateTimeISO(configuredTimezone()));
   // Converts rather than reading the wall clock, mirroring the adapter twin's
   // `value.toInstant()` (connection-adapters/abstract/quoting.ts:591) and Rails'
   // `value.getutc` (abstract/quoting.rb:186-188).
   if (value instanceof Temporal.ZonedDateTime)
-    return formatPlainDateTime(value.toInstant().toZonedDateTimeISO("UTC"));
+    return formatPlainDateTime(value.toInstant().toZonedDateTimeISO(configuredTimezone()));
   if (value instanceof Temporal.PlainDateTime) return formatPlainDateTime(value);
   if (value instanceof Temporal.PlainDate) {
     return `${padYear(value.year)}-${pad(value.month)}-${pad(value.day)}`;
