@@ -12,11 +12,19 @@
  *   - Class instance + static methods (one container per ClassBody).
  *   - Top-level FunctionDeclaration (incl. `export function …`).
  *
- * The manifest provides a single flat expected order per file. For each
- * container, the rule filters expected names to those present in that
- * container; the relative order between mapped names must match. Names
- * not in the manifest (TS-only helpers) preserve their relative order
- * after the mapped block.
+ * The manifest keys expected order per container: `classes[Name]` for
+ * each class body (matched by the class's declared name) and `functions`
+ * for the file's top-level functions. For each container, the rule
+ * filters expected names to those present in that container; the relative
+ * order between mapped names must match. Names not in the manifest
+ * (TS-only helpers) preserve their relative order after the mapped block.
+ * Keying per class lets one file define several classes whose members
+ * share names but appear in different Rails order (e.g. `casted.rb`'s
+ * `Casted` vs `Quoted`). A class body is matched to a bucket by exact TS
+ * name; when trails renamed the Rails constant (`Type::Integer` →
+ * `IntegerType`, `Name` → `ModelName`), it falls back to pairing the sole
+ * unmatched class body with the sole unmatched bucket. Anything more
+ * ambiguous is left unordered.
  *
  * Autofix carries leading JSDoc / line comments with each declaration
  * (a comment is attached if it ends on the line immediately preceding
@@ -40,6 +48,36 @@ function loadManifest() {
   }
   manifestCache = JSON.parse(fs.readFileSync(MANIFEST_PATH, "utf8"));
   return manifestCache;
+}
+
+// Opt-in coverage report (set RAILS_STRUCTURE_REPORT=1, as the CI step does).
+// Manifest buckets that match no container in their file are silently dropped —
+// a Rails constant trails renamed past the substring fallback, or a Ruby module
+// ported as a TS class (its order lands in `functions`, which no class body
+// reads). This surfaces them so the drop is visible rather than invisible.
+const coverageReport = process.env.RAILS_STRUCTURE_REPORT ? [] : null;
+let reportHookInstalled = false;
+function installReportHook() {
+  if (reportHookInstalled || !coverageReport) return;
+  reportHookInstalled = true;
+  process.on("exit", () => {
+    if (coverageReport.length === 0) return;
+    let dropped = 0;
+    const lines = [];
+    for (const { rel, classes, functionsDropped } of coverageReport) {
+      const parts = [];
+      if (classes.length) parts.push(`classes: ${classes.join(", ")}`);
+      if (functionsDropped) parts.push("functions (no top-level fns)");
+      if (parts.length === 0) continue;
+      dropped += classes.length + (functionsDropped ? 1 : 0);
+      lines.push(`  ${rel} — ${parts.join("; ")}`);
+    }
+    if (lines.length === 0) return;
+    process.stderr.write(
+      `[rails-file-structure-method-order] ${dropped} manifest bucket(s) matched no ` +
+        `container (order not enforced):\n${lines.join("\n")}\n`,
+    );
+  });
 }
 
 let repoRootCache = null;
@@ -114,6 +152,27 @@ function memberName(node) {
       node.declaration?.type === "TSDeclareFunction")
   ) {
     return node.declaration.id?.name ?? null;
+  }
+  return null;
+}
+
+// Name of the class a ClassBody belongs to, for manifest lookup. Handles
+// `class Foo {}` / `export class Foo` / `export default class Foo`
+// (ClassDeclaration.id) and `const Foo = class {}` (ClassExpression under a
+// VariableDeclarator). Anonymous class expressions with no binding name
+// return null and are skipped — the manifest can't address them.
+function classNameOf(classBody) {
+  const parent = classBody.parent;
+  if (!parent) return null;
+  if (
+    (parent.type === "ClassDeclaration" || parent.type === "ClassExpression") &&
+    parent.id?.type === "Identifier"
+  ) {
+    return parent.id.name;
+  }
+  if (parent.type === "ClassExpression" && parent.parent?.type === "VariableDeclarator") {
+    const id = parent.parent.id;
+    if (id?.type === "Identifier") return id.name;
   }
   return null;
 }
@@ -240,8 +299,13 @@ const rule = {
     if (!filename) return {};
     const rel = relFromRepoRoot(filename);
     const manifest = loadManifest();
-    const expectedOrder = manifest.files?.[rel];
-    if (!expectedOrder || expectedOrder.length === 0) return {};
+    const fileOrder = manifest.files?.[rel];
+    if (!fileOrder) return {};
+    const classOrders = fileOrder.classes ?? {};
+    const functionOrder = fileOrder.functions ?? [];
+    const hasAnyOrder =
+      functionOrder.length > 0 || Object.values(classOrders).some((a) => a.length > 0);
+    if (!hasAnyOrder) return {};
 
     const sourceCode = context.sourceCode ?? context.getSourceCode();
 
@@ -269,6 +333,13 @@ const rule = {
     // would risk TDZ violations (plan §7) — don't do it without scope
     // analysis to verify each move is safe.
     const containers = [];
+    // Eligible class bodies collected during traversal, resolved to their
+    // manifest bucket at Program:exit (see `resolveClassOrder`).
+    const classCandidates = [];
+    // Every class name in the file, including bodies with <2 orderable members;
+    // used only to keep the coverage report signal (renames / module-as-class)
+    // free of noise from small classes that were never orderable anyway.
+    const allClassNames = new Set();
 
     return {
       ClassBody(node) {
@@ -296,21 +367,81 @@ const rule = {
           ancestor = ancestor.parent;
         }
         if (nested) return;
+        const name = classNameOf(node);
+        if (name) allClassNames.add(name);
         const orderable = node.body.filter(isOrderableClassMember);
         if (orderable.length < 2) return;
-        containers.push({ container: node, members: orderable });
+        classCandidates.push({ node, name, members: orderable });
       },
       "Program:exit"(programNode) {
+        // Assign each class body its manifest bucket. Exact TS-name match
+        // first; then, because trails often RENAMES the Rails constant
+        // (`ActiveModel::Type::Integer` → `IntegerType`, `ActiveModel::Name`
+        // → `ModelName`, `Arel::Visitors::Dot::Node` → `DotNode`), fall back
+        // to pairing when EXACTLY ONE class body and EXACTLY ONE manifest
+        // bucket remain unmatched — an unambiguous 1:1 rename. Anything more
+        // ambiguous is left unordered rather than risk a wrong pairing.
+        const bucketKeys = Object.keys(classOrders).filter((k) => classOrders[k].length > 0);
+        const usedBucket = new Set();
+        for (const cand of classCandidates) {
+          if (cand.name && bucketKeys.includes(cand.name) && classOrders[cand.name].length > 0) {
+            cand.expectedOrder = classOrders[cand.name];
+            usedBucket.add(cand.name);
+          }
+        }
+        const unresolved = classCandidates.filter((c) => !c.expectedOrder);
+        const freeBuckets = bucketKeys.filter((k) => !usedBucket.has(k));
+        if (unresolved.length === 1 && freeBuckets.length === 1) {
+          // Require evidence the two are the same entity before pairing: the
+          // Rails constant must be a case-insensitive substring of the TS class
+          // name (or vice versa). Every real rename satisfies this — `Name` ⊂
+          // `ModelName`, `Integer` ⊂ `IntegerType`, `Node` ⊂ `DotNode`. Without
+          // it, a file with one matched class, one TS-only helper class, and one
+          // never-ported Ruby class hits the same 1/1 shape and the helper would
+          // be reordered to an unrelated Rails order.
+          const tsName = (unresolved[0].name ?? "").toLowerCase();
+          const bucket = freeBuckets[0].toLowerCase();
+          if (tsName && (tsName.includes(bucket) || bucket.includes(tsName))) {
+            unresolved[0].expectedOrder = classOrders[freeBuckets[0]];
+            usedBucket.add(freeBuckets[0]);
+          }
+        }
+        for (const cand of classCandidates) {
+          if (cand.expectedOrder) {
+            containers.push({ members: cand.members, expectedOrder: cand.expectedOrder });
+          }
+        }
+
         const topLevel = programNode.body.filter(isOrderableTopLevel);
-        if (topLevel.length >= 2) {
-          containers.push({ container: programNode, members: topLevel });
+        const functionsConsumed = topLevel.length >= 2 && functionOrder.length > 0;
+        if (functionsConsumed) {
+          containers.push({
+            container: programNode,
+            members: topLevel,
+            expectedOrder: functionOrder,
+          });
+        }
+
+        if (coverageReport) {
+          installReportHook();
+          // Only buckets with no class of that name at all — the genuine
+          // rename/module-as-class drops. A bucket whose class exists but has
+          // <2 orderable members is not a concerning drop, so drop it from the
+          // report signal.
+          const unmatchedClasses = bucketKeys.filter(
+            (k) => !usedBucket.has(k) && !allClassNames.has(k),
+          );
+          const functionsDropped = functionOrder.length > 0 && !functionsConsumed;
+          if (unmatchedClasses.length > 0 || functionsDropped) {
+            coverageReport.push({ rel, classes: unmatchedClasses, functionsDropped });
+          }
         }
 
         const fixes = [];
         let firstMismatch = null; // { node, expectedName, beforeName }
         let mismatchCount = 0;
 
-        for (const { members } of containers) {
+        for (const { members, expectedOrder } of containers) {
           // Collapse consecutive same-named members into units before
           // reorder, so TS overload groups (and class accessor pairs
           // where the pair is already adjacent) move as a single block.

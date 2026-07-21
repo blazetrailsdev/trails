@@ -160,12 +160,16 @@ export abstract class Attribute {
     return this._originalValueForDatabase();
   }
 
+  private isAssigned(): boolean {
+    return this.originalAttribute !== null;
+  }
+
+  abstract typeCast(value: unknown): unknown;
+
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
     return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
   }
-
-  abstract typeCast(value: unknown): unknown;
 
   /** @internal */
   protected _valueForDatabase(): unknown {
@@ -250,10 +254,6 @@ export abstract class Attribute {
     this.originalAttribute = attr;
   }
 
-  private isAssigned(): boolean {
-    return this.originalAttribute !== null;
-  }
-
   /**
    * Create an attribute where we already have both the raw and cast values.
    * Used in the Model constructor after applying normalization/nullify.
@@ -269,6 +269,10 @@ export abstract class Attribute {
 }
 
 export class FromDatabase extends Attribute {
+  typeCast(value: unknown): unknown {
+    return this.type.deserialize(value);
+  }
+
   override forgettingAssignment(): Attribute {
     // Rails condition: `!defined?(@value_for_database) && !changed_in_place?`
     // → fast-path creates a new FromDatabase using the existing value_before_type_cast.
@@ -278,10 +282,6 @@ export class FromDatabase extends Attribute {
     // a new FromDatabase, resetting the baseline to the post-mutation state.
     if (!this.changedInPlace()) return this;
     return super.forgettingAssignment();
-  }
-
-  typeCast(value: unknown): unknown {
-    return this.type.deserialize(value);
   }
 
   /** @internal */
@@ -310,12 +310,12 @@ export class FromUser extends Attribute {
 }
 
 export class WithCastValue extends Attribute {
-  changedInPlace(): boolean {
-    return false;
-  }
-
   typeCast(value: unknown): unknown {
     return value;
+  }
+
+  changedInPlace(): boolean {
+    return false;
   }
 }
 
@@ -324,20 +324,20 @@ export class Null extends Attribute {
     super(name, null, typeRegistry.lookup("value"));
   }
 
-  withValueFromUser(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
-  }
-
-  withValueFromDatabase(_value: unknown): Attribute {
-    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+  typeCast(): unknown {
+    return null;
   }
 
   override withType(type: Type): Attribute {
     return Attribute.withCastValue(this.name, null, type);
   }
 
-  typeCast(): unknown {
-    return null;
+  withValueFromDatabase(_value: unknown): Attribute {
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
+  }
+
+  withValueFromUser(_value: unknown): Attribute {
+    throw new MissingAttributeError(`can't write unknown attribute \`${this.name ?? ""}\``);
   }
 }
 
@@ -358,6 +358,10 @@ export class Uninitialized extends Attribute {
     return undefined;
   }
 
+  isInitialized(): boolean {
+    return false;
+  }
+
   forgettingAssignment(): Attribute {
     return new Uninitialized(this.name, this.type);
   }
@@ -368,9 +372,5 @@ export class Uninitialized extends Attribute {
 
   typeCast(): unknown {
     return undefined;
-  }
-
-  isInitialized(): boolean {
-    return false;
   }
 }

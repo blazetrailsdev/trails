@@ -1281,6 +1281,20 @@ jobs:
         # blazetrails/rails-private-jsdoc. The standalone Lint job has
         # no Ruby and intentionally no-ops this rule.
         run: pnpm exec tsx scripts/build-rails-privates-manifest.ts && pnpm exec eslint packages/arel/src
+      - name: Rails file-structure method-order lint
+        # Needs rails-api.json (extracted above) to build the per-class
+        # method-order manifest, then enforce
+        # blazetrails/rails-file-structure-method-order. The manifest is
+        # gitignored and only exists here (never committed), so the
+        # standalone Lint job intentionally no-ops this rule — this is the
+        # only job where it goes live. Enabled per-package via
+        # eslint.config.mjs (arel + activemodel). RAILS_STRUCTURE_REPORT=1 prints
+        # (to stderr, non-failing) any manifest bucket that matched no container
+        # — a renamed class past the fallback, or a module ported as a class —
+        # so the silent-drop surface stays visible in the job log.
+        env:
+          RAILS_STRUCTURE_REPORT: "1"
+        run: pnpm exec tsx scripts/build-rails-file-structure-manifest.ts && pnpm exec eslint packages/arel/src packages/activemodel/src
       - name: Test comparison
         # --gates prints the advisory adapter/feature gate-mismatch breakdown
         # (should-gate / missing-gate / wrong-gate / over-gated) in the log.

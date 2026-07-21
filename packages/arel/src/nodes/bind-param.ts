@@ -22,11 +22,6 @@ export class BindParam extends Node {
     this.value = value;
   }
 
-  valueBeforeTypeCast(): unknown {
-    const v = this.value as { valueBeforeTypeCast?: () => unknown } | null | undefined;
-    return typeof v?.valueBeforeTypeCast === "function" ? v.valueBeforeTypeCast() : this.value;
-  }
-
   /**
    * Mirrors `Arel::Nodes::BindParam#nil?` (bind_param.rb:23-25), which
    * delegates to `value.nil?`. A bare raw `null` value is nil; a wrapped
@@ -40,6 +35,11 @@ export class BindParam extends Node {
     if (this.value === null) return true;
     const v = this.value as { isNil?: () => boolean } | undefined;
     return typeof v?.isNil === "function" && v.isNil();
+  }
+
+  valueBeforeTypeCast(): unknown {
+    const v = this.value as { valueBeforeTypeCast?: () => unknown } | null | undefined;
+    return typeof v?.valueBeforeTypeCast === "function" ? v.valueBeforeTypeCast() : this.value;
   }
 
   /**
