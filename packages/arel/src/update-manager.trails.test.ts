@@ -12,6 +12,9 @@ describe("UpdateManager#set with a temporal value", () => {
     const um = new UpdateManager();
     um.table(users);
     um.set([[users.get("created_at"), Temporal.Instant.from("2026-04-30T12:34:56Z")]]);
-    expect(um.toSql()).toContain("2026-04-30");
+    // Full SQL, not a substring: a bare or ISO-8601 literal would still contain
+    // the date, but only the quoted `quoted_time` form proves the value went
+    // through quote() rather than reaching a visitor.
+    expect(um.toSql()).toBe('UPDATE "users" SET "created_at" = \'2026-04-30 12:34:56\'');
   });
 });
