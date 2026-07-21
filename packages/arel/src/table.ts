@@ -101,9 +101,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#group
    */
   group(...columns: (Node | string)[]): SelectManager {
-    const manager = this.from();
-    manager.group(...columns);
-    return manager;
+    return this.from().group(...columns);
   }
 
   /**
@@ -112,9 +110,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#order
    */
   order(...exprs: Node[]): SelectManager {
-    const manager = this.from();
-    manager.order(...exprs);
-    return manager;
+    return this.from().order(...exprs);
   }
 
   /**
@@ -123,17 +119,11 @@ export class Table extends Node {
    * Mirrors: Arel::Table#where
    */
   where(condition: Node): SelectManager {
-    const manager = this.from();
-    manager.where(condition);
-    return manager;
+    return this.from().where(condition);
   }
 
   project(...projections: (Node | string)[]): SelectManager {
-    const manager = this.from();
-    if (projections.length > 0) {
-      manager.project(...projections);
-    }
-    return manager;
+    return this.from().project(...projections);
   }
 
   /**
@@ -142,9 +132,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#take
    */
   take(amount: number): SelectManager {
-    const manager = this.from();
-    manager.take(amount);
-    return manager;
+    return this.from().take(amount);
   }
 
   /**
@@ -153,9 +141,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#skip
    */
   skip(amount: number): SelectManager {
-    const manager = this.from();
-    manager.skip(amount);
-    return manager;
+    return this.from().skip(amount);
   }
 
   /**
@@ -164,9 +150,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#having
    */
   having(expr: Node): SelectManager {
-    const manager = this.from();
-    manager.having(expr);
-    return manager;
+    return this.from().having(expr);
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
