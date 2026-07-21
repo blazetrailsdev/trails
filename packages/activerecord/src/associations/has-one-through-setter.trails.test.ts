@@ -79,6 +79,11 @@ describe("HasOneThroughSetterTrails", () => {
   it("assigning to a new owner defers the join row to the owner's first save", async () => {
     const member = Member.new({ name: "Unsaved" });
     const club = clubs("boring_club");
+    // Row count, not a `findBy` on `club_id`: four fixture memberships already
+    // point at `boring_club`, so any club-scoped lookup is non-null before we
+    // start. A count delta is what actually pins "the build arm wrote nothing".
+    const rowCount = async () => Number(await CurrentMembership.count());
+    const before = await rowCount();
 
     // A new owner takes Rails' `through_proxy.build` arm (:36-37), which needs
     // no `await` — the plain property setter is the faithful surface here.
@@ -89,9 +94,12 @@ describe("HasOneThroughSetterTrails", () => {
     const built = member.currentMembership;
     expect(built).not.toBeNull();
     expect(built!.isNewRecord()).toBe(true);
-    expect(await CurrentMembership.findBy({ club_id: club.id, member_id: null })).toBeNull();
+    expect(await rowCount()).toBe(before);
 
     await member.save();
+
+    // The deferred build lands exactly one row, at the owner's first save.
+    expect(await rowCount()).toBe(before + 1);
 
     const persisted = await CurrentMembership.findBy({ member_id: member.id });
     expect(persisted).not.toBeNull();
