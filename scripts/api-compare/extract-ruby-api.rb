@@ -326,6 +326,7 @@ class ApiExtractor
     end
 
     @current_file = rel_path
+    @current_line = 0
     walk(sexp)
 
     # Handle dynamic class creation via const_set:
@@ -417,6 +418,21 @@ class ApiExtractor
 
   def walk(node)
     return unless node.is_a?(Array)
+
+    # Track the source line of the construct being visited so every recorded
+    # method carries a position. Without it `class << self` blocks placed above
+    # the instance methods (e.g. active_model/attribute.rb:7-24) can't be
+    # interleaved back into Rails source order by manifest consumers.
+    #
+    # INVARIANT: a recorder must read `@current_line` BEFORE walking children.
+    # This is set on the way IN and never restored on the way OUT, so after a
+    # nested walk it holds the deepest line last visited, not the line of the
+    # construct being recorded. Every recorder today satisfies this (process_def
+    # /process_defs use non-walking helpers for deps/calls/digest; the
+    # process_command and method_add_block codegen recorders all fire before
+    # descending) — keep it that way, or capture the line into a local first.
+    line = first_line(node)
+    @current_line = line if line
 
     case node[0]
     when :module
@@ -570,6 +586,7 @@ class ApiExtractor
       visibility: vis.to_s,
       params: params,
       file: @current_file,
+      line: @current_line,
     }
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
@@ -621,6 +638,7 @@ class ApiExtractor
       visibility: vis.to_s,
       params: params,
       file: @current_file,
+      line: @current_line,
     }
     method_info[:deps] = dep_info[:deps] unless dep_info[:deps].empty?
     method_info[:depRefs] = dep_info[:depRefs] unless dep_info[:depRefs].empty?
@@ -895,7 +913,7 @@ class ApiExtractor
     names = extract_symbol_args(args)
     names.each do |name|
       if kind == :reader || kind == :accessor
-        entry = { name: name, visibility: vis.to_s, params: [], file: file }
+        entry = { name: name, visibility: vis.to_s, params: [], file: file, line: @current_line }
         entry[:umbrellaConfig] = true if redirect_fqn
         target[bucket] << entry
       end
@@ -905,6 +923,7 @@ class ApiExtractor
           visibility: vis.to_s,
           params: [{ name: "value", kind: "required" }],
           file: file,
+          line: @current_line,
         }
         entry[:umbrellaConfig] = true if redirect_fqn
         target[bucket] << entry
@@ -944,6 +963,7 @@ class ApiExtractor
           visibility: vis.to_s,
           params: [],
           file: @current_file,
+          line: @current_line,
         }
       end
       if kind == :writer || kind == :accessor
@@ -952,6 +972,7 @@ class ApiExtractor
           visibility: vis.to_s,
           params: [{ name: "value", kind: "required" }],
           file: @current_file,
+          line: @current_line,
         }
       end
       maybe_update_module_file(fqn, target)
@@ -974,6 +995,7 @@ class ApiExtractor
       visibility: vis.to_s,
       params: [],
       file: @current_file,
+      line: @current_line,
       notes: "alias",
     }
     # Record the aliased target so resolve_aliases! can copy its real param
@@ -1005,6 +1027,7 @@ class ApiExtractor
       visibility: current_visibility.to_s,
       params: [],
       file: @current_file,
+      line: @current_line,
       notes: "alias",
     }
     # Record the aliased target so resolve_aliases! can copy its real param
@@ -1212,6 +1235,7 @@ class ApiExtractor
       visibility: "public",
       params: params,
       file: @current_file,
+      line: @current_line,
       notes: "class_attribute",
     }
     target[:classMethods] << info if on_class
@@ -1252,6 +1276,7 @@ class ApiExtractor
       visibility: "public",
       params: [],
       file: @current_file,
+      line: @current_line,
       notes: "scope",
     }
   end
@@ -1269,6 +1294,7 @@ class ApiExtractor
       visibility: "public",
       params: [],
       file: @current_file,
+      line: @current_line,
       notes: "scope",
     }
   end
@@ -1326,6 +1352,7 @@ class ApiExtractor
         visibility: "public",
         params: [],
         file: @current_file,
+        line: @current_line,
         notes: "delegate",
       }
     end
@@ -1356,6 +1383,7 @@ class ApiExtractor
         visibility: "public",
         params: params,
         file: @current_file,
+        line: @current_line,
         notes: "define_column_methods",
       }
     end
@@ -1415,6 +1443,7 @@ class ApiExtractor
             visibility: "public",
             params: form == :writer ? [{ name: "value", kind: "required" }] : [],
             file: @current_file,
+            line: @current_line,
             notes: "class_eval",
           }
         end
@@ -1838,6 +1867,35 @@ class ApiExtractor
   end
 
   # ---- Helpers ----
+
+  # Earliest source line under `node`. Ripper's SCANNER events carry a
+  # `[lineno, column]` tuple as their last element (e.g.
+  # `[:@ident, "from_database", [7, 8]]`); parser events don't, so recurse
+  # until one turns up.
+  #
+  # The scanner-event gate (`:@`-prefixed head) is what makes this exact rather
+  # than a guess: shape alone ("last element is a 2-Integer array") would also
+  # match any parser event that happened to end in one, and silently yield a
+  # line from the wrong subtree. Only scanner events ever carry positions, so
+  # checking the head costs nothing and removes the ambiguity.
+  def first_line(node)
+    return nil unless node.is_a?(Array)
+
+    head = node[0]
+    if head.is_a?(Symbol) && head.to_s.start_with?("@")
+      tail = node.last
+      if tail.is_a?(Array) && tail.length == 2 &&
+         tail[0].is_a?(Integer) && tail[1].is_a?(Integer)
+        return tail[0]
+      end
+    end
+
+    node.each do |child|
+      line = first_line(child)
+      return line if line
+    end
+    nil
+  end
 
   def new_class_info(name, fqn)
     {

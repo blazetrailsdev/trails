@@ -736,3 +736,77 @@ describe("Ruby extractor body digest (source-hash pinning)", () => {
     expect(edited["Foo#save"]).not.toBe(base["Foo#save"]);
   });
 });
+
+// Per-method source lines let consumers (the file-structure method-order
+// manifest) interleave classMethods back into Rails source order instead of
+// appending them after instanceMethods — which inverts every Rails file that
+// opens with a `class << self` block (active_model/attribute.rb:7-24).
+describe("Ruby extractor method source lines", () => {
+  const RUBY_SCRIPT = path.join(HERE, "extract-ruby-api.rb");
+
+  // Returns "<fqn>#<method>" -> [bucket, line].
+  function rubyLines(src: string): Record<string, [string, number]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "lines-rb-"));
+    try {
+      fs.writeFileSync(path.join(dir, "a.rb"), src);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        ex = ApiExtractor.new
+        ex.process_file(File.join(${JSON.stringify(dir)}, "a.rb"), ${JSON.stringify(dir)})
+        out = {}
+        ex.classes.each do |fqn, info|
+          %i[instanceMethods classMethods].each do |bucket|
+            info[bucket].each { |m| out["#{fqn}##{m[:name]}"] = [bucket.to_s, m[:line]] }
+          end
+        end
+        puts JSON.generate(out)
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("records a leading `class << self` block ahead of the instance methods", () => {
+    const lines = rubyLines(
+      [
+        "class Attribute",
+        "  class << self",
+        "    def from_database(value)",
+        "      new(value)",
+        "    end",
+        "  end",
+        "",
+        "  attr_reader :value",
+        "",
+        "  def initialize(value)",
+        "    @value = value",
+        "  end",
+        "end",
+      ].join("\n"),
+    );
+    expect(lines["Attribute#from_database"]).toEqual(["classMethods", 3]);
+    expect(lines["Attribute#value"]).toEqual(["instanceMethods", 8]);
+    expect(lines["Attribute#initialize"]).toEqual(["instanceMethods", 10]);
+  });
+
+  it("records a line for `def self.` singleton methods and aliases", () => {
+    const lines = rubyLines(
+      [
+        "class Foo",
+        "  def bar",
+        "  end",
+        "",
+        "  alias baz bar",
+        "",
+        "  def self.qux",
+        "  end",
+        "end",
+      ].join("\n"),
+    );
+    expect(lines["Foo#bar"]).toEqual(["instanceMethods", 2]);
+    expect(lines["Foo#baz"]).toEqual(["instanceMethods", 5]);
+    expect(lines["Foo#qux"]).toEqual(["classMethods", 7]);
+  });
+});

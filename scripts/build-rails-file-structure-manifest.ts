@@ -26,6 +26,7 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
 import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import { mergeBySourceLine } from "./api-compare/source-order.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -59,6 +60,7 @@ interface RubyMethod {
   name: string;
   visibility: "public" | "private" | "protected";
   file?: string;
+  line?: number;
 }
 interface RubyEntity {
   fqn: string;
@@ -185,13 +187,11 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
       const className = host.fqn.split("::").pop() ?? host.fqn;
-      for (const m of host.instanceMethods ?? []) {
-        const file = m.file ?? host.file;
-        noteClass(file, className, host.fqn);
-        const b = bucketFor(file, className);
-        pushMethod(b.names, b.seen, m.name);
-      }
-      for (const m of host.classMethods ?? []) {
+      // Order by source line rather than appending classMethods after
+      // instanceMethods — see mergeBySourceLine for why. Bucketing by `file`
+      // happens below, after ordering; the merge is a total order on `line`, so
+      // each file's slice is still ascending.
+      for (const m of mergeBySourceLine(host.instanceMethods, host.classMethods)) {
         const file = m.file ?? host.file;
         noteClass(file, className, host.fqn);
         const b = bucketFor(file, className);
@@ -202,11 +202,7 @@ for (const [pkg, rubyPkg] of Object.entries<any>(railsApi.packages)) {
   const visitModules = (entities: Record<string, RubyEntity>) => {
     for (const host of Object.values(entities)) {
       if (!host.file) continue;
-      for (const m of host.instanceMethods ?? []) {
-        const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
-        pushMethod(b.names, b.seen, m.name);
-      }
-      for (const m of host.classMethods ?? []) {
+      for (const m of mergeBySourceLine(host.instanceMethods, host.classMethods)) {
         const b = bucketFor(m.file ?? host.file, FUNCTIONS_KEY);
         pushMethod(b.names, b.seen, m.name);
       }

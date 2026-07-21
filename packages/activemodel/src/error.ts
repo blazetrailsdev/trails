@@ -103,43 +103,6 @@ export class Error {
     this.options = options;
   }
 
-  get message(): string {
-    // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
-    // TS has no Symbol type; identifier-shaped strings (no spaces/punctuation) are the equivalent.
-    if (IDENTIFIER_RE.test(this.rawType)) {
-      const opts: Record<string, unknown> = {};
-      for (const [k, v] of Object.entries(this.options)) {
-        if (!CALLBACKS_OPTIONS.has(k)) opts[k] = v;
-      }
-      return Error.generateMessage(this.attribute, this.rawType, this.base, opts);
-    }
-    return this.rawType;
-  }
-
-  get details(): Record<string, unknown> {
-    const result: Record<string, unknown> = { error: this.rawType };
-    for (const [key, value] of Object.entries(this.options)) {
-      if (
-        key !== "if" &&
-        key !== "unless" &&
-        key !== "on" &&
-        key !== "allow_nil" &&
-        key !== "allow_blank" &&
-        key !== "allowNil" &&
-        key !== "allowBlank" &&
-        key !== "strict" &&
-        key !== "message"
-      ) {
-        result[key] = value;
-      }
-    }
-    return result;
-  }
-
-  get detail(): Record<string, unknown> {
-    return this.details;
-  }
-
   get fullMessage(): string {
     return Error.fullMessage(this.attribute, this.message, this.base);
   }
@@ -201,64 +164,6 @@ export class Error {
     }
 
     return format;
-  }
-
-  /**
-   * See if this error matches `attribute`, `type`, and `options`. Mirrors
-   * Rails `Error#match?` (activemodel/lib/active_model/error.rb:166-174):
-   * subset match — every key in `options` must equal (Ruby `==`, i.e.
-   * structural for Array/Hash, value-equal for primitives) the
-   * corresponding value in `this.options`; extra keys on the error are
-   * ignored. Not Ruby's case-equality (`===`), which would imply
-   * RegExp/Range-style matching — Rails' `match?` uses `!=`.
-   */
-  match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
-    if (this.attribute !== attribute) return false;
-    if (type !== undefined && this.type !== type) return false;
-    if (options) {
-      for (const [key, value] of Object.entries(options)) {
-        if (!optionsEqual(this.options[key], value)) return false;
-      }
-    }
-    return true;
-  }
-
-  /**
-   * Strict match — Rails `Error#strict_match?`
-   * (activemodel/lib/active_model/error.rb:184-188): attribute/type must
-   * match and `options` must equal the error's `@options` with
-   * `CALLBACKS_OPTIONS` and `MESSAGE_OPTIONS` stripped.
-   */
-  strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
-    if (!this.match(attribute, type)) return false;
-    const expected = options ?? {};
-    const own: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.options)) {
-      if (!CALLBACKS_OPTIONS.has(k) && !MESSAGE_OPTIONS.has(k)) own[k] = v;
-    }
-    const expectedKeys = Object.keys(expected);
-    const ownKeys = Object.keys(own);
-    if (expectedKeys.length !== ownKeys.length) return false;
-    for (const k of expectedKeys) {
-      if (!Object.prototype.hasOwnProperty.call(own, k) || !optionsEqual(own[k], expected[k]))
-        return false;
-    }
-    return true;
-  }
-
-  /**
-   * Identity tuple used by `==` and `hash`. Mirrors Rails
-   * `attributes_for_hash` (activemodel/lib/active_model/error.rb:204-206):
-   * `[@base, @attribute, @raw_type, @options.except(*CALLBACKS_OPTIONS)]`.
-   *
-   * @internal Rails-private helper.
-   */
-  protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
-    const own: Record<string, unknown> = {};
-    for (const [k, v] of Object.entries(this.options)) {
-      if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
-    }
-    return [this.base, this.attribute, this.rawType, own];
   }
 
   /**
@@ -339,6 +244,101 @@ export class Error {
       defaults: defaults.slice(1),
       defaultValue: type,
     });
+  }
+
+  get message(): string {
+    // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
+    // TS has no Symbol type; identifier-shaped strings (no spaces/punctuation) are the equivalent.
+    if (IDENTIFIER_RE.test(this.rawType)) {
+      const opts: Record<string, unknown> = {};
+      for (const [k, v] of Object.entries(this.options)) {
+        if (!CALLBACKS_OPTIONS.has(k)) opts[k] = v;
+      }
+      return Error.generateMessage(this.attribute, this.rawType, this.base, opts);
+    }
+    return this.rawType;
+  }
+
+  get details(): Record<string, unknown> {
+    const result: Record<string, unknown> = { error: this.rawType };
+    for (const [key, value] of Object.entries(this.options)) {
+      if (
+        key !== "if" &&
+        key !== "unless" &&
+        key !== "on" &&
+        key !== "allow_nil" &&
+        key !== "allow_blank" &&
+        key !== "allowNil" &&
+        key !== "allowBlank" &&
+        key !== "strict" &&
+        key !== "message"
+      ) {
+        result[key] = value;
+      }
+    }
+    return result;
+  }
+
+  get detail(): Record<string, unknown> {
+    return this.details;
+  }
+
+  /**
+   * See if this error matches `attribute`, `type`, and `options`. Mirrors
+   * Rails `Error#match?` (activemodel/lib/active_model/error.rb:166-174):
+   * subset match — every key in `options` must equal (Ruby `==`, i.e.
+   * structural for Array/Hash, value-equal for primitives) the
+   * corresponding value in `this.options`; extra keys on the error are
+   * ignored. Not Ruby's case-equality (`===`), which would imply
+   * RegExp/Range-style matching — Rails' `match?` uses `!=`.
+   */
+  match(attribute: string, type?: string, options?: Record<string, unknown>): boolean {
+    if (this.attribute !== attribute) return false;
+    if (type !== undefined && this.type !== type) return false;
+    if (options) {
+      for (const [key, value] of Object.entries(options)) {
+        if (!optionsEqual(this.options[key], value)) return false;
+      }
+    }
+    return true;
+  }
+
+  /**
+   * Strict match — Rails `Error#strict_match?`
+   * (activemodel/lib/active_model/error.rb:184-188): attribute/type must
+   * match and `options` must equal the error's `@options` with
+   * `CALLBACKS_OPTIONS` and `MESSAGE_OPTIONS` stripped.
+   */
+  strictMatch(attribute: string, type: string, options?: Record<string, unknown>): boolean {
+    if (!this.match(attribute, type)) return false;
+    const expected = options ?? {};
+    const own: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(this.options)) {
+      if (!CALLBACKS_OPTIONS.has(k) && !MESSAGE_OPTIONS.has(k)) own[k] = v;
+    }
+    const expectedKeys = Object.keys(expected);
+    const ownKeys = Object.keys(own);
+    if (expectedKeys.length !== ownKeys.length) return false;
+    for (const k of expectedKeys) {
+      if (!Object.prototype.hasOwnProperty.call(own, k) || !optionsEqual(own[k], expected[k]))
+        return false;
+    }
+    return true;
+  }
+
+  /**
+   * Identity tuple used by `==` and `hash`. Mirrors Rails
+   * `attributes_for_hash` (activemodel/lib/active_model/error.rb:204-206):
+   * `[@base, @attribute, @raw_type, @options.except(*CALLBACKS_OPTIONS)]`.
+   *
+   * @internal Rails-private helper.
+   */
+  protected attributesForHash(): [ModelBase, string, string, Record<string, unknown>] {
+    const own: Record<string, unknown> = {};
+    for (const [k, v] of Object.entries(this.options)) {
+      if (!CALLBACKS_OPTIONS.has(k)) own[k] = v;
+    }
+    return [this.base, this.attribute, this.rawType, own];
   }
 
   /**
