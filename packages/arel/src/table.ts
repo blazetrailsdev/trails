@@ -50,6 +50,10 @@ export class Table extends Node {
     this.typeCaster = options?.typeCaster ?? null;
   }
 
+  get engine(): unknown {
+    return Table.engine;
+  }
+
   /**
    * Create an alias for this table.
    *
@@ -184,10 +188,6 @@ export class Table extends Node {
 
   isAbleToTypeCast(): boolean {
     return this.typeCaster != null;
-  }
-
-  get engine(): unknown {
-    return Table.engine;
   }
 
   get(name: string, table?: Attribute["relation"]): Attribute {

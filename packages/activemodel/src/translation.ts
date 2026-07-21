@@ -36,6 +36,13 @@ const MISSING_TRANSLATION = "\x00__MISSING_TRANSLATION__\x00";
 
 let _raiseOnMissingTranslations = false;
 
+export function raiseOnMissingTranslations(value?: boolean): boolean {
+  if (value !== undefined) {
+    _raiseOnMissingTranslations = value;
+  }
+  return _raiseOnMissingTranslations;
+}
+
 /**
  * Walk the class prototype chain collecting constructors that expose a
  * modelName static (i.e. those that include ActiveModel::Naming in Rails).
@@ -99,13 +106,6 @@ export function humanAttributeName(
     }
     return result;
   }
-}
-
-export function raiseOnMissingTranslations(value?: boolean): boolean {
-  if (value !== undefined) {
-    _raiseOnMissingTranslations = value;
-  }
-  return _raiseOnMissingTranslations;
 }
 
 function _callI18n(

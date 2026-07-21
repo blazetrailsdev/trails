@@ -57,6 +57,40 @@ export abstract class Attribute {
     this._hasValueForDatabase = false;
   }
 
+  // --- Factory methods ---
+
+  static fromDatabase(name: string, value: unknown, type: Type, castValue?: unknown): FromDatabase {
+    if (arguments.length >= 4) {
+      return new FromDatabase(name, value, type, null, castValue);
+    }
+    return new FromDatabase(name, value, type, null);
+  }
+
+  static fromUser(
+    name: string,
+    value: unknown,
+    type: Type,
+    originalAttribute: Attribute | null = null,
+  ): FromUser {
+    return new FromUser(name, value, type, originalAttribute);
+  }
+
+  withCastValue(value: unknown): Attribute {
+    return new WithCastValue(this.name, value, this.type);
+  }
+
+  static withCastValue(name: string, value: unknown, type: Type): WithCastValue {
+    return new WithCastValue(name, value, type);
+  }
+
+  static null(name: string): Null {
+    return new Null(name);
+  }
+
+  static uninitialized(name: string, type: Type): Uninitialized {
+    return new Uninitialized(name, type);
+  }
+
   get valueBeforeTypeCast(): unknown {
     return this._valueBeforeTypeCast;
   }
@@ -120,14 +154,6 @@ export abstract class Attribute {
     return Attribute.fromDatabase(this.name, value, this.type);
   }
 
-  withCastValue(value: unknown): Attribute {
-    return new WithCastValue(this.name, value, this.type);
-  }
-
-  static withCastValue(name: string, value: unknown, type: Type): WithCastValue {
-    return new WithCastValue(name, value, type);
-  }
-
   withType(type: Type): Attribute {
     if (this.changedInPlace()) {
       return this.withValueFromUser(this.value).withType(type);
@@ -144,6 +170,8 @@ export abstract class Attribute {
   isInitialized(): boolean {
     return true;
   }
+
+  abstract typeCast(value: unknown): unknown;
 
   cameFromUser(): boolean {
     return false;
@@ -164,8 +192,6 @@ export abstract class Attribute {
     return this.originalAttribute !== null;
   }
 
-  abstract typeCast(value: unknown): unknown;
-
   private changedFromAssignment(): boolean {
     if (!this.isAssigned()) return false;
     return this.type.isChanged(this.originalValue, this.value, this.valueBeforeTypeCast);
@@ -179,32 +205,6 @@ export abstract class Attribute {
   /** @internal */
   protected _originalValueForDatabase(): unknown {
     return this.type.serialize(this.originalValue);
-  }
-
-  // --- Factory methods ---
-
-  static fromDatabase(name: string, value: unknown, type: Type, castValue?: unknown): FromDatabase {
-    if (arguments.length >= 4) {
-      return new FromDatabase(name, value, type, null, castValue);
-    }
-    return new FromDatabase(name, value, type, null);
-  }
-
-  static fromUser(
-    name: string,
-    value: unknown,
-    type: Type,
-    originalAttribute: Attribute | null = null,
-  ): FromUser {
-    return new FromUser(name, value, type, originalAttribute);
-  }
-
-  static null(name: string): Null {
-    return new Null(name);
-  }
-
-  static uninitialized(name: string, type: Type): Uninitialized {
-    return new Uninitialized(name, type);
   }
 
   /**
