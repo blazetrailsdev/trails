@@ -26,11 +26,14 @@ describe("ReloadAssociationCacheTest", () => {
     await publication.reload();
     expect(publication.readAttribute("name")).toBe("Rails Way");
     const pub = publication as unknown as {
-      editors: Editor[];
+      editors: { replace(records: Editor[]): Promise<void> };
       buildEditorInChief(attrs: { name: string }): Editor;
     };
     await transaction(Publication, async () => {
-      pub.editors = [pub.buildEditorInChief({ name: "Alex Black" })];
+      // Rails' `publication.editors = [...]` persists the replacement at
+      // assignment; that needs `await` in JS, so the `=` setter throws
+      // (RFC 0068). Use the awaitable Rails-named replacement.
+      await pub.editors.replace([pub.buildEditorInChief({ name: "Alex Black" })]);
       await publication.saveBang();
     });
     expect(publication.readAttribute("name")).toBe("Rails Way (touched)");

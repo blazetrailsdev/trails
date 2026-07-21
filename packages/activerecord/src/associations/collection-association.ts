@@ -259,7 +259,11 @@ export class CollectionAssociation extends Association {
       );
     }
 
-    await this.writer(records);
+    // Rails' `ids_writer` ends in `replace(records)` (collection_association.rb:83).
+    // Mirror that direct call, then run the persisted-owner half `replace`
+    // defers (the awaitable `writer` does the same two steps).
+    const plan = this.replace(records);
+    if (plan) await this.persistReplacePlan(plan);
   }
 
   override reset(): void {
