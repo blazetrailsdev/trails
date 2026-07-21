@@ -8,6 +8,7 @@ import {
   UpdateManager,
   Nodes,
   Visitors,
+  EmptyJoinError,
 } from "./index.js";
 
 describe("SelectManagerTest", () => {
@@ -483,40 +484,64 @@ describe("SelectManagerTest", () => {
     expect(join).toBeInstanceOf(Nodes.InnerJoin);
   });
 
+  describe("join", () => {
+    it("responds to join", () => {
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+      const mgr = new SelectManager();
+
+      mgr.from(left);
+      mgr.join(right).on(predicate);
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" INNER JOIN "users" "users_2" ON "users"."id" = "users_2"."id"',
+      );
+    });
+
+    it("takes a class", () => {
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+      const mgr = new SelectManager();
+
+      mgr.from(left);
+      mgr.join(right, Nodes.OuterJoin).on(predicate);
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" LEFT OUTER JOIN "users" "users_2" ON "users"."id" = "users_2"."id"',
+      );
+    });
+
+    it("noops on nil", () => {
+      const mgr = new SelectManager();
+      expect(mgr.join(null)).toBe(mgr);
+    });
+
+    it("raises EmptyJoinError on empty", () => {
+      const left = new Table("users");
+      const mgr = new SelectManager();
+
+      mgr.from(left);
+      expect(() => mgr.join("")).toThrow(EmptyJoinError);
+    });
+  });
+
   describe("outer join", () => {
     it("responds to join", () => {
-      const mgr = users.project(star);
-      expect(mgr).toHaveProperty("join");
-    });
-  });
+      const left = new Table("users");
+      const right = left.alias();
+      const predicate = left.get("id").eq(right.get("id"));
+      const mgr = new SelectManager();
 
-  describe("join", () => {
-    it("takes a class", () => {
-      // In Rails, SelectManager can take a class. We take a Table.
-      const mgr = new SelectManager(users);
-      expect(mgr).toBeInstanceOf(SelectManager);
+      mgr.from(left);
+      mgr.outerJoin(right).on(predicate);
+      expect(mgr.toSql()).toBe(
+        'SELECT FROM "users" LEFT OUTER JOIN "users" "users_2" ON "users"."id" = "users_2"."id"',
+      );
     });
-  });
 
-  describe("join", () => {
     it("noops on nil", () => {
-      // Table.join with a null-like argument - the manager still works
-      const mgr = users.from();
-      expect(mgr).toBeInstanceOf(SelectManager);
-    });
-  });
-
-  describe("join", () => {
-    it("raises EmptyJoinError on empty", () => {
-      expect(() => users.join("")).toThrow("EmptyJoinError");
-    });
-  });
-
-  describe("outer join", () => {
-    it("noops on nil", () => {
-      // Creating a SelectManager with no table
-      const mgr = new SelectManager(null);
-      expect(mgr).toBeInstanceOf(SelectManager);
+      const mgr = new SelectManager();
+      expect(mgr.outerJoin(null)).toBe(mgr);
     });
   });
 
