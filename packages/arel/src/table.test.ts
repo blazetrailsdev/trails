@@ -61,8 +61,7 @@ describe("TableTest", () => {
     describe("join", () => {
       it("noops on nil", () => {
         const mgr = users.join(null);
-        expect(mgr.toSql()).toContain("FROM");
-        expect(mgr.toSql()).not.toContain("JOIN");
+        expect(mgr.toSql()).toBe('SELECT FROM "users"');
       });
 
       it("raises EmptyJoinError on empty", () => {
@@ -73,14 +72,18 @@ describe("TableTest", () => {
         const right = users.alias();
         const predicate = users.get("id").eq(right.get("id"));
         const mgr = users.join(right, Nodes.OuterJoin).on(predicate);
-        expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
+        expect(mgr.toSql()).toBe(
+          'SELECT FROM "users" LEFT OUTER JOIN "users" "users_2" ON "users"."id" = "users_2"."id"',
+        );
       });
 
       it("creates an outer join", () => {
         const right = users.alias();
         const predicate = users.get("id").eq(right.get("id"));
         const mgr = users.outerJoin(right).on(predicate);
-        expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
+        expect(mgr.toSql()).toBe(
+          'SELECT FROM "users" LEFT OUTER JOIN "users" "users_2" ON "users"."id" = "users_2"."id"',
+        );
       });
     });
   });
