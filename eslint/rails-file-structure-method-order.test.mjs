@@ -68,6 +68,21 @@ const fixture = {
       classes: { S: ["static first", "second"] },
       functions: [],
     },
+    // Rails defines a CLASS method (`static first`), and the port implemented
+    // it as an INSTANCE method (a legitimate instance↔static flip). With no
+    // `static first` declared, the slot falls back to the instance member so
+    // the file still orders — the common port, not an invention.
+    "packages/arel/src/fixture-flip.ts": {
+      classes: { F: ["static first", "second"] },
+      functions: [],
+    },
+    // Both a static and an instance member of the same name, each with its own
+    // Rails definition (`static kind` at validator.rb:103, `kind` at :116).
+    // Two distinct slots; each is filled by the matching-staticness member.
+    "packages/arel/src/fixture-both.ts": {
+      classes: { B2: ["static first", "constructor", "first"] },
+      functions: [],
+    },
   },
 };
 function restoreManifest() {
@@ -90,6 +105,8 @@ const ambiguousFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ambiguous.
 const noEvidenceFile = path.join(REPO_ROOT, "packages/arel/src/fixture-noevidence.ts");
 const ctorFile = path.join(REPO_ROOT, "packages/arel/src/fixture-ctor.ts");
 const staticFile = path.join(REPO_ROOT, "packages/arel/src/fixture-static.ts");
+const flipFile = path.join(REPO_ROOT, "packages/arel/src/fixture-flip.ts");
+const bothFile = path.join(REPO_ROOT, "packages/arel/src/fixture-both.ts");
 
 const tester = new RuleTester({
   languageOptions: {
@@ -334,6 +351,34 @@ try {
         errors: [{ messageId: "outOfOrder" }],
         output:
           `class S {\n` + `  static first() {}\n` + `  second() {}\n` + `  first() {}\n` + `}\n`,
+      },
+      // Fallback: Rails has `static first` but the port made it an INSTANCE
+      // method (no static declared). The slot fills with the instance member
+      // — the legitimate instance↔static flip — so it still orders.
+      {
+        filename: flipFile,
+        code: `class F {\n` + `  second() {}\n` + `  first() {}\n` + `}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output: `class F {\n` + `  first() {}\n` + `  second() {}\n` + `}\n`,
+      },
+      // Both declared: `static first` and instance `first` each fill their own
+      // slot by matching staticness, with the constructor between them —
+      // exactly the validator.rb `self.kind` / `initialize` / `kind` layout.
+      {
+        filename: bothFile,
+        code:
+          `class B2 {\n` +
+          `  first() {}\n` +
+          `  constructor() {}\n` +
+          `  static first() {}\n` +
+          `}\n`,
+        errors: [{ messageId: "outOfOrder" }],
+        output:
+          `class B2 {\n` +
+          `  static first() {}\n` +
+          `  constructor() {}\n` +
+          `  first() {}\n` +
+          `}\n`,
       },
       // Duplicate-named members (getter/setter pairs, TS overload
       // signatures) stay grouped under reorder. The manifest lists each
