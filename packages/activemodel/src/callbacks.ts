@@ -476,12 +476,15 @@ export function runAllCallbacks(
   record: CallbackRecord,
   block?: () => unknown,
   opts?: RunCallbacksOptions,
-): boolean | Promise<boolean> {
+): unknown {
   const chain = asPeekCallbackChain(proto, event);
   if (!chain) {
-    const r = block?.();
-    if (isThenable(r)) return Promise.resolve(r).then(() => true);
-    return true;
+    // Rails run_callbacks with an empty chain: `yield if block_given?`.
+    // NOTE: the activesupport sibling additionally throws on a thenable block
+    // under `strict: "sync"`. That guard is a trails invention with no Rails
+    // counterpart, and it survives lint only via the rails-error-parity
+    // grandfather list; it is deliberately not propagated here.
+    return block?.();
   }
   return chain.compile().invoke(record, block, opts as ASRunCallbacksOptions);
 }
@@ -496,7 +499,7 @@ export function runBeforeCallbacksOnProto(
   event: string,
   record: CallbackRecord,
   opts?: RunCallbacksOptions,
-): boolean | Promise<boolean> {
+): unknown {
   const chain = asPeekCallbackChain(proto, event);
   if (!chain) return true;
   const tmp = new ASCallbackChain(event, chain.config);

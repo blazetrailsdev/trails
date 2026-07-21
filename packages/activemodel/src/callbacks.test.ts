@@ -572,7 +572,10 @@ describe("unified sync/async runner", () => {
     _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    const result = runAllCallbacks(proto, "save", {}, () => log.push("block"));
+    const result = runAllCallbacks(proto, "save", {}, () => {
+      log.push("block");
+      return true;
+    });
     expect(result).toBe(true);
     expect(log).toEqual(["before", "block", "after"]);
   });
@@ -587,7 +590,10 @@ describe("unified sync/async runner", () => {
     _registerCallbackOnProto(proto, "after", "save", () => {
       log.push("after");
     });
-    const result = runAllCallbacks(proto, "save", {}, () => log.push("block"));
+    const result = runAllCallbacks(proto, "save", {}, () => {
+      log.push("block");
+      return true;
+    });
     expect(result).toBeInstanceOf(Promise);
     expect(await result).toBe(true);
     expect(log).toEqual(["before", "block", "after"]);
@@ -601,6 +607,7 @@ describe("unified sync/async runner", () => {
     const result = runAllCallbacks(proto, "save", {}, async () => {
       await Promise.resolve();
       log.push("block");
+      return true;
     });
     expect(result).toBeInstanceOf(Promise);
     expect(await result).toBe(true);
@@ -716,9 +723,16 @@ describe("unified sync/async runner", () => {
     const log: string[] = [];
     _registerCallbackOnProto(proto, "before", "validation", () => log.push("before"));
     _registerCallbackOnProto(proto, "after", "validation", () => log.push("after"));
-    const result = runAllCallbacks(proto, "validation", {}, () => log.push("block"), {
-      strict: "sync",
-    });
+    const result = runAllCallbacks(
+      proto,
+      "validation",
+      {},
+      () => {
+        log.push("block");
+        return true;
+      },
+      { strict: "sync" },
+    );
     expect(result).toBe(true);
     expect(log).toEqual(["before", "block", "after"]);
   });
