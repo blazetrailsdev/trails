@@ -202,6 +202,12 @@ export class SelectManager extends TreeManager {
   ): this {
     if (table == null) return this;
 
+    // Rails' signature is `join(relation, klass = Nodes::InnerJoin)` and it
+    // always passes `nil` as create_join's constraint. The second arg here is
+    // overloaded to also accept an ON predicate — a pre-existing trails
+    // extension several activerecord callers rely on positionally (e.g.
+    // query-methods.ts's `manager.join(tableNode, onNode)`), where Rails would
+    // chain `.on(...)`. Narrowing that surface is a separate change.
     let klass: new (left: Node, right: Node | null) => Join = InnerJoin;
     let constraint: Node | null = null;
     if (klassOrCondition && typeof klassOrCondition === "function" && klassOrCondition.prototype) {
