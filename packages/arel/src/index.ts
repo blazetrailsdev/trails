@@ -40,6 +40,7 @@ import { Node } from "./nodes/node.js";
 import { NodeExpression } from "./nodes/node-expression.js";
 import { InfixOperation } from "./nodes/infix-operation.js";
 import { Function as FunctionNode } from "./nodes/function.js";
+import { Filter as FilterNode } from "./nodes/filter.js";
 import { Predications } from "./predications.js";
 import { Math as MathMixin } from "./math.js";
 import { FactoryMethods } from "./factory-methods.js";
@@ -82,6 +83,8 @@ include(_SqlLiteral, asRuntime(OrderPredications));
 // Function includes WindowPredications and FilterPredications.
 include(FunctionNode, asRuntime(WindowPredications));
 include(FunctionNode, asRuntime(FilterPredications));
+// Filter includes WindowPredications (nodes/filter.rb:6).
+include(FilterNode, asRuntime(WindowPredications));
 
 /**
  * Arel.sql() — escape hatch for raw SQL.

@@ -5,30 +5,15 @@ describe("Arel::Nodes::OverTest", () => {
   const users = new Table("users");
   describe("as", () => {
     it("should alias the expression", () => {
-      const fn = new Nodes.NamedFunction("ROW_NUMBER", []);
-      const over = new Nodes.Over(fn);
-      const visitor = new Visitors.ToSql();
-      expect(visitor.compile(over)).toBe("ROW_NUMBER() OVER ()");
+      const over = users.get("id").count().over().as("foo");
+      expect(new Visitors.ToSql().compile(over)).toBe('COUNT("users"."id") OVER () AS foo');
     });
   });
 
   describe("with SQL literal", () => {
     it("should reference the window definition by name", () => {
-      const fn = new Nodes.NamedFunction("ROW_NUMBER", []);
-      const w = new Nodes.Window();
-      w.order(users.get("id").asc());
-      const over = new Nodes.Over(fn, w);
-      const visitor = new Visitors.ToSql();
-      const result = visitor.compile(over);
-      expect(result).toContain("OVER");
-      expect(result).toContain("ORDER BY");
-    });
-
-    it("should reference the window definition by name", () => {
-      const count = new Nodes.NamedFunction("COUNT", [new Nodes.SqlLiteral("*")]);
-      const filter = new Nodes.Filter(count, users.get("active").eq(true));
-      const over = filter.over("w");
-      expect(over).toBeInstanceOf(Nodes.Over);
+      const over = users.get("id").count().over(new Nodes.SqlLiteral("foo"));
+      expect(new Visitors.ToSql().compile(over)).toBe('COUNT("users"."id") OVER foo');
     });
   });
 
@@ -70,9 +55,8 @@ describe("Arel::Nodes::OverTest", () => {
 
   describe("with literal", () => {
     it("should reference the window definition by name", () => {
-      const over = new Nodes.Over(users.get("id").count(), new Nodes.SqlLiteral("foo"));
-      const sql = new Visitors.ToSql().compile(over);
-      expect(sql).toContain("OVER foo");
+      const sql = new Visitors.ToSql().compile(users.get("id").count().over("foo"));
+      expect(sql).toBe('COUNT("users"."id") OVER "foo"');
     });
   });
 });

@@ -20,8 +20,6 @@ import {
 } from "../nodes/infix-operation.js";
 import { BitwiseNot } from "../nodes/unary-operation.js";
 import type { NodeOrValue } from "../nodes/binary.js";
-import { Over } from "../nodes/over.js";
-import { NamedWindow, Window } from "../nodes/window.js";
 import { Predications } from "../predications.js";
 
 /**
@@ -193,18 +191,6 @@ export class Attribute extends Node {
   extract(field: string): Extract {
     // Mirrors Rails: `Nodes::Extract.new [self], field` (expressions.rb).
     return new Extract([this], field);
-  }
-
-  /**
-   * Apply a window to this expression.
-   *
-   * Mirrors: `OVER` support on Arel expressions.
-   */
-  over(window?: Window | NamedWindow | string | null): Over {
-    if (!window) return new Over(this, null);
-    if (typeof window === "string") return new Over(this, new SqlLiteral(window));
-    if (window instanceof NamedWindow) return new Over(this, new SqlLiteral(`"${window.name}"`));
-    return new Over(this, window);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
