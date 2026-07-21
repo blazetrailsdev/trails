@@ -276,13 +276,6 @@
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Arel_Nodes_Over",
-    "call": "quote_column_name",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_Over",
     "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
