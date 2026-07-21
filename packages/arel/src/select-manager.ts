@@ -223,7 +223,7 @@ export class SelectManager extends TreeManager {
     // check and the StringJoin promotion.
     if (typeof table === "string" || table instanceof SqlLiteral) {
       const text = typeof table === "string" ? table : table.value;
-      if (text.length === 0) throw new EmptyJoinError("EmptyJoinError");
+      if (text.length === 0) throw new EmptyJoinError();
       klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
     }
 
