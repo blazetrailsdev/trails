@@ -13,6 +13,7 @@
 import { describe, it, expect } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { loadHasMany } from "../associations.js";
+import { Preloader } from "./preloader.js";
 import { AssociationTargetReplacedDuringLoad } from "../errors.js";
 import type { Base } from "../base.js";
 import { Firm, Client } from "../test-helpers/models/company.js";
@@ -83,6 +84,50 @@ describe("has_many mid-flight reassignment", () => {
 
     expect(a.length).toBe(persisted.length);
     expect(b.length).toBe(persisted.length);
+  });
+
+  it("the writer path raises too, not just the raw setTarget", async () => {
+    // `firm.clients = [...]` goes through CollectionAssociation#replace, which
+    // mutates target directly rather than calling setTarget — so the guard has
+    // to be applied there as well or the ordinary user-facing assignment stays
+    // silently clobberable.
+    const firm = (await Firm.first()) as Firm;
+    const other = (await Client.first()) as Client;
+
+    const inFlight = firm.association("clients").loadTarget();
+    const holder = firm.association("clients") as unknown as { replace(r: Base[]): void };
+    expect(() => holder.replace([other])).toThrow(AssociationTargetReplacedDuringLoad);
+    await inFlight;
+  });
+
+  it("a preload landing mid-load neither raises nor aborts the batch", async () => {
+    // The Preloader is a loader, not a caller replacing the target:
+    // loader-vs-loader is not the race we refuse, and raising would abort the
+    // whole batch because ONE owner happened to have a lazy load in flight.
+    //
+    // The in-flight window is held open directly rather than by racing a real
+    // `loadTarget()`: driving it through the public API is timing-dependent
+    // (the load's query resolves before the preloader reaches its associate
+    // step, so the window has already closed and the test passes vacuously —
+    // confirmed by reverting the fix). Setting the flag pins the invariant
+    // deterministically instead of hoping for an interleaving.
+    const firm = (await Firm.first()) as Firm;
+    const other = (await Firm.where({ id: firm.id }))[0];
+    const holder = firm.association("clients") as unknown as {
+      _loaderWritebackSuppressed: number;
+    };
+
+    holder._loaderWritebackSuppressed++;
+    try {
+      await expect(
+        new Preloader({ records: [firm, other], associations: "clients" }).call(),
+      ).resolves.not.toThrow();
+    } finally {
+      holder._loaderWritebackSuppressed--;
+    }
+
+    // The non-racing owner in the same batch still got its target.
+    expect(other.association("clients").isLoaded()).toBe(true);
   });
 
   it("replacing a has_many :through target mid-load raises", async () => {

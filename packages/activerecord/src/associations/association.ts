@@ -63,10 +63,20 @@ export class Association {
    * between issuing the query and assigning the result. Ours awaits, and an
    * assignment landing in that window (`firm.association("clients")
    * .setTarget([other])`) was silently clobbered by the loader's redundant
-   * writeback. Suppressing the writeback keys off the loader/driver relation
-   * itself rather than on any observed holder state, so a collection that
-   * legitimately mutates its own target mid-load (dirty targets, in-memory
-   * built/pushed records, target merging) is unaffected.
+   * writeback.
+   *
+   * **Scoping — this flag is holder-scoped, not loader-scoped.** While it is
+   * set, `syncToAssociationInstance` suppresses *every* writeback into this
+   * holder, not just the driving loader's own. A concurrent
+   * `loadHasMany(owner, sameName, differentOptions)` carrying differently
+   * scoped rows is therefore dropped from the holder too (it still returns its
+   * rows to its own caller; only the holder cache goes unwritten, and the
+   * driving load assigns the holder immediately after). Making it
+   * loader-scoped would require threading a per-load token through
+   * `loadHasMany`; the holder-scoped version is what the guard needs, since a
+   * collection that legitimately mutates its own target mid-load (dirty
+   * targets, in-memory built/pushed records, target merging) is unaffected
+   * either way.
    * @internal
    */
   _loaderWritebackSuppressed = 0;
@@ -194,20 +204,45 @@ export class Association {
   }
 
   setTarget(target: Base | Base[] | null): void {
-    // Refuse the race rather than silently picking a winner. `find_target` is
-    // synchronous in Rails (association.rb:248) so this cannot arise there;
-    // ours awaits, and an assignment landing inside that window used to be
-    // silently clobbered by the load. `_loaderWritebackSuppressed` is what
-    // makes this safe to raise on: the loader's own writeback bails before
-    // reaching here, so only a genuine external replacement trips it.
-    if (this._loaderWritebackSuppressed) {
-      throw new AssociationTargetReplacedDuringLoad(
-        `Cannot replace the target of association \`${this.reflection.name}\` while a load for it is still in flight. ` +
-          `Await the load (or the reader) before assigning.`,
-      );
-    }
+    this.raiseIfLoadInFlight();
+    this._setTargetFromLoader(target);
+  }
+
+  /**
+   * Assign the target WITHOUT the in-flight guard — the entry point for code
+   * that is itself a loader (the `Preloader`), as opposed to a caller
+   * replacing the target.
+   *
+   * Loader-vs-loader is not the race we refuse: both sides are reads of the
+   * same association, so whichever lands last is a legitimate result rather
+   * than a lost intent. Raising here would instead abort an entire preload
+   * batch because one unrelated owner happened to have a lazy load in flight.
+   * @internal
+   */
+  _setTargetFromLoader(target: Base | Base[] | null): void {
     this.target = target;
     this.loadedBang();
+  }
+
+  /**
+   * Raise if a load for this association is still in flight. Guards the
+   * *assignment* paths (`setTarget`, `CollectionAssociation#replace`) — the
+   * ones that carry a caller's explicit intent.
+   *
+   * Refuses the race rather than silently picking a winner. `find_target` is
+   * synchronous in Rails (association.rb:248) so this cannot arise there; ours
+   * awaits, and an assignment landing inside that window used to be silently
+   * clobbered by the load. `_loaderWritebackSuppressed` is what makes this safe
+   * to raise on: a loader's own writeback never reaches an assignment path, so
+   * only a genuine external replacement trips it.
+   * @internal
+   */
+  protected raiseIfLoadInFlight(): void {
+    if (!this._loaderWritebackSuppressed) return;
+    throw new AssociationTargetReplacedDuringLoad(
+      `Cannot replace the target of association \`${this.reflection.name}\` while a load for it is still in flight. ` +
+        `Await the load (or the reader) before assigning.`,
+    );
   }
 
   /**

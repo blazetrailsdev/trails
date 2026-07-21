@@ -431,6 +431,12 @@ export class CollectionAssociation extends Association {
    * delete/add only records that have changed.
    */
   replace(otherArray: Base[]): void {
+    // The writer path (`firm.clients = [...]`, `firm.client_ids = [...]`, mass
+    // assignment) mutates `target` directly rather than going through
+    // `setTarget`, so it needs the in-flight guard applied here too —
+    // otherwise the ordinary user-facing assignment stays silently clobberable
+    // while only the raw `association(name).setTarget(...)` call is protected.
+    this.raiseIfLoadInFlight();
     for (const val of otherArray) (this as any).raiseOnTypeMismatchBang(val);
     const wasLoaded = this.isLoaded();
     const originalTarget = [...this.target];

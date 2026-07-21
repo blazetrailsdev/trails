@@ -218,7 +218,9 @@ export class Association {
         const owner = owners[i];
         try {
           const association = (owner as any).association(this.reflection.name);
-          association.setTarget(record);
+          // Loader writeback, not an assignment — must not trip the
+          // in-flight guard (see Association#_setTargetFromLoader).
+          association._setTargetFromLoader(record);
           association._loadedFromPreload = true;
           if (i === 0) {
             association.setInverseInstance(record);
@@ -244,10 +246,10 @@ export class Association {
       const currentTarget: Base[] = Array.isArray(association.target) ? association.target : [];
       const notPersistedRecords = currentTarget.filter((r) => !(r as any).isPersisted());
       value = [...records, ...notPersistedRecords];
-      association.setTarget(value);
+      association._setTargetFromLoader(value);
     } else {
       value = records[0] ?? null;
-      association.setTarget(value);
+      association._setTargetFromLoader(value);
     }
     association._loadedFromPreload = true;
 
