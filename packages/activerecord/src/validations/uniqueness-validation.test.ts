@@ -15,6 +15,7 @@ import { Base } from "../index.js";
 import { registerModel } from "../associations.js";
 import { registerSubclass } from "../inheritance.js";
 import { adapterType } from "../test-adapter.js";
+import { itIfSupports } from "../test-helpers/supports.js";
 import { assertQueriesCount, assertNoQueries } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Topic } from "../test-helpers/models/topic.js";
@@ -833,10 +834,7 @@ describe("UniquenessValidationWithIndexTest", () => {
     });
   });
 
-  // Rails `skip unless @connection.supports_partial_index?` — MySQL is the only
-  // adapter whose `supportsPartialIndex()` is false, and the vitest lint rule
-  // forbids a runtime conditional inside the test body.
-  it.skipIf(adapterType === "mysql")("partial index", async () => {
+  itIfSupports("partial_index", "partial index", async () => {
     Topic.validatesUniqueness("title");
     await Base.connection.addIndex("topics", "title", {
       unique: true,
