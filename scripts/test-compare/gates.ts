@@ -120,6 +120,7 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   // single-term polarity below — and likewise for `runIf(A && B && …)`.
   const adapterMatch = text.match(/adapterType\s*(===|!==)\s*["']([a-z0-9]+)["']/);
   let adapters: GateAdapter[] | undefined;
+  let adapterIsPositive = false;
   if (adapterMatch) {
     const [, op, literal] = adapterMatch;
     const adapter = normalizeAdapterType(literal);
@@ -127,6 +128,7 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
       // Does the expression being true mean "is this adapter"?
       const trueMeansEqual = op === "===";
       const runWhenEqual = runsWhenTrue ? trueMeansEqual : !trueMeansEqual;
+      adapterIsPositive = runWhenEqual;
       adapters = sortedUnique(runWhenEqual ? [adapter] : ALL_ADAPTERS.filter((a) => a !== adapter));
     }
   }
@@ -141,15 +143,25 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
     (m) => m[1],
   );
 
-  if (adapters && featureMatches.length) {
-    return { adapters, features: sortedUnique(featureMatches), source: ["test"] };
-  }
-  if (adapters) return { adapters, source: ["test"] };
-  if (featureMatches.length) {
-    return { features: sortedUnique(featureMatches), source: ["test"] };
-  }
+  // `isMariaDb` (test-helper boolean) / `isMariadb()` (adapter method) — the
+  // TS analogs of Rails' `mariadb?` predicate, which the Ruby extractor records
+  // as a `mariadb` guard. Polarity-blind, like the feature predicates above.
+  const guards: string[] = [];
+  if (/isMaria[Dd]b\b/.test(text)) guards.push("mariadb");
 
-  return { guards: ["unknown"], source: ["test"] };
+  // A POSITIVE adapter set mixed with a guard isn't sound (the run-on set
+  // depends on whether the compound is `&&` or `||`) — drop it and keep the
+  // guard, mirroring the Ruby extractor's `mixed` rule in
+  // `gate_from_run_condition`. An adapter EXCLUSION stays: in the standard skip
+  // idiom `skipIf(adapterType === "x" || guard)` the run condition is the pure
+  // conjunction `!x && !guard`, which Ruby likewise keeps as
+  // adapters-minus-x + guard.
+  const gate: TestGate = { source: ["test"] };
+  if (adapters && !(guards.length && adapterIsPositive)) gate.adapters = adapters;
+  if (featureMatches.length) gate.features = sortedUnique(featureMatches);
+  if (guards.length) gate.guards = guards;
+  if (!gate.adapters && !gate.features && !gate.guards) gate.guards = ["unknown"];
+  return gate;
 }
 
 // ---------------------------------------------------------------------------
