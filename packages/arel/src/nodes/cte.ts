@@ -29,7 +29,11 @@ export class Cte extends Binary {
   }
 
   toTable(): Table {
-    return new Table(this.name instanceof SqlLiteral ? this.name.value : this.name);
+    // Rails `Arel::Table.new(name)` passes the name through unchanged, so a
+    // `SqlLiteral` name stays a literal and the Table visitor renders it bare
+    // (visit_Arel_Table visits a Node name). `Table` types `name` as `string`;
+    // a smuggled `SqlLiteral` is cast, matching visit_Arel_Table's convention.
+    return new Table(this.name as unknown as string);
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {
