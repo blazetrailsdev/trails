@@ -1,7 +1,7 @@
 import { isHashAnalogue, rubyClassName } from "./ruby-class.js";
 
 // Rails interpolates `object.class` straight into its "Cannot visit" TypeError
-// (visitor.rb:38). The nearest handle here is the Ruby class the value would
+// (visitor.rb:39). The nearest handle here is the Ruby class the value would
 // have had, falling back to the JS constructor for a real class.
 function describeClass(object: unknown): string {
   const rubyClass = rubyClassName(object);
@@ -96,12 +96,12 @@ export abstract class Visitor {
     if (!methodName) {
       // Rails' second failure terminal: no handler on the class or any of its
       // ancestors falls out of `rescue NoMethodError` as a TypeError
-      // (visitor.rb:38), distinct from a class whose handler is aliased to
+      // (visitor.rb:39), distinct from a class whose handler is aliased to
       // `unsupported` and raises UnsupportedVisitError (to_sql.rb:828).
       throw new TypeError(`Cannot visit ${describeClass(object)}`);
     }
     // `dispatchMethod` only ever returns a name the visitor responds to
-    // (mirroring `respond_to?(dispatch[klass], true)`, visitor.rb:35-37), so a
+    // (mirroring `respond_to?(dispatch[klass], true)`, visitor.rb:36-37), so a
     // resolved name always names a real function here — a mis-registered class
     // resolves to an ancestor's handler or falls out as the TypeError above.
     const fn = (this as unknown as Record<string, unknown>)[methodName] as (
@@ -162,7 +162,7 @@ export abstract class Visitor {
    * actually resolves to a function on the visitor, so a class whose own entry
    * names a missing method falls through to an ancestor's working handler.
    * Successful lookups are memoized into the cache, matching Rails
-   * (`dispatch[object.class] = dispatch[superklass]`, visitor.rb:39).
+   * (`dispatch[object.class] = dispatch[superklass]`, visitor.rb:40).
    */
   private resolveDispatch(ctor: NodeCtor): string | undefined {
     const direct = this.dispatch.get(ctor);

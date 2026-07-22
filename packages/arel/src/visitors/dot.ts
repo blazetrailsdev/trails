@@ -497,7 +497,7 @@ export class Dot extends Visitor {
     }
     this.nodes.push(node);
     this.withNode(node, () => {
-      // visitor.rb:38 — no ancestor answered the dispatch. Since #5002,
+      // visitor.rb:39 — no ancestor answered the dispatch. Since #5002,
       // Visitor#visit's no-handler arm already throws Ruby's
       // `TypeError, "Cannot visit <Class>"` directly, so it propagates
       // unchanged. A class whose own dispatch entry names a missing method

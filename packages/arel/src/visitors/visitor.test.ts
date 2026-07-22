@@ -86,14 +86,14 @@ describe("Visitor dispatch", () => {
     }
     const v = new FallUpVisitor();
     expect(v.accept(new B())).toBe("A");
-    // Only the successful ancestor resolution is memoized onto B (visitor.rb:39).
+    // Only the successful ancestor resolution is memoized onto B (visitor.rb:40).
     expect(FallUpVisitor.dispatchCache().get(B)).toBe("visitA");
   });
 
   it("raises TypeError when neither the class nor an ancestor has a responding handler", () => {
     // Both the class's own entry and every ancestor's name a missing method, so
     // no handler responds and the terminal is Rails' `TypeError, "Cannot visit
-    // X"` (visitor.rb:38) — not an UnsupportedVisitError for a mis-registration.
+    // X"` (visitor.rb:39) — not an UnsupportedVisitError for a mis-registration.
     class BadVisitor extends Visitor {
       static {
         this.dispatchCache().set(A, "visitTypoed");
