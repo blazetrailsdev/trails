@@ -109,11 +109,11 @@ describe("gates.ts pure helpers", () => {
       guards: ["mariadb"],
       source: ["test"],
     });
-    // Compound hoisted boolean is still opaque, but a visible isMariaDb term in
-    // the expression is recorded alongside the adapter set, mirroring the Ruby
-    // extractor's `mariadb?` handling.
+    // An adapterType term mixed with the guard: the adapter set is unsound
+    // (`&&` vs `||` changes the run-on set) and is dropped, keeping only the
+    // guard — mirroring the Ruby extractor's `mixed` rule for
+    // `current_adapter?(…) && mariadb?` compounds.
     expect(gateFromGuardExpr('!(adapterType === "mysql" && !isMariaDb)', false)).toEqual({
-      adapters: ["postgresql", "sqlite"],
       guards: ["mariadb"],
       source: ["test"],
     });

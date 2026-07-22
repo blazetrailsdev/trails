@@ -147,8 +147,12 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   const guards: string[] = [];
   if (/isMaria[Dd]b\b/.test(text)) guards.push("mariadb");
 
+  // An adapter set mixed with a guard isn't sound (the condition could combine
+  // them with `&&` or `||`; the run-on set differs) — drop it and keep the
+  // guard, mirroring the Ruby extractor's `mixed` rule in
+  // `gate_from_run_condition`.
   const gate: TestGate = { source: ["test"] };
-  if (adapters) gate.adapters = adapters;
+  if (adapters && !guards.length) gate.adapters = adapters;
   if (featureMatches.length) gate.features = sortedUnique(featureMatches);
   if (guards.length) gate.guards = guards;
   if (!gate.adapters && !gate.features && !gate.guards) gate.guards = ["unknown"];
