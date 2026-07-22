@@ -836,19 +836,16 @@ export class Relation<T extends Base> {
       rel._whereClause.predicates.push(...clause.invert().predicates);
       return rel;
     }
-    const castConditions: Record<string, unknown> = {};
-    for (const [key, value] of Object.entries(conditions)) {
-      castConditions[key] = this._castWhereValue(key, value);
-    }
+    // Values pass to PredicateBuilder raw, like Rails — the QueryAttribute
+    // bind owns casting/serialization at compile time (predicate_builder.rb:57-69).
+    //
     // Mirrors Rails' WhereClause#invert — branches on the actual predicate count,
     // not the key count, since one key can expand to multiple predicates:
     // - 1 predicate → invert_predicate (NOT NULL, !=, NOT BETWEEN, NOT IN, etc.)
     // - 2+ predicates → NOT(p1 AND p2 AND ...) — semantically different from p1 != AND p2 !=
-    const positiveNodes = this.predicateBuilder.buildFromHash(castConditions);
+    const positiveNodes = this.predicateBuilder.buildFromHash(conditions);
     if (positiveNodes.length <= 1) {
-      rel._whereClause.predicates.push(
-        ...this.predicateBuilder.buildNegatedFromHash(castConditions),
-      );
+      rel._whereClause.predicates.push(...this.predicateBuilder.buildNegatedFromHash(conditions));
     } else {
       rel._whereClause.predicates.push(new Nodes.Not(new Nodes.And(positiveNodes)));
     }
@@ -885,13 +882,8 @@ export class Relation<T extends Base> {
     if (conditions.length === 0) return this;
     if (conditions.length === 1) return this.where(conditions[0]);
 
-    const buildClause = (cond: Record<string, unknown>): WhereClause => {
-      const cast: Record<string, unknown> = {};
-      for (const [key, value] of Object.entries(cond)) {
-        cast[key] = value instanceof Relation ? value : this._castWhereValue(key, value);
-      }
-      return new WhereClause(this.predicateBuilder.buildFromHash(cast));
-    };
+    const buildClause = (cond: Record<string, unknown>): WhereClause =>
+      new WhereClause(this.predicateBuilder.buildFromHash(cond));
 
     let combined = buildClause(conditions[0]);
     for (let i = 1; i < conditions.length; i++) {
@@ -5757,61 +5749,6 @@ export class Relation<T extends Base> {
         }
       }
     }
-  }
-
-  private _castWhereValue(key: string, value: unknown): unknown {
-    if (value === null || value === undefined || value instanceof Range) return value;
-    let attrKey = key;
-    const firstDot = key.indexOf(".");
-    if (firstDot !== -1 && key.indexOf(".", firstDot + 1) === -1 && !key.includes('"')) {
-      const tablePrefix = key.slice(0, firstDot);
-      if (tablePrefix === this._modelClass.arelTable.name) {
-        attrKey = key.slice(firstDot + 1);
-      }
-    }
-    if (Array.isArray(value)) {
-      // A `where(col: [...])` array is one of two things: an `IN (...)` list of
-      // scalars (element-cast each through the column type) or — on a
-      // force-equality column (PG array / range / serialized) — a single
-      // force-equality value the predicate builder binds whole. `force_equality?`
-      // on the column type distinguishes them. Element-casting a whole array
-      // through an OID::Array column would run the string-only
-      // `_castAttributeValue` per element and parse each scalar as its own array
-      // literal (`'black'` → `[]`), corrupting `['black','blue']` → `[[],[]]`;
-      // leave the array intact and let the predicate builder's force-equality
-      // bind serialize it via the column type. Non-force-equality columns keep
-      // the element-wise IN-list cast.
-      const type = this._modelClass.typeForAttribute?.(attrKey) as
-        | { isForceEquality?(v: unknown): boolean }
-        | undefined;
-      if (type?.isForceEquality?.(value)) return value;
-      return value.map((v) => this._castPreservingUncastable(attrKey, v));
-    }
-    return this._castPreservingUncastable(attrKey, value);
-  }
-
-  /**
-   * Cast a scalar `where` value through its column type, but preserve the raw
-   * value when the cast collapses a non-null input to `null`.
-   *
-   * Rails never pre-casts a `where` value to nil: an un-castable string
-   * (`where(parent_id: "not-a-number")`, `where(written_on: "")`, or such an
-   * element inside `where(parent_id: ["not-a-number"])`) keeps its raw value and
-   * the QueryAttribute bind serializes to NULL at compile time — yielding
-   * `col = NULL` / `col IN (NULL)` (matches nothing), not the `IS NULL` path
-   * (matches nulls). Collapsing to nil here would misroute BOTH the scalar
-   * (Equality → `rightIsNull`) and array (ArrayHandler's `values.compact!`
-   * nil-partition, array_handler.rb:16) paths onto explicit-nil handling. So the
-   * bind — evaluated by the visitor via `nil?`/`unboundable?` — decides
-   * nullness, not this pre-cast. A genuinely null input stays null (routes to
-   * `IS NULL`), matching Rails treating only real `nil` as null.
-   */
-  private _castPreservingUncastable(attrKey: string, value: unknown): unknown {
-    const cast = this._modelClass._castAttributeValue(attrKey, value);
-    if ((cast === null || cast === undefined) && value !== null && value !== undefined) {
-      return value;
-    }
-    return cast;
   }
 
   private _qualifiedCol(table: Table, key: string): { tbl: string; col: string } {
