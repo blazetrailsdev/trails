@@ -550,12 +550,16 @@ describe("SelectManagerTest", () => {
     it("returns inner join sql", () => {
       const mgr = users
         .project(users.get("name"), posts.get("title"))
-        .join(posts, users.get("id").eq(posts.get("user_id")));
+        .join(posts)
+        .on(users.get("id").eq(posts.get("user_id")));
       expect(mgr.toSql()).toContain("INNER JOIN");
     });
 
     it("returns outer join sql", () => {
-      const mgr = users.project(star).outerJoin(posts, users.get("id").eq(posts.get("user_id")));
+      const mgr = users
+        .project(star)
+        .outerJoin(posts)
+        .on(users.get("id").eq(posts.get("user_id")));
       expect(mgr.toSql()).toContain("LEFT OUTER JOIN");
     });
 
@@ -958,7 +962,8 @@ describe("SelectManagerTest", () => {
       expect(
         users
           .project(users.get("name"), posts.get("title"))
-          .join(posts, users.get("id").eq(posts.get("user_id")))
+          .join(posts)
+          .on(users.get("id").eq(posts.get("user_id")))
           .toSql(),
       ).toBe(
         'SELECT "users"."name", "posts"."title" FROM "users" INNER JOIN "posts" ON "users"."id" = "posts"."user_id"',
@@ -969,7 +974,8 @@ describe("SelectManagerTest", () => {
       expect(
         users
           .project(star)
-          .outerJoin(posts, users.get("id").eq(posts.get("user_id")))
+          .outerJoin(posts)
+          .on(users.get("id").eq(posts.get("user_id")))
           .toSql(),
       ).toBe('SELECT * FROM "users" LEFT OUTER JOIN "posts" ON "users"."id" = "posts"."user_id"');
     });
@@ -1164,7 +1170,10 @@ describe("SelectManagerTest", () => {
   });
 
   it("returns join nodes after join()", () => {
-    const manager = users.project("*").join(posts, users.attr("id").eq(posts.attr("user_id")));
+    const manager = users
+      .project("*")
+      .join(posts)
+      .on(users.attr("id").eq(posts.attr("user_id")));
     expect(manager.joinSources.length).toBe(1);
     expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
   });
@@ -1173,8 +1182,10 @@ describe("SelectManagerTest", () => {
     const comments = new Table("comments");
     const manager = users
       .project("*")
-      .join(posts, users.attr("id").eq(posts.attr("user_id")))
-      .outerJoin(comments, posts.attr("id").eq(comments.attr("post_id")));
+      .join(posts)
+      .on(users.attr("id").eq(posts.attr("user_id")))
+      .outerJoin(comments)
+      .on(posts.attr("id").eq(comments.attr("post_id")));
     expect(manager.joinSources.length).toBe(2);
     expect(manager.joinSources[0]).toBeInstanceOf(Nodes.InnerJoin);
     expect(manager.joinSources[1]).toBeInstanceOf(Nodes.OuterJoin);

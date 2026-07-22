@@ -206,23 +206,9 @@ export class SelectManager extends TreeManager {
    */
   join(
     table: Node | string | null | undefined,
-    klassOrCondition?: (new (left: Node, right: Node | null) => Join) | Node,
+    klass: new (left: Node, right: Node | null) => Join = InnerJoin,
   ): this {
     if (table == null) return this;
-
-    // Rails' signature is `join(relation, klass = Nodes::InnerJoin)` and it
-    // always passes `nil` as create_join's constraint. The second arg here is
-    // overloaded to also accept an ON predicate — a pre-existing trails
-    // extension several activerecord callers rely on positionally (e.g.
-    // query-methods.ts's `manager.join(tableNode, onNode)`), where Rails would
-    // chain `.on(...)`. Narrowing that surface is a separate change.
-    let klass: new (left: Node, right: Node | null) => Join = InnerJoin;
-    let constraint: Node | null = null;
-    if (klassOrCondition && typeof klassOrCondition === "function" && klassOrCondition.prototype) {
-      klass = klassOrCondition as new (left: Node, right: Node | null) => Join;
-    } else if (klassOrCondition instanceof Node) {
-      constraint = klassOrCondition;
-    }
 
     const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
 
@@ -235,23 +221,16 @@ export class SelectManager extends TreeManager {
       klass = StringJoin as unknown as new (left: Node, right: Node | null) => Join;
     }
 
-    this.core.source.right.push(this.createJoin(tableNode, constraint, klass));
+    this.core.source.right.push(this.createJoin(tableNode, null, klass));
     return this;
   }
 
   /**
    * LEFT OUTER JOIN.
+   *
+   * Mirrors: Arel::SelectManager#outer_join (select_manager.rb:115-117).
    */
-  outerJoin(table: Node | string | null | undefined, onCondition?: Node): this {
-    // Rails: `outer_join(relation) = join(relation, Nodes::OuterJoin)`
-    // (select_manager.rb:115-117). The onCondition arg is a trails extension
-    // used by callers that would otherwise chain `.on(...)`.
-    if (onCondition) {
-      if (table == null) return this;
-      const tableNode = typeof table === "string" ? new SqlLiteral(table) : table;
-      this.core.source.right.push(this.createJoin(tableNode, onCondition, OuterJoin));
-      return this;
-    }
+  outerJoin(table: Node | string | null | undefined): this {
     return this.join(table, OuterJoin);
   }
 
@@ -590,13 +569,10 @@ export class SelectManager extends TreeManager {
   }
 
   // -- FactoryMethods (via TreeManager) --
-  // createTrue/createFalse/createTableAlias/createStringJoin/createAnd/
-  // createOn/grouping/lower/coalesce/cast are mixed in from
+  // createTrue/createFalse/createTableAlias/createJoin/createStringJoin/
+  // createAnd/createOn/grouping/lower/coalesce/cast are mixed in from
   // Arel::FactoryMethods (see ./factory-methods.ts and the include() call
-  // in ./index.ts). createJoin is overridden below because Rails' Arel
-  // wraps the constraint in an `On` node when sourced from a SelectManager.
-
-  private static readonly defaultJoinConstructor = InnerJoin;
+  // in ./index.ts).
 
   /**
    * Build a DeleteManager that applies this SELECT's constraints,
@@ -621,24 +597,6 @@ export class SelectManager extends TreeManager {
     }
     if (havingClause !== null) dm.having(havingClause);
     return dm;
-  }
-
-  private static isJoinConstructor(
-    value: unknown,
-  ): value is new (left: Node, right: Node | null) => Join {
-    return typeof value === "function";
-  }
-
-  createJoin(
-    to: Node,
-    constraint?: Node | null,
-    klass?: new (left: Node, right: Node | null) => Join,
-  ): Join {
-    const JoinKlass =
-      klass && SelectManager.isJoinConstructor(klass)
-        ? klass
-        : SelectManager.defaultJoinConstructor;
-    return new JoinKlass(to, constraint ? new On(constraint) : null);
   }
 
   /**
