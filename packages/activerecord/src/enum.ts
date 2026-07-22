@@ -692,6 +692,7 @@ export function _enum(
   const enumMethodNames = enumMethodsHost._enumMethodsModuleNames!;
   const definedNames = new Set<string>();
   const valueMethodNames: string[] = [];
+  const aliasedLabels = new Set<string>();
   for (const [n] of Object.entries(mapping)) {
     const fullName = toCamel(methodName(n));
     const { predicateName, bangName, notScopeName } = enumMethodNamesFor(fullName);
@@ -699,10 +700,17 @@ export function _enum(
 
     // Rails feeds both the value method name and its special-char-stripped
     // friendly alias into detect_negative_enum_conditions! (enum.rb:266-279),
-    // pushing the alias only when it differs and isn't already present.
+    // pushing the alias only when it differs and isn't already present. The
+    // same guard also gates the alias's define_enum_methods call (enum.rb:273):
+    // two labels mangling to one alias (e.g. "Etc/GMT+1" / "Etc/GMT-1") is NOT
+    // a conflict — the alias sticks to the first label and the second label
+    // simply doesn't get one. Record the decision in `aliasedLabels` so the
+    // generation pass below skips the alias for later same-mangling labels too.
     valueMethodNames.push(fullName);
-    if (friendlyName !== fullName && !valueMethodNames.includes(friendlyName)) {
+    const aliasIsNew = friendlyName !== fullName && !valueMethodNames.includes(friendlyName);
+    if (aliasIsNew) {
       valueMethodNames.push(friendlyName);
+      aliasedLabels.add(n);
     }
 
     // Rails runs `detect_enum_conflict!` for the `?`/`!` methods *only* inside
@@ -752,7 +760,7 @@ export function _enum(
       detectEnumConflictBang.call(this, attribute, fullName, true);
       detectEnumConflictBang.call(this, attribute, notScopeName, true);
     }
-    if (friendlyName !== fullName) {
+    if (aliasIsNew) {
       const {
         predicateName: fp,
         bangName: friendlyBang,
@@ -815,7 +823,7 @@ export function _enum(
       scopesEnabled,
       instanceMethodsEnabled,
     );
-    if (friendlyName !== fullName) {
+    if (aliasedLabels.has(n)) {
       methodsModule.defineEnumMethods(
         attrName,
         friendlyName,
@@ -857,7 +865,7 @@ export function _enum(
       const names = enumMethodNamesFor(fullName);
       enumMethodNames.add(names.predicateName);
       enumMethodNames.add(names.bangName);
-      if (friendlyName !== fullName) {
+      if (aliasedLabels.has(n)) {
         const friendlyNames = enumMethodNamesFor(friendlyName);
         enumMethodNames.add(friendlyNames.predicateName);
         enumMethodNames.add(friendlyNames.bangName);

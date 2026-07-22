@@ -593,8 +593,36 @@ describe("EnumTest", () => {
   });
 
   // Rails: anonymous AR class with `validates_uniqueness_of` / inclusion.
-  it.skip("validate uniqueness", () => {});
-  it.skip("validate inclusion of value in array", () => {});
+  it("validate uniqueness", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written"]);
+        this.validatesUniquenessOf("status");
+      }
+    }
+    registerModel(Klass);
+    await (Klass as any).deleteAll();
+    await Klass.createBang({ status: "proposed" });
+    const book = new Klass({ status: "written" }) as any;
+    expect(await book.isValid()).toBe(true);
+    book.status = "proposed";
+    expect(await book.isValid()).toBe(false);
+  });
+
+  it("validate inclusion of value in array", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["proposed", "written"]);
+        this.validatesInclusionOf("status", { in: ["written"] });
+      }
+    }
+    const invalidBook = new Klass({ status: "proposed" }) as any;
+    expect(await invalidBook.isValid()).toBe(false);
+    const validBook = new Klass({ status: "written" }) as any;
+    expect(await validBook.isValid()).toBe(true);
+  });
 
   // Rails: `book.status_change` / per-class & inheritable enum redefinition.
   it("enums are distinct per class", async () => {
@@ -896,13 +924,70 @@ describe("EnumTest", () => {
   });
 
   // Rails: the legacy `:_default` / `:_prefix` / `:_suffix` / `:_scopes` /
-  // `:_instance_methods` options must raise — covered behaviorally in
-  // enum.trails.test.ts (assertValidEnumOptions).
-  it.skip(":_default is invalid in the new API", () => {});
-  it.skip(":_prefix is invalid in the new API", () => {});
-  it.skip(":_suffix is invalid in the new API", () => {});
-  it.skip(":_scopes is invalid in the new API", () => {});
-  it.skip(":_instance_methods is invalid in the new API", () => {});
+  // `:_instance_methods` options must raise (assertValidEnumOptions).
+  it(":_default is invalid in the new API", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", ["proposed", "written", "published"], {
+            _default: "published",
+          } as any);
+        }
+      }
+      void Klass;
+    }).toThrow(/invalid option\(s\): :_default/);
+  });
+
+  it(":_prefix is invalid in the new API", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", ["proposed", "written", "published"], { _prefix: true } as any);
+        }
+      }
+      void Klass;
+    }).toThrow(/invalid option\(s\): :_prefix/);
+  });
+
+  it(":_suffix is invalid in the new API", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", ["proposed", "written", "published"], { _suffix: true } as any);
+        }
+      }
+      void Klass;
+    }).toThrow(/invalid option\(s\): :_suffix/);
+  });
+
+  it(":_scopes is invalid in the new API", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", ["proposed", "written", "published"], { _scopes: false } as any);
+        }
+      }
+      void Klass;
+    }).toThrow(/invalid option\(s\): :_scopes/);
+  });
+
+  it(":_instance_methods is invalid in the new API", () => {
+    expect(() => {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.enum("status", ["proposed", "written", "published"], {
+            _instance_methods: false,
+          } as any);
+        }
+      }
+      void Klass;
+    }).toThrow(/invalid option\(s\): :_instance_methods/);
+  });
 
   // Rails: `scopes: false` / `instance_methods: false` opt-outs.
   it("scopes can be disabled by :scopes", () => {
@@ -997,11 +1082,48 @@ describe("EnumTest", () => {
     expect(typeof (K as any).balineseJavanese).toBe("function");
   });
 
-  // Rails: anonymous-class enum names with capitals / unicode / slashes, and
-  // Struct-keyed hash labels — JS-idiom-divergent enum-name surfaces.
-  it.skip("capital characters for enum names", () => {});
-  it.skip("unicode characters for enum names", () => {});
-  it.skip("mangling collision for enum names", () => {});
+  // Rails: anonymous-class enum names with capitals / unicode / slashes. Labels
+  // with characters outside `\w` get the original-form predicate (bracket
+  // notation) alongside the camelized scope, mirroring Rails'
+  // `define_method("Etc/GMT+1?")` surface.
+  it("capital characters for enum names", () => {
+    class Klass extends Base {
+      static _tableName = "computers";
+      static {
+        this.enum("extendedWarranty", ["extendedSilver", "extendedGold"]);
+      }
+    }
+    const computer = (Klass as any).extendedSilver().build();
+    expect(computer.isExtendedSilver()).toBe(true);
+    expect(computer.isExtendedGold()).toBe(false);
+  });
+
+  it("unicode characters for enum names", () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("language", ["🇺🇸", "🇪🇸", "🇫🇷"]);
+      }
+    }
+    const book = (Klass as any)["🇺🇸"]().build();
+    expect(book["is🇺🇸"]()).toBe(true);
+    expect(book["is🇪🇸"]()).toBe(false);
+  });
+
+  it("mangling collision for enum names", () => {
+    class Klass extends Base {
+      static _tableName = "computers";
+      static {
+        this.enum("timezone", ["Etc/GMT+1", "Etc/GMT-1"]);
+      }
+    }
+    // Rails calls the scope by its literal label (`public_send(:"Etc/GMT+1")`);
+    // trails scope names go through camelize, which maps "/" to "::" —
+    // "Etc/GMT+1" → "etc::GMT+1". The original-form predicates keep the label.
+    const computer = (Klass as any)["etc::GMT+1"]().build();
+    expect(computer["isEtc/GMT+1"]()).toBe(true);
+    expect(computer["isEtc/GMT-1"]()).toBe(false);
+  });
 
   // Rails keys the hash with `Struct.new(:to_s).new("proposed")` objects and
   // asserts `book.status` returns the original key. JS object keys stringify, so
@@ -1021,7 +1143,33 @@ describe("EnumTest", () => {
     expect((b as any).isProposed()).toBe(true);
     expect((b as any).isWritten()).toBe(false);
   });
-  it.skip("serializable? with large number label", () => {});
+  // Rails' out-of-range Integer literals translate to BigInt: an unmapped
+  // number past the column's byte range is not serializable, the string label
+  // is (it maps to 0/1).
+  it("serializable? with large number label", async () => {
+    class Klass extends Base {
+      static _tableName = "books";
+      static {
+        this.enum("status", ["9223372036854775808", "-9223372036854775809"]);
+      }
+    }
+    const type = (Klass as any).typeForAttribute("status");
+
+    expect(type.isSerializable("9223372036854775808")).toBe(true);
+    expect(type.isSerializable("-9223372036854775809")).toBe(true);
+
+    expect(type.isSerializable(9223372036854775808n)).toBe(false);
+    expect(type.isSerializable(-9223372036854775809n)).toBe(false);
+
+    const book1 = await Klass.createBang({ status: "9223372036854775808" });
+    const book2 = await Klass.createBang({ status: "-9223372036854775809" });
+
+    expect((book1 as any).statusForDatabase).toBe(0);
+    expect((book2 as any).statusForDatabase).toBe(1);
+
+    expect((await Klass.where({ status: "9223372036854775808" }).last())?.id).toBe(book1.id);
+    expect((await Klass.where({ status: "-9223372036854775809" }).last())?.id).toBe(book2.id);
+  });
 
   // Rails routes the clash message through the model logger; trails routes it
   // through the `setEnumWarn` sink (default `console.warn`). The exact wording
@@ -1060,8 +1208,22 @@ describe("EnumTest", () => {
     }
   });
 
-  // Rails: `boolean_status` / distinct-clash surface not yet expressible.
-  it.skip("enum doesn't log a warning if no clashes detected", () => {});
+  it("enum doesn't log a warning if no clashes detected", () => {
+    const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
+    try {
+      class Klass extends Base {
+        static _tableName = "books";
+        static {
+          this.attribute("status", "integer");
+          this.enum("status", ["notSent"]);
+        }
+      }
+      void Klass;
+      expect(spy).not.toHaveBeenCalled();
+    } finally {
+      spy.mockRestore();
+    }
+  });
 
   it("enum doesn't log a warning if opting out of scopes", () => {
     const spy = vi.spyOn(console, "warn").mockImplementation(() => {});
