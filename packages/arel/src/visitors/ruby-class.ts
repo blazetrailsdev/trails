@@ -35,17 +35,47 @@ export function rubyClassName(v: unknown): string | null {
   if (typeof v === "symbol") return "Symbol";
   const dateTime = dateTimeClassName(v);
   if (dateTime !== null) return dateTime;
-  if (isPlainObject(v)) return "Hash";
+  if (isHashAnalogue(v)) return "Hash";
   return null;
 }
 
-// The analogue of Ruby's Hash — an object literal, i.e. one whose prototype is
-// Object.prototype (or null). Anything else is an instance of some other class
-// and dispatches on that class in Rails, not on Hash.
-function isPlainObject(v: unknown): boolean {
+/**
+ * The analogue of Ruby's Hash — the class `Visitor#visit` would dispatch a
+ * record on.
+ *
+ * Rails' `Visitor#visit` walks `object.class.ancestors` (visitor.rb:36-41), so
+ * every `Hash` descendant reaches `visit_Hash` for *any* visitor, not just one.
+ * JS has no Hash class — the record literal *is* the Hash — so the equivalent
+ * of that ancestor split is whether the prototype chain is made only of plain
+ * records:
+ *
+ *   - `{ a: 1 }` and `Object.create(null)` are Hashes;
+ *   - `Object.create({ a: 1 })` is the JS way to derive a record from another
+ *     record — Ruby's `class MyHash < Hash` — so it's a Hash too;
+ *   - a class instance (including `class Config extends Object`) has a prototype
+ *     whose own `constructor` points back at the class, which is Ruby's
+ *     `Config < Object`: no ancestor handler, so it is not a Hash.
+ *
+ * What marks a *class* prototype is that back-reference: `class C {}` installs
+ * `C.prototype.constructor === C`, so the own `constructor` is a function
+ * pointing back at this very object. Anything else — absent, a non-function, or
+ * a function whose `.prototype` is some other object — leaves the value a
+ * record, so keep walking. A literal `constructor` key (`{ constructor: "x" }`)
+ * fails the identity, and its name is irrelevant to dispatch anyway: Ruby
+ * dispatches by ancestry, so a Hash with a `:constructor` key is still a Hash.
+ */
+export function isHashAnalogue(v: unknown): boolean {
   if (typeof v !== "object" || v === null) return false;
-  const proto = Object.getPrototypeOf(v);
-  return proto === Object.prototype || proto === null;
+  for (let proto = Object.getPrototypeOf(v); proto !== null; proto = Object.getPrototypeOf(proto)) {
+    if (proto === Object.prototype) return true;
+    const ctor = Object.getOwnPropertyDescriptor(proto, "constructor")?.value as
+      | { prototype?: unknown }
+      | undefined;
+    if (typeof ctor === "function" && ctor.prototype === proto) {
+      return false;
+    }
+  }
+  return true;
 }
 
 // The Ruby class Rails would dispatch a date/time value on, all three of which
