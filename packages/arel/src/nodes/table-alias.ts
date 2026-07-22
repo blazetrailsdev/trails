@@ -59,7 +59,7 @@ export class TableAlias extends Binary {
   }
 
   toCte(): Cte {
-    return new Cte(this.nameString, this.relation);
+    return new Cte(this.name, this.relation);
   }
 
   /** The alias as a bare string, unwrapping a `SqlLiteral` name. */

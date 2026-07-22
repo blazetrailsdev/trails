@@ -387,27 +387,38 @@ describe("the to_sql visitor", () => {
   });
 
   describe("Nodes::With", () => {
-    it("handles Cte nodes", () => {
-      const cte = new Nodes.Cte("t", users.project(users.get("id")).ast);
-      const sql = new Visitors.ToSql(testConnection).compile(cte);
-      expect(sql).toContain('"t" AS (');
+    it("handles table aliases", () => {
+      const manager = new Table("foo").project(star).from(new Nodes.SqlLiteral("expr2"));
+      const expr1 = new Table("bar").project(star).as("expr1");
+      const expr2 = new Table("baz").project(star).as("expr2");
+      manager.with(expr1, expr2);
+      const sql = new Visitors.ToSql(testConnection).compile(manager.ast);
+      expect(sql).toBe(
+        'WITH expr1 AS (SELECT * FROM "bar"), expr2 AS (SELECT * FROM "baz") SELECT * FROM expr2',
+      );
     });
 
-    it("handles table aliases", () => {
-      const mgr = users.project(star);
-      const asNode = new Nodes.As(mgr.ast, new Nodes.SqlLiteral("foo"));
-      const node = new Nodes.With([asNode]);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toContain("WITH");
-      expect(sql).toContain("foo");
+    it("handles Cte nodes", () => {
+      const cte = new Nodes.Cte("expr1", new Table("bar").project(star).ast);
+      const manager = new Table("foo")
+        .project(star)
+        .with(cte)
+        .from(cte.toTable())
+        .where(cte.toTable().get("score").gt(5));
+      const sql = new Visitors.ToSql(testConnection).compile(manager.ast);
+      expect(sql).toBe(
+        'WITH "expr1" AS (SELECT * FROM "bar") SELECT * FROM "expr1" WHERE "expr1"."score" > 5',
+      );
     });
   });
 
   describe("Nodes::WithRecursive", () => {
     it("handles table aliases", () => {
-      const aliased = new Nodes.TableAlias(users, "u");
-      const sql = new Visitors.ToSql(testConnection).compile(aliased);
-      expect(sql).toBe('"users" "u"');
+      const manager = new Table("foo").project(star).from(new Nodes.SqlLiteral("expr1"));
+      const expr1 = new Table("bar").project(star).as("expr1");
+      manager.withRecursive(expr1);
+      const sql = new Visitors.ToSql(testConnection).compile(manager.ast);
+      expect(sql).toBe('WITH RECURSIVE expr1 AS (SELECT * FROM "bar") SELECT * FROM expr1');
     });
   });
 
