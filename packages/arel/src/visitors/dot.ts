@@ -500,11 +500,11 @@ export class Dot extends Visitor {
       // visitor.rb:39 — no ancestor answered the dispatch. Since #5002,
       // Visitor#visit's no-handler arm already throws Ruby's
       // `TypeError, "Cannot visit <Class>"` directly, so it propagates
-      // unchanged. A mis-registered dispatch method (a plain Error from
-      // visitor.ts) likewise propagates as-is — it is a visitor bug, not an
-      // unvisitable value, and must never be relabelled. UnsupportedVisitError
-      // is unreachable here: Dot registers no `unsupported`-aliased handler,
-      // so no super.visit path produces it.
+      // unchanged. A class whose own dispatch entry names a missing method
+      // no longer raises here either: Visitor#visit falls through to an
+      // ancestor's handler (respond_to? check, visitor.rb:36-37).
+      // UnsupportedVisitError is unreachable: Dot registers no
+      // `unsupported`-aliased handler, so no super.visit path produces it.
       super.visit(object);
     });
     return undefined;
