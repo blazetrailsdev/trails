@@ -1207,17 +1207,23 @@ export const TEST_SCHEMA: Schema = {
   },
 
   posts: {
-    author_id: "integer",
-    title: { type: "string", null: false },
-    body: { type: "text", null: false },
-    type: "string",
-    legacy_comments_count: { type: "integer", default: 0 },
-    taggings_with_delete_all_count: { type: "integer", default: 0 },
-    taggings_with_destroy_count: { type: "integer", default: 0 },
-    tags_count: { type: "integer", default: 0 },
-    indestructible_tags_count: { type: "integer", default: 0 },
-    tags_with_destroy_count: { type: "integer", default: 0 },
-    tags_with_nullify_count: { type: "integer", default: 0 },
+    columns: {
+      author_id: "integer",
+      title: { type: "string", null: false },
+      body: { type: "text", null: false },
+      type: "string",
+      legacy_comments_count: { type: "integer", default: 0 },
+      taggings_with_delete_all_count: { type: "integer", default: 0 },
+      taggings_with_destroy_count: { type: "integer", default: 0 },
+      tags_count: { type: "integer", default: 0 },
+      indestructible_tags_count: { type: "integer", default: 0 },
+      tags_with_destroy_count: { type: "integer", default: 0 },
+      tags_with_nullify_count: { type: "integer", default: 0 },
+    },
+    // Rails: `t.references :author` — references default `index: true`, so
+    // schema.rb emits index_posts_on_author_id (load-bearing for the SQLite
+    // explain eager-loading plan: SEARCH posts USING INDEX, not SCAN).
+    indexes: [{ columns: "author_id", name: "index_posts_on_author_id" }],
   },
 
   postesques: {
