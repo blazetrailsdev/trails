@@ -14,6 +14,7 @@ import { MigrationContext } from "./migration.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import {
   describeIfMysql,
+  isMariaDb,
   Mysql2Adapter,
   MYSQL_TEST_URL,
   supportsDefaultExpression,
@@ -174,8 +175,10 @@ describe("DefaultStringsTest", () => {
 });
 
 // Rails gates the whole class to `current_adapter?(:SQLite3Adapter, :PostgreSQLAdapter)`.
-// (`test_default_binary_string` is nested under a further `Mysql2Adapter` guard
-// that can never be true inside the sqlite/pg gate, so it never runs — omitted.)
+// Rails' inner `current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && !mariadb?`
+// guard on `test_default_binary_string`, mirrored below.
+const runsOnNonMariadbMysql = adapterType === "mysql" && !isMariaDb;
+
 describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   let adapter: DatabaseAdapter;
   let DefaultBinary: typeof Base;
@@ -212,8 +215,11 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   // `current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && !mariadb?` guard
   // *inside* the sqlite/pg gate — a combination that can never hold — and
   // `binary_col` is declared in no schema, so the test is dead on every adapter.
-  // Ported verbatim under the same MySQL guard for name parity; it never runs.
-  it.skipIf(adapterType !== "mysql")("default binary string", () => {
+  // Ported verbatim under the same compound guard for name parity; it never
+  // runs. The condition is hoisted into a boolean so the gate extractor sees a
+  // guard-only gate, matching the Ruby extractor's handling of the compound
+  // `&&` (unsound adapter term dropped, mariadb guard kept).
+  it.skipIf(!runsOnNonMariadbMysql)("default binary string", () => {
     // Rails: assert_equal "binary_default", DefaultBinary.new.binary_col
     expect(decodeBinaryDefault((new DefaultBinary() as any).binary_col)).toBe("binary_default");
   });
