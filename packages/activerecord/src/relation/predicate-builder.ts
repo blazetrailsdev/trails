@@ -263,11 +263,15 @@ export class PredicateBuilder {
   private groupingQueries(queryGroups: Nodes.Node[][]): Nodes.Node[] {
     if (queryGroups.length === 0) return [];
     if (queryGroups.length === 1) return queryGroups[0];
-    // Rails `grouping_queries`: `Arel::Nodes::Or.new(queries.map!(&:reduce(:and)))`
-    // — an n-ary Or over the full array, wrapped in one Grouping.
-    const reduced = queryGroups.map((inner) =>
-      inner.length === 1 ? inner[0] : new Nodes.And(inner),
-    );
+    // Rails `grouping_queries` (predicate_builder.rb:157-159):
+    // `queries.map! { |query| query.reduce(&:and) }` then an n-ary
+    // `Arel::Nodes::Or.new(queries)` wrapped in one Grouping. `Node#and`
+    // is binary (`And.new [self, right]`), so a 3-predicate group is the
+    // nested chain `And([And([p1, p2]), p3])` — mirrored here via the same
+    // pairwise reduce, not a flat n-ary `And`. SQL is identical either way
+    // (the And visitor joins children without parens), but the AST shape
+    // matches Rails for anything walking the tree.
+    const reduced = queryGroups.map((inner) => inner.reduce((left, right) => left.and(right)));
     return [new Nodes.Grouping(new Nodes.Or(reduced))];
   }
 
@@ -455,15 +459,26 @@ export class PredicateBuilder {
     // expand_from_hash does via `self[key, value]` — dotted keys are
     // not split here (Rails doesn't either).
     const attrs = cols.map((c) => this.table.arelTable.get(c));
+    // Per-tuple AND uses the pairwise `reduce(&:and)` shape (nested
+    // binary `And` chain), matching Rails' `grouping_queries`
+    // (predicate_builder.rb:157) — not a flat n-ary `And`. SQL output
+    // is identical; only the AST shape differs.
+    //
+    // Deviation from the Rails array-key branch's exact tree: Rails'
+    // `grouping_queries` wraps only the outer Or in a single Grouping
+    // (and for a single tuple returns the predicates flat, as separate
+    // where-clause entries). `buildComposite` must return one node, so
+    // each tuple (and the single-tuple case) is wrapped in its own
+    // Grouping — semantically a no-op (AND binds tighter than OR) that
+    // keeps the emitted `(c1 = ? AND c2 = ?) OR (...)` form stable.
     const groupings: Nodes.Node[] = validTuples.map((tuple) => {
       const eqs = attrs.map((attr, i) => attr.eq(this.buildBindAttribute(attr.name, tuple[i])));
-      return new Nodes.Grouping(new Nodes.And(eqs));
+      return new Nodes.Grouping(eqs.reduce((left, right) => left.and(right)));
     });
     if (groupings.length === 1) return groupings[0];
-    // Use n-ary `Or(children[])` (Arel `Nodes::Or` extends `Nary`)
-    // for a flat AST instead of the deeply-nested binary chain
-    // `reduce` would produce. Keeps depth O(1) instead of O(n) for
-    // large tuple lists.
+    // n-ary `Or(children[])` matches Rails: `grouping_queries` builds
+    // `Arel::Nodes::Or.new(queries)` over the whole array (Arel's `Or`
+    // extends `Nary` in Rails 8.0.2 too).
     return new Nodes.Grouping(new Nodes.Or(groupings));
   }
 
