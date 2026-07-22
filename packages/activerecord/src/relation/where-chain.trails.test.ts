@@ -13,6 +13,7 @@ import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
 import { Customer } from "../test-helpers/models/customer.js";
+import { Company } from "../test-helpers/models/company.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 
 registerModel(Post);
@@ -104,6 +105,15 @@ describe("WhereChain not inversion shapes (trails)", () => {
     // `(id < 1 OR id >= 5)`.
     const sql = Post.whereNot({ id: new Range(1, 5, true) }).toSql();
     expect(sql).toMatch(/NOT \(.*id.*>=.*AND.*id.*<.*\)/is);
+  });
+
+  it("resolves attribute aliases before inversion like build_where_clause", () => {
+    // Rails WhereChain#not routes through build_where_clause (query_methods.rb:49),
+    // which resolves alias_attribute keys before expand_from_hash — so
+    // `where.not(newName: ...)` lands on the real `name` column, inverted.
+    const sql = Company.whereNot({ newName: "37signals" }).toSql();
+    expect(sql).toMatch(/["`]name["`]\s*!=/);
+    expect(sql).not.toMatch(/newName/);
   });
 });
 

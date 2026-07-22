@@ -838,17 +838,15 @@ export class Relation<T extends Base> {
       rel._whereClause.predicates.push(...clause.invert().predicates);
       return rel;
     }
-    // Values pass to PredicateBuilder raw, like Rails — the QueryAttribute
-    // bind owns casting/serialization at compile time (predicate_builder.rb:57-69).
-    //
     // Mirrors Rails WhereChain#not → `build_where_clause(opts).invert`
-    // (query_methods.rb:49): the predicate builder is always positive;
-    // negation is a single WhereClause#invert over the assembled clause —
-    // 1 predicate → node.invert() (`!=`, `IS NOT NULL`, `NOT IN`, ...),
-    // 2+ predicates → NOT(p1 AND p2 AND ...).
-    rel._whereClause.predicates.push(
-      ...new WhereClause(this.predicateBuilder.buildFromHash(conditions)).invert().predicates,
-    );
+    // (query_methods.rb:49): the hash routes through the same
+    // `build_where_clause` as `where` — which resolves attribute aliases and
+    // passes the join-dependency lookup block before `build_from_hash`
+    // (query_methods.rb:1631-1644) — then a single WhereClause#invert over the
+    // assembled clause: 1 predicate → node.invert() (`!=`, `IS NOT NULL`,
+    // `NOT IN`, ...), 2+ predicates → NOT(p1 AND p2 AND ...).
+    const clause = rel.buildWhereClause(conditions) as WhereClause;
+    rel._whereClause.predicates.push(...clause.invert().predicates);
     return rel;
   }
 
