@@ -343,6 +343,46 @@ describe("EagerAssociationTest", () => {
       expect(eagerMateys.map(mateyAttrs)).toEqual(mateysList.map(mateyAttrs));
     });
   });
+  it("type cast in where references association name", async () => {
+    const parent = comments("greetings");
+    const child = await (parent as any).children.createBang({
+      label: "child",
+      body: "hi",
+      post_id: parent.post_id,
+    });
+
+    const comment = (await Comment.includes("children")
+      .where({ "children.label": "child" })
+      .last()) as any;
+
+    expect(comment.id).toBe(parent.id);
+    expect((await comment.children.toArray()).map((c: any) => c.id)).toEqual([child.id]);
+  });
+  it("attribute alias in where references association name", async () => {
+    const firm = (await Firm.includes("clients")
+      .where({ "clients.newName": "Summit" })
+      .last()) as any;
+    expect(firm.id).toBe(companies("first_firm").id);
+    expect((await firm.clients.toArray()).map((c: any) => c.id)).toEqual([
+      companies("first_client").id,
+    ]);
+  });
+  it("calculate with string in from and eager loading", async () => {
+    expect(
+      await Post.from("authors, posts")
+        .eagerLoad("comments")
+        .where("posts.author_id = authors.id")
+        .count(),
+    ).toBe(10);
+  });
+  it("with two tables in from without getting double quoted", async () => {
+    const postsArr = await Post.select("posts.*")
+      .from("authors, posts")
+      .eagerLoad("comments")
+      .where("posts.author_id = authors.id")
+      .order("posts.id");
+    expect(await (postsArr[0] as any).comments.length()).toBe(2);
+  });
   it("duplicate middle objects", async () => {
     const commentArr = await Comment.where({ post_id: 1 }).includes({ post: "author" });
     await assertNoQueries(false, () => {
