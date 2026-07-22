@@ -129,10 +129,11 @@ export class PostgreSQLCompat {
   }
 }
 
-/** @internal Shape of a TableDefinition the V6_1 compat layer patches. */
+/** @internal Shape of a TableDefinition / Table the V6_1 compat layer patches. */
 interface CompatTableDefinition {
-  newColumnDefinition(name: string, type: string, options?: Record<string, unknown>): unknown;
-  column(name: string, type: string, options?: Record<string, unknown>): unknown;
+  newColumnDefinition?(name: string, type: string, options?: Record<string, unknown>): unknown;
+  column?(name: string, type: string, options?: Record<string, unknown>): unknown;
+  change?(name: string, type: string, options?: Record<string, unknown>): unknown;
 }
 
 /**
@@ -187,24 +188,41 @@ export function installCompatibilityVersions(current: MigrationClass): void {
      * `V6_1::TableDefinition` to the yielded table definition's singleton
      * class; here the equivalent is patching the instance's methods so they
      * run before the prototype's.
+     *
+     * @internal
      */
     override compatibleTableDefinition(t: unknown): unknown {
       const td = t as CompatTableDefinition;
       const conn = this.connection;
+      // Ruby prepends V6_1::TableDefinition to both create_table's
+      // TableDefinition and change_table's Table; Table has no
+      // new_column_definition, so each patch is guarded on the method existing.
       const origNewColumnDefinition = td.newColumnDefinition;
-      // Mirrors: V6_1::TableDefinition#new_column_definition
-      td.newColumnDefinition = function (name, type, options = {}) {
-        type = PostgreSQLCompat.compatibleTimestampType(type, conn);
-        return origNewColumnDefinition.call(this, name, type, options);
-      };
+      if (origNewColumnDefinition) {
+        // Mirrors: V6_1::TableDefinition#new_column_definition
+        td.newColumnDefinition = function (name, type, options = {}) {
+          type = PostgreSQLCompat.compatibleTimestampType(type, conn);
+          return origNewColumnDefinition.call(this, name, type, options);
+        };
+      }
+      // Mirrors: V6_1::TableDefinition#column / #change — Ruby's
+      // `options[:precision] ||= nil` marks the key present (suppressing the
+      // Rails 7 datetime precision-6 default) for every column type, since
+      // aliasing can turn e.g. :timestamp into :datetime downstream.
+      const markPrecision = (options: Record<string, unknown>) =>
+        "precision" in options ? options : { ...options, precision: null };
       const origColumn = td.column;
-      // Mirrors: V6_1::TableDefinition#column — `options[:precision] ||= nil`
-      td.column = function (name, type, options = {}) {
-        if (type === "datetime" && !("precision" in options)) {
-          options = { ...options, precision: null };
-        }
-        return origColumn.call(this, name, type, options);
-      };
+      if (origColumn) {
+        td.column = function (name, type, options = {}) {
+          return origColumn.call(this, name, type, markPrecision(options));
+        };
+      }
+      const origChange = td.change;
+      if (origChange) {
+        td.change = function (name, type, options = {}) {
+          return origChange.call(this, name, type, markPrecision(options));
+        };
+      }
       return super.compatibleTableDefinition(t);
     }
   }

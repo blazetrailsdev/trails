@@ -946,13 +946,19 @@ export abstract class Migration {
   ): Promise<void> {
     const options = typeof fnOrOptions === "function" ? {} : (fnOrOptions ?? {});
     const callback = typeof fnOrOptions === "function" ? fnOrOptions : fn;
+    // Mirrors Rails Migration::Current#change_table — the yielded table routes
+    // through compatible_table_definition (migration.rb:588), same as createTable.
+    // Wrapped before recording, matching Ruby where `super { |t| yield ... }`
+    // hands the recorder the already-wrapping block.
+    const wrappedCallback =
+      callback && ((t: Table) => callback(this.compatibleTableDefinition(t) as Table));
     if (this._recording) {
       // Rails: change_table delegates to the CommandRecorder so individual
       // ops inside the block can be inverted (or batched, in the bulk path).
       await this._recorder.changeTable(
         tableName,
         options as Record<string, unknown>,
-        callback as Parameters<CommandRecorder["changeTable"]>[2],
+        wrappedCallback as Parameters<CommandRecorder["changeTable"]>[2],
       );
       return;
     }
@@ -961,7 +967,7 @@ export abstract class Migration {
       // records ops via a Proxy and coalesces into a single ALTER. Apply
       // tableNamePrefix here since SchemaStatements doesn't.
       const tname = this._pt(tableName);
-      await this.schema.changeTable(tname, options, callback);
+      await this.schema.changeTable(tname, options, wrappedCallback);
       return;
     }
     // Build Table against Migration (not SchemaStatements) so that
@@ -974,7 +980,7 @@ export abstract class Migration {
       ).nativeDatabaseTypes?.() ?? {},
     );
     const table = withAdapterColumnMethods(new Table(tableName, this), columnTypes);
-    if (callback) await callback(table);
+    if (wrappedCallback) await wrappedCallback(table);
   }
 
   async renameIndex(tableName: string, oldName: string, newName: string): Promise<void> {
