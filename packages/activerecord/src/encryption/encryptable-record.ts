@@ -259,8 +259,11 @@ export class EncryptableRecord {
    * Record a pending encryption so `applyPendingEncryptions` (encryption.ts)
    * re-runs column-size validation and installs the frozen-encryption validator
    * on every `_defaultAttributes` rebuild (the type wrapping itself is the
-   * durable decorator pushed by `pushEncryptionDecorator`). Own-property
-   * guarded like the encrypted-attribute Set.
+   * durable decorator pushed by `pushEncryptionDecorator`). The `scheme` is
+   * kept in each entry for `encryptFixtureRows` (define-fixtures.ts), which
+   * builds fixture ciphertext before the schema has reflected — at that point
+   * `typeForAttribute` still resolves a plain ValueType. Own-property guarded
+   * like the encrypted-attribute Set.
    * @internal
    */
   static registerPendingEncryption(modelClass: any, name: string, scheme: Scheme): void {
