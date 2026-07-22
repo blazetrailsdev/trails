@@ -30,6 +30,18 @@ export class DeferredDistinctPkIn extends Nodes.In {
   ) {
     super(attribute, inlineSubquery);
   }
+
+  // Inherited In#invert would build a plain NotIn and drop the deferred
+  // innerRelation, so the load pipeline would never materialize the ids.
+  // `where.not(col: relationWithLimit)` reaches the negated marker through
+  // here (WhereClause#invert over the positively-built predicate).
+  invert(): DeferredDistinctPkNotIn {
+    return new DeferredDistinctPkNotIn(
+      this.left as Nodes.Attribute,
+      this.right as Nodes.Node,
+      this.innerRelation,
+    );
+  }
 }
 
 export class DeferredDistinctPkNotIn extends Nodes.NotIn {
@@ -39,6 +51,14 @@ export class DeferredDistinctPkNotIn extends Nodes.NotIn {
     readonly innerRelation: { _materializeDistinctPkIds(): Promise<unknown[]> },
   ) {
     super(attribute, inlineSubquery);
+  }
+
+  invert(): DeferredDistinctPkIn {
+    return new DeferredDistinctPkIn(
+      this.left as Nodes.Attribute,
+      this.right as Nodes.Node,
+      this.innerRelation,
+    );
   }
 }
 

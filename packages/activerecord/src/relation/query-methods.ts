@@ -1593,7 +1593,7 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // their ids).
   if (unloadedRelations.length === 0) {
     this._whereClause.predicates.push(
-      ...this.predicateBuilder.buildNegatedFromHash({ [pk]: literalRecords }),
+      this.predicateBuilder.build(this.predicateBuilder.resolveColumn(pk), literalRecords).invert(),
     );
     return this;
   }
@@ -1611,9 +1611,10 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   const attribute = (this._modelClass as any).arelTable.get(pk);
   // Mirror the array handler's `x.is_a?(Base) ? x.id : x` deref.
   const literalIds = literalRecords.map((r) => (isBaseInstance(r) ? (r as any).id : r));
-  const inlineSubquery = (
-    this.predicateBuilder.buildNegated(attribute, unloadedRelations[0]) as Nodes.NotIn
-  ).right as Nodes.Node;
+  // Build the positive `IN (subquery)` (Rails builds positively and inverts);
+  // only its subquery `right` is needed for the marker's display fallback.
+  const inlineSubquery = (this.predicateBuilder.build(attribute, unloadedRelations[0]) as Nodes.In)
+    .right as Nodes.Node;
   this._whereClause.predicates.push(
     new DeferredIdsNotIn(attribute, inlineSubquery, literalIds, unloadedRelations),
   );

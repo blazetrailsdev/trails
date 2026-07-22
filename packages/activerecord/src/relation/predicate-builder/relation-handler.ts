@@ -2,7 +2,7 @@ import { Nodes } from "@blazetrails/arel";
 import { ArgumentError } from "@blazetrails/activemodel";
 
 import { rubyInspectArray } from "../ruby-inspect.js";
-import { DeferredDistinctPkIn, DeferredDistinctPkNotIn } from "./deferred-distinct-pk-in.js";
+import { DeferredDistinctPkIn } from "./deferred-distinct-pk-in.js";
 
 /**
  * Handles Relation values in where conditions by converting them to
@@ -16,17 +16,10 @@ import { DeferredDistinctPkIn, DeferredDistinctPkNotIn } from "./deferred-distin
  */
 export class RelationHandler {
   call(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const deferred = this.deferDistinctPkMaterialization(attribute, value, false);
+    const deferred = this.deferDistinctPkMaterialization(attribute, value);
     if (deferred) return deferred;
     const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
     return attribute.in(relation.toArel());
-  }
-
-  callNegated(attribute: Nodes.Attribute, value: any): Nodes.Node {
-    const deferred = this.deferDistinctPkMaterialization(attribute, value, true);
-    if (deferred) return deferred;
-    const relation = this.injectPrimaryKeySelect(attribute, this.applyJoinDependency(value));
-    return attribute.notIn(relation.toArel());
   }
 
   // Rails routes an eager-loading subquery with a limit/offset over a collection
@@ -40,14 +33,13 @@ export class RelationHandler {
   private deferDistinctPkMaterialization(
     attribute: Nodes.Attribute,
     value: any,
-    negated: boolean,
   ): Nodes.Node | null {
     if (typeof value?._isDeferredDistinctPkSubquery !== "function") return null;
     if (!value._isDeferredDistinctPkSubquery()) return null;
     const inlineSubquery = value._buildDeferredDistinctPkInlineSubquery();
-    return negated
-      ? new DeferredDistinctPkNotIn(attribute, inlineSubquery, value)
-      : new DeferredDistinctPkIn(attribute, inlineSubquery, value);
+    // Always positive — `where.not(...)` reaches the negated marker via
+    // `DeferredDistinctPkIn#invert` (WhereClause#invert).
+    return new DeferredDistinctPkIn(attribute, inlineSubquery, value);
   }
 
   // Mirrors Rails `if value.eager_loading? value = value.send(:apply_join_dependency) end`

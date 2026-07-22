@@ -2,7 +2,6 @@ import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
-import { isBaseInstance } from "./predicate-builder/is-base-instance.js";
 import { RangeHandler, UnboundableBound } from "./predicate-builder/range-handler.js";
 import { BasicObjectHandler } from "./predicate-builder/basic-object-handler.js";
 import { RelationHandler } from "./predicate-builder/relation-handler.js";
@@ -69,7 +68,7 @@ export class PredicateBuilder {
    * `serializable? { |v| @_unboundable = v <=> 0 }` (query_attribute.rb:46-50),
    * driven by the ActiveModelRangeError raised on serialize. Reusing it (rather
    * than a second sign computation) keeps this in lockstep with the
-   * equality/negation single-value paths, and handles non-numeric out-of-range
+   * equality single-value path, and handles non-numeric out-of-range
    * bounds (e.g. custom types) type-agnostically.
    *
    * Callers pass the type from {@link typeOf} so sign detection uses the same
@@ -100,19 +99,11 @@ export class PredicateBuilder {
     conditions: Record<string, unknown>,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
-    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), false, block);
-  }
-
-  buildNegatedFromHash(
-    conditions: Record<string, unknown>,
-    block?: (tableName: string) => unknown,
-  ): Nodes.Node[] {
-    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), true, block);
+    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), block);
   }
 
   private buildFromHashInternal(
     conditions: Record<string, unknown>,
-    negated: boolean,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
     // Mirrors Rails PredicateBuilder#expand_from_hash: `return ["1=0"] if
@@ -121,14 +112,11 @@ export class PredicateBuilder {
     // `where(sink: {})` (empty hash, no foreign key) match nothing. Top-level
     // `where({})` never reaches here — it short-circuits as a blank argument in
     // `Relation#where` (like Rails' `args.first.blank?`), so this fires only for
-    // the nested/associated recursion.
-    //
-    // Under negation (`where.not(sink: {})`) trails threads `negated` into the
-    // recursion (Rails builds positively then inverts the WhereClause), so the
-    // contradiction inverts to the `1=1` tautology — `NOT (1=0)` matches every
-    // row, mirroring `WhereClause#invert` over Rails' `["1=0"]`.
+    // the nested/associated recursion. Like Rails, expansion is always
+    // positive: `where.not(...)` inverts the assembled WhereClause one level
+    // up (WhereClause#invert), so `where.not(sink: {})` becomes `NOT (1=0)`.
     if (Object.keys(conditions).length === 0) {
-      return [arelSql(negated ? "1=1" : "1=0")];
+      return [arelSql("1=0")];
     }
     const nodes: Nodes.Node[] = [];
     for (const [key, value] of Object.entries(conditions)) {
@@ -145,27 +133,22 @@ export class PredicateBuilder {
           key,
           block as (name: string) => never,
         ).predicateBuilder;
-        const innerNodes = negated
-          ? assocPb.buildNegatedFromHash(value)
-          : assocPb.buildFromHash(value);
-        nodes.push(...innerNodes);
+        nodes.push(...assocPb.buildFromHash(value));
       } else if (this.table.isAssociatedWith(key)) {
         const assocNodes = this.buildFromHashAssociation(
           this.table.associatedTable(key),
           key,
           value,
-          negated,
           conditions,
         );
         nodes.push(...assocNodes);
       } else if (this.table.aggregatedWith(key)) {
-        nodes.push(...this.buildFromHashAggregate(key, value, negated));
+        nodes.push(...this.buildFromHashAggregate(key, value));
       } else {
         // Rails `self[key, value]` (predicate_builder.rb:53-55): the attribute
         // is read straight off the builder's arel table — dotted keys were
         // already normalized into nested hashes by convertDotNotationToHash.
-        const attr = this.table.arelTable.get(key);
-        nodes.push(negated ? this.buildNegated(attr, value) : this.build(attr, value));
+        nodes.push(this.build(this.table.arelTable.get(key), value));
       }
     }
     return nodes;
@@ -179,7 +162,7 @@ export class PredicateBuilder {
    *
    * @internal
    */
-  private buildFromHashAggregate(key: string, value: unknown, negated: boolean): Nodes.Node[] {
+  private buildFromHashAggregate(key: string, value: unknown): Nodes.Node[] {
     const reflection = this.table.reflectOnAggregation(key);
     const mapping: [string, string][] = reflection.mapping();
     // Rails: `values = value.nil? ? [nil] : Array.wrap(value)`.
@@ -189,13 +172,10 @@ export class PredicateBuilder {
       const [columnName, aggregateAttr] = mapping[0];
       // Rails: `object.respond_to?(aggr) ? object.public_send(aggr) : object`.
       const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
-      return negated
-        ? this.buildNegatedFromHash({ [columnName]: mapped })
-        : this.buildFromHash({ [columnName]: mapped });
+      return this.buildFromHash({ [columnName]: mapped });
     }
     // Multi-mapping: one AND-group per object over every mapped column, ORed
-    // together (grouping_queries). Each column is built positively; negation is
-    // applied once at the group level, mirroring expand_from_hash.
+    // together (grouping_queries), mirroring expand_from_hash.
     const queryGroups: Nodes.Node[][] = values.map((object) =>
       mapping.map(([fieldAttr, aggregateAttr]) =>
         this.build(
@@ -204,7 +184,7 @@ export class PredicateBuilder {
         ),
       ),
     );
-    return this.groupingQueries(queryGroups, negated);
+    return this.groupingQueries(queryGroups);
   }
 
   /** @internal */
@@ -212,7 +192,6 @@ export class PredicateBuilder {
     associatedTable: any,
     key: string,
     value: unknown,
-    negated: boolean,
     attributes: Record<string, unknown>,
   ): Nodes.Node[] {
     if (associatedTable.isPolymorphicAssociation?.()) {
@@ -234,11 +213,9 @@ export class PredicateBuilder {
         if (inner.length === 0) continue;
         queryGroups.push(inner);
       }
-      return this.groupingQueries(queryGroups, negated);
+      return this.groupingQueries(queryGroups);
     }
     // Through: delegate with the associated model's primary key (Rails: through_association? path).
-    // Always build positively — negation is applied once at the group level below (mirrors Rails
-    // expand_from_hash which never recurses with negation).
     if (associatedTable.isThroughAssociation?.()) {
       const rawPk = associatedTable.klass?.primaryKey ?? "id";
       if (Array.isArray(rawPk)) {
@@ -257,11 +234,9 @@ export class PredicateBuilder {
       const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
       const inner = normalizedQueries.flatMap((q) => assocPb.buildFromHash(q));
       if (inner.length === 0) return [];
-      const group = inner.length === 1 ? inner[0] : new Nodes.And(inner);
-      return negated ? [new Nodes.Not(new Nodes.Grouping(group))] : [group];
+      return [inner.length === 1 ? inner[0] : new Nodes.And(inner)];
     }
     // Core non-polymorphic, non-through path.
-    // Rails expand_from_hash is always positive; negation is applied once at the group level.
     const queries = new AssociationQueryValue(associatedTable, value).queries();
     const queryGroups: Nodes.Node[][] = [];
     for (const query of queries) {
@@ -274,123 +249,26 @@ export class PredicateBuilder {
         queryGroups.push(inner);
       }
     }
-    return this.groupingQueries(queryGroups, negated);
+    return this.groupingQueries(queryGroups);
   }
 
   /**
    * Mirrors PredicateBuilder#grouping_queries: a single query group's predicates
    * are returned *flat* (so each column stays an addressable predicate, which
    * `WhereClause#extract_attributes` — and thus `rewhere` — relies on); multiple
-   * groups are each AND-reduced and ORed inside a Grouping. Negation wraps the
-   * group(s) in `NOT (...)` rather than negating each predicate independently.
+   * groups are each AND-reduced and ORed inside a Grouping.
    *
    * @internal
    */
-  private groupingQueries(queryGroups: Nodes.Node[][], negated: boolean): Nodes.Node[] {
+  private groupingQueries(queryGroups: Nodes.Node[][]): Nodes.Node[] {
     if (queryGroups.length === 0) return [];
-    if (queryGroups.length === 1) {
-      const inner = queryGroups[0];
-      if (!negated) return inner;
-      const node = inner.length === 1 ? inner[0] : new Nodes.And(inner);
-      return [new Nodes.Not(new Nodes.Grouping(node))];
-    }
+    if (queryGroups.length === 1) return queryGroups[0];
     // Rails `grouping_queries`: `Arel::Nodes::Or.new(queries.map!(&:reduce(:and)))`
     // — an n-ary Or over the full array, wrapped in one Grouping.
     const reduced = queryGroups.map((inner) =>
       inner.length === 1 ? inner[0] : new Nodes.And(inner),
     );
-    const grouping = new Nodes.Grouping(new Nodes.Or(reduced));
-    return negated ? [new Nodes.Not(grouping)] : [grouping];
-  }
-
-  buildNegated(attribute: Nodes.Attribute, value: unknown): Nodes.Node {
-    // Mirror build()'s deref (predicate_builder.rb:58). In Rails the deref lives in
-    // build() and negation is the inversion of a positively-built predicate, so
-    // `value = value.id if value.respond_to?(:id)` always applies — `where.not(col: record)`
-    // must compare against record.id, not the whole record object.
-    if (respondsToId(value)) {
-      value = (value as { id: unknown }).id;
-    }
-    if (value === null || value === undefined) {
-      return attribute.notEq(null);
-    }
-    if (value instanceof Set) {
-      value = Array.from(value);
-    }
-    if (value instanceof Range) {
-      return this.rangeHandler.callNegated(attribute, value);
-    }
-    if (Array.isArray(value)) {
-      return this.buildNegatedArray(attribute, value);
-    }
-    if (this.isRelation(value)) {
-      return this.relationHandler.callNegated(attribute, value);
-    }
-    // Build a bind attribute (as the positive BasicObjectHandler path does)
-    // rather than passing the raw value: Rails builds negation by inverting a
-    // positively-built predicate, so the RHS is a QueryAttribute bind. This
-    // also lets an out-of-range value report `unboundable?` at the visitor
-    // (`!=` → `1=1`) instead of raising ActiveModelRangeError when bound.
-    return attribute.notEq(this.buildBindAttribute(attribute.name, value));
-  }
-
-  private buildNegatedArray(attribute: Nodes.Attribute, value: unknown[]): Nodes.Node {
-    if (value.length === 0) return attribute.notIn([]);
-
-    const scalarValues: unknown[] = [];
-    let hasNull = false;
-    const ranges: Range[] = [];
-    const nonScalarValues: unknown[] = [];
-
-    for (const item of value) {
-      if (item === null || item === undefined) {
-        hasNull = true;
-      } else if (item instanceof Range) {
-        ranges.push(item);
-      } else if (isBaseInstance(item)) {
-        // Rails ArrayHandler: `x.is_a?(Base) ? x.id : x` — only genuine AR
-        // records deref to their PK; a non-Base object carrying an `id` does not.
-        scalarValues.push(item.id);
-      } else if (typeof item === "object" || typeof item === "function") {
-        nonScalarValues.push(item);
-      } else {
-        scalarValues.push(item);
-      }
-    }
-
-    const parts: Nodes.Node[] = [];
-
-    // Mirror Rails `ArrayHandler#call` (array_handler.rb:18-23) followed by
-    // `.invert`: a length-1 value array builds the scalar predicate
-    // (`build(attribute, values.first)` → Equality) and inverts to `!=`, only
-    // multi-value arrays use `IN` (→ `NOT IN` here). The positive
-    // `ArrayHandler.call` already collapses the single-value case via
-    // `predicateBuilder.build`; mirror its inverse here with `buildNegated` so
-    // both paths agree (`where.not`, `excluding`).
-    if (scalarValues.length === 1) {
-      parts.push(this.buildNegated(attribute, scalarValues[0]));
-    } else if (scalarValues.length > 1) {
-      // Mirror Rails `ArrayHandler#call` + `.invert`: the multi-value case is a
-      // `HomogeneousIn` node, inverted to `:notin`. Its `castedValues` drops
-      // out-of-range values, matching the positive IN path.
-      parts.push(new Nodes.HomogeneousIn(scalarValues, attribute, "notin"));
-    }
-
-    if (hasNull) {
-      parts.push(attribute.notEq(null));
-    }
-
-    for (const range of ranges) {
-      parts.push(this.buildNegated(attribute, range));
-    }
-
-    for (const v of nonScalarValues) {
-      parts.push(this.buildNegated(attribute, v));
-    }
-
-    if (parts.length === 0) return attribute.notIn([]);
-    if (parts.length === 1) return parts[0];
-    return new Nodes.And(parts);
+    return [new Nodes.Grouping(new Nodes.Or(reduced))];
   }
 
   build(attribute: Nodes.Attribute, value: unknown): Nodes.Node {

@@ -819,7 +819,9 @@ export class Relation<T extends Base> {
       // predicate added (matches Rails' `where.not(...)` no-op for
       // empty hashes).
       if (node !== null) {
-        rel._whereClause.predicates.push(new Nodes.Not(new Nodes.Grouping(node)));
+        // Rails builds the positive predicate and inverts it (WhereClause#invert
+        // → node.invert): `IN` → `NOT IN`, a grouped tuple-OR → `NOT (...)`.
+        rel._whereClause.predicates.push(node.invert());
       }
       return rel;
     }
@@ -839,16 +841,14 @@ export class Relation<T extends Base> {
     // Values pass to PredicateBuilder raw, like Rails — the QueryAttribute
     // bind owns casting/serialization at compile time (predicate_builder.rb:57-69).
     //
-    // Mirrors Rails' WhereClause#invert — branches on the actual predicate count,
-    // not the key count, since one key can expand to multiple predicates:
-    // - 1 predicate → invert_predicate (NOT NULL, !=, NOT BETWEEN, NOT IN, etc.)
-    // - 2+ predicates → NOT(p1 AND p2 AND ...) — semantically different from p1 != AND p2 !=
-    const positiveNodes = this.predicateBuilder.buildFromHash(conditions);
-    if (positiveNodes.length <= 1) {
-      rel._whereClause.predicates.push(...this.predicateBuilder.buildNegatedFromHash(conditions));
-    } else {
-      rel._whereClause.predicates.push(new Nodes.Not(new Nodes.And(positiveNodes)));
-    }
+    // Mirrors Rails WhereChain#not → `build_where_clause(opts).invert`
+    // (query_methods.rb:49): the predicate builder is always positive;
+    // negation is a single WhereClause#invert over the assembled clause —
+    // 1 predicate → node.invert() (`!=`, `IS NOT NULL`, `NOT IN`, ...),
+    // 2+ predicates → NOT(p1 AND p2 AND ...).
+    rel._whereClause.predicates.push(
+      ...new WhereClause(this.predicateBuilder.buildFromHash(conditions)).invert().predicates,
+    );
     return rel;
   }
 
@@ -4982,12 +4982,12 @@ export class Relation<T extends Base> {
         for (const rel of node.innerRelations) {
           ids.push(...(await rel.ids()));
         }
-        // Route through the negated predicate builder — trails' equivalent of
-        // Rails `predicate_builder[primary_key, records].invert`
+        // Build positively and invert — Rails
+        // `predicate_builder[primary_key, records].invert`
         // (query_methods.rb:1587) — instead of hardcoding `NOT IN`, so the
-        // materialized array shares the loaded/`where.not` array-negation logic
-        // (e.g. an eventual single-id `!=` collapse) rather than diverging.
-        predicates[i] = this.predicateBuilder.buildNegated(attribute, ids);
+        // materialized array shares the `where.not` array-negation logic
+        // (e.g. the single-id `!=` collapse) rather than diverging.
+        predicates[i] = this.predicateBuilder.build(attribute, ids).invert();
       }
     }
   }
