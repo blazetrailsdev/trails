@@ -248,6 +248,11 @@ describe("AttributeTest", () => {
     });
 
     it("should accept various data types.", () => {
+      // Rails also asserts a `created_at <= Time.now` half here. Like the
+      // sibling #gt/#gteq/#lt data-types tests in this file, that half is
+      // omitted: temporal quoting in trails routes through the invented
+      // connection-less quoters slated for removal (RFC 0007), so asserting
+      // its output would entrench the invention.
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").lteq("fake_name"));
@@ -732,8 +737,10 @@ describe("AttributeTest", () => {
 
     it("should generate NOT IN in sql", () => {
       const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").notIn([1, 2]));
-      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (1, 2)');
+      mgr.where(users.get("id").notIn([1, 2, 3]));
+      expect(mgr.toSql()).toBe(
+        'SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (1, 2, 3)',
+      );
     });
   });
 
