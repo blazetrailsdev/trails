@@ -86,6 +86,7 @@ describe("belongs_to composite-FK staleState with a BigInt component", () => {
       target: unknown;
       loadedBang(): void;
       isStaleTarget(): boolean;
+      readonly reader: unknown;
     };
     holder.target = post;
     holder.loadedBang();
@@ -93,5 +94,9 @@ describe("belongs_to composite-FK staleState with a BigInt component", () => {
 
     (comment as unknown as Record<string, unknown>).blog_post_id = 2n;
     expect(holder.isStaleTarget()).toBe(false);
+    // The reader keeps the cached target — no stale-reload Promise. Verified
+    // in Rails 8.0.2: `book.order` still returns the originally loaded record
+    // after the composite FK changes.
+    expect(holder.reader).toBe(post);
   });
 });
