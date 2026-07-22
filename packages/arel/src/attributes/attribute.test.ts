@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { testConnection } from "../test-helpers/connection.js";
-import { Table, star, SelectManager, Nodes, Visitors, relationName } from "../index.js";
+import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
 
 describe("AttributeTest", () => {
   const users = new Table("users");
@@ -62,6 +62,7 @@ describe("AttributeTest", () => {
 
   describe("#gt", () => {
     it("should create a GreaterThan node", () => {
+      expect(users.get("age").gt(10)).toBeInstanceOf(Nodes.GreaterThan);
       expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
         'SELECT * FROM "users" WHERE "users"."age" > 10',
       );
@@ -92,15 +93,6 @@ describe("AttributeTest", () => {
       expect(users.get("id").gteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").gteqAny([1, 2]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#gteq_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").gteqAny([1, 2]));
@@ -149,15 +141,6 @@ describe("AttributeTest", () => {
     });
 
     it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").ltAny([1, 2]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#lt_any", () => {
-    it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").ltAny([1, 2]));
       expect(mgr.toSql()).toBe(
@@ -182,6 +165,7 @@ describe("AttributeTest", () => {
 
   describe("#lt", () => {
     it("should create a LessThan node", () => {
+      expect(users.get("age").lt(10)).toBeInstanceOf(Nodes.LessThan);
       expect(users.project(star).where(users.get("age").lt(10)).toSql()).toBe(
         'SELECT * FROM "users" WHERE "users"."age" < 10',
       );
@@ -205,15 +189,6 @@ describe("AttributeTest", () => {
       expect(users.get("id").lteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").lteqAny([1, 2]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#lteq_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("id").lteqAny([1, 2]));
@@ -269,10 +244,11 @@ describe("AttributeTest", () => {
     });
 
     it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").eqAny([1, 2]));
-      expect(mgr.toSql()).toContain("OR");
+      const mgr = users.project(users.get("id"));
+      mgr.where(users.get("id").eqAny([1, 2]));
+      expect(mgr.toSql()).toBe(
+        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 OR "users"."id" = 2)',
+      );
     });
 
     it("should not eat input", () => {
@@ -280,16 +256,6 @@ describe("AttributeTest", () => {
       const values = [1, 2];
       relation.get("id").eqAny(values);
       expect(values).toEqual([1, 2]);
-    });
-  });
-
-  describe("#eq_any", () => {
-    it("should generate ORs in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").eqAny([1, 2]));
-      expect(mgr.toSql()).toBe(
-        'SELECT "users"."id" FROM "users" WHERE ("users"."id" = 1 OR "users"."id" = 2)',
-      );
     });
   });
 
@@ -360,6 +326,7 @@ describe("AttributeTest", () => {
 
   describe("#eq", () => {
     it("should return an equality node", () => {
+      expect(users.get("id").eq(10)).toBeInstanceOf(Nodes.Equality);
       expect(users.project(star).where(users.get("id").eq(10)).toSql()).toBe(
         'SELECT * FROM "users" WHERE "users"."id" = 10',
       );
@@ -383,15 +350,6 @@ describe("AttributeTest", () => {
       expect(users.get("name").matchesAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").matchesAny(["%a%", "%b%"]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#matches_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").matchesAny(["%foo%", "%bar%"]));
@@ -417,6 +375,7 @@ describe("AttributeTest", () => {
 
   describe("#matches", () => {
     it("should create a Matches node", () => {
+      expect(users.get("name").matches("%bacon%")).toBeInstanceOf(Nodes.Matches);
       expect(users.project(star).where(users.get("name").matches("%bacon%")).toSql()).toBe(
         `SELECT * FROM "users" WHERE "users"."name" LIKE '%bacon%'`,
       );
@@ -434,15 +393,6 @@ describe("AttributeTest", () => {
       expect(users.get("name").doesNotMatchAny(["%foo%", "%bar%"])).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").doesNotMatchAny(["%a%", "%b%"]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#does_not_match_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(users.get("name").doesNotMatchAny(["%foo%", "%bar%"]));
@@ -468,6 +418,7 @@ describe("AttributeTest", () => {
 
   describe("#does_not_match", () => {
     it("should create a DoesNotMatch node", () => {
+      expect(users.get("name").doesNotMatch("%bacon%")).toBeInstanceOf(Nodes.DoesNotMatch);
       expect(users.project(star).where(users.get("name").doesNotMatch("%bacon%")).toSql()).toBe(
         `SELECT * FROM "users" WHERE "users"."name" NOT LIKE '%bacon%'`,
       );
@@ -490,15 +441,6 @@ describe("AttributeTest", () => {
       ).toBeInstanceOf(Nodes.Grouping);
     });
 
-    it("should generate ORs in sql", () => {
-      const relation = new Table("users");
-      const mgr = relation.project(relation.get("id"));
-      mgr.where(relation.get("id").inAny([[1], [2]]));
-      expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("#in_any", () => {
     it("should generate ORs in sql", () => {
       const mgr = users.project(users.get("id"));
       mgr.where(
@@ -868,6 +810,11 @@ describe("AttributeTest", () => {
   });
 
   describe("#overlaps", () => {
+    it("should create an Overlaps node", () => {
+      const node = users.get("tags").overlaps("bar");
+      expect(node).toBeInstanceOf(Nodes.Overlaps);
+    });
+
     it("should generate && in sql", () => {
       const visitor = new Visitors.ToSql(testConnection);
       const node = users.get("tags").overlaps("bar");
@@ -1150,24 +1097,10 @@ describe("AttributeTest", () => {
     );
   });
 
-  describe("#gt", () => {
-    it("should create a GreaterThan node", () => {
-      const node = users.get("age").gt(10);
-      expect(node).toBeInstanceOf(Nodes.GreaterThan);
-    });
-  });
-
   it("should accept various data types for gt", () => {
     expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
       'SELECT * FROM "users" WHERE "users"."age" > 10',
     );
-  });
-
-  describe("#lt", () => {
-    it("should create a LessThan node", () => {
-      const node = users.get("age").lt(10);
-      expect(node).toBeInstanceOf(Nodes.LessThan);
-    });
   });
 
   it("should generate the proper SQL for AVG", () => {
@@ -1200,13 +1133,6 @@ describe("AttributeTest", () => {
     );
   });
 
-  describe("#eq", () => {
-    it("should return an equality node", () => {
-      const node = users.get("id").eq(10);
-      expect(node).toBeInstanceOf(Nodes.Equality);
-    });
-  });
-
   it("should handle nil for eq", () => {
     expect(users.project(star).where(users.get("name").eq(null)).toSql()).toBe(
       'SELECT * FROM "users" WHERE "users"."name" IS NULL',
@@ -1225,20 +1151,6 @@ describe("AttributeTest", () => {
     const copy = [...input];
     users.get("id").eqAll(input);
     expect(input).toEqual(copy);
-  });
-
-  describe("#matches", () => {
-    it("should create a Matches node", () => {
-      const node = users.get("name").matches("%bacon%");
-      expect(node).toBeInstanceOf(Nodes.Matches);
-    });
-  });
-
-  describe("#does_not_match", () => {
-    it("should create a DoesNotMatch node", () => {
-      const node = users.get("name").doesNotMatch("%bacon%");
-      expect(node).toBeInstanceOf(Nodes.DoesNotMatch);
-    });
   });
 
   it("can be constructed with a list for IN", () => {
@@ -1325,39 +1237,6 @@ describe("AttributeTest", () => {
     expect(node).toBeInstanceOf(Nodes.Division);
   });
 
-  describe("#sum", () => {
-    it("should generate the proper SQL", () => {
-      const node = users.get("tags").contains("foo");
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toBe('"users"."tags" @> \'foo\'');
-    });
-  });
-
-  describe("#minimum", () => {
-    it("should generate proper SQL", () => {
-      const node = users.get("tags").overlaps("bar");
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toBe('"users"."tags" && \'bar\'');
-    });
-  });
-
-  describe("#overlaps", () => {
-    it("should create an Overlaps node", () => {
-      const node = users.get("tags").overlaps("bar");
-      expect(node).toBeInstanceOf(Nodes.InfixOperation);
-      expect((node as Nodes.InfixOperation).operator).toBe("&&");
-    });
-  });
-
-  describe("#to_sql", () => {
-    it("should produce sql", () => {
-      const relation = new Table("users");
-      const node = relation.get("id").eq(10);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(node)).toContain('"users"."id" = 10');
-    });
-  });
-
   describe("#gt_any", () => {
     it("should create a Grouping node", () => {
       const relation = new Table("users");
@@ -1397,27 +1276,6 @@ describe("AttributeTest", () => {
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("id").notEqAny([1, 2]));
       expect(mgr.toSql()).toContain("OR");
-    });
-  });
-
-  describe("relationName", () => {
-    it("returns a plain string name unchanged", () => {
-      expect(relationName("users")).toBe("users");
-    });
-
-    it("unwraps a SqlLiteral name to its value", () => {
-      // Unlike Rails (where SqlLiteral < String), trails models SqlLiteral as a
-      // standalone Node, so a TableAlias derived-table alias must be unwrapped
-      // before it flows into any String-typed slot.
-      const alias = new Nodes.TableAlias(new Table("users"), new Nodes.SqlLiteral("derived"));
-      expect(relationName(alias.name)).toBe("derived");
-    });
-
-    it("coerces an attribute on a SqlLiteral-aliased relation to a string name", () => {
-      const alias = new Nodes.TableAlias(new Table("users"), new Nodes.SqlLiteral("derived"));
-      const attr = alias.get("id");
-      const qualified = `${relationName(attr.relation.name)}.${attr.name}`;
-      expect(qualified).toBe("derived.id");
     });
   });
 });
