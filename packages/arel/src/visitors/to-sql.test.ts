@@ -448,7 +448,10 @@ describe("the to_sql visitor", () => {
 
   describe("Nodes::Fragments", () => {
     it("joins subexpressions", () => {
-      const mgr = users.project(star).join(posts, users.get("id").eq(posts.get("user_id")));
+      const mgr = users
+        .project(star)
+        .join(posts)
+        .on(users.get("id").eq(posts.get("user_id")));
       const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).toContain("JOIN");
       expect(sql).toContain("ON");

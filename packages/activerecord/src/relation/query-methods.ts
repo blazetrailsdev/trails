@@ -2974,10 +2974,11 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
       : j.table;
     const onNode = typeof j.on === "string" ? arelSql(j.on) : j.on;
     if (j.type === "inner") {
-      manager.join(tableNode, onNode);
+      manager.join(tableNode);
     } else {
-      manager.outerJoin(tableNode, onNode);
+      manager.outerJoin(tableNode);
     }
+    if (onNode != null) manager.on(onNode);
   }
 
   // One AliasTracker shared across every JoinDependency, mirroring Rails' single
