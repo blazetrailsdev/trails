@@ -282,8 +282,9 @@ interface FinderRelation {
   _scopeAttributes(): Record<string, unknown>;
   scopeForCreate(): Record<string, unknown>;
   _clone(): any;
-  /** Rails' not-found `conditions` clause: ` [WHERE …]` or "" (relation.ts). */
-  _conditionsClause(): string;
+  _whereClause: { isEmpty(): boolean };
+  /** Relation#arel — the built SelectManager (relation.ts). */
+  arel(): { whereSql(engine: unknown): string | null };
   where(conditions: unknown, ...rest: unknown[]): any;
   limit(n: number): any;
   order(...args: any[]): any;
@@ -309,9 +310,16 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   const normalized = normalizeFindArgs(modelName, pk, args);
   if (normalized.emptyArray) return [];
   const { ids, wantArray, tuples } = normalized;
-  // Rails appends the relation's WHERE clause to every not-found message
-  // (`conditions = " [#{arel.where_sql(model)}]" unless where_clause.empty?`).
-  const conditions = this._conditionsClause();
+  // Rails appends the relation's WHERE clause to every not-found message.
+  // Rails builds it inside raise_record_not_found_exception! (finder_methods.rb:418);
+  // trails precomputes it here because the raise paths below go through the
+  // shared raiseNotFoundSingle/raiseNotFoundAll helpers rather than the bang.
+  // The guard is `where_clause.empty?`, but the rendered SQL comes from the
+  // built arel, whose WHERE also folds in the STI type_condition and any
+  // default-scope predicates.
+  const conditions = this._whereClause.isEmpty()
+    ? ""
+    : ` [${this.arel().whereSql(this._modelClass) ?? ""}]`;
 
   // Composite PK: OR over per-tuple WHERE conditions. The
   // `Array.isArray(pk)` guard narrows `pk` to `string[]` via
@@ -669,9 +677,15 @@ export function raiseRecordNotFoundExceptionBang(
   key?: string,
   notFoundIds?: unknown[],
 ): never {
+  // Rails: `conditions = " [#{arel.where_sql(model)}]" unless where_clause.empty?`
+  // (finder_methods.rb:418). `where_sql` returns nil when the manager has no
+  // wheres, which Ruby interpolates as "" — hence the `?? ""`.
+  const conditions = this._whereClause.isEmpty()
+    ? ""
+    : ` [${this.arel().whereSql(this._modelClass) ?? ""}]`;
+
   const name = this._modelClass.name;
   const k = key ?? String(this._modelClass.primaryKey);
-  const conditions = this._conditionsClause();
 
   if (ids === undefined || ids === null) {
     // Rails: `error << " with#{conditions}" if conditions`.

@@ -347,7 +347,7 @@ function makeFindSomeRel(
     _rawOrderClauses: [],
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
-    _conditionsClause: () => "",
+    _whereClause: { isEmpty: () => true },
     where(_cond: any) {
       const rel: any = { toArray: async () => records, select: () => rel };
       return rel;
@@ -454,7 +454,7 @@ function makeFindSomeOrderedRel(
     _rawOrderClauses: [],
     selectValues: [],
     raiseRecordNotFoundExceptionBang,
-    _conditionsClause: () => "",
+    _whereClause: { isEmpty: () => true },
     where(_cond: any) {
       const rel: any = { toArray: async () => records, select: () => rel };
       return rel;
@@ -627,7 +627,7 @@ describe("finder not-found message fidelity", () => {
     const rel: any = {
       _modelClass: { name: "Car", primaryKey: "id" },
       raiseRecordNotFoundExceptionBang,
-      _conditionsClause: () => "",
+      _whereClause: { isEmpty: () => true },
       findBy: async () => null,
     };
     try {
@@ -655,7 +655,7 @@ describe("finder not-found message fidelity", () => {
       _offsetValue: null,
       selectValues: [],
       raiseRecordNotFoundExceptionBang,
-      _conditionsClause: () => "",
+      _whereClause: { isEmpty: () => true },
       where(_cond: any) {
         const inner: any = { toArray: async () => [], select: () => inner };
         return inner;
