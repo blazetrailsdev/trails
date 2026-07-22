@@ -141,15 +141,18 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
     (m) => m[1],
   );
 
-  if (adapters && featureMatches.length) {
-    return { adapters, features: sortedUnique(featureMatches), source: ["test"] };
-  }
-  if (adapters) return { adapters, source: ["test"] };
-  if (featureMatches.length) {
-    return { features: sortedUnique(featureMatches), source: ["test"] };
-  }
+  // `isMariaDb` (test-helper boolean) / `isMariadb()` (adapter method) — the
+  // TS analogs of Rails' `mariadb?` predicate, which the Ruby extractor records
+  // as a `mariadb` guard. Polarity-blind, like the feature predicates above.
+  const guards: string[] = [];
+  if (/isMaria[Dd]b\b/.test(text)) guards.push("mariadb");
 
-  return { guards: ["unknown"], source: ["test"] };
+  const gate: TestGate = { source: ["test"] };
+  if (adapters) gate.adapters = adapters;
+  if (featureMatches.length) gate.features = sortedUnique(featureMatches);
+  if (guards.length) gate.guards = guards;
+  if (!gate.adapters && !gate.features && !gate.guards) gate.guards = ["unknown"];
+  return gate;
 }
 
 // ---------------------------------------------------------------------------

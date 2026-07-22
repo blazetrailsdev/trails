@@ -103,6 +103,22 @@ describe("gates.ts pure helpers", () => {
     });
   });
 
+  it("records a mariadb guard for isMariaDb terms, dropping nothing else", () => {
+    // Guard-only: `it.skipIf(isMariaDb)` (mysql2-adapter.test.ts idiom).
+    expect(gateFromGuardExpr("isMariaDb", false)).toEqual({
+      guards: ["mariadb"],
+      source: ["test"],
+    });
+    // Compound hoisted boolean is still opaque, but a visible isMariaDb term in
+    // the expression is recorded alongside the adapter set, mirroring the Ruby
+    // extractor's `mariadb?` handling.
+    expect(gateFromGuardExpr('!(adapterType === "mysql" && !isMariaDb)', false)).toEqual({
+      adapters: ["postgresql", "sqlite"],
+      guards: ["mariadb"],
+      source: ["test"],
+    });
+  });
+
   it("falls back to an unknown guard for unrecognized expressions", () => {
     expect(gateFromGuardExpr("!supportsConflictTarget", false)).toEqual({
       guards: ["unknown"],
