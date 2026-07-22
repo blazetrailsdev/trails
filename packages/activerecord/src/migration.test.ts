@@ -2169,15 +2169,20 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
       t.string("name");
       t.date("birthdate");
     });
+    let cols = await adapter.columns("delete_me");
+    expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
+    expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
+
     await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.change("name", "string", { default: "NONAME" });
       t.change("birthdate", "datetime", { comment: "This is a comment" });
     });
-    const cols = await adapter.columns("delete_me");
+    cols = await adapter.columns("delete_me");
     const name = cols.find((c) => c.name === "name")!;
     const birthdate = cols.find((c) => c.name === "birthdate")!;
     expect(String(name.default)).toBe("NONAME");
     expect(birthdate.type).toBe("datetime");
+    expect(birthdate.comment).toBe("This is a comment");
   });
 
   it("changing column null with default", async () => {
@@ -2186,6 +2191,10 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
       t.integer("age");
       t.date("birthdate");
     });
+    const preCols = await adapter.columns("delete_me");
+    expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
+    expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
+
     await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.change("name", "string", { default: "NONAME" });
       t.change("birthdate", "datetime");
