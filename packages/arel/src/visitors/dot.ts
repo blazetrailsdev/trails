@@ -2,7 +2,6 @@ import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { Table } from "../table.js";
 import { Visitor, type NodeCtor } from "./visitor.js";
-import { UnsupportedVisitError } from "../errors.js";
 import { PlainString } from "../collectors/plain-string.js";
 import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 import { temporalClassName } from "../temporal-tag.js";
@@ -498,24 +497,15 @@ export class Dot extends Visitor {
     }
     this.nodes.push(node);
     this.withNode(node, () => {
-      try {
-        super.visit(object);
-      } catch (e) {
-        // visitor.rb:39 — no ancestor answered the dispatch. Dot has always
-        // reported that as Ruby's TypeError with the value's class name.
-        //
-        // `cause` has no counterpart in `raise TypeError, "Cannot visit ..."`
-        // because Ruby chains the active exception into `#cause` implicitly;
-        // JS does not, so passing it is what keeps the two equivalent. It is
-        // also required here by the `preserve-caught-error` lint rule. The
-        // class and message still match visitor.rb:39 exactly.
-        if (e instanceof UnsupportedVisitError) {
-          throw new TypeError(`Cannot visit ${this.classNameOf(object)}`, { cause: e });
-        }
-        // A mis-registered dispatch method (a plain Error from visitor.ts) is
-        // a bug in this visitor, not an unvisitable value — never relabel it.
-        throw e;
-      }
+      // visitor.rb:39 — no ancestor answered the dispatch. Since #5002,
+      // Visitor#visit's no-handler arm already throws Ruby's
+      // `TypeError, "Cannot visit <Class>"` directly, so it propagates
+      // unchanged. A mis-registered dispatch method (a plain Error from
+      // visitor.ts) likewise propagates as-is — it is a visitor bug, not an
+      // unvisitable value, and must never be relabelled. UnsupportedVisitError
+      // is unreachable here: Dot registers no `unsupported`-aliased handler,
+      // so no super.visit path produces it.
+      super.visit(object);
     });
     return undefined;
   }
