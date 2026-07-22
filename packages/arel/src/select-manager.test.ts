@@ -468,9 +468,11 @@ describe("SelectManagerTest", () => {
   });
 
   it("should create and nodes", () => {
-    const mgr = new SelectManager(users);
-    const and = mgr.createAnd([users.get("id").eq(1), users.get("name").eq("dean")]);
-    expect(and).toBeInstanceOf(Nodes.And);
+    const mgr = new SelectManager();
+    const children = ["foo", "bar", "baz"];
+    const clause = mgr.createAnd(children);
+    expect(clause).toBeInstanceOf(Nodes.And);
+    expect(clause.children).toEqual(children);
   });
 
   it("should create insert managers", () => {
@@ -480,9 +482,11 @@ describe("SelectManagerTest", () => {
   });
 
   it("should create join nodes", () => {
-    const mgr = new SelectManager(users);
-    const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")));
+    const mgr = new SelectManager();
+    const join = mgr.createJoin("foo", "bar");
     expect(join).toBeInstanceOf(Nodes.InnerJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
   });
 
   describe("join", () => {

@@ -34,12 +34,12 @@ export interface FactoryMethodsModule {
   createFalse(): False;
   createTableAlias(relation: Node, name: string | SqlLiteral): TableAlias;
   createJoin(
-    to: Node,
-    constraint?: Node | null,
+    to: Node | string,
+    constraint?: Node | string | null,
     klass?: new (left: Node, right: Node | null) => Join,
   ): Join;
   createStringJoin(to: string | Node): StringJoin;
-  createAnd(clauses: Node[]): And;
+  createAnd(clauses: (Node | string)[]): And;
   createOn(expr: Node): On;
   grouping(expr: Node): Grouping;
   lower(column: unknown): NamedFunction;
@@ -60,13 +60,15 @@ export const FactoryMethods: FactoryMethodsModule = {
     return new TableAlias(relation, name);
   },
 
+  // Rails' create_join/create_and are duck-typed and its own tests exercise
+  // them with bare strings, so the params admit `string` like Table#createJoin.
   createJoin(
-    to: Node,
-    constraint?: Node | null,
+    to: Node | string,
+    constraint?: Node | string | null,
     klass?: new (left: Node, right: Node | null) => Join,
   ): Join {
     const JoinKlass = klass ?? InnerJoin;
-    return new JoinKlass(to, constraint ?? null);
+    return new JoinKlass(to as Node, (constraint ?? null) as Node | null);
   },
 
   createStringJoin(to: string | Node): StringJoin {
@@ -74,8 +76,8 @@ export const FactoryMethods: FactoryMethodsModule = {
     return this.createJoin(node, null, StringJoin) as StringJoin;
   },
 
-  createAnd(clauses: Node[]): And {
-    return new And(clauses);
+  createAnd(clauses: (Node | string)[]): And {
+    return new And(clauses as Node[]);
   },
 
   createOn(expr: Node): On {

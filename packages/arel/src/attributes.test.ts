@@ -6,8 +6,8 @@ describe("Attributes", () => {
   it("responds to lower", () => {
     const name = users.get("name");
     const fn = name.lower();
-    expect(fn).toBeInstanceOf(Nodes.NamedFunction);
     expect(fn.name).toBe("LOWER");
+    expect(fn.expressions).toEqual([name]);
   });
 
   describe("equality", () => {

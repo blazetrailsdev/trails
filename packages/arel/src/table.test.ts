@@ -1,28 +1,45 @@
 import { describe, it, expect } from "vitest";
-import { Table, sql, star, SelectManager, Nodes, Visitors, EmptyJoinError } from "./index.js";
+import {
+  Table,
+  sql,
+  star,
+  SelectManager,
+  TreeManager,
+  Nodes,
+  Visitors,
+  EmptyJoinError,
+} from "./index.js";
 import { testConnection, mysqlTestConnection } from "./test-helpers/connection.js";
 
 describe("TableTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
   it("should create join nodes", () => {
-    const join = users.createJoin(posts, users.get("id").eq(posts.get("user_id")));
+    const join = users.createJoin("foo", "bar");
     expect(join).toBeInstanceOf(Nodes.InnerJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
   });
 
   it("should create join nodes with a klass", () => {
     const join = users.createJoin("foo", "bar", Nodes.FullOuterJoin);
     expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
   });
 
   it("should create join nodes with a klass", () => {
     const join = users.createJoin("foo", "bar", Nodes.OuterJoin);
     expect(join).toBeInstanceOf(Nodes.OuterJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
   });
 
   it("should create join nodes with a klass", () => {
     const join = users.createJoin("foo", "bar", Nodes.RightOuterJoin);
     expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
   });
 
   describe("createJoin with On constraint", () => {
@@ -98,9 +115,8 @@ describe("TableTest", () => {
 
   describe("new", () => {
     it("should accept a hash", () => {
-      // Table where accepts node conditions
-      const mgr = users.where(users.get("id").eq(1));
-      expect(mgr).toBeInstanceOf(SelectManager);
+      const rel = new Table("users", { as: "foo" });
+      expect(rel.tableAlias).toBe("foo");
     });
 
     it("ignores as if it equals name", () => {
@@ -151,8 +167,10 @@ describe("TableTest", () => {
 
   describe("where", () => {
     it("returns a tree manager", () => {
-      const mgr = users.project(star);
-      expect(mgr).toBeInstanceOf(SelectManager);
+      const mgr = users.where(users.get("id").eq(1));
+      mgr.project(users.get("id"));
+      expect(mgr).toBeInstanceOf(TreeManager);
+      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" = 1');
     });
   });
 
@@ -168,16 +186,23 @@ describe("TableTest", () => {
   });
 
   describe("equality", () => {
+    // Rails asserts `array.uniq.size` (table_test.rb:191-202), which exercises
+    // the eql? + hash contract together; JS has no uniq-by-eql, so assert both
+    // halves explicitly.
     it("is equal with equal ivars", () => {
-      const a = new Nodes.And([users.get("id").eq(1)]);
-      const b = new Nodes.And([users.get("id").eq(1)]);
-      expect(a.children.length).toBe(b.children.length);
+      const relation1 = new Table("users", { as: "zomg" });
+      const relation2 = new Table("users", { as: "zomg" });
+      expect(relation1.eql(relation2)).toBe(true);
+      expect(relation1.hash()).toBe(relation2.hash());
     });
 
     it("is not equal with different ivars", () => {
-      const a = users.get("name");
-      const b = users.get("email");
-      expect(a.name).not.toBe(b.name);
+      const relation1 = new Table("users", { as: "zomg" });
+      const relation2 = new Table("users", { as: "zomg2" });
+      // Rails' Table#hash hashes only @name (table.rb:88-92), so these share a
+      // hash bucket; uniq drops to eql?, which distinguishes them.
+      expect(relation1.hash()).toBe(relation2.hash());
+      expect(relation1.eql(relation2)).toBe(false);
     });
   });
 
@@ -253,18 +278,6 @@ describe("TableTest", () => {
     const aliased = users.alias("u");
     expect(aliased).toBeInstanceOf(Nodes.TableAlias);
     expect(aliased.name).toBe("u");
-  });
-
-  it("should accept a hash (constructor options)", () => {
-    const t = new Table("users", { as: "u" });
-    expect(t.tableAlias).toBe("u");
-  });
-
-  describe("where", () => {
-    it("returns a tree manager", () => {
-      const mgr = users.project(star);
-      expect(mgr).toBeInstanceOf(SelectManager);
-    });
   });
 
   it("manufactures an attribute", () => {
