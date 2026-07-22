@@ -67,7 +67,10 @@ function rubyTimeToS(zdt: Temporal.ZonedDateTime): string {
   const sign = offsetMinutes < 0 ? "-" : "+";
   const abs = Math.abs(offsetMinutes);
   const offset = `${sign}${p(Math.floor(abs / 60))}${p(abs % 60)}`;
-  return `${String(zdt.year).padStart(4, "0")}-${p(zdt.month)}-${p(zdt.day)} ${p(zdt.hour)}:${p(zdt.minute)}:${p(zdt.second)} ${offset}`;
+  // Ruby renders BCE years sign-then-zero-padded: `Time.new(-1, ...).to_s` is
+  // `-0001-01-01 ...`; a bare padStart on the signed string would emit `00-1`.
+  const year = `${zdt.year < 0 ? "-" : ""}${String(Math.abs(zdt.year)).padStart(4, "0")}`;
+  return `${year}-${p(zdt.month)}-${p(zdt.day)} ${p(zdt.hour)}:${p(zdt.minute)}:${p(zdt.second)} ${offset}`;
 }
 
 /**
