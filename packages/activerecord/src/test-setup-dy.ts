@@ -35,9 +35,20 @@ import { DatabaseTasks } from "./tasks/database-tasks.js";
 import "./relation.js";
 
 const { adapter, envConfig } = await buildTestDatabaseConfig();
-const schemaFilePath = await generateSchemaFile(TEST_SCHEMA, adapter);
 
 await Base.establishConnection(envConfig.configuration as Record<string, unknown>);
+
+// Resolve `supports_expression_index?` from the live connection BEFORE
+// generating the schema file: without it the generator falls back to its
+// coarse `adapterName === "mysql"` skip and this per-worker rebuild silently
+// strips the canonical expression indexes a MySQL-8 template DB carries
+// (company_expression_index / full_name_index), diverging from schema.rb.
+const { supportsExpressionIndex } = await import("./test-helpers/schema-types.js");
+const schemaFilePath = await generateSchemaFile(
+  TEST_SCHEMA,
+  adapter,
+  await supportsExpressionIndex(Base.connection),
+);
 
 const pgExclusive = adapter === "postgres" && !!process.env.AR_PG_EXCLUSIVE_DB;
 const mysqlExclusive = adapter === "mysql" && !!process.env.AR_MYSQL_EXCLUSIVE_DB;

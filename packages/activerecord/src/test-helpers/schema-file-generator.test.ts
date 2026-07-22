@@ -449,6 +449,9 @@ const PARITY_INDEXES: Parameters<typeof emitTableIndexes>[3] = [
     opts: { length: 8, using: "btree", type: "btree", nullsNotDistinct: true },
   },
   { columns: "(lower(external_id))", opts: {} },
+  // Adapter-restricted index (schema.rb's inline current_adapter? gate, e.g.
+  // the MySQL-only full_name_index) — both emitters must apply the same skip.
+  { columns: "body", opts: { name: "idx_probe_mysql_only", adapters: ["mysql"] } },
 ];
 const PARITY_EXPRESSION_INDEX = "(lower(external_id))";
 const GENERATOR_INDEXES: IndexSpec[] = PARITY_INDEXES.map((i) => ({
@@ -477,10 +480,11 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
         generatorIndexes(GENERATOR_SCHEMA, adapter),
         canonicalIndexes(PARITY_INDEXES, adapter, true),
       ]);
-      // All four indexes survive on PG/SQLite (expression kept). Pin the count
-      // so the equality below can't pass vacuously if the schema wrapper stops
-      // being recognized and both sides silently record zero indexes.
-      expect(gen).toHaveLength(PARITY_INDEXES.length);
+      // Everything but the MySQL-only adapters-gated index survives on
+      // PG/SQLite (expression kept). Pin the count so the equality below can't
+      // pass vacuously if the schema wrapper stops being recognized and both
+      // sides silently record zero indexes.
+      expect(gen).toHaveLength(PARITY_INDEXES.length - 1);
       expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canon));
     });
   }
@@ -494,8 +498,9 @@ describe("generateSchemaFile / canonical-schema.ts index-gating parity", () => {
       generatorIndexes(GENERATOR_SCHEMA, "mysql"),
       canonicalIndexes(PARITY_INDEXES, "mysql", false),
     ]);
-    // Only the expression index is dropped, so the other three survive — pin
-    // the count so the equality can't pass vacuously.
+    // Only the expression index is dropped (the adapters-gated MySQL-only
+    // index survives here), so the rest come through — pin the count so the
+    // equality can't pass vacuously.
     expect(gen).toHaveLength(PARITY_INDEXES.length - 1);
     expect(normalizeRecorded(gen)).toBe(normalizeRecorded(canon));
     // Length survives on MySQL (both keep it) and the expression index is

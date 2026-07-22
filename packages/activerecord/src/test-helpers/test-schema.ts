@@ -526,6 +526,12 @@ export const TEST_SCHEMA: Schema = {
         columns: "(CASE WHEN rating > 0 THEN lower(name) END) DESC",
         name: "company_expression_index",
       },
+      // schema.rb:426 — MySQL-only functional index (current_adapter?(:Mysql2, :Trilogy)).
+      {
+        columns: "(CONCAT_WS(`firm_name`, `name`, _utf8mb4' '))",
+        name: "full_name_index",
+        adapters: ["mysql"],
+      },
     ],
   },
 

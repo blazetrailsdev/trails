@@ -291,10 +291,27 @@ describe("SchemaDumperTest", () => {
     line = line.replace(/, \{ name: "company_expression_index" \}\);$/, "");
     if (adapterType === "postgres") {
       expect(line).toMatch(/CASE.+lower\(\(name\)::text\).+END\) DESC"/i);
+    } else if (adapterType === "mysql") {
+      expect(line).toMatch(/CASE.+lower\(`name`\).+END\) DESC"/i);
     } else {
       expect(line).toMatch(/CASE.+lower\(name\).+END\) DESC"/i);
     }
   });
+
+  // Rails: schema_dumper_test.rb:313 — current_adapter?(:Mysql2, :Trilogy)
+  // inside the supports_expression_index? block, asserting the canonical
+  // companies `full_name_index` concat_ws expression round-trips with MySQL's
+  // backtick/charset-literal escaping intact.
+  itIfSupports.skipIf(adapterType !== "mysql")(
+    "expression_index",
+    "schema dump expression indices escaping",
+    async () => {
+      const output = await dumpCanonicalTable("companies");
+      let line = companyIndexLine(output, /full_name_index/);
+      line = line.replace(/, \{ name: "full_name_index" \}\);$/, "");
+      expect(line).toMatch(/concat_ws\(`firm_name`,`name`,_utf8mb4' '\)\)"$/i);
+    },
+  );
 
   it("schema dump includes decimal options", { timeout: FULL_DUMP_TIMEOUT_MS }, async () => {
     // Rails: dump_all_table_schema([/^[^n]/]) — keep only tables starting with
@@ -522,28 +539,6 @@ describe("SchemaDumperTest", () => {
       expect(output).not.toMatch(/addIndex.*test_uc_no_idx.*test_uc_no_idx_position/);
     },
   );
-  // NOT converted to itIfSupports: Rails gates this by current_adapter?(:Mysql2,
-  // :Trilogy) (schema_dumper_test.rb:313, real-MySQL-only, asserts concat_ws
-  // backtick output), not by supports_expression_index?. Our body is a PG/SQLite
-  // port (`lower(a || b)`), so it's a pre-existing divergence — left as-is.
-  it.skipIf(adapterType === "mysql")("schema dump expression indices escaping", async () => {
-    await ctx.createTable("users", { force: true }, (t) => {
-      t.string("first_name");
-      t.string("last_name");
-    });
-    await ctx.addIndex("users", "lower(first_name || ' ' || last_name)", {
-      name: "idx_users_full_name",
-    });
-    const output = await SchemaDumper.dumpTableSchema(Base.connection, "users");
-    expect(output).toContain("idx_users_full_name");
-    // Real introspection returns the backend's stored expression form — sqlite
-    // keeps `lower(first_name || ' ' || last_name)` verbatim, PostgreSQL
-    // normalizes it to `lower((((first_name)::text || ' '::text) || …))`. Assert
-    // the lowercased expression over both columns rather than a byte-exact form,
-    // but still require the quoted `' '` space literal between them so the
-    // escaping is verified (mirrors Rails schema_dumper_test.rb:318).
-    expect(output).toMatch(/lower\(.*first_name.*' '.*last_name.*\).*idx_users_full_name/s);
-  });
   it.skipIf(adapterType !== "mysql")(
     "schema dump includes length for mysql binary fields",
     async () => {
