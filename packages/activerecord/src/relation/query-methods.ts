@@ -1592,8 +1592,12 @@ function excludingBang(this: QueryMethodsHost, records: any[]): any {
   // predicate exactly as Rails does (array handler dereferences AR records to
   // their ids).
   if (unloadedRelations.length === 0) {
+    // Rails `predicate_builder[primary_key, records].invert` — `#[]` reads the
+    // attribute straight off the builder's arel table (predicate_builder.rb:53-55).
     this._whereClause.predicates.push(
-      this.predicateBuilder.build(this.predicateBuilder.resolveColumn(pk), literalRecords).invert(),
+      this.predicateBuilder
+        .build(this.predicateBuilder.table.arelTable.get(pk), literalRecords)
+        .invert(),
     );
     return this;
   }

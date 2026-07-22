@@ -12,6 +12,8 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Author } from "../test-helpers/models/author.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Customer } from "../test-helpers/models/customer.js";
+import { Range } from "../connection-adapters/postgresql/oid/range.js";
 
 registerModel(Post);
 registerModel(Author);
@@ -55,6 +57,53 @@ describe("WhereChain associated join guard (trails)", () => {
     const loj = Comment.leftOuterJoins("children").where().associated("children").toSql();
     expect(joinCount(loj)).toBe(1);
     expect(loj).toMatch(/["`]?children["`]?\.["`]?id["`]?\s+IS NOT NULL/i);
+  });
+});
+
+// `where.not` is a single WhereClause#invert over the positively-built clause
+// (query_methods.rb:49, where_clause.rb:85-92) — never per-branch negation
+// threaded through the predicate builder. These pin the inversion shapes the
+// old threading got structurally different (Rails-shape SQL + row semantics).
+describe("WhereChain not inversion shapes (trails)", () => {
+  fixtures(["posts", "authors", "authorAddresses", "customers"]);
+
+  it("inverts an array containing null as NOT (IN ... OR IS NULL)", async () => {
+    const relation = Post.whereNot({
+      title: [null, "Welcome to the weblog", "So I was thinking"],
+    });
+    // Positive ArrayHandler shape `(title IN (...) OR title IS NULL)`, inverted
+    // once at the clause level — not the threaded `NOT IN ... AND IS NOT NULL`.
+    expect(relation.toSql()).toMatch(/NOT \(.*IN \(.*\).*OR.*IS NULL\)/is);
+    const posts = await relation;
+    expect(posts.length).toBeGreaterThan(0);
+    for (const post of posts) {
+      expect(post.title).not.toBeNull();
+      expect(post.title).not.toBe("Welcome to the weblog");
+    }
+  });
+
+  it("inverts a multi-column aggregate group as one NOT over the AND group", async () => {
+    const david = await Customer.find(1);
+    const relation = Customer.whereNot({ address: david.address });
+    // expand_from_hash builds the three mapped-column equalities positively;
+    // WhereClause#invert wraps them in a single NOT(...) group.
+    expect(relation.toSql()).toMatch(
+      /NOT \(.*address_street.*AND.*address_city.*AND.*address_country.*\)/is,
+    );
+    // The flat positive predicates invert via NOT(ast) — no per-branch
+    // Grouping double-wrap (`NOT ((...))`) like the old negation threading.
+    expect(relation.toSql()).not.toMatch(/NOT \(\(/);
+    const customers = await relation;
+    expect(customers.length).toBeGreaterThan(0);
+    expect(ids(customers)).not.toContain(1);
+  });
+
+  it("inverts an exclusive range as NOT over the positive bound pair", () => {
+    // Arel builds `gteq(begin) AND lt(end)`; And has no invert override, so
+    // Node#invert yields `NOT (id >= 1 AND id < 5)` — not a re-derived
+    // `(id < 1 OR id >= 5)`.
+    const sql = Post.whereNot({ id: new Range(1, 5, true) }).toSql();
+    expect(sql).toMatch(/NOT \(.*id.*>=.*AND.*id.*<.*\)/is);
   });
 });
 
