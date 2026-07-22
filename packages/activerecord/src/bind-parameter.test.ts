@@ -242,19 +242,21 @@ describe("BindParameterTest", () => {
     expect(statementCacheKeys(conn)).not.toContain(conn.sqlKey(cap.sqls.at(-1)));
   });
 
-  // DEVIATION (tracked): Rails asserts the SQL string literal IS cached
-  // (bind_parameter_test.rb:100-107, `assert_includes`): `sanitize_sql` bakes the
-  // value into an `Arel::Nodes::SqlLiteral`, leaving `collector.preparable = true`
-  // (no unpreparable node), so a no-bind-but-preparable SELECT is pooled. The
-  // `collector.preparable` threading (Composite default-true, SqlLiteral
-  // non-preparable, `compileWithBinds` 4-tuple, `opts.preparable` into selectAll)
-  // is now restored, but un-skipping this case ALSO needs `where("col = ?", val)`
-  // to route through `BoundSqlLiteral` (preparable) instead of a plain
-  // `SqlLiteral` (non-preparable). That `build_where_clause` → `BoundSqlLiteral`
-  // wiring is deferred to the `converge-build-where-clause-bound-sql-literal`
-  // story (see the NOTE in relation/query-methods.ts), so this case stays skipped
-  // until that lands and is un-skipped there.
-  it.skip("statement cache with sql string literal", () => {});
+  it("statement cache with sql string literal", async (ctx) => {
+    const conn = (await Topic.leaseConnection()) as any;
+    ctx.skip(!conn.preparedStatements);
+    conn.clearCache();
+
+    const cap = captureSelectSql();
+    // Rails: `Topic.where("topics.id = ?", 1)` — the `?` fragment routes through
+    // BoundSqlLiteral (preparable), so the statement IS pooled (assert_includes,
+    // bind_parameter_test.rb:100-107).
+    const topics = Topic.where("topics.id = ?", 1);
+    expect((await topics.toArray()).map((t: any) => Number(t.id))).toEqual([1]);
+    cap.stop();
+
+    expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
+  });
 
   it("too many binds", async () => {
     const conn = (await Topic.leaseConnection()) as any;
