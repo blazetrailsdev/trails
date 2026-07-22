@@ -124,14 +124,22 @@ export class SelectManager extends TreeManager {
 
   /**
    * Add a lock clause (FOR UPDATE by default).
+   *
+   * Mirrors: Arel::SelectManager#lock (select_manager.rb:52-63). Rails'
+   * `case`: `true` and the no-arg default both become `Arel.sql("FOR
+   * UPDATE")`, a `SqlLiteral` passes through unwrapped (empty `when` branch),
+   * and a bare `String` is wrapped. `true` is how ActiveRecord's `lock!` /
+   * `with_lock` express the default lock.
    */
-  lock(lockClause?: string | Node): this {
+  lock(lockClause: string | Node | boolean = true): this {
     const expr =
-      lockClause === undefined
+      lockClause === true
         ? new SqlLiteral("FOR UPDATE")
-        : typeof lockClause === "string"
-          ? new SqlLiteral(lockClause)
-          : lockClause;
+        : lockClause instanceof SqlLiteral
+          ? lockClause
+          : typeof lockClause === "string"
+            ? new SqlLiteral(lockClause)
+            : lockClause;
     this.ast.lock = new Lock(expr);
     return this;
   }

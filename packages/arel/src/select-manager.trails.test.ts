@@ -34,4 +34,35 @@ describe("SelectManagerTest (trails)", () => {
     mgr.join("comments ON comments.user_id = users.id");
     expect(mgr.joinSources[0]).toBeInstanceOf(Nodes.StringJoin);
   });
+
+  // Trails-only coverage for Arel::SelectManager#lock's `case` arms
+  // (select_manager.rb:52-63). Rails' select_manager_test.rb pins only the
+  // no-arg default ("adds a lock node"); the `true`, bare-String, and
+  // pass-through-SqlLiteral arms each need their own pin here.
+  describe("lock arms", () => {
+    const star = new Nodes.SqlLiteral("*");
+
+    it("maps true to FOR UPDATE", () => {
+      const mgr = new SelectManager(users).project(star);
+      expect(mgr.lock(true).toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
+    });
+
+    it("wraps a bare string in a SqlLiteral", () => {
+      const mgr = new SelectManager(users).project(star);
+      expect(mgr.lock("FOR SHARE").toSql()).toBe('SELECT * FROM "users" FOR SHARE');
+    });
+
+    it("passes a SqlLiteral through unwrapped", () => {
+      const mgr = new SelectManager(users).project(star);
+      const literal = new Nodes.SqlLiteral("FOR UPDATE NOWAIT");
+      mgr.lock(literal);
+      expect((mgr.locked as Nodes.Lock).expr).toBe(literal);
+      expect(mgr.toSql()).toBe('SELECT * FROM "users" FOR UPDATE NOWAIT');
+    });
+
+    it("defaults to FOR UPDATE with no argument", () => {
+      const mgr = new SelectManager(users).project(star);
+      expect(mgr.lock().toSql()).toBe('SELECT * FROM "users" FOR UPDATE');
+    });
+  });
 });
