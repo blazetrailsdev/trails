@@ -149,19 +149,40 @@ export function loadIndex(): Index {
   return JSON.parse(readFileSync(indexPath, "utf8")) as Index;
 }
 
-function isIndexStale(indexPath: string): boolean {
+export function isIndexStale(indexPath: string, tasksDir: string = TASKS_DIR): boolean {
   const indexMtime = statSync(indexPath).mtimeMs;
-  for (const rfcDir of readdirSync(TASKS_DIR)) {
+  // index.json is DERIVED by scripts/*.mjs (build-index.mjs plus the lib/
+  // validate-lib modules it imports). A script change with no content edit —
+  // e.g. the effective-status derivation that downgrades `ready` under a
+  // non-active RFC — must invalidate an index the old code built, or every
+  // consumer keeps serving the old shape until some story file happens to
+  // change.
+  const scriptsDir = join(tasksDir, "scripts");
+  let scriptNames: string[];
+  try {
+    scriptNames = readdirSync(scriptsDir);
+  } catch {
+    scriptNames = [];
+  }
+  for (const name of scriptNames) {
+    if (!name.endsWith(".mjs")) continue;
+    if (statSync(join(scriptsDir, name)).mtimeMs > indexMtime) return true;
+  }
+  // RFC dirs live under rfcs/ (post repo-rename layout); scanning the repo
+  // root here — as this function originally did — finds no `NNNN-` dirs and
+  // silently reports every index fresh forever.
+  const rfcsRoot = join(tasksDir, "rfcs");
+  for (const rfcDir of readdirSync(rfcsRoot)) {
     if (!/^\d{4}-/.test(rfcDir)) continue;
     // The RFC README's frontmatter feeds the index too (status, clusters,
     // packages, owner — and clusters drive `deps_rfc` resolution). A
     // README edit without a story touch must invalidate the cache.
     try {
-      if (statSync(join(TASKS_DIR, rfcDir, "README.md")).mtimeMs > indexMtime) return true;
+      if (statSync(join(rfcsRoot, rfcDir, "README.md")).mtimeMs > indexMtime) return true;
     } catch {
       /* missing README — validate step will catch */
     }
-    const storiesDir = join(TASKS_DIR, rfcDir, "stories");
+    const storiesDir = join(rfcsRoot, rfcDir, "stories");
     let entries: string[];
     try {
       entries = readdirSync(storiesDir);
