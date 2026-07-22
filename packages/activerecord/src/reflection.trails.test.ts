@@ -7,7 +7,7 @@
  * counter-cache column helpers exported from reflection.ts.
  */
 import { describe, it, expect } from "vitest";
-import { Base, columns, reflectOnAssociation, registerModel } from "./index.js";
+import { Base, reflectOnAssociation, registerModel } from "./index.js";
 import {
   configureEncryption,
   snapshotEncryptionConfig,
@@ -405,7 +405,9 @@ describe("ReflectionTest", () => {
     configureEncryption();
     try {
       await EncryptedBookWithSerializedFirstBinary.loadSchema();
-      const logo = columns(EncryptedBookWithSerializedFirstBinary).find((c) => c.name === "logo");
+      const logo = EncryptedBookWithSerializedFirstBinary.columns().find(
+        (c: { name: string }) => c.name === "logo",
+      );
       expect(logo?.type).toBe("binary");
       // The attribute definition stays decorated — only `columns()` reads
       // the schema column (the encryption idempotence guard depends on it).

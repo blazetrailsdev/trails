@@ -7,9 +7,6 @@ import type { AssociationProxy } from "./associations/collection-proxy.js";
 import { describe, it, expect } from "vitest";
 import {
   Base,
-  columns,
-  columnNames,
-  contentColumns,
   reflectOnAssociation,
   reflectOnAllAssociations,
   reflectOnAllAutosaveAssociations,
@@ -30,6 +27,7 @@ import {
   MyAppBusinessCompany,
 } from "./test-helpers/models/company-in-module.js";
 import { Post as CanonicalPost } from "./test-helpers/models/post.js";
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
 import { create as createReflection } from "./reflection.js";
 import { Customer } from "./test-helpers/models/customer.js";
 import { Organization } from "./test-helpers/models/organization.js";
@@ -39,7 +37,7 @@ import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/fixtures.js";
 
-fixtures([]);
+fixtures(["topics"]);
 
 describe("ReflectionTest", () => {
   function makeModels() {
@@ -477,32 +475,51 @@ describe("ReflectionTest", () => {
     expect(refs[0].name).toBe("habtmPosts");
   });
   it("columns are returned in the order they were declared", () => {
-    class Topic extends Base {
-      declare title: string | null;
-      declare author_name: string | null;
-      declare body: string | null;
-
-      static {
-        this.attribute("title", "string");
-        this.attribute("author_name", "string");
-        this.attribute("body", "string");
-      }
-    }
-    const names = columnNames(Topic);
-    expect(names.indexOf("title")).toBeLessThan(names.indexOf("author_name"));
-    expect(names.indexOf("author_name")).toBeLessThan(names.indexOf("body"));
+    const columnNames = CanonicalTopic.columns().map((c: { name: string }) => c.name);
+    expect(columnNames).toEqual([
+      "id",
+      "title",
+      "author_name",
+      "author_email_address",
+      "written_on",
+      "bonus_time",
+      "last_read",
+      "content",
+      "important",
+      "binary_content",
+      "approved",
+      "replies_count",
+      "unique_replies_count",
+      "parent_id",
+      "parent_title",
+      "type",
+      "group",
+      "created_at",
+      "updated_at",
+    ]);
   });
   it("content columns", () => {
-    class Topic extends Base {}
-    const cols = contentColumns(Topic);
-    const colNames = cols.map((c) => c.name);
-    // Should exclude id (PK) and parent_id (FK ending in _id)
-    expect(colNames).not.toContain("id");
-    expect(colNames).not.toContain("parent_id");
-    // Should include content columns (canonical topics schema)
-    expect(colNames).toContain("title");
-    expect(colNames).toContain("author_name");
-    expect(colNames).toContain("content");
+    const contentColumns = CanonicalTopic.contentColumns();
+    const contentColumnNames = contentColumns.map((c: { name: string }) => c.name);
+    expect(contentColumns.length).toBe(14);
+    expect(contentColumnNames.sort()).toEqual(
+      [
+        "title",
+        "author_name",
+        "author_email_address",
+        "written_on",
+        "bonus_time",
+        "last_read",
+        "content",
+        "important",
+        "binary_content",
+        "group",
+        "approved",
+        "parent_title",
+        "created_at",
+        "updated_at",
+      ].sort(),
+    );
   });
   it("non existent types are identity types", () => {
     class Topic2 extends Base {
@@ -1658,25 +1675,35 @@ describe("ReflectionTest", () => {
 });
 
 describe("ReflectionTest", () => {
-  // Rails: test "columns"
   it("columns", () => {
-    class Topic extends Base {}
-    expect(columns(Topic).length).toBe(19);
+    expect(CanonicalTopic.columns().length).toBe(19);
   });
 
-  // Rails: test "column_names"
-  it("read attribute names", () => {
-    class Person extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-      }
-    }
-
-    expect(columnNames(Person)).toEqual(["id", "name"]);
+  it("read attribute names", async () => {
+    const first = await CanonicalTopic.find(1);
+    expect(first.attributeNames().sort()).toEqual(
+      [
+        "id",
+        "title",
+        "author_name",
+        "author_email_address",
+        "bonus_time",
+        "written_on",
+        "last_read",
+        "content",
+        "important",
+        "binary_content",
+        "group",
+        "approved",
+        "replies_count",
+        "unique_replies_count",
+        "parent_id",
+        "parent_title",
+        "type",
+        "created_at",
+        "updated_at",
+      ].sort(),
+    );
   });
 
   it("using query constraints warns about changing behavior", () => {

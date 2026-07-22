@@ -358,16 +358,19 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
 }
 
 /**
- * Return content columns (excluding PK, FKs, and timestamps).
+ * Return the column objects for "content" columns — everything except the
+ * primary key, the inheritance column, and `_id`/`_count` columns.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#content_columns
+ * (model_schema.rb:489-495).
  */
-export function contentColumns(this: typeof Base): string[] {
+export function contentColumns(this: typeof Base): any[] {
   const pk = this.primaryKey;
-  return columnNames.call(this).filter((col) => {
-    if (col === pk) return false;
-    if (col.endsWith("_id")) return false;
-    if (col === "created_at" || col === "updated_at") return false;
+  const inheritance = this.inheritanceColumn;
+  return columns.call(this as unknown as SchemaHost).filter((col: { name: string }) => {
+    if (col.name === pk) return false;
+    if (col.name === inheritance) return false;
+    if (col.name.endsWith("_id") || col.name.endsWith("_count")) return false;
     return true;
   });
 }
