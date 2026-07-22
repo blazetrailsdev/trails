@@ -85,8 +85,13 @@ ADAPTER_SYMBOL_MAP = {
   "PostgreSQL" => "postgresql",
   "Mysql2Adapter" => "mysql",
   "Mysql2" => "mysql",
-  "TrilogyAdapter" => "mysql",
-  "Trilogy" => "mysql",
+  # Trilogy is a distinct MySQL DRIVER, not a member of trails' adapter set —
+  # trails' mysql family runs the mysql2 driver, so `current_adapter?(:Trilogy*)`
+  # is statically false here. Mapped to a pseudo family (not in ALL_ADAPTERS)
+  # that gate_from_run_condition folds away, so `unless TrilogyAdapter` inside a
+  # mysql-dir file no longer collapses to `mysql AND !mysql` = the empty set.
+  "TrilogyAdapter" => "trilogy",
+  "Trilogy" => "trilogy",
   "AbstractMysqlAdapter" => "mysql",
   "SQLite3Adapter" => "sqlite",
   "SQLite3" => "sqlite",
@@ -602,7 +607,22 @@ class TestExtractor
 
     adapters = acc[:adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
     neg_adapters = acc[:neg_adapter_syms].map { |s| ADAPTER_SYMBOL_MAP[s] }.compact.uniq
+    # `current_adapter?(:Trilogy*)` is statically false in trails (see
+    # ADAPTER_SYMBOL_MAP): an exclusion (`unless Trilogy`) excludes nothing and
+    # a disjunct (`if Mysql2 || Trilogy`) reduces to the remaining adapters, so
+    # fold the pseudo family out of both sets before deriving the gate.
+    trilogy_only = !adapters.empty? && (adapters - ["trilogy"]).empty?
+    adapters -= ["trilogy"]
+    neg_adapters -= ["trilogy"]
     gate = {}
+    # A condition that is ONLY Trilogy-positive runs nowhere in trails: emit the
+    # explicit empty adapter set (distinct from "no gate" = runs everywhere).
+    # Restricted to pure adapter conditions: a compound like `if Trilogy &&
+    # supports_x?` keeps its feature/guard gate instead — conservative, but
+    # comparable, and no such compound exists in the Rails suite today.
+    if trilogy_only && positive && acc[:features].empty? && acc[:guards].empty?
+      gate[:adapters] = []
+    end
     # A POSITIVE adapter set isn't sound — and must be dropped — when the
     # condition mixes it with a feature/guard (`supports_X? && current_adapter?`
     # could be `&&` or `||`; the run-on set differs), or with a negated adapter
