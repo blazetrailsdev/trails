@@ -3462,8 +3462,17 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `[WHERE …]` conditions clause into the not-found raisers. Computed
     // lazily (only when raising) — building the scope relation is wasted
     // work on the hot path where every id is found.
-    const conditionsClause = (): string =>
-      (this.scope() as { _conditionsClause(): string })._conditionsClause();
+    // Built exactly as Rails' raise_record_not_found_exception! does
+    // (finder_methods.rb:418): `" [#{arel.where_sql(model)}]" unless
+    // where_clause.empty?` — off the scope relation, since Rails raises via
+    // `scope.raise_record_not_found_exception!`.
+    const conditionsClause = (): string => {
+      const scope = this.scope() as unknown as {
+        _whereClause: { isEmpty(): boolean };
+        arel(): { whereSql(engine: unknown): string | null };
+      };
+      return scope._whereClause.isEmpty() ? "" : ` [${scope.arel().whereSql(targetModel) ?? ""}]`;
+    };
 
     // Composite + any-multi: always use the "Couldn't find all" shape
     // (matches performFind). Simple-PK single-id uses "with 'pk'=id".
