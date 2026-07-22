@@ -1,11 +1,11 @@
-import type { ArelConnection } from "./connection.js";
-import { quoteSchemaQualifiedName } from "./split-schema-qualified-name.js";
+import type { ArelConnection } from "../visitors/connection.js";
+import { quoteSchemaQualifiedName } from "../visitors/split-schema-qualified-name.js";
 import { quoteArrayLiteral } from "../quote-array.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
-// Standalone comment sanitize for connection-less `Node#toSql()` (debug aid):
-// strips block-comment delimiters (leaving `--` alone, like Rails' abstract
-// sanitize). Real adapters override via `AbstractAdapter#sanitizeAsSqlComment`.
+// Standalone comment sanitize for these test hosts: strips block-comment
+// delimiters (leaving `--` alone, like Rails' abstract sanitize). Real
+// adapters override via `AbstractAdapter#sanitizeAsSqlComment`.
 function defaultSanitizeAsSqlComment(value: string): string {
   return String(value)
     .replace(/[\r\n]+/g, " ")
@@ -32,7 +32,7 @@ type TemporalDateLike =
 // reached through `@connection.quote`. Real adapters own the authoritative,
 // timezone-aware version in
 // packages/activerecord/src/connection-adapters/abstract/quoting.ts; this copy
-// only serves the connection-less `Node#toSql()` debug path.
+// only serves arel's own test suite.
 //
 // `quoted_date`/`quoted_time` deliberately stay OFF `ArelConnection`: Rails puts
 // them on the adapter (`ConnectionAdapters::Quoting`), and Arel reaches them only
@@ -169,8 +169,9 @@ function quoteScalar(this: ArelConnection, value: unknown): string {
 }
 
 /**
- * MySQL default quoter: backtick-quoted identifiers, same escaping as the abstract adapter.
- * Used when `new MySQL()` is constructed without a connection quoter (test / debug use).
+ * MySQL test quoter: backtick-quoted identifiers, same escaping as the abstract
+ * adapter. Test-only — surfaced as `mysqlTestConnection` (connection.ts); no
+ * visitor falls back to it.
  */
 export const mysqlDefaultQuoter: ArelConnection = {
   quoteTableName(name: string): string {
@@ -232,12 +233,15 @@ export const mysqlDefaultQuoter: ArelConnection = {
 };
 
 /**
- * Default connection used when no adapter is passed to a visitor.
- * Emits ANSI double-quoted identifiers and single-quoted strings —
- * matches the Rails abstract-adapter defaults.
+ * Generic test connection: ANSI double-quoted identifiers and single-quoted
+ * strings, matching the Rails abstract-adapter defaults.
  *
- * `Node#toSql()` (no connection in scope) uses this; treat its output
- * as a debug aid, not production SQL — same as Rails.
+ * Test-only, and permanently so as long as `packages/arel` ships its own suite:
+ * Rails' Arel tests reach a real adapter via `Table.engine.lease_connection`
+ * (one gem, no cycle), but `@blazetrails/activerecord` depends on
+ * `@blazetrails/arel`, so arel-side tests cannot import a real adapter without
+ * a circular dependency. This host stands in for that adapter; production code
+ * always passes a real connection (RFC 0007) — no visitor defaults to this.
  */
 export const defaultQuoter: ArelConnection = {
   quoteTableName(name: string): string {
@@ -293,12 +297,12 @@ export const defaultQuoter: ArelConnection = {
 };
 
 /**
- * PostgreSQL quoter used when `new PostgreSQL()` is constructed without a
- * connection (test / debug use). Rails' `Arel::Visitors::PostgreSQL` has no
- * `quote` override — array literals are formatted by the adapter
- * (`quote(OID::Array::Data)` → `encode_array`, postgresql/quoting.rb:221-226).
- * Trails' connection-less visitors have no adapter to reach, so this host
- * carries the minimal array-literal encoding in the adapter's place.
+ * PostgreSQL test quoter, surfaced as `postgresqlTestConnection`
+ * (connection.ts). Rails' `Arel::Visitors::PostgreSQL` has no `quote` override
+ * — array literals are formatted by the adapter (`quote(OID::Array::Data)` →
+ * `encode_array`, postgresql/quoting.rb:221-226). Arel-side tests have no
+ * adapter to reach (see `defaultQuoter`), so this host carries the minimal
+ * array-literal encoding in the adapter's place.
  */
 export const postgresqlDefaultQuoter: ArelConnection = {
   ...defaultQuoter,

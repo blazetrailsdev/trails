@@ -24,7 +24,12 @@ function describeClass(object: unknown): string {
  * reject any ctor with a more-specific parameter type.
  */
 export type NodeCtor = abstract new (...args: never[]) => object;
-type VisitorCtor = typeof Visitor;
+// Structural, not `typeof Visitor`: concrete visitors now take a required
+// `ArelConnection` constructor argument (RFC 0007 deleted the defaults), so
+// their constructor signatures are not assignable to the abstract base's.
+// Only the static dispatch surface matters here, never construction.
+type VisitorCtor = (abstract new (...args: never[]) => Visitor) &
+  Pick<typeof Visitor, "dispatchCache">;
 
 const PER_CLASS_CACHE = new WeakMap<VisitorCtor, Map<NodeCtor, string>>();
 

@@ -1,11 +1,7 @@
 import type { ArelConnection } from "../visitors/connection.js";
 import type { ArelEngine } from "../nodes/node.js";
 import { ToSql } from "../visitors/to-sql.js";
-import {
-  defaultQuoter,
-  mysqlDefaultQuoter,
-  postgresqlDefaultQuoter,
-} from "../visitors/default-quoter.js";
+import { defaultQuoter, mysqlDefaultQuoter, postgresqlDefaultQuoter } from "./default-quoter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 /**
@@ -26,20 +22,17 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
  * adapter as Rails does.
  *
  * The point of routing through this module is that the connection is *explicit at
- * the call site*: no visitor silently falls back to a default. The underlying
- * `defaultQuoter` values are the invention RFC 0007 is deleting — once every call
- * site names its connection, the visitor constructor defaults go away and these
- * bindings become the only reference, at which point they collapse into this file.
+ * the call site*: no visitor falls back to a default — the constructor defaults
+ * (and the production `defaultQuoter` surface) were deleted by RFC 0007. The
+ * quoting hosts now live next door in `test-helpers/default-quoter.ts`, a
+ * permanent test-only stub (see its header for why the package split forces it).
  *
  * @internal
  */
 export const testConnection: ArelConnection = defaultQuoter;
 
 /**
- * The MySQL/PostgreSQL analogues of {@link testConnection}: the adapter-specific
- * quoters the `MySQL` and `PostgreSQL` visitors otherwise fall back to as their
- * constructor default (`visitors/mysql.ts`, `visitors/postgresql.ts`). Naming them
- * at the call site is what lets those defaults be deleted; unlike the generic
+ * The MySQL/PostgreSQL analogues of {@link testConnection}. Unlike the generic
  * `defaultQuoter`, they render adapter-specific forms (PG array literals, MySQL
  * backticks) the Arel visitor tests assert on.
  *

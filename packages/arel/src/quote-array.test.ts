@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { quoteArrayLiteral } from "./quote-array.js";
-import { defaultQuoter } from "./visitors/default-quoter.js";
+import { defaultQuoter } from "./test-helpers/default-quoter.js";
 import { BinaryData } from "@blazetrails/activemodel";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";

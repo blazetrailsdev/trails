@@ -8,5 +8,5 @@ import { fakeRecordEngine } from "./test-helpers/connection.js";
 // compiles through `Table.engine`, installing that double suite-wide is what
 // makes every bare `.toSql()` render `'t'`/`'f'` for booleans, exactly as Rails'
 // arel suite does. This replaces the earlier generic `Visitors::ToSql`, which
-// anchored the suite on the connection-less `defaultQuoter` RFC 0007 is deleting.
+// anchored the suite on the connection-less `defaultQuoter` RFC 0007 deleted.
 Table.engine = fakeRecordEngine;

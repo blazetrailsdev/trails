@@ -112,7 +112,7 @@ function typeCastArrayElement(
   // connection.ts) carries no `quotedDate`/`quotedTime` to dispatch onto —
   // Rails' Arel does no value formatting, so those live on the adapter — which
   // is exactly what `formatElement` exists to supply: the only caller,
-  // `postgresqlDefaultQuoter.quote` (visitors/default-quoter.ts:231), routes
+  // `postgresqlDefaultQuoter.quote` (test-helpers/default-quoter.ts), routes
   // date-likes through its `quotedDate` before the value reaches here. A
   // Temporal value (trails' `Type::Time::Value` analogue) has no `toISOString`
   // and so is NOT covered by that hook; it raises here rather than silently

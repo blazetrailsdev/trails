@@ -1,16 +1,17 @@
 import { describe, it, expect } from "vitest";
-import { Visitors } from "@blazetrails/arel";
+import { postgresqlTestConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Array as OidArray, Data as ArrayData } from "./array.js";
 import { StringType } from "@blazetrails/activemodel";
 
-// trails-only: the connection-less Arel quoter (`postgresqlDefaultQuoter`)
+// trails-only: arel's PG test quoter (`postgresqlTestConnection`, formerly the
+// production `postgresqlDefaultQuoter` — RFC 0007 moved it to test-helpers)
 // re-implements the array literal that the adapter builds via
 // `quote(ArrayData)` -> `encode_array`. Three PRs (#4867, #4869, #4872) each had
 // to re-converge the copy after it drifted. Both now share
 // `encodeArrayElement`; this pins that they agree byte-for-byte.
 describe("PostgreSQL array literal encoding", () => {
   const encoder = new OidArray(new StringType());
-  const arelQuoter = Visitors.postgresqlDefaultQuoter;
+  const arelQuoter = postgresqlTestConnection;
 
   const cases: [string, unknown[]][] = [
     ["strings", ["a", "b"]],

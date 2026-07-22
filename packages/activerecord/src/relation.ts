@@ -5474,8 +5474,11 @@ export class Relation<T extends Base> {
   }
 
   private _arelVisitor(): Visitors.ToSql {
-    const adapter = this._resolveAdapter();
-    return adapter?.visitor ?? new Visitors.ToSql(adapter ?? undefined);
+    // `_conn()` (not `_resolveAdapter()`) so an unconnected model raises
+    // ConnectionNotEstablished, as Rails does — the connection-less ANSI
+    // fallback this used to reach was the invention RFC 0007 deleted.
+    const adapter = this._conn();
+    return adapter.visitor ?? new Visitors.ToSql(adapter);
   }
 
   /** Returns the adapter's visitor when defined, or null. */
@@ -5485,7 +5488,6 @@ export class Relation<T extends Base> {
 
   /**
    * Compile a SelectManager's AST through the adapter visitor (`_arelVisitor`).
-   * Falls back to the default ANSI ToSql when no connection is established.
    * Sets _lastSelectRetryable and _lastSelectBinds for the execution call sites.
    */
   /**

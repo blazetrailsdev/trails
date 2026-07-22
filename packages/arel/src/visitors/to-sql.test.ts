@@ -1911,7 +1911,7 @@ describe("the to_sql visitor", () => {
         }
       }
       const tbl = new Table("users");
-      const v = new NumberedVisitor();
+      const v = new NumberedVisitor(testConnection);
       // Only BindParam routes through addBind (and therefore bindBlock); Casted
       // and Quoted values inline their quoted literal (Rails to_sql.rb:87-88).
       const [sql] = v.compileWithBinds(
@@ -1944,7 +1944,7 @@ describe("the to_sql visitor", () => {
           return (i: number) => `$${i}`;
         }
       }
-      const v = new NumberedVisitor();
+      const v = new NumberedVisitor(testConnection);
       const collector = new Collectors.SQLString();
       (
         v as unknown as { visitActiveModelAttribute(o: AMAttribute, c: Collectors.SQLString): void }

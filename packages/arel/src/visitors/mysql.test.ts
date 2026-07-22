@@ -28,13 +28,15 @@ describe("MysqlTest", () => {
     it("should know how to visit", () => {
       const node = users.get("name").matchesRegexp("foo.*");
       expect(node).toBeInstanceOf(Nodes.Regexp);
-      expect(new Visitors.MySQL().compile(node)).toBe("`users`.`name` REGEXP 'foo.*'");
+      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
+        "`users`.`name` REGEXP 'foo.*'",
+      );
     });
 
     it("can handle subqueries", () => {
       const subquery = users.project("id").where(users.get("name").matchesRegexp("foo.*"));
       const node = users.get("id").in(subquery);
-      expect(new Visitors.MySQL().compile(node)).toBe(
+      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
         "`users`.`id` IN (SELECT id FROM `users` WHERE `users`.`name` REGEXP 'foo.*')",
       );
     });
@@ -44,7 +46,7 @@ describe("MysqlTest", () => {
     it("can handle subqueries", () => {
       const subquery = users.project("id").where(users.get("name").doesNotMatchRegexp("foo.*"));
       const node = users.get("id").in(subquery);
-      expect(new Visitors.MySQL().compile(node)).toBe(
+      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
         "`users`.`id` IN (SELECT id FROM `users` WHERE `users`.`name` NOT REGEXP 'foo.*')",
       );
     });
@@ -52,7 +54,9 @@ describe("MysqlTest", () => {
     it("should know how to visit", () => {
       const node = users.get("name").doesNotMatchRegexp("foo.*");
       expect(node).toBeInstanceOf(Nodes.NotRegexp);
-      expect(new Visitors.MySQL().compile(node)).toBe("`users`.`name` NOT REGEXP 'foo.*'");
+      expect(new Visitors.MySQL(mysqlTestConnection).compile(node)).toBe(
+        "`users`.`name` NOT REGEXP 'foo.*'",
+      );
     });
   });
 
