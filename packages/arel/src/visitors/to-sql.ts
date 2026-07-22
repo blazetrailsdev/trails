@@ -16,7 +16,6 @@ import { Attribute as ModelAttribute } from "@blazetrails/activemodel";
 // here so api:compare finds it where Rails defines it.
 export { UnsupportedVisitError };
 
-import { defaultQuoter } from "./default-quoter.js";
 export type { ArelConnection } from "./connection.js";
 import type { ArelConnection } from "./connection.js";
 
@@ -183,7 +182,7 @@ function hex4(code: number): string {
 export class ToSql extends Visitor {
   protected readonly connection: ArelConnection;
 
-  constructor(connection: ArelConnection = defaultQuoter) {
+  constructor(connection: ArelConnection) {
     super();
     this.connection = connection;
   }
@@ -1669,8 +1668,7 @@ export class ToSql extends Visitor {
    * Mirrors `to_sql.rb#quote` (to_sql.rb:867-870): SqlLiteral passes through,
    * everything else is handed to the connection. Rails' Arel does no value
    * formatting of its own — every date/array/binary decision lives in the
-   * adapter's `quote`. Connection-less visitors reach the default quoters in
-   * `default-quoter.ts`, which stand in for an adapter.
+   * adapter's `quote`.
    */
   protected quote(value: unknown): string {
     if (value instanceof Nodes.SqlLiteral) return value.value;

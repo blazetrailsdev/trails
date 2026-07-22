@@ -3,7 +3,6 @@ import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql, cteRelationSelfWraps } from "./to-sql.js";
 import type { ArelConnection } from "./connection.js";
-import { mysqlDefaultQuoter } from "./default-quoter.js";
 
 /**
  * MySQL visitor — dialect tweaks on top of generic ToSql.
@@ -11,7 +10,7 @@ import { mysqlDefaultQuoter } from "./default-quoter.js";
  * Mirrors: Arel::Visitors::MySQL
  */
 export class MySQL extends ToSql {
-  constructor(connection: ArelConnection = mysqlDefaultQuoter) {
+  constructor(connection: ArelConnection) {
     super(connection);
   }
 

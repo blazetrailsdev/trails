@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Table, Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { Substitute } from "../statement-cache.js";
@@ -135,7 +136,7 @@ describe("PredicateBuilderTest", () => {
     const [node] = Topic.predicateBuilder.buildFromHash({
       "schema.table.column": "value",
     });
-    const sql = new Visitors.ToSql().compile(node);
+    const sql = new Visitors.ToSql(testConnection).compile(node);
     // Arel resolves "schema.table" as schema.table identifier, producing:
     // "schema"."table"."column" = ?  (the value is a BindParam, not inlined —
     // Rails parity, see Arel BindParam#toSql).
@@ -155,7 +156,7 @@ describe("PredicateBuilderTest", () => {
 
   describe("buildFromHash", () => {
     const table = castedTable("posts");
-    const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
+    const compile = (node: Nodes.Node) => new Visitors.ToSql(testConnection).compile(node);
 
     it("builds equality for scalars", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
@@ -206,7 +207,7 @@ describe("PredicateBuilderTest", () => {
     it("does not dereference a plain object literal to its id", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), { id: 5 });
-      const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
+      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
       expect(sql).toContain('"posts"."title" = ?');
       // The whole object is bound, not the dereferenced `5`.
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
@@ -215,7 +216,7 @@ describe("PredicateBuilderTest", () => {
     it("does not dereference a plain object literal inside an array", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), [{ id: 5 }]);
-      const [, binds] = new Visitors.ToSql().compileWithBinds(node);
+      const [, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
     });
 
@@ -229,7 +230,7 @@ describe("PredicateBuilderTest", () => {
       }
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("id"), [new NotARecord(5), new NotARecord(7)]);
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       // The objects flow into HomogeneousIn untouched — they are NOT flattened
       // to `IN (5, 7)` the way a real AR record would be.
       expect(sql).not.toMatch(/IN \(5, 7\)/);
@@ -261,7 +262,7 @@ describe("PredicateBuilderTest", () => {
       const feTable = new Table("posts", { typeCaster: { typeForAttribute: () => forceEqType } });
       const builder = new PredicateBuilder(new TableMetadata(null, feTable));
       const node = builder.build(feTable.get("tags"), [1, 2]);
-      const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
+      const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(node);
       // Single equality bind, NOT `IN (?, ?)`.
       expect(sql).toContain('"posts"."tags" = ?');
       expect(sql).not.toMatch(/IN \(/);
@@ -272,7 +273,7 @@ describe("PredicateBuilderTest", () => {
 
   describe("buildNegatedFromHash", () => {
     const table = castedTable("posts");
-    const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
+    const compile = (node: Nodes.Node) => new Visitors.ToSql(testConnection).compile(node);
 
     it("builds IS NOT NULL for null values", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
@@ -303,7 +304,7 @@ describe("PredicateBuilderTest", () => {
     it("does not dereference a plain object literal to its id when negated", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.buildNegated(table.get("title"), { id: 5 });
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       // Negation binds the RHS (Rails inverts a positively-built, bound
       // predicate), so the value rides a QueryAttribute bind rather than being
       // inlined.
@@ -324,7 +325,7 @@ describe("PredicateBuilderTest", () => {
       const [node] = builder.buildNegatedFromHash({
         id: [new NotARecord(5), new NotARecord(7)],
       });
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).not.toMatch(/NOT IN \(5, 7\)/);
     });
   });
@@ -342,7 +343,7 @@ describe("PredicateBuilderTest", () => {
       const table = castedTable("users");
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), "alice");
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const [sql, binds] = visitor.compileWithBinds(node);
       expect(sql).toContain('"users"."name" = ?');
       expect(binds).toHaveLength(1);
@@ -352,7 +353,7 @@ describe("PredicateBuilderTest", () => {
       const table = castedTable("users");
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), new Substitute());
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const [sql, binds] = visitor.compileWithBinds(node);
       expect(sql).toContain('"users"."name" = ?');
       expect(binds).toHaveLength(1);
@@ -365,7 +366,7 @@ describe("PredicateBuilderTest", () => {
       const table = castedTable("users");
       const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), "alice");
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       // The value is wrapped in a BindParam, so raw Arel compile emits `?`
       // (mirrors Rails); the value is carried as a bind, not inlined.
       expect(visitor.compile(node)).toBe('"users"."name" = ?');
@@ -403,7 +404,7 @@ describe("PredicateBuilderTest", () => {
       const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ authors: { name: "Rails" } });
-      const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+      const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
       expect(sql).toContain("= ?");
       expect(sql).not.toContain('"posts"."authors"');
@@ -416,7 +417,7 @@ describe("PredicateBuilderTest", () => {
       const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildFromHash({ writer: { name: "Rails" } });
-      const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+      const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"writer"."name"');
       expect(sql).toContain("= ?");
     });
@@ -425,7 +426,7 @@ describe("PredicateBuilderTest", () => {
       const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
       const nodes = builder.buildNegatedFromHash({ authors: { name: "Rails" } });
-      const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+      const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
       // Negation binds the RHS, so 'Rails' rides a QueryAttribute bind.
       const bound = (nodes[0] as unknown as { right: { value: { value: unknown } } }).right.value
@@ -449,7 +450,7 @@ describe("PredicateBuilderTest", () => {
         const meta = new TableMetadata(PbTestProduct as any, (PbTestProduct as any).arelTable);
         const builder = meta.predicateBuilder;
         const nodes = builder.buildFromHash({ price: { foo: "bar" } });
-        const sql = nodes.map((n) => new Visitors.ToSql().compile(n)).join(" AND ");
+        const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
         expect(sql).toContain('"products"."price"');
         expect(sql).not.toContain('"price"."foo"');
       } finally {

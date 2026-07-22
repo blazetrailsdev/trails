@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { IntegerType } from "@blazetrails/activemodel";
 import { Table, Visitors } from "@blazetrails/arel";
 import { Company, Firm } from "../test-helpers/models/company.js";
@@ -47,12 +48,14 @@ describe("PredicateBuilder positive-equality bind typing", () => {
   };
 
   it("collapses a joined out-of-range equality to 1=0", () => {
-    const sql = new Visitors.ToSql().compile(buildJoinedEquality(OUT_OF_RANGE));
+    const sql = new Visitors.ToSql(testConnection).compile(buildJoinedEquality(OUT_OF_RANGE));
     expect(sql).toBe("1=0");
   });
 
   it("leaves an in-range joined equality as a bound predicate", () => {
-    const [sql, binds] = new Visitors.ToSql().compileWithBinds(buildJoinedEquality(7n));
+    const [sql, binds] = new Visitors.ToSql(testConnection).compileWithBinds(
+      buildJoinedEquality(7n),
+    );
     expect(sql).not.toContain("1=0");
     expect(binds).toHaveLength(1);
   });

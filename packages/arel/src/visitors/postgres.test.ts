@@ -123,7 +123,7 @@ describe("PostgresTest", () => {
 
   describe("Nodes::BindParam", () => {
     it("increments each bind param", () => {
-      const visitor = new Visitors.PostgreSQLWithBinds();
+      const visitor = new Visitors.PostgreSQLWithBinds(postgresqlTestConnection);
       const a = users.get("id").eq(new Nodes.BindParam());
       const b = users.get("name").eq(new Nodes.BindParam());
       const sql = visitor.compile(new Nodes.And([a, b]));
@@ -132,7 +132,7 @@ describe("PostgresTest", () => {
     });
 
     it("compileWithBinds extracts values with $N placeholders", () => {
-      const visitor = new Visitors.PostgreSQLWithBinds();
+      const visitor = new Visitors.PostgreSQLWithBinds(postgresqlTestConnection);
       const a = users.get("id").eq(new Nodes.BindParam(42));
       const b = users.get("name").eq(new Nodes.BindParam("alice"));
       const [sql, binds] = visitor.compileWithBinds(new Nodes.And([a, b]));
@@ -144,7 +144,7 @@ describe("PostgresTest", () => {
     });
 
     it("compileWithBinds uses $N placeholders for Quoted Date values", () => {
-      const visitor = new Visitors.PostgreSQLWithBinds();
+      const visitor = new Visitors.PostgreSQLWithBinds(postgresqlTestConnection);
       const d = Temporal.Instant.from("2020-01-02T12:00:00.000Z");
       const node = users.get("created_at").eq(new Nodes.Quoted(d));
       const [sql, binds] = visitor.compileWithBinds(node);
