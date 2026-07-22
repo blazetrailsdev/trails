@@ -38,7 +38,7 @@ describe("DeleteManagerTest", () => {
     mgr.order(users.get("created_at").asc());
     mgr.take(10);
     expect(mgr.toSql()).toBe(
-      'DELETE FROM "users" WHERE "users"."active" = FALSE ORDER BY "users"."created_at" ASC LIMIT 10',
+      `DELETE FROM "users" WHERE "users"."active" = 'f' ORDER BY "users"."created_at" ASC LIMIT 10`,
     );
   });
 

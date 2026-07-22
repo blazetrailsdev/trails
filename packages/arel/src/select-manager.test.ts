@@ -10,6 +10,7 @@ import {
   Visitors,
   EmptyJoinError,
 } from "./index.js";
+import { testConnection } from "./test-helpers/connection.js";
 
 describe("SelectManagerTest", () => {
   const users = new Table("users");
@@ -1361,25 +1362,34 @@ describe("SelectManagerTest", () => {
       expect(mgr.toSql()).toBe('SELECT /*+ NO_INDEX_MERGE(users) BKA(users) */ * FROM "users"');
     });
 
+    // Comment sanitization is an adapter behaviour: the visitor routes each hint
+    // through `connection.sanitizeAsSqlComment`, and the suite's FakeRecord engine
+    // returns it unchanged (fake_record.rb:63-65). These tests exercise the
+    // sanitizing path, so they name a real quoting connection at the call site.
     it("sanitizes comment delimiters from hints", () => {
       const mgr = new SelectManager(users)
         .project(star)
         .optimizerHints("HINT */ DROP TABLE users --");
-      const sql = mgr.toSql();
-      // `*/` stripped; `--` left intact, matching Rails' sanitize_as_sql_comment.
+      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
+      // `*/` stripped; `--` left intact, matching sanitize_as_sql_comment.
       expect(sql).toBe('SELECT /*+ HINT DROP TABLE users -- */ * FROM "users"');
     });
 
     it("sanitizes newlines from hints", () => {
       const mgr = new SelectManager(users).project(star).optimizerHints("HINT\nwith\nnewlines");
-      const sql = mgr.toSql();
+      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).not.toContain("\n");
       expect(sql).toContain("/*+ HINT with newlines */");
     });
 
-    it("strips empty hints after sanitization", () => {
+    it("emits the hint comment even when hints sanitize to empty", () => {
+      // Rails always wraps the sanitized-and-joined hints in `/*+ ... */`
+      // (to_sql.rb:170-172); it never drops the comment when the hints reduce to
+      // empty, so `optimizer_hints("/* */", "/**/")` still emits the marker.
       const mgr = new SelectManager(users).project(star).optimizerHints("/* */", "/**/");
-      expect(mgr.toSql()).toBe('SELECT * FROM "users"');
+      expect(new Visitors.ToSql(testConnection).compile(mgr.ast)).toBe(
+        'SELECT /*+   */ * FROM "users"',
+      );
     });
 
     // Mirrors Rails: `optimizer_hints(*hints)` builds
