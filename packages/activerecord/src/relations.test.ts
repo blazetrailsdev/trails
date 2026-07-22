@@ -697,18 +697,15 @@ describe("RelationTest", () => {
     expect(sql).toContain("body");
   });
 
-  it.skipIf(adapterType === "mysql")("finding with sanitized order", () => {
-    const q1 = Tag.order([arelSql("field(id, ?)"), [1, 3, 2]]).toSql();
-    expect(q1).toMatch(/field\(id, 1,\s*3,\s*2\)/);
-    const q2 = Tag.order([arelSql("field(id, ?)"), []]).toSql();
-    expect(q2).toMatch(/field\(id, NULL\)/);
-    const q3 = Tag.order([arelSql("field(id, ?)"), null as any]).toSql();
-    expect(q3).toMatch(/field\(id, NULL\)/);
-  });
+  // Mirrors Rails' inline `current_adapter?(:Mysql2Adapter, :TrilogyAdapter)`
+  // branch (relations_test.rb:476); kept out of the test body so
+  // vitest/no-conditional-in-test stays happy.
+  const sanitizedOrderRe =
+    adapterType === "mysql" ? /field\(id, '1',\s*'3',\s*'2'\)/ : /field\(id, 1,\s*3,\s*2\)/;
 
-  it.skipIf(adapterType !== "mysql")("finding with sanitized order (mysql)", () => {
+  it("finding with sanitized order", () => {
     const q1 = Tag.order([arelSql("field(id, ?)"), [1, 3, 2]]).toSql();
-    expect(q1).toMatch(/field\(id, '1',\s*'3',\s*'2'\)/);
+    expect(q1).toMatch(sanitizedOrderRe);
     const q2 = Tag.order([arelSql("field(id, ?)"), []]).toSql();
     expect(q2).toMatch(/field\(id, NULL\)/);
     const q3 = Tag.order([arelSql("field(id, ?)"), null as any]).toSql();

@@ -214,8 +214,10 @@ function buildAggNode(
   distinct: boolean,
 ): any {
   const sqlName = SQL_FN_NAMES[fn];
-  if (column === "*" || column instanceof Nodes.SqlLiteral) {
-    const lit = column === "*" ? new Nodes.SqlLiteral("*") : column;
+  // "all" is the JS analogue of Rails' :all symbol — aggregate_column maps it
+  // to Arel.star (calculations.rb:414-423), i.e. COUNT(*), not a column ref.
+  if (column === "*" || column === "all" || column instanceof Nodes.SqlLiteral) {
+    const lit = column instanceof Nodes.SqlLiteral ? column : new Nodes.SqlLiteral("*");
     return new Nodes.NamedFunction(sqlName, [lit], undefined, distinct);
   }
   // Arel node (e.g. arelTable.get("col")) — use it directly without string resolution.
@@ -304,9 +306,9 @@ function needsBigintCast(rel: CalculationRelation): boolean {
  * needsBigintCast() is true. Aliases are quoted to match SQLite's
  * identifier quoting convention.
  */
-function wrapBigintAgg(innerSql: string, grouped = false): string {
+function wrapBigintAgg(innerSql: string, grouped = false, aggAlias = "val"): string {
   if (grouped) {
-    return `SELECT "group_key", CAST("val" AS TEXT) AS "val" FROM (${innerSql}) AS "_bigint_agg"`;
+    return `SELECT "group_key", CAST("${aggAlias}" AS TEXT) AS "${aggAlias}" FROM (${innerSql}) AS "_bigint_agg"`;
   }
   return `SELECT CAST("val" AS TEXT) AS "val" FROM (${innerSql}) AS "_bigint_agg"`;
 }
@@ -480,7 +482,14 @@ async function groupedAggregate(
   const groupNode = arelColumns.call(rel as never, [effectiveGroupCol])[0] as Nodes.Node;
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
-  const manager = table.project(groupKeyAlias, aggNode.as("val"));
+  // Rails aliases the aggregate as `column_alias_for("#{operation} #{column_name}")`
+  // — e.g. `sum_credit_limit`, `count_all` — so order("sum_credit_limit desc")
+  // can reference it (calculations.rb:537). A raw Arel node keeps "val".
+  const aggAlias =
+    typeof column === "string"
+      ? columnAliasFor(`${fn} ${column.toLowerCase()}`.replace(/\*/g, "all"))
+      : "val";
+  const manager = table.project(groupKeyAlias, aggNode.as(aggAlias));
   // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
   // into `joins_values` via `apply_join_dependency` before dispatching to the
   // grouped/simple calculation. Fold it into the shared `build_joins` port so
@@ -495,6 +504,10 @@ async function groupedAggregate(
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
   manager.group(groupNode);
+  // Rails `execute_grouped_calculation` runs `select_all` on the relation's own
+  // arel, which retains order_values — without the ORDER BY, LIMIT/OFFSET pick
+  // arbitrary groups on PG/MySQL.
+  rel._applyOrderToManager(manager, table);
 
   if (rel._limitValue !== null) manager.take(rel._limitValue);
   if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
@@ -504,7 +517,7 @@ async function groupedAggregate(
   const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? wrapBigintAgg(withCtes, true)
+      ? wrapBigintAgg(withCtes, true, aggAlias)
       : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
   const queryResult = await rel
@@ -530,7 +543,7 @@ async function groupedAggregate(
     const byId = new Map(records.map((r) => [String(r.id), r]));
     const result = new Map<unknown, unknown>();
     for (const row of rows) {
-      result.set(byId.get(String(row.group_key)) ?? null, aggOf(row.val));
+      result.set(byId.get(String(row.group_key)) ?? null, aggOf(row[aggAlias]));
     }
     return result;
   }
@@ -548,7 +561,7 @@ async function groupedAggregate(
       raw == null
         ? "null"
         : String(typeof keyType?.deserialize === "function" ? keyType.deserialize(raw) : raw);
-    result[key] = aggOf(row.val);
+    result[key] = aggOf(row[aggAlias]);
   }
   return result;
 }
@@ -1047,7 +1060,9 @@ export async function performCount(
 
   // `table` and `project` (alias-aware) were resolved above the limit/offset
   // branch so every count path shares them.
-  const effectiveColumn = column === "*" ? undefined : column;
+  // "all" is the JS analogue of Rails' :all symbol — aggregate_column maps both
+  // it and "*" to Arel.star, i.e. COUNT(*) (calculations.rb:414-423).
+  const effectiveColumn = column === "*" || column === "all" ? undefined : column;
 
   // Rails: when no explicit column, check if select_values has a single Arel attribute
   // and use it as the count column (mirrors calculations.rb#execute_simple_calculation).
