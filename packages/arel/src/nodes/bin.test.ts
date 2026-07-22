@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection, mysqlTestConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors } from "../index.js";
 
 describe("TestBin", () => {
@@ -21,14 +22,14 @@ describe("TestBin", () => {
 
   it("default to sql", () => {
     const node = new Nodes.Bin(new Nodes.SqlLiteral("zomg"));
-    const sql = new Visitors.ToSql().compile(node);
+    const sql = new Visitors.ToSql(testConnection).compile(node);
     expect(sql).toBe("zomg");
   });
 
   it("mysql to sql", () => {
     // Rails MySQL: visit_Arel_Nodes_Bin emits `CAST(... AS BINARY)`.
     const node = new Nodes.Bin(new Nodes.SqlLiteral("zomg"));
-    const sql = new Visitors.MySQL().compile(node);
+    const sql = new Visitors.MySQL(mysqlTestConnection).compile(node);
     expect(sql).toBe("CAST(zomg AS BINARY)");
   });
 });

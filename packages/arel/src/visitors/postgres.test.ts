@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection, postgresqlTestConnection } from "../test-helpers/connection.js";
 import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
@@ -6,14 +7,14 @@ describe("PostgresTest", () => {
   const users = new Table("users");
   describe("Nodes::NotRegexp", () => {
     it("should know how to visit", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const node = users.get("id").in([1, 2, 3]);
       expect(visitor.compile(node)).toContain("IN");
     });
 
     it("can handle case insensitive", () => {
       const node = users.get("name").doesNotMatchRegexp("foo.*", false);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("!~*");
     });
 
@@ -22,7 +23,7 @@ describe("PostgresTest", () => {
         .project(users.get("id"))
         .where(users.get("name").doesNotMatchRegexp("foo.*"));
       const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("!~");
     });
   });
@@ -34,14 +35,14 @@ describe("PostgresTest", () => {
 
   describe("Nodes::IsDistinctFrom", () => {
     it("should handle nil", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const node = users.get("name").isDistinctFrom(null);
       expect(visitor.compile(node)).toContain("IS NOT NULL");
     });
 
     it("should handle column names on both sides", () => {
       const node = users.get("name").isDistinctFrom(users.get("login"));
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("IS DISTINCT FROM");
     });
   });
@@ -49,20 +50,20 @@ describe("PostgresTest", () => {
   describe("Nodes::DoesNotMatch", () => {
     it("can handle ESCAPE", () => {
       const node = users.get("name").doesNotMatch("foo%", "\\", true);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const result = visitor.compile(node);
       expect(result).toContain("NOT LIKE");
     });
 
     it("should know how to visit", () => {
       const node = users.get("name").doesNotMatch("foo%");
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("NOT ILIKE");
     });
 
     it("should know how to visit case sensitive", () => {
       const node = users.get("name").doesNotMatch("foo%", null, true);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("NOT LIKE");
       expect(sql).not.toContain("ILIKE");
     });
@@ -70,7 +71,7 @@ describe("PostgresTest", () => {
     it("can handle subqueries", () => {
       const mgr = users.project(users.get("id")).where(users.get("name").doesNotMatch("foo%"));
       const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("NOT ILIKE");
     });
   });
@@ -78,33 +79,33 @@ describe("PostgresTest", () => {
   describe("locking", () => {
     it("defaults to FOR UPDATE", () => {
       const mgr = users.project(star).lock();
-      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
       expect(sql).toContain("FOR UPDATE");
     });
 
     it("allows a custom string to be used as a lock", () => {
       const mgr = users.project(star).lock("FOR SHARE");
-      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
       expect(sql).toContain("FOR SHARE");
     });
   });
 
   it("should support DISTINCT ON", () => {
     const mgr = new SelectManager(users).project(star).distinctOn(users.get("id"));
-    const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
     expect(sql).toContain('DISTINCT ON ( "users"."id" )');
   });
 
   it("should support DISTINCT", () => {
     const mgr = new SelectManager(users).project(star).distinct();
-    const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
     expect(sql).toContain("SELECT DISTINCT");
   });
 
   it("encloses LATERAL queries in parens", () => {
     const sub = users.project(users.get("id"));
     const lat = sub.lateral();
-    const sql = new Visitors.PostgreSQL().compile(lat);
+    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(lat);
     expect(sql).toContain("LATERAL (");
     expect(sql).toContain(")");
   });
@@ -116,7 +117,7 @@ describe("PostgresTest", () => {
     // because Rails' `quote_table_name` returns SqlLiterals unchanged.
     const sub = users.project(users.get("id"));
     const lat = sub.lateral("t");
-    const sql = new Visitors.PostgreSQL().compile(lat);
+    const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(lat);
     expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users") t');
   });
 
@@ -157,33 +158,33 @@ describe("PostgresTest", () => {
   describe("Nodes::RollUp", () => {
     it("should know how to visit with array arguments", () => {
       const node = users.get("id").in([1, 2, 3]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("IN (1, 2, 3)");
     });
 
     it("should know how to visit with CubeDimension Argument", () => {
       const mgr = users.project(star).group(new Nodes.Cube([users.get("id")]));
-      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
       expect(sql).toContain("CUBE(");
     });
 
     it("should know how to generate parenthesis when supplied with many Dimensions", () => {
       const mgr = users.project(star).group(new Nodes.Cube([users.get("id"), users.get("name")]));
-      const sql = new Visitors.PostgreSQL().compile(mgr.ast);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(mgr.ast);
       // Rails Postgres formats grouping elements with spaces inside parens.
       expect(sql).toContain('CUBE( "users"."id", "users"."name" )');
     });
 
     it("should know how to visit with array arguments", () => {
       const node = new Nodes.Rollup([users.get("name"), users.get("bool")]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ROLLUP");
     });
 
     it("should know how to visit with CubeDimension Argument", () => {
       const dim = new Nodes.GroupingElement([users.get("name")]);
       const node = new Nodes.Rollup([dim]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ROLLUP");
     });
 
@@ -191,7 +192,7 @@ describe("PostgresTest", () => {
       const d1 = new Nodes.GroupingElement([users.get("name")]);
       const d2 = new Nodes.GroupingElement([users.get("bool")]);
       const node = new Nodes.Rollup([d1, d2]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ROLLUP");
       expect(sql).toContain("(");
     });
@@ -200,33 +201,33 @@ describe("PostgresTest", () => {
   describe("Nodes::IsNotDistinctFrom", () => {
     it("should handle nil", () => {
       const node = users.get("name").isNotDistinctFrom(null);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("IS NOT DISTINCT FROM");
     });
 
     it("should construct a valid generic SQL statement", () => {
       const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("IS NOT DISTINCT FROM");
     });
 
     it("should handle column names on both sides", () => {
       const node = users.get("name").isNotDistinctFrom(users.get("login"));
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("IS NOT DISTINCT FROM");
     });
   });
 
   describe("Nodes::InfixOperation", () => {
     it("should handle Contains", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const products = new Table("products");
       const node = products.get("metadata").contains('{"foo":"bar"}');
       expect(visitor.compile(node)).toBe(`"products"."metadata" @> '{"foo":"bar"}'`);
     });
 
     it("should handle Overlaps", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const products = new Table("products");
       const node = products.get("tags").overlaps("{foo,bar,baz}");
       expect(visitor.compile(node)).toBe(`"products"."tags" && '{foo,bar,baz}'`);
@@ -236,14 +237,14 @@ describe("PostgresTest", () => {
   describe("Nodes::GroupingSet", () => {
     it("should know how to visit with array arguments", () => {
       const node = new Nodes.GroupingSet([users.get("name"), users.get("bool")]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("GROUPING SETS");
     });
 
     it("should know how to visit with CubeDimension Argument", () => {
       const dim = new Nodes.GroupingElement([users.get("name"), users.get("bool")]);
       const node = new Nodes.GroupingSet([dim]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("GROUPING SETS");
     });
 
@@ -251,7 +252,7 @@ describe("PostgresTest", () => {
       const d1 = new Nodes.GroupingElement([users.get("name")]);
       const d2 = new Nodes.GroupingElement([users.get("bool")]);
       const node = new Nodes.GroupingSet([d1, d2]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("GROUPING SETS");
       expect(sql).toContain("(");
     });
@@ -260,14 +261,14 @@ describe("PostgresTest", () => {
   describe("Nodes::Cube", () => {
     it("should know how to visit with array arguments", () => {
       const node = new Nodes.Cube([users.get("name"), users.get("bool")]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("CUBE");
     });
 
     it("should know how to visit with CubeDimension Argument", () => {
       const dim = new Nodes.GroupingElement([users.get("name"), users.get("bool")]);
       const node = new Nodes.Cube([dim]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("CUBE");
     });
 
@@ -275,7 +276,7 @@ describe("PostgresTest", () => {
       const d1 = new Nodes.GroupingElement([users.get("name")]);
       const d2 = new Nodes.GroupingElement([users.get("bool"), users.get("created_at")]);
       const node = new Nodes.Cube([d1, d2]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("CUBE");
       expect(sql).toContain("(");
     });
@@ -284,21 +285,21 @@ describe("PostgresTest", () => {
   describe("Nodes::Regexp", () => {
     it("should know how to visit", () => {
       const node = users.get("name").matchesRegexp("foo.*");
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("~");
       expect(sql).toContain("foo.*");
     });
 
     it("can handle case insensitive", () => {
       const node = users.get("name").matchesRegexp("foo.*", false);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("~*");
     });
 
     it("can handle subqueries", () => {
       const mgr = users.project(users.get("id")).where(users.get("name").matchesRegexp("foo.*"));
       const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("SELECT");
       expect(sql).toContain("~");
     });
@@ -307,20 +308,20 @@ describe("PostgresTest", () => {
   describe("Nodes::Matches", () => {
     it("should know how to visit", () => {
       const node = users.get("name").matches("foo%");
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ILIKE");
     });
 
     it("should know how to visit case sensitive", () => {
       const node = users.get("name").matches("foo%", null, true);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("LIKE");
       expect(sql).not.toContain("ILIKE");
     });
 
     it("can handle ESCAPE", () => {
       const node = users.get("name").matches("foo!%", "!");
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ILIKE");
       expect(sql).toContain("ESCAPE");
     });
@@ -328,7 +329,7 @@ describe("PostgresTest", () => {
     it("can handle subqueries", () => {
       const mgr = users.project(users.get("id")).where(users.get("name").matches("foo%"));
       const node = users.get("id").in(mgr);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ILIKE");
     });
   });
@@ -336,7 +337,7 @@ describe("PostgresTest", () => {
   describe("array quoting", () => {
     it("quotes array values as PG array literals", () => {
       const node = users.get("tags").eq(["a", "b"]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("'{a,b}'");
     });
 
@@ -345,13 +346,13 @@ describe("PostgresTest", () => {
         [1, 2],
         [3, 4],
       ]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("'{{1,2},{3,4}}'");
     });
 
     it("escapes single quotes in array elements", () => {
       const node = users.get("tags").eq(["O'Reilly"]);
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       // The apostrophe is escaped by the outer single-quoting, not the array
       // encoder — `'` is not in PG::TextEncoder::Array's quote-triggering set,
       // so the element itself stays bare.
@@ -363,22 +364,30 @@ describe("PostgresTest", () => {
       // scalar takes (`when Date, Time then quoted_date`), so the array element
       // must carry the db form the scalar path emits — not ISO-8601.
       const d = Temporal.Instant.from("2026-04-26T14:23:55Z");
-      const scalar = new Visitors.PostgreSQL().compile(users.get("at").eq(d));
+      const scalar = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
+        users.get("at").eq(d),
+      );
       expect(scalar).toContain("'2026-04-26 14:23:55'");
 
-      const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([d]));
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
+        users.get("ats").eq([d]),
+      );
       expect(sql).toContain("'{\"2026-04-26 14:23:55\"}'");
     });
 
     it("emits fixed-6 microseconds for a sub-second date array element", () => {
       const d = Temporal.Instant.from("2026-04-26T14:23:55.123Z");
-      const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([d]));
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
+        users.get("ats").eq([d]),
+      );
       expect(sql).toContain("'{\"2026-04-26 14:23:55.123000\"}'");
     });
 
     it("quotes date elements of a nested array as db dates", () => {
       const d = Temporal.Instant.from("2026-04-26T14:23:55Z");
-      const sql = new Visitors.PostgreSQL().compile(users.get("ats").eq([[d]]));
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
+        users.get("ats").eq([[d]]),
+      );
       expect(sql).toContain("'{{\"2026-04-26 14:23:55\"}}'");
     });
 
@@ -387,10 +396,14 @@ describe("PostgresTest", () => {
       // sqlite3/quoting.rb:87 do), so it inherits Ruby true/false and
       // encode_array emits '{true,false}'. The scalar path keeps quoted_true's
       // TRUE — the two pairs legitimately differ.
-      const sql = new Visitors.PostgreSQL().compile(users.get("flags").eq([true, false]));
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
+        users.get("flags").eq([true, false]),
+      );
       expect(sql).toContain("'{true,false}'");
 
-      const scalar = new Visitors.PostgreSQL().compile(users.get("flag").eq(true));
+      const scalar = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
+        users.get("flag").eq(true),
+      );
       expect(scalar).toContain("TRUE");
     });
   });
@@ -402,7 +415,8 @@ describe("PostgresTest", () => {
 // overrides (behaviorally identical to base, kept for fidelity).
 describe("PostgreSQL dialect overrides (audit follow-up)", () => {
   const users = new Table("users");
-  const compile = (n: Nodes.Node): string => new Visitors.PostgreSQL().compile(n);
+  const compile = (n: Nodes.Node): string =>
+    new Visitors.PostgreSQL(postgresqlTestConnection).compile(n);
 
   it("GroupingElement renders with spaces inside parens", () => {
     const ge = new Nodes.GroupingElement([users.get("a"), users.get("b")]);
@@ -457,19 +471,19 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
   describe("Matches ESCAPE", () => {
     it("hard-quotes a string escape", () => {
       const node = users.get("name").matches("x%", "!");
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ESCAPE '!'");
     });
 
     it("visits a Node escape", () => {
       const node = users.get("name").matches("x%", new Nodes.Quoted("!"));
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ESCAPE '!'");
     });
 
     it("visits a Node escape on DoesNotMatch", () => {
       const node = users.get("name").doesNotMatch("x%", new Nodes.Quoted("!"));
-      const sql = new Visitors.PostgreSQL().compile(node);
+      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
       expect(sql).toContain("ESCAPE '!'");
     });
   });
@@ -482,20 +496,28 @@ describe("Temporal array elements", () => {
   // trails' analogue is Temporal.PlainTime, which carries no date to emit.
   it("quotes a time array element as a db time, matching the scalar path", () => {
     const t = Temporal.PlainTime.from("14:23:55");
-    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(t))).toContain("'14:23:55'");
-    expect(new Visitors.PostgreSQL().compile(users.get("ats").eq([t]))).toContain("'{14:23:55}'");
+    expect(
+      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(t)),
+    ).toContain("'14:23:55'");
+    expect(
+      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("ats").eq([t])),
+    ).toContain("'{14:23:55}'");
   });
 
   // `when Date, Time then quoted_date` (:103) for the date-only analogue.
   it("quotes a date-only array element without a time part", () => {
     const d = Temporal.PlainDate.from("2026-04-26");
-    expect(new Visitors.PostgreSQL().compile(users.get("ats").eq([d]))).toContain("'{2026-04-26}'");
+    expect(
+      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("ats").eq([d])),
+    ).toContain("'{2026-04-26}'");
   });
 
   // A JS Date is rejected AR-wide (#939): it must not be claimed as a Time.
   it("refuses a JS Date rather than formatting it as a Time", () => {
     const d = new Date("2026-04-26T14:23:55Z");
-    expect(() => new Visitors.PostgreSQL().compile(users.get("at").eq(d))).toThrow(TypeError);
+    expect(() =>
+      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(d)),
+    ).toThrow(TypeError);
   });
 });
 
@@ -506,14 +528,16 @@ describe("quotedDate normalisation", () => {
   // serialization zone rather than emitting its own wall clock.
   it("converts a zoned value instead of emitting its wall clock", () => {
     const z = Temporal.Instant.from("2026-04-26T14:23:55Z").toZonedDateTimeISO("America/New_York");
-    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(z))).toContain(
-      "'2026-04-26 14:23:55'",
-    );
+    expect(
+      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(z)),
+    ).toContain("'2026-04-26 14:23:55'");
   });
 
   // Rails' `to_fs(:db)` never emits a zero-padded negative year like "00-1".
   it("keeps the sign on a negative year", () => {
     const d = new Temporal.PlainDate(-1, 4, 26);
-    expect(new Visitors.PostgreSQL().compile(users.get("at").eq(d))).toContain("'-1-04-26'");
+    expect(
+      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(d)),
+    ).toContain("'-1-04-26'");
   });
 });

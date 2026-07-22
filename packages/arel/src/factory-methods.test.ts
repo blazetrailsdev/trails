@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "./test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "./index.js";
 
 describe("TestFactoryMethods", () => {
@@ -48,14 +49,16 @@ describe("TestFactoryMethods", () => {
   it("lower wraps non-Node arguments via buildQuoted", () => {
     const fn = users.lower("name");
     expect(fn.expressions[0]).toBeInstanceOf(Nodes.Quoted);
-    expect(new Visitors.ToSql().compile(fn)).toBe("LOWER('name')");
+    expect(new Visitors.ToSql(testConnection).compile(fn)).toBe("LOWER('name')");
   });
 
   it("coalesce", () => {
     const fn = users.coalesce(users.get("name"), new Nodes.Quoted("default"));
     expect(fn).toBeInstanceOf(Nodes.NamedFunction);
     expect(fn.name).toBe("COALESCE");
-    expect(new Visitors.ToSql().compile(fn)).toBe('COALESCE("users"."name", \'default\')');
+    expect(new Visitors.ToSql(testConnection).compile(fn)).toBe(
+      'COALESCE("users"."name", \'default\')',
+    );
   });
 
   it("cast", () => {
@@ -65,7 +68,7 @@ describe("TestFactoryMethods", () => {
     // Mirrors Rails: `cast` builds NamedFunction("CAST", [name.as(type)]),
     // not a string-interpolated SqlLiteral. The compiled SQL must reference
     // the column properly rather than "[object Object] AS VARCHAR".
-    expect(new Visitors.ToSql().compile(fn)).toBe('CAST("users"."age" AS VARCHAR)');
+    expect(new Visitors.ToSql(testConnection).compile(fn)).toBe('CAST("users"."age" AS VARCHAR)');
   });
 
   // Mirrors Rails: delegating to `name.as(type)` produces an `As` whose
@@ -83,13 +86,13 @@ describe("TestFactoryMethods", () => {
   it("create true", () => {
     const t = users.createTrue();
     expect(t).toBeInstanceOf(Nodes.True);
-    expect(new Visitors.ToSql().compile(t)).toBe("TRUE");
+    expect(new Visitors.ToSql(testConnection).compile(t)).toBe("TRUE");
   });
 
   it("create false", () => {
     const f = users.createFalse();
     expect(f).toBeInstanceOf(Nodes.False);
-    expect(new Visitors.ToSql().compile(f)).toBe("FALSE");
+    expect(new Visitors.ToSql(testConnection).compile(f)).toBe("FALSE");
   });
 
   // Regression: verifies the include(Node, FactoryMethods) call in index.ts

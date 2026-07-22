@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, Visitors } from "../index.js";
 
 describe("MathTest", () => {
-  const visitor = new Visitors.ToSql();
+  const visitor = new Visitors.ToSql(testConnection);
   const table = new Table("users");
 
   // These test names match the Ruby convention (interpolation-stripped names)
@@ -249,35 +250,35 @@ describe("MathTest", () => {
 
   it("average should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql().compile(table.get("id").average().divide(2));
+    const sql = new Visitors.ToSql(testConnection).compile(table.get("id").average().divide(2));
     expect(sql).toContain("AVG");
     expect(sql).toContain("/");
   });
 
   it("count should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql().compile(table.get("id").count().divide(2));
+    const sql = new Visitors.ToSql(testConnection).compile(table.get("id").count().divide(2));
     expect(sql).toContain("COUNT");
     expect(sql).toContain("/");
   });
 
   it("maximum should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql().compile(table.get("id").maximum().divide(2));
+    const sql = new Visitors.ToSql(testConnection).compile(table.get("id").maximum().divide(2));
     expect(sql).toContain("MAX");
     expect(sql).toContain("/");
   });
 
   it("minimum should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql().compile(table.get("id").minimum().divide(2));
+    const sql = new Visitors.ToSql(testConnection).compile(table.get("id").minimum().divide(2));
     expect(sql).toContain("MIN");
     expect(sql).toContain("/");
   });
 
   it("attribute node should be compatible with ", () => {
     const table = new Table("users");
-    const sql = new Visitors.ToSql().compile(table.get("id").divide(2));
+    const sql = new Visitors.ToSql(testConnection).compile(table.get("id").divide(2));
     expect(sql).toContain("/");
   });
 });

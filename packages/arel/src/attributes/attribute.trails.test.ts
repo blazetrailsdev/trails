@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 // TS-only coverage for the `when Enumerable` arm of Attribute#in / #notIn
@@ -8,7 +9,7 @@ import { Table, Nodes, Visitors } from "../index.js";
 // simply Enumerable; the distinction only exists on this side of the port.
 describe("AttributeTest (trails)", () => {
   const users = new Table("users");
-  const visitor = new Visitors.ToSql();
+  const visitor = new Visitors.ToSql(testConnection);
 
   describe("#in", () => {
     it("expands a Set through the Enumerable arm", () => {

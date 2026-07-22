@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, SelectManager, Nodes, Visitors } from "../index.js";
 
 describe("TestNode", () => {
@@ -52,13 +53,13 @@ describe("TestNode", () => {
 
   it("should extract field", () => {
     const node = new Nodes.Extract(users.get("created_at"), "YEAR");
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     expect(visitor.compile(node)).toBe('EXTRACT(YEAR FROM "users"."created_at")');
   });
 
   it("should alias the extract", () => {
     const node = new Nodes.Extract(users.get("created_at"), "MONTH").as("birth_month");
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     expect(visitor.compile(node)).toBe('EXTRACT(MONTH FROM "users"."created_at") AS birth_month');
   });
 
@@ -68,7 +69,7 @@ describe("TestNode", () => {
   });
 
   it("operation ordering via sql", () => {
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     const node = new Nodes.InfixOperation("+", users.get("a"), new Nodes.Quoted(1));
     expect(visitor.compile(node)).toBe('"users"."a" + 1');
   });
@@ -76,7 +77,7 @@ describe("TestNode", () => {
   it("construct with alias via constructor", () => {
     const fn = new Nodes.NamedFunction("SUM", [users.get("age")], "total");
     expect(fn.alias).toBeInstanceOf(Nodes.SqlLiteral);
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     expect(visitor.compile(fn)).toBe('SUM("users"."age") AS total');
   });
 
@@ -174,7 +175,7 @@ describe("Node base polymorphic defaults", () => {
 });
 
 describe("Table.engine", () => {
-  const sqliteEngine = { connection: { visitor: new Visitors.SQLite() } };
+  const sqliteEngine = { connection: { visitor: new Visitors.SQLite(testConnection) } };
 
   it("Node#toSql() compiles through the engine connection's visitor", () => {
     const users = new Table("users");

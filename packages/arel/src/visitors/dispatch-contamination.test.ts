@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("DispatchContaminationTest", () => {
@@ -28,8 +29,8 @@ describe("DispatchContaminationTest", () => {
   });
 
   it("is threadsafe when implementing superclass fallback", () => {
-    const v1 = new Visitors.ToSql();
-    const v2 = new Visitors.ToSql();
+    const v1 = new Visitors.ToSql(testConnection);
+    const v2 = new Visitors.ToSql(testConnection);
     const n1 = users.get("id").eq(1);
     const n2 = users.get("id").eq(2);
     expect(v1.compile(n1)).toBe('"users"."id" = 1');

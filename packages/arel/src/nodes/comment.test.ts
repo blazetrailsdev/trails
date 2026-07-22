@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors, Table, star } from "../index.js";
 
 describe("CommentTest", () => {
@@ -21,7 +22,7 @@ describe("CommentTest", () => {
       const users = new Table("users");
       const mgr = users.project(star);
       mgr.comment("hello */ DROP TABLE users");
-      const sql = new Visitors.ToSql().compile(mgr.ast);
+      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       // The */ is stripped so the comment stays enclosed
       expect(sql).toContain("/* hello DROP TABLE users */");
       // There should be exactly one block comment pair
@@ -33,7 +34,7 @@ describe("CommentTest", () => {
       const users = new Table("users");
       const mgr = users.project(star);
       mgr.comment("before /* nested */ after");
-      const sql = new Visitors.ToSql().compile(mgr.ast);
+      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       // Both /* and */ stripped from the value
       expect(sql).toContain("/* before nested after */");
     });
@@ -42,7 +43,7 @@ describe("CommentTest", () => {
       const users = new Table("users");
       const mgr = users.project(star);
       mgr.comment("hello   \n  world");
-      const sql = new Visitors.ToSql().compile(mgr.ast);
+      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
       expect(sql).toContain("/* hello world */");
     });
   });
