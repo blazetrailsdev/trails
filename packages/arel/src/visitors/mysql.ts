@@ -171,10 +171,7 @@ export class MySQL extends ToSql {
     collector: SQLString,
   ): SQLString {
     collector.append("NOT ");
-    this.visit(node.left, collector);
-    collector.append(" <=> ");
-    this.visit(node.right, collector);
-    return collector;
+    return this.visitArelNodesIsNotDistinctFrom(node, collector);
   }
 
   // MySQL uses `REGEXP` / `NOT REGEXP`, not the SQL-standard `~` /
