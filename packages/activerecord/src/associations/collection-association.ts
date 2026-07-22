@@ -97,8 +97,11 @@ export class CollectionAssociation extends Association {
     // first statement (collection_association.rb:242), before any load or
     // persist — and so before the persisted-owner deviation below. That guard
     // is synchronous, so preserve its ordering even on this non-awaitable
-    // path: `firm.clients = [1]` must report `AssociationTypeMismatch`.
-    for (const val of records ?? []) (this as any).raiseOnTypeMismatchBang(val);
+    // path: `firm.clients = [1]` must report `AssociationTypeMismatch`, and
+    // `firm.clients = null` must fail here (Rails: NoMethodError from
+    // `nil.each`; here: TypeError from iterating null) on BOTH owner arms,
+    // ahead of the persisted-owner throw.
+    for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
       throw new CollectionPersistedAssignmentError(this.reflection.name);
     }
@@ -107,9 +110,16 @@ export class CollectionAssociation extends Association {
 
   /**
    * The `#{singular}Ids=` analogue of {@link queueWrite}. Resolving ids to
-   * records is itself a query, so even the unpersisted-owner arm is async —
-   * but a new owner has nothing to reconcile, so the setter can safely leave
-   * the returned promise to `idsWriter` (which ends in an in-memory replace).
+   * records is itself a query, so even the unpersisted-owner arm is async.
+   *
+   * The unpersisted arm returns a promise the property setter must discard —
+   * an id that doesn't resolve (`raiseNotFoundAll`) surfaces as an unhandled
+   * rejection, not a catchable throw, and an immediate `save()` can race the
+   * in-flight resolution. This is the pre-existing shape (the setter always
+   * called `idsWriter` un-awaited) and the story's acceptance criteria keep
+   * unpersisted-owner assignment working, so it is retained rather than made
+   * a second persisted-style throw; callers who need the result awaitable use
+   * `await owner.association(name).idsWriter(ids)`.
    */
   queueIdsWrite(ids: unknown[]): Promise<void> {
     if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
