@@ -113,4 +113,103 @@ export interface Compatibility {
   version: string;
 }
 
+/**
+ * Mirrors: ActiveRecord::Migration::Compatibility::V6_1::PostgreSQLCompat
+ */
+export class PostgreSQLCompat {
+  static compatibleTimestampType(type: string, connection: { adapterName: string }): string {
+    if (connection.adapterName === "postgres") {
+      // For Rails <= 6.1, :datetime was aliased to :timestamp
+      // See: https://github.com/rails/rails/blob/v6.1.3.2/activerecord/lib/active_record/connection_adapters/postgresql_adapter.rb#L108
+      // From Rails 7 onwards, you can define what :datetime resolves to (the default is still :timestamp)
+      // See `ActiveRecord::ConnectionAdapters::PostgreSQLAdapter.datetime_type`
+      return type === "datetime" ? "timestamp" : type;
+    }
+    return type;
+  }
+}
+
+/** @internal Shape of a TableDefinition the V6_1 compat layer patches. */
+interface CompatTableDefinition {
+  newColumnDefinition(name: string, type: string, options?: Record<string, unknown>): unknown;
+  column(name: string, type: string, options?: Record<string, unknown>): unknown;
+}
+
+/**
+ * Define and register the versioned compatibility classes.
+ *
+ * Ruby declares `class V6_1 < V7_0` inline in compatibility.rb; here a
+ * top-level `extends Current` would hit the migration.ts ⇄ compatibility.ts
+ * import cycle before `Current` is initialized, so the class bodies are
+ * deferred behind this hook, called from migration.ts once `Current` exists.
+ */
+export function installCompatibilityVersions(current: MigrationClass): void {
+  const CurrentClass = current as abstract new (...args: unknown[]) => Migration;
+
+  /**
+   * Mirrors: ActiveRecord::Migration::Compatibility::V6_1
+   */
+  abstract class V6_1 extends CurrentClass {
+    override async addColumn(
+      tableName: string,
+      columnName: string,
+      type: Parameters<Migration["addColumn"]>[2],
+      options: Parameters<Migration["addColumn"]>[3] = {},
+    ): Promise<void> {
+      if ((type as string) === "datetime" && !("precision" in options)) {
+        options = { ...options, precision: null };
+      }
+      type = PostgreSQLCompat.compatibleTimestampType(
+        type as string,
+        this.connection,
+      ) as typeof type;
+      await super.addColumn(tableName, columnName, type, options);
+    }
+
+    override async changeColumn(
+      tableName: string,
+      columnName: string,
+      type: Parameters<Migration["changeColumn"]>[2],
+      options: Parameters<Migration["changeColumn"]>[3] = {},
+    ): Promise<void> {
+      if ((type as string) === "datetime" && !("precision" in options)) {
+        options = { ...options, precision: null };
+      }
+      type = PostgreSQLCompat.compatibleTimestampType(
+        type as string,
+        this.connection,
+      ) as typeof type;
+      await super.changeColumn(tableName, columnName, type, options);
+    }
+
+    /**
+     * Mirrors: V6_1#compatible_table_definition — Ruby prepends
+     * `V6_1::TableDefinition` to the yielded table definition's singleton
+     * class; here the equivalent is patching the instance's methods so they
+     * run before the prototype's.
+     */
+    override compatibleTableDefinition(t: unknown): unknown {
+      const td = t as CompatTableDefinition;
+      const conn = this.connection;
+      const origNewColumnDefinition = td.newColumnDefinition;
+      // Mirrors: V6_1::TableDefinition#new_column_definition
+      td.newColumnDefinition = function (name, type, options = {}) {
+        type = PostgreSQLCompat.compatibleTimestampType(type, conn);
+        return origNewColumnDefinition.call(this, name, type, options);
+      };
+      const origColumn = td.column;
+      // Mirrors: V6_1::TableDefinition#column — `options[:precision] ||= nil`
+      td.column = function (name, type, options = {}) {
+        if (type === "datetime" && !("precision" in options)) {
+          options = { ...options, precision: null };
+        }
+        return origColumn.call(this, name, type, options);
+      };
+      return super.compatibleTableDefinition(t);
+    }
+  }
+
+  registerVersion("6.1", V6_1 as unknown as MigrationClass);
+}
+
 export { CURRENT_VERSION };

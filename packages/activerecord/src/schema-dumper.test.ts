@@ -1,6 +1,6 @@
 import { describe, it, expect, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Base } from "./base.js";
-import { MigrationContext } from "./migration.js";
+import { Migration, MigrationContext } from "./migration.js";
 import { SchemaDumper } from "./connection-adapters/abstract/schema-dumper.js";
 import type { SchemaSource } from "./schema-dumper.js";
 import { adapterType } from "./test-adapter.js";
@@ -887,17 +887,66 @@ describe("SchemaDumperTest", () => {
       });
     },
   );
-  it.skipIf(adapterType !== "postgres")("timestamps schema dump before rails 7", (ctx) => {
-    ctx.skip();
-    // BLOCKED: needs Migration version compatibility (Migration[6.1]).
-    // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+  it.skipIf(adapterType !== "postgres")("timestamps schema dump before rails 7", async () => {
+    class TimestampsMigration extends Migration.forVersion(6.1) {
+      override write(): void {}
+      override async up(): Promise<void> {
+        await this.createTable("timestamps", (t) => {
+          t.datetime("this_should_remain_datetime");
+          t.timestamp("this_is_an_alias_of_datetime");
+          t.column("this_is_also_an_alias_of_datetime", "timestamp");
+        });
+      }
+      override async down(): Promise<void> {
+        await this.dropTable("timestamps");
+      }
+    }
+    const migration = new TimestampsMigration();
+    try {
+      await migration.migrate("up");
+      const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
+      expect(output).toContain('t.datetime("this_should_remain_datetime"');
+      expect(output).toContain('t.datetime("this_is_an_alias_of_datetime"');
+      expect(output).toContain('t.datetime("this_is_also_an_alias_of_datetime"');
+    } finally {
+      await migration.migrate("down");
+    }
   });
   it.skipIf(adapterType !== "postgres")(
     "timestamps schema dump before rails 7 with timestamptz setting",
-    (ctx) => {
-      ctx.skip();
-      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        class TimestampsMigration extends Migration.forVersion(6.1) {
+          override write(): void {}
+          override async up(): Promise<void> {
+            await this.createTable("timestamps", (t) => {
+              t.datetime("this_should_change_to_timestamp");
+              t.timestamp("this_should_stay_as_timestamp");
+              t.column("this_should_also_stay_as_timestamp", "timestamp");
+            });
+          }
+          override async down(): Promise<void> {
+            await this.dropTable("timestamps");
+          }
+        }
+        const migration = new TimestampsMigration();
+        try {
+          await migration.migrate("up");
+          const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
+          // Normally we'd write `t.datetime` here. But because you've changed the `datetime_type`
+          // to something else, `t.datetime` now means `:timestamptz`. To ensure that old columns
+          // are still created as a `:timestamp` we need to change what is written to the schema dump.
+          //
+          // Typically in Rails we handle this through Migration versioning (`ActiveRecord::Migration::Compatibility`)
+          // but that doesn't work here because the schema dumper is not aware of which migration
+          // a column was added in.
+          expect(output).toContain('t.timestamp("this_should_change_to_timestamp"');
+          expect(output).toContain('t.timestamp("this_should_stay_as_timestamp"');
+          expect(output).toContain('t.timestamp("this_should_also_stay_as_timestamp"');
+        } finally {
+          await migration.migrate("down");
+        }
+      });
     },
   );
   it.skipIf(adapterType !== "postgres")(
@@ -954,18 +1003,63 @@ describe("SchemaDumperTest", () => {
 
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7",
-    (ctx) => {
-      ctx.skip();
-      // BLOCKED: needs Migration version compatibility (Migration[6.1]).
-      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    async () => {
+      class TimestampsMigration extends Migration.forVersion(6.1) {
+        override write(): void {}
+        override async up(): Promise<void> {
+          await this.createTable("timestamps");
+          await this.addColumn("timestamps", "default_format", "datetime");
+          await this.addColumn("timestamps", "without_time_zone", "datetime");
+          await this.addColumn("timestamps", "also_without_time_zone", "timestamp");
+        }
+        override async down(): Promise<void> {
+          await this.dropTable("timestamps");
+        }
+      }
+      const migration = new TimestampsMigration();
+      try {
+        await migration.migrate("up");
+        const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
+        expect(output).toContain('t.datetime("default_format"');
+        expect(output).toContain('t.datetime("without_time_zone"');
+        expect(output).toContain('t.datetime("also_without_time_zone"');
+      } finally {
+        await migration.migrate("down");
+      }
     },
   );
   it.skipIf(adapterType !== "postgres")(
     "schema dump with correct timestamp types via add column before rails 7 with timestamptz setting",
-    (ctx) => {
-      ctx.skip();
-      // BLOCKED: needs Migration version compatibility + datetime_type-aware dump.
-      // Tracked: rfcs/0030-ar-test-compare-residual-burndown/stories/c1-schema-dumper-residual-gaps.md
+    async () => {
+      await withPostgresqlDatetimeType("timestamptz", async () => {
+        class TimestampsMigration extends Migration.forVersion(6.1) {
+          override write(): void {}
+          override async up(): Promise<void> {
+            await this.createTable("timestamps");
+            await this.addColumn("timestamps", "this_should_change_to_timestamp", "datetime");
+            await this.addColumn("timestamps", "this_should_stay_as_timestamp", "timestamp");
+          }
+          override async down(): Promise<void> {
+            await this.dropTable("timestamps");
+          }
+        }
+        const migration = new TimestampsMigration();
+        try {
+          await migration.migrate("up");
+          const output = await SchemaDumper.dumpTableSchema(Base.connection, "timestamps");
+          // Normally we'd write `t.datetime` here. But because you've changed the `datetime_type`
+          // to something else, `t.datetime` now means `:timestamptz`. To ensure that old columns
+          // are still created as a `:timestamp` we need to change what is written to the schema dump.
+          //
+          // Typically in Rails we handle this through Migration versioning (`ActiveRecord::Migration::Compatibility`)
+          // but that doesn't work here because the schema dumper is not aware of which migration
+          // a column was added in.
+          expect(output).toContain('t.timestamp("this_should_change_to_timestamp"');
+          expect(output).toContain('t.timestamp("this_should_stay_as_timestamp"');
+        } finally {
+          await migration.migrate("down");
+        }
+      });
     },
   );
 

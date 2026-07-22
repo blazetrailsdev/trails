@@ -33,7 +33,12 @@ import { DatabaseConfigurations } from "./database-configurations.js";
 import { DefaultStrategy } from "./migration/default-strategy.js";
 import type { ExecutionStrategy, MigrationLike } from "./migration/execution-strategy.js";
 import type { PendingMigrationConnection } from "./migration/pending-migration-connection.js";
-import { registerVersion, findVersion, CURRENT_VERSION } from "./migration/compatibility.js";
+import {
+  registerVersion,
+  findVersion,
+  installCompatibilityVersions,
+  CURRENT_VERSION,
+} from "./migration/compatibility.js";
 
 export type {
   ReferentialAction,
@@ -441,7 +446,17 @@ export abstract class Migration {
       return;
     }
     const tname = this._pt(name);
-    await this.schema.createTable(tname, optionsOrFn, fn);
+    // Mirrors Rails Migration::Current#create_table — the block's table
+    // definition routes through compatible_table_definition so versioned
+    // compatibility classes (e.g. Migration[6.1]) can patch it.
+    const wrap = (block?: (t: TableDefinition) => void) =>
+      block &&
+      ((t: TableDefinition) => block(this.compatibleTableDefinition(t) as TableDefinition));
+    if (typeof optionsOrFn === "function") {
+      await this.schema.createTable(tname, wrap(optionsOrFn));
+    } else {
+      await this.schema.createTable(tname, optionsOrFn, wrap(fn));
+    }
   }
 
   async dropTable(
@@ -3120,6 +3135,9 @@ export class Current extends Migration {
 
 // Register the current version so Migration.forVersion(1.0) works
 registerVersion(CURRENT_VERSION, Current);
+// Define + register the versioned compatibility classes (e.g. Migration[6.1]) —
+// deferred behind this hook to break the migration ⇄ compatibility import cycle.
+installCompatibilityVersions(Current);
 
 /**
  * Mirrors: ActiveRecord::Migration::CheckPending
