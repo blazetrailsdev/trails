@@ -6,6 +6,7 @@ import { describe, it, expect } from "vitest";
 import { Base } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
 
+import { pp } from "./pretty-print.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Topic, TitlePrimaryKeyTopic } from "./test-helpers/models/topic.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
@@ -69,9 +70,27 @@ describe("CoreTest", () => {
     });
   });
 
+  it("inspect instance with lambda date formatter", async () => {
+    // Rails swaps Time::DATE_FORMATS[:inspect] for a lambda and asserts the
+    // date column still renders "2004-04-15" — a Date is formatted through
+    // Date::DATE_FORMATS, so the Time lambda never applies. trails has no
+    // DATE_FORMATS registry (Temporal values render ISO directly), so the
+    // pinned behavior — a time-format override cannot leak into a date
+    // column — holds by construction; the assertion is ported verbatim.
+    await withAttributesForInspect(["id", "last_read"], () => {
+      const topic = topics("first") as any;
+      expect(topic.inspect()).toBe(`#<Topic id: 1, last_read: "2004-04-15">`);
+    });
+  });
+
   it("inspect new instance", () => {
     expect(new Topic({}).inspect()).toMatch(/Topic id: nil/);
   });
+
+  // Permanent skip: Ruby-only. `Topic.new.singleton_class.inspect` exercises
+  // Ruby's per-object singleton class (`#<Class:#<Topic:0x...>>`); JS has no
+  // singleton-class concept and no AR code participates in that rendering.
+  it.skip("inspect singleton instance", () => {});
 
   it("inspect limited select instance", async () => {
     await withAttributesForInspect(["id", "title"], async () => {
@@ -121,6 +140,73 @@ describe("CoreTest", () => {
     await withAttributesForInspect(["id", "title"], () => {
       const topic = topics("first") as any;
       expect(topic.fullInspect()).toBe(fullInspectString(topic));
+    });
+  });
+
+  // The pretty print family drives trails' `pp(obj, io)` (pretty-print.ts), the
+  // analogue of Ruby's `PP.pp(topic, StringIO.new(actual))`. Our PrettyPrinter
+  // renders breakables as spaces and has no object address, so where Rails
+  // asserts a multi-line `#<Topic:0x...>` block, the ported expectation is the
+  // same attribute list on one line without the `:0x...` address.
+  async function ppString(obj: unknown): Promise<string> {
+    let out = "";
+    await pp(obj, { write: (s: string) => (out += s) });
+    return out;
+  }
+
+  it("pretty print new", async () => {
+    const topic = new Topic({});
+    expect(await ppString(topic)).toBe(
+      `#<Topic id: nil, title: nil, author_name: nil, ` +
+        `author_email_address: "test@test.com", written_on: nil, bonus_time: nil, ` +
+        `last_read: nil, content: nil, important: nil, binary_content: nil, ` +
+        `approved: true, replies_count: 0, unique_replies_count: 0, parent_id: nil, ` +
+        `parent_title: nil, type: nil, group: nil, created_at: nil, updated_at: nil>\n`,
+    );
+  });
+
+  it("pretty print persisted", async () => {
+    const topic = topics("first") as any;
+    expect(await ppString(topic)).toBe(`${fullInspectString(topic)}\n`);
+  });
+
+  it("pretty print full", async () => {
+    await withAttributesForInspect("all", async () => {
+      const topic = topics("first") as any;
+      expect(await ppString(topic)).toBe(`${fullInspectString(topic)}\n`);
+    });
+  });
+
+  it("pretty print uninitialized", async () => {
+    // Rails: `Topic.allocate` — an instance that skipped initialize, so
+    // `@attributes` is unset and pretty_print renders "not initialized".
+    const topic = Object.create(Topic.prototype);
+    expect(await ppString(topic)).toBe("#<Topic not initialized>\n");
+  });
+
+  it("pretty print overridden by inspect", async () => {
+    class Subtopic extends Topic {}
+    // Base declares `inspect` as a property type, so an `override` method
+    // declaration is rejected by TS; define the override on the prototype
+    // (an own property, which is what isCustomInspectMethodDefined checks).
+    (Subtopic.prototype as any).inspect = () => "inspecting topic";
+    expect(await ppString(new Subtopic({}))).toBe("inspecting topic\n");
+  });
+
+  it("pretty print with non primary key id attribute", async () => {
+    const topic = (topics("first") as any).becomes(TitlePrimaryKeyTopic);
+    expect(await ppString(topic)).toMatch(/id: 1/);
+  });
+
+  it("pretty print with overridden attribute for inspect", async () => {
+    const topic = topics("first") as any;
+    const superAttributeForInspect = topic.attributeForInspect.bind(topic);
+    topic.attributeForInspect = (attrName: string) =>
+      attrName === "title"
+        ? JSON.stringify(topic.readAttribute("title").toUpperCase())
+        : superAttributeForInspect(attrName);
+    await withAttributesForInspect("all", async () => {
+      expect(await ppString(topic)).toMatch(/title: "THE FIRST TOPIC"/);
     });
   });
 
