@@ -5,27 +5,30 @@ import { Table, Nodes, Visitors } from "../index.js";
 describe("DispatchContaminationTest", () => {
   const users = new Table("users");
   it("dispatches properly after failing upwards", () => {
-    class A extends Nodes.Node {
-      accept<T>(visitor: Nodes.NodeVisitor<T>): T {
-        return visitor.visit(this);
-      }
-    }
-    class B extends Nodes.Node {
-      accept<T>(visitor: Nodes.NodeVisitor<T>): T {
-        return visitor.visit(this);
-      }
-    }
+    const node = new Nodes.Union(new Nodes.True(), new Nodes.False());
+    expect(node.toSql()).toBe("( TRUE UNION FALSE )");
 
-    const visitor: Nodes.NodeVisitor<string> = {
-      visit(node: Nodes.Node): string {
-        if (node instanceof A) throw new Error("nope");
-        if (node instanceof B) return "ok";
-        return "unknown";
-      },
-    };
+    // Rails' anonymous `Class.new(Visitor)` with `visit_Arel_Nodes_Union` and
+    // its True/False aliases. Ruby derives dispatch names from class names, so
+    // defining the methods is registration; trails' Visitor routes through an
+    // explicit per-class cache instead, so registering on the subclass's own
+    // `dispatchCache()` is the analogue. The Union handler is registered under
+    // `Binary` (Union's superclass) so that accepting the node exercises
+    // `resolveDispatch`'s ancestor fallthrough and memoizes the corrected
+    // entry — the write that must land in the subclass's cache, never the
+    // shared one ToSql dispatches through.
+    class ContaminatingVisitor extends Visitors.Visitor {
+      protected visitArelNodesUnion(_node: unknown): void {}
+    }
+    const cache = ContaminatingVisitor.dispatchCache();
+    cache.set(Nodes.Binary, "visitArelNodesUnion");
+    cache.set(Nodes.True, "visitArelNodesUnion");
+    cache.set(Nodes.False, "visitArelNodesUnion");
 
-    expect(() => visitor.visit(new A())).toThrow();
-    expect(visitor.visit(new B())).toBe("ok");
+    new ContaminatingVisitor().accept(node);
+    expect(cache.get(Nodes.Union)).toBe("visitArelNodesUnion");
+
+    expect(node.toSql()).toBe("( TRUE UNION FALSE )");
   });
 
   it("is threadsafe when implementing superclass fallback", () => {
