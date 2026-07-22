@@ -1382,9 +1382,14 @@ describe("SelectManagerTest", () => {
       expect(sql).toContain("/*+ HINT with newlines */");
     });
 
-    it("strips empty hints after sanitization", () => {
+    it("emits the hint comment even when hints sanitize to empty", () => {
+      // Rails always wraps the sanitized-and-joined hints in `/*+ ... */`
+      // (to_sql.rb:170-172); it never drops the comment when the hints reduce to
+      // empty, so `optimizer_hints("/* */", "/**/")` still emits the marker.
       const mgr = new SelectManager(users).project(star).optimizerHints("/* */", "/**/");
-      expect(new Visitors.ToSql(testConnection).compile(mgr.ast)).toBe('SELECT * FROM "users"');
+      expect(new Visitors.ToSql(testConnection).compile(mgr.ast)).toBe(
+        'SELECT /*+   */ * FROM "users"',
+      );
     });
 
     // Mirrors Rails: `optimizer_hints(*hints)` builds

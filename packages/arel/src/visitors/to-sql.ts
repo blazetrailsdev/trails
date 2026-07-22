@@ -622,11 +622,13 @@ export class ToSql extends Visitor {
   ): SQLString {
     // Each hint routes through `sanitizeAsSqlComment` — the same
     // connection-delegating helper `visitArelNodesComment` uses (to_sql.rb:171).
-    const sanitized = node.hints
-      .map((h) => this.sanitizeAsSqlComment(h))
-      .filter((h) => h.length > 0);
-    if (sanitized.length === 0) return collector;
-    collector.append(` /*+ ${sanitized.join(" ")} */`);
+    // Rails maps every hint through the sanitizer and ALWAYS wraps the joined
+    // result in `/*+ ... */` (to_sql.rb:170-172) — there is no post-sanitization
+    // empty filter, so hints that sanitize to empty still emit the comment. The
+    // node only exists when `optimizer_hints(*hints)` got a non-empty splat
+    // (select_manager.rb:147-149), which is the only emptiness Rails guards.
+    const hints = node.hints.map((h) => this.sanitizeAsSqlComment(h)).join(" ");
+    collector.append(` /*+ ${hints} */`);
     return collector;
   }
 
