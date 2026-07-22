@@ -186,15 +186,22 @@ describe("TableTest", () => {
   });
 
   describe("equality", () => {
+    // Rails asserts `array.uniq.size` (table_test.rb:191-202), which exercises
+    // the eql? + hash contract together; JS has no uniq-by-eql, so assert both
+    // halves explicitly.
     it("is equal with equal ivars", () => {
       const relation1 = new Table("users", { as: "zomg" });
       const relation2 = new Table("users", { as: "zomg" });
       expect(relation1.eql(relation2)).toBe(true);
+      expect(relation1.hash()).toBe(relation2.hash());
     });
 
     it("is not equal with different ivars", () => {
       const relation1 = new Table("users", { as: "zomg" });
       const relation2 = new Table("users", { as: "zomg2" });
+      // Rails' Table#hash hashes only @name (table.rb:88-92), so these share a
+      // hash bucket; uniq drops to eql?, which distinguishes them.
+      expect(relation1.hash()).toBe(relation2.hash());
       expect(relation1.eql(relation2)).toBe(false);
     });
   });
