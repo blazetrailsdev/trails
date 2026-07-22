@@ -1,9 +1,8 @@
 import { afterAll, beforeAll, beforeEach, describe, expect, it } from "vitest";
 import { Base, TransactionIsolationError } from "./index.js";
-import { adapterType } from "./test-adapter.js";
+import { adapterType, ambientPoolConfiguration } from "./test-adapter.js";
 import { adapterSupports } from "./test-helpers/supports.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { describeIfPg, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
 
 // Runs when the adapter does NOT support transaction isolation (or is SQLite3).
 // Rails: TransactionIsolationUnsupportedTest
@@ -27,68 +26,22 @@ describe("TransactionIsolationUnsupportedTest", () => {
   });
 });
 
-// Rails: TransactionIsolationTest (joining/nested subtests).
-// Rails guards the full class with `supports_transaction_isolation? &&
-// !current_adapter?(:SQLite3Adapter)` (transaction_isolation_test.rb:20), which the
-// test:compare Ruby extractor renders as adapters=[mysql,postgresql]
-// features=[transaction_isolation]. These two subtests assert that requesting an
-// isolation level while joining/nesting raises — framework-only behavior that holds
-// on both Postgres and MySQL — so the compound guard below mirrors both dimensions of
-// Rails' gate (non-SQLite adapter set + the feature).
+// Rails: TransactionIsolationTest, guarded by `supports_transaction_isolation? &&
+// !current_adapter?(:SQLite3Adapter)` (transaction_isolation_test.rb:20-21), which
+// the test:compare Ruby extractor renders as adapters=[mysql,postgresql]
+// features=[transaction_isolation]. Each subtest carries the compound skipIf below
+// to mirror both dimensions of Rails' gate (non-SQLite adapter set + the feature).
 //
-// The four isolation-LEVEL subtests below (read uncommitted/committed/repeatable
-// read/serializable) are NOT framework-only — they need real cross-connection
-// semantics over two independent physical connections, so they stay in the
-// PG-bodied describeIfPg block and remain a tracked wrong-gate (sub-story
-// transaction-isolation-level-generic-dual-connection: a generic dual-connection
-// body that also runs on MySQL is required before their gate can match Rails'
-// mysql,postgresql adapter set).
+// Tag and Tag2 each establish their own connection to the active lane's primary
+// database (via ambientPoolConfiguration) so their transactions run on independent
+// physical connections — matching Rails' `Tag.establish_connection :arunit` /
+// `Tag2.establish_connection :arunit` pattern, generically across pg + mysql.
 describe("TransactionIsolationTest", () => {
-  fixtures({}, { useTransactionalTests: false });
-
-  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
-    "setting isolation when joining a transaction raises an error",
-    async () => {
-      class Tag extends Base {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      await Tag.transaction(async () => {
-        await expect(
-          Tag.transaction(async () => {}, { isolation: "serializable" }),
-        ).rejects.toThrow(TransactionIsolationError);
-      });
-    },
-  );
-
-  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
-    "setting isolation when starting a nested transaction raises error",
-    async () => {
-      class Tag extends Base {
-        static {
-          this.attribute("name", "string");
-        }
-      }
-      await Tag.transaction(async () => {
-        await expect(
-          Tag.transaction(async () => {}, { requiresNew: true, isolation: "serializable" }),
-        ).rejects.toThrow(TransactionIsolationError);
-      });
-    },
-  );
-});
-
-// Rails: TransactionIsolationTest, guarded by supports_transaction_isolation? && !SQLite3.
-// Mirrors vendor/rails/activerecord/test/cases/transaction_isolation_test.rb.
-// Tag and Tag2 each establish their own connection to the same database so
-// their transactions run on independent physical connections — matching Rails'
-// `Tag.establish_connection :arunit` / `Tag2.establish_connection :arunit` pattern.
-describeIfPg("TransactionIsolationTest", () => {
   fixtures({}, { useTransactionalTests: false });
 
   class Tag extends Base {
     static {
+      this._tableName = "tags";
       this.attribute("name", "string");
     }
   }
@@ -101,11 +54,13 @@ describeIfPg("TransactionIsolationTest", () => {
   }
 
   beforeAll(async () => {
-    await Tag.establishConnection(PG_TEST_URL);
-    await Tag2.establishConnection(PG_TEST_URL);
+    if (adapterType === "sqlite" || !adapterSupports("transaction_isolation")) return;
+    await Tag.establishConnection(ambientPoolConfiguration());
+    await Tag2.establishConnection(ambientPoolConfiguration());
   });
 
   afterAll(async () => {
+    if (adapterType === "sqlite" || !adapterSupports("transaction_isolation")) return;
     try {
       await Tag.destroyAll();
     } finally {
@@ -115,65 +70,100 @@ describeIfPg("TransactionIsolationTest", () => {
   });
 
   beforeEach(async () => {
+    if (adapterType === "sqlite" || !adapterSupports("transaction_isolation")) return;
     await Tag.destroyAll();
   });
 
   // PG aliases READ UNCOMMITTED to READ COMMITTED — Rails notes this test only
   // asserts that the second connection's auto-committed insert becomes visible.
-  it("read uncommitted", async () => {
-    await Tag.transaction(
-      async () => {
-        expect(await Tag.count()).toBe(0);
-        await Tag2.create({});
-        expect(await Tag.count()).toBe(1);
-      },
-      { isolation: "read_uncommitted" },
-    );
-  });
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
+    "read uncommitted",
+    async () => {
+      await Tag.transaction(
+        async () => {
+          expect(await Tag.count()).toBe(0);
+          await Tag2.create({});
+          expect(await Tag.count()).toBe(1);
+        },
+        { isolation: "read_uncommitted" },
+      );
+    },
+  );
 
   // A dirty read must not happen: Tag2's uncommitted insert is invisible to Tag.
-  it("read committed", async () => {
-    await Tag.transaction(
-      async () => {
-        expect(await Tag.count()).toBe(0);
-        await Tag2.transaction(async () => {
-          await Tag2.create({});
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
+    "read committed",
+    async () => {
+      await Tag.transaction(
+        async () => {
           expect(await Tag.count()).toBe(0);
-        });
-      },
-      { isolation: "read_committed" },
-    );
-    expect(await Tag.count()).toBe(1);
-  });
+          await Tag2.transaction(async () => {
+            await Tag2.create({});
+            expect(await Tag.count()).toBe(0);
+          });
+        },
+        { isolation: "read_committed" },
+      );
+      expect(await Tag.count()).toBe(1);
+    },
+  );
 
   // A non-repeatable read must not happen: a committed update from the second
   // connection is invisible to the first connection's repeatable-read snapshot.
-  it("repeatable read", async () => {
-    const tag = await Tag.create({ name: "jon" });
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
+    "repeatable read",
+    async () => {
+      const tag = await Tag.create({ name: "jon" });
 
-    await Tag.transaction(
-      async () => {
-        await tag.reload();
-        const t2 = await Tag2.find(tag.id);
-        await t2.update({ name: "emily" });
+      await Tag.transaction(
+        async () => {
+          await tag.reload();
+          const t2 = await Tag2.find(tag.id);
+          await t2.update({ name: "emily" });
 
-        await tag.reload();
-        expect(tag.name).toBe("jon");
-      },
-      { isolation: "repeatable_read" },
-    );
+          await tag.reload();
+          expect(tag.name).toBe("jon");
+        },
+        { isolation: "repeatable_read" },
+      );
 
-    await tag.reload();
-    expect(tag.name).toBe("emily");
-  });
+      await tag.reload();
+      expect(tag.name).toBe("emily");
+    },
+  );
 
   // No-error smoke test for serializable — DBs enforce serializability differently.
-  it("serializable", async () => {
-    await Tag.transaction(
-      async () => {
-        await Tag.create({});
-      },
-      { isolation: "serializable" },
-    );
-  });
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
+    "serializable",
+    async () => {
+      await Tag.transaction(
+        async () => {
+          await Tag.create({});
+        },
+        { isolation: "serializable" },
+      );
+    },
+  );
+
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
+    "setting isolation when joining a transaction raises an error",
+    async () => {
+      await Tag.transaction(async () => {
+        await expect(
+          Tag.transaction(async () => {}, { isolation: "serializable" }),
+        ).rejects.toThrow(TransactionIsolationError);
+      });
+    },
+  );
+
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("transaction_isolation"))(
+    "setting isolation when starting a nested transaction raises error",
+    async () => {
+      await Tag.transaction(async () => {
+        await expect(
+          Tag.transaction(async () => {}, { requiresNew: true, isolation: "serializable" }),
+        ).rejects.toThrow(TransactionIsolationError);
+      });
+    },
+  );
 });
