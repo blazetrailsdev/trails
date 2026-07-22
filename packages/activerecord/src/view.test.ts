@@ -225,6 +225,19 @@ describe("UpdateableViewTest", () => {
   class PrintedBook extends Base {
     static override _tableName = "printed_books";
     static override _primaryKey = "id";
+    // Rails' AR test suite runs with the class default `partial_inserts = true`
+    // (helper.rb never flips it — only a `config.load_defaults 7.0+` app does),
+    // while our test-setup-ar.ts deliberately runs loadDefaults("7.0"), i.e.
+    // partialInserts=false. That difference is fatal here on MySQL only: the
+    // updatable view reports its NOT-NULL `id` with a fabricated default "0"
+    // (SHOW FULL FIELDS strips `auto_increment` from Extra, so the column is
+    // not auto-populated and survives the full-insert column set), and with
+    // NO_AUTO_VALUE_ON_ZERO in sql_mode the INSERT stores literal 0 instead of
+    // letting the underlying `books` table auto-assign. Rails under
+    // partial_inserts=false fails identically — there is no adapter gap — so
+    // restore Rails' own test-suite setting for this model: the unchanged `id`
+    // then stays out of the INSERT column list and MySQL auto-assigns.
+    static override partialInserts = true;
   }
 
   beforeAll(rebuildBooksTables);
@@ -253,16 +266,8 @@ describe("UpdateableViewTest", () => {
   });
 
   // Rails gates this `features=[views]` (runs on mysql + postgresql; SQLite views
-  // do not support DML). Match that static gate with `skipIf(sqlite)` and skip
-  // MySQL at runtime via ctx.skip so the extracted gate stays `mysql,postgresql|
-  // views` without a false green:
-  //   BLOCKED (MySQL): the updatable view reports its NOT-NULL `id` with default
-  //   "0" (via SHOW FULL FIELDS) and NO_AUTO_VALUE_ON_ZERO keeps id=0 in
-  //   attributesForCreate, so the INSERT stores literal 0 instead of letting the
-  //   underlying books table auto-assign. PG/Trilogy are unaffected.
-  //   Sub-story: view-insert-mysql-no-auto-value-on-zero.
-  itIfSupports.skipIf(adapterType === "sqlite")("views", "insert record", async (ctx) => {
-    ctx.skip(adapterType === "mysql");
+  // do not support DML).
+  itIfSupports.skipIf(adapterType === "sqlite")("views", "insert record", async () => {
     await PrintedBook.createBang({ name: "Rails in Action", status: 0, format: "paperback" });
     const newBook = await PrintedBook.last();
     expect((newBook as any).name).toBe("Rails in Action");
