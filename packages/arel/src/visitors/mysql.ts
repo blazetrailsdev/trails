@@ -2,7 +2,6 @@ import { Node } from "../nodes/node.js";
 import * as Nodes from "../nodes/index.js";
 import { SQLString } from "../collectors/sql-string.js";
 import { ToSql, cteRelationSelfWraps } from "./to-sql.js";
-import type { ArelConnection } from "./connection.js";
 
 /**
  * MySQL visitor — dialect tweaks on top of generic ToSql.
@@ -10,10 +9,6 @@ import type { ArelConnection } from "./connection.js";
  * Mirrors: Arel::Visitors::MySQL
  */
 export class MySQL extends ToSql {
-  constructor(connection: ArelConnection) {
-    super(connection);
-  }
-
   // Mirrors Rails' MySQL visitor: `CAST(expr AS BINARY)` (the explicit
   // cast form) rather than the prefix-`BINARY ` operator the previous
   // Trails impl used. Both force binary comparison; this matches Rails'
