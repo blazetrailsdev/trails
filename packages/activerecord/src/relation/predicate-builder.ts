@@ -223,7 +223,7 @@ export class PredicateBuilder {
           ? assocPb.buildNegatedFromHash(value)
           : assocPb.buildFromHash(value);
         nodes.push(...innerNodes);
-      } else if (this.table.isAssociatedWith(key) && !this.table.hasColumn(key)) {
+      } else if (this.table.isAssociatedWith(key)) {
         const assocNodes = this.buildFromHashAssociation(
           this.table.associatedTable(key),
           key,
@@ -732,8 +732,12 @@ export class PredicateBuilder {
   }
 
   with(table: TableMetadata): PredicateBuilder {
+    // Rails: `other = dup; other.table = table` — dup shares the @handlers
+    // ARRAY OBJECT, so handlers registered on the model builder later are
+    // visible to builders already derived for associated metadata (and vice
+    // versa). A `[...this.handlers]` snapshot would leave them stale.
     const builder = new PredicateBuilder(table);
-    builder.handlers = [...this.handlers];
+    builder.handlers = this.handlers;
     return builder;
   }
 
