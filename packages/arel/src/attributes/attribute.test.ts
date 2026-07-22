@@ -230,11 +230,11 @@ describe("AttributeTest", () => {
       expect(mgr.toSql()).toContain(`"users"."name" <= 'fake_name'`);
 
       // Rails compares against Time.now; a fixed value keeps the assertion
-      // deterministic. PlainDateTime reaches the quoter's DateTime arm, whose
-      // space-separated form matches Rails' quoted_date shape.
-      const currentTime = Temporal.PlainDateTime.from("2024-01-01T00:00:00");
+      // deterministic. Instant is the Time analogue and reaches FakeRecord's
+      // `else` arm, which renders Ruby's `Time#to_s` shape.
+      const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
       mgr.where(relation.get("created_at").lteq(currentTime));
-      expect(mgr.toSql()).toContain(`"users"."created_at" <= '2024-01-01 00:00:00'`);
+      expect(mgr.toSql()).toContain(`"users"."created_at" <= '2024-01-01 00:00:00 +0000'`);
     });
   });
 
