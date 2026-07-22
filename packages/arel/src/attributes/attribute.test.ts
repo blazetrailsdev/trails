@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 import { testConnection } from "../test-helpers/connection.js";
 import { Table, star, SelectManager, Nodes, Visitors, relationName } from "../index.js";
 
@@ -248,17 +249,16 @@ describe("AttributeTest", () => {
     });
 
     it("should accept various data types.", () => {
-      // Rails also asserts a `created_at <= Time.now` half here. Like the
-      // sibling #gt/#gteq/#lt data-types tests in this file, that half is
-      // omitted: temporal quoting in trails routes through the invented
-      // connection-less quoters slated for removal (RFC 0007), so asserting
-      // its output would entrench the invention.
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").lteq("fake_name"));
-      expect(mgr.toSql()).toBe(
-        `SELECT "users"."id" FROM "users" WHERE "users"."name" <= 'fake_name'`,
-      );
+      expect(mgr.toSql()).toContain(`"users"."name" <= 'fake_name'`);
+
+      // Rails compares against Time.now; a fixed Instant (the Time analogue)
+      // keeps the assertion deterministic.
+      const currentTime = Temporal.Instant.from("2024-01-01T00:00:00Z");
+      mgr.where(relation.get("created_at").lteq(currentTime));
+      expect(mgr.toSql()).toContain(`"users"."created_at" <= '2024-01-01T00:00:00Z'`);
     });
   });
 
