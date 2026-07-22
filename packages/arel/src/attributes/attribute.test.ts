@@ -812,8 +812,7 @@ describe("AttributeTest", () => {
   describe("#overlaps", () => {
     it("should create an Overlaps node", () => {
       const node = users.get("tags").overlaps("bar");
-      expect(node).toBeInstanceOf(Nodes.InfixOperation);
-      expect((node as Nodes.InfixOperation).operator).toBe("&&");
+      expect(node).toBeInstanceOf(Nodes.Overlaps);
     });
 
     it("should generate && in sql", () => {
