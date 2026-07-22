@@ -9,6 +9,7 @@ import { sql as arelSql } from "@blazetrails/arel";
 
 import { registerModel, Range } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
+import { itIfSupports } from "../test-helpers/supports.js";
 import { assertQueriesCount, assertQueriesMatch } from "../testing/query-assertions.js";
 import { quoteTableName, escapeRegExp } from "../test-helpers/quote-regex.js";
 import { Author } from "../test-helpers/models/author.js";
@@ -496,40 +497,52 @@ describe("MergingDifferentRelationsTest", () => {
     expect(await ids((dev as any).ratings)).toEqual([rating1.id]);
   });
 
-  it("merging relation with common table expression", async () => {
-    const postsWithTags = Post.with({
-      posts_with_tags: Post.where("tags_count > 0"),
-    }).from("posts_with_tags AS posts");
-    const postsWithComments = Post.where("legacy_comments_count > 0");
-    const relation = postsWithComments.merge(postsWithTags).order("posts.id");
+  itIfSupports(
+    "common_table_expressions",
+    "merging relation with common table expression",
+    async () => {
+      const postsWithTags = Post.with({
+        posts_with_tags: Post.where("tags_count > 0"),
+      }).from("posts_with_tags AS posts");
+      const postsWithComments = Post.where("legacy_comments_count > 0");
+      const relation = postsWithComments.merge(postsWithTags).order("posts.id");
 
-    expect((await relation.pluck("id")).map(Number)).toEqual([1, 2, 7]);
-  });
+      expect((await relation.pluck("id")).map(Number)).toEqual([1, 2, 7]);
+    },
+  );
 
-  it("merging multiple relations with common table expression", async () => {
-    const postsWithTags = Post.with({ posts_with_tags: Post.where("tags_count > 0") });
-    const postsWithComments = Post.with({
-      posts_with_comments: Post.where("legacy_comments_count > 0"),
-    });
-    const relation = postsWithComments
-      .merge(postsWithTags)
-      .joins(
-        "JOIN posts_with_tags pwt ON pwt.id = posts.id JOIN posts_with_comments pwc ON pwc.id = posts.id",
-      )
-      .order("posts.id");
+  itIfSupports(
+    "common_table_expressions",
+    "merging multiple relations with common table expression",
+    async () => {
+      const postsWithTags = Post.with({ posts_with_tags: Post.where("tags_count > 0") });
+      const postsWithComments = Post.with({
+        posts_with_comments: Post.where("legacy_comments_count > 0"),
+      });
+      const relation = postsWithComments
+        .merge(postsWithTags)
+        .joins(
+          "JOIN posts_with_tags pwt ON pwt.id = posts.id JOIN posts_with_comments pwc ON pwc.id = posts.id",
+        )
+        .order("posts.id");
 
-    expect((await relation.pluck("id")).map(Number)).toEqual([1, 2, 7]);
-  });
+      expect((await relation.pluck("id")).map(Number)).toEqual([1, 2, 7]);
+    },
+  );
 
-  it("relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed", async () => {
-    const postsWithTags = Post.with({ popular_posts: Post.where("tags_count > 0") });
-    const postsWithComments = Post.with({
-      popular_posts: Post.where("legacy_comments_count > 0"),
-    });
-    const relation = postsWithTags
-      .merge(postsWithComments)
-      .joins("JOIN popular_posts pp ON pp.id = posts.id");
+  itIfSupports(
+    "common_table_expressions",
+    "relation merger leaves to database to decide what to do when multiple CTEs with same alias are passed",
+    async () => {
+      const postsWithTags = Post.with({ popular_posts: Post.where("tags_count > 0") });
+      const postsWithComments = Post.with({
+        popular_posts: Post.where("legacy_comments_count > 0"),
+      });
+      const relation = postsWithTags
+        .merge(postsWithComments)
+        .joins("JOIN popular_posts pp ON pp.id = posts.id");
 
-    await expect(relation.toArray()).rejects.toThrow();
-  });
+      await expect(relation.toArray()).rejects.toThrow();
+    },
+  );
 });
