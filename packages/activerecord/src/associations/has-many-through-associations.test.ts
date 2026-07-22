@@ -2246,7 +2246,6 @@ describe("HasManyThroughAssociationsTest", () => {
     const expected = ids(await association(author, "comments").toArray());
 
     const inside = await FirstPost.unscoped(async () => {
-      await author.reload();
       return association(author, "commentsOnFirstPosts").toArray();
     });
 
@@ -2259,7 +2258,7 @@ describe("HasManyThroughAssociationsTest", () => {
     const expected = ids(await association(author, "commentsOnFirstPosts").toArray());
 
     const inside = await FirstPost.where({ id: 2 }).scoping(async () => {
-      await author.reload();
+      association(author, "commentsOnFirstPosts").reset();
       return association(author, "commentsOnFirstPosts").toArray();
     });
 
