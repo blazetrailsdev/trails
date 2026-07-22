@@ -8,6 +8,7 @@ import { DatabaseConfigurations } from "../database-configurations.js";
 import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
+import { adapterType, inMemoryDb } from "../test-adapter.js";
 
 describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   it("raises an error when called with protected environment", async () => {
@@ -61,7 +62,9 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 });
 
 describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
-  it("with multiple databases", async () => {
+  // Rails: `if current_adapter?(:SQLite3Adapter) && !in_memory_db?`
+  // (database_tasks_test.rb:156).
+  it.skipIf(adapterType !== "sqlite" || inMemoryDb())("with multiple databases", async () => {
     // Rails: test_with_multiple_databases (database_tasks_test.rb:155) —
     // two sqlite3 file databases in one env, both stamped with the current
     // environment; the guard passes, then fires once the env is protected.

@@ -20,7 +20,25 @@ describe("PrimaryClassTest", () => {
   // The connects_to tests below need a live primary connection to share.
   fixtures({}, { useTransactionalTests: false });
 
+  // Mirrors ActiveRecord::TestCase#clean_up_connection_handler (Rails'
+  // per-test `teardown { clean_up_connection_handler }`, primary_class_test.rb:8):
+  // drop every non-default (e.g. :reading) role the connects_to tests
+  // established, leaving the writing pool.
+  function cleanUpConnectionHandler(): void {
+    const managers: Map<string, { roleNames: string[]; removeRole(role: string): boolean }> = (
+      Base.connectionHandler as unknown as {
+        _connectionNameToPoolManager: Map<string, never>;
+      }
+    )._connectionNameToPoolManager as never;
+    for (const [, poolManager] of managers) {
+      for (const role of [...poolManager.roleNames]) {
+        if (role !== Base.defaultRole) poolManager.removeRole(role);
+      }
+    }
+  }
+
   afterEach(() => {
+    cleanUpConnectionHandler();
     __resetPrimaryAbstractClass();
     delete (globalThis as Record<string, unknown>)["ApplicationRecord"];
   });
