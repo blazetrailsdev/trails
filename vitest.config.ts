@@ -406,6 +406,9 @@ export default defineConfig({
             "vendor/*.test.ts",
           ],
           exclude: ["packages/activerecord/**", ...SHARED_EXCLUDE],
+          // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
+          // (it runs under activerecord, where the engine is ActiveRecord::Base).
+          setupFiles: ["./packages/arel/src/test-setup-engine.ts"],
           poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },

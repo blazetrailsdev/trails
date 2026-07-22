@@ -146,10 +146,10 @@ async function main(): Promise<void> {
       db.close();
     }
 
-    // 2. Wire the SQLite visitor through the package registry so both
-    //    `Node#toSql()` and `TreeManager#toSql()` route through it
-    //    (TreeManager.toSql delegates to the AST node's toSql, which
-    //    uses _registry.ToSql). Mirrors the Rails side's
+    // 2. Point `Arel::Table.engine` at an engine whose connection carries the
+    //    SQLite visitor, so both `Node#toSql()` and `TreeManager#toSql()`
+    //    compile through it (both resolve `engine.connection.visitor`).
+    //    Mirrors the Rails side's
     //    `establish_connection adapter: "sqlite3"` — for example,
     //    `IS DISTINCT FROM` now emits as `IS NOT` because
     //    Visitors.SQLite#visitIsDistinctFrom overrides it.
@@ -158,10 +158,10 @@ async function main(): Promise<void> {
     //    scripts/parity is itself a workspace package — see
     //    scripts/parity/package.json. That ensures Node ESM dedupes
     //    this import with the fixture's `@blazetrails/arel` import to a
-    //    single module instance, so the registry override is visible
+    //    single module instance, so the engine assignment is visible
     //    to the fixture's nodes.
     const arel = await import("@blazetrails/arel");
-    arel.setToSqlVisitor(arel.Visitors.SQLite);
+    arel.Table.engine = { connection: { visitor: new arel.Visitors.SQLite() } };
 
     // 4. Import query.ts. Fixtures end with `export default <expr>` — see
     //    scripts/parity/translate/arel.ts (generateTs).

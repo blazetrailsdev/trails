@@ -340,6 +340,6 @@
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "raise_record_not_found_exception!",
     "call": "where_sql",
-    "reason": "Satisfied by a different path: Rails builds the condition string with `arel.where_sql(model)` (finder_methods.rb:418); trails routes it through the `_conditionsClause()` host method instead. Newly visible (not newly broken) because #5037 gave Arel's whereSql a connection parameter; the divergent indirection pre-dates it."
+    "reason": "Satisfied by a different path: Rails builds the condition string with `arel.where_sql(model)` (finder_methods.rb:418); trails routes it through the `_conditionsClause()` host method instead. Newly visible (not newly broken) because #5037 gave Arel's whereSql a connection parameter; the divergent indirection pre-dates it. Convergence tracked by story where-sql-wraps-in-and-and-returns-sqlliteral, which also owns removing this entry."
   }
 ]

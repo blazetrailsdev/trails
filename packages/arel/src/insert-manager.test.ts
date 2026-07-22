@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Table, sql, InsertManager, Nodes } from "./index.js";
-import { fakeRecordConnection } from "./test-helpers/connection.js";
+import { fakeRecordEngine } from "./test-helpers/connection.js";
 
 describe("InsertManagerTest", () => {
   const users = new Table("users");
@@ -60,7 +60,7 @@ describe("InsertManagerTest", () => {
     it("inserts false", () => {
       const mgr = new InsertManager();
       mgr.insert([[users.get("bool"), false]]);
-      expect(mgr.toSql(fakeRecordConnection)).toBe(`INSERT INTO "users" ("bool") VALUES ('f')`);
+      expect(mgr.toSql(fakeRecordEngine)).toBe(`INSERT INTO "users" ("bool") VALUES ('f')`);
     });
 
     it("inserts null", () => {

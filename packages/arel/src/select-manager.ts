@@ -1,4 +1,4 @@
-import { Node } from "./nodes/node.js";
+import { ArelEngine, Node, _engine } from "./nodes/node.js";
 import { TreeManager } from "./tree-manager.js";
 import { SelectStatement } from "./nodes/select-statement.js";
 import { SelectCore } from "./nodes/select-core.js";
@@ -372,14 +372,11 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#where_sql
    */
-  // Mirrors `where_sql(engine = Table.engine)` (arel/select_manager.rb:192-196),
-  // which threads the engine into `to_sql(engine)`; see Node#toSql for why the
-  // connection, not an engine, is the parameter.
-  whereSql(connection?: import("./visitors/connection.js").ArelConnection): string | null {
+  whereSql(engine: ArelEngine | null = _engine.current): string | null {
     if (this.core.wheres.length === 0) return null;
     const predicate =
       this.core.wheres.length === 1 ? this.core.wheres[0] : new And(this.core.wheres);
-    return `WHERE ${predicate.toSql(connection)}`;
+    return `WHERE ${predicate.toSql(engine)}`;
   }
 
   /**

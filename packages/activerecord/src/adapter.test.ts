@@ -44,15 +44,17 @@ import {
   ARUNIT2_DATABASE,
 } from "./adapters/abstract-mysql-adapter/test-helper.js";
 
-// Build the placeholder the same way Rails does — `Arel::Nodes::BindParam.new(nil)
-// .to_sql` collects the `?` marker — rather than hard-coding a literal `?`.
-const qm = new Nodes.BindParam(null).toSql();
-
 // Drives Rails' AdapterTest casted/non-casted bind probes against the leased
 // connection and the canonical `events` table. The insert return value is
 // normalized (`Number(...)`) and skipped on MySQL, whose driver reports `0` for
 // an explicit-id INSERT rather than the inserted key.
 async function roundTripBinds(conn: DatabaseAdapter, binds: unknown[]): Promise<void> {
+  // Build the placeholder the same way Rails does — `Arel::Nodes::BindParam.new(nil)
+  // .to_sql` collects the `?` marker — rather than hard-coding a literal `?`.
+  // `to_sql` compiles through an engine's connection (arel/nodes/node.rb:148-153),
+  // so it takes the leased `conn` and cannot be hoisted to module scope: Rails'
+  // helper.rb has a connection before test files load, trails' setup does not.
+  const qm = new Nodes.BindParam(null).toSql({ connection: conn });
   const id = await conn.insert(
     `INSERT INTO events(id) VALUES (${qm})`,
     null,

@@ -1,4 +1,4 @@
-import { Node } from "./nodes/node.js";
+import { ArelEngine, Node, _engine } from "./nodes/node.js";
 import { PlainString } from "./collectors/plain-string.js";
 import { Dot } from "./visitors/dot.js";
 import { Limit, Offset } from "./nodes/unary.js";
@@ -71,14 +71,9 @@ export abstract class TreeManager {
     return collector.value;
   }
 
-  // Mirrors `to_sql(engine = Table.engine)` (arel/tree_manager.rb:53-58); see
-  // Node#toSql for why the connection, not an engine, is the parameter.
-  toSql(connection?: import("./visitors/connection.js").ArelConnection): string {
-    // Route through the same Node#toSql() the registry powers, so a
-    // `setToSqlVisitor()` override (e.g. SQLite for the parity runner)
-    // applies to managers as well as raw nodes. Plain `new ToSql()`
-    // would always be the generic visitor.
-    return this.ast.toSql(connection);
+  /** Mirrors: Arel::TreeManager#to_sql (arel/tree_manager.rb:53). */
+  toSql(engine: ArelEngine | null = _engine.current): string {
+    return this.ast.toSql(engine);
   }
 }
 

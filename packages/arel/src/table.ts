@@ -1,6 +1,6 @@
 import { Attribute } from "./attributes/attribute.js";
 import { EmptyJoinError } from "./errors.js";
-import { Node, NodeVisitor } from "./nodes/node.js";
+import { _engine, ArelEngine, Node, NodeVisitor } from "./nodes/node.js";
 import { SelectManager } from "./select-manager.js";
 import { InnerJoin } from "./nodes/inner-join.js";
 import { OuterJoin } from "./nodes/outer-join.js";
@@ -31,16 +31,6 @@ export interface TypeCaster {
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Table extends Node {
-  static engine: unknown = null;
-
-  readonly name: string;
-  readonly tableAlias: string | null;
-  readonly klass?: TableKlass;
-  /** Rails: `private attr_reader :type_caster` (table.rb:115). An aliased table
-   *  is a `TableAlias` wrapping this one and delegates its caster back here
-   *  (table_alias.rb:22-24), so no external reader is needed. */
-  private readonly typeCaster: unknown;
-
   constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
     super();
     this.name = name;
@@ -50,8 +40,21 @@ export class Table extends Node {
     this.typeCaster = options?.typeCaster ?? null;
   }
 
-  get engine(): unknown {
-    return Table.engine;
+  readonly name: string;
+  readonly tableAlias: string | null;
+  readonly klass?: TableKlass;
+
+  /** Mirrors: `Arel::Table.engine` (table.rb:8-9, `class << self; attr_accessor
+   *  :engine`). Rails assigns `ActiveRecord::Base` from
+   *  `active_record.rb:562-564`; trails assigns it at the bottom of
+   *  activerecord's `base.ts` — see the comment there for why it rides the
+   *  load-hook run, and why it is not bare `Base`. */
+  static get engine(): ArelEngine | null {
+    return _engine.current;
+  }
+
+  static set engine(value: ArelEngine | null) {
+    _engine.current = value;
   }
 
   /**
@@ -185,6 +188,11 @@ export class Table extends Node {
   typeForAttribute(name: string): unknown {
     return (this.typeCaster as TypeCaster).typeForAttribute(name);
   }
+
+  /** Rails: `private attr_reader :type_caster` (table.rb:115). An aliased table
+   *  is a `TableAlias` wrapping this one and delegates its caster back here
+   *  (table_alias.rb:22-24), so no external reader is needed. */
+  private readonly typeCaster: unknown;
 
   isAbleToTypeCast(): boolean {
     return this.typeCaster != null;

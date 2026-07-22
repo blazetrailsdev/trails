@@ -1,3 +1,19 @@
+import { SQLString } from "../collectors/sql-string.js";
+
+/**
+ * The `engine` `Node#toSql()` / `TreeManager#toSql()` compile through — Rails'
+ * `ActiveRecord::Base`, duck-typed here so arel does not import activerecord.
+ */
+export interface ArelEngine {
+  connection: { visitor: { accept(node: Node, collector: SQLString): SQLString } };
+}
+
+/** Backing store for `Arel::Table.engine`. It lives here, not in table.ts,
+ *  because `Table extends Node` — a static `import { Table }` from this module
+ *  would make table.ts evaluate against a half-initialised node.ts. `Table`
+ *  exposes it as the Rails-named `Table.engine` accessor. */
+export const _engine: { current: ArelEngine | null } = { current: null };
+
 /**
  * Base class for all AST nodes in Arel.
  *
@@ -30,14 +46,26 @@ export abstract class Node {
     return new _registry.Not!(this);
   }
 
-  // Mirrors `to_sql(engine = Table.engine)` (arel/nodes/node.rb:148-153): Rails
-  // resolves a connection off the engine and hands it to the visitor. trails has
-  // no `Table.engine` (arel must not depend on activerecord), so the connection
-  // itself is the parameter and the connection-less default stands in for the
-  // engine default.
-  toSql(connection?: import("../visitors/connection.js").ArelConnection): string {
-    assertRegistered("ToSql");
-    return new _registry.ToSql!(connection).compile(this);
+  /**
+   * Mirrors: Arel::Nodes::Node#to_sql (arel/nodes/node.rb:148-153).
+   *
+   * Deviation: `engine.connection` in place of Rails'
+   * `engine.with_connection { |c| ... }`. trails' `withConnection` is async
+   * (per-checkout `verifyBang` is awaited — see ConnectionPool#checkout) and
+   * `to_sql` is synchronous at all 600+ call sites, so this takes the sync
+   * `engine.connection` lease. Same visitor and connection; it skips only the
+   * async per-checkout verify, the residual tracked by
+   * `connection-pool-pinned-sync-checkout-per-checkout-verify`.
+   */
+  toSql(engine: ArelEngine | null = _engine.current): string {
+    if (!engine) {
+      throw new TypeError(
+        "undefined method `connection' for nil — Arel::Table.engine is unset. " +
+          "Set it to your ActiveRecord base class, or pass an engine to toSql().",
+      );
+    }
+    const collector = new SQLString();
+    return engine.connection.visitor.accept(this, collector).value;
   }
 
   fetchAttribute(_block?: (attr: Node) => unknown): unknown {
@@ -82,16 +110,11 @@ export interface NodeVisitor<T> {
   visit(node: Node): T;
 }
 
-type ToSqlCtor = new (connection?: import("../visitors/connection.js").ArelConnection) => {
-  compile(node: Node): string;
-};
-
 interface NodeRegistry {
   Not?: new (expr: Node) => Node;
   Grouping?: new (expr: Node) => Node;
   Or?: new (children: Node[]) => Node;
   And?: new (children: Node[]) => Node;
-  ToSql?: ToSqlCtor;
 }
 
 // Registry for breaking circular dependencies.
@@ -111,28 +134,11 @@ export function registerNodeDeps(deps: {
   Grouping: new (expr: Node) => Node;
   Or: new (children: Node[]) => Node;
   And: new (children: Node[]) => Node;
-  ToSql: ToSqlCtor;
 }): void {
   _registry.Not = deps.Not;
   _registry.Grouping = deps.Grouping;
   _registry.Or = deps.Or;
   _registry.And = deps.And;
-  _registry.ToSql = deps.ToSql;
-}
-
-/**
- * Override the visitor used by `Node#toSql()`. `TreeManager#toSql()` and
- * `SelectManager#whereSql()` delegate to the underlying AST node's
- * `toSql()`, so they pick up the override transparently.
- *
- * Used by the parity runner so trails-side fixture output goes through
- * the SQLite visitor (matching the Ruby side's `ActiveRecord::Base
- * .establish_connection adapter: "sqlite3"`). Call once at process
- * startup, before importing fixtures. The override is process-global —
- * tests should restore the default in a `finally` block.
- */
-export function setToSqlVisitor(visitor: new () => { compile(node: Node): string }): void {
-  _registry.ToSql = visitor;
 }
 
 function fnv1a32(input: string): number {

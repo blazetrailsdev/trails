@@ -5,6 +5,7 @@
 import { describe, it, expect } from "vitest";
 import { Table, Nodes } from "@blazetrails/arel";
 import { WhereClause } from "./where-clause.js";
+import { fixtures } from "../test-helpers/use-fixtures.js";
 
 // Mirrors Rails' private helpers in WhereClauseTest
 function table(): Table {
@@ -27,6 +28,9 @@ function eql(a: WhereClause, b: WhereClause): boolean {
 }
 
 describe("ActiveRecord::Relation", () => {
+  // `to_sql` compiles through `Table.engine`'s connection (arel/nodes/node.rb:148-153),
+  // so these Arel assertions need a connection, as Rails' do via helper.rb.
+  fixtures({});
   describe("WhereClauseTest", () => {
     it("+ combines two where clauses", () => {
       const t = table();

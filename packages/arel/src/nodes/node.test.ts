@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { Table, SelectManager, Nodes, Visitors, setToSqlVisitor } from "../index.js";
+import { Table, SelectManager, Nodes, Visitors } from "../index.js";
 
 describe("TestNode", () => {
   const users = new Table("users");
@@ -173,38 +173,35 @@ describe("Node base polymorphic defaults", () => {
   });
 });
 
-describe("setToSqlVisitor", () => {
-  // The override is process-global (it mutates the module-level
-  // registry). Restore the default in `finally` so subsequent tests in
-  // the same worker don't see the SQLite override leak across.
-  const restore = (): void => setToSqlVisitor(Visitors.ToSql);
+describe("Table.engine", () => {
+  const sqliteEngine = { connection: { visitor: new Visitors.SQLite() } };
 
-  it("Node#toSql() routes through the configured visitor", () => {
-    try {
-      const users = new Table("users");
-      const node = users.get("name").isDistinctFrom(null);
-      // Generic visitor.
-      expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
-      // SQLite visitor.
-      setToSqlVisitor(Visitors.SQLite);
-      expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
-    } finally {
-      restore();
-    }
+  it("Node#toSql() compiles through the engine connection's visitor", () => {
+    const users = new Table("users");
+    const node = users.get("name").isDistinctFrom(null);
+    // Default engine (generic visitor, supplied by the suite setup).
+    expect(node.toSql()).toBe(`"users"."name" IS NOT NULL`);
+    // An engine whose connection carries the SQLite visitor.
+    expect(node.toSql(sqliteEngine)).toBe(`"users"."name" IS NOT NULL`);
   });
 
-  it("TreeManager#toSql() (SelectManager) also routes through the configured visitor", () => {
+  it("TreeManager#toSql() compiles through the engine connection's visitor", () => {
+    const users = new Table("users");
+    const mgr = users.project(users.get("id")).where(users.get("active").isNotDistinctFrom(true));
+    expect(mgr.toSql()).toContain("IS NOT DISTINCT FROM");
+    const sqlite = mgr.toSql(sqliteEngine);
+    // SQLite emits IS for IS NOT DISTINCT FROM; Quoted(true) inlines as 1 in SQLite.
+    expect(sqlite).toContain('"users"."active" IS 1');
+    expect(sqlite).not.toContain("IS NOT DISTINCT FROM");
+  });
+
+  it("Node#toSql() raises when no engine is set", () => {
+    const previous = Table.engine;
     try {
-      const users = new Table("users");
-      const mgr = users.project(users.get("id")).where(users.get("active").isNotDistinctFrom(true));
-      expect(mgr.toSql()).toContain("IS NOT DISTINCT FROM");
-      setToSqlVisitor(Visitors.SQLite);
-      const sqlite = mgr.toSql();
-      // SQLite emits IS for IS NOT DISTINCT FROM; Quoted(true) inlines as 1 in SQLite.
-      expect(sqlite).toContain('"users"."active" IS 1');
-      expect(sqlite).not.toContain("IS NOT DISTINCT FROM");
+      Table.engine = null;
+      expect(() => new Table("users").get("id").eq(1).toSql()).toThrow(TypeError);
     } finally {
-      restore();
+      Table.engine = previous;
     }
   });
 });

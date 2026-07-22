@@ -5219,3 +5219,28 @@ DatabaseTasks._registerBase(Base);
 // initializers register `on_load(:active_record)` consumers that need a
 // fully-defined `Base` class (timezone, filter attributes, ...).
 runLoadHooks("active_record", Base);
+
+// Mirrors: `ActiveSupport.on_load(:active_record) { Arel::Table.engine = self }`
+// (active_record.rb:562-564) — `self` there is Base. Rails can register that
+// consumer from the entrypoint because requiring `active_record` is the only
+// way to reach `Base`; here many modules and tests deep-import `base.js`
+// directly and never evaluate `index.ts`, so the assignment rides the same
+// module as the hook run to keep `Table.engine` set on every load path.
+//
+// Rails assigns `Base` itself and reaches the visitor via
+// `engine.with_connection` (arel/nodes/node.rb:150). trails' `withConnection` is
+// async, and `to_sql` is synchronous in Rails and at every call site here, so
+// the engine must expose a *synchronous* connection. Assigning bare `Base` would
+// route through `Base.connection`, which is deprecated: under
+// `permanentConnectionCheckout = "disallowed"` it raises
+// (connection-handling.ts:461-463), so every `toSql()` in the app would throw —
+// something Rails' `with_connection`-based `to_sql` never does. This delegates
+// to the pool's non-deprecated sync surface instead: the already-checked-out
+// connection when there is one, else a sync lease — the same connection
+// `Base.connection` would return, without the deprecation gate.
+Table.engine = {
+  get connection(): DatabaseAdapter {
+    const pool = Base.connectionPool();
+    return pool.activeConnection ?? pool.leaseConnectionSync();
+  },
+};
