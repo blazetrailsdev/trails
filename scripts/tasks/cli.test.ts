@@ -439,6 +439,24 @@ describe("isIndexStale", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  it("detects edits under a legacy draft-slug RFC dir (indexed by RFC_DIR_RE too)", () => {
+    const { dir, index, setAge } = checkout();
+    mkdirSync(join(dir, "rfcs", "draft-r", "stories"), { recursive: true });
+    writeFileSync(join(dir, "rfcs", "draft-r", "stories", "s.md"), "x");
+    setAge("rfcs/draft-r/stories/s.md", 200);
+    expect(isIndexStale(index, dir)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("ignores 0000-template (excluded from the index, so it can't stale it)", () => {
+    const { dir, index, setAge } = checkout();
+    mkdirSync(join(dir, "rfcs", "0000-template", "stories"), { recursive: true });
+    writeFileSync(join(dir, "rfcs", "0000-template", "README.md"), "x");
+    setAge("rfcs/0000-template/README.md", 200);
+    expect(isIndexStale(index, dir)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   it("detects a build script newer than the index (derivation changes must reindex)", () => {
     const { dir, index, setAge } = checkout();
     setAge("scripts/build-index.mjs", 200);

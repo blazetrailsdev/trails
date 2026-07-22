@@ -170,10 +170,14 @@ export function isIndexStale(indexPath: string, tasksDir: string = TASKS_DIR): b
   }
   // RFC dirs live under rfcs/ (post repo-rename layout); scanning the repo
   // root here — as this function originally did — finds no `NNNN-` dirs and
-  // silently reports every index fresh forever.
+  // silently reports every index fresh forever. The dir predicate mirrors
+  // RFC_DIR_RE in the tasks repo's scripts/lib.mjs: numbered `NNNN-slug`,
+  // unnumbered `0000-slug` placeholders, and legacy `draft-slug` all feed the
+  // index (0000-template is excluded there too), so an edit under any of them
+  // must invalidate the cache.
   const rfcsRoot = join(tasksDir, "rfcs");
   for (const rfcDir of readdirSync(rfcsRoot)) {
-    if (!/^\d{4}-/.test(rfcDir)) continue;
+    if (!/^(?!0000-template$)(?:\d{4}|draft)-[a-z0-9][a-z0-9-]*$/.test(rfcDir)) continue;
     // The RFC README's frontmatter feeds the index too (status, clusters,
     // packages, owner — and clusters drive `deps_rfc` resolution). A
     // README edit without a story touch must invalidate the cache.
