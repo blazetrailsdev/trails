@@ -161,7 +161,10 @@ export class PredicateBuilder {
       } else if (this.table.aggregatedWith(key)) {
         nodes.push(...this.buildFromHashAggregate(key, value, negated));
       } else {
-        const attr = this.resolveColumn(key);
+        // Rails `self[key, value]` (predicate_builder.rb:53-55): the attribute
+        // is read straight off the builder's arel table — dotted keys were
+        // already normalized into nested hashes by convertDotNotationToHash.
+        const attr = this.table.arelTable.get(key);
         nodes.push(negated ? this.buildNegated(attr, value) : this.build(attr, value));
       }
     }
@@ -196,7 +199,7 @@ export class PredicateBuilder {
     const queryGroups: Nodes.Node[][] = values.map((object) =>
       mapping.map(([fieldAttr, aggregateAttr]) =>
         this.build(
-          this.resolveColumn(fieldAttr),
+          this.table.arelTable.get(fieldAttr),
           extractAggregateAttr(object, aggregateAttr, true),
         ),
       ),
@@ -264,7 +267,7 @@ export class PredicateBuilder {
     for (const query of queries) {
       // Cycle guard: prevents infinite recursion when FK name == association name.
       if (isSameHash(query, attributes)) {
-        queryGroups.push([this.build(this.resolveColumn(key), value)]);
+        queryGroups.push([this.build(this.table.arelTable.get(key), value)]);
       } else {
         const inner = this.buildFromHash(query);
         if (inner.length === 0) continue;
@@ -558,7 +561,7 @@ export class PredicateBuilder {
     // identically (or better) on indexed columns.
     if (cols.length === 1) {
       const values = validTuples.map((t) => t[0]);
-      return this.resolveColumn(cols[0]).in(values);
+      return this.table.arelTable.get(cols[0]).in(values);
     }
     // Build equalities through `buildBindAttribute` so each value
     // becomes a `QueryAttribute` (= bind param) rather than an
@@ -566,16 +569,14 @@ export class PredicateBuilder {
     // bypass `compileWithBinds` / prepared-statement caching and
     // mishandle `StatementCache::Substitute` placeholders.
     //
-    // Use the resolved attribute's `.name` (not the raw `c`) when
-    // constructing the bind so qualified column keys
-    // (e.g. `"orders.shop_id"`) resolve to the same column-name
-    // PredicateBuilder.BasicObjectHandler uses for type lookup.
-    //
     // Pre-resolve `Attribute[]` once outside the per-tuple loop —
-    // each `resolveColumn` allocates a fresh `Arel::Attribute` (and
-    // sometimes a `Table`). Reusing the resolved attrs keeps large
-    // tuple lists allocation-light.
-    const attrs = cols.map((c) => this.resolveColumn(c));
+    // each `arelTable.get` allocates a fresh `Arel::Attribute`.
+    // Reusing the resolved attrs keeps large tuple lists
+    // allocation-light. Column names are read straight off the
+    // builder's arel table, the way Rails' array-key branch of
+    // expand_from_hash does via `self[key, value]` — dotted keys are
+    // not split here (Rails doesn't either).
+    const attrs = cols.map((c) => this.table.arelTable.get(c));
     const groupings: Nodes.Node[] = validTuples.map((tuple) => {
       const eqs = attrs.map((attr, i) => attr.eq(this.buildBindAttribute(attr.name, tuple[i])));
       return new Nodes.Grouping(new Nodes.And(eqs));
@@ -586,20 +587,6 @@ export class PredicateBuilder {
     // `reduce` would produce. Keeps depth O(1) instead of O(n) for
     // large tuple lists.
     return new Nodes.Grouping(new Nodes.Or(groupings));
-  }
-
-  resolveColumn(key: string): Nodes.Attribute {
-    // A `"table.column"` key resolves through `resolveArelAttribute`, so the
-    // table carries a caster. Rails reaches the same place from the other side:
-    // convert_dot_notation_to_hash splits on `rindex(".")`
-    // (predicate_builder.rb:171) and routes the table part through
-    // `associated_table` — hence lastIndexOf, matching convertDotNotationToHash
-    // and references() rather than reading `a.b.c` as one column name.
-    if (!key.includes('"')) {
-      const dot = key.lastIndexOf(".");
-      if (dot !== -1) return this.resolveArelAttribute(key.slice(0, dot), key.slice(dot + 1));
-    }
-    return this.table.arelTable.get(key);
   }
 
   registerHandler(
