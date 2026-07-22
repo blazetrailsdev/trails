@@ -24,25 +24,20 @@ describe("Base.predicateBuilder STI memoization", () => {
   });
 });
 
-// trails-specific regression guard (no Rails counterpart): Rails re-roots the
-// builder's `table` per association, so `build_bind_attribute` always sees the
-// right type caster. trails instead threads the attribute's own relation through
-// the shared type cascade — without it, a joined/aliased out-of-range equality
-// falls through to the identity fallback and silently binds a raw value the
-// column cannot hold, instead of collapsing to `1=0`.
+// trails-specific regression guard (no Rails counterpart): pins the
+// out-of-range collapse through the single-source type lookup. Rails re-roots
+// the builder's `table` per association (`associated_table(key).predicate_builder`,
+// predicate_builder.rb:96-98), so by the time `build` runs, a joined column's
+// builder is rooted on the joined table and `table.type(attribute.name)`
+// (predicate_builder.rb:57-69) is the one and only type source — mirror that
+// shape here by rooting the builder on the joined table itself.
 describe("PredicateBuilder positive-equality bind typing", () => {
   const int8 = new IntegerType({ limit: 8 });
   const OUT_OF_RANGE = 2n ** 63n;
 
-  // Only the attribute's relation knows the column type. The builder's own
-  // table answers undefined — the identity-fallback trap the narrow
-  // `this.table`-only lookup used to fall into.
   const buildJoinedEquality = (value: unknown) => {
-    const table = new Table("posts", {
-      typeCaster: { typeForAttribute: () => undefined },
-    });
-    const builder = new PredicateBuilder(new TableMetadata(null, table));
     const joined = new Table("authors", { typeCaster: { typeForAttribute: () => int8 } });
+    const builder = new PredicateBuilder(new TableMetadata(null, joined));
     return builder.build(joined.get("id"), value);
   };
 
