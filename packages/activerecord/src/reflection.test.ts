@@ -1660,23 +1660,8 @@ describe("ReflectionTest", () => {
 describe("ReflectionTest", () => {
   // Rails: test "columns"
   it("columns", () => {
-    class Person extends Base {
-      declare name: string | null;
-      declare age: number | null;
-      declare active: boolean | null;
-
-      static {
-        this._tableName = "people";
-        this.attribute("id", "integer");
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.attribute("active", "boolean");
-      }
-    }
-
-    const cols = columns(Person);
-    expect(cols.length).toBe(4);
-    expect(cols.map((c) => c.name)).toEqual(["id", "name", "age", "active"]);
+    class Topic extends Base {}
+    expect(columns(Topic).length).toBe(19);
   });
 
   // Rails: test "column_names"

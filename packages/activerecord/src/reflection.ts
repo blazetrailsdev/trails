@@ -2213,10 +2213,10 @@ export class RuntimeReflection extends AbstractReflection {
 
 export class ColumnReflection {
   readonly name: string;
-  readonly type: string;
+  readonly type: string | null;
   readonly defaultValue: unknown;
 
-  constructor(name: string, type: string, defaultValue: unknown) {
+  constructor(name: string, type: string | null, defaultValue: unknown) {
     this.name = name;
     this.type = type;
     this.defaultValue = defaultValue;
@@ -2386,8 +2386,13 @@ export function clearReflectionsCache(modelClass: typeof Base): void {
 // ---------------------------------------------------------------------------
 
 export function columns(modelClass: typeof Base): ColumnReflection[] {
-  return Array.from(modelClass._attributeDefinitions.entries()).map(
-    ([name, def]) => new ColumnReflection(name, def.type.constructor.name, def.defaultValue),
+  // Rails' `columns` is the database column objects (`columns_hash.values`,
+  // model_schema.rb:432-434) — sourced from the schema, never from attribute-level
+  // decoration. Reading `_attributeDefinitions[].type` here would report the
+  // decorated cast-type wrapper (serialize/encrypts/normalizes/enum) instead
+  // of the column's own type.
+  return Object.values(modelClass.columnsHash()).map(
+    (col) => new ColumnReflection(col.name, col.type ?? null, col.default),
   );
 }
 
