@@ -100,21 +100,15 @@ export abstract class Visitor {
       // `unsupported` and raises UnsupportedVisitError (to_sql.rb:828).
       throw new TypeError(`Cannot visit ${describeClass(object)}`);
     }
-    const fn = (this as unknown as Record<string, unknown>)[methodName];
-    if (typeof fn !== "function") {
-      // Cache hit but the instance has no such method — almost always a
-      // mis-registration (a typo'd method name landed in the dispatch
-      // cache). This is a visitor bug, not an unvisitable value, so it is
-      // a plain Error rather than an UnsupportedVisitError (matching the
-      // same check in to-sql.ts:479). This must stay distinct from the
-      // no-handler terminal above (Rails' `TypeError, "Cannot visit ..."`,
-      // visitor.rb:38), or a typo'd registration masquerades as an
-      // unvisitable value.
-      throw new Error(
-        `Dispatch method '${methodName}' is not defined on ${this.constructor.name} for node ${describeClass(object)}`,
-      );
-    }
-    return (fn as (n: unknown, c?: unknown) => unknown).call(this, object, collector);
+    // `dispatchMethod` only ever returns a name the visitor responds to
+    // (mirroring `respond_to?(dispatch[klass], true)`, visitor.rb:35-37), so a
+    // resolved name always names a real function here — a mis-registered class
+    // resolves to an ancestor's handler or falls out as the TypeError above.
+    const fn = (this as unknown as Record<string, unknown>)[methodName] as (
+      n: unknown,
+      c?: unknown,
+    ) => unknown;
+    return fn.call(this, object, collector);
   }
 
   /**
@@ -144,25 +138,42 @@ export abstract class Visitor {
       }
     }
     const rubyClass = rubyClassName(object);
-    return rubyClass === null ? undefined : `visit${rubyClass}`;
+    if (rubyClass === null) return undefined;
+    const byName = `visit${rubyClass}`;
+    return this.respondsTo(byName) ? byName : undefined;
+  }
+
+  /**
+   * Does this visitor actually have a method named `methodName`? Mirrors
+   * Ruby's `respond_to?(dispatch[klass], true)` (visitor.rb:36-37): a dispatch
+   * entry is only usable when the named method truly resolves to a function on
+   * the visitor instance. `true` includes private methods; in JS every method
+   * on the prototype chain is reachable, so a plain property lookup suffices.
+   */
+  private respondsTo(methodName: string): boolean {
+    return typeof (this as unknown as Record<string, unknown>)[methodName] === "function";
   }
 
   /**
    * Resolve the dispatch method name for `ctor`, walking the JS prototype
    * chain to find an ancestor's handler when there is no direct entry.
-   * Mirrors Ruby's `klass.ancestors.find { |k| respond_to?(dispatch[k]) }`.
-   * Successful lookups are memoized into the cache, matching Rails.
+   * Mirrors Ruby's `klass.ancestors.find { |k| respond_to?(dispatch[k]) }`
+   * (visitor.rb:36-37): a dispatch entry counts only when its named method
+   * actually resolves to a function on the visitor, so a class whose own entry
+   * names a missing method falls through to an ancestor's working handler.
+   * Successful lookups are memoized into the cache, matching Rails
+   * (`dispatch[object.class] = dispatch[superklass]`, visitor.rb:39).
    */
   private resolveDispatch(ctor: NodeCtor): string | undefined {
     const direct = this.dispatch.get(ctor);
-    if (direct) return direct;
+    if (direct && this.respondsTo(direct)) return direct;
     let cur: NodeCtor | null = ctor;
     while (cur) {
       const proto = Object.getPrototypeOf(cur.prototype) as object | null;
       const parent = proto?.constructor as NodeCtor | undefined;
       if (!parent || (parent as unknown) === Object) return undefined;
       const found = this.dispatch.get(parent);
-      if (found) {
+      if (found && this.respondsTo(found)) {
         this.dispatch.set(ctor, found);
         return found;
       }

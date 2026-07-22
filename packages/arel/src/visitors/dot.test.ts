@@ -282,21 +282,18 @@ describe("TestDot", () => {
       );
     });
 
-    it("a mis-registered dispatch method is not reported as an unvisitable value", () => {
-      // The base visitor's "no handler at all" arm already raises Rails'
-      // `TypeError, "Cannot visit ..."` (visitor.rb:39) directly, and Dot lets
-      // it propagate unchanged. That must not be confused with the base
-      // visitor's *other* error — a typo'd method name in the dispatch table —
-      // or a Dot registration bug is indistinguishable from a value Rails
-      // genuinely cannot visit.
+    it("a mis-registered dispatch method falls through to an ancestor's handler", () => {
+      // Mirrors `respond_to?(dispatch[klass], true)` (visitor.rb:36-37): a class
+      // whose own dispatch entry names a missing method does not raise — it
+      // falls through to an ancestor's working handler. Weird extends Unary, so
+      // a typo'd Weird entry resolves upward to `visitArelNodesUnary` and the
+      // node is visited instead of reported as an unvisitable value.
       class Weird extends Nodes.Unary {}
       const v = new Visitors.Dot();
       (v as unknown as { dispatch: Map<unknown, string> }).dispatch.set(Weird, "visitTypoed");
       type Internals = { visit(o: unknown): void };
       v.compile(new Nodes.SqlLiteral("seed"));
-      expect(() => (v as unknown as Internals).visit(new Weird(null))).toThrow(
-        /Dispatch method 'visitTypoed' is not defined on Dot/,
-      );
+      expect(() => (v as unknown as Internals).visit(new Weird(null))).not.toThrow();
     });
 
     it("Temporal values reach visit_Date / visit_Time instead of raising", () => {
