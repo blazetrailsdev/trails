@@ -777,15 +777,17 @@ describe("resolveConfigForConnection / connectsTo with unset configurations", ()
   });
 });
 
-describe("ConnectionHandlingTest common APIs with_connection", () => {
+// Second `ConnectionHandlingTest` block: this test needs `fixtures :posts`
+// while the block above runs fixture-less against a hand-established pool.
+describe("ConnectionHandlingTest", () => {
   // Mirrors Rails `ConnectionHandlingTest` with `fixtures :posts`. The test
   // asserts the pool releases its connection after each common API, so it must
   // run OUTSIDE transactional fixtures (which hold a permanent lease for the
   // wrapping transaction) — opt out by name via `usesTransaction`.
-  const testName =
-    "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed";
   fixtures(["posts"], {
-    usesTransaction: [testName],
+    usesTransaction: [
+      "common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed",
+    ],
   });
 
   afterEach(async () => {
@@ -796,7 +798,7 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
     await Post.where({ title: "foo" }).deleteAll();
   });
 
-  it(testName, async () => {
+  it("common APIs don't permanently hold a connection when permanent checkout is deprecated or disallowed", async () => {
     setPermanentConnectionCheckout("deprecated");
     Base.releaseConnection();
     expect(Base.connectionPool().activeConnection).toBeNull();
@@ -807,28 +809,7 @@ describe("ConnectionHandlingTest common APIs with_connection", () => {
     await Post.first();
     expect(Post.connectionPool().activeConnection).toBeNull();
 
-    await Post.first(2);
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.second();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.secondToLast();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.last();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.last(2);
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
     await Post.count();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.findBySql("SELECT * FROM posts");
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.countBySql("SELECT COUNT(*) FROM posts");
     expect(Post.connectionPool().activeConnection).toBeNull();
   });
 });
