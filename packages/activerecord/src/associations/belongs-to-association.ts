@@ -209,20 +209,18 @@ export class BelongsToAssociation extends SingularAssociation {
   }
 
   protected override staleState(): unknown {
+    // Rails: `owner._read_attribute(reflection.foreign_key)`
+    // (belongs_to_association.rb:164-166) with NO array branching. For a
+    // composite (array) foreign key, Ruby's `@attributes[Array]` matches no
+    // stored attribute and resolves to `Attribute.null` → nil (verified
+    // against ActiveRecord 8.0.2: composite `stale_state` is nil, so
+    // `stale_target?` never fires and an FK change does NOT reload a loaded
+    // composite-FK belongs_to). Only a scalar FK yields a real state.
     const fks = this.foreignKeyNames();
-    const values = fks.map((fk) =>
-      typeof (this.owner as any)._readAttribute === "function"
-        ? (this.owner as any)._readAttribute(fk)
-        : (this.owner as any)[fk],
-    );
-    if (values.length === 1) return values[0];
-    // BigInt FK components (int8 under PG bigserial) can't go through
-    // JSON.stringify ("Do not know how to serialize a BigInt"); fold to their
-    // decimal string, mirroring CollectionAssociation#recordIdentity. The
-    // single-FK branch returns the raw value, so only the composite path needs
-    // this. The key stays deterministic — same source on every read.
-    const ids = values.map((v) => (typeof v === "bigint" ? v.toString() : v));
-    return JSON.stringify(ids);
+    if (fks.length !== 1) return null;
+    return typeof (this.owner as any)._readAttribute === "function"
+      ? (this.owner as any)._readAttribute(fks[0])
+      : (this.owner as any)[fks[0]];
   }
 
   protected override findTargetNeeded(): boolean {
