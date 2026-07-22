@@ -2387,7 +2387,7 @@ export function clearReflectionsCache(modelClass: typeof Base): void {
 
 export function columns(modelClass: typeof Base): ColumnReflection[] {
   // Rails' `columns` is the database column objects (`columns_hash.values`,
-  // model_schema.rb) — sourced from the schema, never from attribute-level
+  // model_schema.rb:432-434) — sourced from the schema, never from attribute-level
   // decoration. Reading `_attributeDefinitions[].type` here would report the
   // decorated cast-type wrapper (serialize/encrypts/normalizes/enum) instead
   // of the column's own type.
