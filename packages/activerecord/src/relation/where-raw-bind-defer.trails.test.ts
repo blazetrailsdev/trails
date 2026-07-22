@@ -38,7 +38,8 @@ describe("where value defer-to-bind casting", () => {
   });
 
   it("having with an un-castable string binds it instead of IS NULL", async () => {
-    const rel = Topic.group("parent_id").having({ parent_id: "not-a-number" });
+    // Select only the grouped column — PG rejects an ungrouped `topics.*`.
+    const rel = Topic.select("parent_id").group("parent_id").having({ parent_id: "not-a-number" });
     expect(rel.toSql()).not.toMatch(/IS NULL/i);
     expect(await rel).toHaveLength(0);
   });
