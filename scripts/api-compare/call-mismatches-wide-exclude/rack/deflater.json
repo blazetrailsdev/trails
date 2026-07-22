@@ -67,7 +67,7 @@
     "tsFile": "deflater.ts",
     "rubyName": "initialize",
     "call": "fetch",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails deflater.rb:39-44 uses `options.fetch(:sync, true)`; trails deflater.ts:28-33 spells the default as `opts.sync !== false`."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails deflater.rb:39-44 stores `@sync = options.fetch(:sync, true)` — key-present semantics, so `sync: nil` stays nil (falsy); trails deflater.ts:28-33 uses `opts.sync !== false`, which coerces every non-false value (including null) to true. Divergence tracked in story fetch-nil-presence-divergences-globalid-rack."
   },
   {
     "package": "rack",
