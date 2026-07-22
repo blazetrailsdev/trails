@@ -211,11 +211,13 @@ describe.skipIf(adapterType === "mysql")("DefaultBinaryTest", () => {
   // `current_adapter?(:Mysql2Adapter, :TrilogyAdapter) && !mariadb?` guard
   // *inside* the sqlite/pg gate — a combination that can never hold — and
   // `binary_col` is declared in no schema, so the test is dead on every adapter.
-  // Ported verbatim under the same compound guard for name parity; it never
-  // runs. Inlined (not hoisted) so the gate extractor sees the isMariaDb term
-  // and records the same `mariadb` guard the Ruby extractor derives from
-  // Rails' `mariadb?`.
-  it.skipIf(!(adapterType === "mysql" && !isMariaDb))("default binary string", () => {
+  // Ported under the same compound guard for name parity (De-Morgan'd into the
+  // standard skip form); it never runs. Inlined (not hoisted) so the gate
+  // extractor sees the terms: the positive mysql term mixed with the guard is
+  // dropped as unsound and only the `mariadb` guard is kept — the same gate
+  // the Ruby extractor derives from Rails' compound `current_adapter? &&
+  // !mariadb?`.
+  it.skipIf(adapterType !== "mysql" || isMariaDb)("default binary string", () => {
     // Rails: assert_equal "binary_default", DefaultBinary.new.binary_col
     expect(decodeBinaryDefault((new DefaultBinary() as any).binary_col)).toBe("binary_default");
   });

@@ -109,11 +109,19 @@ describe("gates.ts pure helpers", () => {
       guards: ["mariadb"],
       source: ["test"],
     });
-    // An adapterType term mixed with the guard: the adapter set is unsound
-    // (`&&` vs `||` changes the run-on set) and is dropped, keeping only the
-    // guard — mirroring the Ruby extractor's `mixed` rule for
-    // `current_adapter?(…) && mariadb?` compounds.
-    expect(gateFromGuardExpr('!(adapterType === "mysql" && !isMariaDb)', false)).toEqual({
+    // A POSITIVE adapterType term mixed with the guard: the adapter set is
+    // unsound (`&&` vs `||` changes the run-on set) and is dropped, keeping
+    // only the guard — mirroring the Ruby extractor's `mixed` rule for
+    // `current_adapter?(…) && !mariadb?` compounds (defaults_test.rb).
+    expect(gateFromGuardExpr('adapterType !== "mysql" || isMariaDb', false)).toEqual({
+      guards: ["mariadb"],
+      source: ["test"],
+    });
+    // An adapter EXCLUSION in the standard skip idiom is a pure conjunction on
+    // the run side (`!sqlite && !mariadb`) — sound, so it composes with the
+    // guard, exactly as Ruby keeps `!current_adapter?(:X) && mariadb?`.
+    expect(gateFromGuardExpr('adapterType === "sqlite" || isMariaDb', false)).toEqual({
+      adapters: ["mysql", "postgresql"],
       guards: ["mariadb"],
       source: ["test"],
     });

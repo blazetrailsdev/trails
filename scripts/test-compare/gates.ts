@@ -120,6 +120,7 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   // single-term polarity below — and likewise for `runIf(A && B && …)`.
   const adapterMatch = text.match(/adapterType\s*(===|!==)\s*["']([a-z0-9]+)["']/);
   let adapters: GateAdapter[] | undefined;
+  let adapterIsPositive = false;
   if (adapterMatch) {
     const [, op, literal] = adapterMatch;
     const adapter = normalizeAdapterType(literal);
@@ -127,6 +128,7 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
       // Does the expression being true mean "is this adapter"?
       const trueMeansEqual = op === "===";
       const runWhenEqual = runsWhenTrue ? trueMeansEqual : !trueMeansEqual;
+      adapterIsPositive = runWhenEqual;
       adapters = sortedUnique(runWhenEqual ? [adapter] : ALL_ADAPTERS.filter((a) => a !== adapter));
     }
   }
@@ -147,12 +149,15 @@ export function gateFromGuardExpr(exprText: string, runsWhenTrue: boolean): Test
   const guards: string[] = [];
   if (/isMaria[Dd]b\b/.test(text)) guards.push("mariadb");
 
-  // An adapter set mixed with a guard isn't sound (the condition could combine
-  // them with `&&` or `||`; the run-on set differs) — drop it and keep the
+  // A POSITIVE adapter set mixed with a guard isn't sound (the run-on set
+  // depends on whether the compound is `&&` or `||`) — drop it and keep the
   // guard, mirroring the Ruby extractor's `mixed` rule in
-  // `gate_from_run_condition`.
+  // `gate_from_run_condition`. An adapter EXCLUSION stays: in the standard skip
+  // idiom `skipIf(adapterType === "x" || guard)` the run condition is the pure
+  // conjunction `!x && !guard`, which Ruby likewise keeps as
+  // adapters-minus-x + guard.
   const gate: TestGate = { source: ["test"] };
-  if (adapters && !guards.length) gate.adapters = adapters;
+  if (adapters && !(guards.length && adapterIsPositive)) gate.adapters = adapters;
   if (featureMatches.length) gate.features = sortedUnique(featureMatches);
   if (guards.length) gate.guards = guards;
   if (!gate.adapters && !gate.features && !gate.guards) gate.guards = ["unknown"];
