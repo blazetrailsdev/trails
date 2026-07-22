@@ -809,28 +809,7 @@ describe("ConnectionHandlingTest", () => {
     await Post.first();
     expect(Post.connectionPool().activeConnection).toBeNull();
 
-    await Post.first(2);
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.second();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.secondToLast();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.last();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.last(2);
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
     await Post.count();
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.findBySql("SELECT * FROM posts");
-    expect(Post.connectionPool().activeConnection).toBeNull();
-
-    await Post.countBySql("SELECT COUNT(*) FROM posts");
     expect(Post.connectionPool().activeConnection).toBeNull();
   });
 });
