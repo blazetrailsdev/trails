@@ -12,6 +12,7 @@ import {
   EncryptedBookWithSerializedSecondBinary,
 } from "../test-helpers/models/book-encrypted.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
+import { applyPendingEncryptions } from "../encryption.js";
 import { Serialized } from "../type/serialized.js";
 import { BinaryType } from "@blazetrails/activemodel";
 
@@ -78,5 +79,35 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     const subtype = (encrypted as EncryptedAttributeType).castType;
     expect(subtype).toBeInstanceOf(BinaryType);
     expect(subtype).not.toBeInstanceOf(Serialized);
+  });
+
+  it("does not grow the pending-decorator queue or reorder the nesting on _defaultAttributes rebuilds", async () => {
+    await freshAdapter();
+
+    const model = EncryptedBookWithSerializedSecondBinary as unknown as {
+      typeForAttribute(name: string): unknown;
+      _pendingAttributeModifications?: unknown[];
+      _cachedDefaultAttributes?: unknown;
+    };
+    // Force one initial resolution so all pending machinery has run.
+    model.typeForAttribute("logo");
+    const queueLength = model._pendingAttributeModifications?.length;
+    expect(queueLength).toBeGreaterThan(0);
+
+    // Repeated cache invalidation + re-resolution mimics schema reloads. The
+    // old registerEncryptedType pushed a fresh PendingDecorator on each pass,
+    // growing the queue unboundedly AND moving the encryption decorator to the
+    // tail (flipping the nesting to Encrypted(Serialized(...))).
+    for (let i = 0; i < 3; i++) {
+      model._cachedDefaultAttributes = null;
+      // The rebuild paths (defineAttribute, applyColumnsHash, Base statics)
+      // all re-invoke applyPendingEncryptions — the exact call that used to
+      // re-push the encryption decorator onto the queue tail.
+      applyPendingEncryptions(model);
+      const type = model.typeForAttribute("logo");
+      expect(type).toBeInstanceOf(Serialized);
+      expect((type as Serialized).subtype).toBeInstanceOf(EncryptedAttributeType);
+    }
+    expect(model._pendingAttributeModifications?.length).toBe(queueLength);
   });
 });
