@@ -60,6 +60,16 @@ export class UpdateManager extends TreeManager {
     } else if (values instanceof SqlLiteral || values instanceof BoundSqlLiteral) {
       this.ast.values = [values];
     } else {
+      // Boundary cast — the one that survives the NodeOrValue narrowing.
+      // `UpdateManager#set` is the package edge: ActiveRecord hands over
+      // already-type-cast-for-database column values as
+      // `Record<string, unknown>` (persistence.ts `_updateRecord`), so `val`
+      // is genuinely `unknown` here and cannot be narrowed without pushing a
+      // false type onto AR's DB-value layer. Rails passes these through raw
+      // too; the visitor's Assignment arm quotes a non-Node right rather than
+      // visiting it (to_sql.rb:637-639). This is why `undefined` can still
+      // reach dispatch and the `undefined`→NilClass normalization in
+      // ruby-class.ts / to-sql.ts stays load-bearing.
       this.ast.values = values.map(
         ([col, val]) => new Assignment(new UnqualifiedColumn(col), val as NodeOrValue),
       );

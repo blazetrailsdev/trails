@@ -71,8 +71,11 @@ function isActiveModelAttribute(v: unknown): boolean {
 // dropped from `NodeOrValue` (binary.ts). The two are complementary rather than
 // contradictory: the union declines to *declare* `undefined` a legal slot
 // occupant, while this normalizes one that arrives anyway. It can still arrive,
-// because `math.ts` / `attribute.ts` / `update-manager.ts` launder values into
-// slots via `as NodeOrValue` casts from `unknown`. The primary normalization is
+// because `update-manager.ts` launders values into a slot via one boundary
+// `as NodeOrValue` cast from `unknown` — the `math.ts` / `attribute.ts` casts
+// were removed once their operands were narrowed to `NodeOrValue`, but
+// `UpdateManager#set` sits on the ActiveRecord edge and cannot be (see the note
+// at its call site). The primary normalization is
 // `rubyClassName` (ruby-class.ts:32), which maps `undefined` to `"NilClass"` at
 // the dispatch boundary so it routes to `visitNilClass`; this helper and
 // `rubyInspect` below just keep the downstream message consistent with that.
