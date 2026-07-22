@@ -950,7 +950,9 @@ describe("AttributeTest", () => {
       const table = new Table("foo", { typeCaster: fakeCaster });
       const condition = table.get("id").notIn(["1", "2"]);
 
-      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" NOT IN (1, 2)');
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe(
+        '"foo"."id" NOT IN (1, 2)',
+      );
     });
 
     it("builds Casted nodes so a null in an IN list casts through the column", () => {
