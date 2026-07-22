@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
-import { loadBelongsTo, modelRegistry } from "../associations.js";
+import { modelRegistry } from "../associations.js";
 import { baseClass, demodulize } from "../inheritance.js";
 import { underscore } from "@blazetrails/activesupport";
 import { BelongsToAssociation, inferCompositePrimaryKey } from "./belongs-to-association.js";
@@ -160,10 +160,6 @@ export class BelongsToPolymorphicAssociation extends BelongsToAssociation {
       return refl.polymorphicInverseOf(record.constructor as typeof Base);
     }
     return null;
-  }
-
-  protected override async doAsyncFindTarget(): Promise<Base | null> {
-    return loadBelongsTo(this.owner, this.reflection.name, this.reflection.options);
   }
 
   /**
