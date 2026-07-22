@@ -29,6 +29,7 @@ import {
   GreenCabbage,
   KingCole,
   RedCabbage,
+  YellingVegetable,
 } from "./test-helpers/models/vegetables.js";
 import { Subscriber, SpecialSubscriber } from "./test-helpers/models/subscriber.js";
 import { SelectedMembership } from "./test-helpers/models/membership.js";
@@ -222,23 +223,31 @@ describe("InheritanceTest", () => {
     expect(cabbage).toBeInstanceOf(Cabbage);
   });
 
-  it.skip("becomes sets variables before initialization callbacks", () => {
-    // TRACKED-PENDING-CONVERGENCE: trails becomes() does not trigger afterInitialize
-    // callbacks on the new instance; Rails calls initialize on the becomes() target class
-    // so YellingVegetable.afterInitialize fires and upcases the name. Story:
-    // becomes-after-initialize (RFC 0019).
+  it("becomes sets variables before initialization callbacks", async () => {
+    const vegetable = await Vegetable.createBang({ name: "yelling carrot" });
+    expect(vegetable).toBeInstanceOf(Vegetable);
+    expect(vegetable.name).toBe("yelling carrot");
+
+    const yellingVeggie = vegetable.becomes(YellingVegetable);
+    expect(yellingVeggie.name).toBe("YELLING CARROT");
+    expect(vegetable.name).toBe("YELLING CARROT");
   });
 
-  it.skip("becomes and change tracking for inheritance columns", () => {
-    // TRACKED-PENDING-CONVERGENCE: change tracking for custom inheritance columns (custom_type
-    // on Vegetable) after becomes() is not yet implemented in trails. Story:
-    // becomes-custom-type-change-tracking (RFC 0019).
+  it("becomes and change tracking for inheritance columns", async () => {
+    const cucumber = await Vegetable.find(1);
+    const cabbage = cucumber.becomesBang(Cabbage);
+    expect((cabbage as any).attributeChange("custom_type")).toEqual(["Cucumber", "Cabbage"]);
   });
 
-  it.skip("alt becomes bang resets inheritance type column", () => {
-    // TRACKED-PENDING-CONVERGENCE: trails stores the base class name in the custom_type column
-    // (e.g. "Vegetable") instead of NULL for a base-class instance; Rails stores NULL.
-    // Story: becomes-custom-type-null-base (RFC 0019).
+  it("alt becomes bang resets inheritance type column", async () => {
+    const vegetable = await Vegetable.createBang({ name: "Red Pepper" });
+    expect(vegetable.custom_type).toBeNull();
+
+    const cabbage = vegetable.becomesBang(Cabbage);
+    expect(cabbage.custom_type).toBe("Cabbage");
+
+    cabbage.becomesBang(Vegetable);
+    expect(cabbage.custom_type).toBeNull();
   });
 
   it("inheritance find all", async () => {
@@ -307,10 +316,11 @@ describe("InheritanceTest", () => {
     );
   });
 
-  it.skip("new with ar base", () => {
-    // TRACKED-PENDING-CONVERGENCE: in trails, Base.abstractClass is false (not an abstract
-    // class), so Base.new() does not throw. Rails raises NotImplementedError for
-    // ActiveRecord::Base.new. Story: base-class-new-abstract (RFC 0019).
+  it("new with ar base", () => {
+    expect(() => Base.new()).toThrow(NotImplementedError);
+    // Rails: "ActiveRecord::Base is an abstract class..." — trails has no Ruby
+    // namespace, so the class reads as "Base".
+    expect(() => Base.new()).toThrow("Base is an abstract class and cannot be instantiated.");
   });
 
   it("new with invalid type", () => {
@@ -505,11 +515,15 @@ describe("InheritanceTest", () => {
     expect(error).toBeUndefined();
   });
 
-  it.skip("scope inherited properly", () => {
-    // TRACKED-PENDING-CONVERGENCE: trails' join implementation does not yet support
-    // nested association paths ({ account: "firm" }). The ofFirstFirm scope uses
-    // q.joins({ account: "firm" }) which throws ArgumentError in trails.
-    // Story: scope-inherited-nested-join (RFC 0019).
+  it("scope inherited properly", async () => {
+    let error: unknown;
+    try {
+      await Company.ofFirstFirm();
+      await Client.ofFirstFirm();
+    } catch (e) {
+      error = e;
+    }
+    expect(error).toBeUndefined();
   });
 
   it("inheritance with default scope", async () => {
@@ -540,10 +554,34 @@ describe("InheritanceComputeTypeTest", () => {
     expect(error).toBeUndefined();
   });
 
-  it.skip("inheritance new with subclass as default", () => {
-    // PERMANENT-SKIP: requires DDL (change_column_default) at runtime.
-    // Rails uses connection.change_column_default + reset_column_information to set a column
-    // default mid-test. Trails does not support live DDL column-default changes in tests.
+  it("inheritance new with subclass as default", async () => {
+    await Company.loadSchema();
+    const originalType = (Company as any).columnsHash()["type"].default;
+    try {
+      await Base.connection.changeColumnDefault("companies", "type", "Firm");
+      (Company as any).resetColumnInformation();
+      await Company.loadSchema();
+
+      let firm = Company.new(); // without arguments
+      expect((firm as any).type).toBe("Firm");
+      expect(firm).toBeInstanceOf(Firm);
+
+      firm = Company.new({ firm_name: "Shri Hans Plastic" }); // with arguments
+      expect((firm as any).type).toBe("Firm");
+      expect(firm).toBeInstanceOf(Firm);
+
+      const client = Client.new();
+      expect((client as any).type).toBe("Client");
+      expect(client).toBeInstanceOf(Client);
+
+      firm = Company.new({ type: "Client" }); // overwrite the default type
+      expect((firm as any).type).toBe("Client");
+      expect(firm).toBeInstanceOf(Client);
+    } finally {
+      await Base.connection.changeColumnDefault("companies", "type", originalType);
+      (Company as any).resetColumnInformation();
+      await Company.loadSchema();
+    }
   });
 });
 

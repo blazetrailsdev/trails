@@ -1622,7 +1622,10 @@ interface BecomesRecord {
  */
 export function becomes<
   T extends BecomesRecord,
-  K extends new (attrs: Record<string, unknown>) => BecomesRecord,
+  K extends new (
+    attrs: Record<string, unknown>,
+    initBlock?: (record: BecomesRecord) => void,
+  ) => BecomesRecord,
 >(this: T, klass: K): InstanceType<K> {
   // Rails: `became = klass.allocate` — construct the exact target class,
   // bypassing `new`'s STI dispatch so becomes(base) is never re-resolved to
@@ -1631,37 +1634,53 @@ export function becomes<
   // Store the class itself, not a boolean: the constructor only skips dispatch
   // when `new.target` *is* this class, so an inherited static never suppresses
   // a nested `new <subclass>()`.
-  const ctor = klass as unknown as { _suppressStiNewDispatch?: unknown };
+  const ctor = klass as unknown as {
+    _suppressStiNewDispatch?: unknown;
+    _suppressAbstractCheck?: boolean;
+  };
   const hadOwn = Object.prototype.hasOwnProperty.call(ctor, "_suppressStiNewDispatch");
   const prev = ctor._suppressStiNewDispatch;
   ctor._suppressStiNewDispatch = klass;
+  // Rails allocates with `klass.allocate`, which never goes through
+  // Inheritance::ClassMethods#new — so the abstract-class / Base guard that
+  // `new` enforces (inheritance.rb:57) does not apply to becomes().
+  const hadOwnAbstract = Object.prototype.hasOwnProperty.call(ctor, "_suppressAbstractCheck");
+  const prevAbstract = ctor._suppressAbstractCheck;
+  ctor._suppressAbstractCheck = true;
   let instance: InstanceType<K>;
   try {
-    instance = new klass({}) as InstanceType<K>;
+    // Rails passes the variable swap as the `initialize` block, which runs
+    // BEFORE `_run_initialize_callbacks` — so after_initialize hooks on the
+    // target class observe this record's (shared) attributes, not the
+    // throwaway construction-time set.
+    instance = new klass({}, (becoming) => {
+      // Mirrors Rails: `@attributes.reverse_merge!(becoming.@attributes)` — the
+      // new class's default attributes fill in any keys this record is missing
+      // (e.g. attributes declared only on the target subclass), then both
+      // objects share this record's (now merged) attribute set.
+      this._attributes.reverseMergeBang(becoming._attributes);
+      becoming._attributes = this._attributes;
+      becoming._newRecord = this._newRecord;
+      becoming._destroyed = this._destroyed;
+      // Rails: `becoming.instance_variable_set(:@mutations_from_database, ...)`
+      // — share the original's dirty tracker by reference so the became record
+      // reports the same change-set (the throwaway `new klass({})`
+      // construction-time changes, e.g. the STI `type` column, are discarded
+      // with its private attribute set).
+      becoming._dirty = this._dirty;
+      // Rails: `becoming.errors.copy!(errors)` — propagate pending validation
+      // errors across the class swap. Noop if the errors object doesn't expose
+      // a `copy` method (defensive for hosts that stub errors differently).
+      const targetErrors = becoming.errors as { copy?(other: unknown): void };
+      if (typeof targetErrors.copy === "function") {
+        targetErrors.copy(this.errors);
+      }
+    }) as InstanceType<K>;
   } finally {
     if (hadOwn) ctor._suppressStiNewDispatch = prev;
     else delete ctor._suppressStiNewDispatch;
-  }
-  const target = instance as unknown as BecomesRecord;
-  // Mirrors Rails: `@attributes.reverse_merge!(becoming.@attributes)` — the new
-  // class's default attributes fill in any keys this record is missing (e.g.
-  // attributes declared only on the target subclass), then both objects share
-  // this record's (now merged) attribute set.
-  this._attributes.reverseMergeBang(target._attributes);
-  target._attributes = this._attributes;
-  target._newRecord = this._newRecord;
-  target._destroyed = this._destroyed;
-  // Rails: `becoming.instance_variable_set(:@mutations_from_database, ...)` —
-  // share the original's dirty tracker by reference so the became record reports
-  // the same change-set (the throwaway `new klass({})` construction-time changes,
-  // e.g. the STI `type` column, are discarded with its private attribute set).
-  target._dirty = this._dirty;
-  // Rails: `becoming.errors.copy!(errors)` — propagate pending validation
-  // errors across the class swap. Noop if the errors object doesn't expose
-  // a `copy` method (defensive for hosts that stub errors differently).
-  const targetErrors = target.errors as { copy?(other: unknown): void };
-  if (typeof targetErrors.copy === "function") {
-    targetErrors.copy(this.errors);
+    if (hadOwnAbstract) ctor._suppressAbstractCheck = prevAbstract;
+    else delete ctor._suppressAbstractCheck;
   }
   return instance;
 }
