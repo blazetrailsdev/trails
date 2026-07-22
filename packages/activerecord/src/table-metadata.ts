@@ -121,9 +121,7 @@ export class TableMetadata {
         null;
       if (modelPb && typeof modelPb.with === "function") return modelPb.with(this);
     }
-    const pb = new PredicateBuilder(this._arelTable);
-    pb.setTableContext(this);
-    return pb;
+    return new PredicateBuilder(this);
   }
 
   get arelTable(): Table | any {

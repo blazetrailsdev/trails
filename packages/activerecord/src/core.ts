@@ -676,9 +676,7 @@ export function predicateBuilder(this: CoreHost): PredicateBuilder {
     return this._predicateBuilder;
   const table = this.arelTable;
   const metadata = new TableMetadata(this as any, table);
-  const pb = new PredicateBuilder(table);
-  pb.setTableContext(metadata);
-  this._predicateBuilder = pb;
+  this._predicateBuilder = new PredicateBuilder(metadata);
   return this._predicateBuilder;
 }
 

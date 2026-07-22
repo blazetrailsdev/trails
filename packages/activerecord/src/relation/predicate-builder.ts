@@ -1,4 +1,4 @@
-import { Table, Nodes, sql as arelSql } from "@blazetrails/arel";
+import { Nodes, sql as arelSql } from "@blazetrails/arel";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { QueryAttribute } from "./query-attribute.js";
 import { ArrayHandler } from "./predicate-builder/array-handler.js";
@@ -10,8 +10,8 @@ import { AssociationQueryValue } from "./predicate-builder/association-query-val
 import { Substitute } from "../statement-cache.js";
 import { PolymorphicArrayValue } from "./predicate-builder/polymorphic-array-value.js";
 import { argumentError } from "./query-methods.js";
-import { Connection as TypeCasterConnection } from "../type-caster/connection.js";
 import { attributeRelationOf } from "./predicate-builder/attribute-relation.js";
+import type { TableMetadata } from "../table-metadata.js";
 
 interface BoundType {
   cast?(x: unknown): unknown;
@@ -37,14 +37,14 @@ const IDENTITY_CAST_TYPE = {
  * Mirrors: ActiveRecord::PredicateBuilder
  */
 export class PredicateBuilder {
-  private _table: Table;
+  private _table: TableMetadata;
 
   /** @internal */
-  get table(): Table {
+  get table(): TableMetadata {
     return this._table;
   }
 
-  protected set table(value: Table) {
+  protected set table(value: TableMetadata) {
     this._table = value;
   }
   private arrayHandler: ArrayHandler;
@@ -52,9 +52,8 @@ export class PredicateBuilder {
   private basicObjectHandler: BasicObjectHandler;
   private relationHandler: RelationHandler;
   private handlers: Array<[any, { call(attr: Nodes.Attribute, value: any): Nodes.Node }]> = [];
-  private _tableContext: any = null;
 
-  constructor(table: Table) {
+  constructor(table: TableMetadata) {
     this._table = table;
     this.arrayHandler = new ArrayHandler(this);
     this.rangeHandler = new RangeHandler((attribute, v) => {
@@ -117,9 +116,9 @@ export class PredicateBuilder {
 
   /**
    * Resolves the column type for a range bound, preferring the attribute's own
-   * relation typeCaster (covers joined/aliased tables), then the predicate
-   * builder's table/model context, then the arel table. Mirrors the cascade
-   * Rails' `build_bind_attribute` gets for free via `table.type(column_name)`.
+   * relation typeCaster (covers joined/aliased tables), then the builder's
+   * TableMetadata. Mirrors the cascade Rails' `build_bind_attribute` gets for
+   * free via `table.type(column_name)`.
    */
   private resolveBoundType(attribute: Nodes.Attribute): BoundType | undefined {
     return this.resolveColumnType(attribute.name, attributeRelationOf(attribute)) as
@@ -130,14 +129,13 @@ export class PredicateBuilder {
   /**
    * The single type-resolution cascade every bind-building path shares: the
    * attribute's own relation typeCaster (covers joined/aliased tables), then
-   * the predicate builder's table/model context, then the arel table. Returns
+   * the builder's TableMetadata (Rails' `table.type(column_name)`). Returns
    * the first candidate `accept` approves.
    *
    * `accept` is what lets the force-equality scan share this cascade: it probes
    * every level for `isForceEquality?(value)` rather than stopping at the first
    * type that merely exists. Each level is evaluated lazily and only until
-   * `accept` is satisfied — the arel-table leg throws on a caster-less table,
-   * so it must stay unreached when an earlier level answers.
+   * `accept` is satisfied.
    *
    * Written as a straight-line cascade rather than a generator or a lookup
    * array on purpose: positive single-value equality is the hottest path in the
@@ -153,9 +151,7 @@ export class PredicateBuilder {
   ): TypeCandidate {
     const relationType = (relation as TypeCaster | undefined)?.typeForAttribute?.(columnName);
     if (accept(relationType)) return relationType;
-    const contextType = (this._tableContext as TypeCaster | null)?.typeForAttribute?.(columnName);
-    if (accept(contextType)) return contextType;
-    const tableType = this.table.typeForAttribute(columnName) as TypeCandidate;
+    const tableType = this.table.type(columnName) as TypeCandidate;
     if (accept(tableType)) return tableType;
     return undefined;
   }
@@ -164,7 +160,8 @@ export class PredicateBuilder {
    * First existing type in the cascade, or undefined.
    *
    * Note this is byte-compatible with the old `this.table`-only lookup for
-   * plain (non-joined) columns: `table.get(col).relation` IS `this.table`, so
+   * plain (non-joined) columns: `table.get(col).relation` IS the metadata's
+   * arel table, so
    * the first leg answers with exactly the type the narrow lookup would have
    * returned. The extra levels only come into play for joined/aliased
    * attributes, which is precisely where the narrow lookup was wrong.
@@ -209,12 +206,7 @@ export class PredicateBuilder {
     }
     const nodes: Nodes.Node[] = [];
     for (const [key, value] of Object.entries(conditions)) {
-      if (
-        isPlainObject(value) &&
-        this._tableContext &&
-        typeof this._tableContext.associatedTable === "function" &&
-        !this._tableContext.hasColumn?.(key)
-      ) {
+      if (isPlainObject(value) && !this.table.hasColumn(key)) {
         // Mirrors Rails PredicateBuilder#expand_from_hash: pass the
         // join-dependency resolver block to associatedTable so a nested-hash key
         // that is not a direct reflection (e.g. a join table name) still
@@ -223,35 +215,24 @@ export class PredicateBuilder {
         // caller relation's join deps by table name and has no valid context
         // against the now-resolved associated table (Rails passes &block only to
         // associated_table, then calls expand_from_hash with no block).
-        const assocPb: PredicateBuilder = this._tableContext.associatedTable(
+        const assocPb: PredicateBuilder = this.table.associatedTable(
           key,
-          block,
+          block as (name: string) => never,
         ).predicateBuilder;
         const innerNodes = negated
           ? assocPb.buildNegatedFromHash(value)
           : assocPb.buildFromHash(value);
         nodes.push(...innerNodes);
-      } else if (
-        !isPlainObject(value) &&
-        this._tableContext &&
-        typeof this._tableContext.isAssociatedWith === "function" &&
-        typeof this._tableContext.associatedTable === "function" &&
-        this._tableContext.isAssociatedWith(key) &&
-        !this._tableContext.hasColumn?.(key)
-      ) {
+      } else if (this.table.isAssociatedWith(key) && !this.table.hasColumn(key)) {
         const assocNodes = this.buildFromHashAssociation(
-          this._tableContext.associatedTable(key),
+          this.table.associatedTable(key),
           key,
           value,
           negated,
           conditions,
         );
         nodes.push(...assocNodes);
-      } else if (
-        this._tableContext &&
-        typeof this._tableContext.aggregatedWith === "function" &&
-        this._tableContext.aggregatedWith(key)
-      ) {
+      } else if (this.table.aggregatedWith(key)) {
         nodes.push(...this.buildFromHashAggregate(key, value, negated));
       } else {
         const attr = this.resolveColumn(key);
@@ -270,7 +251,7 @@ export class PredicateBuilder {
    * @internal
    */
   private buildFromHashAggregate(key: string, value: unknown, negated: boolean): Nodes.Node[] {
-    const reflection = this._tableContext.reflectOnAggregation(key);
+    const reflection = this.table.reflectOnAggregation(key);
     const mapping: [string, string][] = reflection.mapping();
     // Rails: `values = value.nil? ? [nil] : Array.wrap(value)`.
     const values =
@@ -576,12 +557,10 @@ export class PredicateBuilder {
    * `type_for_attribute(name).cast(value)`.
    */
   private normalizeQueryValue(columnName: string, value: unknown): unknown {
-    const klass = (this.table as { klass?: { _normalizations?: Map<string, unknown> } }).klass;
+    const klass = this.table.klass as { _normalizations?: Map<string, unknown> } | null;
     const normalizations = klass?._normalizations;
     if (!normalizations || !normalizations.has(columnName)) return value;
-    const type = this.table.typeForAttribute(columnName) as
-      | { cast?(v: unknown): unknown }
-      | undefined;
+    const type = this.table.type(columnName) as { cast?(v: unknown): unknown } | undefined;
     return type?.cast ? type.cast(value) : value;
   }
 
@@ -702,7 +681,7 @@ export class PredicateBuilder {
       const dot = key.lastIndexOf(".");
       if (dot !== -1) return this.resolveArelAttribute(key.slice(0, dot), key.slice(dot + 1));
     }
-    return this.table.get(key);
+    return this.table.arelTable.get(key);
   }
 
   registerHandler(
@@ -747,38 +726,15 @@ export class PredicateBuilder {
     // associated_table had to alias to the hash key (table-metadata.ts:83-84,
     // mirroring table_metadata.rb:44) — both answer `get`, neither is
     // `instanceof Table`.
-    const ctx = this._tableContext as {
-      associatedTable?: (
-        n: string,
-        f?: (name: string) => unknown,
-      ) => { arelTable: Table | Nodes.TableAlias };
-    };
-    if (typeof ctx?.associatedTable === "function") {
-      return ctx.associatedTable(tableName, fallback).arelTable.get(columnName);
-    }
-    // Rails' PredicateBuilder always holds a TableMetadata, so `associated_table`
-    // is always reachable and never yields a caster-less table; trails' holds the
-    // raw Arel table plus the metadata as `_tableContext`, so a builder
-    // constructed without one lands here. Attach a caster the way the no-klass
-    // branch of associated_table does (table_metadata.rb:47-48) — with
-    // type_for_attribute delegating bare, a bare table would raise.
-    const klass = (this._tableContext as { klass?: unknown })?.klass ?? null;
-    return new Table(tableName, {
-      typeCaster: new TypeCasterConnection(klass as never, tableName),
-    }).get(columnName);
+    return this.table
+      .associatedTable(tableName, fallback as (name: string) => never)
+      .arelTable.get(columnName);
   }
 
-  with(context: any): PredicateBuilder {
-    const table = context?.arelTable ?? this.table;
+  with(table: TableMetadata): PredicateBuilder {
     const builder = new PredicateBuilder(table);
     builder.handlers = [...this.handlers];
-    builder._tableContext = context;
     return builder;
-  }
-
-  /** Set context without cloning — use only when constructing a fresh builder. */
-  setTableContext(context: any): void {
-    this._tableContext = context;
   }
 
   /**
