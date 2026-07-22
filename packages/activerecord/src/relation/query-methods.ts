@@ -234,7 +234,6 @@ interface QueryMethodsHost {
   _skipQueryCache: boolean | undefined;
   _modelClass: typeof import("../base.js").Base;
   predicateBuilder: import("./predicate-builder.js").PredicateBuilder;
-  _castWhereValue(key: string, value: unknown): unknown;
 }
 
 // ---------------------------------------------------------------------------
@@ -1044,10 +1043,14 @@ export function buildWhereClause(
     referencesBang.call(this, ...referencesFromConditions(opts));
     const mc = (this as any)._modelClass;
     const aliases: Record<string, string> = mc?._attributeAliases ?? {};
+    // Rails never pre-casts hash values here — build_where_clause hands them
+    // raw to PredicateBuilder, whose QueryAttribute bind casts/serializes at
+    // compile time (predicate_builder.rb:57-69 → build_bind_attribute →
+    // value_for_database).
     const normalized: Record<string, unknown> = {};
     for (const [key, value] of Object.entries(opts)) {
       const resolved = aliases[key] ?? key;
-      normalized[resolved] = isRelationLike(value) ? value : this._castWhereValue(resolved, value);
+      normalized[resolved] = value;
     }
     const block = (tableName: string) => lookupTableKlassFromJoinDependencies.call(this, tableName);
     const parts = this.predicateBuilder.buildFromHash(normalized, block);
@@ -1361,11 +1364,7 @@ function havingBang(
     throw argumentError(`Unsupported argument type for having: ${typeof opts} (${String(opts)})`);
   }
 
-  const cast: Record<string, unknown> = {};
-  for (const [key, value] of Object.entries(opts)) {
-    cast[key] = isRelationLike(value) ? value : this._castWhereValue(key, value);
-  }
-  this._havingClause.predicates.push(...this.predicateBuilder.buildFromHash(cast));
+  this._havingClause.predicates.push(...this.predicateBuilder.buildFromHash(opts));
   return this;
 }
 
