@@ -345,7 +345,7 @@ describe("EagerAssociationTest", () => {
   });
   it("type cast in where references association name", async () => {
     const parent = comments("greetings");
-    const child = await (parent as any).children.create({
+    const child = await (parent as any).children.createBang({
       label: "child",
       body: "hi",
       post_id: parent.post_id,
