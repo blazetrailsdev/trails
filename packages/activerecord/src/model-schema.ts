@@ -362,7 +362,10 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
  * primary key, the inheritance column, and `_id`/`_count` columns.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#content_columns
- * (model_schema.rb:489-495).
+ * (model_schema.rb:489-495). Rails memoizes into `@content_columns` (cleared by
+ * reset_column_information); recomputing here is behaviorally identical — the
+ * underlying `columns` array is already memoized — and avoids threading another
+ * cache slot through SchemaHost and the reset/STI cache-host plumbing.
  */
 export function contentColumns(this: typeof Base): any[] {
   const pk = this.primaryKey;
