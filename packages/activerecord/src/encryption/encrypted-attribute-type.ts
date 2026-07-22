@@ -170,17 +170,6 @@ export class EncryptedAttributeType extends ValueType implements WrappedType {
     return this.castType.type();
   }
 
-  // Deviation from Rails' `binary?` (false on EncryptedAttributeType): Ruby's
-  // Binary#deserialize returns a binary-encoded STRING, so a wrapping coder's
-  // `load` works on it directly. trails' BinaryType yields bytes, and
-  // Serialized#deserialize's bytes→utf8 compensation (type/serialized.ts) is
-  // gated on `subtype.isBinary()` — for the encrypts-before-serialize nesting
-  // (Serialized(Encrypted(Binary))) that subtype is this type, so delegate to
-  // the cast type like `type()` above or the compensation never fires.
-  override isBinary(): boolean {
-    return this.castType.isBinary();
-  }
-
   get previousTypes(): EncryptedAttributeType[] {
     // Key on both supportUnencryptedData and the global-previous version counter
     // so the list is recomputed whenever config changes (e.g. configure() called

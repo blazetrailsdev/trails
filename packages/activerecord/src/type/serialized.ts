@@ -271,9 +271,13 @@ export class Serialized extends ValueType {
     // Rails: binary subtypes (bytea) return a binary-encoded Ruby String; JS
     // returns a Uint8Array. BinaryType.serialize pipes coder.dump() output
     // through TextEncoder (UTF-8), so the bridge must invert with UTF-8 to
-    // recover the string coder.load() expects.
+    // recover the string coder.load() expects. Gated on `type()`, not
+    // `isBinary()`: an EncryptedAttributeType subtype (encrypts-then-serialize
+    // nesting) delegates `type` — but NOT `binary?` — to its binary cast type
+    // (encrypted_attribute_type.rb:16, value.rb:77-79), and its deserialize
+    // yields the cast type's bytes, which need the same inversion.
     const forCoder =
-      this.subtype.isBinary() && deserialized instanceof Uint8Array
+      this.subtype.type?.() === "binary" && deserialized instanceof Uint8Array
         ? Buffer.from(deserialized).toString("utf8")
         : deserialized;
     return this.coder.load(forCoder);
