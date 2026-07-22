@@ -2143,7 +2143,10 @@ describe("PersistenceTest", () => {
     await Base.connection.dropTable("pk_autopopulated_by_a_trigger_records", { ifExists: true });
   });
 
-  it.skipIf(!supportsTrigger)(
+  // Inline De-Morgan'd skip form of Rails' `if supports_insert_returning? &&
+  // !current_adapter?(:SQLite3Adapter)` — kept inline (not the `supportsTrigger`
+  // const) so the gate extractor reads adapters+features off the expression.
+  it.skipIf(adapterType === "sqlite" || !adapterSupports("insert_returning"))(
     "model with no auto populated fields still returns primary key after insert",
     async () => {
       const record = (await PkAutopopulatedByATriggerRecord.create()) as any;
