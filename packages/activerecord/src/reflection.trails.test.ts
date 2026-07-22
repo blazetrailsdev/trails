@@ -7,7 +7,14 @@
  * counter-cache column helpers exported from reflection.ts.
  */
 import { describe, it, expect } from "vitest";
-import { Base, reflectOnAssociation, registerModel } from "./index.js";
+import { Base, columns, reflectOnAssociation, registerModel } from "./index.js";
+import {
+  configureEncryption,
+  snapshotEncryptionConfig,
+  restoreEncryptionConfig,
+} from "./encryption/test-helpers.js";
+import { EncryptedBookWithSerializedFirstBinary } from "./test-helpers/models/book-encrypted.js";
+import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Associations, modelRegistry } from "./associations.js";
 import {
   AssociationReflection,
@@ -386,5 +393,27 @@ describe("ReflectionTest", () => {
     registerModel("SingularOwner", SingularOwner);
     expect(create("hasMany", "comment", null, {}, PluralOwner).pluralName).toBe("comments");
     expect(create("hasMany", "comment", null, {}, SingularOwner).pluralName).toBe("comment");
+  });
+
+  it("columns reports the column's own type, not the decorated cast type", async () => {
+    // Rails' `columns` is `columns_hash.values` (model_schema.rb:432-434) —
+    // schema-sourced, never attribute-decorated. trails previously built it
+    // from `_attributeDefinitions[].type.constructor.name`, so a decorated
+    // column (serialize + encrypts here) reported the wrapper class instead
+    // of the column's own type.
+    const configSnapshot = snapshotEncryptionConfig();
+    configureEncryption();
+    try {
+      await EncryptedBookWithSerializedFirstBinary.loadSchema();
+      const logo = columns(EncryptedBookWithSerializedFirstBinary).find((c) => c.name === "logo");
+      expect(logo?.type).toBe("binary");
+      // The attribute definition stays decorated — only `columns()` reads
+      // the schema column (the encryption idempotence guard depends on it).
+      expect(EncryptedBookWithSerializedFirstBinary.typeForAttribute("logo")).toBeInstanceOf(
+        EncryptedAttributeType,
+      );
+    } finally {
+      restoreEncryptionConfig(configSnapshot);
+    }
   });
 });
