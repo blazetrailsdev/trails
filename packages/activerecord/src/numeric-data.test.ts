@@ -7,10 +7,6 @@ import { Base } from "./index.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
 
-// Rails guards test_numeric_fields_with_nan with current_adapter?(:PostgreSQLAdapter):
-// only PostgreSQL's numeric type stores NaN (SQLite/MySQL reject 'NaN'::numeric).
-const itPg = adapterType === "postgres" ? it : it.skip;
-
 fixtures([]);
 
 beforeAll(async () => {
@@ -93,7 +89,9 @@ describe("NumericDataTest", () => {
     expect((m1!.big_bank_balance as BigDecimal).toString("F")).toBe("234000567.95");
   });
 
-  itPg("numeric fields with nan", async () => {
+  // Rails guards test_numeric_fields_with_nan with current_adapter?(:PostgreSQLAdapter):
+  // only PostgreSQL's numeric type stores NaN (SQLite/MySQL reject 'NaN'::numeric).
+  it.skipIf(adapterType !== "postgres")("numeric fields with nan", async () => {
     // BigDecimal has no NaN form, so BigDecimal("NaN") (passed in as the JS
     // NaN) round-trips as the sentinel "NaN" rather than a BigDecimal — the
     // stand-in for Rails' `nan?` predicate.
