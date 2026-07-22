@@ -1,4 +1,12 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdirSync,
+  mkdtempSync,
+  readFileSync,
+  rmSync,
+  utimesSync,
+  writeFileSync,
+} from "node:fs";
 import { homedir, tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
@@ -20,6 +28,7 @@ afterEach(() => {
 
 import {
   bestBundle,
+  isIndexStale,
   __setLockDirForTest,
   acquireTasksLock,
   buildRfcContent,
@@ -204,6 +213,28 @@ describe("ready", () => {
     expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
   });
 
+  it("never surfaces a story build-index downgraded under a postponed RFC", () => {
+    // build-index.mjs (tasks repo) emits effective status: a `ready` story
+    // under a non-active RFC arrives here as `draft` with the authored value
+    // in raw_status. Pin that neither ready() nor listFiltered's status
+    // filter resurrects it as claimable from the raw value.
+    const idx = index([
+      story({ id: "active", rfc: "0001-r", raw_status: "ready" }),
+      story({ id: "downgraded", rfc: "0004-r", status: "draft", raw_status: "ready" }),
+    ]);
+    idx.rfcs.push({
+      id: "0004-r",
+      title: "R4",
+      status: "postponed",
+      owner: "@x",
+      packages: [],
+      clusters: ["c1"],
+      file_path: "0004-r/README.md",
+    });
+    expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
+    expect(listFiltered(idx, { status: "ready" }).map((s) => s.id)).toEqual(["active"]);
+  });
+
   it("excludes a ready story whose RFC is null-status or absent from the index", () => {
     const idx = index([
       story({ id: "active", rfc: "0001-r" }), // active → included
@@ -354,6 +385,83 @@ describe("nextBundle", () => {
     const bundle = nextBundle(idx, { maxLoc: 250 });
     // Both clusters tie at 100; either may win, but never both together.
     expect(bundle.length).toBe(1);
+  });
+});
+
+describe("isIndexStale", () => {
+  // Lay out a minimal tasks checkout: rfcs/0001-r/{README.md,stories/s.md},
+  // scripts/build-index.mjs, and index.json, all with controlled mtimes so
+  // each staleness trigger can be exercised independently.
+  function checkout(): { dir: string; index: string; setAge: (rel: string, sec: number) => void } {
+    const dir = mkdtempSync(join(tmpdir(), "tasks-stale-"));
+    mkdirSync(join(dir, "rfcs", "0001-r", "stories"), { recursive: true });
+    mkdirSync(join(dir, "scripts"), { recursive: true });
+    for (const rel of [
+      "rfcs/0001-r/README.md",
+      "rfcs/0001-r/stories/s.md",
+      "scripts/build-index.mjs",
+      "index.json",
+    ]) {
+      writeFileSync(join(dir, rel), "x");
+    }
+    const setAge = (rel: string, sec: number): void => {
+      // utimes takes seconds; positive sec = newer than the epoch base below.
+      utimesSync(join(dir, rel), 1_000_000 + sec, 1_000_000 + sec);
+    };
+    // Baseline: everything older than the index → fresh.
+    for (const rel of [
+      "rfcs/0001-r/README.md",
+      "rfcs/0001-r/stories/s.md",
+      "scripts/build-index.mjs",
+    ])
+      setAge(rel, 0);
+    setAge("index.json", 100);
+    return { dir, index: join(dir, "index.json"), setAge };
+  }
+
+  it("reports fresh when the index is newest", () => {
+    const { dir, index } = checkout();
+    expect(isIndexStale(index, dir)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects a story file newer than the index (rfcs/ layout, not repo root)", () => {
+    const { dir, index, setAge } = checkout();
+    setAge("rfcs/0001-r/stories/s.md", 200);
+    expect(isIndexStale(index, dir)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects an RFC README newer than the index (status flips live there)", () => {
+    const { dir, index, setAge } = checkout();
+    setAge("rfcs/0001-r/README.md", 200);
+    expect(isIndexStale(index, dir)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects edits under a legacy draft-slug RFC dir (indexed by RFC_DIR_RE too)", () => {
+    const { dir, index, setAge } = checkout();
+    mkdirSync(join(dir, "rfcs", "draft-r", "stories"), { recursive: true });
+    writeFileSync(join(dir, "rfcs", "draft-r", "stories", "s.md"), "x");
+    setAge("rfcs/draft-r/stories/s.md", 200);
+    expect(isIndexStale(index, dir)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("ignores 0000-template (excluded from the index, so it can't stale it)", () => {
+    const { dir, index, setAge } = checkout();
+    mkdirSync(join(dir, "rfcs", "0000-template", "stories"), { recursive: true });
+    writeFileSync(join(dir, "rfcs", "0000-template", "README.md"), "x");
+    setAge("rfcs/0000-template/README.md", 200);
+    expect(isIndexStale(index, dir)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
+  it("detects a build script newer than the index (derivation changes must reindex)", () => {
+    const { dir, index, setAge } = checkout();
+    setAge("scripts/build-index.mjs", 200);
+    expect(isIndexStale(index, dir)).toBe(true);
+    rmSync(dir, { recursive: true, force: true });
   });
 });
 

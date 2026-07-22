@@ -105,7 +105,14 @@ export interface StoryEntry {
   id: string;
   rfc: string;
   title: string | null;
+  // The EFFECTIVE status: build-index.mjs downgrades `ready` to `draft` when
+  // the parent RFC is not active (effectiveStoryStatus in validate-lib.mjs),
+  // so no index.json consumer can surface such a story as claimable. The
+  // ready() gate below re-checks the RFC status anyway — belt and suspenders.
   status: StoryStatus | null;
+  // The authored frontmatter status, before the parent-RFC override. Optional:
+  // absent from index.json files built before the override existed.
+  raw_status?: string | null;
   cluster: string | null;
   deps: string[];
   deps_rfc: string[];
@@ -142,19 +149,44 @@ export function loadIndex(): Index {
   return JSON.parse(readFileSync(indexPath, "utf8")) as Index;
 }
 
-function isIndexStale(indexPath: string): boolean {
+export function isIndexStale(indexPath: string, tasksDir: string = TASKS_DIR): boolean {
   const indexMtime = statSync(indexPath).mtimeMs;
-  for (const rfcDir of readdirSync(TASKS_DIR)) {
-    if (!/^\d{4}-/.test(rfcDir)) continue;
+  // index.json is DERIVED by scripts/*.mjs (build-index.mjs plus the lib/
+  // validate-lib modules it imports). A script change with no content edit —
+  // e.g. the effective-status derivation that downgrades `ready` under a
+  // non-active RFC — must invalidate an index the old code built, or every
+  // consumer keeps serving the old shape until some story file happens to
+  // change.
+  const scriptsDir = join(tasksDir, "scripts");
+  let scriptNames: string[];
+  try {
+    scriptNames = readdirSync(scriptsDir);
+  } catch {
+    scriptNames = [];
+  }
+  for (const name of scriptNames) {
+    if (!name.endsWith(".mjs")) continue;
+    if (statSync(join(scriptsDir, name)).mtimeMs > indexMtime) return true;
+  }
+  // RFC dirs live under rfcs/ (post repo-rename layout); scanning the repo
+  // root here — as this function originally did — finds no `NNNN-` dirs and
+  // silently reports every index fresh forever. The dir predicate mirrors
+  // RFC_DIR_RE in the tasks repo's scripts/lib.mjs: numbered `NNNN-slug`,
+  // unnumbered `0000-slug` placeholders, and legacy `draft-slug` all feed the
+  // index (0000-template is excluded there too), so an edit under any of them
+  // must invalidate the cache.
+  const rfcsRoot = join(tasksDir, "rfcs");
+  for (const rfcDir of readdirSync(rfcsRoot)) {
+    if (!/^(?!0000-template$)(?:\d{4}|draft)-[a-z0-9][a-z0-9-]*$/.test(rfcDir)) continue;
     // The RFC README's frontmatter feeds the index too (status, clusters,
     // packages, owner — and clusters drive `deps_rfc` resolution). A
     // README edit without a story touch must invalidate the cache.
     try {
-      if (statSync(join(TASKS_DIR, rfcDir, "README.md")).mtimeMs > indexMtime) return true;
+      if (statSync(join(rfcsRoot, rfcDir, "README.md")).mtimeMs > indexMtime) return true;
     } catch {
       /* missing README — validate step will catch */
     }
-    const storiesDir = join(TASKS_DIR, rfcDir, "stories");
+    const storiesDir = join(rfcsRoot, rfcDir, "stories");
     let entries: string[];
     try {
       entries = readdirSync(storiesDir);
