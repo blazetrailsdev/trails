@@ -547,6 +547,10 @@ describe("TimestampsWithoutTransactionTest", () => {
       created_at: unknown = null;
       updated_at: unknown = null;
     }
+    // Reflect the raw-created table's `id` column: the virtual attribute
+    // declarations suppress lazy DB reflection, and strict _writeAttribute
+    // (write.rb:42) raises when `id=` misses the attribute set.
+    await TimestampAttributePost.loadSchema();
 
     const post = new TimestampAttributePost({ id: 1 });
     await post.save();
