@@ -40,9 +40,12 @@ export class Table extends Node {
     this.typeCaster = options?.typeCaster ?? null;
   }
 
+  // Typed `string`, but — like `visit_Arel_Table` (see its comment) — a caller
+  // may smuggle a `SqlLiteral` name in (Rails' `SqlLiteral` subclasses `String`,
+  // so `Cte#to_table` hands one straight to `Arel::Table.new`). The string
+  // operations below coerce through `nameString` so they don't collapse a
+  // literal to the seed hash or compare it by object identity.
   readonly name: string;
-  readonly tableAlias: string | null;
-  readonly klass?: TableKlass;
 
   /** Mirrors: `Arel::Table.engine` (table.rb:8-9, `class << self; attr_accessor
    *  :engine`). Rails assigns `ActiveRecord::Base` from
@@ -56,6 +59,8 @@ export class Table extends Node {
   static set engine(value: ArelEngine | null) {
     _engine.current = value;
   }
+  readonly tableAlias: string | null;
+  readonly klass?: TableKlass;
 
   /**
    * Create an alias for this table.
@@ -63,7 +68,7 @@ export class Table extends Node {
    * Mirrors: Arel::Table#alias
    */
   alias(name?: string): TableAlias {
-    return new TableAlias(this, name ?? `${this.name}_2`);
+    return new TableAlias(this, name ?? `${this.nameString}_2`);
   }
 
   from(): SelectManager {
@@ -165,8 +170,9 @@ export class Table extends Node {
    */
   override hash(): number {
     let h = 0x811c9dc5;
-    for (let i = 0; i < this.name.length; i++) {
-      h ^= this.name.charCodeAt(i);
+    const name = this.nameString;
+    for (let i = 0; i < name.length; i++) {
+      h ^= name.charCodeAt(i);
       h = Math.imul(h, 0x01000193);
     }
     return h >>> 0;
@@ -178,7 +184,7 @@ export class Table extends Node {
    */
   eql(other: unknown): boolean {
     if (!(other instanceof Table)) return false;
-    return this.name === other.name && this.tableAlias === other.tableAlias;
+    return this.nameString === other.nameString && this.tableAlias === other.tableAlias;
   }
 
   typeCastForDatabase(attrName: string, value: unknown): unknown {
@@ -189,13 +195,19 @@ export class Table extends Node {
     return (this.typeCaster as TypeCaster).typeForAttribute(name);
   }
 
+  isAbleToTypeCast(): boolean {
+    return this.typeCaster != null;
+  }
+
   /** Rails: `private attr_reader :type_caster` (table.rb:115). An aliased table
    *  is a `TableAlias` wrapping this one and delegates its caster back here
    *  (table_alias.rb:22-24), so no external reader is needed. */
   private readonly typeCaster: unknown;
 
-  isAbleToTypeCast(): boolean {
-    return this.typeCaster != null;
+  /** The name as a bare string, unwrapping any smuggled `SqlLiteral`. */
+  private get nameString(): string {
+    const n = this.name as string | SqlLiteral;
+    return n instanceof SqlLiteral ? n.value : n;
   }
 
   get(name: string, table?: Attribute["relation"]): Attribute {
