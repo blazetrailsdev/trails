@@ -3718,7 +3718,14 @@ export class Base extends Model {
       const lockIdx = declaredChanges.indexOf(lockCol);
       if (lockIdx !== -1) updateValues.splice(lockIdx, 1);
       this._writeAttribute(lockCol, currentVersion + 1);
-      updateValues.push([table.get(lockCol), currentVersion + 1]);
+      // Rails increments `self[locking_column]` and lets `_update_record` pass
+      // the attribute to Arel like every other SET column (optimistic.rb:
+      // 101-108 → persistence.rb attributes_with_values), so the bumped lock
+      // value is bound, not inlined — route through the same write-path node.
+      updateValues.push([
+        table.get(lockCol),
+        writePathValueNode(ctor._attributeDefinitions.get(lockCol), currentVersion + 1, adapter),
+      ]);
     }
 
     const um = new UpdateManager()
