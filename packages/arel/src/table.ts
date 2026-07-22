@@ -31,19 +31,6 @@ export interface TypeCaster {
  */
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
 export class Table extends Node {
-  constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
-    super();
-    this.name = name;
-    const as = options?.as ?? null;
-    this.tableAlias = as === name ? null : as;
-    this.klass = options?.klass;
-    this.typeCaster = options?.typeCaster ?? null;
-  }
-
-  readonly name: string;
-  readonly tableAlias: string | null;
-  readonly klass?: TableKlass;
-
   /** Mirrors: `Arel::Table.engine` (table.rb:8-9, `class << self; attr_accessor
    *  :engine`). Rails assigns `ActiveRecord::Base` from
    *  `active_record.rb:562-564`; trails assigns it at the bottom of
@@ -55,6 +42,19 @@ export class Table extends Node {
 
   static set engine(value: ArelEngine | null) {
     _engine.current = value;
+  }
+
+  readonly name: string;
+  readonly tableAlias: string | null;
+  readonly klass?: TableKlass;
+
+  constructor(name: string, options?: { as?: string; klass?: TableKlass; typeCaster?: unknown }) {
+    super();
+    this.name = name;
+    const as = options?.as ?? null;
+    this.tableAlias = as === name ? null : as;
+    this.klass = options?.klass;
+    this.typeCaster = options?.typeCaster ?? null;
   }
 
   /**

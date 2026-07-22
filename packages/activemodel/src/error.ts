@@ -83,30 +83,6 @@ export class Error {
   readonly rawType: string;
   readonly options: Record<string, unknown>;
 
-  constructor(
-    base: ModelBase,
-    attribute: string,
-    type: string = "invalid",
-    options: Record<string, unknown> = {},
-    rawType?: string,
-  ) {
-    this.base = base;
-    this.attribute = attribute;
-    // Rails `NestedError#initialize` keeps `@raw_type = inner_error.raw_type`
-    // while allowing `@type` to be overridden via `override_options[:type]`
-    // (activemodel/lib/active_model/nested_error.rb:8-15). Message
-    // generation keys off `raw_type` so i18n lookups still resolve the
-    // original error's key even when the surface `type` has been renamed.
-    // `rawType` defaults to `type` for the common case where they match.
-    this.rawType = rawType ?? type;
-    this.type = type || "invalid";
-    this.options = options;
-  }
-
-  get fullMessage(): string {
-    return Error.fullMessage(this.attribute, this.message, this.base);
-  }
-
   static fullMessage(attribute: string, message: string, base: ModelBase): string {
     if (attribute === "base") return message;
     const modelClass = base?.constructor as ModelClass | undefined;
@@ -246,6 +222,26 @@ export class Error {
     });
   }
 
+  constructor(
+    base: ModelBase,
+    attribute: string,
+    type: string = "invalid",
+    options: Record<string, unknown> = {},
+    rawType?: string,
+  ) {
+    this.base = base;
+    this.attribute = attribute;
+    // Rails `NestedError#initialize` keeps `@raw_type = inner_error.raw_type`
+    // while allowing `@type` to be overridden via `override_options[:type]`
+    // (activemodel/lib/active_model/nested_error.rb:8-15). Message
+    // generation keys off `raw_type` so i18n lookups still resolve the
+    // original error's key even when the surface `type` has been renamed.
+    // `rawType` defaults to `type` for the common case where they match.
+    this.rawType = rawType ?? type;
+    this.type = type || "invalid";
+    this.options = options;
+  }
+
   get message(): string {
     // Rails error.rb:136-141: dispatch on raw_type shape — Symbol → generate_message, else → literal.
     // TS has no Symbol type; identifier-shaped strings (no spaces/punctuation) are the equivalent.
@@ -281,6 +277,10 @@ export class Error {
 
   get detail(): Record<string, unknown> {
     return this.details;
+  }
+
+  get fullMessage(): string {
+    return Error.fullMessage(this.attribute, this.message, this.base);
   }
 
   /**

@@ -57,14 +57,14 @@ export class Casted extends NodeExpression {
   readonly value: unknown;
   readonly attribute: Attribute;
 
+  valueBeforeTypeCast(): unknown {
+    return this.value;
+  }
+
   constructor(value: unknown, attribute: Attribute) {
     super();
     this.value = value;
     this.attribute = attribute;
-  }
-
-  valueBeforeTypeCast(): unknown {
-    return this.value;
   }
 
   /**

@@ -12,10 +12,6 @@ export class AttributeSet {
   private attributes: Map<string, Attribute>;
   private _frozen = false;
 
-  constructor(attributes: Map<string, Attribute> = new Map()) {
-    this.attributes = attributes;
-  }
-
   /**
    * Yield each underlying Attribute value.
    *
@@ -55,6 +51,10 @@ export class AttributeSet {
       if (!drop.has(name)) result.set(name, attr);
     }
     return result;
+  }
+
+  constructor(attributes: Map<string, Attribute> = new Map()) {
+    this.attributes = attributes;
   }
 
   castTypes(): Record<string, import("./type/value.js").Type> {

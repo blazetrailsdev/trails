@@ -4,14 +4,14 @@ import { NodeExpression } from "./node-expression.js";
 export class Unary extends NodeExpression {
   readonly expr: unknown;
 
-  constructor(expr: unknown) {
-    super();
-    this.expr = expr;
-  }
-
   // Mirrors Rails `alias :value :expr` (unary.rb:7).
   get value(): unknown {
     return this.expr;
+  }
+
+  constructor(expr: unknown) {
+    super();
+    this.expr = expr;
   }
 
   accept<T>(visitor: NodeVisitor<T>): T {

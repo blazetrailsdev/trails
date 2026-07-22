@@ -20,11 +20,6 @@ export class Composite {
   private right: CollectorLike;
   preparable = true;
 
-  constructor(left: CollectorLike, right: CollectorLike) {
-    this.left = left;
-    this.right = right;
-  }
-
   get retryable(): boolean {
     if ("retryable" in this.left && this.left.retryable === false) return false;
     if ("retryable" in this.right && this.right.retryable === false) return false;
@@ -36,6 +31,11 @@ export class Composite {
       (this.left as CollectorLike & { retryable: boolean }).retryable = value;
     if ("retryable" in this.right)
       (this.right as CollectorLike & { retryable: boolean }).retryable = value;
+  }
+
+  constructor(left: CollectorLike, right: CollectorLike) {
+    this.left = left;
+    this.right = right;
   }
 
   addBind(value: unknown, block?: (index: number) => string): this {

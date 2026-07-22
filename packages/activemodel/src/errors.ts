@@ -23,10 +23,6 @@ export class Errors<TBase extends object = object> {
   private _errors: ActiveModelError[] = [];
   private _base: TBase | null;
 
-  constructor(base: TBase | null) {
-    this._base = base;
-  }
-
   get errors(): this {
     return this;
   }
@@ -38,6 +34,10 @@ export class Errors<TBase extends object = object> {
    */
   get objects(): ActiveModelError[] {
     return this._errors;
+  }
+
+  constructor(base: TBase | null) {
+    this._base = base;
   }
 
   /**

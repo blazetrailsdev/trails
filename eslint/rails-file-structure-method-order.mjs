@@ -26,6 +26,14 @@
  * unmatched class body with the sole unmatched bucket. Anything more
  * ambiguous is left unordered.
  *
+ * A manifest entry is `name` for a Ruby instance method and `static name`
+ * for a Ruby class method. Staticness discriminates only when it has to:
+ * a slot prefers a member of matching staticness, and falls back to a
+ * mismatched one when the container declares nothing with the expected
+ * staticness (the common port that flipped instance↔static). A same-named
+ * member of the OTHER staticness, when Rails defines only one of the two,
+ * is a trails invention and stays in the unmapped tail.
+ *
  * Autofix carries leading JSDoc / line comments with each declaration
  * (a comment is attached if it ends on the line immediately preceding
  * the next attached comment or the declaration itself).
@@ -218,55 +226,82 @@ function groupUnits(members) {
   const units = [];
   for (const m of members) {
     const name = memberName(m);
+    const isStatic = m.static === true;
     const prev = units[units.length - 1];
-    if (prev && prev.name === name && name !== null) {
+    // Staticness is part of the grouping key: an adjacent `static foo` /
+    // `foo` pair are two distinct members that map to two distinct Rails
+    // definitions, so they must not collapse into one movable unit.
+    if (prev && prev.name === name && prev.isStatic === isStatic && name !== null) {
       prev.members.push(m);
     } else {
-      units.push({ name, members: [m] });
+      units.push({ name, isStatic, members: [m] });
     }
   }
   return units;
 }
 
-function computeTargetOrder(currentNodes, expectedOrder) {
-  const names = currentNodes.map((u) => u.name);
-  const expectedSet = new Set(expectedOrder);
-  // Mapped subset in current order — used to detect "already correct"
-  // without rebuilding when nothing maps.
-  const mappedIdxByName = new Map();
-  names.forEach((n, i) => {
-    if (n && expectedSet.has(n) && !mappedIdxByName.has(n)) mappedIdxByName.set(n, i);
-  });
-  if (mappedIdxByName.size === 0) return currentNodes;
+// Manifest entries are `name` (instance) or `static name` (Rails class method).
+function parseExpected(entry) {
+  return entry.startsWith("static ")
+    ? { name: entry.slice(7), isStatic: true }
+    : { name: entry, isStatic: false };
+}
 
-  // Target: for each expected name, take ALL same-named nodes (in their
-  // current relative order) and place them together at the manifest
-  // position. Keeps getter/setter pairs and TS overload signatures
-  // grouped — splitting them would corrupt the class.
-  // Then append remaining unmapped nodes in their current order.
+// `declaredKeys` holds `static name` / `name` for EVERY member the container
+// declares, including ones that are not themselves orderable. `Arel::Table`'s
+// `static engine` is a PropertyDefinition (a field, not a method), so it never
+// becomes a unit — but it is still the member that owns the Rails
+// `static engine` slot, and its presence is what disqualifies the invented
+// instance `get engine()` from being moved into that slot.
+function computeTargetOrder(currentNodes, expectedOrder, declaredKeys) {
+  const expected = expectedOrder.map(parseExpected);
+  const names = currentNodes.map((u) => u.name);
+  const expectedNames = new Set(expected.map((e) => e.name));
+  // Does anything map at all? Used to detect "nothing to do" without
+  // rebuilding. Staticness only ever narrows which unit fills a slot, so
+  // a name-level check is the right coarse gate here.
+  if (!names.some((n) => n && expectedNames.has(n))) return currentNodes;
+
   const used = new Array(currentNodes.length).fill(false);
   const target = [];
 
-  // Constructor carve-out: TS class `constructor` always sorts first
-  // even when not in the manifest. Some Rails classes inherit from
-  // Struct (no explicit `initialize`), so the manifest omits
-  // `constructor` entirely; without this carve-out the constructor
-  // falls into the unmapped tail (visually unusual).
-  for (let i = 0; i < currentNodes.length; i++) {
-    if (!used[i] && names[i] === "constructor") {
-      target.push(currentNodes[i]);
-      used[i] = true;
-    }
-  }
-
-  for (const name of expectedOrder) {
-    if (name === "constructor") continue;
+  // Constructor carve-out: some Rails classes inherit from Struct and have
+  // no explicit `initialize`, so the manifest omits `constructor` and it
+  // would land in the unmapped tail (visually unusual) — hoist it in that
+  // case only. When the manifest DOES list `constructor`, Rails has a real
+  // `initialize` with a real source position, and honoring that position is
+  // the whole point of the manifest: `ActiveModel::Error` defines
+  // `def self.full_message` (error.rb:15) and `def self.generate_message`
+  // (:64) BEFORE `initialize` (:103). An unconditional hoist made those
+  // files lint clean while ordered wrongly.
+  if (!expectedNames.has("constructor")) {
     for (let i = 0; i < currentNodes.length; i++) {
-      if (used[i]) continue;
-      if (names[i] === name) {
+      if (!used[i] && names[i] === "constructor") {
         target.push(currentNodes[i]);
         used[i] = true;
       }
+    }
+  }
+
+  // Fill each expected slot. Prefer units whose staticness matches the Rails
+  // definition. Fall back to a staticness-mismatched unit only when the
+  // container declares NO member with the expected staticness — that is the
+  // common, benign case of a port that legitimately flipped instance↔static,
+  // and matching it keeps those files ordered exactly as before.
+  //
+  // When the expected member IS declared, a differently-scoped same-named
+  // member is a trails invention with no Rails counterpart, so it stays in the
+  // unmapped tail rather than being moved into a slot that belongs to its
+  // sibling. `Arel::Table` is the case: Rails has only the class-level
+  // `attr_accessor :engine` (table.rb:9); trails' extra instance
+  // `get engine()` is an invention and gets no Rails-derived position.
+  for (const { name, isStatic } of expected) {
+    const exactDeclared = declaredKeys.has(isStatic ? `static ${name}` : name);
+    for (let i = 0; i < currentNodes.length; i++) {
+      if (used[i] || names[i] !== name) continue;
+      if (exactDeclared && currentNodes[i].isStatic !== isStatic) continue;
+      target.push(currentNodes[i]);
+      used[i] = true;
     }
   }
   for (let i = 0; i < currentNodes.length; i++) {
@@ -371,7 +406,13 @@ const rule = {
         if (name) allClassNames.add(name);
         const orderable = node.body.filter(isOrderableClassMember);
         if (orderable.length < 2) return;
-        classCandidates.push({ node, name, members: orderable });
+        // Every declared member, orderable or not — see computeTargetOrder.
+        const declaredKeys = new Set();
+        for (const m of node.body) {
+          const n = memberName(m);
+          if (n) declaredKeys.add(m.static === true ? `static ${n}` : n);
+        }
+        classCandidates.push({ node, name, members: orderable, declaredKeys });
       },
       "Program:exit"(programNode) {
         // Assign each class body its manifest bucket. Exact TS-name match
@@ -408,7 +449,11 @@ const rule = {
         }
         for (const cand of classCandidates) {
           if (cand.expectedOrder) {
-            containers.push({ members: cand.members, expectedOrder: cand.expectedOrder });
+            containers.push({
+              members: cand.members,
+              expectedOrder: cand.expectedOrder,
+              declaredKeys: cand.declaredKeys,
+            });
           }
         }
 
@@ -419,6 +464,8 @@ const rule = {
             container: programNode,
             members: topLevel,
             expectedOrder: functionOrder,
+            // Top-level functions have no staticness; every name is "instance".
+            declaredKeys: new Set(topLevel.map(memberName).filter(Boolean)),
           });
         }
 
@@ -441,12 +488,12 @@ const rule = {
         let firstMismatch = null; // { node, expectedName, beforeName }
         let mismatchCount = 0;
 
-        for (const { members, expectedOrder } of containers) {
+        for (const { members, expectedOrder, declaredKeys } of containers) {
           // Collapse consecutive same-named members into units before
           // reorder, so TS overload groups (and class accessor pairs
           // where the pair is already adjacent) move as a single block.
           const units = groupUnits(members);
-          const target = computeTargetOrder(units, expectedOrder);
+          const target = computeTargetOrder(units, expectedOrder, declaredKeys);
           if (!ordersDiffer(units, target)) continue;
 
           // Each unit's slot spans from the first member's extended

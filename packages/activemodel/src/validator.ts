@@ -77,14 +77,14 @@ export function shouldValidate(record: ValidatableRecord, options: ConditionalOp
 export abstract class Validator<TBase extends object = object> {
   readonly options: Record<string, unknown>;
 
-  constructor(options: Record<string, unknown> = {}) {
-    const { class: _cls, ...rest } = options;
-    this.options = Object.freeze(rest);
-  }
-
   static get kind(): string {
     const name = underscore(this.name);
     return name.endsWith("_validator") ? name.slice(0, -"_validator".length) : name;
+  }
+
+  constructor(options: Record<string, unknown> = {}) {
+    const { class: _cls, ...rest } = options;
+    this.options = Object.freeze(rest);
   }
 
   get kind(): string {
