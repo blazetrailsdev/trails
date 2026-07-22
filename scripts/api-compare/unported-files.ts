@@ -285,6 +285,46 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "have no JavaScript equivalent.",
   },
   {
+    testFile: "inheritance_test.rb",
+    className: "InheritanceTest",
+    tests: [
+      "compute type no method error",
+      "compute type on undefined method",
+      "compute type argument error",
+    ],
+    reason:
+      "Registers an Object.autoload for a model whose file raises during require, so the " +
+      "exception surfaces from constantize inside compute_type. JS has no autoload/require " +
+      "hook — a module either resolves at import time or the constant simply doesn't exist.",
+  },
+  {
+    testFile: "inheritance_test.rb",
+    className: "InheritanceTest",
+    tests: ["base class activerecord error"],
+    reason:
+      "Asserts `Class.new { include ActiveRecord::Inheritance }` raises ActiveRecordError via " +
+      "Ruby's Module#included hook. Trails mixes modules in statically; there is no runtime " +
+      "include on an arbitrary class to guard.",
+  },
+  {
+    testFile: "inheritance_test.rb",
+    className: "InheritanceTest",
+    tests: ["new with autoload paths"],
+    reason:
+      "Stands up a Zeitwerk loader at runtime so STI dispatch resolves a constant from an " +
+      "autoload path. JS has no runtime constant autoloading; trails resolves subclasses via " +
+      "explicit registerSubclass.",
+  },
+  {
+    testFile: "inheritance_test.rb",
+    className: "InheritanceComputeTypeTest",
+    tests: ["instantiation doesnt try to require corresponding file"],
+    reason:
+      "Exercises Ruby constant-lookup/dependencies integration: a DB type with no top-level " +
+      "constant raises RecordNotFound, then const_set on the test class vs on Firm changes " +
+      "which constant compute_type sees. JS has no const_missing/autoload namespace walk.",
+  },
+  {
     testFile: "modules_test.rb",
     tests: [
       "module spanning associations",
