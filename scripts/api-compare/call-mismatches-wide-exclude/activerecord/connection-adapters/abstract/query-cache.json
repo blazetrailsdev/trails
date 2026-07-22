@@ -11,14 +11,14 @@
     "tsFile": "connection-adapters/abstract/query-cache.ts",
     "rubyName": "query_cache",
     "call": "compute_if_absent",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails query_cache.rb:187-191 calls `@thread_query_caches.compute_if_absent(IsolatedExecutionState.context)`; trails query-cache.ts:318-322 calls the same computeIfAbsent with `executionContextId()` standing in for IsolatedExecutionState.context — the getter form keeps the extractor from crediting the calls."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails query_cache.rb:187-191 calls `@thread_query_caches.compute_if_absent(IsolatedExecutionState.context)`; trails query-cache.ts:318-322 makes the same computeIfAbsent call with `executionContextId()` standing in for IsolatedExecutionState.context — the TS method is a getter, and the extractor records no calls for getters (its ts-api record carries no call set), so both reads go uncredited."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/query-cache.ts",
     "rubyName": "query_cache",
     "call": "context",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails query_cache.rb:187-191 calls `@thread_query_caches.compute_if_absent(IsolatedExecutionState.context)`; trails query-cache.ts:318-322 calls the same computeIfAbsent with `executionContextId()` standing in for IsolatedExecutionState.context — the getter form keeps the extractor from crediting the calls."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails query_cache.rb:187-191 calls `@thread_query_caches.compute_if_absent(IsolatedExecutionState.context)`; trails query-cache.ts:318-322 makes the same computeIfAbsent call with `executionContextId()` standing in for IsolatedExecutionState.context — the TS method is a getter, and the extractor records no calls for getters (its ts-api record carries no call set), so both reads go uncredited."
   },
   {
     "package": "activerecord",

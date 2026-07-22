@@ -11,6 +11,6 @@
     "tsFile": "generators/resource-helpers.ts",
     "rubyName": "controller_file_path",
     "call": "join",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails resource_helpers.rb:46-48 joins `(controller_class_path + [controller_file_name]).join(\"/\")`; trails resource-helpers.ts:38-39 performs the identical `[...].join(\"/\")` — flagged only because the extractor does not credit calls inside concise arrow-function exports."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails resource_helpers.rb:46-48 joins `(controller_class_path + [controller_file_name]).join(\"/\")`; trails resource-helpers.ts:38-39 performs the identical `[...].join(\"/\")` — the extractor credits the controllerClassPath/controllerFileName reads but not calls whose receiver is an array literal, so `join` goes unrecorded (confirmed against output/ts-api.json)."
   }
 ]
