@@ -617,6 +617,9 @@ class TestExtractor
     gate = {}
     # A condition that is ONLY Trilogy-positive runs nowhere in trails: emit the
     # explicit empty adapter set (distinct from "no gate" = runs everywhere).
+    # Restricted to pure adapter conditions: a compound like `if Trilogy &&
+    # supports_x?` keeps its feature/guard gate instead — conservative, but
+    # comparable, and no such compound exists in the Rails suite today.
     if trilogy_only && positive && acc[:features].empty? && acc[:guards].empty?
       gate[:adapters] = []
     end
