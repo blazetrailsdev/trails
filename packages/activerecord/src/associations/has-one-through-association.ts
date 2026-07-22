@@ -2,7 +2,6 @@ import type { Base } from "../base.js";
 import type { AssociationDefinition } from "../associations.js";
 import { HasOneAssociation, sameRecord } from "./has-one-association.js";
 import {
-  HasOnePersistedAssignmentError,
   HasOneThroughCantAssociateThroughHasOneOrManyReflection,
   HasOneThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
@@ -29,10 +28,21 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   /**
    * A has_one_through persists its association through a join-model
    * build/create/update/destroy (`createThroughRecord`), not the direct
-   * foreign-key save the base `HasOneAssociation` uses. The through target
-   * therefore keeps its own deferred-replace queue (flushed post-commit by
-   * `flushPendingReplaces` → `persistReplace`); the base has_one converged onto
-   * the single `autosaveHasOne` path and no longer carries this.
+   * foreign-key save the base `HasOneAssociation` uses, so it keeps its own
+   * replace queue. Two roles survive, both Rails-faithful:
+   *
+   *   - **New owner** — Rails' `create_through_record` takes the
+   *     `owner.new_record? || !save` arm and only *builds* the join record
+   *     (has_one_through_association.rb:36-37); the row is written at the
+   *     owner's first `save`. This marker carries that deferral.
+   *   - **Sync `build`/`create` on a persisted owner** — the `!save` half of the
+   *     same arm, reached from non-awaitable builders that cannot `await` the
+   *     join-row reconcile; `persistThroughRecord` drains it inside the save.
+   *
+   * It is NOT a deferral for assignment to a persisted owner: `writer` runs
+   * `persistReplace` inline (clearing the marker before it returns), mirroring
+   * Rails' assignment-time `through_proxy.create` / `through_record.update`
+   * (:30-40).
    */
   _pendingReplace: { record: Base | null; readonly previousTarget: Base | null } | null = null;
 
@@ -96,34 +106,13 @@ export class HasOneThroughAssociation extends HasOneAssociation {
   }
 
   /**
-   * The non-awaitable property-setter / mass-assignment path. Same
-   * throw-or-in-memory dispatch as the base `HasOneAssociation#queueWrite`:
-   * a persisted owner throws (Rails persists the join-row displacement inline
-   * at assignment, which needs `await` in JS — see RFC 0068), and an
-   * unpersisted owner does the in-memory `replace` (which builds the join
-   * record for the owner's next `save()` to persist).
-   */
-  override queueWrite(record: Base | null): void {
-    // Preserve Rails' leading synchronous class-mismatch guard
-    // (has_one_association.rb:59-60) before the persisted-owner throw, matching
-    // the base `HasOneAssociation#queueWrite`.
-    if (record) {
-      (this as unknown as { raiseOnTypeMismatchBang(r: Base): void }).raiseOnTypeMismatchBang(
-        record,
-      );
-    }
-    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
-      throw new HasOnePersistedAssignmentError(this.reflection.name);
-    }
-    this.replace(record);
-  }
-
-  /**
    * Mirrors Rails `HasOneThroughAssociation#replace` immediate persist to a
    * saved owner. The base `writer` saves the target's foreign key directly,
    * which is wrong for a through (persistence routes through the join model), so
-   * we override to run the deferred `persistReplace` instead. For a new owner
-   * persistence defers to the owner's next save (`flushPendingReplaces`).
+   * we override to run `persistReplace` — the join-row create/update/destroy of
+   * `create_through_record` (:15-40) — inline, before this returns. For a new
+   * owner Rails takes the `owner.new_record?` build arm (:36-37), so persistence
+   * defers to the owner's next save.
    */
   override writer(record: Base | null): void | Promise<void> {
     this.replace(record);
