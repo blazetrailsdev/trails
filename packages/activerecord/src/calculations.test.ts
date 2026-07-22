@@ -271,9 +271,7 @@ describe("CalculationsTest", () => {
     expect(keys).toEqual(expect.arrayContaining([6, 2, 9, 1]));
   });
 
-  it.skipIf(adapterType !== "sqlite")("should limit calculation", async () => {
-    // group+order+limit+sum returning ordered keys works on SQLite; PG/MySQL wrap
-    // in a subquery that drops the outer ORDER BY — trails implementation gap.
+  it("should limit calculation", async () => {
     const c = (await Account.where("firm_id IS NOT NULL")
       .group("firm_id")
       .order("firm_id")
@@ -283,7 +281,7 @@ describe("CalculationsTest", () => {
     expect(keys).toEqual([1, 2]);
   });
 
-  it.skipIf(adapterType !== "sqlite")("should limit calculation with offset", async () => {
+  it("should limit calculation with offset", async () => {
     const c = (await Account.where("firm_id IS NOT NULL")
       .group("firm_id")
       .order("firm_id")
@@ -549,9 +547,7 @@ describe("CalculationsTest", () => {
     expect(c[2]).toBe(60);
   });
 
-  it.skipIf(adapterType !== "sqlite")("should calculate with invalid field", async () => {
-    // Rails: both "*" and :all are treated as COUNT(*). In trails, calculate("count", "all")
-    // generates COUNT(all) which is invalid SQL on PG/MySQL — implementation gap.
+  it("should calculate with invalid field", async () => {
     expect(await Account.calculate("count", "*")).toBe(6);
     expect(await Account.calculate("count", "all")).toBe(6);
   });
@@ -1346,13 +1342,19 @@ describe("CalculationsTest", () => {
     ]);
   });
 
-  it.skip(// Rails: PG-only. In trails, maximum("comments_count") fails because the Post model
-  // aliases it as "commentsCount" and the snake_case alias isn't resolved in calculations.
-  "group by with order by virtual count attribute", async () => {
-    const expected = { SpecialPost: 1, StiPost: 2 };
-    const actual = await Post.group("type").order("count").limit(2).maximum("comments_count");
-    expect(actual).toEqual(expected);
-  });
+  it.skipIf(adapterType !== "postgres")(
+    "group by with order by virtual count attribute",
+    async () => {
+      const expected = { SpecialPost: 1, StiPost: 2 };
+      // Rails `order(:count)`: the Symbol qualifies to `"posts"."count"`, which PG
+      // resolves via functional notation as `count(posts.*)` — the "virtual count
+      // attribute". A bare string would stay raw SQL and fail to parse.
+      const actual = await (Post.group("type").order(Symbol.for("count") as any) as any)
+        .limit(2)
+        .maximum("comments_count");
+      expect(actual).toEqual(expected);
+    },
+  );
 
   it("group by with limit", async () => {
     const actual = await Post.includes("comments")
