@@ -110,42 +110,44 @@ export class Attribute extends Node {
   // -- Math --
   //
   // Mirrors Arel::Math: operands pass through unwrapped. The visitor
-  // renders primitive values via `visit` class dispatch.
+  // renders primitive values via `visit` class dispatch. The operand is
+  // typed `NodeOrValue` (not `unknown` + cast) so the union that encodes
+  // what a Rails node slot admits is enforced at the call site.
 
-  add(other: unknown): Grouping {
-    return new Grouping(new Addition(this, other as NodeOrValue));
+  add(other: NodeOrValue): Grouping {
+    return new Grouping(new Addition(this, other));
   }
 
-  subtract(other: unknown): Grouping {
-    return new Grouping(new Subtraction(this, other as NodeOrValue));
+  subtract(other: NodeOrValue): Grouping {
+    return new Grouping(new Subtraction(this, other));
   }
 
-  multiply(other: unknown): Multiplication {
-    return new Multiplication(this, other as NodeOrValue);
+  multiply(other: NodeOrValue): Multiplication {
+    return new Multiplication(this, other);
   }
 
-  divide(other: unknown): Division {
-    return new Division(this, other as NodeOrValue);
+  divide(other: NodeOrValue): Division {
+    return new Division(this, other);
   }
 
-  bitwiseAnd(other: unknown): Grouping {
-    return new Grouping(new BitwiseAnd(this, other as NodeOrValue));
+  bitwiseAnd(other: NodeOrValue): Grouping {
+    return new Grouping(new BitwiseAnd(this, other));
   }
 
-  bitwiseOr(other: unknown): Grouping {
-    return new Grouping(new BitwiseOr(this, other as NodeOrValue));
+  bitwiseOr(other: NodeOrValue): Grouping {
+    return new Grouping(new BitwiseOr(this, other));
   }
 
-  bitwiseXor(other: unknown): Grouping {
-    return new Grouping(new BitwiseXor(this, other as NodeOrValue));
+  bitwiseXor(other: NodeOrValue): Grouping {
+    return new Grouping(new BitwiseXor(this, other));
   }
 
-  bitwiseShiftLeft(other: unknown): Grouping {
-    return new Grouping(new BitwiseShiftLeft(this, other as NodeOrValue));
+  bitwiseShiftLeft(other: NodeOrValue): Grouping {
+    return new Grouping(new BitwiseShiftLeft(this, other));
   }
 
-  bitwiseShiftRight(other: unknown): Grouping {
-    return new Grouping(new BitwiseShiftRight(this, other as NodeOrValue));
+  bitwiseShiftRight(other: NodeOrValue): Grouping {
+    return new Grouping(new BitwiseShiftRight(this, other));
   }
 
   bitwiseNot(): BitwiseNot {
