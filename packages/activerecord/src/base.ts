@@ -852,7 +852,22 @@ function _dispatchAssociationAttrs(
 // prepared-statement parameter (`type_casted_binds`) — null bytes round-trip
 // and intermediate database values (BinaryData, Temporal, BigDecimal) are
 // finished off by each adapter's bind normalization instead of being inlined
-// via `quote()`. Array columns keep their bespoke inline quoting: their
+// via `quote()`.
+//
+// Deviation: the bind carries the pre-extracted `valuesForDatabase()` primitive
+// where Rails' AST carries the Attribute object itself (attribute_methods.rb
+// `attributes_with_values` → persistence.rb `_insert_record`/`_update_record`),
+// keeping type metadata until the adapter's `type_casted_binds`. In trails the
+// Attribute would be resolved to the very same primitive one step later anyway:
+// `toSqlAndBinds` (abstract/database-statements.ts) unwraps every ModelAttribute
+// bind to `valueForDatabase` at compile time — a trails-wide seam shared with
+// the read path and relied on by query-cache keying
+// (`JSON.stringify([sql, binds])`), so threading the Attribute through here is
+// inert. The only driver dispatch keyed off attribute type (SQLite's
+// FloatType → SQLITE_FLOAT for whole-valued floats) is not observable for
+// table writes: a float column's REAL affinity converts an INTEGER-typed bind
+// on storage (verified: `typeof(col)` is 'real' either way).
+// Array columns keep their bespoke inline quoting: their
 // database value is an adapter-specific aggregate literal (`{…}` / `ARRAY[…]`)
 // that the drivers cannot bind as a single scalar parameter — the adapter's
 // `quote` (Rails' `quote(encode_array(value))`) type-casts every element.
