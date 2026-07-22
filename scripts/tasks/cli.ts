@@ -105,7 +105,14 @@ export interface StoryEntry {
   id: string;
   rfc: string;
   title: string | null;
+  // The EFFECTIVE status: build-index.mjs downgrades `ready` to `draft` when
+  // the parent RFC is not active (effectiveStoryStatus in validate-lib.mjs),
+  // so no index.json consumer can surface such a story as claimable. The
+  // ready() gate below re-checks the RFC status anyway — belt and suspenders.
   status: StoryStatus | null;
+  // The authored frontmatter status, before the parent-RFC override. Optional:
+  // absent from index.json files built before the override existed.
+  raw_status?: string | null;
   cluster: string | null;
   deps: string[];
   deps_rfc: string[];

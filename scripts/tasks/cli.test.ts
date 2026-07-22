@@ -204,6 +204,28 @@ describe("ready", () => {
     expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
   });
 
+  it("never surfaces a story build-index downgraded under a postponed RFC", () => {
+    // build-index.mjs (tasks repo) emits effective status: a `ready` story
+    // under a non-active RFC arrives here as `draft` with the authored value
+    // in raw_status. Pin that neither ready() nor listFiltered's status
+    // filter resurrects it as claimable from the raw value.
+    const idx = index([
+      story({ id: "active", rfc: "0001-r", raw_status: "ready" }),
+      story({ id: "downgraded", rfc: "0004-r", status: "draft", raw_status: "ready" }),
+    ]);
+    idx.rfcs.push({
+      id: "0004-r",
+      title: "R4",
+      status: "postponed",
+      owner: "@x",
+      packages: [],
+      clusters: ["c1"],
+      file_path: "0004-r/README.md",
+    });
+    expect(ready(idx).map((s) => s.id)).toEqual(["active"]);
+    expect(listFiltered(idx, { status: "ready" }).map((s) => s.id)).toEqual(["active"]);
+  });
+
   it("excludes a ready story whose RFC is null-status or absent from the index", () => {
     const idx = index([
       story({ id: "active", rfc: "0001-r" }), // active → included
