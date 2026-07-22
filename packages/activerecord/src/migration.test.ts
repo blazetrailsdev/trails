@@ -36,8 +36,8 @@ function emitTableSql(td: TableDefinition): string {
 }
 import { Person } from "./test-helpers/models/person.js";
 import { loadSchemaFromAdapter } from "./model-schema.js";
-import { itIfSupports, describeIfSupports, adapterSupports } from "./test-helpers/supports.js";
-import { describeIfPg, PostgreSQLAdapter, PG_TEST_URL } from "./adapters/postgresql/test-helper.js";
+import { itIfSupports, describeIfSupports } from "./test-helpers/supports.js";
+import { describeIfPg } from "./adapters/postgresql/test-helper.js";
 import {
   describeIfMysql,
   Mysql2Adapter,
@@ -1819,9 +1819,9 @@ describe("MigrationTest", () => {
     });
 
     // "changing columns", "changing column null with default", "default
-    // functions on columns" (PostgreSQL) and "updating auto increment" (MySQL)
-    // are backend-specific; they live in the describeIfPg / describeIfMysql
-    // BulkAlterTableMigrationsTest blocks at the end of this file.
+    // functions on columns" and "updating auto increment" (MySQL) target the
+    // ad-hoc delete_me table; they live in the BulkAlterTableMigrationsTest
+    // blocks at the end of this file.
 
     it("changing index", async () => {
       // Create table with a non-unique index, then swap to a unique index
@@ -2149,27 +2149,27 @@ describe("MigrationTest", () => {
   }); // CopyMigrationsTest
 });
 
-// BulkAlterTableMigrationsTest cases that exercise backend-specific schema
-// statements. PostgreSQL: ALTER COLUMN TYPE / DEFAULT functions; MySQL: AUTO
-// INCREMENT. SQLite can't run these, so they're gated to the live PG / MySQL
-// CI lanes via describeIfPg / describeIfMysql.
-describeIfPg("BulkAlterTableMigrationsTest", () => {
-  let adapter: PostgreSQLAdapter;
+// BulkAlterTableMigrationsTest cases whose bodies run on every bulk_alter
+// backend (pg + mysql), mirroring Rails' `if supports_bulk_alter?` class gate
+// (migration_test.rb:1222): the delete_me table is created through the
+// adapter-generic createTable/changeTable surface, exactly like Rails'
+// `@connection.create_table(:delete_me, force: true)` + with_bulk_change_table.
+describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
+  let adapter: DatabaseAdapter;
   beforeEach(async () => {
-    adapter = new PostgreSQLAdapter(PG_TEST_URL);
-    await adapter.exec("DROP TABLE IF EXISTS delete_me");
+    adapter = await freshAdapter();
+    await adapter.createTable("delete_me", { force: true }, () => {});
   });
   afterEach(async () => {
-    await adapter.exec("DROP TABLE IF EXISTS delete_me");
-    await adapter.close();
+    await adapter.dropTable("delete_me", { ifExists: true });
   });
 
   it("changing columns", async () => {
-    await adapter.exec(
-      `CREATE TABLE delete_me (id serial primary key, name varchar, birthdate date)`,
-    );
-    const ss = adapter.schemaStatements();
-    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
+      t.string("name");
+      t.date("birthdate");
+    });
+    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.change("name", "string", { default: "NONAME" });
       t.change("birthdate", "datetime", { comment: "This is a comment" });
     });
@@ -2181,11 +2181,12 @@ describeIfPg("BulkAlterTableMigrationsTest", () => {
   });
 
   it("changing column null with default", async () => {
-    await adapter.exec(
-      `CREATE TABLE delete_me (id serial primary key, name varchar, age integer, birthdate date)`,
-    );
-    const ss = adapter.schemaStatements();
-    await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
+    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
+      t.string("name");
+      t.integer("age");
+      t.date("birthdate");
+    });
+    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
       t.change("name", "string", { default: "NONAME" });
       t.change("birthdate", "datetime");
       t.changeNull("age", false, 0);
@@ -2208,42 +2209,32 @@ describeIfPg("BulkAlterTableMigrationsTest", () => {
 // supports_text_column_with_default? is true for any non-MySQL/Trilogy adapter per
 // adapter_helper.rb:42 — which includes MariaDB). Rails branches in-body (migration_test.rb:1460)
 // to `UUID()` on the non-Postgres path. Our CI matrix is mysql:8 (not MariaDB), so at runtime this
-// only ever runs on Postgres today, but the body now branches like Rails: a backend-appropriate
-// adapter plus `gen_random_uuid()` on Postgres / `UUID()` otherwise (default_function `uuid()`),
-// so the test is correct if MariaDB ever joins the matrix.
+// only ever runs on Postgres today, but the body branches like Rails: `gen_random_uuid()` on
+// Postgres / `UUID()` otherwise (default_function `uuid()`), so the test is correct if MariaDB
+// ever joins the matrix.
 describe("BulkAlterTableMigrationsTest", () => {
-  it.skipIf(!adapterSupports("bulk_alter") || !adapterSupports("text_column_with_default"))(
-    "default functions on columns",
-    async () => {
-      const isPg = adapterType === "postgres";
-      const adapter = isPg ? new PostgreSQLAdapter(PG_TEST_URL) : new Mysql2Adapter(MYSQL_TEST_URL);
-      try {
-        await adapter.exec("DROP TABLE IF EXISTS delete_me");
-        await adapter.exec(
-          isPg
-            ? `CREATE TABLE delete_me (id serial primary key)`
-            : `CREATE TABLE delete_me (id INT NOT NULL AUTO_INCREMENT, PRIMARY KEY (id))`,
-        );
-        const ss = adapter.schemaStatements();
-        await ss.changeTable("delete_me", { bulk: true }, (t: any) => {
-          t.string("name", { default: () => (isPg ? "gen_random_uuid()" : "UUID()") });
-        });
-        const cols = await adapter.columns("delete_me");
-        const name = cols.find((c) => c.name === "name")!;
-        expect(name.default).toBeNull();
-        expect((name as any).defaultFunction).toBe(isPg ? "gen_random_uuid()" : "uuid()");
+  itIfSupports("bulk_alter,text_column_with_default", "default functions on columns", async () => {
+    const isPg = adapterType === "postgres";
+    const adapter = await freshAdapter();
+    await adapter.createTable("delete_me", { force: true }, () => {});
+    try {
+      await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.string("name", { default: () => (isPg ? "gen_random_uuid()" : "UUID()") });
+      });
+      const cols = await adapter.columns("delete_me");
+      const name = cols.find((c) => c.name === "name")!;
+      expect(name.default).toBeNull();
+      expect((name as any).defaultFunction).toBe(isPg ? "gen_random_uuid()" : "uuid()");
 
-        await adapter.exec(
-          isPg ? "INSERT INTO delete_me DEFAULT VALUES" : "INSERT INTO delete_me () VALUES ()",
-        );
-        const row = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
-        expect(String(row!.name)).toMatch(/^(.+)-(.+)-(.+)-(.+)$/);
-      } finally {
-        await adapter.exec("DROP TABLE IF EXISTS delete_me");
-        await adapter.close();
-      }
-    },
-  );
+      await adapter.executeMutation(
+        isPg ? "INSERT INTO delete_me DEFAULT VALUES" : "INSERT INTO delete_me () VALUES ()",
+      );
+      const row = await adapter.selectOne("SELECT * FROM delete_me ORDER BY id DESC");
+      expect(String(row!.name)).toMatch(/^(.+)-(.+)-(.+)-(.+)$/);
+    } finally {
+      await adapter.dropTable("delete_me", { ifExists: true });
+    }
+  });
 });
 
 describeIfMysql("BulkAlterTableMigrationsTest", () => {
