@@ -40,19 +40,17 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     restoreEncryptionConfig(configSnapshot);
   });
 
-  // Rails resolves `serialize :logo, coder: JSON` + `encrypts :logo` to
-  // EncryptedAttributeType(Serialized(<binary column type>)) — the pending
-  // decorators replay over a seed built from `type_for_column`
-  // (activemodel/lib/active_model/attribute_registration.rb:23-34,
-  // activerecord/lib/active_record/attributes.rb:241-245), so each decorator
-  // is applied exactly once.
-  it.each([
-    ["serialize before encrypts", EncryptedBookWithSerializedFirstBinary],
-    ["encrypts before serialize", EncryptedBookWithSerializedSecondBinary],
-  ])("resolves logo to Encrypted(Serialized(binary)) — %s", async (_label, model) => {
+  // Rails replays pending decorators in declaration order
+  // (activemodel/lib/active_model/attribute_registration.rb:66-72) over a seed
+  // built from `type_for_column`, so `serialize` + `encrypts` nest in the order
+  // they were declared: serialize-then-encrypts →
+  // EncryptedAttributeType(Serialized(binary)), encrypts-then-serialize →
+  // Serialized(EncryptedAttributeType(binary)). Each decorator applies exactly
+  // once (the seed carries no EncryptedAttributeType).
+  it("resolves logo to Encrypted(Serialized(binary)) — serialize before encrypts", async () => {
     await freshAdapter();
 
-    const encrypted = model.typeForAttribute("logo");
+    const encrypted = EncryptedBookWithSerializedFirstBinary.typeForAttribute("logo");
     expect(encrypted).toBeInstanceOf(EncryptedAttributeType);
 
     const serialized = (encrypted as EncryptedAttributeType).castType;
@@ -63,5 +61,22 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     const subtype = (serialized as Serialized).subtype;
     expect(subtype).toBeInstanceOf(BinaryType);
     expect(subtype).not.toBeInstanceOf(EncryptedAttributeType);
+  });
+
+  it("resolves logo to Serialized(Encrypted(binary)) — encrypts before serialize", async () => {
+    await freshAdapter();
+
+    const serialized = EncryptedBookWithSerializedSecondBinary.typeForAttribute("logo");
+    expect(serialized).toBeInstanceOf(Serialized);
+
+    const encrypted = (serialized as Serialized).subtype;
+    expect(encrypted).toBeInstanceOf(EncryptedAttributeType);
+
+    // Declaration-order replay: the encryption decorator was pushed at
+    // `encrypts` time, before `serialize`'s — a rebuild-time re-push would land
+    // it after and flip the nesting back to Encrypted(Serialized(binary)).
+    const subtype = (encrypted as EncryptedAttributeType).castType;
+    expect(subtype).toBeInstanceOf(BinaryType);
+    expect(subtype).not.toBeInstanceOf(Serialized);
   });
 });
