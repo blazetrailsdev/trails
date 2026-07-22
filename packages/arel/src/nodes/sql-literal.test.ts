@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Nodes, Visitors } from "../index.js";
 
 describe("SqlLiteralTest", () => {
@@ -14,14 +15,14 @@ describe("SqlLiteralTest", () => {
     it("makes a count node", () => {
       const lit = new Nodes.SqlLiteral("*");
       const count = new Nodes.NamedFunction("COUNT", [lit]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(count)).toBe("COUNT(*)");
     });
 
     it("makes a distinct node", () => {
       const lit = new Nodes.SqlLiteral("zomg");
       const count = new Nodes.NamedFunction("COUNT", [lit], undefined, true);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(count)).toBe("COUNT(DISTINCT zomg)");
     });
   });
@@ -30,7 +31,7 @@ describe("SqlLiteralTest", () => {
     it("makes an equality node", () => {
       const lit = new Nodes.SqlLiteral("foo");
       const eq = new Nodes.Equality(lit, new Nodes.Quoted(1));
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(eq)).toBe("foo = 1");
     });
 
@@ -93,7 +94,7 @@ describe("SqlLiteralTest", () => {
       const b = new Nodes.SqlLiteral("bar");
       const fragments = a.join(b);
       expect(fragments).toBeInstanceOf(Nodes.Fragments);
-      const sql = new Visitors.ToSql().compile(fragments);
+      const sql = new Visitors.ToSql(testConnection).compile(fragments);
       expect(sql).toBe("foo bar");
     });
 
@@ -102,7 +103,7 @@ describe("SqlLiteralTest", () => {
       const b = new Nodes.SqlLiteral("bar");
       const fragments = a.plus(b);
       expect(fragments).toBeInstanceOf(Nodes.Fragments);
-      expect(new Visitors.ToSql().compile(fragments)).toBe("foo bar");
+      expect(new Visitors.ToSql(testConnection).compile(fragments)).toBe("foo bar");
     });
   });
 });

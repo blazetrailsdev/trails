@@ -15,7 +15,7 @@ import { testConnection } from "./test-helpers/connection.js";
 describe("SelectManagerTest", () => {
   const users = new Table("users");
   const posts = new Table("posts");
-  const visitor = new Visitors.ToSql();
+  const visitor = new Visitors.ToSql(testConnection);
   it("join sources", () => {
     const mgr = users.project(star);
     expect(mgr.joinSources).toEqual([]);
@@ -64,7 +64,7 @@ describe("SelectManagerTest", () => {
         const mgr = new SelectManager();
         const as = mgr.as("foo");
         expect(as).toBeInstanceOf(Nodes.TableAlias);
-        const sql = new Visitors.ToSql().compile(as);
+        const sql = new Visitors.ToSql(testConnection).compile(as);
         expect(sql).toContain("foo");
       });
 
@@ -309,7 +309,7 @@ describe("SelectManagerTest", () => {
       const q1 = users.project(users.get("name")).where(users.get("age").gt(21));
       const q2 = users.project(users.get("name")).where(users.get("age").lt(18));
       const union = q1.union(q2);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const compiled = visitor.compile(union);
       expect(compiled).toContain("UNION");
     });
@@ -317,7 +317,7 @@ describe("SelectManagerTest", () => {
     it("should union all", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(q1.unionAll(q2))).toContain("UNION ALL");
     });
   });
@@ -326,7 +326,7 @@ describe("SelectManagerTest", () => {
     it("should intersect two managers", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(q1.intersect(q2))).toContain("INTERSECT");
     });
   });
@@ -335,7 +335,7 @@ describe("SelectManagerTest", () => {
     it("should except two managers", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(q1.except(q2))).toContain("EXCEPT");
     });
   });
@@ -344,7 +344,7 @@ describe("SelectManagerTest", () => {
     it("minus aliases except", () => {
       const q1 = users.project(star);
       const q2 = users.project(star);
-      expect(new Visitors.ToSql().compile(q1.minus(q2))).toContain("EXCEPT");
+      expect(new Visitors.ToSql(testConnection).compile(q1.minus(q2))).toContain("EXCEPT");
     });
   });
 
@@ -630,7 +630,7 @@ describe("SelectManagerTest", () => {
       w.order(users.get("id").asc());
       w.frame(new Nodes.Rows(new Nodes.Preceding()));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.Over(fn, w))).toContain("ROWS UNBOUNDED PRECEDING");
     });
 
@@ -639,22 +639,22 @@ describe("SelectManagerTest", () => {
       w.order(users.get("id").asc());
       w.frame(new Nodes.Rows(new Nodes.Preceding(new Nodes.Quoted(3))));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.Over(fn, w))).toContain("3 PRECEDING");
     });
 
     it("takes a rows frame, unbounded following", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.Following())).toBe("UNBOUNDED FOLLOWING");
     });
 
     it("takes a rows frame, bounded following", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.Following(new Nodes.Quoted(5)))).toBe("5 FOLLOWING");
     });
 
     it("takes a rows frame, current row", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.CurrentRow())).toBe("CURRENT ROW");
     });
 
@@ -663,7 +663,7 @@ describe("SelectManagerTest", () => {
       w.order(users.get("id").asc());
       w.frame(new Nodes.Rows(new Nodes.Between(new Nodes.CurrentRow(), new Nodes.Following())));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const result = visitor.compile(new Nodes.Over(fn, w));
       expect(result).toContain("ROWS");
       expect(result).toContain("CURRENT ROW");
@@ -674,7 +674,7 @@ describe("SelectManagerTest", () => {
       w.order(users.get("id").asc());
       w.frame(new Nodes.Range(new Nodes.Preceding()));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.Over(fn, w))).toContain("RANGE UNBOUNDED PRECEDING");
     });
 
@@ -683,7 +683,7 @@ describe("SelectManagerTest", () => {
       w.order(users.get("id").asc());
       w.frame(new Nodes.Range(new Nodes.Preceding(new Nodes.Quoted(3))));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.Over(fn, w))).toContain("3 PRECEDING");
     });
 
@@ -702,7 +702,7 @@ describe("SelectManagerTest", () => {
       w.order(users.get("id").asc());
       w.frame(new Nodes.Range(new Nodes.CurrentRow()));
       const fn = new Nodes.NamedFunction("SUM", [users.get("amount")]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(new Nodes.Over(fn, w))).toContain("RANGE CURRENT ROW");
     });
 
@@ -1016,7 +1016,7 @@ describe("SelectManagerTest", () => {
       const mgr = new SelectManager(users).project(users.get("id"));
       const lat = mgr.lateral();
       expect(lat).toBeInstanceOf(Nodes.Lateral);
-      const sql = new Visitors.ToSql().compile(lat);
+      const sql = new Visitors.ToSql(testConnection).compile(lat);
       expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users")');
     });
 
@@ -1028,7 +1028,7 @@ describe("SelectManagerTest", () => {
       const lat = mgr.lateral("u");
       expect(lat).toBeInstanceOf(Nodes.Lateral);
       expect(lat.subquery).toBeInstanceOf(Nodes.TableAlias);
-      const sql = new Visitors.ToSql().compile(lat);
+      const sql = new Visitors.ToSql(testConnection).compile(lat);
       expect(sql).toBe('LATERAL (SELECT "users"."id" FROM "users") u');
     });
   });

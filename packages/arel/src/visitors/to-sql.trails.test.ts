@@ -3,13 +3,15 @@
  * arel/test/visitors/test_to_sql.rb.
  */
 import { describe, it, expect } from "vitest";
+import { testConnection, mysqlTestConnection } from "../test-helpers/connection.js";
 import * as Nodes from "../nodes/index.js";
 import * as Visitors from "./index.js";
 import { Table } from "../table.js";
 
 describe("ToSql Array-named identifiers", () => {
   type ToSqlInternals = { quoteColumnName(name: string | Nodes.SqlLiteral): string };
-  const make = (): ToSqlInternals => new Visitors.ToSql() as unknown as ToSqlInternals;
+  const make = (): ToSqlInternals =>
+    new Visitors.ToSql(testConnection) as unknown as ToSqlInternals;
 
   // Rails' adapters stringify with `name.to_s`, and Ruby's `Array#to_s` is
   // inspect-style rather than JS's comma-join. An Array-named Attribute shows
@@ -24,7 +26,7 @@ describe("ToSql Array-named identifiers", () => {
   it("an Array-named attribute compiles to Rails' Array#to_s column reference", () => {
     const orders = new Table("cpk_orders");
     const attr = orders.get(["shop_id", "id"] as unknown as string);
-    expect(new Visitors.ToSql().compile(new Nodes.Descending(attr))).toBe(
+    expect(new Visitors.ToSql(testConnection).compile(new Nodes.Descending(attr))).toBe(
       '"cpk_orders"."[""shop_id"", ""id""]" DESC',
     );
   });
@@ -75,7 +77,7 @@ describe("ToSql Array-named identifiers", () => {
       ["a", "b"] as unknown as string,
       new Table("t").from().project(new Nodes.SqlLiteral("1")).ast,
     );
-    expect(new Visitors.MySQL().compile(cte)).toContain('`["a", "b"]` AS ');
+    expect(new Visitors.MySQL(mysqlTestConnection).compile(cte)).toContain('`["a", "b"]` AS ');
   });
 });
 
@@ -91,11 +93,11 @@ describe("ToSql raw scalars in quoting slots", () => {
   // union on the strength of that alias alone would contradict this behaviour.
   it("quotes a bare boolean in an Assignment right instead of raising", () => {
     const node = new Nodes.Assignment(users.get("admin"), true);
-    expect(new Visitors.ToSql().compile(node)).toBe('"users"."admin" = TRUE');
+    expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."admin" = TRUE');
   });
 
   it("quotes a bare string in an Assignment right instead of raising", () => {
     const node = new Nodes.Assignment(users.get("name"), "x");
-    expect(new Visitors.ToSql().compile(node)).toBe('"users"."name" = \'x\'');
+    expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"users"."name" = \'x\'');
   });
 });

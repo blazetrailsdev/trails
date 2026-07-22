@@ -1,9 +1,10 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, star, SelectManager, Nodes, Visitors, relationName } from "../index.js";
 
 describe("AttributeTest", () => {
   const users = new Table("users");
-  const visitor = new Visitors.ToSql();
+  const visitor = new Visitors.ToSql(testConnection);
   describe("#not_eq", () => {
     it("should create a NotEqual node", () => {
       expect(users.project(star).where(users.get("id").notEq(10)).toSql()).toBe(
@@ -19,7 +20,7 @@ describe("AttributeTest", () => {
     it("should handle nil", () => {
       const relation = new Table("users");
       const node = relation.get("id").notEq(null);
-      expect(new Visitors.ToSql().compile(node)).toContain("IS NOT NULL");
+      expect(new Visitors.ToSql(testConnection).compile(node)).toContain("IS NOT NULL");
     });
   });
 
@@ -386,7 +387,7 @@ describe("AttributeTest", () => {
     });
 
     it("should handle nil", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const node = users.get("name").eq(null);
       expect(visitor.compile(node)).toBe('"users"."name" IS NULL');
     });
@@ -806,14 +807,14 @@ describe("AttributeTest", () => {
   describe("#not_between", () => {
     it("can be constructed with a standard range", () => {
       const node = users.get("age").notBetween(18, 65);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const sql = visitor.compile(node);
       expect(sql).toBe('("users"."age" < 18 OR "users"."age" > 65)');
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
       const node = users.get("age").notBetween(-Infinity, 65);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
 
@@ -844,7 +845,7 @@ describe("AttributeTest", () => {
 
     it("can be constructed with an exclusive range", () => {
       const node = users.get("age").notBetween({ begin: 18, end: 65, excludeEnd: true });
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const result = visitor.compile(node);
       expect(result).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
     });
@@ -860,7 +861,7 @@ describe("AttributeTest", () => {
   describe("#not_in", () => {
     it("can be constructed with a list", () => {
       const node = users.get("id").notIn([1, 2, 3]);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(node)).toBe('"users"."id" NOT IN (1, 2, 3)');
     });
 
@@ -926,7 +927,7 @@ describe("AttributeTest", () => {
     });
 
     it("should generate @> in sql", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const node = users.get("tags").contains("foo");
       expect(visitor.compile(node)).toBe('"users"."tags" @> \'foo\'');
     });
@@ -934,7 +935,7 @@ describe("AttributeTest", () => {
 
   describe("#overlaps", () => {
     it("should generate && in sql", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const node = users.get("tags").overlaps("bar");
       expect(visitor.compile(node)).toBe('"users"."tags" && \'bar\'');
     });
@@ -942,7 +943,7 @@ describe("AttributeTest", () => {
 
   describe("equality", () => {
     it("should produce sql", () => {
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const node = users.get("tags").contains("foo");
       expect(visitor.compile(node)).toBe('"users"."tags" @> \'foo\'');
     });
@@ -951,7 +952,7 @@ describe("AttributeTest", () => {
       it("should produce sql", () => {
         const relation = new Table("users");
         const node = relation.get("id").eq(10);
-        const visitor = new Visitors.ToSql();
+        const visitor = new Visitors.ToSql(testConnection);
         expect(visitor.compile(node)).toContain('"users"."id" = 10');
       });
     });
@@ -963,7 +964,7 @@ describe("AttributeTest", () => {
       const condition = table.get("id").eq("1");
 
       expect(table.isAbleToTypeCast()).toBe(false);
-      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" = \'1\'');
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" = \'1\'');
     });
 
     it("type casts when given an explicit caster", () => {
@@ -976,7 +977,7 @@ describe("AttributeTest", () => {
       const condition = table.get("id").eq("1").and(table.get("other_id").eq("2"));
 
       expect(table.isAbleToTypeCast()).toBe(true);
-      expect(new Visitors.ToSql().compile(condition)).toBe(
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe(
         '"foo"."id" = 1 AND "foo"."other_id" = \'2\'',
       );
     });
@@ -991,7 +992,7 @@ describe("AttributeTest", () => {
       const condition = table.get("id").eq(new Nodes.SqlLiteral("(select 1)"));
 
       expect(table.isAbleToTypeCast()).toBe(true);
-      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" = (select 1)');
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" = (select 1)');
     });
 
     it("type casts IN list elements through the attribute", () => {
@@ -1003,7 +1004,7 @@ describe("AttributeTest", () => {
       const table = new Table("foo", { typeCaster: fakeCaster });
       const condition = table.get("id").in(["1", "2"]);
 
-      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" IN (1, 2)');
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" IN (1, 2)');
     });
 
     it("type casts NOT IN list elements through the attribute", () => {
@@ -1015,7 +1016,9 @@ describe("AttributeTest", () => {
       const table = new Table("foo", { typeCaster: fakeCaster });
       const condition = table.get("id").notIn(["1", "2"]);
 
-      expect(new Visitors.ToSql().compile(condition)).toBe('"foo"."id" NOT IN (1, 2)');
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe(
+        '"foo"."id" NOT IN (1, 2)',
+      );
     });
 
     it("builds Casted nodes so a null in an IN list casts through the column", () => {
@@ -1031,7 +1034,7 @@ describe("AttributeTest", () => {
 
       expect(right).toBeInstanceOf(Nodes.Casted);
       expect((right as Nodes.Casted).attribute).toBe(attr);
-      expect(new Visitors.ToSql().compile(node)).toBe('"foo"."id" IN (0)');
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"foo"."id" IN (0)');
     });
   });
 
@@ -1337,7 +1340,7 @@ describe("AttributeTest", () => {
   });
 
   it("should produce sql for attribute", () => {
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     const attr = users.get("name");
     expect(visitor.compile(attr)).toBe('"users"."name"');
   });
@@ -1345,13 +1348,13 @@ describe("AttributeTest", () => {
   it("can be constructed with a subquery for IN", () => {
     const subquery = users.project(users.get("id"));
     const node = users.get("id").in(subquery);
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     expect(visitor.compile(node)).toBe('"users"."id" IN (SELECT "users"."id" FROM "users")');
   });
 
   it("can be constructed with a standard range for between", () => {
     const node = users.get("age").between({ begin: 18, end: 65 });
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     expect(visitor.compile(node)).toBe('"users"."age" BETWEEN 18 AND 65');
   });
 
@@ -1411,7 +1414,7 @@ describe("AttributeTest", () => {
     it("can be constructed with a range starting from -Infinity", () => {
       // Mirrors Rails: not_between(-Inf..end) collapses to gt(end).
       const node = users.get("age").notBetween(-Infinity, 65);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
   });
@@ -1421,7 +1424,7 @@ describe("AttributeTest", () => {
       const left = users.get("age").notBetween(18, 30);
       const right = users.get("age").notBetween(40, 50);
       const node = new Nodes.Grouping(new Nodes.Or(left, right));
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const result = visitor.compile(node);
       expect(result).toContain("OR");
     });
@@ -1439,7 +1442,7 @@ describe("AttributeTest", () => {
       const left = users.get("age").notBetween(18, 65);
       const right = users.get("score").notBetween(1, 100);
       const node = new Nodes.Grouping(new Nodes.And([left, right]));
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const result = visitor.compile(node);
       expect(result).toContain("AND");
     });
@@ -1448,14 +1451,14 @@ describe("AttributeTest", () => {
   describe("#not_between", () => {
     it("can be constructed with a standard range", () => {
       const node = users.get("id").between([1, 100]);
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toContain("BETWEEN");
       expect(sql).toContain("1 AND 100");
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
       const node = users.get("id").between(-Infinity, 100);
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toContain("<=");
       expect(sql).toContain("100");
     });
@@ -1467,7 +1470,7 @@ describe("AttributeTest", () => {
       const node = new Nodes.Grouping(
         new Nodes.And([users.get("id").gteq(begin), users.get("id").lt(end)]),
       );
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toContain(">=");
       expect(sql).toContain("<");
     });
@@ -1481,7 +1484,7 @@ describe("AttributeTest", () => {
       m2.project(star);
       const union = m1.union(m2);
       expect(union).toBeInstanceOf(Nodes.Union);
-      const sql = new Visitors.ToSql().compile(union);
+      const sql = new Visitors.ToSql(testConnection).compile(union);
       expect(sql).toContain("UNION");
     });
   });
@@ -1489,7 +1492,7 @@ describe("AttributeTest", () => {
   describe("#sum", () => {
     it("should generate the proper SQL", () => {
       const node = users.get("tags").contains("foo");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe('"users"."tags" @> \'foo\'');
     });
   });
@@ -1497,7 +1500,7 @@ describe("AttributeTest", () => {
   describe("#minimum", () => {
     it("should generate proper SQL", () => {
       const node = users.get("tags").overlaps("bar");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe('"users"."tags" && \'bar\'');
     });
   });
@@ -1514,7 +1517,7 @@ describe("AttributeTest", () => {
     it("should produce sql", () => {
       const relation = new Table("users");
       const node = relation.get("id").eq(10);
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(node)).toContain('"users"."id" = 10');
     });
   });

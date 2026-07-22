@@ -1,7 +1,11 @@
 import type { ArelConnection } from "../visitors/connection.js";
 import type { ArelEngine } from "../nodes/node.js";
 import { ToSql } from "../visitors/to-sql.js";
-import { defaultQuoter } from "../visitors/default-quoter.js";
+import {
+  defaultQuoter,
+  mysqlDefaultQuoter,
+  postgresqlDefaultQuoter,
+} from "../visitors/default-quoter.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 /**
@@ -30,6 +34,21 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
  * @internal
  */
 export const testConnection: ArelConnection = defaultQuoter;
+
+/**
+ * The MySQL/PostgreSQL analogues of {@link testConnection}: the adapter-specific
+ * quoters the `MySQL` and `PostgreSQL` visitors otherwise fall back to as their
+ * constructor default (`visitors/mysql.ts`, `visitors/postgresql.ts`). Naming them
+ * at the call site is what lets those defaults be deleted; unlike the generic
+ * `defaultQuoter`, they render adapter-specific forms (PG array literals, MySQL
+ * backticks) the Arel visitor tests assert on.
+ *
+ * @internal
+ */
+export const mysqlTestConnection: ArelConnection = mysqlDefaultQuoter;
+
+/** @internal */
+export const postgresqlTestConnection: ArelConnection = postgresqlDefaultQuoter;
 
 // Stands in for a method FakeRecord does not define. Rails gets this for free —
 // an undefined method on the double raises NoMethodError — so raising here is the

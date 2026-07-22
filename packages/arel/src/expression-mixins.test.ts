@@ -1,7 +1,8 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "./test-helpers/connection.js";
 import { Nodes, Visitors } from "./index.js";
 
-const compile = (n: Nodes.Node): string => new Visitors.ToSql().compile(n);
+const compile = (n: Nodes.Node): string => new Visitors.ToSql(testConnection).compile(n);
 
 // Behavior tests for the mixin surface added in this PR — Expressions,
 // AliasPredication, OrderPredications, FilterPredications,

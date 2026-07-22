@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, sql, star, SelectManager, Nodes, Visitors, EmptyJoinError } from "./index.js";
-import { testConnection } from "./test-helpers/connection.js";
+import { testConnection, mysqlTestConnection } from "./test-helpers/connection.js";
 
 describe("TableTest", () => {
   const users = new Table("users");
@@ -221,7 +221,7 @@ describe("TableTest", () => {
   });
 
   it("star routes table-name quoting through the adapter visitor (MySQL=backticks)", () => {
-    const sql = new Visitors.MySQL().compile(users.star);
+    const sql = new Visitors.MySQL(mysqlTestConnection).compile(users.star);
     expect(sql).toBe("`users`.*");
   });
 
@@ -285,7 +285,7 @@ describe("TableTest", () => {
       const aliased = users.as("u");
       expect(aliased).toBeInstanceOf(Nodes.TableAlias);
       expect(aliased.relation).toBe(users);
-      const sql = new Visitors.ToSql().compile(aliased.get("id"));
+      const sql = new Visitors.ToSql(testConnection).compile(aliased.get("id"));
       expect(sql).toBe('"u"."id"');
     });
   });
@@ -308,7 +308,7 @@ describe("TableTest", () => {
       const aliased = users.as("u");
       const attr = users.get("id", aliased);
       expect(attr.relation).toBe(aliased);
-      expect(new Visitors.ToSql().compile(attr)).toBe('"u"."id"');
+      expect(new Visitors.ToSql(testConnection).compile(attr)).toBe('"u"."id"');
     });
   });
 

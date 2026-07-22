@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("And", () => {
@@ -22,7 +23,7 @@ describe("And", () => {
       const caseNode = new Nodes.Case()
         .when(new Nodes.SqlLiteral("1 = 1"), new Nodes.SqlLiteral("'yes'"))
         .as("result");
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       expect(visitor.compile(caseNode)).toBe("CASE WHEN 1 = 1 THEN 'yes' END AS result");
     });
   });

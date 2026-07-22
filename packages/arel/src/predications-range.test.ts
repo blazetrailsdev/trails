@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "./test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "./index.js";
 
 // Mirrors Rails' Arel attribute_test.rb #between / #not_between blocks.
@@ -123,7 +124,7 @@ describe("Predications range semantics", () => {
   });
 
   describe("#between SQL output", () => {
-    const sql = (n: Nodes.Node) => new Visitors.ToSql().compile(n);
+    const sql = (n: Nodes.Node) => new Visitors.ToSql(testConnection).compile(n);
 
     it("inclusive standard range → BETWEEN", () => {
       expect(sql(id.between({ begin: 1, end: 3 }))).toBe('"users"."id" BETWEEN 1 AND 3');
@@ -149,7 +150,7 @@ describe("Predications range semantics", () => {
   });
 
   describe("#not_between SQL output", () => {
-    const sql = (n: Nodes.Node) => new Visitors.ToSql().compile(n);
+    const sql = (n: Nodes.Node) => new Visitors.ToSql(testConnection).compile(n);
 
     it("inclusive range → (col < b OR col > e)", () => {
       expect(sql(id.notBetween({ begin: 1, end: 3 }))).toBe(

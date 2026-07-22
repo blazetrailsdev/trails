@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 import { Attribute as AMAttribute, StringType } from "@blazetrails/activemodel";
 
@@ -24,21 +25,21 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
   const users = new Table("users", { typeCaster: fakePgCaster });
   it("in", () => {
     const node = new Nodes.HomogeneousIn(["Bobby", "Robert"], users.get("name"), "in");
-    const sql = new Visitors.ToSql().compile(node);
+    const sql = new Visitors.ToSql(testConnection).compile(node);
     expect(sql).toBe('"users"."name" IN (?, ?)');
   });
 
   it("custom attribute node", () => {
     const node = new TypedNode("COALESCE", [users.get("nickname"), users.get("name")], STRING_TYPE);
     const expr = new Nodes.HomogeneousIn(["Bobby", "Robert"], node, "in");
-    const sql = new Visitors.ToSql().compile(expr);
+    const sql = new Visitors.ToSql(testConnection).compile(expr);
     expect(sql).toBe('COALESCE("users"."nickname", "users"."name") IN (?, ?)');
   });
 
   describe("HomogeneousIn visitor", () => {
     it("compiles IN with values", () => {
       const node = new Nodes.HomogeneousIn([1, 2, 3], users.get("id"), "in");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       // HomogeneousIn keeps add_binds + bind_block (to_sql.rb:352), so a bare
       // SQLString collector emits `?` placeholders — mirrors Rails test_in.
       expect(sql).toBe('"users"."id" IN (?, ?, ?)');
@@ -46,7 +47,7 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
 
     it("compiles NOT IN with values", () => {
       const node = new Nodes.HomogeneousIn([4, 5], users.get("id"), "notin");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe('"users"."id" NOT IN (?, ?)');
     });
 
@@ -54,13 +55,13 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       // Mirrors Rails to_sql.rb:347-349 — empty casted_values emits
       // `quote(nil)` inside the parens, not a `1=0` short-circuit.
       const node = new Nodes.HomogeneousIn([], users.get("id"), "in");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe('"users"."id" IN (NULL)');
     });
 
     it("compiles empty NOT IN as NOT IN (NULL)", () => {
       const node = new Nodes.HomogeneousIn([], users.get("id"), "notin");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe('"users"."id" NOT IN (NULL)');
     });
 
@@ -73,13 +74,13 @@ describe("Arel::Nodes::HomogeneousInTest", () => {
       };
       const attr = new Nodes.Attribute(filteringRelation as never, "id");
       const node = new Nodes.HomogeneousIn([1, 2], attr, "in");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe('"users"."id" IN (NULL)');
     });
 
     it("compiles string values", () => {
       const node = new Nodes.HomogeneousIn(["a", "b"], users.get("name"), "in");
-      const sql = new Visitors.ToSql().compile(node);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
       expect(sql).toBe('"users"."name" IN (?, ?)');
     });
   });

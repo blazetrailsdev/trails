@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("Arel::Nodes::ExtractTest", () => {
@@ -6,7 +7,7 @@ describe("Arel::Nodes::ExtractTest", () => {
   it("should extract field", () => {
     const createdAt = users.get("created_at");
     const node = new Nodes.Extract(createdAt, "YEAR");
-    const visitor = new Visitors.ToSql();
+    const visitor = new Visitors.ToSql(testConnection);
     const sql = visitor.compile(node);
     expect(sql).toBe('EXTRACT(YEAR FROM "users"."created_at")');
   });
@@ -17,7 +18,7 @@ describe("Arel::Nodes::ExtractTest", () => {
     // of how it was constructed.
     const createdAt = users.get("created_at");
     const node = new Nodes.Extract(createdAt, "month");
-    const sql = new Visitors.ToSql().compile(node);
+    const sql = new Visitors.ToSql(testConnection).compile(node);
     expect(sql).toBe('EXTRACT(MONTH FROM "users"."created_at")');
   });
 
@@ -30,14 +31,16 @@ describe("Arel::Nodes::ExtractTest", () => {
     const node = createdAt.extract("year");
     expect(Array.isArray(node.expr)).toBe(true);
     expect((node.expr as Nodes.Node[])[0]).toBe(createdAt);
-    expect(new Visitors.ToSql().compile(node)).toBe('EXTRACT(YEAR FROM "users"."created_at")');
+    expect(new Visitors.ToSql(testConnection).compile(node)).toBe(
+      'EXTRACT(YEAR FROM "users"."created_at")',
+    );
   });
 
   describe("as", () => {
     it("should alias the extract", () => {
       const createdAt = users.get("created_at");
       const node = new Nodes.Extract(createdAt, "MONTH").as("birth_month");
-      const visitor = new Visitors.ToSql();
+      const visitor = new Visitors.ToSql(testConnection);
       const sql = visitor.compile(node);
       expect(sql).toBe('EXTRACT(MONTH FROM "users"."created_at") AS birth_month');
     });

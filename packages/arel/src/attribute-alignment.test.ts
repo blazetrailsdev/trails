@@ -1,8 +1,9 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "./test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "./index.js";
 
 const users = new Table("users");
-const compile = (n: Nodes.Node): string => new Visitors.ToSql().compile(n);
+const compile = (n: Nodes.Node): string => new Visitors.ToSql(testConnection).compile(n);
 
 // Behavior tests for the attribute-alignment changes — typed-subclass
 // returns from aggregates / contains / overlaps / concat, plus the
@@ -101,7 +102,7 @@ describe("Per-class `as(name)` marks the alias SqlLiteral as retryable", () => {
   // collector.retryable to false.
 
   const collectorIsRetryableAfter = (n: Nodes.Node): boolean =>
-    new Visitors.ToSql().compileWithCollector(n).retryable;
+    new Visitors.ToSql(testConnection).compileWithCollector(n).retryable;
 
   it("Attribute#as keeps the collector retryable", () => {
     expect(collectorIsRetryableAfter(users.attr("id").as("aliased"))).toBe(true);

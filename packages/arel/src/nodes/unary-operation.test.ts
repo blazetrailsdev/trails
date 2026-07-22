@@ -1,4 +1,5 @@
 import { describe, it, expect } from "vitest";
+import { testConnection } from "../test-helpers/connection.js";
 import { Table, Nodes, Visitors } from "../index.js";
 
 describe("TestUnaryOperation", () => {
@@ -50,6 +51,6 @@ describe("TestUnaryOperation", () => {
   // is preserved rather than trimmed.
   it("visitor preserves operator whitespace verbatim", () => {
     const node = new Nodes.UnaryOperation("- ", users.get("age"));
-    expect(new Visitors.ToSql().compile(node)).toBe(' -  "users"."age"');
+    expect(new Visitors.ToSql(testConnection).compile(node)).toBe(' -  "users"."age"');
   });
 });
