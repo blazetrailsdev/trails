@@ -364,11 +364,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("encrypts serialized attributes where encrypts is declared first", async () => {
-    // _pendingEncryptions defers the wrapping until attribute() is called.
-    // applyPendingEncryptions() then wraps the resolved serialized type, so
-    // declaration order (encrypts before attribute) is transparent. Mirrors
-    // Rails' EncryptedFirstTrafficLight (`encrypts :state` declared before
-    // `serialize :state, type: Array`) on the canonical `traffic_lights` table.
+    // Mirrors Rails' EncryptedFirstTrafficLight (`encrypts :state` declared
+    // before `serialize :state, type: Array`) on the canonical `traffic_lights`
+    // table. Pending decorators replay in declaration order, so the resolved
+    // chain nests Serialized(Encrypted(...)) — serialize, declared second,
+    // wraps the encrypted type (traffic_light_encrypted.rb:10-16).
     const adp = await freshAdapter();
     // `freshAdapter()` already lays the canonical `traffic_lights` table via
     // installEncryptionSchema, so no additional schema setup is needed here.
@@ -376,14 +376,18 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
       static {
         this._tableName = "traffic_lights";
         this.adapter = adp;
-        this.encrypts("state"); // declared BEFORE the serialized type
+        // Raw adapter (schema cache not warmed): declare the columns first —
+        // Rails gets these via schema reflection, which always seeds BEFORE the
+        // pending queue replays. A PendingType declared after encrypts would
+        // replace the decorated type (declaration-order replay), in Rails too.
         this.attribute("id", "integer");
-        this.attribute("state", "json");
-        this.attribute("long_state", "json");
-        // Raw adapter (schema cache not warmed): declare the timestamp columns
-        // the create-time callbacks write, for strict writeFromUser.
+        this.attribute("state", "string");
+        this.attribute("long_state", "string");
         this.attribute("created_at", "datetime");
         this.attribute("updated_at", "datetime");
+        this.encrypts("state"); // declared BEFORE the serialized type
+        this.serialize("state", { type: "Array" });
+        this.serialize("long_state", { type: "Array" });
       }
     } as any;
     new EncryptedFirstTrafficLight();
@@ -681,18 +685,20 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
 
   it("when ignore_case: true is declared before the attributes, the original_<name> reader still decrypts (replay-safe)", async () => {
     const adapter = await freshAdapter();
-    // Declare `encrypts` BEFORE the attribute definitions exist, so both `name`
-    // and its `original_name` counterpart are buffered and only wrapped when the
-    // defs appear — the replay path. If the original_<name> encrypted type is
-    // lost on that replay (the regression this guards), its reader returns raw
-    // ciphertext instead of the decrypted, case-preserved value.
+    // Declare `encrypts` BEFORE the attribute definitions exist (the columns
+    // arrive later via schema reflection), so both `name` and its
+    // `original_name` counterpart are only wrapped on the post-reflection
+    // replay. If the original_<name> encrypted type is lost on that replay (the
+    // regression this guards), its reader returns raw ciphertext instead of the
+    // decrypted, case-preserved value. NOTE: an explicit `attribute()` call
+    // after `encrypts` would REPLACE the encrypted type (declaration-order
+    // replay, as in Rails) — reflection is the only Rails-faithful way for the
+    // columns to appear after the declaration.
     const Book = class extends Base {
       static {
         this._tableName = "encrypted_books";
         this.adapter = adapter;
         this.encrypts("name", { deterministic: true, ignoreCase: true });
-        this.attribute("name", "string");
-        this.attribute("original_name", "string");
       }
     } as unknown as typeof Base & {
       create: (a: object) => Promise<any>;

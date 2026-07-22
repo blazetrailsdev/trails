@@ -12,6 +12,7 @@ import {
   EncryptedBookWithSerializedSecondBinary,
 } from "../test-helpers/models/book-encrypted.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
+import { applyPendingEncryptions } from "../encryption.js";
 import { Serialized } from "../type/serialized.js";
 import { BinaryType } from "@blazetrails/activemodel";
 
@@ -40,19 +41,17 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     restoreEncryptionConfig(configSnapshot);
   });
 
-  // Rails resolves `serialize :logo, coder: JSON` + `encrypts :logo` to
-  // EncryptedAttributeType(Serialized(<binary column type>)) — the pending
-  // decorators replay over a seed built from `type_for_column`
-  // (activemodel/lib/active_model/attribute_registration.rb:23-34,
-  // activerecord/lib/active_record/attributes.rb:241-245), so each decorator
-  // is applied exactly once.
-  it.each([
-    ["serialize before encrypts", EncryptedBookWithSerializedFirstBinary],
-    ["encrypts before serialize", EncryptedBookWithSerializedSecondBinary],
-  ])("resolves logo to Encrypted(Serialized(binary)) — %s", async (_label, model) => {
+  // Rails replays pending decorators in declaration order
+  // (activemodel/lib/active_model/attribute_registration.rb:66-72) over a seed
+  // built from `type_for_column`, so `serialize` + `encrypts` nest in the order
+  // they were declared: serialize-then-encrypts →
+  // EncryptedAttributeType(Serialized(binary)), encrypts-then-serialize →
+  // Serialized(EncryptedAttributeType(binary)). Each decorator applies exactly
+  // once (the seed carries no EncryptedAttributeType).
+  it("resolves logo to Encrypted(Serialized(binary)) — serialize before encrypts", async () => {
     await freshAdapter();
 
-    const encrypted = model.typeForAttribute("logo");
+    const encrypted = EncryptedBookWithSerializedFirstBinary.typeForAttribute("logo");
     expect(encrypted).toBeInstanceOf(EncryptedAttributeType);
 
     const serialized = (encrypted as EncryptedAttributeType).castType;
@@ -63,5 +62,52 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     const subtype = (serialized as Serialized).subtype;
     expect(subtype).toBeInstanceOf(BinaryType);
     expect(subtype).not.toBeInstanceOf(EncryptedAttributeType);
+  });
+
+  it("resolves logo to Serialized(Encrypted(binary)) — encrypts before serialize", async () => {
+    await freshAdapter();
+
+    const serialized = EncryptedBookWithSerializedSecondBinary.typeForAttribute("logo");
+    expect(serialized).toBeInstanceOf(Serialized);
+
+    const encrypted = (serialized as Serialized).subtype;
+    expect(encrypted).toBeInstanceOf(EncryptedAttributeType);
+
+    // Declaration-order replay: the encryption decorator was pushed at
+    // `encrypts` time, before `serialize`'s — a rebuild-time re-push would land
+    // it after and flip the nesting back to Encrypted(Serialized(binary)).
+    const subtype = (encrypted as EncryptedAttributeType).castType;
+    expect(subtype).toBeInstanceOf(BinaryType);
+    expect(subtype).not.toBeInstanceOf(Serialized);
+  });
+
+  it("does not grow the pending-decorator queue or reorder the nesting on _defaultAttributes rebuilds", async () => {
+    await freshAdapter();
+
+    const model = EncryptedBookWithSerializedSecondBinary as unknown as {
+      typeForAttribute(name: string): unknown;
+      _pendingAttributeModifications?: unknown[];
+      _cachedDefaultAttributes?: unknown;
+    };
+    // Force one initial resolution so all pending machinery has run.
+    model.typeForAttribute("logo");
+    const queueLength = model._pendingAttributeModifications?.length;
+    expect(queueLength).toBeGreaterThan(0);
+
+    // Repeated cache invalidation + re-resolution mimics schema reloads. The
+    // old registerEncryptedType pushed a fresh PendingDecorator on each pass,
+    // growing the queue unboundedly AND moving the encryption decorator to the
+    // tail (flipping the nesting to Encrypted(Serialized(...))).
+    for (let i = 0; i < 3; i++) {
+      model._cachedDefaultAttributes = null;
+      // The rebuild paths (defineAttribute, applyColumnsHash, Base statics)
+      // all re-invoke applyPendingEncryptions — the exact call that used to
+      // re-push the encryption decorator onto the queue tail.
+      applyPendingEncryptions(model);
+      const type = model.typeForAttribute("logo");
+      expect(type).toBeInstanceOf(Serialized);
+      expect((type as Serialized).subtype).toBeInstanceOf(EncryptedAttributeType);
+    }
+    expect(model._pendingAttributeModifications?.length).toBe(queueLength);
   });
 });

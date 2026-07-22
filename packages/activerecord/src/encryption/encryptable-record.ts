@@ -218,13 +218,17 @@ export class EncryptableRecord {
     const scheme = prebuiltScheme ?? schemeFor(options);
 
     if (typeof modelClass.decorateAttributes === "function") {
-      // Durable path (real model classes): buffer the pending encryption in the
-      // class's own `_pendingEncryptions` and apply it now — and again on every
-      // `_defaultAttributes` rebuild / schema load. This gives the scheme path
-      // its own replay buffer (the RFC 0047 follow-up registerEncryptedType's
-      // doc references), so the encrypted type survives replay even though
-      // `Base.encrypts` declares at static-init before the schema is loaded.
+      // Durable path (real model classes): push the durable PendingDecorator NOW,
+      // at declaration time, so its position in the pending queue tracks
+      // declaration order relative to `serialize` / `normalizes` — mirroring
+      // Rails, where `encrypts` calls `decorate_attributes` inline
+      // (encryptable_record.rb:87-92) and AttributeRegistration replays in
+      // declaration order. The decorator resolves the column default at replay
+      // time, so it needs no re-push after schema reflection. The
+      // `_pendingEncryptions` buffer remains for the eager
+      // `_attributeDefinitions` view + validator re-runs on rebuild.
       this.registerPendingEncryption(modelClass, name, scheme);
+      this.pushEncryptionDecorator(modelClass, name, scheme);
       encryptionHooks.applyPendingEncryptions(modelClass);
     } else {
       // Immediate path (plain-object callers without decoration machinery, e.g.
@@ -262,16 +266,54 @@ export class EncryptableRecord {
   }
 
   /**
+   * Push the durable encryption PendingDecorator, exactly once per `encrypts`
+   * declaration — mirroring Rails' `decorate_attributes([name]) { ... }` in
+   * encryptable_record.rb:87-92. Pushing at declaration time (not on the first
+   * post-reflection rebuild, as before) keeps the decorator's queue position —
+   * and therefore the resolved nesting relative to `serialize` — in declaration
+   * order, and bounds the queue: repeated `_defaultAttributes` rebuilds never
+   * re-push (`registerEncryptedType` no longer touches the queue).
+   *
+   * The column default is resolved inside the decorator at replay time
+   * (mirrors Rails' `default: columns_hash[name.to_s]&.default`, evaluated in
+   * the block), so a replay after schema reflection picks up the authoritative
+   * DB default without any re-push.
+   * @internal
+   */
+  static pushEncryptionDecorator(modelClass: any, name: string, scheme: Scheme): void {
+    modelClass.decorateAttributes([name], (attrName: string, castType: Type, host?: unknown) => {
+      // Idempotence guard for the eager immediate-apply pass (a fresh-seed
+      // replay applies each queued decorator once, but `decorateAttributes`
+      // also applies eagerly to a possibly already-wrapped definitions view).
+      if (castType instanceof EncryptedAttributeType) return null as unknown as Type;
+      const target = host ?? modelClass;
+      return new EncryptedAttributeType({
+        scheme,
+        castType,
+        default: this.columnDefaultFor(
+          target,
+          attrName,
+          (target as { _attributeDefinitions?: Map<string, unknown> })._attributeDefinitions?.get?.(
+            attrName,
+          ),
+        ),
+      });
+    });
+  }
+
+  /**
    * The single EncryptedAttributeType-wrapping primitive shared by both
    * declaration paths, so `Base.encrypts` (via `applyPendingEncryptions`) and
    * the scheme-based `encryptAttribute` register the wrapped type through one
    * implementation:
    *
    * - Models exposing `decorateAttributes` (real Base subclasses driven by the
-   *   `Base.encrypts` → `applyPendingEncryptions` path) get a replay-safe
-   *   PendingDecorator so `_defaultAttributes` re-wraps after schema reflection.
-   *   Skips when the def isn't present yet — the persistent `_pendingEncryptions`
-   *   buffer re-invokes this once the column is reflected — or already encrypted.
+   *   `Base.encrypts` → `applyPendingEncryptions` path) get their eager
+   *   `_attributeDefinitions` view wrapped/corrected here. The durable
+   *   PendingDecorator is NOT pushed from here — `pushEncryptionDecorator`
+   *   pushed it once at declaration time, preserving declaration order in the
+   *   pending queue. Skips when the def isn't present yet — the persistent
+   *   `_pendingEncryptions` buffer re-invokes this once the column is reflected.
    * - Plain models (the scheme-based / mock-model test path) set
    *   `_attributeDefinitions` directly, seeding a schema-sourced placeholder
    *   when no def exists yet so `loadSchemaFromAdapter` can supply the real
@@ -310,23 +352,26 @@ export class EncryptableRecord {
       const columnDefault = authoritative ? (cached ?? undefined) : (def.defaultValue ?? undefined);
       if (def.type instanceof EncryptedAttributeType) {
         // Already wrapped. Re-wrap only to correct a provisional default once the
-        // authoritative column default is known and differs — otherwise stay put
-        // so the PendingDecorator queue doesn't grow on every replay. The
-        // immediate apply below updates def.type, so the next replay early-returns.
+        // authoritative column default is known and differs — otherwise stay put.
         if (!authoritative || def.type._default === columnDefault) return;
-      }
-      modelClass.decorateAttributes([name], (_attrName: string, castType: Type) => {
-        if (castType instanceof EncryptedAttributeType) {
-          if (!authoritative || (castType as any)._default === columnDefault) {
-            return null as unknown as Type;
-          }
-          return new EncryptedAttributeType({
+        modelClass._attributeDefinitions.set(name, {
+          ...def,
+          type: new EncryptedAttributeType({
             scheme,
-            castType: castType.castType,
+            castType: def.type.castType,
             default: columnDefault,
-          });
-        }
-        return new EncryptedAttributeType({ scheme, castType, default: columnDefault });
+          }),
+        });
+        return;
+      }
+      // NOTE: this writes only the eager `_attributeDefinitions` back-compat
+      // view. The durable PendingDecorator was already pushed at declaration
+      // time by `pushEncryptionDecorator` — pushing here (on rebuild) would move
+      // the encryption decorator to the queue tail, breaking declaration-order
+      // nesting relative to `serialize` (the encrypts-first case).
+      modelClass._attributeDefinitions.set(name, {
+        ...def,
+        type: new EncryptedAttributeType({ scheme, castType: def.type, default: columnDefault }),
       });
       return;
     }
