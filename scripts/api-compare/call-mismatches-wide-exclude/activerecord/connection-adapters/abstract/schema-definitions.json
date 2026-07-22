@@ -200,14 +200,14 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "include?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `!options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`. The presence check is preserved under the nil↔null mapping: an explicit `default: null` is !== undefined, so it disables the rewrite exactly as Rails' key?-present nil does; the only unmatched shape is an explicit `default: undefined`, which has no Ruby analogue and conventionally means absent in JS."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "key?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `!options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`. The presence check is preserved under the nil↔null mapping: an explicit `default: null` is !== undefined, so it disables the rewrite exactly as Rails' key?-present nil does; the only unmatched shape is an explicit `default: undefined`, which has no Ruby analogue and conventionally means absent in JS."
   },
   {
     "package": "activerecord",
