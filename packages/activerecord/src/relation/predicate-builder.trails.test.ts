@@ -3,6 +3,7 @@ import { IntegerType } from "@blazetrails/activemodel";
 import { Table, Visitors } from "@blazetrails/arel";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { PredicateBuilder } from "./predicate-builder.js";
+import { TableMetadata } from "../table-metadata.js";
 
 // trails-specific regression guard (no Rails counterpart): Base.predicateBuilder
 // is now TableMetadata-backed, and that metadata is bound to the class. The memo
@@ -40,7 +41,7 @@ describe("PredicateBuilder positive-equality bind typing", () => {
     const table = new Table("posts", {
       typeCaster: { typeForAttribute: () => undefined },
     });
-    const builder = new PredicateBuilder(table);
+    const builder = new PredicateBuilder(new TableMetadata(null, table));
     const joined = new Table("authors", { typeCaster: { typeForAttribute: () => int8 } });
     return builder.build(joined.get("id"), value);
   };

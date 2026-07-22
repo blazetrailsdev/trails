@@ -158,7 +158,7 @@ describe("PredicateBuilderTest", () => {
     const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
 
     it("builds equality for scalars", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ title: "hello" });
       expect(compile(node)).toContain('"posts"."title"');
       // Value is a BindParam → rendered as `?`, not inlined (Rails parity).
@@ -166,25 +166,25 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("builds IS NULL for null values", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ title: null });
       expect(compile(node)).toMatch(/IS NULL/);
     });
 
     it("builds IN for arrays", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ id: [1, 2, 3] });
       expect(compile(node)).toMatch(/IN \(\?, \?, \?\)/);
     });
 
     it("builds IN for Set values (mirrors Rails registering Set => ArrayHandler)", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ id: new Set([1, 2, 3]) });
       expect(compile(node)).toMatch(/IN \(\?, \?, \?\)/);
     });
 
     it("builds IN for Set values when a custom handler is also registered", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       builder.registerHandler(Date, {
         call: (attr, _v) => attr.eq(0),
       });
@@ -193,7 +193,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("builds BETWEEN for ranges", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ age: new Range(18, 65) });
       expect(compile(node)).toMatch(/BETWEEN 18 AND 65/);
     });
@@ -204,7 +204,7 @@ describe("PredicateBuilderTest", () => {
     // `respond_to?(:id)` (Object#id was removed in 1.9), so `where(col: { id: 5 })`
     // routes the Hash to a handler rather than dereferencing it to `5`.
     it("does not dereference a plain object literal to its id", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), { id: 5 });
       const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
       expect(sql).toContain('"posts"."title" = ?');
@@ -213,7 +213,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("does not dereference a plain object literal inside an array", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("title"), [{ id: 5 }]);
       const [, binds] = new Visitors.ToSql().compileWithBinds(node);
       expect((binds[0] as { value: unknown }).value).toEqual({ id: 5 });
@@ -227,7 +227,7 @@ describe("PredicateBuilderTest", () => {
       class NotARecord {
         constructor(public id: number) {}
       }
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("id"), [new NotARecord(5), new NotARecord(7)]);
       const sql = new Visitors.ToSql().compile(node);
       // The objects flow into HomogeneousIn untouched — they are NOT flattened
@@ -236,7 +236,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("handles exclusive ranges", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildFromHash({ age: new Range(18, 65, true) });
       const sql = compile(node);
       expect(sql).toMatch(/>= 18/);
@@ -251,14 +251,16 @@ describe("PredicateBuilderTest", () => {
     // dispatch, so an array never reaches ArrayHandler → `IN (...)`. This is the
     // PG-array case (`where(arrayCol: [1, 2])` → `arr = '{1,2}'`) at unit level.
     it("forces equality for a force-equality type instead of dispatching to a handler", () => {
-      const builder = new PredicateBuilder(table);
       const forceEqType = {
         isForceEquality: (v: unknown) => Array.isArray(v),
         cast: (v: unknown) => v,
         serialize: (v: unknown) => v,
       };
-      (builder as any)._tableContext = { typeForAttribute: () => forceEqType };
-      const node = builder.build(table.get("tags"), [1, 2]);
+      // The metadata's table caster answers the force-equality type — the
+      // `table.type(attribute.name)` lookup Rails' build performs.
+      const feTable = new Table("posts", { typeCaster: { typeForAttribute: () => forceEqType } });
+      const builder = new PredicateBuilder(new TableMetadata(null, feTable));
+      const node = builder.build(feTable.get("tags"), [1, 2]);
       const [sql, binds] = new Visitors.ToSql().compileWithBinds(node);
       // Single equality bind, NOT `IN (?, ?)`.
       expect(sql).toContain('"posts"."tags" = ?');
@@ -273,25 +275,25 @@ describe("PredicateBuilderTest", () => {
     const compile = (node: Nodes.Node) => new Visitors.ToSql().compile(node);
 
     it("builds IS NOT NULL for null values", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildNegatedFromHash({ title: null });
       expect(compile(node)).toMatch(/IS NOT NULL/);
     });
 
     it("builds NOT IN for arrays", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildNegatedFromHash({ id: [1, 2, 3] });
       expect(compile(node)).toMatch(/NOT IN \(\?, \?, \?\)/);
     });
 
     it("builds NOT IN for Set values in negated predicates", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildNegatedFromHash({ id: new Set([1, 2]) });
       expect(compile(node)).toMatch(/NOT IN \(\?, \?\)/);
     });
 
     it("builds correct negation for exclusive ranges", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildNegatedFromHash({ age: new Range(18, 65, true) });
       const sql = compile(node);
       expect(sql).toMatch(/< 18/);
@@ -299,7 +301,7 @@ describe("PredicateBuilderTest", () => {
     });
 
     it("does not dereference a plain object literal to its id when negated", () => {
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.buildNegated(table.get("title"), { id: 5 });
       const sql = new Visitors.ToSql().compile(node);
       // Negation binds the RHS (Rails inverts a positively-built, bound
@@ -318,7 +320,7 @@ describe("PredicateBuilderTest", () => {
       class NotARecord {
         constructor(public id: number) {}
       }
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const [node] = builder.buildNegatedFromHash({
         id: [new NotARecord(5), new NotARecord(7)],
       });
@@ -330,7 +332,7 @@ describe("PredicateBuilderTest", () => {
   describe("QueryAttribute bind handling", () => {
     it("buildBindAttribute creates a QueryAttribute", () => {
       const table = castedTable("users");
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const qa = builder.buildBindAttribute("name", "alice");
       expect(qa.name).toBe("name");
       expect(qa.value).toBe("alice");
@@ -338,7 +340,7 @@ describe("PredicateBuilderTest", () => {
 
     it("BasicObjectHandler routes through buildBindAttribute", () => {
       const table = castedTable("users");
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql();
       const [sql, binds] = visitor.compileWithBinds(node);
@@ -348,7 +350,7 @@ describe("PredicateBuilderTest", () => {
 
     it("Substitute flows through as BindParam via QueryAttribute", () => {
       const table = castedTable("users");
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), new Substitute());
       const visitor = new Visitors.ToSql();
       const [sql, binds] = visitor.compileWithBinds(node);
@@ -361,7 +363,7 @@ describe("PredicateBuilderTest", () => {
 
     it("compile inlines QueryAttribute values for display SQL", () => {
       const table = castedTable("users");
-      const builder = new PredicateBuilder(table);
+      const builder = new PredicateBuilder(new TableMetadata(null, table));
       const node = builder.build(table.get("name"), "alice");
       const visitor = new Visitors.ToSql();
       // The value is wrapped in a BindParam, so raw Arel compile emits `?`
