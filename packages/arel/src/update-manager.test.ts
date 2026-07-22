@@ -194,7 +194,7 @@ describe("UpdateManagerTest", () => {
     mgr.order(users.get("name").asc());
     mgr.take(5);
     expect(mgr.toSql()).toBe(
-      `UPDATE "users" SET "active" = FALSE WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`,
+      `UPDATE "users" SET "active" = 'f' WHERE "users"."age" < 18 ORDER BY "users"."name" ASC LIMIT 5`,
     );
   });
 
@@ -209,7 +209,7 @@ describe("UpdateManagerTest", () => {
     const mgr = new UpdateManager();
     mgr.table(users);
     mgr.set([[users.get("active"), false]]);
-    expect(mgr.toSql()).toContain("FALSE");
+    expect(mgr.toSql()).toContain("'f'");
   });
 
   it("handles limit properly", () => {

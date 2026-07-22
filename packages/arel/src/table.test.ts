@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { Table, sql, star, SelectManager, Nodes, Visitors, EmptyJoinError } from "./index.js";
+import { testConnection } from "./test-helpers/connection.js";
 
 describe("TableTest", () => {
   const users = new Table("users");
@@ -198,18 +199,25 @@ describe("TableTest", () => {
     expect(users.star.toSql()).toBe('"users".*');
   });
 
+  // Schema-qualified quoting is an adapter behaviour (ANSI dot-splitting); the
+  // suite's FakeRecord engine wraps the whole name in one pair of quotes, so
+  // these name a real quoting connection at the call site to exercise the split.
   it("star splits schema-qualified name", () => {
-    expect(new Table("test_schema.things").star.toSql()).toBe('"test_schema"."things".*');
-  });
-
-  it("star preserves quoted table name with dot", () => {
-    expect(new Table('test_schema."things.table"').star.toSql()).toBe(
-      '"test_schema"."things.table".*',
+    expect(new Visitors.ToSql(testConnection).compile(new Table("test_schema.things").star)).toBe(
+      '"test_schema"."things".*',
     );
   });
 
+  it("star preserves quoted table name with dot", () => {
+    expect(
+      new Visitors.ToSql(testConnection).compile(new Table('test_schema."things.table"').star),
+    ).toBe('"test_schema"."things.table".*');
+  });
+
   it("star preserves quoted schema name with dot", () => {
-    expect(new Table('"my.schema".articles').star.toSql()).toBe('"my.schema"."articles".*');
+    expect(new Visitors.ToSql(testConnection).compile(new Table('"my.schema".articles').star)).toBe(
+      '"my.schema"."articles".*',
+    );
   });
 
   it("star routes table-name quoting through the adapter visitor (MySQL=backticks)", () => {

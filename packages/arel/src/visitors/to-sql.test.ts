@@ -1823,10 +1823,12 @@ describe("the to_sql visitor", () => {
   describe("schema-qualified table identifier", () => {
     it("quotes each segment of a schema.table name in SELECT and column refs", () => {
       const tbl = new Table("schema.table");
-      const sql = tbl.project(tbl.get("col")).toSql();
-      // Both the FROM clause and the qualified column reference should
-      // emit "schema"."table" — not "schema.table" (which would be a
-      // single identifier and reference a different relation).
+      // Dot-splitting is an adapter behaviour, so name a real quoting connection
+      // rather than the suite's FakeRecord engine (which wraps the whole name in
+      // one pair of quotes). Both the FROM clause and the qualified column
+      // reference should emit "schema"."table" — not "schema.table" (which would
+      // be a single identifier and reference a different relation).
+      const sql = new Visitors.ToSql(testConnection).compile(tbl.project(tbl.get("col")).ast);
       expect(sql).toBe('SELECT "schema"."table"."col" FROM "schema"."table"');
     });
   });
@@ -1838,7 +1840,11 @@ describe("the to_sql visitor", () => {
     it("UPDATE SET column quotes embedded double-quotes", () => {
       const tbl = new Table('tab"le');
       const mgr = new UpdateManager().table(tbl).set([[tbl.get('co"l'), 1]]);
-      expect(mgr.toSql()).toContain('"co""l" = 1');
+      // Identifier-escaping is an adapter behaviour; the suite's FakeRecord
+      // engine leaves the embedded quote intact, so name a real quoting
+      // connection to exercise the escape (matching the sibling CTE test).
+      const sql = new Visitors.ToSql(testConnection).compile(mgr.ast);
+      expect(sql).toContain('"co""l" = 1');
     });
 
     it("CTE name escapes embedded double-quotes", () => {
