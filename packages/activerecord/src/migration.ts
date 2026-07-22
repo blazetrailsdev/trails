@@ -918,6 +918,18 @@ export abstract class Migration {
     options?: JoinTableOptions | ((t: TableDefinition) => void),
     fn?: (t: TableDefinition) => void,
   ): Promise<void> {
+    // Mirrors Rails Migration::Current#create_join_table — the block's table
+    // definition routes through compatible_table_definition (migration.rb:596),
+    // same as createTable/changeTable. Wrapped before recording, matching Ruby
+    // where `super { |t| yield ... }` hands the recorder the wrapping block.
+    const wrap = (block?: (t: TableDefinition) => void) =>
+      block &&
+      ((t: TableDefinition) => block(this.compatibleTableDefinition(t) as TableDefinition));
+    if (typeof options === "function") {
+      options = wrap(options);
+    } else {
+      fn = wrap(fn);
+    }
     if (this._recording) {
       this._recorder.record("createJoinTable", [table1, table2, options, fn]);
       return;
