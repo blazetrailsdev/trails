@@ -87,6 +87,38 @@ describe("Ruby extractor gate detection", () => {
     expect(g["pg and ps"]).toEqual({ guards: ["prepared_statements"], source: ["class"] });
   });
 
+  it("folds statically-false Trilogy predicates out of gate conditions", () => {
+    const g = rubyGates({
+      // Mirrors abstract_mysql_adapter/connection_test.rb:144 — an `unless
+      // TrilogyAdapter` wrapper inside a mysql-dir file must not collapse to
+      // `mysql AND !mysql` = the empty adapter set.
+      "cases/adapters/abstract_mysql_adapter/connection_test.rb": `
+        unless current_adapter?(:TrilogyAdapter)
+          def test_passing_arbitrary_flags_to_adapter; end
+        end
+      `,
+      // Mirrors base_test.rb:871 — Trilogy drops out of the disjunction.
+      "cases/base_test.rb": `
+        unless current_adapter?(:PostgreSQLAdapter) || current_adapter?(:TrilogyAdapter)
+          def test_no_pg_no_trilogy; end
+        end
+        if current_adapter?(:TrilogyAdapter)
+          def test_trilogy_only; end
+        end
+      `,
+    });
+    expect(g["passing arbitrary flags to adapter"]).toEqual({
+      adapters: ["mysql"],
+      source: ["dir"],
+    });
+    expect(g["no pg no trilogy"]).toEqual({
+      adapters: ["mysql", "sqlite"],
+      source: ["class"],
+    });
+    // A Trilogy-only positive gate runs nowhere in trails: explicit empty set.
+    expect(g["trilogy only"]).toEqual({ adapters: [], source: ["class"] });
+  });
+
   it("captures a negated current_adapter? exclusion in a compound trailing-if", () => {
     const g = rubyGates({
       // Mirrors persistence_test.rb:1614 — `end if supports_X? && !current_adapter?(:SQLite3Adapter)`.
