@@ -8,15 +8,12 @@
  * `Book.published` → `Book.published()`, `@book.written!` → `book.writtenBang()`,
  * `Book.statuses` → `Book.statuses`).
  *
- * Cases the canonical `Book` enum surface cannot yet express are kept under
- * their Rails names and `it.skip`-ped, tracked-pending-convergence under RFC
- * 0023-surfaced-deviations (enum-canonical-book-gaps): frozen `statuses`,
- * `*_before_type_cast` / `*_for_database`, and the
- * conflict-detection / option-validation message surface (the last is covered
- * behaviorally in enum.trails.test.ts). The `cover` string enum, the
- * `boolean_status` boolean enum, and the `last_read` `forgotten: nil` value are
- * now wired on the canonical `Book` model (EnumType supports string/boolean/nil
- * values).
+ * The `cover` string enum, the `boolean_status` boolean enum, and the
+ * `last_read` `forgotten: nil` value are wired on the canonical `Book` model
+ * (EnumType supports string/boolean/nil values). Remaining sub-assertion gaps
+ * on the canonical `Book` surface are tracked under RFC
+ * 0023-surfaced-deviations (enum-canonical-book-gaps) via inline pending
+ * comments below.
  */
 import { describe, it, expect, beforeAll, beforeEach, vi } from "vitest";
 import { Base, registerModel, Range } from "./index.js";
