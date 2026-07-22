@@ -31,8 +31,6 @@ class EncryptedCompany extends Company {}
 class OtherEncryptedCompany extends Company {}
 class ReflectedEncryptedCompany extends Company {}
 
-// Resolve through typeForAttribute — Rails' single lookup surface. The eager
-// `_attributeDefinitions` back-compat view this used to read is retired.
 const defTypeFor = (klass: typeof Company, name: string) => klass.typeForAttribute(name);
 
 const encryptedAttributesOf = (klass: typeof Company) =>

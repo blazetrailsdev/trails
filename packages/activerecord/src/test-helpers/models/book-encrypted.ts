@@ -138,18 +138,14 @@ export class EncryptedBookWithSerializedSecondBinary extends Base {
   }
 }
 
-// trails-only: no Rails counterpart. Guards that `deterministicEncryptedAttributes`
-// / `encryptedAttribute?` unwrap a post-encrypts `serialize` decorator
-// (Serialized(Encrypted(...))) — Rails gets this for free via DelegateClass
-// delegation on Type::Serialized, which trails wrappers lack.
+// trails-only: no Rails counterpart. Guards Serialized(Encrypted(...)) unwrap
+// in deterministicEncryptedAttributes / encryptedAttribute?.
 export class EncryptedBookWithSerializedDeterministicName extends Base {
   static _tableName = "encrypted_books";
 
   static {
     this.encrypts("name", { deterministic: true });
-    // Lenient JSON coder: the canonical `encrypted_books.name` default
-    // (`<untitled>`) is not valid JSON, and dirty tracking deserializes the
-    // column default through the full Serialized(Encrypted(...)) chain.
+    // Lenient JSON coder: the column default `<untitled>` is not valid JSON.
     this.serialize("name", {
       coder: {
         dump: (value: unknown) => JSON.stringify(value),

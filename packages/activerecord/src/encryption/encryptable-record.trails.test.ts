@@ -113,11 +113,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
     expect(model._pendingAttributeModifications?.length).toBe(queueLength);
   });
 
-  // Rails resolves these through `type_for_attribute(name).deterministic?` /
-  // `.encrypted?`, which reach the encrypted type inside a Serialized wrapper
-  // via DelegateClass delegation (encryptable_record.rb:58-62, 146-153). trails
-  // wrappers don't auto-delegate, so `encryptedTypeOf` unwraps explicitly —
-  // these guard that the unwrap keeps working for encrypts-then-serialize.
   it("includes a Serialized(Encrypted) attribute in deterministicEncryptedAttributes", async () => {
     await freshAdapter();
 
@@ -125,7 +120,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
       EncryptedBookWithSerializedDeterministicName,
     );
     expect(deterministic.has("name")).toBe(true);
-    // Non-deterministic Serialized(Encrypted) stays out.
     expect(
       EncryptableRecord.deterministicEncryptedAttributes(
         EncryptedBookWithSerializedSecondBinary,
@@ -138,8 +132,6 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
 
     const book = await EncryptedBookWithSerializedDeterministicName.create({ name: "Dune" });
 
-    // Read back from the DB: before-type-cast is now the stored ciphertext
-    // (on the fresh record it is still the plaintext user input, as in Rails).
     const reloaded = await EncryptedBookWithSerializedDeterministicName.find(book.id);
     expect(reloaded.name).toBe("Dune");
     expect(reloaded.encryptedAttribute("name")).toBe(true);

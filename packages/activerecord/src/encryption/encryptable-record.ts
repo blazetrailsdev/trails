@@ -179,9 +179,6 @@ export class EncryptableRecord {
   static deterministicEncryptedAttributes(modelClass: any): Set<string> {
     const result = new Set<string>();
     for (const name of this.encryptedAttributes(modelClass)) {
-      // Unwrap post-encrypts decorators (Serialized, Normalized) — Rails'
-      // `type_for_attribute(name).deterministic?` reaches the encrypted type
-      // through DelegateClass delegation (encryptable_record.rb:58-62).
       const type = encryptedTypeOf(getAttributeType(modelClass, name));
       if (type?.deterministic) {
         result.add(name);
@@ -257,13 +254,8 @@ export class EncryptableRecord {
 
   /**
    * Record a pending encryption so `applyPendingEncryptions` (encryption.ts)
-   * re-runs column-size validation and installs the frozen-encryption validator
-   * on every `_defaultAttributes` rebuild (the type wrapping itself is the
-   * durable decorator pushed by `pushEncryptionDecorator`). The `scheme` is
-   * kept in each entry for `encryptFixtureRows` (define-fixtures.ts), which
-   * builds fixture ciphertext before the schema has reflected — at that point
-   * `typeForAttribute` still resolves a plain ValueType. Own-property guarded
-   * like the encrypted-attribute Set.
+   * re-runs its bookkeeping on every `_defaultAttributes` rebuild. The `scheme`
+   * is kept in each entry for `encryptFixtureRows` (define-fixtures.ts).
    * @internal
    */
   static registerPendingEncryption(modelClass: any, name: string, scheme: Scheme): void {
@@ -311,17 +303,10 @@ export class EncryptableRecord {
 
   /**
    * Register the EncryptedAttributeType for a plain mock model (the immediate
-   * path in `encryptAttribute` — callers without `decorateAttributes`). Sets
-   * `_attributeDefinitions` directly, seeding a schema-sourced placeholder when
-   * no def exists yet so `loadSchemaFromAdapter` can supply the real cast type
-   * on the next pass.
-   *
-   * Real Base subclasses never come through here anymore: their wrapping is the
-   * durable PendingDecorator pushed once at declaration time by
-   * `pushEncryptionDecorator`, and every type inspection resolves through
-   * `typeForAttribute` (Rails' single lookup surface,
-   * attribute_registration.rb:66-72) — the eager `_attributeDefinitions`
-   * re-wrap this method used to maintain on rebuild is retired.
+   * path in `encryptAttribute` — callers without `decorateAttributes`). Real
+   * Base subclasses never come through here: their wrapping is the durable
+   * decorator pushed by `pushEncryptionDecorator`, resolved via
+   * `typeForAttribute`.
    * @internal
    */
   static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
@@ -563,8 +548,6 @@ export class EncryptableRecord {
     // Resolve attribute aliases before checking encrypted set.
     const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
     if (!klass._encryptedAttributes?.has(resolvedName)) return false;
-    // Unwrap post-encrypts decorators — Rails' `type.encrypted?(raw)` reaches
-    // the encrypted type through DelegateClass delegation.
     const type = encryptedTypeOf(getAttributeType(klass, resolvedName));
     if (!type) return false;
     const raw = record.readAttributeBeforeTypeCast?.(resolvedName);
@@ -656,10 +639,6 @@ export class EncryptableRecord {
       const raw = record.readAttributeBeforeTypeCast?.(name);
       // Only decrypt if actually encrypted — mirrors Rails' type.deserialize
       // which returns the raw value when support_unencrypted_data is true.
-      // Deserialize through the FULL resolved type (Rails deserializes
-      // `type_for_attribute`'s type, encryptable_record.rb:216-218) so outer
-      // wrappers — a Serialized coder on top of the encrypted type — apply
-      // after decryption.
       if (encryptedType?.isEncrypted(raw) && type?.deserialize) {
         result[name] = type.deserialize(raw);
       } else {
@@ -689,11 +668,8 @@ export class EncryptableRecord {
 }
 
 /**
- * Resolve an attribute's type the way Rails does — through the class's single
- * `type_for_attribute` lookup surface (the replayed default attribute set,
- * attribute_registration.rb:66-72). Falls back to the raw
- * `_attributeDefinitions` entry only for plain mock models that lack the full
- * model machinery (the immediate `registerEncryptedType` path).
+ * Resolve an attribute's type through `typeForAttribute` (Rails' single lookup
+ * surface); falls back to `_attributeDefinitions` for plain mock models.
  */
 export function getAttributeType(klass: any, name: string): unknown {
   if (typeof klass?.typeForAttribute === "function") {
@@ -704,15 +680,8 @@ export function getAttributeType(klass: any, name: string): unknown {
 
 /**
  * Find the EncryptedAttributeType inside a possibly-wrapped resolved type
- * (e.g. `Serialized(Encrypted(binary))` from encrypts-then-serialize).
- *
- * Rails needs no such walk: `Type::Serialized` and `NormalizedValueType`
- * delegate missing methods (`deterministic?`, `encrypted?`, `previous_types`)
- * to their inner type via DelegateClass / delegate_missing_to, so
- * `type_for_attribute(name).deterministic?` reaches the encrypted type through
- * any wrapper. trails wrappers don't auto-delegate, so callers unwrap along the
- * wrappers' inner-type fields (`subtype` for Serialized, `castType` for
- * NormalizedValueType) explicitly.
+ * (e.g. `Serialized(Encrypted(binary))`). Stands in for Rails' DelegateClass
+ * delegation on Type::Serialized / NormalizedValueType.
  */
 export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefined {
   let current: any = type;

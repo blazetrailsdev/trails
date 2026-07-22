@@ -271,8 +271,6 @@ export function isEncryptedAttribute(klass: any, attr: string): boolean {
     if (pending?.some((p) => p.name === attr)) return true;
     const defs = current._attributeDefinitions;
     if (defs) {
-      // Unwrap post-encrypts decorators (Serialized may sit on top of the
-      // encrypted type in a decorateAttributes-eager def).
       if (encryptedTypeOf(defs.get(attr)?.type)) return true;
     }
     current = Object.getPrototypeOf(current);
@@ -291,9 +289,6 @@ export function encryptedAttributeQ(record: any, attributeName: string): boolean
   // Resolve attribute aliases (mirrors Rails' attribute_aliases lookup).
   const resolved = klass._attributeAliases?.[attributeName] ?? attributeName;
   if (!klass._encryptedAttributes?.has(resolved)) return false;
-  // Resolve through typeForAttribute and unwrap post-encrypts decorators —
-  // Rails' `type.encrypted?(raw)` reaches the encrypted type through
-  // DelegateClass delegation (encryptable_record.rb:146-153).
   const type = encryptedTypeOf(getAttributeType(klass, resolved));
   if (!type) return false;
   const rawValue = record.readAttributeBeforeTypeCast(resolved);
@@ -361,9 +356,6 @@ export async function decryptRecord(record: any): Promise<void> {
     const type = getAttributeType(klass, attr) as { deserialize?: (v: unknown) => unknown };
     const encryptedType = encryptedTypeOf(type);
     const raw = record.readAttributeBeforeTypeCast(attr);
-    // Deserialize through the FULL resolved type so outer wrappers (a
-    // Serialized coder on top of the encrypted type) apply after decryption —
-    // mirrors Rails' type_for_attribute deserialize (encryptable_record.rb:216).
     if (encryptedType?.isEncrypted(raw) && type?.deserialize) {
       assignments[attr] = type.deserialize(raw);
     } else {

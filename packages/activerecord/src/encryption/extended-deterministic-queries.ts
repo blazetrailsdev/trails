@@ -120,8 +120,6 @@ export class EncryptedQuery {
     let modified = false;
 
     for (const attrName of encryptedAttrs) {
-      // Unwrap post-encrypts decorators — query expansion serializes through
-      // the encrypted type itself, like Rails' delegated previous_types.
       const type = encryptedTypeOf(getAttributeType(model, attrName));
       if (!type) continue;
       if (!type.deterministic) continue;
