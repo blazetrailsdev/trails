@@ -1,5 +1,14 @@
 import { describe, it, expect } from "vitest";
-import { Table, sql, star, SelectManager, Nodes, Visitors, EmptyJoinError } from "./index.js";
+import {
+  Table,
+  sql,
+  star,
+  SelectManager,
+  TreeManager,
+  Nodes,
+  Visitors,
+  EmptyJoinError,
+} from "./index.js";
 import { testConnection, mysqlTestConnection } from "./test-helpers/connection.js";
 
 describe("TableTest", () => {
@@ -160,7 +169,7 @@ describe("TableTest", () => {
     it("returns a tree manager", () => {
       const mgr = users.where(users.get("id").eq(1));
       mgr.project(users.get("id"));
-      expect(mgr).toBeInstanceOf(SelectManager);
+      expect(mgr).toBeInstanceOf(TreeManager);
       expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" = 1');
     });
   });
