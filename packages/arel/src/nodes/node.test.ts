@@ -188,7 +188,11 @@ describe("Table.engine", () => {
   it("TreeManager#toSql() compiles through the engine connection's visitor", () => {
     const users = new Table("users");
     const mgr = users.project(users.get("id")).where(users.get("active").isNotDistinctFrom(true));
-    expect(mgr.toSql()).toContain("IS NOT DISTINCT FROM");
+    // The generic base visitor emits the CASE form (to_sql.rb:658), not the
+    // adapter-native `IS NOT DISTINCT FROM` — that is the SQLite/PG override.
+    expect(mgr.toSql()).toContain("CASE WHEN");
+    expect(mgr.toSql()).toContain("END = 0");
+    expect(mgr.toSql()).not.toContain("IS NOT DISTINCT FROM");
     const sqlite = mgr.toSql(sqliteEngine);
     // SQLite emits IS for IS NOT DISTINCT FROM; Quoted(true) inlines as 1 in SQLite.
     expect(sqlite).toContain('"users"."active" IS 1');
