@@ -344,6 +344,12 @@ export { HashConfig } from "./database-configurations/hash-config.js";
 export { UrlConfig } from "./database-configurations/url-config.js";
 export { DatabaseConfigurations } from "./database-configurations.js";
 export { ConnectionPool } from "./connection-adapters/abstract/connection-pool.js";
+import { PoolConfig as _PoolConfig } from "./connection-adapters/pool-config.js";
+// Mirrors ActiveRecord.disconnect_all! (lib/active_record.rb): explicitly
+// closes all active connections known to this process.
+export async function disconnectAllBang(): Promise<void> {
+  await _PoolConfig.disconnectAllBang();
+}
 export { ConnectionHandler } from "./connection-adapters/abstract/connection-handler.js";
 export { ConnectionManagement, BodyProxy } from "./connection-adapters/connection-management.js";
 export { DatabaseTasks, DatabaseNotSupported } from "./tasks/database-tasks.js";

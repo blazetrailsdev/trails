@@ -5,7 +5,7 @@ import * as path from "node:path";
 import { DatabaseTasks } from "./database-tasks.js";
 import { HashConfig } from "../database-configurations/hash-config.js";
 import { DatabaseConfigurations } from "../database-configurations.js";
-import { NoEnvironmentInSchemaError } from "../migration.js";
+import { NoEnvironmentInSchemaError, ProtectedEnvironmentError } from "../migration.js";
 import { SchemaMigration } from "../schema-migration.js";
 import { Base } from "../base.js";
 
@@ -17,8 +17,8 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
   });
 
   it.skip("raises an error when called with protected environment which name is a symbol", () => {
-    // P3 skip: TypeScript has no Symbol type for string env names; Rails-only coercion,
-    // no TS equivalent. Permanently language-level inapplicable.
+    // PERMANENT-SKIP: Ruby-only (Symbol env names) — protected_environments
+    // symbol→string coercion has no TS equivalent; env names are plain strings.
     // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:98
   });
 
@@ -61,11 +61,68 @@ describe("DatabaseTasksCheckProtectedEnvironmentsTest", () => {
 });
 
 describe("DatabaseTasksCheckProtectedEnvironmentsMultiDatabaseTest", () => {
-  it.skip("with multiple databases", () => {
-    // P3 skip: needs multi-db checkProtectedEnvironmentsBang integration test with two
-    // real SQLite file DBs, each stamped with internal_metadata env, then verifying
-    // protected-env check fires on either. ~50 LOC test + potential Migrator fix.
-    // Rails: vendor/rails/activerecord/test/cases/tasks/database_tasks_test.rb:155
+  it("with multiple databases", async () => {
+    // Rails: test_with_multiple_databases (database_tasks_test.rb:155) —
+    // two sqlite3 file databases in one env, both stamped with the current
+    // environment; the guard passes, then fires once the env is protected.
+    const env = "arunit";
+    const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "trails-multi-db-"));
+    const primaryDb = path.join(tmp, "primary.sqlite3");
+    const secondaryDb = path.join(tmp, "secondary.sqlite3");
+    DatabaseTasks.databaseConfiguration = new DatabaseConfigurations({
+      [env]: {
+        primary: { adapter: "sqlite3", database: primaryDb },
+        secondary: { adapter: "sqlite3", database: secondaryDb },
+      },
+    });
+    DatabaseTasks.registerTask("sqlite", { create: async () => {} });
+    const { BetterSQLite3Adapter } =
+      await import("../connection-adapters/better-sqlite3-adapter.js");
+    const protectedEnvironments = Base.protectedEnvironments;
+
+    // Mirrors `internal_metadata.create_table_and_set_flags(current_env)` on
+    // both databases.
+    for (const dbFile of [primaryDb, secondaryDb]) {
+      const adapter = new BetterSQLite3Adapter(dbFile);
+      try {
+        await adapter.executeMutation(
+          "CREATE TABLE IF NOT EXISTS ar_internal_metadata (key VARCHAR PRIMARY KEY NOT NULL, value VARCHAR, created_at DATETIME NOT NULL, updated_at DATETIME NOT NULL)",
+        );
+        await adapter.executeMutation(
+          `INSERT INTO ar_internal_metadata (key, value, created_at, updated_at) VALUES ('environment', '${env}', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)`,
+        );
+      } finally {
+        await adapter.close();
+      }
+    }
+
+    try {
+      expect(protectedEnvironments).not.toContain(env);
+      // Assert not raises
+      await DatabaseTasks.checkProtectedEnvironmentsBang(env);
+
+      // Mirrors `schema_migration.create_table` + `create_version("1")` on the
+      // secondary database.
+      const secondary = new BetterSQLite3Adapter(secondaryDb);
+      try {
+        await secondary.executeMutation(
+          "CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(255) PRIMARY KEY NOT NULL)",
+        );
+        await secondary.executeMutation("INSERT INTO schema_migrations (version) VALUES ('1')");
+      } finally {
+        await secondary.close();
+      }
+
+      Base.protectedEnvironments = [env];
+      await expect(DatabaseTasks.checkProtectedEnvironmentsBang(env)).rejects.toThrow(
+        ProtectedEnvironmentError,
+      );
+    } finally {
+      Base.protectedEnvironments = protectedEnvironments;
+      DatabaseTasks.databaseConfiguration = null;
+      DatabaseTasks.clearRegisteredTasks();
+      fs.rmSync(tmp, { recursive: true, force: true });
+    }
   });
 });
 
