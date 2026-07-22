@@ -85,4 +85,14 @@ export const supportsDefaultExpression =
   mysqlAvailable &&
   (mariaDb ? _serverVersion?.gte("10.2.1") === true : _serverVersion?.gte("8.0.13") === true);
 
+/**
+ * Mirrors AbstractMysqlAdapter#supports_expression_index?
+ * (abstract_mysql_adapter.rb:104): MySQL ≥ 8.0.13 only; never MariaDB. Feeds
+ * the `expression_index` entry in test-helpers/supports.ts, which cannot bake
+ * the answer into a static adapterType table — the mysql lane may be MySQL 8
+ * (true) or the MariaDB CI stand-in (false).
+ */
+export const supportsExpressionIndex =
+  mysqlAvailable && !mariaDb && _serverVersion?.gte("8.0.13") === true;
+
 export { Mysql2Adapter };

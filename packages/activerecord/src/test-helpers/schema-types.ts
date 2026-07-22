@@ -91,6 +91,12 @@ export interface IndexSpec {
   using?: string;
   /** Index type keyword, mirroring Rails' `t.index type:` (e.g. MySQL `"fulltext"`). */
   type?: string;
+  /**
+   * Restrict the index to these adapters, mirroring schema.rb's inline
+   * `if ActiveRecord::TestCase.current_adapter?(...)` gate (e.g. the MySQL-only
+   * `full_name_index`, schema.rb:426). Omitted = all adapters.
+   */
+  adapters?: readonly string[];
 }
 
 export interface WrappedTableSchema {

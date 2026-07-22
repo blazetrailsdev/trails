@@ -185,12 +185,17 @@ function generateCode(
       // threads in `supportsExpressionIndex` (resolved from the DB version) to
       // match `emitTableIndexes`' runtime `supportsExpressionIndex(adapter)`
       // check (MySQL >= 8.0.13, SQLite >= 3.9, never MariaDB). When the flag is
-      // omitted, fall back to the coarse `adapterName === "mysql"` skip — exact
-      // for the only live caller today, the PG-only template path
-      // (template-global-setup.ts), where PG always supports expression indexes.
+      // omitted, fall back to the coarse `adapterName === "mysql"` skip — a
+      // last resort for a caller with no live connection. Live callers
+      // (test-setup-dy.ts, template-global-setup.ts) must thread the flag, or
+      // a MySQL-8 worker rebuild strips the canonical expression indexes.
       const dropExpression =
         supportsExpressionIndex !== undefined ? !supportsExpressionIndex : adapterName === "mysql";
       if (isExpression && dropExpression) continue;
+      // schema.rb's inline current_adapter? gate (e.g. the MySQL-only
+      // full_name_index) — mirrors emitTableIndexes' `opts.adapters` skip.
+      if (index.adapters && adapterName !== undefined && !index.adapters.includes(adapterName))
+        continue;
       const optEntries: string[] = [];
       if (index.unique) optEntries.push(`unique: true`);
       if (index.where !== undefined) optEntries.push(`where: ${JSON.stringify(index.where)}`);

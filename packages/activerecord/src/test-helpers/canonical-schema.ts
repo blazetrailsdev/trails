@@ -38,6 +38,12 @@ interface ColOpts {
 }
 
 interface IndexOpts {
+  /**
+   * Restrict the index to these adapters, mirroring schema.rb's inline
+   * `if ActiveRecord::TestCase.current_adapter?(...)` gate (e.g. the MySQL-only
+   * `full_name_index`, schema.rb:426). Omitted = all adapters.
+   */
+  adapters?: readonly string[];
   unique?: boolean;
   where?: string;
   name?: string;
@@ -181,6 +187,8 @@ export async function emitTableIndexes(
   for (const { columns, opts } of indexes) {
     const isExpression = typeof columns === "string" && /\W/.test(columns);
     if (isExpression && !(await supportsExpressionIndex(adapter))) continue;
+    // schema.rb's inline current_adapter? gate (e.g. the MySQL-only full_name_index).
+    if (opts.adapters && !opts.adapters.includes(adapter.adapterName)) continue;
     await ss.addIndex(table, columns, {
       unique: opts.unique,
       where: opts.where,
@@ -684,6 +692,11 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.index("name", { name: "company_name_index", using: "btree" });
     t.index("(CASE WHEN rating > 0 THEN lower(name) END) DESC", {
       name: "company_expression_index",
+    });
+    // schema.rb:426 — MySQL-only functional index (current_adapter?(:Mysql2, :Trilogy)).
+    t.index("(CONCAT_WS(`firm_name`, `name`, _utf8mb4' '))", {
+      name: "full_name_index",
+      adapters: ["mysql"],
     });
   });
 

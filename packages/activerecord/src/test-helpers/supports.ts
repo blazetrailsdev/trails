@@ -29,6 +29,17 @@ import { adapterType } from "../test-adapter.js";
 const ALL = ["postgres", "mysql", "sqlite"] as const;
 type Backend = (typeof ALL)[number];
 
+// `supports_expression_index?` on the MySQL family is a live-server predicate
+// (`!mariadb? && database_version >= "8.0.13"`, abstract_mysql_adapter.rb:104)
+// that a static adapterType table cannot bake in: the mysql lane runs against
+// MySQL 8 (true) locally but the MariaDB stand-in (false) in CI. Probe the
+// server once, on the mysql lane only — the dynamic import keeps the probe's
+// connection attempt off the pg/sqlite lanes.
+const mysqlExpressionIndex =
+  adapterType === "mysql"
+    ? (await import("../adapters/abstract-mysql-adapter/test-helper.js")).supportsExpressionIndex
+    : false;
+
 const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // Available on every backend we test (pg17 / mysql:8 / recent sqlite).
   savepoints: ALL,
@@ -51,12 +62,10 @@ const SUPPORTS: Readonly<Record<string, readonly Backend[]>> = {
   // PostgreSQL only (postgresql_adapter.rb:224/228; abstract default false).
   exclusion_constraints: ["postgres"],
   unique_constraints: ["postgres"],
-  // `supports_expression_index?`: `!mariadb? && database_version >= "8.0.13"`.
-  // MySQL 8 qualifies at the server level, but our schema-dump DDL generator
-  // does not yet emit the correct MySQL 8 expression-index syntax (P-9 family).
-  // Unlock "mysql" here once the dump path is fixed. (postgresql_adapter.rb:208,
-  // sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
-  expression_index: ["postgres", "sqlite"],
+  // `supports_expression_index?`: PG + SQLite always; MySQL family per the
+  // live-server probe above (MySQL ≥ 8.0.13, never MariaDB).
+  // (postgresql_adapter.rb:208, sqlite3_adapter.rb:155, abstract_mysql_adapter.rb:104)
+  expression_index: mysqlExpressionIndex ? ALL : ["postgres", "sqlite"],
   // `supports_bulk_alter?`: PostgreSQL + MySQL true, abstract default false.
   // (postgresql_adapter.rb:188, abstract_mysql_adapter.rb:96)
   bulk_alter: ["postgres", "mysql"],

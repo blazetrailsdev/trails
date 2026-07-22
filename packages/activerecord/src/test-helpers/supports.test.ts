@@ -2,6 +2,13 @@ import { describe, expect, it } from "vitest";
 import { adapterType } from "../test-adapter.js";
 import { adapterSupports, describeIfSupports, itIfSupports } from "./supports.js";
 
+// Same lane-gated probe supports.ts itself uses — avoids a MySQL connection
+// attempt on the pg/sqlite lanes.
+const mysqlSupportsExpressionIndex =
+  adapterType === "mysql"
+    ? (await import("../adapters/abstract-mysql-adapter/test-helper.js")).supportsExpressionIndex
+    : false;
+
 // Assertions are computed from `adapterType` so they hold on every CI lane
 // (sqlite / postgres / mysql:8), not just the default sqlite run.
 describe("adapterSupports", () => {
@@ -15,9 +22,11 @@ describe("adapterSupports", () => {
   it("reflects the active adapter for backend-specific capabilities", () => {
     expect(adapterSupports("comments")).toBe(adapterType !== "sqlite");
     expect(adapterSupports("insert_conflict_target")).toBe(adapterType !== "mysql");
-    // expression_index: PG + SQLite; MySQL 8 qualifies at the server level but our
-    // schema-dump DDL generator doesn't yet emit correct MySQL 8 syntax (P-9 family).
-    expect(adapterSupports("expression_index")).toBe(adapterType !== "mysql");
+    // expression_index: PG + SQLite always; the MySQL family follows the live
+    // server (MySQL ≥ 8.0.13 true, MariaDB false) via the mysql test-helper probe.
+    expect(adapterSupports("expression_index")).toBe(
+      adapterType !== "mysql" || mysqlSupportsExpressionIndex,
+    );
     // advisory_locks: PG + MySQL, not SQLite (mirrors the old skipIf(=== sqlite)).
     expect(adapterSupports("advisory_locks")).toBe(adapterType !== "sqlite");
     // exclusion/unique constraints: PG only (mirrors skipIf(!== postgres)).
