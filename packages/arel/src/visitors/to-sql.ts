@@ -1286,7 +1286,9 @@ export class ToSql extends Visitor {
       collector.append(" IS NULL");
       return collector;
     }
-    return this.visitBinaryOp(node, "IS NOT DISTINCT FROM", collector);
+    collector = this.isDistinctFrom(node, collector);
+    collector.append(" = 0");
+    return collector;
   }
 
   protected visitArelNodesIsDistinctFrom(
@@ -1298,7 +1300,9 @@ export class ToSql extends Visitor {
       collector.append(" IS NOT NULL");
       return collector;
     }
-    return this.visitBinaryOp(node, "IS DISTINCT FROM", collector);
+    collector = this.isDistinctFrom(node, collector);
+    collector.append(" = 1");
+    return collector;
   }
 
   private visitArelNodesNotEqual(node: Nodes.NotEqual, collector: SQLString): SQLString {
@@ -1912,7 +1916,10 @@ export class ToSql extends Visitor {
    * Mirrors `to_sql.rb#is_distinct_from`. CASE-form fallback for adapters
    * that lack native `IS [NOT] DISTINCT FROM`.
    */
-  protected isDistinctFrom(o: { left: Node; right: Node }, collector: SQLString): SQLString {
+  protected isDistinctFrom(
+    o: { left: Nodes.NodeOrValue; right: Nodes.NodeOrValue },
+    collector: SQLString,
+  ): SQLString {
     collector.append("CASE WHEN ");
     this.visit(o.left, collector);
     collector.append(" = ");

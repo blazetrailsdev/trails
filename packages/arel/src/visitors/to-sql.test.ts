@@ -18,15 +18,16 @@ describe("the to_sql visitor", () => {
   const users = new Table("users");
   const posts = new Table("posts");
   describe("Nodes::IsDistinctFrom", () => {
-    it("should handle nil", () => {
-      const visitor = new Visitors.ToSql(testConnection);
-      const node = users.get("name").isDistinctFrom(null);
-      expect(visitor.compile(node)).toContain("IS NOT NULL");
+    it("should handle column names on both sides", () => {
+      const node = users.get("first_name").isDistinctFrom(users.get("last_name"));
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(
+        `CASE WHEN "users"."first_name" = "users"."last_name" OR ("users"."first_name" IS NULL AND "users"."last_name" IS NULL) THEN 0 ELSE 1 END = 1`,
+      );
     });
 
-    it("should handle column names on both sides", () => {
-      const node = users.get("name").isDistinctFrom(users.get("login"));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toContain("IS DISTINCT FROM");
+    it("should handle nil", () => {
+      const node = users.get("name").isDistinctFrom(null);
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(`"users"."name" IS NOT NULL`);
     });
   });
 
@@ -232,20 +233,24 @@ describe("the to_sql visitor", () => {
   });
 
   describe("Nodes::IsNotDistinctFrom", () => {
-    it("should handle nil", () => {
-      const node = users.get("name").isNotDistinctFrom(null);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toContain("IS NULL");
-    });
-
     it("should construct a valid generic SQL statement", () => {
-      const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted(1));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toContain("IS NOT DISTINCT FROM");
+      const node = users.get("name").isNotDistinctFrom(new Nodes.Quoted("Aaron Patterson"));
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(
+        `CASE WHEN "users"."name" = 'Aaron Patterson' OR ("users"."name" IS NULL AND 'Aaron Patterson' IS NULL) THEN 0 ELSE 1 END = 0`,
+      );
     });
 
     it("should handle column names on both sides", () => {
-      const node = users.get("name").isNotDistinctFrom(users.get("login"));
-      expect(new Visitors.ToSql(testConnection).compile(node)).toContain("IS NOT DISTINCT FROM");
+      const node = users.get("first_name").isNotDistinctFrom(users.get("last_name"));
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe(
+        `CASE WHEN "users"."first_name" = "users"."last_name" OR ("users"."first_name" IS NULL AND "users"."last_name" IS NULL) THEN 0 ELSE 1 END = 0`,
+      );
+    });
+
+    it("should handle nil", () => {
+      const node = users.get("name").isNotDistinctFrom(null);
+      const sql = new Visitors.ToSql(testConnection).compile(node);
+      expect(sql).toBe(`"users"."name" IS NULL`);
     });
   });
 
