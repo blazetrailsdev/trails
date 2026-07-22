@@ -55,6 +55,7 @@ import { Subscription } from "../test-helpers/models/subscription.js";
 import { ShardedBlog, ShardedBlogPost, ShardedComment } from "../test-helpers/models/sharded.js";
 import { captureSql } from "../testing/sql-capture.js";
 import { Member } from "../test-helpers/models/member.js";
+import { Rating } from "../test-helpers/models/rating.js";
 import { Membership } from "../test-helpers/models/membership.js";
 import { Project } from "../test-helpers/models/project.js";
 import { Mentor } from "../test-helpers/models/mentor.js";
@@ -92,6 +93,7 @@ describe("EagerAssociationTest", () => {
     categories,
     members,
     clubs,
+    memberships,
     comments,
     developers,
     projects,
@@ -128,6 +130,7 @@ describe("EagerAssociationTest", () => {
     "subscriptions",
     "books",
     "tags",
+    "ratings",
     "jobs",
     "owners",
     "pets",
@@ -177,15 +180,37 @@ describe("EagerAssociationTest", () => {
       .where("comments.body like 'Normal%' OR comments.type = 'SpecialComment'");
     expect(postArr.every((p: any) => Number(p.author_id) === Number(author.id))).toBe(true);
   });
-  it.skip("loading polymorphic association with mixed table conditions", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("loading polymorphic association with mixed table conditions", async () => {
+    let rating = (await Rating.first()) as any;
+    expect((await rating.taggingsWithoutTag.toArray()).map((t: any) => t.id)).toEqual([
+      taggings("normal_comment_rating").id,
+    ]);
+
+    rating = await Rating.preload("taggingsWithoutTag").first();
+    expect((await rating.taggingsWithoutTag.toArray()).map((t: any) => t.id)).toEqual([
+      taggings("normal_comment_rating").id,
+    ]);
+
+    rating = await Rating.eagerLoad("taggingsWithoutTag").first();
+    expect((await rating.taggingsWithoutTag.toArray()).map((t: any) => t.id)).toEqual([
+      taggings("normal_comment_rating").id,
+    ]);
   });
-  it.skip("loading association with string joins", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("loading association with string joins", async () => {
+    let rating = (await Rating.first()) as any;
+    expect((await rating.taggingsWithNoTag.toArray()).map((t: any) => t.id)).toEqual([
+      taggings("normal_comment_rating").id,
+    ]);
+
+    rating = await Rating.preload("taggingsWithNoTag").first();
+    expect((await rating.taggingsWithNoTag.toArray()).map((t: any) => t.id)).toEqual([
+      taggings("normal_comment_rating").id,
+    ]);
+
+    rating = await Rating.eagerLoad("taggingsWithNoTag").first();
+    expect((await rating.taggingsWithNoTag.toArray()).map((t: any) => t.id)).toEqual([
+      taggings("normal_comment_rating").id,
+    ]);
   });
   it("loading with scope including joins", async () => {
     let member = await Member.first();
@@ -202,15 +227,42 @@ describe("EagerAssociationTest", () => {
     expect(member?.id).toBe(members("groucho").id);
     expect((member as any).association("generalClub").target?.id).toBe(clubs("boring_club").id);
   });
-  it.skip("loading association with same table joins", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("loading association with same table joins", async () => {
+    const superMemberships = [memberships("super_membership_of_boring_club")];
+
+    let member = (await Member.joins("favoriteMemberships").first()) as any;
+    expect(member.id).toBe(members("groucho").id);
+    expect((await member.superMemberships.toArray()).map((m: any) => m.id)).toEqual(
+      superMemberships.map((m) => m.id),
+    );
+
+    member = await Member.joins("favoriteMemberships").preload("superMemberships").first();
+    expect(member.id).toBe(members("groucho").id);
+    expect((await member.superMemberships.toArray()).map((m: any) => m.id)).toEqual(
+      superMemberships.map((m) => m.id),
+    );
+
+    member = await Member.joins("favoriteMemberships").eagerLoad("superMemberships").first();
+    expect(member.id).toBe(members("groucho").id);
+    expect((await member.superMemberships.toArray()).map((m: any) => m.id)).toEqual(
+      superMemberships.map((m) => m.id),
+    );
   });
-  it.skip("loading association with intersection joins", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("loading association with intersection joins", async () => {
+    let member = (await Member.joins("currentMembership").first()) as any;
+    expect(member.id).toBe(members("groucho").id);
+    expect((await member.club)?.id).toBe(clubs("boring_club").id);
+    expect((await member.currentMembership)?.id).toBe(memberships("membership_of_boring_club").id);
+
+    member = await Member.joins("currentMembership").preload("club", "currentMembership").first();
+    expect(member.id).toBe(members("groucho").id);
+    expect((await member.club)?.id).toBe(clubs("boring_club").id);
+    expect((await member.currentMembership)?.id).toBe(memberships("membership_of_boring_club").id);
+
+    member = await Member.joins("currentMembership").eagerLoad("club", "currentMembership").first();
+    expect(member.id).toBe(members("groucho").id);
+    expect((await member.club)?.id).toBe(clubs("boring_club").id);
+    expect((await member.currentMembership)?.id).toBe(memberships("membership_of_boring_club").id);
   });
 
   it("loading associations dont leak instance state", async () => {
@@ -432,10 +484,14 @@ describe("EagerAssociationTest", () => {
       expectedSubscriptions.map((s) => s.id).sort(),
     );
   });
-  it.skip("string id column joins", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("string id column joins", async () => {
+    const s = await Subscriber.create({ id: "PL" });
+
+    const b = await Book.create({});
+
+    await Subscription.create({ subscriber_id: "PL", book_id: b.id });
+    await s.reload();
+    expect(await (s as any).bookIds).toEqual([b.id]);
   });
   it("eager load has many through with string keys", async () => {
     const expectedBooks = [books("awdr"), books("rfr")];
@@ -666,10 +722,10 @@ describe("EagerAssociationTest", () => {
     expect(raised).toBe(false);
   });
 
-  it.skip("eager association with scope with joins", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("eager association with scope with joins", async () => {
+    await expect(
+      Post.includes("verySpecialCommentWithPostWithJoins").toArray(),
+    ).resolves.toBeDefined();
   });
   it("count with include", async () => {
     const david = authors("david");
@@ -686,10 +742,33 @@ describe("EagerAssociationTest", () => {
       await Comment.all().includes("post");
     });
   });
-  it.skip("eager loading with conditions on string joined table preloads", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("eager loading with conditions on string joined table preloads", async () => {
+    let loaded: Post[] = [];
+    await assertQueriesCount(2, false, async () => {
+      loaded = await Post.all()
+        .select("distinct posts.*")
+        .includes("author")
+        .joins("INNER JOIN comments on comments.post_id = posts.id")
+        .where("comments.body like 'Thank you%'")
+        .order("posts.id");
+    });
+    expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id]);
+    await assertNoQueries(false, async () => {
+      expect((await (loaded[0] as any).author).id).toBe(authors("david").id);
+    });
+
+    await assertQueriesCount(2, false, async () => {
+      loaded = await Post.all()
+        .select("distinct posts.*")
+        .includes("author")
+        .joins(["INNER JOIN comments on comments.post_id = posts.id"])
+        .where("comments.body like 'Thank you%'")
+        .order("posts.id");
+    });
+    expect(loaded.map((p) => p.id)).toEqual([posts("welcome").id]);
+    await assertNoQueries(false, async () => {
+      expect((await (loaded[0] as any).author).id).toBe(authors("david").id);
+    });
   });
   it("preload has many using primary key", async () => {
     const expected = (await (await Firm.first())!.clientsUsingPrimaryKey.toArray()).sort(
@@ -862,10 +941,17 @@ describe("EagerAssociationTest", () => {
     expect(after.id).toBe(expected.id);
   });
 
-  it.skip("preloading associations with string joins and order references", () => {
-    // BLOCKED: associations — eager-loading feature gap
-    // ROOT-CAUSE: associations/eager.ts or preloader.ts missing eager-loading semantics
-    // SCOPE: ~50–200 LOC fix in associations/ or preloader.ts; affects ~10–79 tests in eager.test.ts
+  it("preloading associations with string joins and order references", async () => {
+    let author: any;
+    await assertQueriesCount(2, false, async () => {
+      author = await Author.includes("posts")
+        .joins("LEFT JOIN posts ON posts.author_id = authors.id")
+        .order("posts.title DESC")
+        .first();
+    });
+    await assertNoQueries(false, async () => {
+      expect(await author.posts.size()).toBe(5);
+    });
   });
   it("preloading readonly association", async () => {
     // has-one
