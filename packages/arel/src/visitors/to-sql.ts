@@ -687,14 +687,12 @@ export class ToSql extends Visitor {
 
   private visitArelNodesWith(node: Nodes.With, collector: SQLString): SQLString {
     collector.append("WITH ");
-    this.injectJoin(node.children, ", ", collector);
-    return collector;
+    return this.collectCtes(node.children, collector);
   }
 
   private visitArelNodesWithRecursive(node: Nodes.WithRecursive, collector: SQLString): SQLString {
     collector.append("WITH RECURSIVE ");
-    this.injectJoin(node.children, ", ", collector);
-    return collector;
+    return this.collectCtes(node.children, collector);
   }
 
   // -- Set operations --

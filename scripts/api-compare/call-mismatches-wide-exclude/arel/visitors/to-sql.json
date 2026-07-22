@@ -345,20 +345,6 @@
   {
     "package": "arel",
     "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_With",
-    "call": "collect_ctes",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
-    "rubyName": "visit_Arel_Nodes_WithRecursive",
-    "call": "collect_ctes",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "arel",
-    "tsFile": "visitors/to-sql.ts",
     "rubyName": "visit_Array",
     "call": "inject_join",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
