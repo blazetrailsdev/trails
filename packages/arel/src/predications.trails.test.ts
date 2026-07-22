@@ -26,7 +26,7 @@ describe("PredicationsMixin in/notIn Enumerable arm", () => {
       expect(visitor.compile(expr().in(ids()))).toBe('("users"."bitmap" & 16) IN (1, 2)');
     });
 
-    it("expands a Map through the Enumerable arm", () => {
+    it("expands an iterator taken off a Map through the Enumerable arm", () => {
       expect(visitor.compile(expr().in(new Map([[1, 2]]).keys()))).toBe(
         '("users"."bitmap" & 16) IN (1)',
       );
