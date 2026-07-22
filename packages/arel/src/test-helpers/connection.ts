@@ -61,7 +61,9 @@ function unreachableOnFakeRecord(name: string): () => never {
 // `else` arm below for the Time analogues, whose own `toString` is ISO.
 function rubyTimeToS(zdt: Temporal.ZonedDateTime): string {
   const p = (n: number): string => String(n).padStart(2, "0");
-  const offsetMinutes = zdt.offsetNanoseconds / 60_000_000_000;
+  // Truncate to whole minutes: Ruby's `%z` drops sub-minute seconds from
+  // historical LMT offsets (Europe/Paris 1900, `+00:09:21`, renders `+0009`).
+  const offsetMinutes = Math.trunc(zdt.offsetNanoseconds / 60_000_000_000);
   const sign = offsetMinutes < 0 ? "-" : "+";
   const abs = Math.abs(offsetMinutes);
   const offset = `${sign}${p(Math.floor(abs / 60))}${p(abs % 60)}`;
