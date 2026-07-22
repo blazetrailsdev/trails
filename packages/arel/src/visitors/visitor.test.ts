@@ -69,7 +69,7 @@ describe("Visitor dispatch", () => {
     expect(() => v.accept(new C())).not.toThrow(UnsupportedVisitError);
   });
 
-  it("dispatches properly after failing upwards", () => {
+  it("falls through to an ancestor's handler when its own dispatch entry names a missing method", () => {
     // A class whose own dispatch entry names a missing method falls through to
     // an ancestor's working handler and visits successfully — mirroring Rails'
     // `respond_to?(dispatch[klass], true)` ancestor walk (visitor.rb:36-37),
