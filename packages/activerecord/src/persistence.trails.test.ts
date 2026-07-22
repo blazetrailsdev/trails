@@ -239,3 +239,19 @@ describe("PersistenceTest (trails)", () => {
     expect(aircraft.wingspan).toBeNull();
   });
 });
+
+describe("PersistenceTest (trails)", () => {
+  fixtures(["companies"]);
+
+  // Rails' becomes allocates with `klass.allocate` (persistence.rb:487), which
+  // never enters Inheritance::ClassMethods#new — so the abstract-class / Base
+  // guard `new` enforces (inheritance.rb:57) must not fire for becomes().
+  it("becomes bypasses the Base abstract-instantiation guard", async () => {
+    const { Base } = await import("./index.js");
+    const { Company } = await import("./test-helpers/models/company.js");
+    const company = await Company.first();
+    const asBase = company!.becomes(Base as never);
+    expect(asBase).toBeInstanceOf(Base);
+    expect((asBase as unknown as { id: unknown }).id).toBe(company!.id);
+  });
+});

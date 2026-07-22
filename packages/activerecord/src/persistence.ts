@@ -1634,10 +1634,19 @@ export function becomes<
   // Store the class itself, not a boolean: the constructor only skips dispatch
   // when `new.target` *is* this class, so an inherited static never suppresses
   // a nested `new <subclass>()`.
-  const ctor = klass as unknown as { _suppressStiNewDispatch?: unknown };
+  const ctor = klass as unknown as {
+    _suppressStiNewDispatch?: unknown;
+    _suppressAbstractCheck?: boolean;
+  };
   const hadOwn = Object.prototype.hasOwnProperty.call(ctor, "_suppressStiNewDispatch");
   const prev = ctor._suppressStiNewDispatch;
   ctor._suppressStiNewDispatch = klass;
+  // Rails allocates with `klass.allocate`, which never goes through
+  // Inheritance::ClassMethods#new — so the abstract-class / Base guard that
+  // `new` enforces (inheritance.rb:57) does not apply to becomes().
+  const hadOwnAbstract = Object.prototype.hasOwnProperty.call(ctor, "_suppressAbstractCheck");
+  const prevAbstract = ctor._suppressAbstractCheck;
+  ctor._suppressAbstractCheck = true;
   let instance: InstanceType<K>;
   try {
     // Rails passes the variable swap as the `initialize` block, which runs
@@ -1670,6 +1679,8 @@ export function becomes<
   } finally {
     if (hadOwn) ctor._suppressStiNewDispatch = prev;
     else delete ctor._suppressStiNewDispatch;
+    if (hadOwnAbstract) ctor._suppressAbstractCheck = prevAbstract;
+    else delete ctor._suppressAbstractCheck;
   }
   return instance;
 }
