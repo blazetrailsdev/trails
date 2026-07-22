@@ -15,8 +15,8 @@
  * test_serial_sequence / test_default_sequence_name run against the canonical
  * `accounts` table ("public.accounts_id_seq"), as in Rails, where the table is
  * laid globally by test/schema/schema.rb. trails provisions it through the
- * canonical `fixtures(["accounts"])` surface, scoped to just those two tests so
- * the rest of the file doesn't seed it. The `error.connection_pool`
+ * canonical `fixtures(["accounts"])` surface at suite scope (the describe tree
+ * stays flat, matching Rails). The `error.connection_pool`
  * (NullPool / pool identity) assertions from Rails' connection-error,
  * serial-sequence, and invalid-index tests are ported faithfully — a standalone
  * trails adapter carries a NullPool that connect-time and query-time errors
@@ -129,6 +129,13 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLAdapterTest", () => {
+    // Rails' `accounts` table exists globally from test/schema/schema.rb; the
+    // serial-sequence tests read only the `id` column's sequence, no fixture
+    // rows. Provision the canonical `accounts` through the fixtures helper at
+    // the suite scope — Rails nests no extra class around those tests, so the
+    // describe tree stays flat to match.
+    fixtures(["accounts"], { useTransactionalTests: false });
+
     it("connection error", async () => {
       const bad = new PostgreSQLAdapter("postgres://localhost:59999/nonexistent");
       const error = await bad.execute("SELECT 1").then(
@@ -331,27 +338,19 @@ describeIfPg("PostgreSQLAdapter", () => {
       });
     });
 
-    // Rails' `accounts` table exists globally from test/schema/schema.rb; these
-    // two tests read only the `id` column's sequence, no fixture rows. Provision
-    // the canonical `accounts` through the fixtures helper scoped to just this
-    // pair (not the whole file) so the ~60 unrelated tests don't seed/reseed it.
-    describe("serial_sequence", () => {
-      fixtures(["accounts"], { useTransactionalTests: false });
+    it("serial sequence", async () => {
+      expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
+      const error = await adapter.serialSequence("zomg", "id").then(
+        () => null,
+        (e) => e,
+      );
+      expect(error).toBeInstanceOf(StatementInvalid);
+      expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
+    });
 
-      it("serial sequence", async () => {
-        expect(await adapter.serialSequence("accounts", "id")).toBe("public.accounts_id_seq");
-        const error = await adapter.serialSequence("zomg", "id").then(
-          () => null,
-          (e) => e,
-        );
-        expect(error).toBeInstanceOf(StatementInvalid);
-        expect((error as StatementInvalid).connectionPool).toBe(adapter.pool);
-      });
-
-      it("default sequence name", async () => {
-        expect(await adapter.defaultSequenceName("accounts", "id")).toBe("public.accounts_id_seq");
-        expect(await adapter.defaultSequenceName("accounts")).toBe("public.accounts_id_seq");
-      });
+    it("default sequence name", async () => {
+      expect(await adapter.defaultSequenceName("accounts", "id")).toBe("public.accounts_id_seq");
+      expect(await adapter.defaultSequenceName("accounts")).toBe("public.accounts_id_seq");
     });
 
     it("default sequence name bad table", async () => {

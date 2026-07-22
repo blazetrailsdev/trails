@@ -12,18 +12,18 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { BigDecimal } from "@blazetrails/activesupport";
 import { DecimalType } from "@blazetrails/activemodel";
-import { Base, RecordInvalid } from "../index.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { Base, RecordInvalid } from "./index.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
-import "../test-helpers/canonical-model-index.js";
-import { assertNoQueries } from "../testing/query-assertions.js";
-import { Topic } from "../test-helpers/models/topic.js";
-import { WrongReply } from "../test-helpers/models/reply.js";
-import { Developer } from "../test-helpers/models/developer.js";
-import { Parrot } from "../test-helpers/models/parrot.js";
-import { Company } from "../test-helpers/models/company.js";
-import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
+import "./test-helpers/canonical-model-index.js";
+import { assertNoQueries } from "./testing/query-assertions.js";
+import { Topic } from "./test-helpers/models/topic.js";
+import { WrongReply } from "./test-helpers/models/reply.js";
+import { Developer } from "./test-helpers/models/developer.js";
+import { Parrot } from "./test-helpers/models/parrot.js";
+import { Company } from "./test-helpers/models/company.js";
+import { PriceEstimate } from "./test-helpers/models/price-estimate.js";
 
 // `isAttributeCameFromUser` is mixed into Base instances but not surfaced on the
 // model's declared instance type, so narrow it through a typed shim.
