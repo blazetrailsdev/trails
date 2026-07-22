@@ -1,8 +1,13 @@
-import { describe, it, expect } from "vitest";
+import { beforeAll, describe, it, expect } from "vitest";
 
 import { Base } from "./index.js";
 import { ReadOnlyError } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+import { isSqliteRun } from "./test-helpers/sqlite-template.js";
+import { resolveSecondDatabaseConfig } from "./test-helpers/arunit2-config.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
+import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
+import { Professor } from "./test-helpers/models/professor.js";
 
 describe("BasePreventWritesTest", () => {
   fixtures([]);
@@ -69,8 +74,38 @@ describe("BasePreventWritesTest", () => {
     });
   });
 
-  it.skip("preventing writes applies to all connections in block", () => {
-    // Requires two separate connection pools — cannot verify with single-pool SQLite.
+  // Rails runs this against two real databases (arunit / arunit2). Like
+  // MultipleDbTest, we reproduce the split with a second in-memory SQLite pool
+  // on ARUnit2Model; the PG/MySQL suites don't provision a second named
+  // database, so gate to SQLite.
+  beforeAll(async () => {
+    if (isSqliteRun() && !ARUnit2Model.connectionClassQ()) {
+      await ARUnit2Model.establishConnection(resolveSecondDatabaseConfig().config);
+    }
+  });
+
+  it.skipIf(!isSqliteRun())("preventing writes applies to all connections in block", async () => {
+    await rebuildCanonicalTables(ARUnit2Model.connection, ["professors"]);
+
+    const conn1Error = await Base.whilePreventingWrites(async () => {
+      expect(await Bird.leaseConnection()).toBe(await Base.leaseConnection());
+      expect(await ARUnit2Model.leaseConnection()).not.toBe(await Bird.leaseConnection());
+      await Bird.create({ name: "Bluejay" });
+    }).catch((e) => e);
+    expect(conn1Error).toBeInstanceOf(ReadOnlyError);
+    expect((conn1Error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: INSERT /,
+    );
+
+    const conn2Error = await Base.whilePreventingWrites(async () => {
+      expect(await Professor.leaseConnection()).not.toBe(await Base.leaseConnection());
+      expect(await ARUnit2Model.leaseConnection()).toBe(await Professor.leaseConnection());
+      await Professor.create({ name: "Professor Bluejay" });
+    }).catch((e) => e);
+    expect(conn2Error).toBeInstanceOf(ReadOnlyError);
+    expect((conn2Error as ReadOnlyError).message).toMatch(
+      /^Write query attempted while in readonly mode: INSERT /,
+    );
   });
 
   it("current_preventing_writes", () => {

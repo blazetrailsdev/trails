@@ -1,9 +1,22 @@
-import { describe, it } from "vitest";
+import { describe, expect, it } from "vitest";
+import { Base, disconnectAllBang } from "./index.js";
+import { fixtures } from "./test-helpers/fixtures.js";
+import { inMemoryDb } from "./test-adapter.js";
 
 describe("ActiveRecordTest", () => {
-  it.skip(".disconnect_all! closes all connections", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in active-record
-    // ROOT-CAUSE: connection-adapters/abstract/connection-pool.ts or connection-adapters/abstract/connection-handler.ts missing Rails parity for pool lifecycle
-    // SCOPE: ~50–100 LOC fix in connection-adapters/abstract/connection-pool.ts; affects ~10–24 tests in active-record.test.ts
+  // Rails: `self.use_transactional_tests = false` (active_record_test.rb).
+  fixtures({}, { useTransactionalTests: false });
+
+  // Rails gates this behind `unless in_memory_db?`: disconnecting an
+  // in-memory SQLite database discards its schema.
+  it.skipIf(inMemoryDb())(".disconnect_all! closes all connections", async () => {
+    await (await Base.leaseConnection()).connectBang();
+    expect(Base.isConnectedQ()).toBe(true);
+
+    await disconnectAllBang();
+    expect(Base.isConnectedQ()).toBe(false);
+
+    await (await Base.leaseConnection()).connectBang();
+    expect(Base.isConnectedQ()).toBe(true);
   });
 });

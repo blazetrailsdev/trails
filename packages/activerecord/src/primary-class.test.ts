@@ -1,6 +1,8 @@
 import { afterEach, describe, expect, it } from "vitest";
 import { Base } from "./base.js";
 import { __resetPrimaryAbstractClass } from "./inheritance.js";
+import { inMemoryDb } from "./test-adapter.js";
+import { fixtures } from "./test-helpers/fixtures.js";
 
 class PrimaryAppRecord extends Base {}
 PrimaryAppRecord.abstractClass = true;
@@ -14,7 +16,29 @@ class ApplicationRecord extends Base {
 }
 
 describe("PrimaryClassTest", () => {
+  // Rails: `self.use_transactional_tests = false` (primary_class_test.rb:6).
+  // The connects_to tests below need a live primary connection to share.
+  fixtures({}, { useTransactionalTests: false });
+
+  // Mirrors ActiveRecord::TestCase#clean_up_connection_handler (Rails'
+  // per-test `teardown { clean_up_connection_handler }`, primary_class_test.rb:8):
+  // drop every non-default (e.g. :reading) role the connects_to tests
+  // established, leaving the writing pool.
+  function cleanUpConnectionHandler(): void {
+    const managers: Map<string, { roleNames: string[]; removeRole(role: string): boolean }> = (
+      Base.connectionHandler as unknown as {
+        _connectionNameToPoolManager: Map<string, never>;
+      }
+    )._connectionNameToPoolManager as never;
+    for (const [, poolManager] of managers) {
+      for (const role of [...poolManager.roleNames]) {
+        if (role !== Base.defaultRole) poolManager.removeRole(role);
+      }
+    }
+  }
+
   afterEach(() => {
+    cleanUpConnectionHandler();
     __resetPrimaryAbstractClass();
     delete (globalThis as Record<string, unknown>)["ApplicationRecord"];
   });
@@ -84,14 +108,52 @@ describe("PrimaryClassTest", () => {
     expect(ApplicationRecord.abstractClass).toBe(true);
   });
 
-  // Both tests are gated behind Rails' `unless in_memory_db?` (primary_class_test.rb):
-  // they call `connects_to(database: { writing: :arunit, reading: :arunit })` and
-  // assert the new pool shares ActiveRecord::Base's connection. With an in-memory
-  // SQLite database each `connects_to` pool is an independent `:memory:` DB, so the
-  // connections are never equal — which is exactly why Rails skips them in-memory.
-  // Our default suite is in-memory SQLite (see Story 4.2 / MultipleDbTest), so they
-  // stay skipped here too; the second named pool (ARUnit2Model) itself is wired up.
-  it.skip("application record shares a connection with active record by default", () => {});
+  // Both tests are gated behind Rails' `unless in_memory_db?`
+  // (primary_class_test.rb): re-establishing an in-memory pool would discard
+  // its schema. Rails passes `:arunit`; the trails harness registers no named
+  // configurations, so the current db config stands in for that lookup.
+  it.skipIf(inMemoryDb())(
+    "application record shares a connection with active record by default",
+    async () => {
+      (globalThis as Record<string, unknown>)["ApplicationRecord"] = ApplicationRecord;
+      const original = Base.connectionDbConfig();
+      try {
+        const arunit = original as unknown as Record<string, unknown>;
+        const pools = ApplicationRecord.connectsTo({
+          database: { writing: arunit, reading: arunit },
+        });
+        await Promise.all(pools.map((p) => p.adapterReady));
 
-  it.skip("application record shares a connection with the primary abstract class if set", () => {});
+        expect(ApplicationRecord.primaryClassQ()).toBe(true);
+        expect(ApplicationRecord.applicationRecordClassQ()).toBe(true);
+        expect(await ApplicationRecord.leaseConnection()).toBe(await Base.leaseConnection());
+      } finally {
+        ApplicationRecord.removeConnection();
+        await Base.establishConnection(original);
+      }
+    },
+  );
+
+  it.skipIf(inMemoryDb())(
+    "application record shares a connection with the primary abstract class if set",
+    async () => {
+      PrimaryAppRecord.primaryAbstractClass();
+      const original = Base.connectionDbConfig();
+      try {
+        const arunit = original as unknown as Record<string, unknown>;
+        const pools = PrimaryAppRecord.connectsTo({
+          database: { writing: arunit, reading: arunit },
+        });
+        await Promise.all(pools.map((p) => p.adapterReady));
+
+        expect(PrimaryAppRecord.primaryClassQ()).toBe(true);
+        expect(PrimaryAppRecord.applicationRecordClassQ()).toBe(true);
+        expect(PrimaryAppRecord.abstractClass).toBe(true);
+        expect(await PrimaryAppRecord.leaseConnection()).toBe(await Base.leaseConnection());
+      } finally {
+        PrimaryAppRecord.removeConnection();
+        await Base.establishConnection(original);
+      }
+    },
+  );
 });
