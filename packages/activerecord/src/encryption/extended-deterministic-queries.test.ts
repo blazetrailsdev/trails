@@ -438,8 +438,10 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       }
     }
     (Contact as any)._encryptedAttributes = new Set(["email"]);
-    const defs = (Contact as any)._attributeDefinitions as Map<string, { type: unknown }>;
-    defs.set("email", { type });
+    // Wire the mock type through the decorator queue so `typeForAttribute` —
+    // the lookup surface scopeForCreate resolves through — returns it (the
+    // eager `_attributeDefinitions` view is retired).
+    (Contact as any).decorateAttributes(["email"], () => type);
 
     const avCurrent = new AdditionalValue("plain@example.com", type);
     const avPrev = new AdditionalValue("plain@example.com", prevType);

@@ -1203,13 +1203,13 @@ export class Base extends Model {
     if (name === "id" && Object.prototype.hasOwnProperty.call(this.prototype, "id")) {
       delete (this.prototype as any).id;
     }
-    // Encryption still needs a post-reflection pass: `registerEncryptedType`
-    // defers pushing its `decorateAttributes` decorator until the column is
-    // reflected (it threads the column default into the EncryptedAttributeType),
-    // and this hook also installs the frozen-encryption validator / column-size
-    // checks. `normalizes` / `serialize` push their durable decorator eagerly at
-    // declaration, so — now that `type_for_attribute` / `TypeCaster::Map` resolve
-    // through `attribute_types` (the decorated default attribute set) — they need
+    // Encryption still needs a post-declaration pass — not for type wrapping
+    // (the durable decorator is pushed once at declaration and resolved via
+    // `typeForAttribute`) but for bookkeeping: column-size validation re-runs
+    // and the frozen-encryption validator install. `normalizes` / `serialize`
+    // push their durable decorator eagerly at declaration, so — now that
+    // `type_for_attribute` / `TypeCaster::Map` resolve through
+    // `attribute_types` (the decorated default attribute set) — they need
     // no per-feature `_attributeDefinitions` replay here.
     encryptionHooks.applyPendingEncryptions(this);
   }

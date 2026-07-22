@@ -10,7 +10,9 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import {
   EncryptedBookWithSerializedFirstBinary,
   EncryptedBookWithSerializedSecondBinary,
+  EncryptedBookWithSerializedDeterministicName,
 } from "../test-helpers/models/book-encrypted.js";
+import { EncryptableRecord } from "./encryptable-record.js";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { applyPendingEncryptions } from "../encryption.js";
 import { Serialized } from "../type/serialized.js";
@@ -109,5 +111,37 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest (trails)", () => {
       expect((type as Serialized).subtype).toBeInstanceOf(EncryptedAttributeType);
     }
     expect(model._pendingAttributeModifications?.length).toBe(queueLength);
+  });
+
+  // Rails resolves these through `type_for_attribute(name).deterministic?` /
+  // `.encrypted?`, which reach the encrypted type inside a Serialized wrapper
+  // via DelegateClass delegation (encryptable_record.rb:58-62, 146-153). trails
+  // wrappers don't auto-delegate, so `encryptedTypeOf` unwraps explicitly —
+  // these guard that the unwrap keeps working for encrypts-then-serialize.
+  it("includes a Serialized(Encrypted) attribute in deterministicEncryptedAttributes", async () => {
+    await freshAdapter();
+
+    const deterministic = EncryptableRecord.deterministicEncryptedAttributes(
+      EncryptedBookWithSerializedDeterministicName,
+    );
+    expect(deterministic.has("name")).toBe(true);
+    // Non-deterministic Serialized(Encrypted) stays out.
+    expect(
+      EncryptableRecord.deterministicEncryptedAttributes(
+        EncryptedBookWithSerializedSecondBinary,
+      ).has("logo"),
+    ).toBe(false);
+  });
+
+  it("detects ciphertext through the Serialized(Encrypted) wrapper on encryptedAttribute?", async () => {
+    await freshAdapter();
+
+    const book = await EncryptedBookWithSerializedDeterministicName.create({ name: "Dune" });
+
+    // Read back from the DB: before-type-cast is now the stored ciphertext
+    // (on the fresh record it is still the plaintext user input, as in Rails).
+    const reloaded = await EncryptedBookWithSerializedDeterministicName.find(book.id);
+    expect(reloaded.name).toBe("Dune");
+    expect(reloaded.encryptedAttribute("name")).toBe(true);
   });
 });

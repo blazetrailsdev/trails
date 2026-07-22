@@ -568,7 +568,10 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     } as any;
     await Book.loadSchema();
 
-    const type = Book._attributeDefinitions.get("name").type;
+    // Resolve through typeForAttribute — Rails' single lookup surface (the
+    // eager `_attributeDefinitions` view is retired). The durable decorator
+    // resolves the column default from the warm schema cache at replay time.
+    const type = Book.typeForAttribute("name");
     expect(type._default).toBe("<untitled>");
 
     Configurable.config.supportUnencryptedData = false;

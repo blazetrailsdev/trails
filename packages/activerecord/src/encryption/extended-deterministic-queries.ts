@@ -1,6 +1,6 @@
 import { prepend } from "@blazetrails/activesupport";
 import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attribute-type.js";
-import { getAttributeType } from "./encryptable-record.js";
+import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 
 /**
  * Automatically expands encrypted arguments to support querying both
@@ -120,8 +120,10 @@ export class EncryptedQuery {
     let modified = false;
 
     for (const attrName of encryptedAttrs) {
-      const type = getAttributeType(model, attrName);
-      if (!(type instanceof EncryptedAttributeType)) continue;
+      // Unwrap post-encrypts decorators — query expansion serializes through
+      // the encrypted type itself, like Rails' delegated previous_types.
+      const type = encryptedTypeOf(getAttributeType(model, attrName));
+      if (!type) continue;
       if (!type.deterministic) continue;
       if (!type.previousTypes.length) continue;
       const value = result[attrName];
@@ -234,8 +236,8 @@ export class RelationQueries {
     const scopeAttrs = originalScopeForCreate.call(relation) as Record<string, unknown>;
     const wheres = relation.whereValuesHash();
     for (const attrName of encryptedAttrs) {
-      const type = getAttributeType(model, attrName);
-      if (!(type instanceof EncryptedAttributeType) || !type.deterministic) continue;
+      const type = encryptedTypeOf(getAttributeType(model, attrName));
+      if (!type?.deterministic) continue;
       const values = wheres[attrName];
       if (Array.isArray(values) && values[0] instanceof AdditionalValue) {
         // Our expansion stores AdditionalValue(current) at index 0 (see

@@ -1296,9 +1296,10 @@ function applyColumnsHash(
   invalidate(host, { deleteOwn: false });
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
 
-  // Encryption still needs a post-reflection pass (`registerEncryptedType`
-  // defers pushing its decorator until the column reflects, to thread the column
-  // default). `normalizes` / `serialize` push their durable decorator eagerly, so
+  // Encryption still needs a post-reflection pass — not for type wrapping (the
+  // durable decorator was pushed at declaration; `typeForAttribute` resolves it)
+  // but for column-size validation re-runs against the now-known DB limits.
+  // `normalizes` / `serialize` push their durable decorator eagerly, so
   // — now that `type_for_attribute` / `TypeCaster::Map` resolve through
   // `attribute_types` — no per-feature `_attributeDefinitions` replay is needed.
   encryptionHooks.applyPendingEncryptions(host);
