@@ -202,7 +202,9 @@ export class SelectManager extends TreeManager {
   }
 
   /**
-   * INNER JOIN.
+   * INNER JOIN (or the join class passed as `klass`).
+   *
+   * Mirrors: Arel::SelectManager#join (select_manager.rb:102-113).
    */
   join(
     table: Node | string | null | undefined,
