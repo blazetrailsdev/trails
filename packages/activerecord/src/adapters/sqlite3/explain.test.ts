@@ -6,7 +6,9 @@ import "../../index.js";
 import { describeIfSqlite } from "./test-helper.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
 import { Author } from "../../test-helpers/models/author.js";
-import "../../test-helpers/models/post.js";
+// Opt into the canonical-model autoload index so `Author.has_many :posts`
+// resolves `Post` by name on first reference.
+import "../../test-helpers/canonical-model-index.js";
 
 // -- Rails test class: explain_test.rb (ActiveRecord::SQLite3TestCase) --
 // Pinned to the SQLite backend: the `EXPLAIN for: … "authors" …` header quoting
@@ -25,9 +27,17 @@ describeIfSqlite("SQLite3ExplainTest", () => {
     expect(explain).toMatch(/(SEARCH )?(TABLE )?authors USING (INTEGER )?PRIMARY KEY/);
   });
 
-  it.skip("explain with eager loading", () => {
-    // BLOCKED: adapter-sqlite — SQLite-specific adapter gap in explain
-    // ROOT-CAUSE: adapters/sqlite3/explain.ts missing Rails parity
-    // SCOPE: ~30–100 LOC fix in adapters/sqlite3/explain.ts; affects ~1–17 tests in explain.test.ts
+  it("explain with eager loading", async () => {
+    const explain = await Author.where({ id: authors("david").id })
+      .includes("posts")
+      .explain();
+    expect(explain).toMatch(
+      /EXPLAIN for: SELECT "authors"\.\* FROM "authors" WHERE "authors"\."id" = (?:\? \[\["id", 1\]\]|\? \[1\]|1)/,
+    );
+    expect(explain).toMatch(/(SEARCH )?(TABLE )?authors USING (INTEGER )?PRIMARY KEY/);
+    expect(explain).toMatch(
+      /EXPLAIN for: SELECT "posts"\.\* FROM "posts" WHERE "posts"\."author_id" = (?:\? \[\["author_id", 1\]\]|\? \[1\]|1)/,
+    );
+    expect(explain).toMatch(/(SEARCH |(SCAN )?(TABLE ))posts/);
   });
 });

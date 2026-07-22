@@ -1234,7 +1234,11 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
   });
 
   await define("posts", {}, (t) => {
+    // Rails: `t.references :author` — references default `index: true`, so
+    // schema.rb emits index_posts_on_author_id (load-bearing for the SQLite
+    // explain eager-loading plan: SEARCH posts USING INDEX, not SCAN).
     t.integer("author_id");
+    t.index("author_id", { name: "index_posts_on_author_id" });
     t.string("title", { null: false });
     t.text("body", { null: false });
     t.string("type");

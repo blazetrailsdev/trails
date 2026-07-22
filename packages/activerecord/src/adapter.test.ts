@@ -1,5 +1,6 @@
 import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
 import { Nodes } from "@blazetrails/arel";
+import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { AbstractAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -262,12 +263,11 @@ describe("AdapterTest", () => {
     expect(b.name).toBe("my other \x00 book");
   });
 
-  it.skip("create record with pk as zero", () => {
-    // BLOCKED: schema-gen. defineSchema emits the canonical `books` PK as an
-    // auto-increment/identity column (PG GENERATED AS IDENTITY, MySQL AUTO_INCREMENT
-    // treats inserted 0 as "next value"), so explicit `id: 0` is overridden and
-    // `Book.find(0)` misses. Rails declares `books` with `id: :integer` (plain integer
-    // PK that honours 0). Skipped until defineSchema can mirror that.
+  it("create record with pk as zero", async () => {
+    await Book.create({ id: 0 });
+    expect((await Book.find(0)).id).toBe(0);
+    // assert_nothing_raised: a throw here fails the test.
+    await Book.destroy(0);
   });
 
   it("valid column", () => {
@@ -458,11 +458,17 @@ describe("AdapterTest", () => {
     },
   );
 
-  it.skip("exceptions from notifications are not translated", () => {
-    // BLOCKED: notifications. activesupport Notifications._notify swallows subscriber
-    // errors on the instrument()/instrumentAsync() path (only publish() with
-    // propagate=true re-raises), so a subscriber raising inside sql.active_record never
-    // bubbles to the caller. Needs Notifications to re-raise from instrumented blocks.
+  it("exceptions from notifications are not translated", async () => {
+    const originalError = new Error("This StandardError shouldn't get translated");
+    const subscriber = Notifications.subscribe("sql.active_record", () => {
+      throw originalError;
+    });
+    try {
+      const actualError = await Base.connection.execute("SELECT * FROM posts").catch((e) => e);
+      expect(actualError).toBe(originalError);
+    } finally {
+      Notifications.unsubscribe(subscriber);
+    }
   });
 
   it("database related exceptions are translated to statement invalid", async () => {
@@ -1239,14 +1245,9 @@ function twoWeeksAgo(): string {
     .slice(0, 19);
 }
 
-describe("AdapterThreadSafetyTest", () => {
-  it.skip("#active? is synchronized", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
-  });
-  it.skip("#verify! is synchronized", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — gvl
-  });
-});
+// Rails' AdapterThreadSafetyTest ("#active? is synchronized" / "#verify! is
+// synchronized") is Ruby-only (Thread.new/GVL interleaving) and registered as
+// unported in scripts/api-compare/unported-files.ts.
 
 // MySQL-only: invalidateTransaction fires only when
 // isSavepointErrorsInvalidateTransactions() is true (Mysql2Adapter override);
