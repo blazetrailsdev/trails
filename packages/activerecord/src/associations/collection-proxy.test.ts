@@ -931,16 +931,18 @@ describe("CollectionProxy#find — in-memory not-found message fidelity", () => 
       // Pluralized model name + found/expected suffix + the association scope's
       // `[WHERE …]` conditions clause. Rails' in-memory `find` routes through
       // `scope.raise_record_not_found_exception!`, whose `arel.where_sql(model)`
-      // renders BindParams as `?` placeholders, so the message carries the
-      // scope's STI type filter + owner FK with placeholder values. Quote
-      // characters differ by adapter (double-quote vs backtick), so `.` stands
-      // in for the identifier quotes — assert structure, not exact quoting.
+      // renders BindParams as placeholders, so the message carries the scope's
+      // STI type filter + owner FK with placeholder values. Placeholder style
+      // (`?` vs `$N`) and quote characters (double-quote vs backtick) differ by
+      // adapter, so the regex accepts both — assert structure, not exact
+      // rendering.
+      const ph = `(\\?|\\$\\d+)`;
       expect(err.message).toMatch(
         new RegExp(
           `^Couldn't find all Clients with 'id': \\(${realId}, 999999\\) ` +
             `\\[WHERE .companies.\\..type. ` +
-            `IN \\(\\?, \\?, \\?, \\?\\) ` +
-            `AND .companies.\\..client_of. = \\?\\] ` +
+            `IN \\(${ph}, ${ph}, ${ph}, ${ph}\\) ` +
+            `AND .companies.\\..client_of. = ${ph}\\] ` +
             `\\(found 1 results, but was looking for 2\\)\\.$`,
         ),
       );
