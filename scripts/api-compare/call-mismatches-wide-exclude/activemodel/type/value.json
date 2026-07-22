@@ -4,6 +4,6 @@
     "tsFile": "type/value.ts",
     "rubyName": "initialize",
     "call": "serialize_cast_value_compatible?",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails serialize_cast_value.rb:41-44 eagerly computes `serialize_cast_value_compatible?` in initialize as a warm-up; trails value.ts computes it lazily with per-class memoization in the static serializeCastValueCompatible (value.ts:168+) — the eager constructor call is a Ruby-only perf priming."
   }
 ]

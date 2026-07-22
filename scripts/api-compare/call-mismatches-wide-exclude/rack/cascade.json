@@ -18,13 +18,13 @@
     "tsFile": "cascade.ts",
     "rubyName": "initialize",
     "call": "add",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cascade.rb:21-27 iterates `apps.each { add app }`; trails cascade.ts:8-12 copies via spread and fills cascadeFor with a for-of loop — add()'s bookkeeping is inlined."
   },
   {
     "package": "rack",
     "tsFile": "cascade.ts",
     "rubyName": "initialize",
     "call": "each",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cascade.rb:21-27 iterates `apps.each { add app }`; trails cascade.ts:8-12 copies via spread and fills cascadeFor with a for-of loop — add()'s bookkeeping is inlined."
   }
 ]

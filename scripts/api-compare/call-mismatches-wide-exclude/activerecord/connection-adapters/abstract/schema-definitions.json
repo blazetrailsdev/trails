@@ -137,7 +137,7 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "conditional_options",
     "call": "slice",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:254-256 is `options.slice(:if_exists, :if_not_exists)`; trails schema-definitions.ts:675-680 picks the two keys explicitly."
   },
   {
     "package": "activerecord",
@@ -200,14 +200,14 @@
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "include?",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`."
   },
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/schema-definitions.ts",
     "rubyName": "integer_like_primary_key?",
     "call": "key?",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails schema_definitions.rb:605-607 uses `[:integer, :bigint].include?(type)` and `options.key?(:default)`; trails schema-definitions.ts:1031-1037 inlines the type equality checks and tests `options.default === undefined`."
   },
   {
     "package": "activerecord",

@@ -4,7 +4,7 @@
     "tsFile": "dirty.ts",
     "rubyName": "as_json",
     "call": "merge",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:264-268 merges mutation-tracker ivars into `options[:except]` and defers to the model serializer via super; trails dirty.ts:111-113 returns `this.changes` — the mixin has no super() JSON pipeline. Contract divergence tracked in story activesupport-activemodel-omissions-from-wide-verify."
   },
   {
     "package": "activemodel",
@@ -60,14 +60,14 @@
     "tsFile": "dirty.ts",
     "rubyName": "attribute_previous_change",
     "call": "change_to_attribute",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:404-406 calls `mutations_before_last_save.change_to_attribute(attr_name.to_s)`; trails dirty.ts:76-81 reads the `previousChanges` record directly by string key."
   },
   {
     "package": "activemodel",
     "tsFile": "dirty.ts",
     "rubyName": "attribute_previous_change",
     "call": "to_s",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:404-406 calls `mutations_before_last_save.change_to_attribute(attr_name.to_s)`; trails dirty.ts:76-81 reads the `previousChanges` record directly by string key."
   },
   {
     "package": "activemodel",

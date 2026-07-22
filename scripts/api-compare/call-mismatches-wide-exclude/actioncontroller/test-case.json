@@ -95,7 +95,7 @@
     "tsFile": "test-case.ts",
     "rubyName": "controller_class_name",
     "call": "anonymous?",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails test_case.rb:552-554 branches on `@controller.class.anonymous?`; trails test-case.ts:132-134 returns `controllerClass?.name ?? \"\"` with no anonymous-controller handling. Omission tracked in story actionpack-omissions-from-wide-verify."
   },
   {
     "package": "actioncontroller",

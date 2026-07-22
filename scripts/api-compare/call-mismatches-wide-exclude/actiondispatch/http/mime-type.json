@@ -102,7 +102,7 @@
     "tsFile": "http/mime-type.ts",
     "rubyName": "ref",
     "call": "to_s",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails mime_type.rb:285-287 returns `symbol || to_s`; trails mime-type.ts:194-196 returns `this.symbol` only — the to_s fallback for symbol-less types is unported. Omission tracked in story actionpack-omissions-from-wide-verify."
   },
   {
     "package": "actiondispatch",
@@ -137,7 +137,7 @@
     "tsFile": "http/mime-type.ts",
     "rubyName": "to_str",
     "call": "to_s",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails mime_type.rb:277-279 defines the string-duck `to_str` as `to_s`; trails' toString (mime-type.ts:181-183) serves both roles — Ruby's implicit-conversion protocol has no JS analogue, so no separate to_s call exists."
   },
   {
     "package": "actiondispatch",

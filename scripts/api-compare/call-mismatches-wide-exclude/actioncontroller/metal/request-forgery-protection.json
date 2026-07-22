@@ -123,7 +123,7 @@
     "tsFile": "metal/request-forgery-protection.ts",
     "rubyName": "reset",
     "call": "delete",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails request_forgery_protection.rb:328-330/361-363 call `session.delete`/`cookie_jar.delete`; trails request-forgery-protection.ts:138-140/160-162 use the JS `delete obj[key]` operator, which records no call."
   },
   {
     "package": "actioncontroller",

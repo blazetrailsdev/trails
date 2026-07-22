@@ -32,14 +32,14 @@
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_change_to_be_saved",
     "call": "change_to_attribute",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:152-154 calls `mutations_from_database.change_to_attribute(attr_name.to_s)`; trails attribute-methods/dirty.ts:83-90 reads `record.changes[attr]` directly by string key."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_change_to_be_saved",
     "call": "to_s",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:152-154 calls `mutations_from_database.change_to_attribute(attr_name.to_s)`; trails attribute-methods/dirty.ts:83-90 reads `record.changes[attr]` directly by string key."
   },
   {
     "package": "activerecord",
@@ -67,14 +67,14 @@
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "saved_change_to_attribute",
     "call": "change_to_attribute",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:98-100 calls `mutations_before_last_save.change_to_attribute(attr_name.to_s)`; trails attribute-methods/dirty.ts:34-39 reads `record.previousChanges[attr]` directly by string key."
   },
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "saved_change_to_attribute",
     "call": "to_s",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:98-100 calls `mutations_before_last_save.change_to_attribute(attr_name.to_s)`; trails attribute-methods/dirty.ts:34-39 reads `record.previousChanges[attr]` directly by string key."
   },
   {
     "package": "activerecord",

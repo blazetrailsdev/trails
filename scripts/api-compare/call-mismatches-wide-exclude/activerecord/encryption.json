@@ -18,14 +18,14 @@
     "tsFile": "encryption.ts",
     "rubyName": "context",
     "call": "default_context",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails contexts.rb:62-64 returns `current_custom_context || default_context`; trails encryption.ts:449-451 delegates to Contexts.context (encryption/context.ts), which performs the same custom-else-default read internally."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption.ts",
     "rubyName": "current_custom_context",
     "call": "last",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails contexts.rb:66-68 reads `custom_contexts&.last`; trails encryption.ts:454-456 delegates to Contexts.currentCustomContext, which reads the stack tail inside encryption/context.ts."
   },
   {
     "package": "activerecord",

@@ -130,21 +130,21 @@
     "tsFile": "relation.ts",
     "rubyName": "alias_tracker",
     "call": "connection_pool",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1307-1309 builds `Associations::AliasTracker.create(model.connection_pool, table.name, joins, aliases)`; trails relation.ts:6465-6471 builds a bare join-count map and never touches the AliasTracker class (which exists at associations/alias-tracker.ts:60). Divergence tracked in story relation-alias-tracker-bypasses-class."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "alias_tracker",
     "call": "create",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1307-1309 builds `Associations::AliasTracker.create(model.connection_pool, table.name, joins, aliases)`; trails relation.ts:6465-6471 builds a bare join-count map and never touches the AliasTracker class (which exists at associations/alias-tracker.ts:60). Divergence tracked in story relation-alias-tracker-bypasses-class."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "alias_tracker",
     "call": "model",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1307-1309 builds `Associations::AliasTracker.create(model.connection_pool, table.name, joins, aliases)`; trails relation.ts:6465-6471 builds a bare join-count map and never touches the AliasTracker class (which exists at associations/alias-tracker.ts:60). Divergence tracked in story relation-alias-tracker-bypasses-class."
   },
   {
     "package": "activerecord",
@@ -2503,14 +2503,14 @@
     "tsFile": "relation.ts",
     "rubyName": "none?",
     "call": "empty?",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag — the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "none?",
     "call": "present?",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag — the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
   },
   {
     "package": "activerecord",
@@ -2692,21 +2692,21 @@
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "call",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "each",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "includes_values",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
@@ -2720,14 +2720,14 @@
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "preload_values",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "strict_loading_value",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",

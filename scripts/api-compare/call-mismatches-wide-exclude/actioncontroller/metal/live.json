@@ -4,7 +4,7 @@
     "tsFile": "metal/live.ts",
     "rubyName": "abort",
     "call": "clear",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails live.rb:220-225 calls `@buf.clear`; trails live.ts:117-119 empties the buffer with the JS-native `this._buf.length = 0` spelling."
   },
   {
     "package": "actioncontroller",
