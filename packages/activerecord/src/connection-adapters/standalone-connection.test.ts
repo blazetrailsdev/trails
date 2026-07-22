@@ -1,24 +1,52 @@
-import { describe, it } from "vitest";
+/**
+ * Faithful port of
+ * activerecord/test/cases/connection_adapters/standalone_connection_test.rb.
+ *
+ * Rails builds the standalone adapter with `db_config.new_connection`; trails'
+ * `DatabaseConfig#newConnection` is the same seam, pre-warmed via
+ * `loadAdapter()` because ESM adapter resolution is async.
+ */
+import { describe, it, expect, beforeAll, beforeEach, afterEach } from "vitest";
+import { Base } from "../index.js";
+import { establishFromTestConfig } from "../test-helpers/test-database-config.js";
+import type { AbstractAdapter } from "./abstract-adapter.js";
 
 describe("StandaloneConnectionTest", () => {
-  it.skip("can query", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in standalone-connection
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for StandaloneConnectionTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in standalone-connection.test.ts
+  let connection: AbstractAdapter;
+
+  beforeAll(async () => {
+    await establishFromTestConfig();
   });
+
+  beforeEach(async () => {
+    const dbConfig = Base.connectionDbConfig();
+    await dbConfig.loadAdapter();
+    connection = dbConfig.newConnection() as AbstractAdapter;
+  });
+
+  afterEach(async () => {
+    await connection.disconnectBang();
+  });
+
+  it("can query", async () => {
+    const result = await connection.selectAll("SELECT 1");
+    expect(result.rows).toEqual([[1]]);
+  });
+
   it.skip("async fallback", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in standalone-connection
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for StandaloneConnectionTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in standalone-connection.test.ts
+    // PERMANENT-SKIP: Rails' `select_all("SELECT 1", async: true)` returns a
+    // `FutureResult::Complete` from the load_async infrastructure. Trails has
+    // not ported FutureResult / load_async (selectAll takes no `async` option);
+    // un-skip when that infrastructure lands.
   });
-  it.skip("can throw away", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in standalone-connection
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for StandaloneConnectionTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in standalone-connection.test.ts
+
+  it("can throw away", () => {
+    connection.throwAwayBang();
+    expect(connection.active).toBe(false);
   });
-  it.skip("can close", () => {
-    // BLOCKED: connection-pool — connection pool / handler gap in standalone-connection
-    // ROOT-CAUSE: connection-pool.ts or connection-handler.ts missing Rails parity for StandaloneConnectionTest
-    // SCOPE: ~50–100 LOC fix in connection-pool.ts; affects ~10–24 tests in standalone-connection.test.ts
+
+  it("can close", async () => {
+    await connection.close();
+    expect(connection.active).toBe(false);
   });
 });
