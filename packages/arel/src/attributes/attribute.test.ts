@@ -86,14 +86,6 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#lteq", () => {
-    it("should accept various data types.", () => {
-      expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" > 10',
-      );
-    });
-  });
-
   describe("#gteq_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").gteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
@@ -147,14 +139,6 @@ describe("AttributeTest", () => {
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("name").gteq("fake_name"));
       expect(mgr.toSql()).toContain("fake_name");
-    });
-  });
-
-  describe("#lteq", () => {
-    it("should accept various data types.", () => {
-      expect(users.project(star).where(users.get("age").gteq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" >= 10',
-      );
     });
   });
 
@@ -215,14 +199,6 @@ describe("AttributeTest", () => {
     });
   });
 
-  describe("#lteq", () => {
-    it("should accept various data types.", () => {
-      expect(users.project(star).where(users.get("age").lt(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" < 10',
-      );
-    });
-  });
-
   describe("#lteq_any", () => {
     it("should create a Grouping node", () => {
       expect(users.get("id").lteqAny([1, 2])).toBeInstanceOf(Nodes.Grouping);
@@ -272,8 +248,11 @@ describe("AttributeTest", () => {
     });
 
     it("should accept various data types.", () => {
-      expect(users.project(star).where(users.get("age").lteq(10)).toSql()).toBe(
-        'SELECT * FROM "users" WHERE "users"."age" <= 10',
+      const relation = new Table("users");
+      const mgr = relation.project(relation.get("id"));
+      mgr.where(relation.get("name").lteq("fake_name"));
+      expect(mgr.toSql()).toBe(
+        `SELECT "users"."id" FROM "users" WHERE "users"."name" <= 'fake_name'`,
       );
     });
   });
@@ -639,11 +618,13 @@ describe("AttributeTest", () => {
       const node = users.get("age").notBetween(18, 65);
       expect(node).toBeInstanceOf(Nodes.Grouping);
       expect((node as Nodes.Grouping).expr).toBeInstanceOf(Nodes.Or);
+      expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" > 65)');
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
       const node = users.get("age").notBetween(-Infinity, 65);
       expect(node).toBeInstanceOf(Nodes.GreaterThan);
+      expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
 
     it("can be constructed with a quoted range starting from -Infinity", () => {
@@ -706,6 +687,7 @@ describe("AttributeTest", () => {
       expect(node).toBeInstanceOf(Nodes.Grouping);
       const inner = (node as Nodes.Grouping).expr as Nodes.Or;
       expect(inner.children[1]).toBeInstanceOf(Nodes.GreaterThanOrEqual);
+      expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
     });
 
     it("can be constructed with a Union", () => {
@@ -721,9 +703,23 @@ describe("AttributeTest", () => {
       expect(node).toBeInstanceOf(Nodes.NotIn);
     });
 
+    it("can be constructed with a Union", () => {
+      const mgr1 = users.project(users.get("id"));
+      const mgr2 = users.project(users.get("id"));
+      const union = mgr1.union(mgr2);
+      expect(union).toBeInstanceOf(Nodes.Union);
+      const node = users.get("id").in(union);
+      const sql = visitor.compile(node);
+      expect(sql).toContain('"users"."id" IN (');
+      expect(sql).toContain(
+        'SELECT "users"."id" FROM "users" UNION SELECT "users"."id" FROM "users"',
+      );
+    });
+
     it("can be constructed with a list", () => {
       const node = users.get("id").notIn([1, 2, 3]);
       expect(node).toBeInstanceOf(Nodes.NotIn);
+      expect(visitor.compile(node)).toBe('"users"."id" NOT IN (1, 2, 3)');
     });
 
     it("can be constructed with a random object", () => {
@@ -732,6 +728,12 @@ describe("AttributeTest", () => {
       const node = attribute.notIn(randomObject);
 
       expect(node).toEqual(new Nodes.NotIn(attribute, new Nodes.Casted(randomObject, attribute)));
+    });
+
+    it("should generate NOT IN in sql", () => {
+      const mgr = users.project(users.get("id"));
+      mgr.where(users.get("id").notIn([1, 2]));
+      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (1, 2)');
     });
   });
 
@@ -801,82 +803,6 @@ describe("AttributeTest", () => {
       expect(mgr.toSql()).toBe(
         'SELECT "users"."id" FROM "users" WHERE ("users"."id" NOT IN (1, 2) AND "users"."id" NOT IN (3, 4))',
       );
-    });
-  });
-
-  describe("#not_between", () => {
-    it("can be constructed with a standard range", () => {
-      const node = users.get("age").notBetween(18, 65);
-      const visitor = new Visitors.ToSql(testConnection);
-      const sql = visitor.compile(node);
-      expect(sql).toBe('("users"."age" < 18 OR "users"."age" > 65)');
-    });
-
-    it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("age").notBetween(-Infinity, 65);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(node)).toBe('"users"."age" > 65');
-    });
-
-    it("can be constructed with a range implicitly starting at Infinity", () => {
-      const node = users.get("id").notBetween({ begin: null, end: 0 });
-      expect(node).toBeInstanceOf(Nodes.GreaterThan);
-    });
-
-    it("can be constructed with a range implicitly ending at Infinity", () => {
-      const node = users.get("id").notBetween({ begin: 0, end: null });
-      expect(node).toBeInstanceOf(Nodes.LessThan);
-    });
-
-    it("can be constructed with a quoted range ending at Infinity", () => {
-      const node = users.get("id").notBetween({ begin: 0, end: Infinity });
-      expect(node).toBeInstanceOf(Nodes.LessThan);
-    });
-
-    it("can be constructed with an endless range starting from Infinity", () => {
-      const node = users.get("id").notBetween({ begin: Infinity, end: null });
-      expect(node).toBeInstanceOf(Nodes.NotIn);
-    });
-
-    it("can be constructed with a beginless range ending in -Infinity", () => {
-      const node = users.get("id").notBetween({ begin: null, end: -Infinity });
-      expect(node).toBeInstanceOf(Nodes.NotIn);
-    });
-
-    it("can be constructed with an exclusive range", () => {
-      const node = users.get("age").notBetween({ begin: 18, end: 65, excludeEnd: true });
-      const visitor = new Visitors.ToSql(testConnection);
-      const result = visitor.compile(node);
-      expect(result).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
-    });
-  });
-
-  describe("#not_between", () => {
-    it("can be constructed with a Union", () => {
-      const node = users.get("age").notBetween(1, 100);
-      expect(node).toBeInstanceOf(Nodes.Grouping);
-    });
-  });
-
-  describe("#not_in", () => {
-    it("can be constructed with a list", () => {
-      const node = users.get("id").notIn([1, 2, 3]);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(node)).toBe('"users"."id" NOT IN (1, 2, 3)');
-    });
-
-    it("can be constructed with a random object", () => {
-      const node = users.get("id").notIn(["random_thing"] as unknown[]);
-      expect(node).toBeInstanceOf(Nodes.NotIn);
-    });
-
-    it("should generate NOT IN in sql", () => {
-      expect(
-        users
-          .project(star)
-          .where(users.get("id").notIn([1, 2]))
-          .toSql(),
-      ).toBe('SELECT * FROM "users" WHERE "users"."id" NOT IN (1, 2)');
     });
   });
 
@@ -1016,9 +942,7 @@ describe("AttributeTest", () => {
       const table = new Table("foo", { typeCaster: fakeCaster });
       const condition = table.get("id").notIn(["1", "2"]);
 
-      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe(
-        '"foo"."id" NOT IN (1, 2)',
-      );
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" NOT IN (1, 2)');
     });
 
     it("builds Casted nodes so a null in an IN list casts through the column", () => {
@@ -1316,17 +1240,6 @@ describe("AttributeTest", () => {
     ).toBe('SELECT * FROM "users" WHERE "users"."id" IN (1, 2, 3)');
   });
 
-  describe("#not_in", () => {
-    it("should generate NOT IN in sql", () => {
-      expect(
-        users
-          .project(star)
-          .where(users.get("id").notIn([1, 2]))
-          .toSql(),
-      ).toBe('SELECT * FROM "users" WHERE "users"."id" NOT IN (1, 2)');
-    });
-  });
-
   it("should create a Contains node via InfixOperation", () => {
     const node = users.get("tags").contains("foo");
     expect(node).toBeInstanceOf(Nodes.InfixOperation);
@@ -1400,93 +1313,6 @@ describe("AttributeTest", () => {
   it("attribute node should be compatible with Division", () => {
     const node = users.get("age").divide(2);
     expect(node).toBeInstanceOf(Nodes.Division);
-  });
-
-  describe("#not_in", () => {
-    it("should generate NOT IN in sql", () => {
-      const mgr = users.project(users.get("id"));
-      mgr.where(users.get("id").notIn([1, 2]));
-      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users" WHERE "users"."id" NOT IN (1, 2)');
-    });
-  });
-
-  describe("#not_between", () => {
-    it("can be constructed with a range starting from -Infinity", () => {
-      // Mirrors Rails: not_between(-Inf..end) collapses to gt(end).
-      const node = users.get("age").notBetween(-Infinity, 65);
-      const visitor = new Visitors.ToSql(testConnection);
-      expect(visitor.compile(node)).toBe('"users"."age" > 65');
-    });
-  });
-
-  describe("#not_between", () => {
-    it("should generate ORs in sql", () => {
-      const left = users.get("age").notBetween(18, 30);
-      const right = users.get("age").notBetween(40, 50);
-      const node = new Nodes.Grouping(new Nodes.Or(left, right));
-      const visitor = new Visitors.ToSql(testConnection);
-      const result = visitor.compile(node);
-      expect(result).toContain("OR");
-    });
-  });
-
-  describe("#not_between", () => {
-    it("should create a Grouping node", () => {
-      const left = users.get("age").notBetween(18, 65);
-      const right = users.get("score").notBetween(1, 100);
-      const node = new Nodes.Grouping(new Nodes.And([left, right]));
-      expect(node).toBeInstanceOf(Nodes.Grouping);
-    });
-
-    it("should generate ANDs in sql", () => {
-      const left = users.get("age").notBetween(18, 65);
-      const right = users.get("score").notBetween(1, 100);
-      const node = new Nodes.Grouping(new Nodes.And([left, right]));
-      const visitor = new Visitors.ToSql(testConnection);
-      const result = visitor.compile(node);
-      expect(result).toContain("AND");
-    });
-  });
-
-  describe("#not_between", () => {
-    it("can be constructed with a standard range", () => {
-      const node = users.get("id").between([1, 100]);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toContain("BETWEEN");
-      expect(sql).toContain("1 AND 100");
-    });
-
-    it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("id").between(-Infinity, 100);
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toContain("<=");
-      expect(sql).toContain("100");
-    });
-
-    it("can be constructed with an exclusive range", () => {
-      // Exclusive: attr >= begin AND attr < end
-      const begin = 1;
-      const end = 10;
-      const node = new Nodes.Grouping(
-        new Nodes.And([users.get("id").gteq(begin), users.get("id").lt(end)]),
-      );
-      const sql = new Visitors.ToSql(testConnection).compile(node);
-      expect(sql).toContain(">=");
-      expect(sql).toContain("<");
-    });
-  });
-
-  describe("#not_in", () => {
-    it("can be constructed with a Union", () => {
-      const m1 = new SelectManager(users);
-      m1.project(star);
-      const m2 = new SelectManager(users);
-      m2.project(star);
-      const union = m1.union(m2);
-      expect(union).toBeInstanceOf(Nodes.Union);
-      const sql = new Visitors.ToSql(testConnection).compile(union);
-      expect(sql).toContain("UNION");
-    });
   });
 
   describe("#sum", () => {
