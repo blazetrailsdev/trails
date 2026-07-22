@@ -2,6 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { Table, Visitors, Nodes } from "@blazetrails/arel";
 import { PredicateBuilder } from "./predicate-builder.js";
+import { WhereClause } from "./where-clause.js";
 import { Substitute } from "../statement-cache.js";
 import { Range } from "../connection-adapters/postgresql/oid/range.js";
 import { TableMetadata } from "../table-metadata.js";
@@ -271,58 +272,64 @@ describe("PredicateBuilderTest", () => {
     });
   });
 
+  // Negation is Rails-shaped: the builder is always positive; `where.not`
+  // inverts the assembled clause (WhereClause#invert → node.invert()).
   describe("buildNegatedFromHash", () => {
     const table = castedTable("posts");
     const compile = (node: Nodes.Node) => new Visitors.ToSql(testConnection).compile(node);
+    const buildInverted = (builder: PredicateBuilder, hash: Record<string, unknown>) =>
+      new WhereClause(builder.buildFromHash(hash)).invert().predicates;
 
     it("builds IS NOT NULL for null values", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
-      const [node] = builder.buildNegatedFromHash({ title: null });
+      const [node] = buildInverted(builder, { title: null });
       expect(compile(node)).toMatch(/IS NOT NULL/);
     });
 
     it("builds NOT IN for arrays", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
-      const [node] = builder.buildNegatedFromHash({ id: [1, 2, 3] });
+      const [node] = buildInverted(builder, { id: [1, 2, 3] });
       expect(compile(node)).toMatch(/NOT IN \(\?, \?, \?\)/);
     });
 
     it("builds NOT IN for Set values in negated predicates", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
-      const [node] = builder.buildNegatedFromHash({ id: new Set([1, 2]) });
+      const [node] = buildInverted(builder, { id: new Set([1, 2]) });
       expect(compile(node)).toMatch(/NOT IN \(\?, \?\)/);
     });
 
     it("builds correct negation for exclusive ranges", () => {
+      // Rails: positive `gteq(begin).and(lt(end))`, inverted via Node#invert →
+      // `NOT (age >= 18 AND age < 65)` (And has no invert override).
       const builder = new PredicateBuilder(new TableMetadata(null, table));
-      const [node] = builder.buildNegatedFromHash({ age: new Range(18, 65, true) });
+      const [node] = buildInverted(builder, { age: new Range(18, 65, true) });
       const sql = compile(node);
-      expect(sql).toMatch(/< 18/);
-      expect(sql).toMatch(/>= 65/);
+      expect(sql).toMatch(/^NOT \(/);
+      expect(sql).toMatch(/>= 18/);
+      expect(sql).toMatch(/< 65/);
     });
 
     it("does not dereference a plain object literal to its id when negated", () => {
       const builder = new PredicateBuilder(new TableMetadata(null, table));
-      const node = builder.buildNegated(table.get("title"), { id: 5 });
+      const node = builder.build(table.get("title"), { id: 5 }).invert();
       const sql = new Visitors.ToSql(testConnection).compile(node);
-      // Negation binds the RHS (Rails inverts a positively-built, bound
-      // predicate), so the value rides a QueryAttribute bind rather than being
-      // inlined.
+      // Rails inverts a positively-built, bound predicate, so the value rides a
+      // QueryAttribute bind rather than being inlined.
       expect(sql).toContain('"posts"."title" !=');
       // The whole object is bound, not the dereferenced `5`.
       const bound = (node as unknown as { right: { value: { value: unknown } } }).right.value.value;
       expect(bound).toEqual({ id: 5 });
     });
 
-    // Mirror of the positive ArrayHandler convergence on the negated per-element
-    // path: non-Base objects carrying an `id` are not collapsed into a
+    // Mirror of the positive ArrayHandler convergence on the inverted path:
+    // non-Base objects carrying an `id` are not collapsed into a
     // `NOT IN (5, 7)` PK list the way real AR records would be.
     it("does not dereference non-Base objects carrying an id inside a negated array", () => {
       class NotARecord {
         constructor(public id: number) {}
       }
       const builder = new PredicateBuilder(new TableMetadata(null, table));
-      const [node] = builder.buildNegatedFromHash({
+      const [node] = buildInverted(builder, {
         id: [new NotARecord(5), new NotARecord(7)],
       });
       const sql = new Visitors.ToSql(testConnection).compile(node);
@@ -425,7 +432,8 @@ describe("PredicateBuilderTest", () => {
     it("negated form expands whereNot({authors: {name: 'Rails'}}) to NOT \"authors\".\"name\" = 'Rails'", () => {
       const meta = new TableMetadata(PbTestPost as any, (PbTestPost as any).arelTable);
       const builder = meta.predicateBuilder;
-      const nodes = builder.buildNegatedFromHash({ authors: { name: "Rails" } });
+      const nodes = new WhereClause(builder.buildFromHash({ authors: { name: "Rails" } })).invert()
+        .predicates;
       const sql = nodes.map((n) => new Visitors.ToSql(testConnection).compile(n)).join(" AND ");
       expect(sql).toContain('"authors"."name"');
       // Negation binds the RHS, so 'Rails' rides a QueryAttribute bind.

@@ -62,29 +62,6 @@ export class RangeHandler {
     return attribute.between({ begin: beginVal, end: endVal, excludeEnd: value.excludeEnd });
   }
 
-  callNegated(attribute: Nodes.Attribute, value: Range): Nodes.Node {
-    const [beginVal, endVal] = this._castBounds(attribute, value);
-    const node = attribute.between({
-      begin: beginVal,
-      end: endVal,
-      excludeEnd: value.excludeEnd,
-    });
-    // When `between` returns an `And` (exclusive-end with both bounds
-    // non-open), prefer the explicit `(col < begin OR col >= end)` shape
-    // — `Not(And(gteq, lt))` would lose the ordering AR callers (and
-    // parity tests) match on. Branching on the node class rather than the
-    // bound values catches every non-open-ended case (incl. NaN bounds).
-    if (node instanceof Nodes.And) {
-      return new Nodes.Grouping(new Nodes.Or(attribute.lt(beginVal), attribute.gteq(endVal)));
-    }
-    // Mirrors Rails WhereClause#invert: call `.invert()` on the Arel node so
-    // collapsed predicates (`lteq` → `gt`, `gteq` → `lt`, `In([])` →
-    // `NotIn([])`) become canonical, instead of double-wrapping `Not(...)` over
-    // a simpler form. For full BETWEEN this still yields `Not(Between(...))`
-    // (Node#invert default), matching AR-level `where.not(col: 1..5)` exactly.
-    return node.invert();
-  }
-
   private _castBounds(attribute: Nodes.Attribute, value: Range): [unknown, unknown] {
     // Rails RangeHandler skips no bounds: `build_bind_attribute` wraps even
     // nil / Float::INFINITY. We mirror the intent by passing those through
