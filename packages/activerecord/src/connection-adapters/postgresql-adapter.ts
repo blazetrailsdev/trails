@@ -994,32 +994,23 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    */
   async lookupCastType(sqlType: string): Promise<Type> {
     const rows = await this.schemaQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`);
-    const first = rows[0];
-    const oid = first == null ? Number.NaN : Number(Object.values(first)[0]);
-    return this.typeMap.lookup(oid);
+    return this.typeMap.lookup(Number(Object.values(rows[0] ?? {})[0]));
   }
 
   private readonly preResolvedDefaultCastTypes = new WeakMap<object, Type>();
 
   /** @internal */
   async preResolveDefaultCastTypes(
-    columns: Iterable<{
-      type?: unknown;
-      sqlType?: string | null;
-      options?: object;
-    }>,
+    columns: Iterable<{ type?: string; sqlType?: string | null; options?: ColumnOptions }>,
   ): Promise<void> {
     for (const column of columns) {
       if (column.type === "primary_key") continue;
-      const options = (column.options ?? {}) as { default?: unknown; null?: boolean | null };
+      const options = column.options ?? {};
       if (options.default === undefined) continue;
       if (options.null === false && options.default === null) continue;
       const sqlType =
         column.sqlType ??
-        this.typeToSql(
-          String(column.type),
-          options as Parameters<PostgreSQLAdapter["typeToSql"]>[1],
-        );
+        this.typeToSql(column.type ?? "", options as Parameters<PostgreSQLAdapter["typeToSql"]>[1]);
       this.preResolvedDefaultCastTypes.set(column, await this.lookupCastType(sqlType));
     }
   }
