@@ -148,4 +148,60 @@ describe("STI subclass attribute() routing", () => {
     expect(Circle._attributeDefinitions.get("radius")?.type.name).toBe("integer");
     expect(Circle._attributeDefinitions.get("guid")?.type.name).toBe("uuid");
   });
+  it("own-table descendant under an STI ancestor keeps attribute() on itself", () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Circle extends Shape {
+      static {
+        this.attribute("radius", "integer");
+      }
+    }
+    // Rails' own-table descendant: a class under an STI ancestor that names its
+    // own table owns an independent schema, so its declarations must not land
+    // on the STI base (or leak to shared-table siblings).
+    class Ticket extends Circle {
+      static override tableName = "tickets";
+      static {
+        this.attribute("priority", "integer");
+      }
+    }
+
+    expect(Object.prototype.hasOwnProperty.call(Ticket, "_attributeDefinitions")).toBe(true);
+    expect(Ticket._attributeDefinitions.get("priority")?.type.name).toBe("integer");
+    expect(Shape._attributeDefinitions.has("priority")).toBe(false);
+    expect(Circle._attributeDefinitions.has("priority")).toBe(false);
+
+    // The shared-table subclass still routes to the base.
+    expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
+    expect(Shape._attributeDefinitions.get("radius")?.type.name).toBe("integer");
+
+    // Inherited (shared-ancestor) declarations remain visible on the descendant.
+    expect(Ticket._attributeDefinitions.get("radius")?.type.name).toBe("integer");
+  });
+  it("own-table descendant does not clobber the STI base's attributesBuilder cache", () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+      static {
+        this.inheritanceColumn = "type";
+        this.attribute("radius", "integer");
+      }
+    }
+    class Ticket extends Shape {
+      static override tableName = "tickets";
+      static {
+        this.attribute("priority", "integer");
+      }
+    }
+
+    const shapeBuilder = Shape.attributesBuilder();
+    const ticketBuilder = Ticket.attributesBuilder();
+
+    expect(ticketBuilder).not.toBe(shapeBuilder);
+    expect(Shape.attributesBuilder()).toBe(shapeBuilder);
+    expect(Object.prototype.hasOwnProperty.call(Ticket, "_attributesBuilder")).toBe(true);
+  });
 });

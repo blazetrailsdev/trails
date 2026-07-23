@@ -16,10 +16,9 @@ import {
   resetDefaultAttributes as amResetDefaultAttributes,
   registerWithSuperclass,
 } from "@blazetrails/activemodel";
-import { isStiSubclass, getStiBase } from "./inheritance.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup } from "./type.js";
-import { cachedColumnsHash } from "./model-schema.js";
+import { cachedColumnsHash, stiSchemaHost } from "./model-schema.js";
 
 type AnyClass = any;
 
@@ -84,11 +83,13 @@ export function defineAttribute(
   castType: Type,
   options: { default?: unknown; userProvidedDefault?: boolean; limit?: number | null } = {},
 ): void {
-  // STI subclasses share the base's _attributeDefinitions — route to the
-  // base to avoid forking a subclass-local map that drifts from the base.
-  if (isStiSubclass(this)) {
-    const stiBase = getStiBase(this);
-    (stiBase as AnyClass).defineAttribute(name, castType, options);
+  // Shared-table STI subclasses share the schema host's _attributeDefinitions —
+  // route there to avoid forking a subclass-local map that drifts from it. The
+  // host is the STI base for shared-table subclasses, and the receiver itself
+  // once it claims its own table.
+  const schemaHost = stiSchemaHost(this as unknown as { tableName: string }) as AnyClass;
+  if (schemaHost !== this) {
+    schemaHost.defineAttribute(name, castType, options);
     return;
   }
 
@@ -175,12 +176,12 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     }
   }
 
-  // For STI subclasses, seed the shared (schema-reflected) set on the STI base
-  // so cache invalidation from Base.attribute/defineAttribute (routed to the
-  // base) stays coherent across siblings. The subclass's own declarations are
-  // layered on afterwards (see below).
-  const stiSubclass = isStiSubclass(this);
-  const cacheHost = stiSubclass ? (getStiBase(this) as AnyClass) : this;
+  // For shared-table STI subclasses, seed the shared (schema-reflected) set on
+  // the schema host so cache invalidation from Base.attribute/defineAttribute
+  // (routed to the same host) stays coherent across siblings. The subclass's own
+  // declarations are layered on afterwards (see below).
+  const cacheHost = stiSchemaHost(this as unknown as { tableName: string }) as AnyClass;
+  const stiSubclass = cacheHost !== this;
 
   if (!cacheHost._cachedDefaultAttributes) {
     // Register cacheHost with its superclass so resetDefaultAttributes()
