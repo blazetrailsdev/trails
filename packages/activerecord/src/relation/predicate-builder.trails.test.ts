@@ -59,12 +59,6 @@ describe("PredicateBuilder positive-equality bind typing", () => {
   });
 });
 
-// trails-specific regression guard (no Rails counterpart): Rails'
-// expand_from_hash recurses into a nested hash WITHOUT re-running
-// convert_dot_notation_to_hash (predicate_builder.rb:23-26 vs 99-101), so a
-// dotted key inside a nested hash is a literal column name on the associated
-// table — not a second association hop. trails used to recurse through the
-// public buildFromHash, re-splitting `"comments.body"` into a comments join.
 describe("PredicateBuilder nested-hash recursion skips dot re-normalization", () => {
   fixtures(["authors", "posts", "comments"]);
 

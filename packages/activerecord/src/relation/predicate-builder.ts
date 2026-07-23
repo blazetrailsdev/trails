@@ -102,10 +102,6 @@ export class PredicateBuilder {
     return this.expandFromHash(this.convertDotNotationToHash(conditions), block);
   }
 
-  // Mirrors Rails' protected PredicateBuilder#expand_from_hash
-  // (predicate_builder.rb:84-155): every internal recursion re-enters here
-  // directly, so convertDotNotationToHash runs exactly once per buildFromHash
-  // entry — a dotted key inside a nested hash stays a literal column name.
   protected expandFromHash(
     conditions: Record<string, unknown>,
     block?: (tableName: string) => unknown,
@@ -137,9 +133,6 @@ export class PredicateBuilder {
           key,
           block as (name: string) => never,
         ).predicateBuilder;
-        // Rails recurses via expand_from_hash (predicate_builder.rb:99-101), NOT
-        // build_from_hash — dot notation was already normalized at entry, so a
-        // dotted key here is a literal column name, not another hop.
         nodes.push(...assocPb.expandFromHash(value));
       } else if (this.table.isAssociatedWith(key)) {
         const assocNodes = this.buildFromHashAssociation(
@@ -179,8 +172,6 @@ export class PredicateBuilder {
       const [columnName, aggregateAttr] = mapping[0];
       // Rails: `object.respond_to?(aggr) ? object.public_send(aggr) : object`.
       const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
-      // Rails: `self[column_name, values]` (predicate_builder.rb:131) — the
-      // column is read straight off the arel table, no dot re-normalization.
       return [this.build(this.table.arelTable.get(columnName), mapped)];
     }
     // Multi-mapping: one AND-group per object over every mapped column, ORed
