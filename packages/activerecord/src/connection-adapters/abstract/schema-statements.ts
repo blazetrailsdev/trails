@@ -2608,18 +2608,25 @@ export class SchemaStatements {
     return this.schemaCreation.accept(new AddColumnDefinition(cd));
   }
 
-  /** @internal */
+  /** @internal Mirrors change_column_default_for_alter (schema_statements.rb:1843):
+   * routes through the adapter's build_change_column_default_definition (which
+   * attaches the reflected column, so PG's column-aware default quoting fires)
+   * and the schema-creation visitor. The base builder raises NotImplementedError
+   * as in Rails; PG and MySQL override it. */
   async changeColumnDefaultForAlter(
-    _tableName: string,
+    tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<string> {
-    const newDefault = this.extractNewDefaultValue(defaultOrChanges);
-    const col = this.adapter.quoteIdentifier(columnName);
-    if (newDefault == null) {
-      return `ALTER COLUMN ${col} DROP DEFAULT`;
-    }
-    return `ALTER COLUMN ${col} SET DEFAULT ${await this.adapter.quoteDefaultExpression(newDefault)}`;
+    const cd = await this.buildChangeColumnDefaultDefinition(
+      tableName,
+      columnName,
+      defaultOrChanges,
+    );
+    // ChangeColumnDefaultDefinition is dispatched by the PG/MySQL visitor
+    // subclasses' accept overrides, not the abstract union — same as Rails,
+    // where only those adapters define visit_ChangeColumnDefaultDefinition.
+    return (this.schemaCreation as { accept(o: unknown): Promise<string> }).accept(cd);
   }
 
   /** @internal */

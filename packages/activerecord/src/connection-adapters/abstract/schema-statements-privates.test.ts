@@ -227,17 +227,25 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(frags).toEqual([`DROP COLUMN "updated_at"`, `DROP COLUMN "created_at"`]);
   });
 
-  it("changeColumnDefaultForAlter DROP DEFAULT when null", async () => {
+  // Mirrors change_column_default_for_alter (schema_statements.rb:1843): the
+  // abstract helper only routes builder → schema_creation.accept; the SQL
+  // shapes live in the PG/MySQL visitors (visit_ChangeColumnDefaultDefinition).
+  it("changeColumnDefaultForAlter routes the built definition through schema_creation.accept", async () => {
     const ss = makeStatements();
-    expect(await ss.changeColumnDefaultForAlter("users", "status", null)).toBe(
-      `ALTER COLUMN "status" DROP DEFAULT`,
-    );
+    const cd = { marker: true };
+    vi.spyOn(ss, "buildChangeColumnDefaultDefinition").mockResolvedValue(cd as never);
+    vi.spyOn(ss, "schemaCreation", "get").mockReturnValue({
+      accept: async (o: unknown) => (o === cd ? "ACCEPTED" : "WRONG"),
+    } as never);
+    expect(await ss.changeColumnDefaultForAlter("users", "status", "active")).toBe("ACCEPTED");
   });
 
-  it("changeColumnDefaultForAlter SET DEFAULT for value", async () => {
+  it("changeColumnDefaultForAlter raises NotImplementedError without an adapter builder", async () => {
+    // Rails: the abstract build_change_column_default_definition raises
+    // (schema_statements.rb:738-739); only PG/MySQL override it.
     const ss = makeStatements();
-    expect(await ss.changeColumnDefaultForAlter("users", "status", "active")).toBe(
-      `ALTER COLUMN "status" SET DEFAULT active`,
+    await expect(ss.changeColumnDefaultForAlter("users", "status", null)).rejects.toThrow(
+      "build_change_column_default_definition is not implemented",
     );
   });
 
