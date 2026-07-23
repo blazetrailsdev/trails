@@ -5,94 +5,96 @@ import { expect, beforeEach, afterEach } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
 import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
+import type { Column } from "../../connection-adapters/sqlite3/column.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 
 let adapter: AbstractSQLite3Adapter;
 
-beforeEach(() => {
+// Rails setup: @connection.create_table :virtual_columns, force: true —
+// the raw DDL below is what that create_table emits on SQLite.
+beforeEach(async () => {
   adapter = new BetterSQLite3Adapter(":memory:");
+  await adapter.exec(
+    `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "octet_name" integer GENERATED ALWAYS AS (LENGTH(name)) VIRTUAL, "mutated_name" varchar GENERATED ALWAYS AS (REPLACE(name, 'l', 'L')) VIRTUAL, "column1" integer)`,
+  );
+  // Rails setup: VirtualColumn.create(name: "Rails", column1: 10)
+  await adapter.executeMutation(
+    `INSERT INTO "virtual_columns" ("name", "column1") VALUES ('Rails', 10)`,
+  );
 });
 
 afterEach(async () => {
-  // Throwaway :memory: tables; per-name IF EXISTS drops balance
-  // require-table-teardown (SQLite has no multi-table DROP).
-  await adapter
-    .exec(
-      `DROP TABLE IF EXISTS stored_gen; DROP TABLE IF EXISTS virt_gen; DROP TABLE IF EXISTS impl_virt; DROP TABLE IF EXISTS virt_comma; DROP TABLE IF EXISTS chg_stored; DROP TABLE IF EXISTS chg_virt; DROP TABLE IF EXISTS chg_impl`,
-    )
-    .catch(() => undefined);
+  // Rails teardown: @connection.drop_table :virtual_columns, if_exists: true
+  await adapter.exec(`DROP TABLE IF EXISTS "virtual_columns"`).catch(() => undefined);
   await adapter.close();
 });
+
+async function columnsHash(): Promise<Record<string, Column>> {
+  const hash: Record<string, Column> = {};
+  for (const col of await adapter.columns("virtual_columns")) {
+    hash[col.name] = col as Column;
+  }
+  return hash;
+}
 
 // -- Rails test class: virtual_column_test.rb --
 describeIfSqlite("SQLite3VirtualColumnTest", () => {
   itIfSupports("virtual_columns", "stored column", async () => {
-    await adapter.exec(
-      `CREATE TABLE "stored_gen" ("id" INTEGER PRIMARY KEY, "price" INTEGER, "tax" INTEGER, "total" INTEGER GENERATED ALWAYS AS ("price" + "tax") STORED)`,
-    );
-    await adapter.executeMutation(`INSERT INTO "stored_gen" ("price", "tax") VALUES (100, 10)`);
-    const rows = await adapter.execute(`SELECT "total" FROM "stored_gen"`);
-    expect(rows[0].total).toBe(110);
+    const column = (await columnsHash())["upper_name"];
+    expect(column.isVirtual()).toBe(true);
+    expect(column.isVirtualStored()).toBe(true);
+    const rows = await adapter.execute(`SELECT "upper_name" FROM "virtual_columns" LIMIT 1`);
+    expect(rows[0].upper_name).toBe("RAILS");
   });
 
   itIfSupports("virtual_columns", "explicit virtual column", async () => {
-    await adapter.exec(
-      `CREATE TABLE "virt_gen" ("id" INTEGER PRIMARY KEY, "first" TEXT, "last" TEXT, "full" TEXT GENERATED ALWAYS AS ("first" || ' ' || "last") VIRTUAL)`,
-    );
-    await adapter.executeMutation(
-      `INSERT INTO "virt_gen" ("first", "last") VALUES ('Alice', 'Smith')`,
-    );
-    const rows = await adapter.execute(`SELECT "full" FROM "virt_gen"`);
-    expect(rows[0].full).toBe("Alice Smith");
+    const column = (await columnsHash())["lower_name"];
+    expect(column.isVirtual()).toBe(true);
+    expect(column.isVirtualStored()).toBe(false);
+    const rows = await adapter.execute(`SELECT "lower_name" FROM "virtual_columns" LIMIT 1`);
+    expect(rows[0].lower_name).toBe("rails");
   });
 
   itIfSupports("virtual_columns", "implicit virtual column", async () => {
-    // Without STORED keyword, generated columns are virtual by default
-    await adapter.exec(
-      `CREATE TABLE "impl_virt" ("id" INTEGER PRIMARY KEY, "a" INTEGER, "b" INTEGER, "c" INTEGER GENERATED ALWAYS AS ("a" + "b"))`,
-    );
-    await adapter.executeMutation(`INSERT INTO "impl_virt" ("a", "b") VALUES (3, 4)`);
-    const rows = await adapter.execute(`SELECT "c" FROM "impl_virt"`);
-    expect(rows[0].c).toBe(7);
+    const column = (await columnsHash())["octet_name"];
+    expect(column.isVirtual()).toBe(true);
+    expect(column.isVirtualStored()).toBe(false);
+    const rows = await adapter.execute(`SELECT "octet_name" FROM "virtual_columns" LIMIT 1`);
+    expect(rows[0].octet_name).toBe(5);
   });
 
   itIfSupports("virtual_columns", "virtual column with comma in definition", async () => {
-    await adapter.exec(
-      `CREATE TABLE "virt_comma" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER, "label" TEXT GENERATED ALWAYS AS (CAST("x" AS TEXT) || ',' || CAST("y" AS TEXT)) VIRTUAL)`,
-    );
-    await adapter.executeMutation(`INSERT INTO "virt_comma" ("x", "y") VALUES (1, 2)`);
-    const rows = await adapter.execute(`SELECT "label" FROM "virt_comma"`);
-    expect(rows[0].label).toBe("1,2");
+    const column = (await columnsHash())["mutated_name"];
+    expect(column.isVirtual()).toBe(true);
+    expect(column.isVirtualStored()).toBe(false);
+    expect(column.defaultFunction).not.toBeNull();
+    const rows = await adapter.execute(`SELECT "mutated_name" FROM "virtual_columns" LIMIT 1`);
+    expect(rows[0].mutated_name).toBe("RaiLs");
   });
 
   itIfSupports("virtual_columns", "change table with stored generated column", async () => {
-    await adapter.exec(
-      `CREATE TABLE "chg_stored" ("id" INTEGER PRIMARY KEY, "x" INTEGER, "y" INTEGER)`,
-    );
-    // SQLite 3.31+ supports ADD COLUMN with generated
-    await adapter.exec(
-      `ALTER TABLE "chg_stored" ADD COLUMN "total" INTEGER GENERATED ALWAYS AS ("x" + "y") STORED`,
-    );
-    await adapter.executeMutation(`INSERT INTO "chg_stored" ("x", "y") VALUES (5, 3)`);
-    const rows = await adapter.execute(`SELECT "total" FROM "chg_stored"`);
-    expect(rows[0].total).toBe(8);
+    await adapter.changeTable("virtual_columns", async (t) => {
+      await t.virtual("decr_column1", { type: "integer", as: "column1 - 1", stored: true });
+    });
+    const column = (await columnsHash())["decr_column1"];
+    expect(column.isVirtual()).toBe(true);
+    expect(column.isVirtualStored()).toBe(true);
+    const rows = await adapter.execute(`SELECT "decr_column1" FROM "virtual_columns" LIMIT 1`);
+    expect(rows[0].decr_column1).toBe(9);
   });
 
   itIfSupports(
     "virtual_columns",
     "change table with explicit virtual generated column",
     async () => {
-      await adapter.exec(
-        `CREATE TABLE "chg_virt" ("id" INTEGER PRIMARY KEY, "first" TEXT, "last" TEXT)`,
-      );
-      await adapter.exec(
-        `ALTER TABLE "chg_virt" ADD COLUMN "full" TEXT GENERATED ALWAYS AS ("first" || ' ' || "last") VIRTUAL`,
-      );
-      await adapter.executeMutation(
-        `INSERT INTO "chg_virt" ("first", "last") VALUES ('John', 'Doe')`,
-      );
-      const rows = await adapter.execute(`SELECT "full" FROM "chg_virt"`);
-      expect(rows[0].full).toBe("John Doe");
+      await adapter.changeTable("virtual_columns", async (t) => {
+        await t.virtual("incr_column1", { type: "integer", as: "column1 + 1", stored: false });
+      });
+      const column = (await columnsHash())["incr_column1"];
+      expect(column.isVirtual()).toBe(true);
+      expect(column.isVirtualStored()).toBe(false);
+      const rows = await adapter.execute(`SELECT "incr_column1" FROM "virtual_columns" LIMIT 1`);
+      expect(rows[0].incr_column1).toBe(11);
     },
   );
 
@@ -100,19 +102,19 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
     "virtual_columns",
     "change table with implicit virtual generated column",
     async () => {
-      await adapter.exec(
-        `CREATE TABLE "chg_impl" ("id" INTEGER PRIMARY KEY, "a" INTEGER, "b" INTEGER)`,
-      );
-      await adapter.exec(
-        `ALTER TABLE "chg_impl" ADD COLUMN "c" INTEGER GENERATED ALWAYS AS ("a" * "b")`,
-      );
-      await adapter.executeMutation(`INSERT INTO "chg_impl" ("a", "b") VALUES (4, 5)`);
-      const rows = await adapter.execute(`SELECT "c" FROM "chg_impl"`);
-      expect(rows[0].c).toBe(20);
+      await adapter.changeTable("virtual_columns", async (t) => {
+        await t.virtual("sqr_column1", { type: "integer", as: "pow(column1, 2)" });
+      });
+      const column = (await columnsHash())["sqr_column1"];
+      expect(column.isVirtual()).toBe(true);
+      expect(column.isVirtualStored()).toBe(false);
+      const rows = await adapter.execute(`SELECT "sqr_column1" FROM "virtual_columns" LIMIT 1`);
+      expect(rows[0].sqr_column1).toBe(100);
     },
   );
 
-  // null-overridden: needs schema dump/load infrastructure
+  // null-overridden: needs model layer / schema dump / fixture infrastructure
+  // it.skip("virtual column with full inserts", () => {});
   // it.skip("schema dumping", () => {});
   // it.skip("build fixture sql", () => {});
 });

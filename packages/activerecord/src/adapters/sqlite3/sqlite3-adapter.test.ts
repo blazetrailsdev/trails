@@ -21,6 +21,14 @@ beforeEach(() => {
   adapter = new BetterSQLite3Adapter(":memory:");
 });
 
+// Rails with_example_table default definition:
+//   id integer PRIMARY KEY AUTOINCREMENT, number integer
+async function createExampleTable(): Promise<void> {
+  await adapter.exec(
+    `CREATE TABLE "ex" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
+  );
+}
+
 afterEach(async () => {
   // Static teardown for the tables built in-test via raw CREATE TABLE (mostly on
   // throwaway :memory: adapters that are discarded on close). SQLite has no
@@ -131,12 +139,11 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("exec insert with quote", async () => {
-    const id = await adapter.executeMutation(
-      `INSERT INTO "items" ("name") VALUES ('it''s a test')`,
-    );
-    expect(id).toBe(1);
-    const rows = await adapter.execute(`SELECT "name" FROM "items" WHERE "id" = 1`);
-    expect(rows[0].name).toBe("it's a test");
+    await createExampleTable();
+    await adapter.executeMutation(`insert into "ex" (number) VALUES (?)`, [10]);
+    const rows = await adapter.execute(`select number from "ex" where number = ?`, [10]);
+    expect(rows).toHaveLength(1);
+    expect(rows[0].number).toBe(10);
   });
 
   it("primary key returns nil for no pk", async () => {
@@ -375,9 +382,11 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("columns with default", async () => {
-    const cols = await adapter.execute(`PRAGMA table_info("items")`);
-    const activeCol = cols.find((c: any) => c.name === "active");
-    expect(activeCol!.dflt_value).toBe("1");
+    await adapter.exec(
+      `CREATE TABLE "ex" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer default 10)`,
+    );
+    const column = (await adapter.columns("ex")).find((x) => x.name === "number")!;
+    expect(column.default).toBe("10");
   });
 
   it("columns with not null", async () => {
@@ -456,44 +465,49 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   itIfSupports("expression_index", "expression index", async () => {
-    await adapter.exec(`CREATE INDEX "expression" ON "items" (max(id, price))`);
-    const indexes = (await adapter.indexes("items")) as any[];
+    await createExampleTable();
+    await adapter.exec(`CREATE INDEX "expression" ON "ex" (max(id, number))`);
+    const indexes = (await adapter.indexes("ex")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
-    expect(index.columns).toBe("max(id, price)");
+    expect(index.columns).toBe("max(id, number)");
   });
 
   itIfSupports("expression_index", "expression index with trailing comment", async () => {
-    await adapter.exec(`CREATE INDEX expression on items (price % 10) /* comment */`);
-    const indexes = (await adapter.indexes("items")) as any[];
+    await createExampleTable();
+    await adapter.exec(`CREATE INDEX expression on ex (number % 10) /* comment */`);
+    const indexes = (await adapter.indexes("ex")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
-    expect(index.columns).toBe("price % 10");
+    expect(index.columns).toBe("number % 10");
   });
 
   itIfSupports("expression_index", "expression index with where", async () => {
+    await createExampleTable();
     await adapter.exec(
-      `CREATE INDEX "expression" ON "items" (id % 10, max(id, price)) WHERE id > 1000`,
+      `CREATE INDEX "expression" ON "ex" (id % 10, max(id, number)) WHERE id > 1000`,
     );
-    const indexes = (await adapter.indexes("items")) as any[];
+    const indexes = (await adapter.indexes("ex")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
-    expect(index.columns).toBe("id % 10, max(id, price)");
+    expect(index.columns).toBe("id % 10, max(id, number)");
     expect(index.where).toBe("id > 1000");
   });
 
   itIfSupports("expression_index", "complicated expression", async () => {
+    await createExampleTable();
     await adapter.exec(
-      `CREATE INDEX expression ON items (id % 10, (CASE WHEN price > 0 THEN max(id, price) END))WHERE(id > 1000)`,
+      `CREATE INDEX expression ON ex (id % 10, (CASE WHEN number > 0 THEN max(id, number) END))WHERE(id > 1000)`,
     );
-    const indexes = (await adapter.indexes("items")) as any[];
+    const indexes = (await adapter.indexes("ex")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
-    expect(index.columns).toBe("id % 10, (CASE WHEN price > 0 THEN max(id, price) END)");
+    expect(index.columns).toBe("id % 10, (CASE WHEN number > 0 THEN max(id, number) END)");
     expect(index.where).toBe("(id > 1000)");
   });
 
   itIfSupports("expression_index", "not everything an expression", async () => {
-    await adapter.exec(`CREATE INDEX "expression" ON "items" (id, max(id, price))`);
-    const indexes = (await adapter.indexes("items")) as any[];
+    await createExampleTable();
+    await adapter.exec(`CREATE INDEX "expression" ON "ex" (id, max(id, number))`);
+    const indexes = (await adapter.indexes("ex")) as any[];
     const index = indexes.find((idx) => idx.name === "expression");
-    expect(index.columns).toBe("id, max(id, price)");
+    expect(index.columns).toBe("id, max(id, number)");
   });
 
   it("primary key", async () => {
@@ -548,12 +562,17 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   });
 
   it("add column with custom primary key", async () => {
-    await adapter.exec(`CREATE TABLE "add_col_pk" ("custom_id" INTEGER PRIMARY KEY, "name" TEXT)`);
-    await adapter.exec(`ALTER TABLE "add_col_pk" ADD COLUMN "age" INTEGER`);
-    const cols = await adapter.execute(`PRAGMA table_info("add_col_pk")`);
-    expect(cols.some((c: any) => c.name === "age")).toBe(true);
-    const pkCol = cols.find((c: any) => c.pk === 1);
-    expect(pkCol!.name).toBe("custom_id");
+    await adapter.createTable("barcodes", { id: false, force: true }, (t) => {
+      t.integer("dummy");
+    });
+    await adapter.addColumn("barcodes", "id", "string", { primaryKey: true });
+
+    expect(await adapter.primaryKey("barcodes")).toBe("id");
+
+    const customPk = (await adapter.columns("barcodes")).find((c) => c.name === "id")!;
+
+    expect(customPk.type).toBe("string");
+    expect(customPk.null).toBe(false);
   });
 
   it("remove column preserves index options", async () => {

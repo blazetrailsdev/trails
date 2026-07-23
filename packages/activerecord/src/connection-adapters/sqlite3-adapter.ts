@@ -1661,7 +1661,31 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const sqlType = this.typeToSql(type, options);
+    // Mirrors: SQLite3Adapter#add_column — ALTER TABLE cannot add a primary
+    // key, a NOT NULL column without a default, or a STORED generated column,
+    // so those route through the full table rebuild (Rails: alter_table).
+    if (isInvalidAlterTableType(type, options ?? {})) {
+      const fragment = this._addColumnSqlFragment(type, options);
+      const isPk = Boolean(options?.primaryKey) || type === "primary_key";
+      await this.alterTable(tableName, (columns) => {
+        columns[columnName] = {
+          name: columnName,
+          type: fragment,
+          // Rails' new_column_definition forces null: false on primary keys
+          // (abstract/schema_definitions.rb:571).
+          notnull: options?.null === false || isPk ? 1 : 0,
+          dflt_value:
+            options?.default !== undefined && type !== "virtual"
+              ? this.quoteDefault(
+                  this.serializeDefaultForColumn(options.default, this.typeToSql(type, options)),
+                )
+              : null,
+          pk: isPk ? 1 : 0,
+        };
+      });
+      return;
+    }
+    const sqlType = this._addColumnSqlFragment(type, options);
     let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
     if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
     if (options?.null === false) sql += " NOT NULL";
@@ -1948,6 +1972,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         binds: [],
       });
     }
+  }
+
+  // Column-definition SQL for addColumn, including the GENERATED clause for
+  // `t.virtual` columns (Rails renders these via SchemaCreation from the
+  // ColumnDefinition's :as/:stored options).
+  private _addColumnSqlFragment(type: string, options?: Record<string, unknown>): string {
+    if (type !== "virtual") return this.typeToSql(type, options);
+    if (typeof options?.as !== "string") {
+      throw new Error("virtual columns require an :as option");
+    }
+    const base = options.type ? `${this.typeToSql(String(options.type), options)} ` : "";
+    return `${base}GENERATED ALWAYS AS (${options.as}) ${options.stored ? "STORED" : "VIRTUAL"}`;
   }
 
   private typeToSql(type: string, options?: Record<string, unknown>): string {
@@ -3145,7 +3181,7 @@ function hasDefaultFunction(defaultValue: unknown, default_: string): boolean {
 function isInvalidAlterTableType(type: string, options: Record<string, unknown>): boolean {
   return (
     type === "primary_key" ||
-    Boolean(options["primary_key"]) ||
+    Boolean(options["primaryKey"]) ||
     (options["null"] === false && options["default"] == null) ||
     (type === "virtual" && Boolean(options["stored"]))
   );
