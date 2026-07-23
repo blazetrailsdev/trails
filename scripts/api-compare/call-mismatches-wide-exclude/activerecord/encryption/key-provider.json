@@ -4,7 +4,7 @@
     "tsFile": "encryption/key-provider.ts",
     "rubyName": "encryption_key",
     "call": "last",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails key_provider.rb:20-26 memoizes `@keys.last` and taps it with `key.id` when config.store_key_references; trails key-provider.ts:19-21 returns `_keys[_keys.length - 1]` \u2014 the store_key_references tap (config exists at encryption/config.ts:14) is unported. Omission tracked in story key-provider-ignores-store-key-references."
+    "reason": "Equivalent (bucket b): Rails key_provider.rb:21 reads `@keys.last`; trails key-provider.ts expresses the same read as `_keys[_keys.length - 1]` \u2014 JS arrays have no `.last`, so the call can never appear. The store_key_references tap itself is ported (PR #5143)."
   },
   {
     "package": "activerecord",
