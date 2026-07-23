@@ -518,6 +518,14 @@ export const UNPORTED_FILES: UnportedFile[] = [
     reason: "Ruby Marshal binary serialization — no Node.js equivalent.",
   },
   {
+    testFile: "belongs_to_associations_test.rb",
+    tests: ["belongs to proxy should not respond to private methods"],
+    reason:
+      "Probes Ruby method visibility: `private_method` must raise NoMethodError on a direct " +
+      "call but succeed via `send` (the via-send sibling IS ported). JS has no " +
+      "runtime-enforced private dispatch — a method is either callable or absent.",
+  },
+  {
     testFile: "reaper_test.rb",
     tests: ["connection pool starts reaper in fork"],
     reason: "GVL / Ruby fork() semantics — process forking has no Node.js equivalent.",

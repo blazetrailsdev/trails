@@ -14,7 +14,10 @@ import {
   AssociationTypeMismatch,
   modelRegistry,
 } from "../index.js";
-import { assertNoQueries } from "../testing/query-assertions.js";
+import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
+import { captureSql } from "../testing/sql-capture.js";
+import { MissingAttributeError } from "@blazetrails/activemodel";
+import { throwAbort } from "@blazetrails/activesupport";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { Author, AuthorAddress } from "../test-helpers/models/author.js";
 import { Essay } from "../test-helpers/models/essay.js";
@@ -107,6 +110,32 @@ class WheelPolymorphicName extends Base {
   }
 }
 
+// Mirrors the inline classes in Rails' belongs_to_associations_test.rb
+// (test_dependency_should_halt_parent_destruction*).
+class EssayDestroy extends Base {
+  static _tableName = "essays";
+  static {
+    this.belongsTo("book", { dependent: "destroy", className: "DestroyableBook" });
+  }
+}
+
+class DestroyableBook extends Base {
+  static _tableName = "books";
+  static {
+    this.belongsTo("author", { className: "UndestroyableAuthor", dependent: "destroy" });
+  }
+}
+
+class UndestroyableAuthor extends Base {
+  static _tableName = "authors";
+  static {
+    this.hasOne("book", { className: "DestroyableBook", foreignKey: "author_id" });
+    this.beforeDestroy(function () {
+      throwAbort();
+    });
+  }
+}
+
 for (const m of [
   Author,
   AuthorAddress,
@@ -158,6 +187,9 @@ for (const m of [
   Project,
   AdminUser,
   AdminAccount,
+  EssayDestroy,
+  DestroyableBook,
+  UndestroyableAuthor,
 ]) {
   registerModel(m as any);
 }
@@ -284,7 +316,11 @@ describe("BelongsToAssociationsTest", () => {
     expect(result).toHaveLength(0);
   });
 
-  it.todo("where on polymorphic association with cpk");
+  it("where on polymorphic association with cpk", async () => {
+    const post = await CpkPost.create({ title: "Welcome", author: "Mary" });
+    await (post as any).comments.push(await CpkComment.create({}));
+    expect(await CpkComment.where({ commentable: post }).count()).toBe(1);
+  });
 
   it("assigning belongs to on destroyed object", async () => {
     const client = await Client.create({ name: "Client" });
@@ -306,9 +342,18 @@ describe("BelongsToAssociationsTest", () => {
     expect((client2 as any).firmIdCameFromUser?.()).toBeFalsy();
   });
 
-  it.todo("missing attribute error is raised when no foreign key attribute");
+  it("missing attribute error is raised when no foreign key attribute", async () => {
+    const client = (await Client.select("id").first())!;
+    await expect(client.loadBelongsTo("firm")).rejects.toThrow(MissingAttributeError);
+  });
 
-  it.todo("belongs to does not use order by");
+  it("belongs to does not use order by", async () => {
+    const sqlLog = await captureSql(async () => {
+      const client = await Client.find(3);
+      await client.loadBelongsTo("firm");
+    });
+    expect(sqlLog.filter((sql) => /order by/i.test(sql))).toEqual([]);
+  });
 
   it("belongs to with primary key", async () => {
     const firstFirmName = companies("first_firm").name;
@@ -637,7 +682,15 @@ describe("BelongsToAssociationsTest", () => {
     expect(Number(book.order_id)).toBe(Number(orderId));
   });
 
-  it.todo("should set composite foreign key on association when key changes on associated record");
+  it("should set composite foreign key on association when key changes on associated record", async () => {
+    const book = await CpkBook.create({ id: [1, 2], title: "The Well-Grounded Rubyist" });
+    const order = await CpkOrder.create({ id: [1, 2], book });
+
+    (order as any).shop_id = 3;
+    await order.save();
+
+    expect((book as any).shop_id).toBe(3);
+  });
 
   it("building the belonging object with implicit sti base class", async () => {
     const account = Account.new({});
@@ -705,7 +758,34 @@ describe("BelongsToAssociationsTest", () => {
     expect(odegyAccount.firm!.name).toBe("ODEGY");
   });
 
-  it.todo("reload the belonging object with query cache");
+  it("reload the belonging object with query cache", async () => {
+    const odegyAccountId = accounts("odegy_account").id!;
+
+    const connection = (await Base.leaseConnection()) as any;
+    connection.enableQueryCacheBang();
+    connection.clearQueryCache();
+    try {
+      // Populate the cache with a query
+      const odegyAccount = await Account.find(odegyAccountId);
+
+      // Populate the cache with a second query
+      await odegyAccount.loadBelongsTo("firm");
+
+      expect(connection.queryCache.size).toBe(2);
+
+      // Clear the cache and fetch the firm again, populating the cache with a query
+      await assertQueriesCount(1, false, async () => {
+        await (odegyAccount as any).reloadFirm();
+      });
+
+      // This query is not cached anymore, so it should make a real SQL query
+      await assertQueriesCount(1, false, async () => {
+        await Account.find(odegyAccountId);
+      });
+    } finally {
+      connection.disableQueryCacheBang();
+    }
+  });
 
   it("resetting the association", async () => {
     const odegyAccount = accounts("odegy_account");
@@ -1036,7 +1116,22 @@ describe("BelongsToAssociationsTest", () => {
     expect(lineItem).toBeDefined();
   });
 
-  it.todo("belongs to with touch option on touch without updated at attributes");
+  it("belongs to with touch option on touch without updated at attributes", async () => {
+    expect(LineItem.columnNames()).not.toContain("updated_at");
+
+    const lineItem = await LineItem.create({});
+    const invoice = await Invoice.create({ lineItems: [lineItem] });
+    const initial = invoice.updated_at as Temporal.Instant;
+    travelTo(new Date(Date.now() + 1000));
+    try {
+      await lineItem.touch();
+    } finally {
+      travelBack();
+    }
+
+    const reloadedAt = (await invoice.reload()).updated_at as Temporal.Instant;
+    expect(reloadedAt.equals(initial)).toBe(false);
+  });
 
   it("belongs to with touch option on touch and removed parent", async () => {
     const lineItem = await LineItem.create({});
@@ -1362,8 +1457,10 @@ describe("BelongsToAssociationsTest", () => {
     expect((essay as any).writer_type).toBeNull();
   });
 
-  it.todo("belongs to proxy should not respond to private methods");
-
+  // "belongs to proxy should not respond to private methods" is excluded in
+  // scripts/api-compare/unported-files.ts: it probes Ruby method visibility
+  // (private_method raising NoMethodError outside `send`), which has no JS
+  // equivalent — TS has no runtime-enforced private dispatch on proxies.
   it("belongs to proxy should respond to private methods via send", async () => {
     const firm = companies("first_firm");
     expect((firm as any)["privateMethod"]()).toBe("I am Jack's innermost fears and aspirations");
@@ -1409,11 +1506,47 @@ describe("BelongsToAssociationsTest", () => {
     expect(AuthorAddress.destroyedAuthorAddressIds).toContain(authorAddress.id);
   });
 
-  it.todo("belongs to invalid dependent option raises exception");
+  it("belongs to invalid dependent option raises exception", async () => {
+    expect(() => {
+      class SpecialAuthor extends Author {
+        static {
+          this.belongsTo("specialAuthorAddress", {
+            dependent: "nullify" as any,
+            className: "AuthorAddress",
+          });
+        }
+      }
+      void SpecialAuthor;
+    }).toThrow(
+      "The :dependent option must be one of destroy, delete, destroyAsync, but is :nullify",
+    );
+  });
 
-  it.todo("dependency should halt parent destruction");
+  it("dependency should halt parent destruction", async () => {
+    const author = await UndestroyableAuthor.create({ name: "Test" });
+    const book = await DestroyableBook.create({ author });
 
-  it.todo("dependency should halt parent destruction with cascaded three levels");
+    const authorCount = await UndestroyableAuthor.count();
+    const bookCount = await DestroyableBook.count();
+    expect(await book.destroy()).toBe(false);
+    expect(await UndestroyableAuthor.count()).toBe(authorCount);
+    expect(await DestroyableBook.count()).toBe(bookCount);
+  });
+
+  it("dependency should halt parent destruction with cascaded three levels", async () => {
+    const author = await UndestroyableAuthor.create({ name: "Test" });
+    const book = await DestroyableBook.create({ author });
+    const essay = await EssayDestroy.create({ book });
+
+    const authorCount = await UndestroyableAuthor.count();
+    const bookCount = await DestroyableBook.count();
+    const essayCount = await EssayDestroy.count();
+    expect(await essay.destroy()).toBe(false);
+    expect(essay.isDestroyed()).toBe(false);
+    expect(await UndestroyableAuthor.count()).toBe(authorCount);
+    expect(await DestroyableBook.count()).toBe(bookCount);
+    expect(await EssayDestroy.count()).toBe(essayCount);
+  });
 
   it("attributes are being set when initialized from belongs to association with where clause", async () => {
     const acc = accounts("signals37");
@@ -1677,9 +1810,21 @@ describe("BelongsToAssociationsTest", () => {
     expect(Number((tagging as any).tag_id)).toBe(Number(tag.id));
   });
 
-  it.todo("should set foreign key on save");
+  it("should set foreign key on save", async () => {
+    const client = await Client.create({ name: "fuu" });
+    const firm = (client as any).buildFirm({ name: "baa" });
 
-  it.todo("should set foreign key on save!");
+    await firm.save();
+    expect((client as any).client_of).toBe(firm.id);
+  });
+
+  it("should set foreign key on save!", async () => {
+    const client = await Client.create({ name: "fuu" });
+    const firm = (client as any).buildFirm({ name: "baa" });
+
+    await firm.saveBang();
+    expect((client as any).client_of).toBe(firm.id);
+  });
 
   it("self referential belongs to with counter cache assigning nil", async () => {
     const comment = await Comment.create({ post: posts("thinking"), body: "fuu" });
@@ -1807,7 +1952,16 @@ describe("BelongsToAssociationsTest", () => {
     expect(await Column.count()).toBe(1);
   });
 
-  it.todo("multiple counter cache with after create update");
+  it("multiple counter cache with after create update", async () => {
+    const post = posts("welcome");
+    const parent = comments("greetings");
+
+    const parentChildrenCount = ((await parent.reload()) as any).children_count as number;
+    const postCommentsCount = ((await post.reload()) as any).comments_count as number;
+    await CommentWithAfterCreateUpdate.create({ body: "foo", post, parent });
+    expect(((await parent.reload()) as any).children_count).toBe(parentChildrenCount + 1);
+    expect(((await post.reload()) as any).comments_count).toBe(postCommentsCount + 1);
+  });
 
   it("assigning an association doesn't result in duplicate objects", async () => {
     const post = await Post.create({ title: "title", body: "body" });

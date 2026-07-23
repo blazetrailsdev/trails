@@ -11,19 +11,21 @@
  */
 import type { Base } from "../../base.js";
 import { polymorphicName } from "../../inheritance.js";
+import { rubyInspectArray } from "../ruby-inspect.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
-    joinForeignKey: string;
+    joinForeignKey: string | string[];
     joinForeignType: string;
-    joinPrimaryKey(klass?: unknown): string;
+    joinPrimaryKey(klass?: unknown): string | string[];
   };
   private readonly _values: unknown[];
 
   constructor(
     associatedTable: {
-      joinForeignKey: string;
+      joinForeignKey: string | string[];
       joinForeignType: string;
-      joinPrimaryKey(klass?: unknown): string;
+      joinPrimaryKey(klass?: unknown): string | string[];
     },
     values: unknown[],
   ) {
@@ -42,14 +44,42 @@ export class PolymorphicArrayValue {
   }
 
   queries(): Record<string, unknown>[] {
+    const fk = this.associatedTable.joinForeignKey;
     if (this.values.length === 0) {
-      return [{ [this.associatedTable.joinForeignKey]: this.values }];
+      if (Array.isArray(fk)) {
+        return [Object.fromEntries(fk.map((col) => [col, this.values]))];
+      }
+      return [{ [fk]: this.values }];
     }
     const result: Record<string, unknown>[] = [];
     for (const [type, ids] of this.typeToIdsMapping()) {
+      if (Array.isArray(fk)) {
+        // Composite FK: Ruby uses the FK array itself as the hash key
+        // (`query[associated_table.join_foreign_key] = ids`), which
+        // expand_from_hash later zips per tuple. JS object keys can't be
+        // arrays, so pre-expand here with the same validation and zip
+        // semantics (predicate_builder.rb:93-96): each ids_set must be an
+        // Array, and `key.zip(ids_set)` iterates only the FK columns —
+        // short tuples pad with nil, extra values are dropped. One query
+        // per tuple; queries are ORed by groupingQueries.
+        for (const tuple of ids) {
+          if (!Array.isArray(tuple)) {
+            throw new ArgumentError(
+              `Expected corresponding value for ${rubyInspectArray(fk)} to be an Array`,
+            );
+          }
+          const q: Record<string, unknown> = {};
+          if (type) q[this.associatedTable.joinForeignType] = type;
+          fk.forEach((col, i) => {
+            q[col] = tuple[i] ?? null;
+          });
+          result.push(q);
+        }
+        continue;
+      }
       const q: Record<string, unknown> = {};
       if (type) q[this.associatedTable.joinForeignType] = type;
-      q[this.associatedTable.joinForeignKey] = ids.length === 1 ? ids[0] : ids;
+      q[fk] = ids.length === 1 ? ids[0] : ids;
       result.push(q);
     }
     return result;
@@ -69,7 +99,7 @@ export class PolymorphicArrayValue {
   }
 
   /** @internal */
-  private primaryKey(value: unknown): string {
+  private primaryKey(value: unknown): string | string[] {
     return this.associatedTable.joinPrimaryKey(this.klass(value));
   }
 
@@ -93,6 +123,10 @@ export class PolymorphicArrayValue {
         return (value as any).select(arelTable && !Array.isArray(pk) ? arelTable.get(pk) : pk);
       }
       const pk = this.primaryKey(value);
+      if (Array.isArray(pk)) {
+        // Rails: primary_key.map { |column| value._read_attribute(column) }
+        return pk.map((column) => (value as any)._readAttribute(column));
+      }
       if (pk in value) return (value as any)[pk];
     }
     return value;

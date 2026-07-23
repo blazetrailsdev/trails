@@ -2256,6 +2256,20 @@ export function computeHasManyWhere(
   if (options.as) {
     const foreignKey = options.foreignKey ?? `${underscore(options.as)}_id`;
     if (Array.isArray(foreignKey)) {
+      // Rails permits an explicit composite FK on a polymorphic `:as`
+      // association when it zips against the owner's composite PK (e.g.
+      // Cpk::Post has_many :comments, as: :commentable,
+      // foreign_key: [:commentable_title, :commentable_author]).
+      if (Array.isArray(primaryKey) && primaryKey.length === foreignKey.length) {
+        const typeCol = `${underscore(options.as)}_type`;
+        const conditions: Record<string, unknown> = { [typeCol]: polymorphicName(ctor) };
+        for (let i = 0; i < foreignKey.length; i++) {
+          const pkValue = record._readAttribute(primaryKey[i]);
+          if (pkValue === null || pkValue === undefined) return null;
+          conditions[foreignKey[i]] = pkValue;
+        }
+        return conditions;
+      }
       // Route through the reflection's canonical checkValidityBang (Rails'
       // single raise site) so the error carries the Rails-faithful message;
       // a no-op for polymorphic `:as` (Rails permits no composite key there).

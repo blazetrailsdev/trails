@@ -195,13 +195,16 @@ export class PredicateBuilder {
     attributes: Record<string, unknown>,
   ): Nodes.Node[] {
     if (associatedTable.isPolymorphicAssociation?.()) {
-      const fk = associatedTable.joinForeignKey as string;
+      const fk = associatedTable.joinForeignKey as string | string[];
       const ft = associatedTable.joinForeignType as string;
       const refl = associatedTable.reflection;
-      const pkFor = (klass?: unknown): string =>
-        refl && typeof refl.joinPrimaryKeyFor === "function"
-          ? String(refl.joinPrimaryKeyFor(klass))
-          : String(associatedTable.joinPrimaryKey ?? "id");
+      const pkFor = (klass?: unknown): string | string[] => {
+        const pk =
+          refl && typeof refl.joinPrimaryKeyFor === "function"
+            ? refl.joinPrimaryKeyFor(klass)
+            : (associatedTable.joinPrimaryKey ?? "id");
+        return Array.isArray(pk) ? pk : String(pk);
+      };
       const values = Array.isArray(value) ? value : [value];
       const queries = new PolymorphicArrayValue(
         { joinForeignKey: fk, joinForeignType: ft, joinPrimaryKey: pkFor },
