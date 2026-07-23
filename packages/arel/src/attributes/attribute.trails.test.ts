@@ -108,11 +108,6 @@ describe("AttributeTest (trails)", () => {
     });
   });
 
-  // Rails' `type casting` suite only exercises the caster through #eq
-  // (attributes/attribute_test.rb:1123+); it never pins that #in / #notIn
-  // list elements are wrapped as Casted and rendered through the caster.
-  // The port reimplements that wrapping in predications.ts' array arm, so
-  // these compile-level checks are TS-only coverage.
   describe("type casting", () => {
     it("type casts IN list elements through the attribute", () => {
       const fakeCaster = {
