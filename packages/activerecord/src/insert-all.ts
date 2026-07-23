@@ -782,7 +782,7 @@ export class Builder implements InsertBuilder {
   private _visitor(): Visitors.ToSql {
     const v = this._insertAll.connection.visitor;
     if (v) return v;
-    const q = this._insertAll.connection as unknown as Visitors.ArelQuoter;
+    const q = this._insertAll.connection as unknown as Visitors.ArelConnection;
     if (this._dialect === "mysql") return new Visitors.MySQL(q);
     if (this._dialect === "postgres") return new Visitors.PostgreSQL(q);
     return new Visitors.SQLite(q);
