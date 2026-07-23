@@ -58,20 +58,17 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-// Names BOTH sizing inputs so exhaustion is diagnosable from the message alone.
 // The pool is sized at AR_DB_FORKS + headroom (ar-db-slots.ts), so exhaustion
-// means MORE workers ran concurrently than AR_DB_FORKS promises — historically
-// because the vitest fork cap lived only in per-project poolOptions, which
-// vitest 3's shared pool ignores (see the root poolOptions note in
-// vitest.config.ts) — not that the derivation undercuts the worker count.
+// means more workers ran concurrently than AR_DB_FORKS promises — name both
+// numbers so that reads as a worker-cap bug, not a schema-setup regression.
 function slotExhaustionMessage(fn: string, lockKind: string, slots: number): string {
   return (
     `${fn}: all ${slots} ${lockKind} slots are held after ` +
     `${SLOT_RETRY_ATTEMPTS} attempts (${(SLOT_RETRY_ATTEMPTS * SLOT_RETRY_DELAY_MS) / 1000}s) ` +
-    `with AR_DB_FORKS=${workerForkCount()} (slot pool = forks + headroom; see ` +
+    `with AR_DB_FORKS=${workerForkCount()} (slot pool = forks + headroom, see ` +
     `test-helpers/ar-db-slots.ts). More than ${workerForkCount()} workers are competing: ` +
     `check that the vitest worker cap is honored (root-level poolOptions in ` +
-    `vitest.config.ts), or increase AR_DB_SLOTS, or check for stuck workers.`
+    `vitest.config.ts), increase AR_DB_SLOTS, or check for stuck workers.`
   );
 }
 

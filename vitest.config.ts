@@ -284,14 +284,12 @@ export default defineConfig({
   resolve: { alias },
   test: {
     globals: true,
-    // The worker cap MUST live at the ROOT config: vitest 3's shared fork pool
-    // sizes itself from `vitest.config.poolOptions.forks.maxForks` (see
-    // createForksPool in vitest/dist) and never consults the per-project
-    // `poolOptions`, so a project-level `maxForks` is a silent no-op and the
-    // effective cap becomes `numCpus - 1`. On a many-core host that let every
-    // test file fork at once, exhausting the AR_DB advisory-slot pool (first
-    // N files pin all N slots; every later file fails setup with
-    // "all N GET_LOCK slots are held").
+    // MUST live at the ROOT config: vitest 3's shared fork pool sizes itself
+    // from the root `poolOptions.forks.maxForks` only (createForksPool never
+    // consults per-project poolOptions — a project-level `maxForks` is a
+    // silent no-op and the cap falls back to `numCpus - 1`, which on a
+    // many-core host forks every file at once and exhausts the AR_DB
+    // advisory-slot pool: "all N GET_LOCK slots are held").
     poolOptions: { forks: { maxForks: TEST_FORKS } },
     // In the isolated trails-tsc coverage run, the build-views/watch tests are
     // CPU-pegged in tsc under v8 instrumentation long enough to starve vitest's
@@ -379,7 +377,6 @@ export default defineConfig({
           // tracking removal).
           hookTimeout: 30_000,
           pool: "forks",
-          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
       {
@@ -391,7 +388,6 @@ export default defineConfig({
           name: "sqlite-drivers",
           include: SQLITE_DRIVER_TESTS,
           exclude: [...SHARED_EXCLUDE],
-          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
       {
@@ -418,7 +414,6 @@ export default defineConfig({
           // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
           // (it runs under activerecord, where the engine is ActiveRecord::Base).
           setupFiles: ["./packages/arel/src/test-setup-engine.ts"],
-          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
     ],
