@@ -32,6 +32,7 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
       "Column `car_id` on table `engines` does not match column `id` on `cars`",
     );
     expect(rebuilt.message).toContain("which has type `bigint`");
+    expect(rebuilt.message).toContain("\nOriginal message: Cannot add foreign key constraint");
     expect(rebuilt.stack).toBe(original.stack);
     expect((rebuilt as MismatchedForeignKey).fkDetails).toEqual({
       table: "engines",

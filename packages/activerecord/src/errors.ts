@@ -500,10 +500,12 @@ export class MismatchedForeignKey extends StatementInvalid {
         `(For example \`t.${type} :${foreignKey}\`).`,
       ].join(" ");
     } else {
-      const fallback =
+      msg =
         "There is a mismatch between the foreign key and primary key column types. " +
         "Verify that the foreign key column type and the primary key of the associated table match types.";
-      msg = originalMessage ? `${fallback} ${originalMessage}` : fallback;
+    }
+    if (originalMessage) {
+      msg += `\nOriginal message: ${originalMessage}`;
     }
 
     super(msg, rest);
