@@ -271,6 +271,38 @@ describe("AttributeMethodsTest (trails)", () => {
     expect(Topic.attributeNames()).not.toBe(first);
   });
 
+  it("class columnNames is memoized and frozen", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.columnNames();
+    expect(first).toContain("title");
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Topic.columnNames()).toBe(first);
+  });
+
+  it("ignoredColumns= invalidates the columnNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.columnNames();
+    expect(first).toContain("approved");
+    Topic.ignoredColumns = ["approved"];
+    const second = Topic.columnNames();
+    expect(second).not.toBe(first);
+    expect(second).not.toContain("approved");
+  });
+
+  it("resetColumnInformation invalidates the class columnNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.columnNames();
+    (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
+    // Restore the suite's warm-cache invariant for later tests.
+    await Topic.loadSchema();
+    const second = Topic.columnNames();
+    expect(second).not.toBe(first);
+    expect(second).toEqual(first);
+  });
+
   it("subclass does not inherit the parent's attributeNames memo", async () => {
     class Topic extends Base {}
     await Topic.loadSchema();

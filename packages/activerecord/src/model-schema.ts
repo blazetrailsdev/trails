@@ -204,13 +204,36 @@ export function buildWhereNodeFromConstraints(
  * Return column names for a model, excluding ignored columns.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_names
- * (`columns.map(&:name)`). Reads `columnsHash()` keys rather than `columns()`
- * because trails applies the `ignoredColumns` filter at read time in
- * `columnsHash()` (Rails filters at load), and `columns()`' `_columns` memo
- * would bypass it after an `ignoredColumns=` reassignment.
+ * (`@column_names ||= columns.map(&:name).freeze`, model_schema.rb:478-480).
+ * Reads `columnsHash()` keys rather than `columns()` because trails applies
+ * the `ignoredColumns` filter at read time in `columnsHash()` (Rails filters
+ * at load), and `columns()`' `_columns` memo would bypass it after an
+ * `ignoredColumns=` reassignment.
+ *
+ * The memo is revision-stamped like `attributeNames`' (attribute-methods.ts):
+ * the reset paths that bump `_schemaRevision` (resetColumnInformation,
+ * applyColumnsHash) invalidate it — including subclass memos the base's reset
+ * can't reach — and the non-bumping paths (`ignoredColumns=`, `tableName=`,
+ * `attribute()`) drop it via `clearAttributeNamesMemo`, mirroring Rails'
+ * `reload_schema_from_cache` nilling `@column_names` recursively. Cold
+ * (pre-load) reads are never memoized: the schema cache can warm without a
+ * revision bump to invalidate a memo taken off the synthesized fallback.
  */
 export function columnNames(this: typeof Base): string[] {
-  return Object.keys(this.columnsHash());
+  const host = this as unknown as SchemaHost;
+  const memo = Object.prototype.hasOwnProperty.call(host, "_columnNamesMemo")
+    ? host._columnNamesMemo
+    : undefined;
+  if (memo && memo.revision === (host._schemaRevision ?? 0)) return memo.names as string[];
+  const names = Object.keys(this.columnsHash());
+  if (host._schemaLoaded) {
+    const frozen = Object.freeze(names);
+    // Re-read the revision: `columnsHash()` above can run the first sync
+    // `loadSchema` → `applyColumnsHash`, which bumps it mid-call.
+    host._columnNamesMemo = { revision: host._schemaRevision ?? 0, names: frozen };
+    return frozen as string[];
+  }
+  return names;
 }
 
 /**
@@ -547,6 +570,8 @@ interface SchemaHost {
   _schemaRevision?: number;
   /** Base `_schemaRevision` this subclass's overlay was built from. @internal */
   _stiOverlaySyncedAt?: number;
+  /** Rails' `@column_names` memo, revision-stamped. @internal */
+  _columnNamesMemo?: { revision: number; names: readonly string[] };
   connection: any;
   prototype: Record<string, unknown>;
   superclass?: SchemaHost;
@@ -554,18 +579,21 @@ interface SchemaHost {
 }
 
 /**
- * Drop the memoized class-level `attributeNames` on `host` and its
- * descendants — Rails' `reload_schema_from_cache` nils `@attribute_names`
- * recursively (model_schema.rb:553-568). Used by the invalidation paths that
- * don't bump `_schemaRevision` (`attribute`, `table_name=`, `ignored_columns=`).
+ * Drop the memoized class-level `attributeNames` and `columnNames` on `host`
+ * and its descendants — Rails' `reload_schema_from_cache` nils
+ * `@attribute_names` and `@column_names` recursively (model_schema.rb:553-568).
+ * Used by the invalidation paths that don't bump `_schemaRevision`
+ * (`attribute`, `table_name=`, `ignored_columns=`).
  *
  * @internal
  */
 export function clearAttributeNamesMemo(host: SchemaHost): void {
   const descendants = (host as { descendants?: SchemaHost[] }).descendants ?? [];
   for (const klass of [host, ...descendants]) {
-    if (Object.prototype.hasOwnProperty.call(klass, "_attributeNamesMemo")) {
-      Reflect.deleteProperty(klass, "_attributeNamesMemo");
+    for (const memo of ["_attributeNamesMemo", "_columnNamesMemo"] as const) {
+      if (Object.prototype.hasOwnProperty.call(klass, memo)) {
+        Reflect.deleteProperty(klass, memo);
+      }
     }
   }
 }
