@@ -78,6 +78,8 @@ export interface ColumnInfo {
   unsigned?: boolean;
   /** Generated-column flag — emitted as `t.virtual` by the dialect dumper. */
   virtual?: boolean;
+  /** SQLite `STORED` vs `VIRTUAL` generation flag — emitted as `stored:` by the dialect dumper. */
+  virtualStored?: boolean;
   /** Raw adapter `Extra` string (MySQL) — read to distinguish stored vs virtual generated columns. */
   extra?: string | null;
 }
@@ -252,6 +254,12 @@ class AdapterSchemaSource implements SchemaSource {
         typeof (col as any).isVirtual === "function"
           ? (col as any).isVirtual()
           : (col as any).virtual === true;
+      // SQLite distinguishes STORED from VIRTUAL generation; the flag lives
+      // behind `isVirtualStored()` on the real SQLite3 Column.
+      const isVirtualStored =
+        typeof (col as any).isVirtualStored === "function"
+          ? (col as any).isVirtualStored()
+          : (col as any).virtualStored === true;
       return {
         name: col.name,
         // Carry the dsl cast type in `type` and the raw SQL type in `sqlType`.
@@ -282,6 +290,7 @@ class AdapterSchemaSource implements SchemaSource {
         autoIncrement: (col as any).autoIncrement === true ? true : undefined,
         unsigned: (col as any).unsigned === true ? true : undefined,
         virtual: isVirtual ? true : undefined,
+        virtualStored: isVirtual && isVirtualStored ? true : undefined,
         extra: (col as any).extra ?? undefined,
       };
     });
