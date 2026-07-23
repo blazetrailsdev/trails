@@ -469,7 +469,7 @@ export function thirdToLastBang<T extends typeof Base>(this: T): Promise<Instanc
 
 /**
  * Mirrors: ActiveRecord::Querying#count — accepts an optional column name
- * and returns either a number or a grouped `Record<string, number>` when
+ * and returns either a number or a grouped `Map<unknown, number>` when
  * the active scope has a GROUP BY. Parameters/return are derived from
  * `Relation#count` so the signatures stay in sync.
  */

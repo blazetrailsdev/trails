@@ -411,13 +411,13 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
    * loading) — except we skip the materialization since count
    * doesn't need it. Net: same result, fewer rows hydrated.
    */
-  async count(column?: string): Promise<number | Record<string, number>> {
+  async count(column?: string): Promise<number | Map<unknown, number>> {
     if (this._chainWalker) {
       const { relation } = await this._walkOnce();
       const merged = this._composeChainedState(relation);
       return (
         merged as unknown as {
-          count: (col?: string) => Promise<number | Record<string, number>>;
+          count: (col?: string) => Promise<number | Map<unknown, number>>;
         }
       ).count(column);
     }
@@ -427,7 +427,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
     // override.
     const baseCount = (
       Relation.prototype as unknown as {
-        count: (this: unknown, col?: string) => Promise<number | Record<string, number>>;
+        count: (this: unknown, col?: string) => Promise<number | Map<unknown, number>>;
       }
     ).count;
     return baseCount.call(this, column);

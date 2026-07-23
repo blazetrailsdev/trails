@@ -389,9 +389,7 @@ describe("RelationTest", () => {
     // while average() yields a number, so coerce both to Number for comparison
     // (Rails compares BigDecimal == Integer loosely).
     const relCounts = (await relation.toArray()).map((r: any) => Number(r.post_count)).sort();
-    const subValues = Object.values((await subquery) as Record<string, number>)
-      .map(Number)
-      .sort();
+    const subValues = [...((await subquery) as Map<unknown, number>).values()].map(Number).sort();
     expect(subValues).toEqual(relCounts);
   });
 
@@ -411,9 +409,7 @@ describe("RelationTest", () => {
       .group("type")
       .average("post_count");
     const relCounts = (await relation.toArray()).map((r: any) => Number(r.post_count)).sort();
-    const subValues = Object.values((await subquery) as Record<string, number>)
-      .map(Number)
-      .sort();
+    const subValues = [...((await subquery) as Map<unknown, number>).values()].map(Number).sort();
     expect(subValues).toEqual(relCounts);
   });
 
@@ -1351,11 +1347,12 @@ describe("RelationTest", () => {
       .where("id is not null")
       .group("author_id")
       .where("legacy_comments_count > 0");
-    const expected: Record<number, number> = { 1: 4, 2: 1 };
-    const result = (await postsRel.count()) as Record<string | number, number>;
-    expect(
-      Object.fromEntries(Object.entries(result).map(([k, v]) => [Number(k), Number(v)])),
-    ).toEqual(expected);
+    const expected = new Map([
+      [1, 4],
+      [2, 1],
+    ]);
+    const result = await postsRel.count();
+    expect(result).toEqual(expected);
   });
 
   it("empty", async () => {

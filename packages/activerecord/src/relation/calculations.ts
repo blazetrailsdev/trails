@@ -463,7 +463,7 @@ async function groupedAggregate(
   fn: AggFn,
   column: string | Nodes.Node,
   coerceNumeric: boolean = true,
-): Promise<Record<string, unknown> | Map<unknown, unknown>> {
+): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
   const groupCol = rel._groupColumns[0];
@@ -548,22 +548,51 @@ async function groupedAggregate(
     return result;
   }
 
-  // Rails keys the result by the group column's deserialized value
-  // (execute_grouped_calculation → type_cast_calculated_value on the key), so a
-  // boolean column yields true/false keys rather than the raw driver 1/0.
-  const keyType = pluckCastTypeForKnownColumn(rel, effectiveGroupCol) as {
-    deserialize?(v: unknown): unknown;
-  } | null;
-  const result: Record<string, unknown> = {};
+  // Rails keys the result hash by the group column's deserialized value
+  // (execute_grouped_calculation builds `key_types` from the model's attribute
+  // type, falling back to `calculated_data.column_types` for expressions the
+  // model doesn't own — e.g. `date_trunc('month', created_at)` keys are Time
+  // on PG), so a boolean column yields true/false keys rather than the raw
+  // driver 1/0, and a null group stays a null key.
+  // Rails resolves the key type as `col_name.try(:type_caster) || type_for(col_name)`:
+  // a qualified `other_table.column` group field becomes an Arel attribute of THAT
+  // table via `arel_columns`, so its type_caster wins and the model's own type for a
+  // same-named column is never consulted (calculations_test.rb: grouping Company by
+  // "accounts.status" keeps accounts' string values, not Company's integer enum).
+  // A bare or self-qualified field resolves through the model (`type_for` takes the
+  // last `.`-segment); anything else falls back to the result's column types —
+  // Rails' `calculated_data.column_types.fetch(aliaz, Type.default_value)`.
+  const keyFieldName = qualifiedGroupFieldForModel(rel, effectiveGroupCol);
+  const keyType = ((keyFieldName === null
+    ? null
+    : pluckCastTypeForKnownColumn(rel, keyFieldName)) ??
+    queryResult.columnTypes?.["group_key"] ??
+    null) as { deserialize?(v: unknown): unknown } | null;
+  const result = new Map<unknown, unknown>();
   for (const row of rows) {
     const raw = row.group_key;
     const key =
       raw == null
-        ? "null"
-        : String(typeof keyType?.deserialize === "function" ? keyType.deserialize(raw) : raw);
-    result[key] = aggOf(row[aggAlias]);
+        ? null
+        : typeof keyType?.deserialize === "function"
+          ? keyType.deserialize(raw)
+          : raw;
+    result.set(key, aggOf(row[aggAlias]));
   }
   return result;
+}
+
+/**
+ * The model-attribute name a group field may resolve its key type through, or
+ * null when the field is qualified to a different table (whose own type — via
+ * the result's column types — must win) or isn't a plain column reference.
+ */
+function qualifiedGroupFieldForModel(rel: CalculationRelation, field: unknown): string | null {
+  if (typeof field !== "string") return null;
+  const dot = field.indexOf(".");
+  if (dot === -1) return field;
+  const [table, column] = [field.slice(0, dot), field.slice(dot + 1)];
+  return table === (rel._modelClass as { tableName?: string }).tableName ? column : null;
 }
 
 /**
@@ -689,14 +718,14 @@ function isEmptyCalculationScope(rel: CalculationRelation): boolean {
 export async function performCount(
   this: CalculationRelation,
   column?: string | Nodes.Node,
-): Promise<number | Record<string, number> | Map<unknown, number>> {
+): Promise<number | Map<unknown, number>> {
   if (this._limitValue === 0) return 0;
   // Safe to test contradiction here: every calc method is wrapped by
   // `inQueryConnection`, which awaits `_materializeDeferredDistinctPkPredicates()`
   // before invoking this perform fn — so a deferred distinct-PK marker that
   // resolves to an empty id set is already an empty `IN` (contradiction) by now,
   // same as pluck/exists which materialize inside their own inner functions.
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : 0;
+  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : 0;
 
   // Mirrors calculations.rb:231: `calculate`'s has_include? check precedes the
   // group dispatch. When eager-loading with a group, Rails' `calculate`
@@ -719,12 +748,12 @@ export async function performCount(
         "count",
         column != null && column !== "*" ? column : pk,
         true,
-      ) as Promise<Record<string, number> | Map<unknown, number>>;
+      ) as Promise<Map<unknown, number>>;
     }
   }
 
   if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "count", column ?? "*", true) as Promise<Record<string, number>>;
+    return groupedAggregate(this, "count", column ?? "*", true) as Promise<Map<unknown, number>>;
   }
   this._checkEagerLoadable();
 
@@ -1157,16 +1186,14 @@ export async function performCount(
 export async function performSum(
   this: CalculationRelation,
   column?: string | Nodes.Node,
-): Promise<number | bigint | Record<string, number | bigint> | Map<unknown, number | bigint>> {
+): Promise<number | bigint | Map<unknown, number | bigint>> {
   if (isEmptyCalculationScope(this)) {
-    if (this._groupColumns.length > 0) return {};
+    if (this._groupColumns.length > 0) return new Map();
     return column && resolveColType(this, column) instanceof BigIntegerType ? 0n : 0;
   }
   if (!column) return 0;
   if (this._groupColumns.length > 0) {
-    return groupedAggregate(this, "sum", column, true) as Promise<
-      Record<string, number | bigint> | Map<unknown, number | bigint>
-    >;
+    return groupedAggregate(this, "sum", column, true) as Promise<Map<unknown, number | bigint>>;
   }
   return ((await singleAggregate(this, "sum", column, true)) as number | bigint) ?? 0;
 }
@@ -1174,14 +1201,14 @@ export async function performSum(
 export async function performAverage(
   this: CalculationRelation,
   column: string | Nodes.Node,
-): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
+): Promise<unknown | null | Map<unknown, unknown>> {
   // Returns `unknown` (not just number) because non-numeric column types
   // — interval (Duration), money, time — route through the column type's
   // deserialize and yield a domain object. Rails' AVG return type is
   // similarly polymorphic (BigDecimal for integer/decimal, Duration for
   // interval, etc.). Numeric averages still narrow to JS number at the
   // call site.
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : null;
+  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "average", column, true);
   }
@@ -1191,8 +1218,8 @@ export async function performAverage(
 export async function performMinimum(
   this: CalculationRelation,
   column: string | Nodes.Node,
-): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : null;
+): Promise<unknown | null | Map<unknown, unknown>> {
+  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "minimum", column, false);
   }
@@ -1202,8 +1229,8 @@ export async function performMinimum(
 export async function performMaximum(
   this: CalculationRelation,
   column: string | Nodes.Node,
-): Promise<unknown | null | Record<string, unknown> | Map<unknown, unknown>> {
-  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? {} : null;
+): Promise<unknown | null | Map<unknown, unknown>> {
+  if (isEmptyCalculationScope(this)) return this._groupColumns.length > 0 ? new Map() : null;
   if (this._groupColumns.length > 0) {
     return groupedAggregate(this, "maximum", column, false);
   }
@@ -1222,15 +1249,11 @@ export async function performMaximum(
  * rules then reject every subclass override.
  */
 export interface CalculationMethods {
-  count(
-    column?: string | Nodes.Node,
-  ): Promise<number | Record<string, number> | Map<unknown, number>>;
-  sum(
-    column?: string | Nodes.Node,
-  ): Promise<number | bigint | Record<string, number | bigint> | Map<unknown, number | bigint>>;
-  average(column: string | Nodes.Node): Promise<unknown | null | Record<string, unknown>>;
-  minimum(column: string | Nodes.Node): Promise<unknown | null | Record<string, unknown>>;
-  maximum(column: string | Nodes.Node): Promise<unknown | null | Record<string, unknown>>;
+  count(column?: string | Nodes.Node): Promise<number | Map<unknown, number>>;
+  sum(column?: string | Nodes.Node): Promise<number | bigint | Map<unknown, number | bigint>>;
+  average(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  minimum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
+  maximum(column: string | Nodes.Node): Promise<unknown | null | Map<unknown, unknown>>;
 }
 
 /**
@@ -1394,7 +1417,7 @@ export async function executeGroupedCalculation(
   operation: string,
   columnName: string,
   distinct: boolean,
-): Promise<Record<string, unknown> | Map<unknown, unknown>> {
+): Promise<Map<unknown, unknown>> {
   const fn = operation.toLowerCase() as AggFn;
   // Build a GROUP BY aggregate query via Arel (delegates to the shared groupedAggregate helper).
   const table = rel._modelClass.arelTable as Nodes.Node;

@@ -98,70 +98,70 @@ describe("NullRelationTest", () => {
   it("null relation count", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().count("id")).toBe(0);
-      expect(await Comment.none().group("post_id").count("id")).toEqual({});
+      expect(await Comment.none().group("post_id").count("id")).toEqual(new Map());
     });
   });
 
   it("null relation count async", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().asyncCount("id")).toBe(0);
-      expect(await Comment.none().group("post_id").asyncCount("id")).toEqual({});
+      expect(await Comment.none().group("post_id").asyncCount("id")).toEqual(new Map());
     });
   });
 
   it("null relation sum", async () => {
     await assertNoQueries(false, async () => {
       expect(Number(await Comment.none().sum("id"))).toBe(0);
-      expect(await Comment.none().group("post_id").sum("id")).toEqual({});
+      expect(await Comment.none().group("post_id").sum("id")).toEqual(new Map());
     });
   });
 
   it("null relation sum async", async () => {
     await assertNoQueries(false, async () => {
       expect(Number(await Comment.none().asyncSum("id"))).toBe(0);
-      expect(await Comment.none().group("post_id").asyncSum("id")).toEqual({});
+      expect(await Comment.none().group("post_id").asyncSum("id")).toEqual(new Map());
     });
   });
 
   it("null relation average", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().average("id")).toBeNull();
-      expect(await Comment.none().group("post_id").average("id")).toEqual({});
+      expect(await Comment.none().group("post_id").average("id")).toEqual(new Map());
     });
   });
 
   it("null relation average async", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().asyncAverage("id")).toBeNull();
-      expect(await Comment.none().group("post_id").asyncAverage("id")).toEqual({});
+      expect(await Comment.none().group("post_id").asyncAverage("id")).toEqual(new Map());
     });
   });
 
   it("null relation minimum", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().minimum("id")).toBeNull();
-      expect(await Comment.none().group("post_id").minimum("id")).toEqual({});
+      expect(await Comment.none().group("post_id").minimum("id")).toEqual(new Map());
     });
   });
 
   it("null relation minimum async", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().asyncMinimum("id")).toBeNull();
-      expect(await Comment.none().group("post_id").asyncMinimum("id")).toEqual({});
+      expect(await Comment.none().group("post_id").asyncMinimum("id")).toEqual(new Map());
     });
   });
 
   it("null relation maximum", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().maximum("id")).toBeNull();
-      expect(await Comment.none().group("post_id").maximum("id")).toEqual({});
+      expect(await Comment.none().group("post_id").maximum("id")).toEqual(new Map());
     });
   });
 
   it("null relation maximum async", async () => {
     await assertNoQueries(false, async () => {
       expect(await Comment.none().asyncMaximum("id")).toBeNull();
-      expect(await Comment.none().group("post_id").asyncMaximum("id")).toEqual({});
+      expect(await Comment.none().group("post_id").asyncMaximum("id")).toEqual(new Map());
     });
   });
 

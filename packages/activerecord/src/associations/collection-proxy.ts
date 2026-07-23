@@ -1704,7 +1704,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const box = await this._djarForCount();
         if (!box) return 0;
         const djar = (box as { djar: unknown }).djar as {
-          count: (column?: string) => Promise<number | Record<string, number>>;
+          count: (column?: string) => Promise<number | Map<unknown, number>>;
         };
         const c = await djar.count(column);
         if (typeof c !== "number") {
@@ -1738,13 +1738,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `COUNT(*)` Rails would.
     const countFn = (
       Relation.prototype as unknown as {
-        count: (this: unknown, column?: string) => Promise<number | Record<string, number>>;
+        count: (this: unknown, column?: string) => Promise<number | Map<unknown, number>>;
       }
     ).count;
     const counted = this._relationStateDiverged()
       ? await countFn.call(this, column)
       : await countFn.call(this.scope(), column);
-    // A grouped count (Record) would mean the caller added a
+    // A grouped count (Map) would mean the caller added a
     // `groupBang(...)` on the proxy — ambiguous for CP#count (which
     // returns a single number). Fail loudly instead of silently
     // collapsing to the group count.
@@ -1759,66 +1759,66 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   // treatment as pluck/pick/count. Without overriding, cp.sum('x') /
   // cp.whereBang({...}); cp.average('y') would both bypass the gate
   // and drop in-place mutations.
-  async sum(column?: string): Promise<number | bigint | Record<string, number | bigint>> {
+  async sum(column?: string): Promise<number | bigint | Map<unknown, number | bigint>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
-        sum: (col?: string) => Promise<number | bigint | Record<string, number | bigint>>;
+        sum: (col?: string) => Promise<number | bigint | Map<unknown, number | bigint>>;
       }
     ).sum;
     if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
       s as unknown as {
-        sum: (col?: string) => Promise<number | bigint | Record<string, number | bigint>>;
+        sum: (col?: string) => Promise<number | bigint | Map<unknown, number | bigint>>;
       }
     ).sum(column);
   }
 
-  async average(column: string): Promise<unknown | null | Record<string, unknown>> {
+  async average(column: string): Promise<unknown | null | Map<unknown, unknown>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
-        average: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+        average: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
       }
     ).average;
     if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
       s as unknown as {
-        average: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+        average: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
       }
     ).average(column);
   }
 
-  async minimum(column: string): Promise<unknown | null | Record<string, unknown>> {
+  async minimum(column: string): Promise<unknown | null | Map<unknown, unknown>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
-        minimum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+        minimum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
       }
     ).minimum;
     if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
       s as unknown as {
-        minimum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+        minimum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
       }
     ).minimum(column);
   }
 
-  async maximum(column: string): Promise<unknown | null | Record<string, unknown>> {
+  async maximum(column: string): Promise<unknown | null | Map<unknown, unknown>> {
     this._checkStrictLoading();
     const fn = (
       Relation.prototype as unknown as {
-        maximum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+        maximum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
       }
     ).maximum;
     if (this._relationStateDiverged()) return fn.call(this, column);
     const s = this.scope();
     return (
       s as unknown as {
-        maximum: (col: string) => Promise<unknown | null | Record<string, unknown>>;
+        maximum: (col: string) => Promise<unknown | null | Map<unknown, unknown>>;
       }
     ).maximum(column);
   }
@@ -4071,19 +4071,19 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#calculate
    */
-  async calculate(operation: "count", column?: string): Promise<number | Record<string, number>>;
+  async calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
   async calculate(
     operation: "sum",
     column: string,
-  ): Promise<number | bigint | Record<string, number | bigint>>;
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
   async calculate(
     operation: "average",
     column: string,
-  ): Promise<unknown | null | Record<string, unknown>>;
+  ): Promise<unknown | null | Map<unknown, unknown>>;
   async calculate(
     operation: "minimum" | "maximum",
     column: string,
-  ): Promise<unknown | null | Record<string, unknown>>;
+  ): Promise<unknown | null | Map<unknown, unknown>>;
   async calculate(operation: string, columnName?: string): Promise<unknown> {
     const op =
       operation === "avg"
