@@ -1,63 +1,36 @@
 /**
- * Shared AliasTracker construction for cross-klass merged joins.
+ * Trails-specific alias seeding for the shared `build_joins` AliasTracker.
  *
- * Rails shares one `alias_tracker` across every join dependency in
- * `build_joins`, so a `merge` that brings an association join onto a table the
- * outer relation already joins is aliased (`authors_categorizations`). This
- * builds that single tracker — seeded with the base table (Rails
- * `AliasTracker.create(connection, table_name, joins)`), the manual joins, and
- * the resolved `_joinClauses` tables — and threads it through every
- * `JoinDependency#joinConstraints` in the live SelectManager path
- * (`_applyJoinsToManager`) and the `from`-subquery path (`buildJoins`). Each
+ * Rails shares one `alias_tracker(leading_joins + join_nodes, aliases)`
+ * (query_methods.rb:1894) across every join dependency in `build_joins`, so a
+ * `merge` that brings an association join onto a table the outer relation
+ * already joins is aliased (`authors_categorizations`). Trails builds that
+ * tracker through the converged `Relation#aliasTracker` at each `build_joins`
+ * call site (`buildJoins` / `_applyJoinsToManager`) and then seeds it here
+ * with the resolved `_joinClauses` tables — a trails-only step: Rails has no
+ * `_joinClauses` (its raw join clauses ride `joins_values` as Arel nodes and
+ * are counted by `initial_count_for`), so their pre-resolved tables must be
+ * claimed explicitly for a later association/merged join to collide. Each
  * dependency then claims and aliases its tables lazily at emit-time in
  * `makeConstraints`, so a duplicate join collides naturally — no separate
  * seed/re-align pass.
  */
-import { Nodes } from "@blazetrails/arel";
 import { underscore, pluralize } from "@blazetrails/activesupport";
-import { AliasTracker } from "../associations/alias-tracker.js";
-import { threadedConnectionFor } from "../connection-handling.js";
-import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
+import type { AliasTracker } from "../associations/alias-tracker.js";
 
 interface MergedJoinAliasHost {
   _modelClass: {
     tableName: string;
-    connection: Quoting & { tableAliasLength(): number };
   };
   _joinClauses: Array<{ table: string; assoc?: string }>;
 }
 
 /**
- * Build the AliasTracker shared across a relation's join dependencies. Mirrors
- * Rails `build_joins`' `alias_tracker(leading_joins + join_nodes, aliases)`
- * (query_methods.rb:1891): seeded with the base table (Rails
- * `AliasTracker.create(connection, table_name, joins)`), the `leadingJoins +
- * joinNodes` raw Arel join nodes (so `initialCountFor` counts a table already
- * claimed by a leading/raw join — forcing a same-table association join to its
- * `alias_candidate`), and the resolved `_joinClauses` tables. `existingAliases`
- * is the alias map threaded in from `build_from` (Rails' `aliases` argument);
- * its counts are folded in first. Each JoinDependency then claims and aliases
- * its own tables at emit-time in `makeConstraints`.
+ * Claim the host's resolved `_joinClauses` tables into `tracker` so a later
+ * association/merged join onto the same table is detected as a collision.
  */
-export function buildMergedJoinAliasTracker(
-  host: MergedJoinAliasHost,
-  joinNodes: Nodes.Join[],
-  existingAliases?: Map<string, number>,
-): AliasTracker {
-  // Prefer the connection threaded by the enclosing `withQueryConnection` wrap
-  // (Rails threads the `with_connection` connection through join building)
-  // rather than the deprecated `.connection` getter, which would flip the lease
-  // permanent under `permanent_connection_checkout = :deprecated|:disallowed`.
-  const connection = (threadedConnectionFor(
-    host._modelClass as unknown as Parameters<typeof threadedConnectionFor>[0],
-  ) ?? host._modelClass.connection) as Quoting & { tableAliasLength(): number };
-  const aliasLength = connection.tableAliasLength();
-  const seededAliases = existingAliases ? new Map(existingAliases) : new Map<string, number>();
-  const tracker = new AliasTracker(aliasLength, seededAliases, joinNodes, connection);
+export function seedJoinClauseAliases(host: MergedJoinAliasHost, tracker: AliasTracker): void {
   const ownerTable = host._modelClass.tableName;
-  // Seed the base table (Rails AliasTracker.create sets aliases[initial_table] = 1)
-  // so an association that joins back onto the relation's own table collides.
-  tracker.aliases.set(ownerTable, 1);
   for (const c of host._joinClauses) {
     if (c.assoc) {
       // Association where-join (whereAssociated / associated): mirror the
@@ -74,5 +47,4 @@ export function buildMergedJoinAliasTracker(
       tracker.aliases.set(c.table, 1);
     }
   }
-  return tracker;
 }

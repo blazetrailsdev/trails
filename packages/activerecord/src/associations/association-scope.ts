@@ -6,9 +6,7 @@ import { AliasTracker, aliasedArelTableForReflection } from "./alias-tracker.js"
 import { polymorphicName } from "../inheritance.js";
 import { CompositePrimaryKeyMismatchError } from "./errors.js";
 import { routeThroughCheckValidity } from "./validate-through-reflection.js";
-import type { Quoting } from "../connection-adapters/abstract/quoting-interface.js";
 import { constructJoinDependency, structuralUnionEq } from "../relation/query-methods.js";
-import { threadedConnectionFor } from "../connection-handling.js";
 
 /**
  * Lambda applied to each FK/type bind value before it reaches the
@@ -261,32 +259,26 @@ export class AssociationScope {
    */
   scope(association: AssociationScopeable): unknown {
     const { owner, reflection, klass } = association;
-    // Prefer the connection threaded by the enclosing `withConnection` wrap over
-    // the deprecated `.connection` getter (which flips the lease permanent under
-    // `permanent_connection_checkout = :deprecated|:disallowed`), matching the
-    // resolution in join-dependency.ts and merged-join-alias-tracker.ts.
-    const connection = threadedConnectionFor(klass) ?? klass.connection;
-    const quoter = connection as unknown as Quoting;
     // Rails: `klass.unscoped` (association_scope.rb:23). Rails' unscoped
     // bypasses default_scope but STILL applies the STI `type_condition`
     // because `relation()` adds it for `finder_needs_type_condition?`
     // classes (`core.rb:431-435`). `Base.unscoped` now wires STI through
     // `_buildUnscopedRelation`, so no compensation is needed here.
-    let scope: unknown = klass.unscoped();
-    // Per-scope-build AliasTracker. Rails seeds it from
-    // `scope.alias_tracker` (associations/association_scope.rb:26);
-    // we don't expose one on Relation yet, so create a fresh tracker
-    // here seeded with the owning klass's table name (matches Rails'
-    // default seeding with `klass.arel_table`). The tracker is
-    // shared across the chain walk within this call so repeated
-    // joins to the same table get unique aliases.
-    // Rails builds the tracker with the connection (association_scope.rb:26),
-    // so its alias cap is the connection's `table_alias_length` (256 on MySQL,
-    // 63 on PG). Pass the resolved connection — `create` reads its
-    // `tableAliasLength` — rather than `null`, which would fall back to the 64
-    // default.
-    const tracker = AliasTracker.create(quoter, klass.arelTable.name, [], undefined, quoter);
-    const chain = this.getChain(reflection, tracker);
+    const scopeRelation = klass.unscoped() as {
+      aliasTracker: () => AliasTracker;
+    };
+    let scope: unknown = scopeRelation;
+    // Rails: `get_chain(reflection, association, scope.alias_tracker)`
+    // (association_scope.rb:26) — the tracker comes from the relation's
+    // converged `aliasTracker()` (relation.rb:1307-1309), seeded with the
+    // klass's table name. The tracker is shared across the chain walk within
+    // this call so repeated joins to the same table get unique aliases. The
+    // alias cap comes from `AliasTracker.create`'s pool arg; until the
+    // connection is threaded into `create` (RFC 0051,
+    // thread-connection-table-alias-length-into-tracker-construction) it falls
+    // back to the 64 default — a documented `create`-side deviation, not a
+    // call-site one.
+    const chain = this.getChain(reflection, scopeRelation.aliasTracker());
     // Rails: `scope.extending! reflection.extensions` (association_scope.rb:28).
     // Mix any `extend:`-declared modules onto the relation so extension
     // methods are available on the loaded association's relation.
