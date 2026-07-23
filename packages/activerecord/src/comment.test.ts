@@ -131,39 +131,53 @@ describe("CommentTest", () => {
     expect(col.comment).toBe("I am running out of imagination");
   });
 
-  itIfSupports("comments", "schema dump with comments", async () => {
-    await ctx.addColumn("commenteds", "rating", "integer", {
-      comment: "I am running out of imagination",
-    });
-    await ctx.changeColumn("commenteds", "content", "string", {
-      comment: "Whoa, content describes itself!",
-    });
-    await ctx.changeColumn("commenteds", "obvious", "string", { comment: null as any });
-    // Scope to the table under assertion so the dump stays cheap on a cold
-    // schema cache (the truncate-reset leaves the ~330 canonical tables in place).
-    const output = await SchemaDumper.dumpTableSchema(adapter, "commenteds");
-    expect(output).toMatch(/createTable.*"commenteds".*comment:\s*"A table with comment"/);
-    expect(output).toMatch(
-      /t\.\w+\("name"[^)]*\{[^}]*comment:\s*"Comment should help clarify the column purpose"/,
-    );
-    expect(output).toMatch(/t\.\w+\("obvious"\)\s*;/);
-    expect(output).toMatch(
-      /t\.\w+\("content"[^)]*\{[^}]*comment:\s*"Whoa, content describes itself!"/,
-    );
-    expect(output).toMatch(
-      /t\.\w+\("rating"[^)]*\{[^}]*comment:\s*"I am running out of imagination"/,
-    );
-  });
+  // The three dump tests carry a 60s timeout (matching #4250's enum.test fix):
+  // on the shared PG worker DB the dump can legitimately exceed vitest's 5s
+  // default under parallel forks. Rails' counterpart is plain minitest with no
+  // per-test budget — the 5s ceiling is a harness artifact, not Rails behavior.
+  itIfSupports(
+    "comments",
+    "schema dump with comments",
+    async () => {
+      await ctx.addColumn("commenteds", "rating", "integer", {
+        comment: "I am running out of imagination",
+      });
+      await ctx.changeColumn("commenteds", "content", "string", {
+        comment: "Whoa, content describes itself!",
+      });
+      await ctx.changeColumn("commenteds", "obvious", "string", { comment: null as any });
+      // Scope to the table under assertion so the dump stays cheap on a cold
+      // schema cache (the truncate-reset leaves the ~330 canonical tables in place).
+      const output = await SchemaDumper.dumpTableSchema(adapter, "commenteds");
+      expect(output).toMatch(/createTable.*"commenteds".*comment:\s*"A table with comment"/);
+      expect(output).toMatch(
+        /t\.\w+\("name"[^)]*\{[^}]*comment:\s*"Comment should help clarify the column purpose"/,
+      );
+      expect(output).toMatch(/t\.\w+\("obvious"\)\s*;/);
+      expect(output).toMatch(
+        /t\.\w+\("content"[^)]*\{[^}]*comment:\s*"Whoa, content describes itself!"/,
+      );
+      expect(output).toMatch(
+        /t\.\w+\("rating"[^)]*\{[^}]*comment:\s*"I am running out of imagination"/,
+      );
+    },
+    60_000,
+  );
 
-  itIfSupports("comments", "schema dump omits blank comments", async () => {
-    const output = await SchemaDumper.dumpTableSchema(adapter, "blank_comments");
-    expect(output).toMatch(/createTable.*"blank_comments"/);
-    expect(output).not.toMatch(/createTable.*"blank_comments".*comment:/);
-    for (const field of ["space_comment", "empty_comment", "nil_comment", "absent_comment"]) {
-      expect(output).toMatch(new RegExp(`t\\.\\w+\\("${field}"\\)\\s*;`));
-      expect(output).not.toMatch(new RegExp(`t\\.\\w+\\("${field}"[^)]*comment:`));
-    }
-  });
+  itIfSupports(
+    "comments",
+    "schema dump omits blank comments",
+    async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "blank_comments");
+      expect(output).toMatch(/createTable.*"blank_comments"/);
+      expect(output).not.toMatch(/createTable.*"blank_comments".*comment:/);
+      for (const field of ["space_comment", "empty_comment", "nil_comment", "absent_comment"]) {
+        expect(output).toMatch(new RegExp(`t\\.\\w+\\("${field}"\\)\\s*;`));
+        expect(output).not.toMatch(new RegExp(`t\\.\\w+\\("${field}"[^)]*comment:`));
+      }
+    },
+    60_000,
+  );
 
   itIfSupports("comments", "change table comment", async () => {
     await (ctx as any).changeTableComment("commenteds", "Edited table comment");
@@ -200,13 +214,18 @@ describe("CommentTest", () => {
     expect(tableComment).toBe("Table comment");
   });
 
-  itIfSupports("comments", "schema dump with primary key comment", async () => {
-    const output = await SchemaDumper.dumpTableSchema(adapter, "pk_commenteds");
-    // Tight: the id hash must carry ONLY the comment (no limit/precision/scale/autoIncrement
-    // leak), and the table comment must be separate. Catches the columnSpecForPrimaryKey
-    // wrapping regression.
-    expect(output).toMatch(
-      /createTable.*"pk_commenteds".*id:\s*\{\s*comment:\s*"Primary key comment"\s*\}.*comment:\s*"Table comment"/,
-    );
-  });
+  itIfSupports(
+    "comments",
+    "schema dump with primary key comment",
+    async () => {
+      const output = await SchemaDumper.dumpTableSchema(adapter, "pk_commenteds");
+      // Tight: the id hash must carry ONLY the comment (no limit/precision/scale/autoIncrement
+      // leak), and the table comment must be separate. Catches the columnSpecForPrimaryKey
+      // wrapping regression.
+      expect(output).toMatch(
+        /createTable.*"pk_commenteds".*id:\s*\{\s*comment:\s*"Primary key comment"\s*\}.*comment:\s*"Table comment"/,
+      );
+    },
+    60_000,
+  );
 });
