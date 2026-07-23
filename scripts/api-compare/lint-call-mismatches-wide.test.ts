@@ -88,9 +88,7 @@ describe("split baseline round-trip", () => {
     const relation = JSON.parse(
       await fs.readFile(path.join(dir, "activerecord", "relation.json"), "utf-8"),
     ) as ExcludeEntry[];
-    expect(relation.map(keyOf)).toEqual(
-      [...relation].map(keyOf).sort((a, b) => a.localeCompare(b)),
-    );
+    expect(relation.map(keyOf)).toEqual([...relation].map(keyOf).sort());
   });
 
   it("deletes a converged source file (never leaves []) and prunes its empty dirs", async () => {

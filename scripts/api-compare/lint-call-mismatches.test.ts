@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   callOf,
+  compareKeys,
   diffAgainstBaseline,
   findDuplicateKeys,
   flattenArtifact,
@@ -190,5 +191,27 @@ describe("missingScope", () => {
 
   it("ignores extra packages the artifact compared beyond the expected set", () => {
     expect(missingScope({ packages: [...expected, "arel"], mismatches: [] }, expected)).toEqual([]);
+  });
+});
+
+describe("compareKeys", () => {
+  const k = (rubyName: string, call = "c") => ({
+    package: "actioncontroller",
+    tsFile: "metal/strong-parameters.ts",
+    rubyName,
+    call,
+  });
+
+  // ICU collation demotes punctuation to a secondary difference and would put
+  // `permit_any_in_array` first; code units put "!" (0x21) before "_" (0x5f).
+  it("orders punctuation by code unit, not locale collation", () => {
+    expect(compareKeys(k("permit!"), k("permit_any_in_array"))).toBeLessThan(0);
+    expect(compareKeys(k("permit_any_in_array"), k("permit!"))).toBeGreaterThan(0);
+  });
+
+  it("is zero only for identical keys", () => {
+    expect(compareKeys(k("permit!"), k("permit!"))).toBe(0);
+    expect(compareKeys(k("permit!"), k("permit?"))).not.toBe(0);
+    expect(compareKeys(k("permit!", "a"), k("permit!", "b"))).not.toBe(0);
   });
 });
