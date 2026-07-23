@@ -119,6 +119,11 @@ export function defaultValue(): Type {
   return (_defaultValue ??= new ValueType());
 }
 
+interface AdapterNameSource {
+  connectionDbConfig?: () => { adapter?: string } | undefined;
+  connection?: unknown;
+}
+
 /**
  * Return the normalized adapter name for a given model's configured
  * connection, matching the keys used for adapter-specific type registrations.
@@ -126,6 +131,10 @@ export function defaultValue(): Type {
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
+  // Rails returns the raw `adapter` string as a symbol (:mysql2, :postgresql);
+  // trails' registrations are keyed by the normalized `AdapterName` family
+  // (what `AbstractAdapter#adapterName` returns), so the config string is run
+  // through adapterNameFromConfig to land in the same namespace.
   // Rails reads `model.connection_db_config.adapter` — the CONFIGURED adapter,
   // which is available without a live connection, and raises when the model has
   // no pool at all. Type lookups here run at declare time (before any pool is
@@ -143,11 +152,6 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
       | AdapterName
       | undefined) ?? "sqlite"
   );
-}
-
-interface AdapterNameSource {
-  connectionDbConfig?: () => { adapter?: string } | undefined;
-  connection?: unknown;
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
