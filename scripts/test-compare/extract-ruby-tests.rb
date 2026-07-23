@@ -1191,23 +1191,9 @@ class TestExtractor
   def double_quoted_literal?(node)
     pos = first_tstring_pos(node)
     return true unless pos
-    style = (@quote_styles || {})[pos]
-    return style == :double if style
-    # Fallback for sources Ripper.lex could not tokenize: peek at the source
-    # character preceding the content.
-    line, col = pos
-    before = @source_lines[line - 1].to_s[0...col]
-    return false if before.end_with?("'")
-    return false if before.match?(/%q.\z/)
-    true
+    @quote_styles.fetch(pos, :double) == :double
   end
 
-  # Maps every `tstring_content` token position to the quote style of the
-  # literal that opens it. Ripper's sexp does not record quote style, and the
-  # source character before the content is not enough: a single-quoted heredoc
-  # (`<<~'EOS'`) starts its content at column 0 of a later line, and a `%q`
-  # literal whose content begins on a later line loses its delimiter the same
-  # way. The lexer pass keeps the opening delimiter attached to the content.
   def build_quote_styles(source)
     styles = {}
     open_stack = []
@@ -1228,14 +1214,11 @@ class TestExtractor
       end
     end
     styles
-  rescue StandardError
-    {}
   end
 
   def delimiter_style(tok)
     return :single if tok.start_with?("'")
     return :single if tok.match?(/\A%[qwi]/)
-    # Heredoc opener: `<<~'EOS'` / `<<-'EOS'` / `<<'EOS'`.
     return :single if tok.start_with?("<<") && tok.include?("'")
     :double
   end

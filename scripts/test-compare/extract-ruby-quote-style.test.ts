@@ -6,9 +6,6 @@ import { describe, expect, it } from "vitest";
 
 const HERE = __dirname;
 
-// Exercises the Ruby extractor's literal expected-VALUE tokens through its real
-// Ripper parser (shelled out), pinning quote-style semantics: double-quoted
-// literals cook escape sequences, single-quoted ones keep them raw.
 describe("Ruby extractor literal quote style", () => {
   const RUBY_SCRIPT = path.join(HERE, "extract-ruby-tests.rb");
 
