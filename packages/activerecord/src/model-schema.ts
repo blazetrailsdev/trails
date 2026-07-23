@@ -17,7 +17,6 @@ import {
   isBaseClass,
   baseClass,
   getAbstractClass,
-  qualifiedName,
   lookupModuleTableNamePrefix,
   lookupModuleTableNameSuffix,
 } from "./inheritance.js";
@@ -74,7 +73,7 @@ export function resolveTableName(this: typeof Base): string {
   const suffix = fullTableNameSuffix.call(this as any);
   const contained = containedTableNamePrefix.call(this as any);
   const pluralizes = (this as any).pluralizeTableNames ?? true;
-  const inferred = undecoratedTableName(qualifiedName(this as any), pluralizes);
+  const inferred = undecoratedTableName(String(this.modelName), pluralizes);
   return `${prefix}${contained}${inferred}${suffix}`;
 }
 

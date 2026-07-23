@@ -20,6 +20,7 @@ import type { SpecialComment } from "./comment.js";
 import type { Tag } from "./tag.js";
 import type { VerySpecialComment } from "./comment.js";
 import { throwAbort } from "@blazetrails/activesupport";
+import { ModelName, type ModelLike } from "@blazetrails/activemodel";
 // vendor/rails/activerecord/test/models/post.rb
 import type { AssociationProxy } from "../../associations/collection-proxy.js";
 import { Base } from "../../base.js";
@@ -978,6 +979,10 @@ export class Postesque extends Base {
 
 export class PostRecord extends Base {
   declare comments: AssociationProxy<Comment>;
+
+  static get modelName(): ModelName {
+    return new ModelName("Post", { klass: this as unknown as ModelLike });
+  }
 
   static {
     this.hasMany("comments");
