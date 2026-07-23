@@ -68,7 +68,6 @@ interface PgSchemaAdapter {
     sqlType?: string | null;
     name?: string;
   }): Type;
-  // Optional so lighter test doubles need not implement it.
   preResolveDefaultCastTypes?(columns: Iterable<ColumnDefinition>): Promise<void>;
   reloadTypeMap(): Promise<void>;
   serialFromDefaultFunction(
@@ -917,9 +916,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // string; the only proc Rails appends here is the :comment change.
     this.pg.clearCacheBang();
     const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
-    // Rails quotes a non-nil new DEFAULT through lookup_cast_type's live
-    // `::regtype::oid` query (postgresql/quoting.rb:195); the visitor below
-    // is synchronous, so pre-resolve the cast type before accept.
     if (changeColDef.column.options.default != null) {
       await this.pg.preResolveDefaultCastTypes?.([changeColDef.column]);
     }

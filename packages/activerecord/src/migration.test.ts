@@ -2231,9 +2231,6 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    // migration_test.rb:1403 — PG's third query is the
-    // `SELECT 'character varying'::regtype::oid` lookup that lookup_cast_type
-    // (postgresql/quoting.rb:195) issues from quote_default_expression.
     const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 3 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
@@ -2259,8 +2256,6 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    // migration_test.rb:1433 expects 7/5 (the PG count includes the
-    // `::regtype::oid` lookup noted in "changing columns" above).
     const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 5 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
