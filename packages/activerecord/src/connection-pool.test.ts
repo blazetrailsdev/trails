@@ -486,7 +486,7 @@ it("pin connection connected?", async () => {
 });
 
 it("isConnected probes each pooled connection's connected state", async () => {
-  const pool = makePool();
+  const pool = makeTransactionAwarePool();
   const conn = await pool.checkout();
   expect(pool.isConnected()).toBe(true);
   pool.checkin(conn);
