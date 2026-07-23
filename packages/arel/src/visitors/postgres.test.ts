@@ -333,80 +333,6 @@ describe("PostgresTest", () => {
       expect(sql).toContain("ILIKE");
     });
   });
-
-  describe("array quoting", () => {
-    it("quotes array values as PG array literals", () => {
-      const node = users.get("tags").eq(["a", "b"]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("'{a,b}'");
-    });
-
-    it("quotes nested arrays", () => {
-      const node = users.get("tags").eq([
-        [1, 2],
-        [3, 4],
-      ]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      expect(sql).toContain("'{{1,2},{3,4}}'");
-    });
-
-    it("escapes single quotes in array elements", () => {
-      const node = users.get("tags").eq(["O'Reilly"]);
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(node);
-      // The apostrophe is escaped by the outer single-quoting, not the array
-      // encoder — `'` is not in PG::TextEncoder::Array's quote-triggering set,
-      // so the element itself stays bare.
-      expect(sql).toContain("'{O''Reilly}'");
-    });
-
-    it("quotes a Date array element as a db date, matching the scalar path", () => {
-      // Rails' type_cast_array sends each element through the same type_cast a
-      // scalar takes (`when Date, Time then quoted_date`), so the array element
-      // must carry the db form the scalar path emits — not ISO-8601.
-      const d = Temporal.Instant.from("2026-04-26T14:23:55Z");
-      const scalar = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
-        users.get("at").eq(d),
-      );
-      expect(scalar).toContain("'2026-04-26 14:23:55'");
-
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
-        users.get("ats").eq([d]),
-      );
-      expect(sql).toContain("'{\"2026-04-26 14:23:55\"}'");
-    });
-
-    it("emits fixed-6 microseconds for a sub-second date array element", () => {
-      const d = Temporal.Instant.from("2026-04-26T14:23:55.123Z");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
-        users.get("ats").eq([d]),
-      );
-      expect(sql).toContain("'{\"2026-04-26 14:23:55.123000\"}'");
-    });
-
-    it("quotes date elements of a nested array as db dates", () => {
-      const d = Temporal.Instant.from("2026-04-26T14:23:55Z");
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
-        users.get("ats").eq([[d]]),
-      );
-      expect(sql).toContain("'{{\"2026-04-26 14:23:55\"}}'");
-    });
-
-    it("emits boolean array elements unquoted, as encode_array does", () => {
-      // PostgreSQL does not override unquoted_true (only mysql/quoting.rb:72 and
-      // sqlite3/quoting.rb:87 do), so it inherits Ruby true/false and
-      // encode_array emits '{true,false}'. The scalar path keeps quoted_true's
-      // TRUE — the two pairs legitimately differ.
-      const sql = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
-        users.get("flags").eq([true, false]),
-      );
-      expect(sql).toContain("'{true,false}'");
-
-      const scalar = new Visitors.PostgreSQL(postgresqlTestConnection).compile(
-        users.get("flag").eq(true),
-      );
-      expect(scalar).toContain("TRUE");
-    });
-  });
 });
 
 // Audit follow-up: Postgres dialect overrides for grouping-element
@@ -489,27 +415,16 @@ describe("PostgreSQL dialect overrides (audit follow-up)", () => {
   });
 });
 
-describe("Temporal array elements", () => {
+describe("Temporal scalar quoting", () => {
   const users = new Table("users");
 
   // `when Type::Time::Value then quoted_time` (abstract/quoting.rb:102) —
   // trails' analogue is Temporal.PlainTime, which carries no date to emit.
-  it("quotes a time array element as a db time, matching the scalar path", () => {
+  it("quotes a time value as a db time", () => {
     const t = Temporal.PlainTime.from("14:23:55");
     expect(
       new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("at").eq(t)),
     ).toContain("'14:23:55'");
-    expect(
-      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("ats").eq([t])),
-    ).toContain("'{14:23:55}'");
-  });
-
-  // `when Date, Time then quoted_date` (:103) for the date-only analogue.
-  it("quotes a date-only array element without a time part", () => {
-    const d = Temporal.PlainDate.from("2026-04-26");
-    expect(
-      new Visitors.PostgreSQL(postgresqlTestConnection).compile(users.get("ats").eq([d])),
-    ).toContain("'{2026-04-26}'");
   });
 
   // A JS Date is rejected AR-wide (#939): it must not be claimed as a Time.

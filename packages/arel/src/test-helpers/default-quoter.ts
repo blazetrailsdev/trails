@@ -1,6 +1,5 @@
 import type { ArelConnection } from "../visitors/connection.js";
 import { quoteSchemaQualifiedName } from "../visitors/split-schema-qualified-name.js";
-import { quoteArrayLiteral } from "../quote-array.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
 // Standalone comment sanitize for these test hosts: strips block-comment
@@ -301,8 +300,8 @@ export const defaultQuoter: ArelConnection = {
  * (connection.ts). Rails' `Arel::Visitors::PostgreSQL` has no `quote` override
  * — array literals are formatted by the adapter (`quote(OID::Array::Data)` →
  * `encode_array`, postgresql/quoting.rb:221-226). Arel-side tests have no
- * adapter to reach (see `defaultQuoter`), so this host carries the minimal
- * array-literal encoding in the adapter's place.
+ * adapter to reach (see `defaultQuoter`), and this host does no array encoding
+ * either — an array reaching `quote` here is not a case Rails' Arel handles.
  */
 export const postgresqlDefaultQuoter: ArelConnection = {
   ...defaultQuoter,
@@ -313,23 +312,6 @@ export const postgresqlDefaultQuoter: ArelConnection = {
     // base/MySQL hosts emit them bare, per the abstract adapter.
     if (typeof value === "number" && !Number.isFinite(value)) {
       return `'${String(value)}'`;
-    }
-    if (Array.isArray(value)) {
-      // formatElement keeps #4867's fix alive on this path: a date element gets
-      // the same `quoted_date` form the scalar path emits, mirroring Rails'
-      // `type_cast_array` → `type_cast` → `when Type::Time::Value then quoted_time` /
-      // `when Date, Time then quoted_date` (abstract/quoting.rb:94-107).
-      // quoteArrayLiteral applies the `"..."` quoting, so the hook returns the
-      // bare form. A JS `Date` is deliberately NOT claimed (rejected AR-wide,
-      // #939) and falls through to `type_cast`'s terminal raise.
-      const literal = quoteArrayLiteral(value, this, (v) =>
-        v instanceof Temporal.PlainTime
-          ? quotedTime(v)
-          : isTemporalDateLike(v)
-            ? quotedDate(v)
-            : undefined,
-      );
-      return `'${literal.replace(/'/g, "''")}'`;
     }
     return quoteScalar.call(this, value);
   },
