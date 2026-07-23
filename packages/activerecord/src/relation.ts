@@ -6466,10 +6466,7 @@ export class Relation<T extends Base> {
     return this._limitValue !== null || this._offsetValue !== null;
   }
 
-  /**
-   * Mirrors: ActiveRecord::Relation#alias_tracker (relation.rb:1307-1309)
-   */
-  aliasTracker(joins: unknown[] = [], aliases?: Map<string, number>): AliasTracker {
+  aliasTracker(joins: Nodes.Node[] = [], aliases?: Map<string, number>): AliasTracker {
     return AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases);
   }
 

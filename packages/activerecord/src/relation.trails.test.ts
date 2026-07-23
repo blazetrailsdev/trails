@@ -906,9 +906,6 @@ describe("inspect wrapper class name", () => {
 describe("aliasTracker (trails)", () => {
   fixtures([]);
 
-  // Relation#alias_tracker (relation.rb:1307-1309) has no like-named Rails
-  // test; guard the trails convergence from the old bare join-count map to
-  // AliasTracker.create seeded with the relation's table.
   it("returns an AliasTracker seeded with the relation table and joins", () => {
     const tracker = CanonPost.all().aliasTracker();
     expect(tracker).toBeInstanceOf(AliasTracker);
@@ -917,7 +914,6 @@ describe("aliasTracker (trails)", () => {
     const table = new ArelTable("comments");
     const join = new Nodes.InnerJoin(table, new Nodes.On(new Nodes.SqlLiteral("1=1")));
     const seeded = CanonPost.all().aliasTracker([join]);
-    // A seeded join makes the first `comments` visit collide and alias.
     expect(seeded.aliasedTableFor(table, "comments_posts").right).toBe("comments_posts");
   });
 });
