@@ -13,17 +13,17 @@ import type { Base } from "../../base.js";
 import { polymorphicName } from "../../inheritance.js";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
-    joinForeignKey: string;
+    joinForeignKey: string | string[];
     joinForeignType: string;
-    joinPrimaryKey(klass?: unknown): string;
+    joinPrimaryKey(klass?: unknown): string | string[];
   };
   private readonly _values: unknown[];
 
   constructor(
     associatedTable: {
-      joinForeignKey: string;
+      joinForeignKey: string | string[];
       joinForeignType: string;
-      joinPrimaryKey(klass?: unknown): string;
+      joinPrimaryKey(klass?: unknown): string | string[];
     },
     values: unknown[],
   ) {
@@ -42,14 +42,31 @@ export class PolymorphicArrayValue {
   }
 
   queries(): Record<string, unknown>[] {
+    const fk = this.associatedTable.joinForeignKey;
     if (this.values.length === 0) {
-      return [{ [this.associatedTable.joinForeignKey]: this.values }];
+      return [{ [Array.isArray(fk) ? fk[0] : fk]: this.values }];
     }
     const result: Record<string, unknown>[] = [];
     for (const [type, ids] of this.typeToIdsMapping()) {
+      if (Array.isArray(fk)) {
+        // Composite FK: Ruby uses the FK array itself as the hash key
+        // (`query[associated_table.join_foreign_key] = ids`), which
+        // expand_from_hash later zips per tuple. JS object keys can't be
+        // arrays, so zip each id tuple across the FK columns here — one
+        // query per tuple; queries are ORed by groupingQueries.
+        for (const tuple of ids) {
+          const q: Record<string, unknown> = {};
+          if (type) q[this.associatedTable.joinForeignType] = type;
+          (tuple as unknown[]).forEach((id, i) => {
+            q[fk[i]] = id;
+          });
+          result.push(q);
+        }
+        continue;
+      }
       const q: Record<string, unknown> = {};
       if (type) q[this.associatedTable.joinForeignType] = type;
-      q[this.associatedTable.joinForeignKey] = ids.length === 1 ? ids[0] : ids;
+      q[fk] = ids.length === 1 ? ids[0] : ids;
       result.push(q);
     }
     return result;
@@ -69,7 +86,7 @@ export class PolymorphicArrayValue {
   }
 
   /** @internal */
-  private primaryKey(value: unknown): string {
+  private primaryKey(value: unknown): string | string[] {
     return this.associatedTable.joinPrimaryKey(this.klass(value));
   }
 
@@ -93,6 +110,10 @@ export class PolymorphicArrayValue {
         return (value as any).select(arelTable && !Array.isArray(pk) ? arelTable.get(pk) : pk);
       }
       const pk = this.primaryKey(value);
+      if (Array.isArray(pk)) {
+        // Rails: primary_key.map { |column| value._read_attribute(column) }
+        return pk.map((column) => (value as any)._readAttribute(column));
+      }
       if (pk in value) return (value as any)[pk];
     }
     return value;

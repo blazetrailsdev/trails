@@ -41,6 +41,7 @@ export class BelongsTo extends SingularAssociation {
     const options = reflection.options ?? {};
     const dependent = options.dependent;
     if (dependent) {
+      this.checkDependentOptions(dependent as string, model);
       this.addDestroyCallbacks(model, reflection);
       this.addAfterCommitJobsCallback(model, dependent as string);
     }

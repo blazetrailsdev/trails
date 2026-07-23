@@ -5,6 +5,8 @@ import { underscore } from "@blazetrails/activesupport";
 import { belongsToCounterCacheColumn } from "../reflection.js";
 import { hasQueryConstraints, queryConstraintsList } from "../persistence.js";
 import { SingularAssociation } from "./singular-association.js";
+import { Rollback } from "../errors.js";
+import { MissingAttributeError } from "@blazetrails/activemodel";
 
 /**
  * Mirrors: ActiveRecord::Associations::BelongsToAssociation
@@ -33,7 +35,10 @@ export class BelongsToAssociation extends SingularAssociation {
     switch (dependent) {
       case "destroy":
         if (typeof (target as any).destroy === "function") {
-          await (target as any).destroy();
+          // Rails: raise ActiveRecord::Rollback unless target.destroy
+          if ((await (target as any).destroy()) === false) {
+            throw new Rollback();
+          }
         }
         break;
       case "delete":
@@ -219,7 +224,13 @@ export class BelongsToAssociation extends SingularAssociation {
     const fks = this.foreignKeyNames();
     if (fks.length !== 1) return null;
     return typeof (this.owner as any)._readAttribute === "function"
-      ? (this.owner as any)._readAttribute(fks[0])
+      ? // Rails passes `{ |n| owner.send(:missing_attribute, n, caller) }` — a
+        // known-but-unselected FK column raises MissingAttributeError.
+        (this.owner as any)._readAttribute(fks[0], (n: string) => {
+          throw new MissingAttributeError(
+            `missing attribute '${n}' for ${(this.owner.constructor as { name?: string }).name ?? "unknown"}`,
+          );
+        })
       : (this.owner as any)[fks[0]];
   }
 
