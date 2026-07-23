@@ -1668,7 +1668,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Count associated records.
    */
-  async count(): Promise<number> {
+  async count(column?: string): Promise<number> {
     // Rails' CollectionProxy#count delegates to scope/relation which always
     // issues a SQL COUNT — it does NOT use the loaded-target cache (that is
     // `size`'s job). Remove any _targetLoaded fast-path here to stay faithful.
@@ -1738,12 +1738,12 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     // `COUNT(*)` Rails would.
     const countFn = (
       Relation.prototype as unknown as {
-        count: (this: unknown) => Promise<number | Record<string, number>>;
+        count: (this: unknown, column?: string) => Promise<number | Record<string, number>>;
       }
     ).count;
     const counted = this._relationStateDiverged()
-      ? await countFn.call(this)
-      : await countFn.call(this.scope());
+      ? await countFn.call(this, column)
+      : await countFn.call(this.scope(), column);
     // A grouped count (Record) would mean the caller added a
     // `groupBang(...)` on the proxy — ambiguous for CP#count (which
     // returns a single number). Fail loudly instead of silently

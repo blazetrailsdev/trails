@@ -453,7 +453,7 @@ export class CollectionAssociation extends Association {
       // inverse, then after_remove. delete_records (the DB delete) is skipped —
       // a new owner has no persisted join rows yet, so existing_records is
       // empty (the owner's save is what creates them).
-      const toRemove = this.target.filter((r) => !otherArray.includes(r));
+      const toRemove = this.target.filter((r) => !includesRecord(otherArray, r));
       let removable = true;
       for (const r of toRemove) {
         if (!callback(this, "beforeRemove", r)) {
@@ -476,7 +476,7 @@ export class CollectionAssociation extends Association {
       // we build for the whole difference rather than filtering on addToTarget.
       const added: Base[] = [];
       for (const r of otherArray) {
-        if (!this.target.includes(r)) {
+        if (!includesRecord(this.target, r)) {
           this.addToTarget(r);
           added.push(r);
         }
@@ -491,13 +491,13 @@ export class CollectionAssociation extends Association {
       replaceCommonRecordsInMemory(this, otherArray, originalTarget);
       if (!wasLoaded || !arraysEqual(otherArray, originalTarget)) {
         for (const r of originalTarget) {
-          if (!otherArray.includes(r)) {
+          if (!includesRecord(otherArray, r)) {
             const idx = this.target.indexOf(r);
             if (idx !== -1) this.target.splice(idx, 1);
           }
         }
         for (const r of otherArray) {
-          if (!this.target.includes(r)) {
+          if (!includesRecord(this.target, r)) {
             this.setOwnerAttributes(r);
             this.addToTarget(r);
           }
@@ -1157,6 +1157,19 @@ function transaction(assoc: CollectionAssociation, block: () => Promise<void>): 
   return block();
 }
 
+/**
+ * Membership test for Rails' `difference`/`intersection` in `replace_records`
+ * and `replace_common_records_in_memory`. Ruby's Array#- / Array#& match via
+ * `eql?`/`hash`, which ActiveRecord::Core defines by class + primary key — a
+ * fixture instance and the loaded target instance of the same row ARE common.
+ * A JS identity `includes` treated them as different, so a persisted-owner
+ * replace destroyed the kept record and then failed to re-add it.
+ * @internal
+ */
+function includesRecord(records: Base[], record: Base): boolean {
+  return records.some((r) => (r as unknown as { isEqual(o: unknown): boolean }).isEqual(record));
+}
+
 /** @internal */
 async function replaceRecords(
   assoc: CollectionAssociation,
@@ -1164,9 +1177,9 @@ async function replaceRecords(
   originalTarget: Base[],
 ): Promise<Base[]> {
   // Rails: delete(difference(target, new_target)); concat(difference(new_target, target))
-  const toDelete = assoc.target.filter((r) => !newTarget.includes(r));
+  const toDelete = assoc.target.filter((r) => !includesRecord(newTarget, r));
   if (toDelete.length > 0) await assoc.delete(...toDelete);
-  const toAdd = newTarget.filter((r) => !assoc.target.includes(r));
+  const toAdd = newTarget.filter((r) => !includesRecord(assoc.target, r));
   if (toAdd.length > 0) {
     try {
       await assoc.concat(...toAdd);
@@ -1191,7 +1204,7 @@ function replaceCommonRecordsInMemory(
   newTarget: Base[],
   originalTarget: Base[],
 ): void {
-  const common = newTarget.filter((r) => originalTarget.includes(r));
+  const common = newTarget.filter((r) => includesRecord(originalTarget, r));
   for (const record of common) {
     replaceOnTarget(assoc, record, true, true);
   }
