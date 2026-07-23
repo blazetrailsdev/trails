@@ -22,6 +22,13 @@ describe("ForeignKeyDefinition#export_name_on_schema_dump?", () => {
     expect(fk("ignored_fk_astronauts_rockets").isExportNameOnSchemaDump).toBe(false);
     expect(fk("fk_rails_0123456789").isExportNameOnSchemaDump).toBe(true);
   });
+
+  it("stays stable across repeated calls with a g-flagged pattern", () => {
+    SchemaDumper.fkIgnorePattern = /^ignored_/g;
+    const definition = fk("ignored_fk_astronauts_rockets");
+    expect(definition.isExportNameOnSchemaDump).toBe(false);
+    expect(definition.isExportNameOnSchemaDump).toBe(false);
+  });
 });
 
 describe("CheckConstraintDefinition#export_name_on_schema_dump?", () => {

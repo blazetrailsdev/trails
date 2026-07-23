@@ -11,6 +11,20 @@ import { SchemaDumper } from "../../schema-dumper.js";
  * like `COLLATE \`utf8mb4_bin\``. This regex substitutes for quoting: only
  * safe charset/collation names pass.
  */
+/**
+ * @internal RegExp#test with a g/y-flagged pattern mutates shared lastIndex
+ * state across calls (Ruby's Regexp#match? has no such statefulness), so a
+ * user-configured ignore pattern with those flags would alternate results.
+ * schema-dumper.ts strips the flags the same way in its fallback paths.
+ */
+function statelessTest(pattern: RegExp, value: string): boolean {
+  const stateless =
+    pattern.global || pattern.sticky
+      ? new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""))
+      : pattern;
+  return stateless.test(value);
+}
+
 export function assertSafeMysqlIdentifier(value: string, kind: string): void {
   if (!/^[A-Za-z0-9_]+$/.test(value)) {
     throw new ArgumentError(`Invalid MySQL ${kind}: ${JSON.stringify(value)}`);
@@ -280,7 +294,7 @@ export class ForeignKeyDefinition {
 
   // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
   get isExportNameOnSchemaDump(): boolean {
-    return !SchemaDumper.fkIgnorePattern.test(this.name);
+    return !statelessTest(SchemaDumper.fkIgnorePattern, this.name);
   }
 
   isDefinedFor(options: ForeignKeyLookupOptions = {}): boolean {
@@ -351,7 +365,7 @@ export class CheckConstraintDefinition {
   }
 
   get isExportNameOnSchemaDump(): boolean {
-    return this.name ? !SchemaDumper.chkIgnorePattern.test(this.name) : false;
+    return this.name ? !statelessTest(SchemaDumper.chkIgnorePattern, this.name) : false;
   }
 
   isDefinedFor(options: { name: string; expression?: string; validate?: boolean }): boolean {
