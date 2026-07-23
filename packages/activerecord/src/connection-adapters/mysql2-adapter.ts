@@ -814,7 +814,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // Await so the connect-once warm + checkVersion complete before the
         // socket is handed out — a too-old server rejects the connect (Rails'
         // configure_connection → check_version raises during connect).
-        await this.configureConnection();
+        try {
+          await this.configureConnection();
+        } catch (configureError) {
+          // Mirrors Rails' attempt_configure_connection (abstract_adapter.rb:
+          // 1216): a configure_connection failure tears the connection down
+          // (`disconnect!`) and re-raises, so the handle is never left
+          // half-configured and the next attempt reconnects from scratch
+          // (adapter_test.rb:852).
+          this.disconnectBang();
+          throw configureError;
+        }
         return conn;
       },
       (err) => {
@@ -1609,15 +1619,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
 
   /**
    * Eager connect — mirrors Rails' `AbstractAdapter#connect!` (`verify!; self`),
-   * which `with_raw_connection` calls when `@raw_connection` is nil. Rather than
-   * route through `verify!` (whose `active?` short-circuit assumes an
-   * already-established `@raw_connection`), trails opens the raw connection
-   * directly — the same posture as `PostgreSQLAdapter#connectBang`. A dead socket
-   * surfaces as `ConnectionNotEstablished` here instead of on the first query.
+   * which `with_raw_connection` calls when `@raw_connection` is nil. Routing
+   * through `verifyBang` gives a configure_connection failure its
+   * connection_retries re-attempts via `reconnectBang`'s retry loop
+   * (adapter_test.rb:852), exactly as Rails' verify! → reconnect! does.
    * @internal
    */
   override async connectBang(): Promise<void> {
-    await this.connect();
+    await this.verifyBang();
   }
 
   /**

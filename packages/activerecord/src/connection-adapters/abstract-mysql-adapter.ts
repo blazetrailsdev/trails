@@ -27,6 +27,7 @@ import {
   DatabaseVersionError,
   Deadlocked,
   InvalidForeignKey,
+  ActiveRecordError,
   LockWaitTimeout,
   MismatchedForeignKey,
   NotNullViolation,
@@ -1650,6 +1651,11 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `ConnectionAdapters::AbstractMysqlAdapter#translate_exception`.
    */
   protected _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    // Mirrors Rails' translate_exception_class pass-through: an exception
+    // that is already an ActiveRecordError (e.g. ConnectionFailed raised by
+    // configure_connection during reconnect, adapter_test.rb:852) is re-raised
+    // as-is, never wrapped in StatementInvalid.
+    if (e instanceof ActiveRecordError) return e;
     if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
     const errno = (e as { errno?: number }).errno;
     const msg = e.message;
