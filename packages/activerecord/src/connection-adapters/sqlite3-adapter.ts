@@ -456,6 +456,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     name: string = "SQL",
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
+    await this.ensureConnected();
     await this.materializeTransactions();
 
     const payload = this._notificationPayload(sql, binds, name);
@@ -617,6 +618,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // preprocessQuery runs Rails' check_if_write_query, which raises
     // ReadOnlyError while writes are prevented — see isPreventingWrites below.
     sql = this.preprocessQuery(sql);
+    await this.ensureConnected();
     await this.materializeTransactions();
     const payload = this._notificationPayload(sql, binds, name);
     const driverBinds = binds.map(_driverBind, this) as SqliteBinds;
@@ -2886,6 +2888,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   private async ensureConnected(): Promise<void> {
     if (this._asyncConnectPending) await this.completeAsyncConnect();
+    else if (!this.isActive() && this.isReconnectCanRestoreState()) await this.verifyBang();
   }
 
   /** @internal */
