@@ -486,11 +486,12 @@ describeIfPg("PostgreSQLAdapter", () => {
         )
       `);
       try {
-        const rows = await adapter.execute(`
-          INSERT INTO uuid_column_default_test DEFAULT VALUES
-          RETURNING guid
-        `);
-        expect(isValidUuid(rows[0].guid as string)).toBe(true);
+        const cols = (await adapter.columns("uuid_column_default_test")) as {
+          name: string;
+          defaultFunction?: string;
+        }[];
+        const column = cols.find((c) => c.name === "guid");
+        expect(column!.defaultFunction).toBe("gen_random_uuid()");
       } finally {
         await adapter.exec(`DROP TABLE IF EXISTS uuid_column_default_test`);
       }

@@ -4,7 +4,8 @@
  */
 import { describe, it, expect, beforeEach, afterEach, beforeAll, afterAll, vi } from "vitest";
 import { Base, Migration, Schema, TableDefinition } from "./index.js";
-import { MigrationContext } from "./migration.js";
+import { MigrationContext, Migrator } from "./migration.js";
+import { SchemaMigration } from "./schema-migration.js";
 
 import { adapterType } from "./test-adapter.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
@@ -46,16 +47,20 @@ describe("ActiveRecordSchemaTest", () => {
   });
 
   it("has primary key", async () => {
-    await Schema.define(adapter, async (schema) => {
-      await schema.createTable("pk_test", (t) => {
-        t.string("name");
-      });
-    });
-    // Verify table exists and has auto-incrementing id
-    await adapter.executeMutation(`INSERT INTO "pk_test" ("name") VALUES ('test')`);
-    const rows = await adapter.execute(`SELECT * FROM "pk_test"`);
-    expect(rows.length).toBe(1);
-    expect(rows[0].id).toBeDefined();
+    const oldPrimaryKeyPrefixType = Base.primaryKeyPrefixType;
+    Base.primaryKeyPrefixType = "table_name_with_underscore";
+    const schemaMigration = new SchemaMigration(adapter);
+    try {
+      expect(schemaMigration.primaryKey).toBe("version");
+
+      await schemaMigration.createTable();
+      const before = await schemaMigration.count();
+      await schemaMigration.createVersion("12");
+      expect(await schemaMigration.count()).toBe(before + 1);
+    } finally {
+      await schemaMigration.deleteVersion("12");
+      Base.primaryKeyPrefixType = oldPrimaryKeyPrefixType;
+    }
   });
 
   it("schema without version is the current version schema", () => {
@@ -94,15 +99,16 @@ describe("ActiveRecordSchemaTest", () => {
     const saved = Base.tableNamePrefix;
     Base.tableNamePrefix = "nep_";
     try {
-      await Schema.define(adapter, async (schema) => {
+      await Schema.define(adapter, { version: 7 }, async (schema) => {
         await schema.createTable("fruits", (t) => {
           t.string("color");
         });
       });
-      await adapter.executeMutation(`INSERT INTO "nep_fruits" ("color") VALUES ('red')`);
-      const rows = await adapter.execute(`SELECT * FROM "nep_fruits"`);
-      expect(rows.length).toBe(1);
+      expect(await new Migrator(adapter, []).currentVersion()).toBe(7);
     } finally {
+      // Rails ensure: drop_table :nep_schema_migrations (dropTable resolves the
+      // still-prefixed table name).
+      await new SchemaMigration(adapter).dropTable();
       Base.tableNamePrefix = saved;
     }
   });

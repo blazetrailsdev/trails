@@ -227,7 +227,7 @@ describe("MigrationTest", () => {
   });
 
   it("rename table with prefix and suffix", async () => {
-    const { ctx } = await freshContext();
+    const { adapter, ctx } = await freshContext();
     ctx.tableNamePrefix = "pre_";
     ctx.tableNameSuffix = "_suf";
     // Own the scratch tables for the whole test: with the global reset shielded
@@ -236,12 +236,19 @@ describe("MigrationTest", () => {
     await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     try {
       await ctx.createTable("pre_old_suf", {}, (t) => {
-        t.string("value");
+        t.string("content");
       });
+      await adapter.executeMutation(
+        `INSERT INTO ${adapter.quoteTableName("pre_old_suf")} (${adapter.quoteColumnName("content")}) VALUES ('hello world')`,
+      );
+      const before = await adapter.execute(
+        `SELECT * FROM ${adapter.quoteTableName("pre_old_suf")}`,
+      );
+      expect(before[0].content).toBe("hello world");
 
       await ctx.renameTable("old", "new");
-      expect(await ctx.tableExists("pre_old_suf")).toBe(false);
-      expect(await ctx.tableExists("pre_new_suf")).toBe(true);
+      const after = await adapter.execute(`SELECT * FROM ${adapter.quoteTableName("pre_new_suf")}`);
+      expect(after[0].content).toBe("hello world");
     } finally {
       await ctx.dropTable("pre_old_suf", "pre_new_suf", { ifExists: true });
     }
@@ -729,8 +736,12 @@ describe("MigrationTest", () => {
       },
     ];
     const migrator = new Migrator(adapter, migrations);
-    const pending = await migrator.pendingMigrations();
-    expect(pending.length).toBe(1);
+    try {
+      await migrator.schemaMigration.dropTable();
+      expect(await migrator.needsMigration()).toBe(true);
+    } finally {
+      await migrator.schemaMigration.createTable();
+    }
   });
 
   it("any migrations", async () => {
@@ -1008,9 +1019,9 @@ describe("MigrationTest", () => {
     expect(err).toBeInstanceOf(Error);
     // Without a DDL transaction, the column is not rolled back
     expect(columnAdded).toBe(true);
-    // Error message matches Rails format (no "this and" because no transaction)
-    expect(err.message).toMatch(/An error has occurred, all later migrations canceled/);
-    expect(err.message).not.toContain("this and");
+    expect(err.message).toBe(
+      "An error has occurred, all later migrations canceled:\n\nSomething broke",
+    );
     // The failed no-transaction migration leaves `wtx_test` behind (that is the
     // point of the test); drop it so it does not leak past the shielded reset.
     await adapter.dropTable("wtx_test", { ifExists: true });
@@ -1109,8 +1120,12 @@ describe("MigrationTest", () => {
     const { InternalMetadata } = await import("./internal-metadata.js");
     const im = new InternalMetadata(adapter);
     await im.createTable();
-    await im.set("foo", "bar");
-    expect(await im.get("foo")).toBe("bar");
+    try {
+      await im.set("version", "foo");
+      expect(await im.get("version")).toBe("foo");
+    } finally {
+      await im.deleteAllEntries();
+    }
   });
 
   it("updating an existing entry into internal metadata", async () => {
@@ -1170,8 +1185,8 @@ describe("MigrationTest", () => {
     await adapter.beginTransaction();
     try {
       await sm.createTable();
-      expect(await sm.tableExists()).toBe(true);
-      await sm.createVersion("foo");
+      expect(await sm.tableExists()).toBeTruthy();
+      expect(await sm.createVersion("foo")).toBe("foo");
       await adapter.commit();
     } catch (e) {
       await adapter.rollback();
@@ -1185,8 +1200,8 @@ describe("MigrationTest", () => {
     await adapter.beginTransaction();
     try {
       await sm.createTable();
-      expect(await sm.tableExists()).toBe(true);
-      await sm.createVersion("bar");
+      expect(await sm.tableExists()).toBeTruthy();
+      expect(await sm.createVersion("bar")).toBe("bar");
       await adapter.commit();
     } catch (e) {
       await adapter.rollback();
@@ -2139,12 +2154,45 @@ describe("MigrationTest", () => {
         expect(new NoTs().version).toBe("99999999999999");
       });
 
-      it("copied migrations at timestamp boundary are valid", () => {
-        class Boundary extends Migration {
-          static version = "20231231235959";
-          async change() {}
+      it("copied migrations at timestamp boundary are valid", async () => {
+        const fs = await import("node:fs");
+        const path = await import("node:path");
+        const os = await import("node:os");
+        const { Temporal } = await import("@blazetrails/activesupport/temporal");
+        const root = fs.mkdtempSync(path.join(os.tmpdir(), "trails-mig-boundary-"));
+        const src = path.join(root, "temp_source");
+        const dst = path.join(root, "temp_dest");
+        fs.mkdirSync(src, { recursive: true });
+        fs.mkdirSync(dst, { recursive: true });
+        for (const f of [
+          "20180101010101_test_migration.ts",
+          "20180101010102_test_migration_two.ts",
+          "20180101010103_test_migration_three.ts",
+        ]) {
+          fs.writeFileSync(path.join(src, f), "// temp migration\n");
         }
-        expect(new Boundary().version).toBe("20231231235959");
+        // Rails travel_to(Time.utc(2023, 12, 1, 10, 10, 59)): freeze the clock
+        // so next_migration_number renumbers past the seconds boundary
+        // (…101059, …101060, …101061).
+        const nowSpy = vi
+          .spyOn(Temporal.Now, "instant")
+          .mockReturnValue(Temporal.Instant.from("2023-12-01T10:10:59Z"));
+        try {
+          const copied = await Migration.copy(dst, { temp: src });
+
+          expect(fs.existsSync(path.join(dst, "20231201101059_test_migration.temp.ts"))).toBe(true);
+          expect(fs.existsSync(path.join(dst, "20231201101060_test_migration_two.temp.ts"))).toBe(
+            true,
+          );
+          expect(fs.existsSync(path.join(dst, "20231201101061_test_migration_three.temp.ts"))).toBe(
+            true,
+          );
+
+          expect(Number(copied[copied.length - 1].version)).toBe(20231201101061);
+        } finally {
+          nowSpy.mockRestore();
+          fs.rmSync(root, { recursive: true, force: true });
+        }
       });
     }); // MigrationValidationTest
   }); // CopyMigrationsTest

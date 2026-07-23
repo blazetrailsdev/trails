@@ -306,13 +306,12 @@ describe("DatabaseConnectedJsonEncodingTest", () => {
     const david = await getDavid();
     (david as unknown as { favoriteQuote: () => string }).favoriteQuote = () =>
       "Constraints are liberating";
-    const json = await david.asJson({ include: "posts", methods: ["favoriteQuote"] });
+    const json = JSON.stringify(
+      await david.asJson({ include: "posts", methods: ["favoriteQuote"] }),
+    );
 
-    expect(json.favoriteQuote).toBe("Constraints are liberating");
-    const posts = json.posts as Array<Record<string, unknown>>;
-    for (const p of posts) {
-      expect(p.favoriteQuote).toBeUndefined();
-    }
+    expect(json).toMatch(/"favoriteQuote":"Constraints are liberating"/);
+    expect(json.match(/"favoriteQuote":/g)!.length).toBe(1);
   });
 
   it("should allow only option for list of authors", async () => {

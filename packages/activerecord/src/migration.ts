@@ -2803,7 +2803,9 @@ export class Migrator {
     } catch (e) {
       // Mirrors: ActiveRecord::Migrator#execute_migration_in_transaction rescue block
       const useTx = this._useTransaction(migration);
-      const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e}`;
+      // Ruby's `#{e}` interpolates Exception#to_s — the bare message, without
+      // the `Error: ` prefix JS String(e) would add.
+      const msg = `An error has occurred, ${useTx ? "this and " : ""}all later migrations canceled:\n\n${e instanceof Error ? e.message : e}`;
       throw Object.assign(new Error(msg), { cause: e });
     }
 

@@ -401,8 +401,8 @@ describe("PrimaryKeysTest", () => {
     }[];
     const col = cols.find((c) => c.name === "monkeyID");
     expect(col).toBeDefined();
-    expect(col!.defaultFunction).toMatch(/nextval/);
-    expect(col!.serial).toBe(true);
+    expect(col!.defaultFunction).toBe("nextval('\"mixed_case_monkeys_monkeyID_seq\"'::regclass)");
+    expect(col!.serial).toBeTruthy();
   });
 
   it.skipIf(adapterType !== "postgres")("serial with unquoted sequence name", async () => {
@@ -416,8 +416,8 @@ describe("PrimaryKeysTest", () => {
     }[];
     const col = cols.find((c) => c.name === "id");
     expect(col).toBeDefined();
-    expect(col!.defaultFunction).toMatch(/nextval/);
-    expect(col!.serial).toBe(true);
+    expect(col!.defaultFunction).toBe("nextval('topics_id_seq'::regclass)");
+    expect(col!.serial).toBeTruthy();
   });
 });
 
