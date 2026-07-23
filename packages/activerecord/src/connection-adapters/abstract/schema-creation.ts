@@ -103,8 +103,7 @@ export class SchemaCreation {
     return this.adapter.quoteTableName(name);
   }
 
-  /** @internal Awaitable: PG's quoter resolves cast types with a live
-   * regtype query (postgresql/quoting.rb:195). */
+  /** @internal */
   protected quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
     return this.adapter.quoteDefaultExpression(value, column);
   }

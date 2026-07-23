@@ -167,9 +167,8 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   return abstractQuote.call(this, value);
 }
 
-// Async: the ColumnDefinition (no-OID) lookup path resolves the sql_type with
-// a live `SELECT '<sql_type>'::regtype::oid` query (postgresql/quoting.rb:195);
-// Ruby blocks on it, we await it.
+// Async: the ColumnDefinition (no-OID) path awaits the live regtype lookup
+// (postgresql/quoting.rb:195) that Ruby blocks on.
 export async function quoteDefaultExpression(
   this: QuotingDispatchHost,
   value: unknown,
