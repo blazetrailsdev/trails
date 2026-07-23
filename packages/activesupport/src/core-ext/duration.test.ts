@@ -141,9 +141,9 @@ describe("DurationTest", () => {
   });
 
   it("divide", () => {
-    // dividedBy converts to seconds-based Duration
+    // dividedBy divides each part (Rails duration.rb:297-305)
+    expect(Duration.days(7).dividedBy(7).isEqualTo(Duration.days(1))).toBe(true);
     expect(Duration.days(7).dividedBy(7) instanceof Duration).toBe(true);
-    // 7.days / 7 = 86400 seconds = same as 1 day
     expect(Math.round(Duration.days(7).dividedBy(7).inSeconds())).toBe(86400);
     // 1.day / 24 => 3600 seconds
     expect(Math.round(Duration.days(1).dividedBy(24).inSeconds())).toBe(3600);

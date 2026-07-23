@@ -162,16 +162,21 @@ describe("Engine", () => {
       }
       expect(paths.get("lib")!.isLoadPath()).toBe(true);
       expect(paths.get("vendor")!.isLoadPath()).toBe(true);
+      expect(paths.get("app")!.isEagerLoad()).toBe(true);
+      expect(paths.get("app/models")!.isEagerLoad()).toBe(true);
+      expect(paths.get("app/views")!.isEagerLoad()).toBe(false);
     });
 
-    it("autoload_paths, autoload_once_paths, eager_load_paths are independently writable", () => {
-      const cfg = new EngineConfiguration();
+    it("autoload_paths, autoload_once_paths, eager_load_paths are independently writable", async () => {
+      // Non-existent root: paths().eagerLoad() contributes nothing, so the
+      // custom eager_load_paths entries come back alone.
+      const cfg = new EngineConfiguration("/nonexistent-engine-root");
       cfg.autoloadPaths.push("/x/auto");
       cfg.autoloadOncePaths.push("/x/once");
       cfg.eagerLoadPaths.push("/x/eager");
       expect(cfg.allAutoloadPaths()).toEqual(["/x/auto"]);
       expect(cfg.allAutoloadOncePaths()).toEqual(["/x/once"]);
-      expect(cfg.allEagerLoadPaths()).toEqual(["/x/eager"]);
+      expect(await cfg.allEagerLoadPaths()).toEqual(["/x/eager"]);
     });
   });
 

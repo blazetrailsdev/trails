@@ -2,13 +2,6 @@
   {
     "package": "activemodel",
     "tsFile": "dirty.ts",
-    "rubyName": "as_json",
-    "call": "merge",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:264-268 merges mutation-tracker ivars into `options[:except]` and defers to the model serializer via super; trails dirty.ts:111-113 returns `this.changes` — the mixin has no super() JSON pipeline. Contract divergence tracked in story activesupport-activemodel-omissions-from-wide-verify."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "dirty.ts",
     "rubyName": "attribute_change",
     "call": "change_to_attribute",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

@@ -46,14 +46,14 @@
     "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "any?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails duration.rb:226-234 rejects zero parts and computes @variable via `parts.any? { VARIABLE_PARTS.include?(part) }`; trails duration.ts:54-65 stores a fixed normalized parts record — variable-duration tracking is unported. Gap tracked in story activesupport-activemodel-omissions-from-wide-verify."
+    "reason": "Converged (RFC 0032): trails duration.ts constructor computes the variable flag via `VARIABLE_PARTS.some((part) => this.parts[part] !== 0)` — `Array#some` is the JS spelling of Ruby's `any?`; the extractor does not map the name."
   },
   {
     "package": "activesupport",
     "tsFile": "duration.ts",
     "rubyName": "initialize",
     "call": "include?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails duration.rb:226-234 rejects zero parts and computes @variable via `parts.any? { VARIABLE_PARTS.include?(part) }`; trails duration.ts:54-65 stores a fixed normalized parts record — variable-duration tracking is unported. Gap tracked in story activesupport-activemodel-omissions-from-wide-verify."
+    "reason": "Converged (RFC 0032): Rails iterates parts and asks `VARIABLE_PARTS.include?(part)`; trails inverts the loop (`VARIABLE_PARTS.some(...)` over the fixed parts record), so membership is the iteration itself — no include? call exists to match."
   },
   {
     "package": "activesupport",

@@ -2,13 +2,6 @@
   {
     "package": "trailties",
     "tsFile": "engine/configuration.ts",
-    "rubyName": "all_eager_load_paths",
-    "call": "eager_load",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails engine/configuration.rb:133-135 unions `eager_load_paths + paths.eager_load`; trails engine/configuration.ts:99-101 returns only `[...this.eagerLoadPaths]` — the Paths#eager_load contribution is unported (trails' paths registry carries no eager-load flags). Gap tracked in story activesupport-activemodel-omissions-from-wide-verify."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "engine/configuration.ts",
     "rubyName": "generators",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

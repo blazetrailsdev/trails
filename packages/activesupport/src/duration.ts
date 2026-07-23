@@ -36,6 +36,10 @@ const PART_ORDER: (keyof DurationParts)[] = [
   "seconds",
 ];
 
+// Mirrors Rails VARIABLE_PARTS (duration.rb:131): the calendar units whose
+// wall-clock length varies (DST, month/year length).
+const VARIABLE_PARTS: (keyof DurationParts)[] = ["years", "months", "weeks", "days"];
+
 function zeroParts(): DurationParts {
   return { years: 0, months: 0, weeks: 0, days: 0, hours: 0, minutes: 0, seconds: 0 };
 }
@@ -50,8 +54,15 @@ function mergeParts(a: DurationParts, b: DurationParts): DurationParts {
 
 export class Duration {
   readonly parts: DurationParts;
+  private readonly _variable: boolean;
 
-  constructor(parts: Partial<DurationParts> = {}) {
+  // Mirrors Rails `Duration#initialize(value, parts, variable = nil)`
+  // (duration.rb:226-234). Deviations: trails carries no separate `@value`
+  // (totals derive from `parts` via inSeconds()), and `parts` stays a full
+  // fixed record instead of Rails' zero-rejected sparse hash — the nonzero
+  // filter in the `variable` computation below stands in for
+  // `@parts.reject! { |k, v| v.zero? }`.
+  constructor(parts: Partial<DurationParts> = {}, variable: boolean | null = null) {
     this.parts = {
       years: parts.years ?? 0,
       months: parts.months ?? 0,
@@ -61,48 +72,60 @@ export class Duration {
       minutes: parts.minutes ?? 0,
       seconds: parts.seconds ?? 0,
     };
+    this._variable = variable ?? VARIABLE_PARTS.some((part) => this.parts[part] !== 0);
   }
 
   // ---------------------------------------------------------------------------
   // Factory methods
   // ---------------------------------------------------------------------------
 
+  // Explicit variable flags mirror Rails' factory constructors
+  // (duration.rb:155-180): fixed units pass false, calendar units true.
   static seconds(n: number): Duration {
-    return new Duration({ seconds: n });
+    return new Duration({ seconds: n }, false);
   }
   static minutes(n: number): Duration {
-    return new Duration({ minutes: n });
+    return new Duration({ minutes: n }, false);
   }
   static hours(n: number): Duration {
-    return new Duration({ hours: n });
+    return new Duration({ hours: n }, false);
   }
   static days(n: number): Duration {
-    return new Duration({ days: n });
+    return new Duration({ days: n }, true);
   }
   static weeks(n: number): Duration {
-    return new Duration({ weeks: n });
+    return new Duration({ weeks: n }, true);
   }
   static months(n: number): Duration {
-    return new Duration({ months: n });
+    return new Duration({ months: n }, true);
   }
   static years(n: number): Duration {
-    return new Duration({ years: n });
+    return new Duration({ years: n }, true);
   }
 
   // ---------------------------------------------------------------------------
   // Arithmetic
   // ---------------------------------------------------------------------------
 
+  // Variable flags below mirror Rails' arithmetic (duration.rb:268-304,
+  // 322-324): `+` with a Duration ORs the flags, numeric `+`/`*`/`/` and
+  // unary `-` carry the receiver's flag — never recomputed from result parts.
   plus(other: Duration | number): Duration {
     if (typeof other === "number") {
-      return new Duration(mergeParts(this.parts, { ...zeroParts(), seconds: other }));
+      return new Duration(
+        mergeParts(this.parts, { ...zeroParts(), seconds: other }),
+        this._variable,
+      );
     }
-    return new Duration(mergeParts(this.parts, other.parts));
+    return new Duration(mergeParts(this.parts, other.parts), this._variable || other._variable);
   }
 
   minus(other: Duration | number): Duration {
     if (typeof other === "number") {
-      return new Duration(mergeParts(this.parts, { ...zeroParts(), seconds: -other }));
+      return new Duration(
+        mergeParts(this.parts, { ...zeroParts(), seconds: -other }),
+        this._variable,
+      );
     }
     return this.plus(other.negate());
   }
@@ -112,13 +135,17 @@ export class Duration {
     for (const key of PART_ORDER) {
       result[key] = this.parts[key] * n;
     }
-    return new Duration(result);
+    return new Duration(result, this._variable);
   }
 
+  // Mirrors Rails `/` with a Numeric (duration.rb:297-305): divides each
+  // part, preserving the receiver's variable flag.
   dividedBy(n: number): Duration {
-    // When dividing by a number, Rails converts to total seconds and creates a seconds-only Duration
-    const totalSecs = this.inSeconds();
-    return new Duration({ seconds: totalSecs / n });
+    const result = zeroParts();
+    for (const key of PART_ORDER) {
+      result[key] = this.parts[key] / n;
+    }
+    return new Duration(result, this._variable);
   }
 
   negate(): Duration {
@@ -261,14 +288,10 @@ export class Duration {
     return klass === Duration || this instanceof (klass as any);
   }
 
-  // variable? — true when duration contains calendar units (days, weeks, months, years)
+  /** Mirrors Rails `Duration#variable?` (duration.rb:477-479): reads the
+   * `@variable` flag computed (or passed) at construction. */
   isVariable(): boolean {
-    return (
-      this.parts.years !== 0 ||
-      this.parts.months !== 0 ||
-      this.parts.weeks !== 0 ||
-      this.parts.days !== 0
-    );
+    return this._variable;
   }
 
   // ISO 8601 output
