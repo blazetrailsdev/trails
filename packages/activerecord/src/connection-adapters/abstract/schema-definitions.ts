@@ -58,6 +58,7 @@ export type ReferentialAction = "cascade" | "nullify" | "restrict" | "no_action"
 export interface ForeignKeyOptionsAdapter {
   tableNamePrefix?: string;
   tableNameSuffix?: string;
+  /** @internal */
   foreignKeyOptions(
     fromTable: string,
     toTable: string,
@@ -348,7 +349,6 @@ export class CheckConstraintDefinition {
     return this.validate;
   }
 
-  // Mirrors: ActiveRecord::ConnectionAdapters::CheckConstraintDefinition#export_name_on_schema_dump?
   get isExportNameOnSchemaDump(): boolean {
     return this.name ? !/^chk_rails_[0-9a-f]{10}$/.test(this.name) : false;
   }

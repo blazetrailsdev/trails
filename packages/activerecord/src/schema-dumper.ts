@@ -1050,9 +1050,6 @@ export class SchemaDumper {
       rawChkPattern.global || rawChkPattern.sticky
         ? new RegExp(rawChkPattern.source, rawChkPattern.flags.replace(/[gy]/g, ""))
         : rawChkPattern;
-    // Mirrors Rails' export_name_on_schema_dump? — delegate to the constraint
-    // object when available (CheckConstraintDefinition incorporates the
-    // chk_rails_ ignore-pattern check), else fall back.
     const exportName =
       "isExportNameOnSchemaDump" in (check as object)
         ? (check as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump

@@ -192,12 +192,10 @@ describe("SchemaDumper trails-only cases", () => {
       indexes: async () => [],
       checkConstraints: async () => [{ expression: "price > 0", name: chkName }],
     });
-    // auto-generated Rails name → name: omitted (export_name_on_schema_dump? == false)
     const autoName = "chk_rails_abc123def4";
     const autoOutput = await SchemaDumper.dump(mkSource(autoName) as any);
     expect(autoOutput).toContain("t.checkConstraint");
     expect(autoOutput).not.toContain(`"${autoName}"`);
-    // custom name → name: included
     const customChkName = "products_price_check";
     const customOutput = await SchemaDumper.dump(mkSource(customChkName) as any);
     expect(customOutput).toContain(`name: "${customChkName}"`);
