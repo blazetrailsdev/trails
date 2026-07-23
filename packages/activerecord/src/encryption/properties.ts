@@ -81,6 +81,14 @@ export class Properties {
     this._data.set("e", value);
   }
 
+  get encryptedDataKey(): string | undefined {
+    return this.get("k") as string | undefined;
+  }
+
+  set encryptedDataKey(value: string | undefined) {
+    this.set("k", value);
+  }
+
   get encryptedDataKeyId(): string | undefined {
     return this.get("i") as string | undefined;
   }
