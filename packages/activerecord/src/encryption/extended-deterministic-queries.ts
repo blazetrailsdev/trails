@@ -3,9 +3,9 @@ import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attr
 import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 
 /**
- * What AdditionalValue needs from its type. Rails passes the full resolved
- * `type_for_attribute` type here — for a Serialized(Encrypted(...)) attribute
- * that's the outer Type::Serialized, not EncryptedAttributeType.
+ * What AdditionalValue needs from its type — one of the attribute's
+ * `previousTypes` (bare previous-scheme EncryptedAttributeTypes, as Rails'
+ * delegated `previous_types`).
  */
 export interface SerializableType {
   serialize(value: unknown): unknown;
@@ -140,12 +140,7 @@ export class EncryptedQuery {
       if (!type.previousTypes.length) continue;
       const value = result[attrName];
       if (value === undefined) continue;
-      result[attrName] = this.processEncryptedQueryArgument(
-        value,
-        checkForAdditionalValues,
-        fullType,
-        type,
-      );
+      result[attrName] = this.processEncryptedQueryArgument(value, checkForAdditionalValues, type);
       modified = true;
     }
 
@@ -155,11 +150,8 @@ export class EncryptedQuery {
   private static processEncryptedQueryArgument(
     value: unknown,
     checkForAdditionalValues: boolean,
-    fullType: SerializableType,
     type: EncryptedAttributeType,
   ): unknown {
-    if (value === null) return value;
-
     // Rails' process_encrypted_query_argument short-circuits when the
     // caller is a Relation (`where`/`exists?`) and the value is already
     // an expanded array whose last element is an AdditionalValue — that
@@ -177,14 +169,22 @@ export class EncryptedQuery {
       return value;
     }
 
-    if (Array.isArray(value)) {
-      return value.flatMap((v) => {
-        if (v === null) return [v];
-        if (checkForAdditionalValues && v instanceof AdditionalValue) return [v];
-        return this.allCiphertextsFor(v, fullType, type);
-      });
+    // Only String/Array arguments expand (extended_deterministic_queries.rb:74).
+    // Plaintexts stay raw at the head of the list — the PredicateBuilder
+    // serializes them through the attribute's resolved type
+    // (HomogeneousIn#castedValues), encrypting with the current scheme; only
+    // previous-scheme candidates are AdditionalValue-wrapped.
+    if (typeof value === "string" || Array.isArray(value)) {
+      const list = Array.isArray(value) ? value : [value];
+      return [
+        ...list,
+        ...list.flatMap((eachValue) => {
+          if (checkForAdditionalValues && eachValue instanceof AdditionalValue) return [eachValue];
+          return this.additionalValuesFor(eachValue, type);
+        }),
+      ];
     }
-    return this.allCiphertextsFor(value, fullType, type);
+    return value;
   }
 
   /** @internal */
@@ -193,34 +193,6 @@ export class EncryptedQuery {
     type: EncryptedAttributeType,
   ): AdditionalValue[] {
     return type.previousTypes.map((additionalType) => new AdditionalValue(value, additionalType));
-  }
-
-  private static allCiphertextsFor(
-    plaintext: unknown,
-    fullType: SerializableType,
-    type: EncryptedAttributeType,
-  ): Array<AdditionalValue | unknown> {
-    // Unlike Rails (which keeps plaintext at index 0 and relies on the
-    // PredicateBuilder type-casting scalars to encrypt them), our
-    // PredicateBuilder only type-casts objects via `build`/`QueryAttribute`.
-    // Plain scalars in an IN array bypass `EncryptedAttributeType.serialize`
-    // and land in the SQL unencrypted. Wrapping encrypted candidates in
-    // AdditionalValue ensures those elements go through `predicateBuilder.build`
-    // → `ExtendedEncryptableType.serialize` → pre-computed ciphertext, while
-    // still preserving the raw plaintext when unencrypted data remains queryable
-    // during migration (support_unencrypted_data).
-    // The current-scheme candidate serializes through the FULL resolved type
-    // (coder dumped before encryption, matching the write path); previous-
-    // scheme candidates use the bare previous EncryptedAttributeTypes, as
-    // Rails' delegated `previous_types` do.
-    const results: Array<AdditionalValue | unknown> = [new AdditionalValue(plaintext, fullType)];
-    for (const prev of type.previousTypes) {
-      results.push(new AdditionalValue(plaintext, prev));
-    }
-    if (type.supportUnencryptedData) {
-      results.push(plaintext);
-    }
-    return results;
   }
 }
 
@@ -262,13 +234,18 @@ export class RelationQueries {
       const type = encryptedTypeOf(getAttributeType(model, attrName));
       if (!type?.deterministic) continue;
       const values = wheres[attrName];
-      if (Array.isArray(values) && values[0] instanceof AdditionalValue) {
-        // Our expansion stores AdditionalValue(current) at index 0 (see
-        // allCiphertextsFor). Keep the AV reference — when the new record
-        // saves, EncryptedAttributeType.serialize (patched via
-        // ExtendedEncryptableType) unwraps it to the ciphertext without
-        // re-encrypting. Writing values[0].value directly would serialize
-        // the ciphertext as plaintext, producing a double-encrypted blob.
+      // An expanded list is raw plaintext at [0] followed only by
+      // AdditionalValues — collapse it back to the plaintext so the new
+      // record encrypts through the normal write path
+      // (extended_deterministic_queries.rb:115-117). The length guard is
+      // ours: `[].slice(1).every(...)` is vacuously true and would copy
+      // `undefined` into the scope for an empty (unreachable in Rails,
+      // where `[][1..]` is nil) where-list.
+      if (
+        Array.isArray(values) &&
+        values.length > 0 &&
+        values.slice(1).every((v) => v instanceof AdditionalValue)
+      ) {
         scopeAttrs[attrName] = values[0];
       }
     }

@@ -522,11 +522,9 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       rel.where({ email: "a@x" });
       const captured = rel._lastWhere.email as unknown[];
       expect(Array.isArray(captured)).toBe(true);
-      // See allCiphertextsFor: our expansion puts AV(current) at [0] (not
-      // plaintext like Rails) because our PredicateBuilder bypasses
-      // EncryptedAttributeType.serialize for raw scalars in IN arrays.
-      expect(captured[0]).toBeInstanceOf(AdditionalValue);
-      expect((captured[0] as AdditionalValue).value).toBeDefined();
+      // Rails shape: raw plaintext at [0] (the PredicateBuilder serializes it
+      // through the resolved type), previous-scheme AVs after it.
+      expect(captured[0]).toBe("a@x");
       expect(captured[1]).toBeInstanceOf(AdditionalValue);
     });
   });
@@ -570,7 +568,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries.installSupport"
       (Contact as any).findBy({ email: "x" });
       const captured = (Contact as any)._lastFindBy.email as unknown[];
       expect(Array.isArray(captured)).toBe(true);
-      expect(captured[0]).toBeInstanceOf(AdditionalValue);
+      expect(captured[0]).toBe("x");
       expect(captured[1]).toBeInstanceOf(AdditionalValue);
     });
   });
