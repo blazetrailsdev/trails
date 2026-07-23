@@ -728,6 +728,9 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
  * Rails: @columns ||= columns_hash.values.freeze
  */
 export function columns(this: SchemaHost): any[] {
+  if (isStiSubclass(this) && Object.prototype.hasOwnProperty.call(this, "_ignoredColumns")) {
+    return Object.values((this as unknown as typeof Base).columnsHash());
+  }
   if (this._columns) return this._columns;
   loadSchema.call(this);
   const hash = getColumnsHash(this);
@@ -1480,6 +1483,8 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
           // keeps serving the pre-warm list.
           if (host._schemaLoaded) {
             host._schemaLoaded = false;
+            host._columnsHash = undefined;
+            host._columns = undefined;
             clearAttributeNamesMemo(host);
           }
           return new Set(names);

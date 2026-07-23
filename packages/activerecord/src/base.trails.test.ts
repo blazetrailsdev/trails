@@ -362,6 +362,24 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     ]).not.toContain("author_name");
   });
 
+  it("an STI subclass's own ignoredColumns does not read the base's columns memo", () => {
+    class Company extends Base {
+      static override tableName = "companies";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Firm extends Company {
+      static {
+        this.ignoredColumns = ["rating"];
+      }
+    }
+    expect(Company.columns().map((c: { name: string }) => c.name)).toContain("rating");
+    expect(Firm.columns().map((c: { name: string }) => c.name)).not.toContain("rating");
+    expect(Firm.columnNames()).not.toContain("rating");
+    expect(Company.columns().map((c: { name: string }) => c.name)).toContain("rating");
+  });
+
   it("an ignored column still declared via attribute() casts and responds on SELECT *", async () => {
     const { AttributedDeveloper } = await import("./test-helpers/models/developer.js");
     const dev = await AttributedDeveloper.create();
