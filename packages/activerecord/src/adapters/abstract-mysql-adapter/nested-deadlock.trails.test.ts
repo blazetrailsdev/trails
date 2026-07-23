@@ -1,20 +1,11 @@
-/**
- * Trails-specific (TS-only) extra for the MySQL adapter's nested-deadlock
- * suite. The Rails-named tests from
- * adapters/abstract_mysql_adapter/nested_deadlock_test.rb live in
- * nested-deadlock.test.ts; this file keeps the adapter-level savepoint
- * promotion check that has no Rails counterpart.
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { SavepointTransaction } from "../../connection-adapters/abstract/transaction.js";
 
-/** Mirrors Rails' `make_parent_transaction_dirty` which runs `Sample.take`. */
 async function makeParentDirty(a: Mysql2Adapter): Promise<void> {
   await a.execQuery("SELECT * FROM `samples` LIMIT 1");
 }
 
-/** Mirrors `assert_current_transaction_is_savepoint_transaction`. */
 function assertSavepoint(a: Mysql2Adapter): void {
   expect(a.currentTransaction()).toBeInstanceOf(SavepointTransaction);
 }

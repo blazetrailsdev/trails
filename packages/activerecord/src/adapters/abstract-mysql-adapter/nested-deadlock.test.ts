@@ -1,13 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/nested_deadlock_test.rb
- *
- * Rails provokes a real InnoDB deadlock by running competing nested
- * (savepoint) transactions on two Ruby Threads synchronized with a
- * Concurrent::CyclicBarrier. This port drives the same interleave on two
- * adapter connections raced with Promise.allSettled and an async barrier.
- * Rails' own test creates the `samples` table inline, so the inline
- * DROP/CREATE here is faithful.
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 import { Deadlocked, Rollback } from "../../errors.js";
@@ -28,12 +18,10 @@ function createBarrier(n: number): { wait: () => Promise<void> } {
   };
 }
 
-/** Mirrors Rails' `make_parent_transaction_dirty` which runs `Sample.take`. */
 async function makeParentDirty(a: Mysql2Adapter): Promise<void> {
   await a.execQuery("SELECT * FROM `samples` LIMIT 1");
 }
 
-/** Mirrors `assert_current_transaction_is_savepoint_transaction`. */
 function assertSavepoint(a: Mysql2Adapter): void {
   expect(a.currentTransaction()).toBeInstanceOf(SavepointTransaction);
 }
@@ -66,15 +54,6 @@ describeIfMysql("Mysql2Adapter", () => {
       await adapter.execute("DROP TABLE IF EXISTS `samples`").catch(() => {});
     });
 
-    /**
-     * The shared interleave: each connection opens a parent transaction,
-     * dirties it (forcing the nested `requiresNew` transaction onto a
-     * savepoint), row-locks its own sample, waits at the barrier, then
-     * updates the other's row — guaranteeing InnoDB detects a deadlock on
-     * exactly one side. `onDeadlock` mirrors each Rails test's rescue
-     * placement: undefined lets Deadlocked propagate out of the nested
-     * transaction and doom the whole block.
-     */
     async function raceNestedTransactions(
       adapter2: Mysql2Adapter,
       onDeadlock?: "rollback" | "swallow",
@@ -116,8 +95,6 @@ describeIfMysql("Mysql2Adapter", () => {
           } else {
             await nested;
           }
-          // Rails' first test ends at the nested transaction; only the
-          // recovery tests follow it with the outer `update value: 10`.
           if (onDeadlock !== undefined) {
             await a.executeMutation(`UPDATE \`samples\` SET value = 10 WHERE id = ${updateId}`);
           }

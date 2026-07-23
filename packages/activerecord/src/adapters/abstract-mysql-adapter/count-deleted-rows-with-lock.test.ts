@@ -1,12 +1,3 @@
-/**
- * Mirrors Rails activerecord/test/cases/adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb
- *
- * Rails races `Bulb.unscoped.delete_all` against `Author.create!` on two Ruby
- * Threads and asserts the delete reports 1 row (MySQL row-count-under-lock
- * behavior). This port drives the same race at the adapter level on two
- * connections; the tables use a `test_` prefix so the DROP/CREATE cycle stays
- * off the shared canonical `bulbs`/`authors` tables that parallel workers own.
- */
 import { describe, it, beforeEach, afterEach, expect } from "vitest";
 import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js";
 
