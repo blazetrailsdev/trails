@@ -109,7 +109,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "connected?",
     "call": "any?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails connection_pool.rb:427-429 is `@connections.any?(&:connected?)`; trails connection-pool.ts:570-572 isConnected checks `_connections.length > 0` — pool membership stands in for the per-connection connected? probe (part of the pool async/sync convergence surface)."
+    "reason": "Verified equivalent: Rails connection_pool.rb:427-429 `@connections.any?(&:connected?)` is ported as `_connections.some((conn) => conn.isConnected())` — JS Array#some is the any? analogue; the extractor has no some→any? mapping."
   },
   {
     "package": "activerecord",

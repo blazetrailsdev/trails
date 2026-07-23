@@ -568,7 +568,7 @@ export class ConnectionPool implements ReapablePool {
   }
 
   isConnected(): boolean {
-    return this._connections != null && this._connections.length > 0;
+    return this._connections != null && this._connections.some((conn) => conn.isConnected());
   }
 
   get connections(): DatabaseAdapter[] {

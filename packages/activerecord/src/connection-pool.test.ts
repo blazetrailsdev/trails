@@ -35,6 +35,10 @@ class TransactionAwareTestAdapter extends AbstractAdapter implements DatabaseAda
   isNoDatabaseError(_error: unknown): boolean {
     return false;
   }
+  constructor() {
+    super();
+    this._connection = this;
+  }
   // This double has no real raw connection; report active so checkout's
   // verify! is a no-op (mirroring Rails, where the pinned connection is
   // active and verify! returns without reconnecting). Backed by a mutable
@@ -479,6 +483,16 @@ it("pin connection connected?", async () => {
   await pool.pinConnectionBang();
   expect(pool.isConnected()).toBe(true);
   await pool.unpinConnectionBang();
+});
+
+it("isConnected probes each pooled connection's connected state", async () => {
+  const pool = makePool();
+  const conn = await pool.checkout();
+  expect(pool.isConnected()).toBe(true);
+  pool.checkin(conn);
+  conn.disconnectBang();
+  expect(pool.connections.length).toBe(1);
+  expect(pool.isConnected()).toBe(false);
 });
 
 it("pin connection opens a transaction", async () => {
