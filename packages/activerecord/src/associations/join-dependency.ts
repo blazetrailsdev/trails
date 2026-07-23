@@ -1824,6 +1824,14 @@ function rebindTableReferences(
     clone.expr = rebound;
     return clone;
   }
+  // HomogeneousIn derives left/right from readonly `attribute`/`values`
+  // (getter-only), so the generic binary shallow-clone below cannot assign it —
+  // rebind the attribute and reconstruct instead.
+  if (node instanceof Nodes.HomogeneousIn) {
+    const attribute = rebindTableReferences(node.attribute, fromTableName, toTable);
+    if (attribute === node.attribute) return node;
+    return new Nodes.HomogeneousIn(node.values, attribute, node.type);
+  }
   // Binary nodes (Equality, In, InfixOperation, Matches, etc.) — have left/right.
   // Shallow-clone to preserve extra fields (operator, escape, caseSensitive).
   if ("left" in node && "right" in node) {

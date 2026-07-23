@@ -819,8 +819,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // semantics are not implemented. Once an id: :uuid table is created via the legacy
       // migrator (with implicit gen_random_uuid default), schema dump emission already
       // works (see "schema dumper for uuid primary key default" above).
-      // SCOPE: Migration framework — separate multi-PR effort.
-      // DEFERRED (RFC 0030): tracked by legacy-migration-5-0-uuid-default — converge then un-skip.
+      // PERMANENT-SKIP: Migration[x.y] legacy version-compatibility semantics are
+      // out of scope pre-1.0 (see the uuid_test.rb entry in
+      // scripts/api-compare/unported-files.ts).
     });
   });
 
@@ -864,8 +865,9 @@ describeIfPg("PostgreSQLAdapter", () => {
       // BLOCKED: migration framework — ActiveRecord::Migration[5.0] legacy-flavor migration
       // semantics are not implemented. Schema dump emission for `id: :uuid, default: nil`
       // is already covered by "schema dumper for uuid primary key with default override via nil".
-      // SCOPE: Migration framework — separate multi-PR effort.
-      // DEFERRED (RFC 0030): tracked by legacy-migration-5-0-uuid-default — converge then un-skip.
+      // PERMANENT-SKIP: Migration[x.y] legacy version-compatibility semantics are
+      // out of scope pre-1.0 (see the uuid_test.rb entry in
+      // scripts/api-compare/unported-files.ts).
     });
   });
 

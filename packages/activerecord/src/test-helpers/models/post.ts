@@ -401,7 +401,20 @@ export class Post extends Base {
     });
 
     this.hasMany("taggings", { as: "taggable", counterCache: "tags_count" });
-    this.hasMany("tags", { through: "taggings" });
+    // Mirrors post.rb:139-145 — `has_many :tags, through: :taggings do
+    // def add_joins_and_select ... end` (block-form association extension).
+    this.hasMany("tags", {
+      through: "taggings",
+      extend: {
+        addJoinsAndSelect(this: any) {
+          return this.select("tags.*, authors.id as author_id")
+            .joins(
+              "left outer join posts on taggings.taggable_id = posts.id left outer join authors on posts.author_id = authors.id",
+            )
+            .toArray();
+        },
+      },
+    });
 
     this.hasMany("indestructibleTaggings", {
       as: "taggable",

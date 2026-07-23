@@ -6,8 +6,10 @@ import {
   RecordInvalid,
   IrreversibleOrderError,
   registerModel,
+  registerSubclass,
   Base,
 } from "./index.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
@@ -22,7 +24,7 @@ import {
 } from "./test-helpers/models/post.js";
 import { Author, AuthorAddress } from "./test-helpers/models/author.js";
 import { Topic } from "./test-helpers/models/topic.js";
-import { Comment } from "./test-helpers/models/comment.js";
+import { Comment, SpecialComment, VerySpecialComment } from "./test-helpers/models/comment.js";
 import { Bird } from "./test-helpers/models/bird.js";
 import { Car, CoolCar, FastCar } from "./test-helpers/models/car.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
@@ -91,6 +93,10 @@ describe("RelationTest", () => {
     registerModel(Post);
     registerModel(Author);
     registerModel(Comment);
+    registerModel(SpecialComment);
+    registerSubclass(SpecialComment);
+    registerModel(VerySpecialComment);
+    registerSubclass(VerySpecialComment);
     registerModel(Topic);
     registerModel(Bird);
     registerModel(Car);
@@ -838,8 +844,20 @@ describe("RelationTest", () => {
     }
   });
 
-  it.skip("eager association loading of stis with multiple references", async () => {
-    // BLOCKED: relations — eagerLoad with nested includes across STI subclasses not yet supported
+  it("eager association loading of stis with multiple references", async () => {
+    const loaded = await Author.eagerLoad({
+      posts: { specialComments: { post: ["specialComments", "verySpecialComment"] } },
+    })
+      .order("comments.body, very_special_comments_posts.body")
+      .where("posts.id = 4");
+    expect(loaded.map((a) => a.id)).toEqual([authors("david").id]);
+    await assertQueriesCount(0, false, () => {
+      const target = (rec: Base, name: string) => (rec.association(name) as any).target;
+      const post = target(target(loaded[0], "posts")[0], "specialComments")[0].association("post")
+        .target as Base;
+      target(post, "specialComments");
+      target(post, "verySpecialComment");
+    });
   });
 
   it("find with preloaded associations", async () => {
@@ -1665,8 +1683,28 @@ describe("RelationTest", () => {
     expect((await Bird.findOrCreateBy({ name: "bob" })).id).toBe(bird.id);
   });
 
-  it.skip("find or create by race condition", () => {
-    // PERMANENT-SKIP: Ruby-only — requires stub-based mocking of find_by to simulate race
+  it("find or create by race condition", async () => {
+    expect(await Subscriber.findBy({ nick: "bob" })).toBeNull();
+
+    const bob = await Subscriber.createBang({ nick: "bob" });
+    const relation = Subscriber.all();
+
+    const results: unknown[] = [null, bob];
+    const findByMock = async () => {
+      expect(results.length).toBeGreaterThan(0);
+      return results.shift();
+    };
+    // Rails stubs find_by/find_by! on `relation` and the stub survives the
+    // retry's `where(attributes).lock` because Ruby's spawn is `clone` (the
+    // singleton class rides along); trails spawns a fresh Relation, so the
+    // stub lives on the prototype to cover the spawned retry relation too.
+    vi.spyOn(Relation.prototype as any, "findBy").mockImplementation(findByMock as any);
+    // create_or_find_by always call find_by! on retry
+    vi.spyOn(Relation.prototype as any, "findByBang").mockImplementation(findByMock as any);
+
+    expect((await relation.findOrCreateBy({ nick: "bob" })).id).toBe(bob.id);
+
+    expect(results).toHaveLength(0);
   });
 
   it("find or create by with create with", async () => {

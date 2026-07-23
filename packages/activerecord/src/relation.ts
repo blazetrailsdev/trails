@@ -3965,16 +3965,12 @@ export class Relation<T extends Base> {
     conditions: Record<string, unknown>,
     extra?: Record<string, unknown>,
   ): Promise<T> {
-    const records = await this.where(conditions).limit(1);
-    if (records.length > 0) return records[0];
-    // Rails' scope_for_create: `where_values_hash.merge(create_with_value)` —
-    // scope attrs first, createWith overrides, then the caller's conditions
-    // and the optional extra hash win over both.
-    return this._modelClass.create({
-      ...this.scopeForCreate(),
-      ...conditions,
-      ...extra,
-    }) as Promise<T>;
+    // Rails (relation.rb:231): find_by(attributes) || create_or_find_by(attributes)
+    // — the create leg rides create_or_find_by so a concurrent insert that wins
+    // the race is recovered via its RecordNotUnique rescue instead of raising.
+    const existing = await this.findBy(conditions);
+    if (existing) return existing;
+    return this.createOrFindBy(conditions, extra);
   }
 
   /**
@@ -4037,7 +4033,13 @@ export class Relation<T extends Base> {
       return result;
     } catch (e) {
       if (!(e instanceof RecordNotUnique)) throw e;
-      return this.where(conditions).lock().findByBang(conditions);
+      // Rails (relation.rb:277-281): with a transaction still open the winner
+      // is materialized + row-locked inside it; otherwise plain find_by!, no
+      // lock.
+      if (this._conn().isTransactionOpen()) {
+        return this.where(conditions).lock().findByBang(conditions);
+      }
+      return this.findByBang(conditions);
     }
   }
 

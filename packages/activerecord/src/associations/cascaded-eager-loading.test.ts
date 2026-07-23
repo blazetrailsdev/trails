@@ -323,11 +323,15 @@ describe("CascadedEagerLoadingTest", () => {
     });
   });
 
-  it.skip("eager association loading with has many sti and subclasses", () => {
-    // BLOCKED: join-dependency eager-load alias ordering gap.
-    // ROOT-CAUSE: `order: ["topics.id", "replies_topics.id"]` over `includes(:replies)`
-    //   forces an eager-load join aliased `replies_topics`; trails' alias naming
-    //   differs. Tracked: RFC 0030 story cascaded-eager-join-alias-and-callbacks.
+  it("eager association loading with has many sti and subclasses", async () => {
+    const reply = new Reply({ title: "gaga", content: "boo-boo", parent_id: 1 });
+    expect(await reply.save()).toBe(true);
+
+    const loaded = await Topic.all().includes("replies").order(["topics.id", "replies_topics.id"]);
+    await assertQueriesCount(0, false, () => {
+      expect(targetArr(loaded[0], "replies")).toHaveLength(2);
+      expect(targetArr(loaded[1], "replies")).toHaveLength(0);
+    });
   });
 
   it("eager association loading with belongs to sti", async () => {
@@ -353,11 +357,20 @@ describe("CascadedEagerLoadingTest", () => {
     });
   });
 
-  it.skip("eager association loading of stis with multiple references", () => {
-    // BLOCKED: join-dependency eager-load alias ordering gap.
-    // ROOT-CAUSE: includes({posts: {special_comments: {post: ...}}}) with order on
-    //   `very_special_comments_posts.body` needs the same alias-naming fidelity.
-    //   Tracked: RFC 0030 story cascaded-eager-join-emit-alias.
+  it("eager association loading of stis with multiple references", async () => {
+    const loaded = await Author.all()
+      .includes({ posts: { specialComments: { post: ["specialComments", "verySpecialComment"] } } })
+      .order("comments.body, very_special_comments_posts.body")
+      .where("posts.id = 4");
+    expect(loaded.map((a) => a.id)).toEqual([(authors("david") as any).id]);
+    await assertQueriesCount(0, false, () => {
+      const post = target(
+        targetArr(targetArr(loaded[0], "posts")[0], "specialComments")[0],
+        "post",
+      );
+      targetArr(post!, "specialComments");
+      target(post!, "verySpecialComment");
+    });
   });
 
   it("eager association loading where first level returns nil", async () => {

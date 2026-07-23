@@ -315,11 +315,13 @@ describeIfPg("PostgreSQLAdapter", () => {
 
   describe("PostgreSQLTimestampFixtureTest", () => {
     it.skip("group by date", () => {
-      // BLOCKED: adapter-pg — fixture-based Topic model not available
-      // ROOT-CAUSE: Rails' `fixtures :topics` loads YAML fixtures into the topics table;
-      // the fixture loading infrastructure (FixtureSet, YAML parsing, transactional setup)
-      // is not ported. Also requires Base.group() + count() wired to AR query interface.
-      // SCOPE: fixture loading is a separate multi-PR effort.
+      // BLOCKED: grouped-calculation key typing. Rails' Topic.group(...).count
+      // hash keys are type-cast values (`assert_kind_of Time, k`); trails'
+      // groupedAggregate returns Record<string, unknown>, whose keys are
+      // String()-ified even when the group column deserializes to Temporal
+      // (calculations.ts groupedAggregate). Converging needs a typed-Map
+      // result shape for expression groups.
+      // DEFERRED (RFC 0030): tracked by grouped-calculation-typed-keys.
     });
     it("load infinity and beyond", async () => {
       class Dev extends Base {

@@ -655,6 +655,7 @@ describe("NestedThroughAssociationsTest", () => {
   });
 
   // 3-level nested through (specialComments→specialCommentsRatings→taggings) direct-load returns empty.
+  // DEFERRED (RFC 0030): tracked by nested-through-sti-reflection-load.
   it.todo("has many through with sti on nested through reflection");
 
   it("nested has many through writers should raise error", async () => {

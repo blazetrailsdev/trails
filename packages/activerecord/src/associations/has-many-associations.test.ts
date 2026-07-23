@@ -60,6 +60,7 @@ import {
 } from "../test-helpers/models/author.js";
 import { Essay as HmEssay } from "../test-helpers/models/essay.js";
 import { Person as HmPerson } from "../test-helpers/models/person.js";
+import { Reader as HmReader } from "../test-helpers/models/reader.js";
 import { Subscriber as HmSubscriber } from "../test-helpers/models/subscriber.js";
 import { Subscription as HmSubscription } from "../test-helpers/models/subscription.js";
 import {
@@ -2118,37 +2119,39 @@ describe("HasManyAssociationsTest", () => {
     // FK should be set correctly
     expect((post as any).author_id).toBe(Number(author.id));
   });
-  // TODO: canonical posts has no status column
-  it.skip("association enum works properly", async () => {
-    class Author extends Base {
-      declare name: string | null;
+  it("association enum works properly", async () => {
+    // Rails (has_many_associations_test.rb:480-489): test-local SpecialAuthor /
+    // SpecialBook classes over the canonical authors/books tables.
+    class SpecialAuthor extends Base {
+      static _tableName = "authors";
 
       static {
-        this.attribute("name", "string");
+        this.hasMany("books", { className: "SpecialBook", foreignKey: "author_id" });
       }
     }
-    class Post extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-      declare status: string | null;
+    class SpecialBook extends Base {
+      declare last_read: "unread" | "reading" | "read" | "forgotten";
+
+      static _tableName = "books";
 
       static {
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.attribute("status", "string");
+        this.belongsTo("author");
+        this.enum("last_read", { unread: 0, reading: 2, read: 3, forgotten: null });
       }
     }
-    registerModel(Author);
-    registerModel(Post);
-    const author = await Author.create({ name: "Alice" });
-    await Post.create({ author_id: author.id, title: "A", status: "published", body: "body" });
-    await Post.create({ author_id: author.id, title: "B", status: "draft", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const published = posts.filter((p: any) => p.status === "published");
-    expect(published.length).toBe(1);
+    registerModel(SpecialAuthor);
+    registerModel(SpecialBook);
+
+    const author = await SpecialAuthor.createBang({ name: "Test" });
+    const book = await SpecialBook.createBang({ last_read: "reading" });
+    await (author as any).books.push(book);
+
+    expect(book.last_read).toBe("reading");
+    expect(
+      await SpecialAuthor.joins("books")
+        .where({ books: { last_read: "reading" } })
+        .count(),
+    ).not.toBe(0);
   });
   it("build and create should not happen within scope", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -2187,45 +2190,6 @@ describe("HasManyAssociationsTest", () => {
     expect(found).toBeDefined();
   });
 
-  // TODO: counter cache: canonical authors has no posts_count (use HmTopic/HmReply)
-  it.skip("create resets cached counters", async () => {
-    class CcResetAuthor extends Base {
-      declare name: string | null;
-      declare posts_count: number | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.attribute("posts_count", "integer");
-      }
-    }
-    class CcResetPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-      declare author: CcResetAuthor | null;
-      declare loadBelongsTo: (name: "author") => Promise<CcResetAuthor | null>;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-        this.belongsTo("author", {
-          className: "CcResetAuthor",
-          foreignKey: "author_id",
-          counterCache: "posts_count",
-        });
-      }
-    }
-    registerModel(CcResetAuthor);
-    registerModel(CcResetPost);
-    const author = await CcResetAuthor.create({ name: "Alice", posts_count: 0 });
-    await CcResetPost.create({ author_id: author.id, title: "A", body: "body" });
-    const reloaded = await CcResetAuthor.find(author.id!);
-    expect((reloaded as any).posts_count).toBe(1);
-    await CcResetPost.create({ author_id: author.id, title: "B", body: "body" });
-    const reloaded2 = await CcResetAuthor.find(author.id!);
-    expect((reloaded2 as any).posts_count).toBe(2);
-  });
   it("finding array compatibility", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
@@ -6478,15 +6442,38 @@ describe("HasManyAssociationsTest", () => {
 });
 
 describe("HasManyAssociationsTest", () => {
-  const { authors } = fixtures(["authors", "posts"]);
+  const { authors } = fixtures(["authors", "posts", "people", "readers"]);
 
   beforeAll(async () => {
     registerModel(HmAuthor);
     registerModel(HmPost);
     registerModel(HmFirstPost);
+    registerModel(HmPerson);
+    registerModel(HmReader);
     await HmAuthor.loadSchema();
     await HmPost.loadSchema();
     await HmFirstPost.loadSchema();
+  });
+
+  it("create resets cached counters", async () => {
+    await HmReader.deleteAll();
+
+    const person = await HmPerson.createBang({ first_name: "tenderlove" });
+
+    const post = (await HmPost.first())!;
+
+    expect(await (person as any).readers.toArray()).toEqual([]);
+    // Rails: person.readers.find_by_post_id(post.id) — dynamic finders are
+    // Ruby method_missing sugar; findBy carries the same query.
+    expect(await (person as any).readers.findBy({ post_id: post.id })).toBeNull();
+
+    await (person as any).readers.create({ post_id: post.id });
+
+    expect(await (person as any).readers.count()).toBe(1);
+    expect((await (person as any).readers.toArray()).length).toBe(1);
+    const reader = await (person as any).readers.first();
+    expect((await reader.post).id).toBe(post.id);
+    expect((await reader.person).id).toBe(person.id);
   });
 
   it("find scoped grouped having", async () => {
