@@ -754,7 +754,7 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * Mirrors Rails' `with_raw_connection` which reconnects after
    * `disconnect!`.
    */
-  private async _ensureClient(): Promise<mysql.Connection> {
+  private async _ensureClient(configure = true): Promise<mysql.Connection> {
     if (this._client) return this._client;
     // Return the in-flight promise only if it belongs to the current generation.
     // After disconnectBang() the generation advances, so stale in-flight
@@ -814,11 +814,19 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         // Await so the connect-once warm + checkVersion complete before the
         // socket is handed out — a too-old server rejects the connect (Rails'
         // configure_connection → check_version raises during connect).
-        try {
-          await this.configureConnection();
-        } catch (configureError) {
-          this.disconnectBang();
-          throw configureError;
+        // `reconnect()` passes configure=false: it opens the socket only
+        // (Rails' `Mysql2Adapter#connect`, mysql2_adapter.rb:144) and leaves
+        // the single overridable-hook dispatch to reconnectBang's
+        // attemptConfigureConnection, so a user override never observes
+        // duplicate configure_connection calls per connect
+        // (adapter_test.rb:852).
+        if (configure) {
+          try {
+            await this.configureConnection();
+          } catch (configureError) {
+            this.disconnectBang();
+            throw configureError;
+          }
         }
         return conn;
       },
@@ -1654,7 +1662,9 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     // raises out of `reconnect!` (mysql2_adapter.rb:150 → :144). Awaiting here
     // lets the inherited `reconnectBang` translate + re-raise the
     // `ConnectionNotEstablished` (carrying the pool) instead of swallowing it.
-    await this._ensureClient();
+    // configure=false: Rails' raw connect opens the socket without configuring;
+    // reconnectBang's attemptConfigureConnection dispatches the hook once.
+    await this._ensureClient(false);
   }
 
   /**
