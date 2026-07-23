@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import { SchemaCreation } from "./schema-creation.js";
 import { quoteDefaultExpression } from "./quoting.js";
 import { ExclusionConstraintDefinition, UniqueConstraintDefinition } from "./schema-definitions.js";
+import { Column } from "./column.js";
 import {
   ForeignKeyDefinition,
   ChangeColumnDefinition,
@@ -103,7 +104,7 @@ describe("PostgreSQL SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition", async () => {
-    const col = new ColumnDefinition("x", "string");
+    const col = new Column("x", null, { sqlType: "character varying", type: "string" });
     expect(
       await s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, null)),
     ).toContain("DROP DEFAULT");
@@ -115,7 +116,7 @@ describe("PostgreSQL SchemaCreation", () => {
   it("visitChangeColumnDefaultDefinition: uuid function default stays bare", async () => {
     // postgresql/quoting.rb:159-160 — a `()`-bearing string default on a
     // uuid column must reach the DDL as a call, not as `'uuid_generate_v4()'`.
-    const col = new ColumnDefinition("id", "uuid");
+    const col = new Column("id", null, { sqlType: "uuid", type: "uuid" });
     // The shared stub fakes quoteDefaultExpression; this branch lives in
     // the real one, so wire that in.
     const host = s();

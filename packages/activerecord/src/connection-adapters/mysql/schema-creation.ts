@@ -284,10 +284,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     o: ChangeColumnDefaultDefinition,
   ): Promise<string> {
     let sql = `ALTER COLUMN ${this.adapter.quoteIdentifier(o.column.name)} `;
-    // Rails reads `column.null == false` off the live Column; trails' MySQL
-    // builder still passes a ColumnDefinition, so accept both shapes.
-    const columnNull = "options" in o.column ? o.column.options.null : o.column.null;
-    if (o.default == null && columnNull === false) {
+    if (o.default == null && !o.column.null) {
       sql += "DROP DEFAULT";
     } else {
       sql += `SET DEFAULT ${await this.adapter.quoteDefaultExpression(o.default, o.column)}`;

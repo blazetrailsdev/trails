@@ -71,11 +71,7 @@ import {
   ForeignKeyDefinition,
   IndexDefinition,
 } from "./abstract/schema-definitions.js";
-import type {
-  ColumnType,
-  ColumnOptions,
-  SchemaStatementsLike,
-} from "./abstract/schema-definitions.js";
+import type { ColumnOptions, SchemaStatementsLike } from "./abstract/schema-definitions.js";
 import {
   TableDefinition as MysqlTableDefinition,
   Table as MysqlTable,
@@ -854,17 +850,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     // bare `SET` that quoteDefaultExpression(undefined) → "" would emit.
     // Rails has no nil/undefined split, so this is TS-specific defense.
     const newDefault = extracted === undefined ? null : extracted;
-    // Match the PG adapter's shape: build ColumnDefinition with the
-    // semantic type and set sqlType separately so dumper/visitor paths
-    // see both. visitChangeColumnDefaultDefinition reads name +
-    // options.null, but preserve type metadata for any downstream visitor.
-    const colDef = new ColumnDefinition(
-      column.name,
-      (column.type ?? "string") as ColumnType,
-      { null: column.null } as ColumnOptions,
-    );
-    colDef.sqlType = column.sqlType ?? undefined;
-    return new ChangeColumnDefaultDefinition(colDef, newDefault);
+    return new ChangeColumnDefaultDefinition(column, newDefault);
   }
 
   /**

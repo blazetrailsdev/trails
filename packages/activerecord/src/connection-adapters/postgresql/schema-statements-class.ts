@@ -1006,11 +1006,6 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition | undefined> {
-    // Mirrors PostgreSQL::SchemaStatements#build_change_column_default_definition:
-    // carry the live reflected Column (with oid/fmod) into the definition so
-    // the visitor's quoteDefaultExpression resolves the cast type via the OID
-    // type-map key — no regtype SCHEMA query, and fmod-dependent types
-    // (e.g. numeric precision/scale) keep their modifier.
     const col = (await this.columns(tableName)).find((c) => c.name === columnName);
     if (!col) return undefined;
     const defaultValue = this.extractNewDefaultValue(defaultOrChanges);

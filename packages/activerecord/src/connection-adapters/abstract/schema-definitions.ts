@@ -379,15 +379,11 @@ export class ChangeColumnDefinition {
 
 /**
  * Mirrors: ActiveRecord::ConnectionAdapters::ChangeColumnDefaultDefinition
- *
- * Rails' builders pass the live reflected Column (carrying oid/fmod on PG) —
- * not a synthesized ColumnDefinition — so the visitor's default quoting can
- * resolve the cast type via the OID key without a regtype query.
  */
 export class ChangeColumnDefaultDefinition {
   readonly default: unknown;
   constructor(
-    readonly column: ColumnDefinition | Column,
+    readonly column: Column,
     defaultValue: unknown,
   ) {
     this.default = defaultValue;

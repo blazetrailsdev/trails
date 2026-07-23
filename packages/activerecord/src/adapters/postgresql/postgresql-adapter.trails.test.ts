@@ -1188,7 +1188,8 @@ describeIfPg("PostgreSQLAdapter", () => {
           "id" SERIAL PRIMARY KEY,
           "score" INTEGER DEFAULT 0,
           "created_at" TIMESTAMP WITHOUT TIME ZONE,
-          "tags" TEXT[]
+          "tags" TEXT[],
+          "price" NUMERIC(5,2)
         )
       `);
     });
@@ -1227,14 +1228,21 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("carries the live reflected Column with oid and fmod", async () => {
-      // Rails passes column_for(...)'s live Column straight into
-      // ChangeColumnDefaultDefinition, so the visitor's default quoting
-      // resolves via the (oid, fmod) type-map key — no regtype query.
       const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", 42);
       const col = def!.column as PgColumn;
       expect(col).toBeInstanceOf(PgColumn);
-      expect(col.oid).toBe(23); // int4
+      expect(col.oid).toBe(23);
       expect(col.fmod).not.toBeNull();
+    });
+
+    it("resolves fmod-dependent types (numeric precision/scale) through the carried column", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "price", "12.345");
+      const col = def!.column as PgColumn;
+      expect(col.fmod).not.toBeNull();
+      expect(col.precision).toBe(5);
+      expect(col.scale).toBe(2);
+      const sql = await adapter.schemaCreation.accept(def!);
+      expect(sql).toBe(`ALTER COLUMN "price" SET DEFAULT 12.35`);
     });
 
     it("quotes the default via the OID key without a regtype SCHEMA query", async () => {
