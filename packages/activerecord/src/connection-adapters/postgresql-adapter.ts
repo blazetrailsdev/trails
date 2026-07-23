@@ -216,7 +216,9 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   override get active(): boolean {
-    return !this._closed && this._pgClientOptions != null;
+    // Rails' active? starts with `return false unless @raw_connection`
+    // (postgresql_adapter.rb); the ping half can't run in a sync getter.
+    return this._rawConnection !== null && !this._closed && this._pgClientOptions != null;
   }
 
   // Mirrors Rails' `PostgreSQLAdapter#connected?`
@@ -3072,7 +3074,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     this._statementPool = null;
     this._needsDeallocateAll = false;
     this._inTransaction = false;
-    this._closed = true;
+    // Rails' disconnect! is NOT terminal: with_raw_connection's
+    // `connect! if @raw_connection.nil?` (abstract_adapter.rb:985) lazily
+    // reopens on the next query (cases/disconnected_test.rb). `_closed = true`
+    // is reserved for close()/discardBang(), which ARE terminal.
     // If a connect is in flight, bump its generation so it tears down (end()s,
     // not adopts) its socket when it resolves — even if a racing reconnect
     // clears _closed first — and so a later reconnect opens a fresh acquire
