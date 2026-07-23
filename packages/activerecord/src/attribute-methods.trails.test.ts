@@ -10,6 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, ReadonlyAttributeError, registerModel } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
+import { registerSubclass } from "./inheritance.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
@@ -224,5 +225,71 @@ describe("AttributeMethodsTest (trails)", () => {
     generatable(Widget).defineAttributeMethods();
     const w = new Widget({});
     expect((w as { color: unknown }).color).toBe("fixed");
+  });
+
+  it("class attributeNames is memoized and frozen", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.attributeNames();
+    expect(first).toContain("title");
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Topic.attributeNames()).toBe(first);
+  });
+
+  it("resetColumnInformation invalidates the class attributeNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.attributeNames();
+    (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
+    // The reset drops the shared cache's per-table entry; re-reflect so the
+    // suite's warm-cache invariant is restored for later tests.
+    await Topic.loadSchema();
+    const second = Topic.attributeNames();
+    expect(second).not.toBe(first);
+    expect(second).toEqual(first);
+  });
+
+  it("tableName= invalidates the attributeNames memo on descendants", async () => {
+    class Topic extends Base {}
+    class ImportantTopic extends Topic {
+      static {
+        registerSubclass(this);
+      }
+    }
+    await Topic.loadSchema();
+    Topic.attributeNames();
+    const subNames = ImportantTopic.attributeNames();
+    Topic.tableName = "posts";
+    expect(ImportantTopic.attributeNames()).not.toBe(subNames);
+  });
+
+  it("ignoredColumns= invalidates the attributeNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.attributeNames();
+    Topic.ignoredColumns = ["approved"];
+    expect(Topic.attributeNames()).not.toBe(first);
+  });
+
+  it("subclass does not inherit the parent's attributeNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const parentNames = Topic.attributeNames();
+    class ImportantTopic extends Topic {}
+    expect(ImportantTopic.attributeNames()).not.toBe(parentNames);
+  });
+
+  it("does not memoize the cold-cache fail-open attributeNames answer", async () => {
+    class NonExistentTable extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    // Cold cache fails open (documented inherent deviation — Rails' sync DB
+    // hit would return []); loadSchema seeds dataSourceExists=false, and the
+    // cold answer must not have been memoized, so the guard then closes.
+    expect(NonExistentTable.attributeNames()).toEqual(["name"]);
+    await NonExistentTable.loadSchema();
+    expect(NonExistentTable.attributeNames()).toEqual([]);
   });
 });

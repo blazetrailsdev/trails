@@ -1805,7 +1805,9 @@ export class Model {
    * Mirrors: ActiveModel::AttributeMethods#attribute_names (instance)
    */
   attributeNames(): string[] {
-    return (this.constructor as typeof Model).attributeNames();
+    // Copy: the class-level result is frozen (memoized); Rails' instance
+    // method returns a fresh mutable `@attributes.keys` array.
+    return [...(this.constructor as typeof Model).attributeNames()];
   }
 
   get attributes(): Record<string, unknown> {

@@ -614,6 +614,8 @@ interface AttributeNamesHost {
   _attributeDefinitions: { keys(): Iterable<string>; has(name: string): boolean };
   abstractClass?: boolean;
   columnNames?(): string[];
+  _schemaRevision?: number;
+  _attributeNamesMemo?: { revision: number; names: readonly string[] };
 }
 
 /**
@@ -629,19 +631,50 @@ interface AttributeNamesHost {
  * declaration order.
  */
 export function attributeNames(this: AttributeNamesHost): string[] {
+  // Rails' `@attribute_names ||= ...freeze` memo, own-property per class (a
+  // subclass never reads its parent's memo — Rails nils `@attribute_names` in
+  // `inherited`), revision-stamped so the reset paths that clear
+  // `_columns`/`_columnsHash` (resetColumnInformation, applyColumnsHash)
+  // invalidate it, including subclass memos the base's reset can't reach.
+  const memo = Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")
+    ? this._attributeNamesMemo
+    : undefined;
+  if (memo && memo.revision === (this._schemaRevision ?? 0)) return memo.names as string[];
   // Rails attribute_methods.rb:236-241: `if !abstract_class? && table_exists?`.
-  // trails' tableExists is async, so the table_exists? half runs off the
-  // schema cache's already-resolved answer — `false` only after a
-  // dataSourceExists miss; a cold/unknown table falls through (fail-open,
-  // where Rails' sync DB hit would return []).
-  if (this.abstractClass || cachedTableExists.call(this as never) === false) return [];
+  // trails' tableExists is async, so the table_exists? half runs off the schema
+  // cache's already-resolved answer — `false` only after a dataSourceExists
+  // miss; a cold/unknown table (`undefined`) falls through. Accepted inherent
+  // deviation from Rails' sync-DB-hit `[]`: a sync API cannot make the DB hit,
+  // and failing closed would break every adapter-less attribute-only model.
+  // The async pipeline (loadSchemaFromAdapter → dataSourceExists) seeds the
+  // negative entry, closing the guard once `loadSchema()` has been awaited —
+  // which is why the fail-open answer must never be memoized: that resolution
+  // happens without a `_schemaRevision` bump to invalidate it.
+  const exists = cachedTableExists.call(this as never);
+  if (this.abstractClass || exists === false) {
+    const frozen = Object.freeze([] as string[]);
+    this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
+    return frozen as string[];
+  }
   const declared = [...this._attributeDefinitions.keys()];
   const columnNames = this.columnNames?.() ?? [];
-  if (columnNames.length === 0) return declared;
-  const columnSet = new Set(columnNames);
-  const orderedColumns = columnNames.filter((name) => this._attributeDefinitions.has(name));
-  const virtuals = declared.filter((name) => !columnSet.has(name));
-  return [...orderedColumns, ...virtuals];
+  let names: string[];
+  if (columnNames.length === 0) {
+    names = declared;
+  } else {
+    const columnSet = new Set(columnNames);
+    const orderedColumns = columnNames.filter((name) => this._attributeDefinitions.has(name));
+    const virtuals = declared.filter((name) => !columnSet.has(name));
+    names = [...orderedColumns, ...virtuals];
+  }
+  if (exists !== undefined) {
+    const frozen = Object.freeze(names);
+    // Re-read the revision: `columnNames()` above can run the first sync
+    // `loadSchema` → `applyColumnsHash`, which bumps it mid-call.
+    this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
+    return frozen as string[];
+  }
+  return names;
 }
 
 // ---------------------------------------------------------------------------
