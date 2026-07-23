@@ -235,9 +235,13 @@ export class PredicateBuilder {
         value,
       ).queries();
       const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
-      const inner = normalizedQueries.flatMap((q) => assocPb.expandFromHash(q));
-      if (inner.length === 0) return [];
-      return [inner.length === 1 ? inner[0] : new Nodes.And(inner)];
+      const queryGroups: Nodes.Node[][] = [];
+      for (const query of normalizedQueries) {
+        const inner = assocPb.expandFromHash(query);
+        if (inner.length === 0) continue;
+        queryGroups.push(inner);
+      }
+      return this.groupingQueries(queryGroups);
     }
     // Core non-polymorphic, non-through path.
     const queries = new AssociationQueryValue(associatedTable, value).queries();
