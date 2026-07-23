@@ -1183,13 +1183,26 @@ class TestExtractor
   end
 
   ESCAPES = {
-    "n" => "\n", "t" => "\t", "r" => "\r", "s" => " ", "0" => "\0",
+    "n" => "\n", "t" => "\t", "r" => "\r", "s" => " ",
     "a" => "\a", "b" => "\b", "e" => "\e", "f" => "\f", "v" => "\v",
     "\\" => "\\", '"' => '"', "'" => "'", "#" => "#"
   }.freeze
 
   def unescape_string_literal(text)
-    text.gsub(/\\(.)/m) { ESCAPES.fetch($1, "\\#{$1}") }
+    text.gsub(/\\(u\{[0-9a-fA-F ]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{1,2}|[0-7]{1,3}|.)/m) do
+      seq = Regexp.last_match(1)
+      if seq.start_with?("u{")
+        seq[2..-2].split.map { |cp| cp.to_i(16).chr(Encoding::UTF_8) }.join
+      elsif seq.start_with?("u")
+        seq[1..].to_i(16).chr(Encoding::UTF_8)
+      elsif seq.start_with?("x")
+        seq[1..].to_i(16).chr(Encoding::UTF_8)
+      elsif seq.match?(/\A[0-7]+\z/)
+        seq.to_i(8).chr(Encoding::UTF_8)
+      else
+        ESCAPES.fetch(seq, "\\#{seq}")
+      end
+    end
   end
 
   # ---- String extraction helpers ----
