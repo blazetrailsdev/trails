@@ -1248,6 +1248,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   async reloadTypeMap(): Promise<void> {
     this._typeMap = null;
     await this.loadAdditionalTypes();
+    // A type-map reload signals the database's type universe changed — an
+    // extension or user type (hstore, enum, composite) was created or dropped,
+    // reassigning OIDs. A cached prepared statement that bound or returned one
+    // of those types embeds the now-stale OID in its server-side plan, so
+    // re-executing it raises "cache lookup failed for type <oid>". Drop the
+    // client-side statement map (NOT clearCacheBang) so the next prepare gets a
+    // fresh monotonic name and re-parses against the current OIDs. We
+    // deliberately skip the DEALLOCATE: reloadTypeMap runs mid-DDL-transaction
+    // (e.g. createEnum), and queuing DEALLOCATEs onto the pinned client there
+    // interleaves with the in-flight statement and desyncs the pg protocol.
+    // The orphaned server statements keep their old names — never reused — and
+    // are reclaimed on session reset/close.
+    this._statementPool?.reset();
   }
 
   /**
@@ -3724,6 +3737,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     } else {
       await this.exec(`DROP EXTENSION IF EXISTS ${this.quoteIdentifier(extName)}${cascade}`);
     }
+    // Mirrors Rails' disable_extension, which reloads the type map after the
+    // drop; reloadTypeMap also drops the prepared-statement name map so a later
+    // query doesn't re-execute a plan that referenced the dropped type's OID.
+    await this.reloadTypeMap();
   }
 
   async databaseExists(name: string): Promise<boolean> {

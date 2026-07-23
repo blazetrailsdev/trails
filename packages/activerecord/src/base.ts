@@ -845,12 +845,39 @@ function _dispatchAssociationAttrs(
   }
 }
 
-// Column types whose database value is a plain string the driver can bind as
-// an untyped parameter without losing an implicit cast. Used by the write path
-// to decide which values to bind (vs inline) so null-byte strings round-trip.
-const BINDABLE_STRING_TYPES = new Set(["string", "text", "immutable_string"]);
-function isBindableStringColumn(typeName: string | undefined): boolean {
-  return typeName !== undefined && BINDABLE_STRING_TYPES.has(typeName);
+// Build the Arel value node for one write-path column (INSERT VALUES / UPDATE
+// SET). Mirrors Rails' `_insert_record`/`_update_record`, which hand every
+// column to the Arel visitor as an `ActiveModel::Attribute` so
+// `visit_ActiveModel_Attribute → collector.add_bind(o)` binds it as a typed
+// prepared-statement parameter (`type_casted_binds`) — null bytes round-trip
+// and intermediate database values (BinaryData, Temporal, BigDecimal) are
+// finished off by each adapter's bind normalization instead of being inlined
+// via `quote()`.
+//
+// Deviation: the bind carries the pre-extracted `valuesForDatabase()` primitive
+// where Rails' AST carries the Attribute object itself (attribute_methods.rb
+// `attributes_with_values` → persistence.rb `_insert_record`/`_update_record`),
+// keeping type metadata until the adapter's `type_casted_binds`. In trails the
+// Attribute would be resolved to the very same primitive one step later anyway:
+// `toSqlAndBinds` (abstract/database-statements.ts) unwraps every ModelAttribute
+// bind to `valueForDatabase` at compile time — a trails-wide seam shared with
+// the read path and relied on by query-cache keying
+// (`JSON.stringify([sql, binds])`), so threading the Attribute through here is
+// inert. The only driver dispatch keyed off attribute type (SQLite's
+// FloatType → SQLITE_FLOAT for whole-valued floats) is not observable for
+// table writes: a float column's REAL affinity converts an INTEGER-typed bind
+// on storage (verified: `typeof(col)` is 'real' either way).
+// Array columns keep their bespoke inline quoting: their
+// database value is an adapter-specific aggregate literal (`{…}` / `ARRAY[…]`)
+// that the drivers cannot bind as a single scalar parameter — the adapter's
+// `quote` (Rails' `quote(encode_array(value))`) type-casts every element.
+function writePathValueNode(
+  def: { type?: { name?: string } } | undefined,
+  raw: unknown,
+  adapter: { quote(value: unknown): string },
+): InstanceType<typeof Nodes.Node> | unknown {
+  if (def?.type?.name === "array") return arelSql(adapter.quote(raw));
+  return new Nodes.BindParam(raw);
 }
 
 // eslint-disable-next-line @typescript-eslint/no-unsafe-declaration-merging
@@ -3559,29 +3586,11 @@ export class Base extends Model {
     const values: unknown[] = columns.map((k) => attrs[k]);
 
     // Build the column→value map for the Rails-faithful `_insert_record` class
-    // method, applying the same per-column node handling the inline INSERT used:
-    // bind string/text-column values as prepared-statement parameters (matching
-    // Rails' type_casted_binds) so a value containing a null byte (\x00)
-    // round-trips rather than truncating the inlined SQL at the C-string
-    // boundary; inline-quote arrays; and pass everything else raw so the
-    // visitor's `quote()` finishes serializing intermediate objects and carries
-    // the implicit cast custom-OID columns (hstore, enum) need.
+    // method: every non-array column value is bound as a prepared-statement
+    // parameter (see writePathValueNode), matching Rails' type_casted_binds.
     const valuesMap: Record<string, unknown> = {};
     columns.forEach((c, i) => {
-      const def = ctor._attributeDefinitions.get(c);
-      const isArray = def?.type?.name === "array";
-      const raw = values[i];
-      valuesMap[c] =
-        !isArray && isBindableStringColumn(def?.type?.name) && typeof raw === "string"
-          ? new Nodes.BindParam(raw)
-          : // Array columns serialize to an OID::Array `Data`; quote it via the
-            // adapter's `quote` (Rails' `quote(encode_array(value))`) so every
-            // element gets `type_cast` — datetimes reach `quoted_date`, binary
-            // gets hex — rather than the bare `String(Data)` an inline literal
-            // would otherwise fall to (which emits ISO-8601 for datetimes).
-            isArray
-            ? arelSql(adapter.quote(raw))
-            : raw;
+      valuesMap[c] = writePathValueNode(ctor._attributeDefinitions.get(c), values[i], adapter);
     });
 
     this._pendingOperation = (async () => {
@@ -3694,22 +3703,10 @@ export class Base extends Model {
     }
 
     const updateValues: [InstanceType<typeof Nodes.Node>, unknown][] = declaredChanges.map(
-      (key) => {
-        const val = dbValues[key];
-        const def = ctor._attributeDefinitions.get(key);
-        const isArray = def?.type?.name === "array";
-        // Bind string/text-column SET values as prepared-statement parameters
-        // (see _performInsert) so null-byte values survive; other types stay
-        // inline.
-        return [
-          table.get(key),
-          !isArray && isBindableStringColumn(def?.type?.name) && typeof val === "string"
-            ? new Nodes.BindParam(val)
-            : isArray
-              ? arelSql(adapter.quote(val))
-              : val,
-        ];
-      },
+      (key) => [
+        table.get(key),
+        writePathValueNode(ctor._attributeDefinitions.get(key), dbValues[key], adapter),
+      ],
     );
 
     // Optimistic locking: include lock column in WHERE and increment it.
@@ -3738,7 +3735,14 @@ export class Base extends Model {
       const lockIdx = declaredChanges.indexOf(lockCol);
       if (lockIdx !== -1) updateValues.splice(lockIdx, 1);
       this._writeAttribute(lockCol, currentVersion + 1);
-      updateValues.push([table.get(lockCol), currentVersion + 1]);
+      // Rails increments `self[locking_column]` and lets `_update_record` pass
+      // the attribute to Arel like every other SET column (optimistic.rb:
+      // 101-108 → persistence.rb attributes_with_values), so the bumped lock
+      // value is bound, not inlined — route through the same write-path node.
+      updateValues.push([
+        table.get(lockCol),
+        writePathValueNode(ctor._attributeDefinitions.get(lockCol), currentVersion + 1, adapter),
+      ]);
     }
 
     const um = new UpdateManager()

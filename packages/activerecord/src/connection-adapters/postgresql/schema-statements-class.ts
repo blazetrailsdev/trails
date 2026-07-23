@@ -1640,6 +1640,11 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       : this.pg.quoteIdentifier(enumName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     await this.pg.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+    // Mirrors Rails drop_enum: `internal_exec_query(query).tap { reload_type_map }`
+    // (postgresql_adapter.rb:571-576). reloadTypeMap also drops the
+    // prepared-statement name map so a cached plan referencing the dropped
+    // type's OID is never re-executed ("cache lookup failed for type <oid>").
+    await this.pg.reloadTypeMap();
   }
 
   async renameEnum(name: string, newNameOrOptions: string | { to: string }): Promise<void> {
@@ -1655,6 +1660,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
       : this.pg.quoteIdentifier(enumName);
     await this.pg.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.pg.quoteIdentifier(newName)}`);
+    // Mirrors Rails rename_enum: `exec_query(...).tap { reload_type_map }`
+    // (postgresql_adapter.rb:584).
+    await this.pg.reloadTypeMap();
   }
 
   async addEnumValue(
@@ -1679,6 +1687,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.pg.exec(
       `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.pg.quoteLiteral(value)}${position}`,
     );
+    // Mirrors Rails add_enum_value: `exec_query(...).tap { reload_type_map }`
+    // (postgresql_adapter.rb:602).
+    await this.pg.reloadTypeMap();
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
@@ -1689,6 +1700,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.pg.exec(
       `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.pg.quoteLiteral(options.from)} TO ${this.pg.quoteLiteral(options.to)}`,
     );
+    // Mirrors Rails rename_enum_value: `exec_query(...).tap { reload_type_map }`
+    // (postgresql_adapter.rb:614-616).
+    await this.pg.reloadTypeMap();
   }
 
   // ---------------------------------------------------------------------------
@@ -1726,6 +1740,15 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       parts.push(`SUBTYPE_DIFF = ${quoteQualifiedIdentifier(options.subtypeDiff, "subtypeDiff")}`);
     }
     await this.pg.exec(`CREATE TYPE ${qualifiedName} AS RANGE (${parts.join(", ")})`);
+    // createRange/dropRange are trails additions (Rails has no range-type DDL
+    // helper), but they follow the pattern of Rails' own type-DDL helpers
+    // (create_enum/drop_enum/rename_enum, postgresql_adapter.rb:541-615), which
+    // all `reload_type_map` after mutating the type universe. reloadTypeMap
+    // also drops the prepared-statement name map, so a cached write-path plan
+    // built against a prior incarnation of the type (drop + recreate reassigns
+    // the OID) is re-prepared instead of raising
+    // "cache lookup failed for type <oid>".
+    await this.pg.reloadTypeMap();
   }
 
   async dropRange(name: string, options: { ifExists?: boolean } = {}): Promise<void> {
@@ -1735,6 +1758,8 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       : this.pg.quoteIdentifier(rangeName);
     const ifExists = options.ifExists ? " IF EXISTS" : "";
     await this.pg.exec(`DROP TYPE${ifExists} ${qualifiedName}`);
+    // See createRange: mirror Rails' type-DDL `reload_type_map` pattern.
+    await this.pg.reloadTypeMap();
   }
 
   // ---------------------------------------------------------------------------
