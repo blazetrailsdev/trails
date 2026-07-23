@@ -797,7 +797,7 @@ export class ConnectionPool implements ReapablePool {
     }
     const conn = this._tryAcquire();
     if (conn) {
-      return this._verifyOnCheckout(checkoutAndVerify(this, conn));
+      return checkoutAndVerify(this, conn);
     }
 
     const t = timeout ?? this.checkoutTimeout;
@@ -818,27 +818,7 @@ export class ConnectionPool implements ReapablePool {
       throw new ConnectionNotEstablished("Connection pool has been discarded");
     }
     this._checkedOut.add(c);
-    return this._verifyOnCheckout(checkoutAndVerify(this, c));
-  }
-
-  /**
-   * Rails hands checked-out connections back with the raw connection
-   * established (checkout→verify!→connect); trails' raw connect is lazy and
-   * async, so drive `verifyBang` on the async checkout path, mirroring
-   * `checkout_and_verify`'s rescue (remove + disconnect!) on failure.
-   *
-   * @internal
-   */
-  private async _verifyOnCheckout(c: DatabaseAdapter): Promise<DatabaseAdapter> {
-    try {
-      await (c as unknown as { verifyBang(): void | Promise<void> }).verifyBang();
-      return c;
-    } catch (err) {
-      this.remove(c);
-      (c as unknown as { disconnectBang?: () => void }).disconnectBang?.();
-      this.trackCloseDrain((c as unknown as { whenClosed?: () => Promise<void> }).whenClosed?.());
-      throw err;
-    }
+    return checkoutAndVerify(this, c);
   }
 
   private _acquireConnection(): DatabaseAdapter {
