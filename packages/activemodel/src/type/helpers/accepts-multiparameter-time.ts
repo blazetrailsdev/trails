@@ -116,26 +116,36 @@ export class AcceptsMultiparameterTime {
       return this.type.cast(pdt);
     } catch {
       // Rails assembles via ::Time.public_send(default_timezone, *values).
-      // Time.utc/local rolls *within-range* calendar overflow (Nov 31 → Dec 1,
-      // Feb 29 in a common year → Mar 1) but raises ArgumentError outside its
-      // accepted domain (month 13, mday 32, hour 25 — verified on Ruby 3.3),
-      // which AR surfaces as MultiparameterAssignmentErrors. Roll over only
-      // inside that accepted domain; otherwise raise to match Time's strictness.
+      // Time.utc/local rolls *within-range* overflow (Nov 31 → Dec 1, Feb 29
+      // in a common year → Mar 1, hour 24 with 0 min/sec → next midnight,
+      // sec 60 → next minute) but raises ArgumentError outside its accepted
+      // domain (month 13, mday 32, hour 25 — verified on Ruby 3.3), which AR
+      // surfaces as MultiparameterAssignmentErrors. Roll over only inside that
+      // accepted domain; otherwise raise to match Time's strictness.
+      const midnight24 = hour === 24 && minute === 0 && wholeSecond === 0 && totalNanoseconds === 0;
       if (
         month >= 1 &&
         month <= 12 &&
         day >= 1 &&
         day <= 31 &&
-        hour >= 0 &&
-        hour <= 23 &&
+        ((hour >= 0 && hour <= 23) || midnight24) &&
         minute >= 0 &&
         minute <= 59 &&
         wholeSecond >= 0 &&
         wholeSecond <= 60
       ) {
+        // Duration add carries all out-of-range components (day-in-month,
+        // hour 24, leap-second 60) the way Time normalizes them.
         const rolled = Temporal.PlainDate.from({ year, month: 1, day: 1 })
-          .add({ months: month - 1, days: day - 1 })
-          .toPlainDateTime(timeParts);
+          .toPlainDateTime()
+          .add({
+            months: month - 1,
+            days: day - 1,
+            hours: hour,
+            minutes: minute,
+            seconds: wholeSecond,
+            nanoseconds: totalNanoseconds,
+          });
         return this.type.cast(rolled);
       }
       throw new ArgumentError("argument out of range");
