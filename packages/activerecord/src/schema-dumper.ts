@@ -254,8 +254,6 @@ class AdapterSchemaSource implements SchemaSource {
         typeof (col as any).isVirtual === "function"
           ? (col as any).isVirtual()
           : (col as any).virtual === true;
-      // SQLite distinguishes STORED from VIRTUAL generation; the flag lives
-      // behind `isVirtualStored()` on the real SQLite3 Column.
       const isVirtualStored =
         typeof (col as any).isVirtualStored === "function"
           ? (col as any).isVirtualStored()

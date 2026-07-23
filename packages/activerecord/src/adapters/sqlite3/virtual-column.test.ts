@@ -7,6 +7,7 @@ import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
+import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
 import type { Column } from "../../connection-adapters/sqlite3/column.js";
@@ -19,9 +20,6 @@ afterAll(() => {
   vi.unstubAllEnvs();
 });
 
-// `virtual_columns` is not part of the canonical schema: Rails' own test builds
-// it inline in `setup` via `@connection.create_table :virtual_columns`, so we
-// mirror that rather than reaching for a canonical table.
 fixtures([], { useTransactionalTests: false });
 
 let adapter: AbstractSQLite3Adapter;
@@ -29,8 +27,6 @@ let adapter: AbstractSQLite3Adapter;
 class VirtualColumn extends Base {
   static tableName = "virtual_columns";
   static {
-    // Declare the real PK so strict writeFromUser's post-INSERT id write-back
-    // has a known column (mirrors the PG virtual-column test).
     this.attribute("id", "integer");
   }
 }
@@ -54,8 +50,6 @@ afterEach(async () => {
   VirtualColumn.resetColumnInformation();
 });
 
-// `take()` is nullable in TS; every call site here runs against the row created
-// in `beforeEach`, so unwrap once rather than asserting non-null per test.
 async function take(): Promise<Record<string, unknown>> {
   return (await VirtualColumn.take()) as unknown as Record<string, unknown>;
 }
@@ -160,10 +154,11 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
   });
 
   itIfSupports("virtual_columns", "build fixture sql", async () => {
-    const created = await FixtureSet.createFixtures(adapter, VirtualColumn, {
-      one: { name: "hello" },
-      two: { name: "world" },
-    });
+    const created = await FixtureSet.createFixtures(
+      adapter,
+      VirtualColumn,
+      virtualColumnFixtureData,
+    );
     expect(Object.keys(created).length).toBe(2);
   });
 });
