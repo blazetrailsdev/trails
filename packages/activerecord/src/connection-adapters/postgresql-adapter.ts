@@ -963,19 +963,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     name?: string;
   }): Type {
     const oid = column.oid;
-    if (oid == null) {
-      if (column.sqlType) {
-        // Pass the original sqlType + fmod so registerClassWithLimit /
-        // numeric / interval factories can still extract limit /
-        // precision / scale from the modifier.
-        return this.typeMap.lookup(
-          normalizeFormatType(column.sqlType),
-          column.fmod ?? -1,
-          column.sqlType,
-        );
-      }
-      return new ValueType();
-    }
+    if (oid == null) return new ValueType();
     // Rails' lookup_cast_type_from_column only *looks up* — it never
     // mutates the type_map on miss. Registering a fallback here would
     // poison the map: subsequent getOidType calls would see
@@ -5460,43 +5448,6 @@ export function splitPgDefault(raw: string | null): { literal: unknown; fn: stri
  * unrecognized expression and does not populate Column#default_function.
  */
 const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAMP/;
-
-/**
- * Normalize a `pg_catalog.format_type(...)` string to the typname the
- * static type_map is keyed by. PG returns human-friendly forms like
- * "integer" / "character varying(255)" / "bigint", but we register
- * "int4" / "varchar" / "int8". Strip size modifiers and alias common
- * formatted names so the fallback path in lookupCastTypeFromColumn
- * resolves well-known *scalar* types.
- *
- * Array types (e.g. "integer[]") are deliberately left as-is — they
- * don't have a static registration, so the lookup misses and returns
- * ValueType. Mapping them to the scalar typname (int4) would
- * incorrectly deserialize array values with a scalar type.
- */
-function normalizeFormatType(sqlType: string): string {
-  if (/\[\]\s*$/.test(sqlType)) return sqlType;
-  const base = sqlType
-    .replace(/\(.*\)/, "")
-    .trim()
-    .toLowerCase();
-  return FORMAT_TYPE_ALIASES[base] ?? base;
-}
-
-const FORMAT_TYPE_ALIASES: Record<string, string> = {
-  smallint: "int2",
-  integer: "int4",
-  bigint: "int8",
-  real: "float4",
-  "double precision": "float8",
-  "character varying": "varchar",
-  character: "bpchar",
-  "timestamp without time zone": "timestamp",
-  "timestamp with time zone": "timestamptz",
-  "time without time zone": "time",
-  "time with time zone": "timetz",
-  boolean: "bool",
-};
 
 (PostgreSQLAdapter.prototype as any).performQuery = performQuery;
 (PostgreSQLAdapter.prototype as any).castResult = castResult;

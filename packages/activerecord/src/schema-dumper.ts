@@ -56,6 +56,8 @@ export interface ColumnInfo {
    * `schemaPrecision`) can inspect the raw declaration on live columns.
    */
   sqlType?: string | null;
+  oid?: number | null;
+  fmod?: number | null;
   primaryKey?: boolean;
   null?: boolean;
   default?: unknown;
@@ -260,6 +262,8 @@ class AdapterSchemaSource implements SchemaSource {
         // than coalescing to the raw sqlType name.
         type: col.type ?? null,
         sqlType: col.sqlType ?? undefined,
+        oid: (col as any).oid ?? undefined,
+        fmod: (col as any).fmod ?? undefined,
         primaryKey: col.primaryKey,
         null: col.null,
         // A virtual column has no user-visible default (Rails Column#has_default?
