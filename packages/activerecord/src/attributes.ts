@@ -17,7 +17,7 @@ import {
   registerWithSuperclass,
 } from "@blazetrails/activemodel";
 import { encryptionHooks } from "./encryption-hooks.js";
-import { lookup as typeLookup } from "./type.js";
+import { lookup as typeLookup, adapterNameFrom, type AdapterNameSource } from "./type.js";
 import { cachedColumnsHash, stiSchemaHost } from "./model-schema.js";
 
 type AnyClass = any;
@@ -334,8 +334,11 @@ function resetDefaultAttributes(this: AnyClass): void {
  * @internal
  * Mirrors: ActiveRecord::Attributes::ClassMethods#resolve_type_name
  */
-function resolveTypeName(this: AnyClass, name: string): Type {
-  return typeLookup(name);
+function resolveTypeName(this: AnyClass, name: string, options?: Record<string, unknown>): Type {
+  return typeLookup(name, {
+    ...options,
+    adapter: adapterNameFrom(this as unknown as AdapterNameSource),
+  });
 }
 
 /**

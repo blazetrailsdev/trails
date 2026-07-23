@@ -19,6 +19,7 @@ import {
 } from "@blazetrails/activemodel";
 export { Type } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
+import { ConnectionNotEstablished } from "./errors.js";
 import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
 import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 
@@ -130,7 +131,13 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
   let configAdapter: string | undefined;
   try {
     configAdapter = model.connectionDbConfig()?.adapter;
-  } catch {
+  } catch (error) {
+    // Deviation: Rails lets `connection_db_config`'s ConnectionNotEstablished
+    // propagate. trails resolves adapter names during module load and during
+    // `attribute()` declarations that run before `establishConnection`, so an
+    // unconfigured model degrades to the default adapter instead of raising.
+    // Narrowed on purpose: any other error is a real bug and must not be masked.
+    if (!(error instanceof ConnectionNotEstablished)) throw error;
     return "sqlite";
   }
   return adapterNameFromConfig(configAdapter);

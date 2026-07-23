@@ -9,6 +9,7 @@ import {
   AdapterSpecificRegistry,
 } from "./type.js";
 import { Base } from "./base.js";
+import { ConnectionNotDefined } from "./errors.js";
 import { Type, StringType } from "@blazetrails/activemodel";
 import "./connection-adapters/mysql2-adapter.js";
 
@@ -43,10 +44,20 @@ describe("Type.currentAdapterName", () => {
     expect(
       adapterNameFrom({
         connectionDbConfig: () => {
-          throw new Error("No database connection defined.");
+          throw new ConnectionNotDefined("No database connection defined.");
         },
       }),
     ).toBe("sqlite");
+  });
+
+  it("propagates errors other than a missing connection", () => {
+    expect(() =>
+      adapterNameFrom({
+        connectionDbConfig: () => {
+          throw new TypeError("boom");
+        },
+      }),
+    ).toThrow(TypeError);
   });
 });
 
