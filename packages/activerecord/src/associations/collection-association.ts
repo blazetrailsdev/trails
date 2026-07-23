@@ -32,7 +32,7 @@ export interface ReplacePlan {
  */
 export interface FindFromTargetHost {
   owner: Base;
-  reflection: { options: { strictLoading?: unknown } };
+  reflection: Pick<AssociationDefinition, "options">;
   target: readonly Base[];
 }
 
