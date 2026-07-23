@@ -776,7 +776,9 @@ describe("HasManyAssociationsTest", () => {
 
   it("replace with new", async () => {
     const firm = (await HmFirm.first()) as any;
-    firm.clients = [companies("second_client"), Client.new({ name: "New Client" })];
+    await firm
+      .association("clients")
+      .writer([companies("second_client"), Client.new({ name: "New Client" })]);
     await firm.save();
     await firm.reload();
     const clients = await firm.clients;
