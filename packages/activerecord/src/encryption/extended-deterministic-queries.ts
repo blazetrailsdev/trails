@@ -3,6 +3,15 @@ import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attr
 import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 
 /**
+ * What AdditionalValue needs from its type. Rails passes the full resolved
+ * `type_for_attribute` type here — for a Serialized(Encrypted(...)) attribute
+ * that's the outer Type::Serialized, not EncryptedAttributeType.
+ */
+export interface SerializableType {
+  serialize(value: unknown): unknown;
+}
+
+/**
  * Automatically expands encrypted arguments to support querying both
  * encrypted and unencrypted data during encryption migration periods.
  *
@@ -120,13 +129,23 @@ export class EncryptedQuery {
     let modified = false;
 
     for (const attrName of encryptedAttrs) {
-      const type = encryptedTypeOf(getAttributeType(model, attrName));
-      if (!type) continue;
+      // Rails serializes through the FULL `type_for_attribute` type
+      // (extended_deterministic_queries.rb:58-62); `deterministic`/
+      // `previous_types` reach the inner EncryptedAttributeType via
+      // DelegateClass delegation there, via encryptedTypeOf here.
+      const fullType = getAttributeType(model, attrName) as SerializableType | undefined;
+      const type = encryptedTypeOf(fullType);
+      if (!fullType || !type) continue;
       if (!type.deterministic) continue;
       if (!type.previousTypes.length) continue;
       const value = result[attrName];
       if (value === undefined) continue;
-      result[attrName] = this.processEncryptedQueryArgument(value, checkForAdditionalValues, type);
+      result[attrName] = this.processEncryptedQueryArgument(
+        value,
+        checkForAdditionalValues,
+        fullType,
+        type,
+      );
       modified = true;
     }
 
@@ -136,6 +155,7 @@ export class EncryptedQuery {
   private static processEncryptedQueryArgument(
     value: unknown,
     checkForAdditionalValues: boolean,
+    fullType: SerializableType,
     type: EncryptedAttributeType,
   ): unknown {
     if (value === null) return value;
@@ -161,10 +181,10 @@ export class EncryptedQuery {
       return value.flatMap((v) => {
         if (v === null) return [v];
         if (checkForAdditionalValues && v instanceof AdditionalValue) return [v];
-        return this.allCiphertextsFor(v, type);
+        return this.allCiphertextsFor(v, fullType, type);
       });
     }
-    return this.allCiphertextsFor(value, type);
+    return this.allCiphertextsFor(value, fullType, type);
   }
 
   /** @internal */
@@ -177,6 +197,7 @@ export class EncryptedQuery {
 
   private static allCiphertextsFor(
     plaintext: unknown,
+    fullType: SerializableType,
     type: EncryptedAttributeType,
   ): Array<AdditionalValue | unknown> {
     // Unlike Rails (which keeps plaintext at index 0 and relies on the
@@ -188,7 +209,11 @@ export class EncryptedQuery {
     // → `ExtendedEncryptableType.serialize` → pre-computed ciphertext, while
     // still preserving the raw plaintext when unencrypted data remains queryable
     // during migration (support_unencrypted_data).
-    const results: Array<AdditionalValue | unknown> = [new AdditionalValue(plaintext, type)];
+    // The current-scheme candidate serializes through the FULL resolved type
+    // (coder dumped before encryption, matching the write path); previous-
+    // scheme candidates use the bare previous EncryptedAttributeTypes, as
+    // Rails' delegated `previous_types` do.
+    const results: Array<AdditionalValue | unknown> = [new AdditionalValue(plaintext, fullType)];
     for (const prev of type.previousTypes) {
       results.push(new AdditionalValue(plaintext, prev));
     }
@@ -270,12 +295,12 @@ export class CoreQueries {
  */
 export class AdditionalValue {
   readonly value: unknown;
-  readonly type: EncryptedAttributeType;
+  readonly type: SerializableType;
   // Brand flag so EncryptedAttributeType.cast can identify AV instances
   // without importing this module (which would be circular).
   readonly [ADDITIONAL_VALUE_BRAND] = true;
 
-  constructor(value: unknown, type: EncryptedAttributeType) {
+  constructor(value: unknown, type: SerializableType) {
     this.type = type;
     this.value = this.process(value);
   }
