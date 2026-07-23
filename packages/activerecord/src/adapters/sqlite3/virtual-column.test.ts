@@ -1,82 +1,119 @@
 /**
  * Mirrors Rails activerecord/test/cases/adapters/sqlite3/virtual_column_test.rb
  */
-import { expect, beforeEach, afterEach } from "vitest";
+import { expect, beforeAll, beforeEach, afterEach, afterAll, vi } from "vitest";
 import { describeIfSqlite } from "./test-helper.js";
-import { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
-import { BetterSQLite3Adapter } from "../../connection-adapters/better-sqlite3-adapter.js";
-import type { Column } from "../../connection-adapters/sqlite3/column.js";
+import { Base } from "../../index.js";
+import { SchemaDumper } from "../../schema-dumper.js";
+import { FixtureSet } from "../../test-helpers/fixture-set.js";
+import { fixtures } from "../../test-helpers/fixtures.js";
+import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
+import type { AbstractSQLite3Adapter } from "../../connection-adapters/sqlite3-adapter.js";
+import type { Column } from "../../connection-adapters/sqlite3/column.js";
+
+beforeAll(() => {
+  vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
+});
+
+afterAll(() => {
+  vi.unstubAllEnvs();
+});
+
+fixtures([], { useTransactionalTests: false });
 
 let adapter: AbstractSQLite3Adapter;
 
+class VirtualColumn extends Base {
+  static tableName = "virtual_columns";
+  static {
+    this.attribute("id", "integer");
+  }
+}
+
 beforeEach(async () => {
-  adapter = new BetterSQLite3Adapter(":memory:");
-  await adapter.exec(
-    `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "octet_name" integer GENERATED ALWAYS AS (LENGTH(name)) VIRTUAL, "mutated_name" varchar GENERATED ALWAYS AS (REPLACE(name, 'l', 'L')) VIRTUAL, "column1" integer)`,
-  );
-  await adapter.executeMutation(
-    `INSERT INTO "virtual_columns" ("name", "column1") VALUES ('Rails', 10)`,
-  );
+  adapter = Base.connection as AbstractSQLite3Adapter;
+  await adapter.createTable("virtual_columns", { force: true }, (t) => {
+    t.string("name");
+    t.virtual("upper_name", { type: "string", as: "UPPER(name)", stored: true });
+    t.virtual("lower_name", { type: "string", as: "LOWER(name)", stored: false });
+    t.virtual("octet_name", { type: "integer", as: "LENGTH(name)" });
+    t.virtual("mutated_name", { type: "string", as: "REPLACE(name, 'l', 'L')" });
+    t.integer("column1");
+  });
+  await reloadColumnInformation();
+  await VirtualColumn.create({ name: "Rails", column1: 10 });
 });
 
 afterEach(async () => {
-  await adapter.exec(`DROP TABLE IF EXISTS "virtual_columns"`).catch(() => undefined);
-  await adapter.close();
+  await adapter.dropTable("virtual_columns", { ifExists: true }).catch(() => undefined);
+  VirtualColumn.resetColumnInformation();
 });
 
-async function columnsHash(): Promise<Record<string, Column>> {
-  const hash: Record<string, Column> = {};
-  for (const col of await adapter.columns("virtual_columns")) {
-    hash[col.name] = col as Column;
-  }
-  return hash;
+async function take(): Promise<Record<string, unknown>> {
+  return (await VirtualColumn.take()) as unknown as Record<string, unknown>;
+}
+
+function columnFor(name: string): Column {
+  return VirtualColumn.columnsHash()[name] as unknown as Column;
+}
+
+async function reloadColumnInformation(): Promise<void> {
+  adapter.schemaCache?.clear();
+  VirtualColumn.resetColumnInformation();
+  await VirtualColumn.loadSchema();
 }
 
 // -- Rails test class: virtual_column_test.rb --
 describeIfSqlite("SQLite3VirtualColumnTest", () => {
+  itIfSupports("virtual_columns", "virtual column with full inserts", async () => {
+    const partialInsertsWas = VirtualColumn.partialInserts;
+    VirtualColumn.partialInserts = false;
+    try {
+      await expect(VirtualColumn.createBang({ name: "Rails" })).resolves.toBeTruthy();
+    } finally {
+      VirtualColumn.partialInserts = partialInsertsWas;
+    }
+  });
+
   itIfSupports("virtual_columns", "stored column", async () => {
-    const column = (await columnsHash())["upper_name"];
+    const column = columnFor("upper_name");
     expect(column.isVirtual()).toBe(true);
     expect(column.isVirtualStored()).toBe(true);
-    const rows = await adapter.execute(`SELECT "upper_name" FROM "virtual_columns" LIMIT 1`);
-    expect(rows[0].upper_name).toBe("RAILS");
+    expect((await take()).upper_name).toBe("RAILS");
   });
 
   itIfSupports("virtual_columns", "explicit virtual column", async () => {
-    const column = (await columnsHash())["lower_name"];
+    const column = columnFor("lower_name");
     expect(column.isVirtual()).toBe(true);
     expect(column.isVirtualStored()).toBe(false);
-    const rows = await adapter.execute(`SELECT "lower_name" FROM "virtual_columns" LIMIT 1`);
-    expect(rows[0].lower_name).toBe("rails");
+    expect((await take()).lower_name).toBe("rails");
   });
 
   itIfSupports("virtual_columns", "implicit virtual column", async () => {
-    const column = (await columnsHash())["octet_name"];
+    const column = columnFor("octet_name");
     expect(column.isVirtual()).toBe(true);
     expect(column.isVirtualStored()).toBe(false);
-    const rows = await adapter.execute(`SELECT "octet_name" FROM "virtual_columns" LIMIT 1`);
-    expect(rows[0].octet_name).toBe(5);
+    expect((await take()).octet_name).toBe(5);
   });
 
   itIfSupports("virtual_columns", "virtual column with comma in definition", async () => {
-    const column = (await columnsHash())["mutated_name"];
+    const column = columnFor("mutated_name");
     expect(column.isVirtual()).toBe(true);
     expect(column.isVirtualStored()).toBe(false);
     expect(column.defaultFunction).not.toBeNull();
-    const rows = await adapter.execute(`SELECT "mutated_name" FROM "virtual_columns" LIMIT 1`);
-    expect(rows[0].mutated_name).toBe("RaiLs");
+    expect((await take()).mutated_name).toBe("RaiLs");
   });
 
   itIfSupports("virtual_columns", "change table with stored generated column", async () => {
     await adapter.changeTable("virtual_columns", async (t) => {
       await t.virtual("decr_column1", { type: "integer", as: "column1 - 1", stored: true });
     });
-    const column = (await columnsHash())["decr_column1"];
+    await reloadColumnInformation();
+    const column = columnFor("decr_column1");
     expect(column.isVirtual()).toBe(true);
     expect(column.isVirtualStored()).toBe(true);
-    const rows = await adapter.execute(`SELECT "decr_column1" FROM "virtual_columns" LIMIT 1`);
-    expect(rows[0].decr_column1).toBe(9);
+    expect((await take()).decr_column1).toBe(9);
   });
 
   itIfSupports(
@@ -86,11 +123,11 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
       await adapter.changeTable("virtual_columns", async (t) => {
         await t.virtual("incr_column1", { type: "integer", as: "column1 + 1", stored: false });
       });
-      const column = (await columnsHash())["incr_column1"];
+      await reloadColumnInformation();
+      const column = columnFor("incr_column1");
       expect(column.isVirtual()).toBe(true);
       expect(column.isVirtualStored()).toBe(false);
-      const rows = await adapter.execute(`SELECT "incr_column1" FROM "virtual_columns" LIMIT 1`);
-      expect(rows[0].incr_column1).toBe(11);
+      expect((await take()).incr_column1).toBe(11);
     },
   );
 
@@ -101,19 +138,27 @@ describeIfSqlite("SQLite3VirtualColumnTest", () => {
       await adapter.changeTable("virtual_columns", async (t) => {
         await t.virtual("sqr_column1", { type: "integer", as: "pow(column1, 2)" });
       });
-      const column = (await columnsHash())["sqr_column1"];
+      await reloadColumnInformation();
+      const column = columnFor("sqr_column1");
       expect(column.isVirtual()).toBe(true);
       expect(column.isVirtualStored()).toBe(false);
-      const rows = await adapter.execute(`SELECT "sqr_column1" FROM "virtual_columns" LIMIT 1`);
-      expect(rows[0].sqr_column1).toBe(100);
+      expect((await take()).sqr_column1).toBe(100);
     },
   );
 
-  // null-overridden: needs model layer / schema dump / fixture infrastructure
-  // it.skip("virtual column with full inserts", () => {});
-  // it.skip("schema dumping", () => {});
-  // it.skip("build fixture sql", () => {});
-});
+  itIfSupports("virtual_columns", "schema dumping", async () => {
+    const output = await SchemaDumper.dumpTableSchema(adapter, "virtual_columns");
+    expect(output).toMatch(
+      /t\.virtual\(\s*"upper_name",\s*\{\s*type:\s*"string",\s*as:\s*"UPPER\(name\)",\s*stored:\s*true\s*\}\s*\);/i,
+    );
+  });
 
-// -- Rails test class: virtual_table_test.rb --
-// All tests null-overridden (needs schema dump/load infrastructure)
+  itIfSupports("virtual_columns", "build fixture sql", async () => {
+    const created = await FixtureSet.createFixtures(
+      adapter,
+      VirtualColumn,
+      virtualColumnFixtureData,
+    );
+    expect(Object.keys(created).length).toBe(2);
+  });
+});
