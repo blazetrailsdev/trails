@@ -913,33 +913,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "concurrency test with no single-threaded JS equivalent.",
   },
   {
-    testFile: "adapters/abstract_mysql_adapter/count_deleted_rows_with_lock_test.rb",
-    tests: ["delete and create in different threads synchronize correctly"],
-    reason:
-      "Two Ruby Threads racing a DELETE and CREATE under a row lock to assert " +
-      "MySQL-side synchronization. GVL / shared-memory Thread model has no " +
-      "Node.js equivalent.",
-  },
-  // --- Concurrent-thread deadlock detection ---
-  // Listed in both the MySQL and PostgreSQL sibling files so the shared-test
-  // detector keeps them balanced (an asymmetric exclusion would mis-flag the
-  // surviving sibling as "misplaced").
-  {
-    testFile: "adapters/abstract_mysql_adapter/nested_deadlock_test.rb",
-    tests: [
-      "deadlock correctly raises Deadlocked inside nested SavepointTransaction",
-      "deadlock inside nested SavepointTransaction is recoverable",
-      "rollback exception is swallowed after a rollback",
-    ],
-    reason:
-      "Provokes a real database deadlock by running competing transactions on " +
-      "two Ruby Threads synchronized with a Concurrent::CyclicBarrier " +
-      "(nested_deadlock_test.rb:36-160); 'rollback exception is swallowed after " +
-      "a rollback' (:81) asserts `deadlocks == 1, \"deadlock is required for " +
-      'the test setup"`. A deadlock requires genuine concurrency; ' +
-      "single-threaded JS cannot reproduce it.",
-  },
-  {
     testFile: "adapters/postgresql/transaction_nested_test.rb",
     tests: [
       "deadlock inside nested SavepointTransaction is recoverable",
