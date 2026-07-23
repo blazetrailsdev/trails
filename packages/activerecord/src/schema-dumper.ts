@@ -56,13 +56,6 @@ export interface ColumnInfo {
    * `schemaPrecision`) can inspect the raw declaration on live columns.
    */
   sqlType?: string | null;
-  /**
-   * PG type OID (with its modifier) from the live column. Rails' dumper hands the
-   * real Column to `lookup_cast_type_from_column`, which is keyed on
-   * `(oid, fmod, sql_type)` — carry both so `schemaDefault` resolves the same
-   * OID-registered type (e.g. OID::Array for array columns) instead of a
-   * string-keyed fallback.
-   */
   oid?: number | null;
   fmod?: number | null;
   primaryKey?: boolean;

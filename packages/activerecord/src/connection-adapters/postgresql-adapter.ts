@@ -963,9 +963,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     name?: string;
   }): Type {
     const oid = column.oid;
-    // Rails keys this lookup on (oid, fmod, sql_type) only — a column without
-    // an OID (a bare ColumnDefinition) resolves via `lookupCastType`'s live
-    // regtype query instead (quoting.rb:195), never through a string map.
     if (oid == null) return new ValueType();
     // Rails' lookup_cast_type_from_column only *looks up* — it never
     // mutates the type_map on miss. Registering a fallback here would
