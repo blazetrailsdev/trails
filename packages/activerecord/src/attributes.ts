@@ -83,8 +83,10 @@ export function defineAttribute(
   castType: Type,
   options: { default?: unknown; userProvidedDefault?: boolean; limit?: number | null } = {},
 ): void {
-  // STI subclasses share the base's _attributeDefinitions — route to the
-  // base to avoid forking a subclass-local map that drifts from the base.
+  // Shared-table STI subclasses share the schema host's _attributeDefinitions —
+  // route there to avoid forking a subclass-local map that drifts from it. The
+  // host is the STI base for shared-table subclasses, and the receiver itself
+  // once it claims its own table.
   const schemaHost = stiSchemaHost(this as unknown as { tableName: string }) as AnyClass;
   if (schemaHost !== this) {
     schemaHost.defineAttribute(name, castType, options);
@@ -174,10 +176,10 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
     }
   }
 
-  // For STI subclasses, seed the shared (schema-reflected) set on the STI base
-  // so cache invalidation from Base.attribute/defineAttribute (routed to the
-  // base) stays coherent across siblings. The subclass's own declarations are
-  // layered on afterwards (see below).
+  // For shared-table STI subclasses, seed the shared (schema-reflected) set on
+  // the schema host so cache invalidation from Base.attribute/defineAttribute
+  // (routed to the same host) stays coherent across siblings. The subclass's own
+  // declarations are layered on afterwards (see below).
   const cacheHost = stiSchemaHost(this as unknown as { tableName: string }) as AnyClass;
   const stiSubclass = cacheHost !== this;
 

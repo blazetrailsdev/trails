@@ -1188,12 +1188,13 @@ export class Base extends Model {
     typeName?: string | Type | AttributeOptions,
     options?: AttributeOptions,
   ): void {
-    // STI subclasses share the base's `_attributeDefinitions` — matching
-    // Rails' `ActiveRecord::Inheritance` where `attribute_types` is a
-    // shared `class_attribute`. Route the registration through the STI
-    // base so `Circle.attribute("radius", ...)` lands on `Shape._attributeDefinitions`
-    // instead of forking a subclass-local map that later schema
-    // reflection on the base wouldn't see.
+    // Shared-table STI subclasses share the schema host's `_attributeDefinitions`
+    // — matching Rails' `ActiveRecord::Inheritance` where `attribute_types` is a
+    // shared `class_attribute`. Route the registration through the schema host so
+    // `Circle.attribute("radius", ...)` lands on `Shape._attributeDefinitions`
+    // instead of forking a subclass-local map that later schema reflection on the
+    // host wouldn't see. An own-table descendant IS its own host, so its
+    // declarations stay on itself.
     const schemaHost = ModelSchema.stiSchemaHost(this as unknown as { tableName: string });
     if ((schemaHost as unknown as typeof Base) !== this) {
       (schemaHost as unknown as typeof Base).attribute(name, typeName, options);
