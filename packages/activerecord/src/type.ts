@@ -23,6 +23,7 @@ import type {
   AdapterName,
   AbstractAdapter as DatabaseAdapter,
 } from "./connection-adapters/abstract-adapter.js";
+import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
 import { Time } from "./type/time.js";
@@ -119,12 +120,24 @@ export function defaultValue(): Type {
 }
 
 /**
- * Return the normalized adapter name for a given model's connection,
- * matching the keys used for adapter-specific type registrations.
+ * Return the normalized adapter name for a given model's configured
+ * connection, matching the keys used for adapter-specific type registrations.
  *
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
-export function adapterNameFrom(model: { connection?: unknown }): AdapterName {
+export function adapterNameFrom(model: AdapterNameSource): AdapterName {
+  // Rails reads `model.connection_db_config.adapter` — the CONFIGURED adapter,
+  // which is available without a live connection, and raises when the model has
+  // no pool at all. Type lookups here run at declare time (before any pool is
+  // established in unit tests), so an absent config degrades to :sqlite rather
+  // than raising; a present config always wins over the live connection.
+  let config: { adapter?: string } | undefined;
+  try {
+    config = model.connectionDbConfig?.();
+  } catch {
+    config = undefined;
+  }
+  if (config) return adapterNameFromConfig(config.adapter);
   return (
     ((model.connection as DatabaseAdapter | null | undefined)?.adapterName as
       | AdapterName
@@ -132,10 +145,15 @@ export function adapterNameFrom(model: { connection?: unknown }): AdapterName {
   );
 }
 
+interface AdapterNameSource {
+  connectionDbConfig?: () => { adapter?: string } | undefined;
+  connection?: unknown;
+}
+
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
 // When Base wires setCurrentAdapterResolver(), it reads the real connection adapter.
 /** @internal */
-export function currentAdapterName(getBase?: () => { connection?: unknown }): AdapterName {
+export function currentAdapterName(getBase?: () => AdapterNameSource): AdapterName {
   if (getBase) return adapterNameFrom(getBase());
   return _currentAdapterResolver?.() ?? "sqlite";
 }
