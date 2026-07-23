@@ -39,13 +39,13 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote float nan", async () => {
-      const rows = await adapter.execute("SELECT 'NaN'::float AS val");
-      expect(rows[0].val).toBeNaN();
+      const nan = 0.0 / 0;
+      expect(adapter.quote(nan)).toBe("'NaN'");
     });
 
     it("quote float infinity", async () => {
-      const rows = await adapter.execute("SELECT 'Infinity'::float AS val");
-      expect(rows[0].val).toBe(Infinity);
+      const infinity = 1.0 / 0;
+      expect(adapter.quote(infinity)).toBe("'Infinity'");
     });
 
     it("quote string", async () => {
@@ -111,7 +111,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote integer", async () => {
-      // Rails: @conn.quote(42) returns the SQL literal text "42".
       expect(adapter.quote(42)).toBe("42");
     });
 

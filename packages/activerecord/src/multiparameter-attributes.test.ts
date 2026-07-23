@@ -168,7 +168,6 @@ describe("MultiParameterAttributeTest", () => {
     });
     const dt = topic.written_on as Temporal.Instant;
     expect(dt).toBeInstanceOf(Temporal.Instant);
-    // Rails asserts the full to_fs(:db) representation: "1850-06-24 16:24:00".
     expect(utc(dt).year).toBe(1850);
     expect(utc(dt).month).toBe(6);
     expect(utc(dt).day).toBe(24);
@@ -458,13 +457,11 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("create with multiparameter attributes setting date attribute", () => {
-    // Rails: Topic.create_with(attrs).new — the create_with scope threads the
-    // multiparameter attrs into new, which assign_attributes handles the same way.
-    const topic = new Topic({
+    const topic = Topic.createWith({
       "written_on(1i)": "1952",
       "written_on(2i)": "3",
       "written_on(3i)": "11",
-    });
+    }).new();
     const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).year).toBe(1952);
     expect(utc(dt).month).toBe(3);
@@ -488,13 +485,13 @@ describe("MultiParameterAttributeTest", () => {
   });
 
   it("create with multiparameter attributes setting date and time attribute", () => {
-    const topic = new Topic({
+    const topic = Topic.createWith({
       "written_on(1i)": "1952",
       "written_on(2i)": "3",
       "written_on(3i)": "11",
       "written_on(4i)": "13",
       "written_on(5i)": "55",
-    });
+    }).new();
     const dt = topic.written_on as Temporal.Instant;
     expect(utc(dt).year).toBe(1952);
     expect(utc(dt).month).toBe(3);
