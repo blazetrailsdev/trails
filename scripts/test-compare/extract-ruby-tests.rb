@@ -1162,13 +1162,17 @@ class TestExtractor
     return nil unless node.is_a?(Array)
     case node[0]
     when :@int, :@float
-      "n:#{node[1]}"
+      # Strip `_` digit separators (`123_456`) — the TS twin's NumericLiteral
+      # `.text` is already separator-free, so raw source would false-mismatch.
+      "n:#{node[1].delete('_')}"
     when :unary
       # `-3` / `-1.5` — unary minus over a numeric leaf; other unaries are non-literal.
-      node[1] == :-@ && node[2].is_a?(Array) && %i[@int @float].include?(node[2][0]) ? "n:-#{node[2][1]}" : nil
+      if node[1] == :-@ && node[2].is_a?(Array) && %i[@int @float].include?(node[2][0])
+        "n:-#{node[2][1].delete('_')}"
+      end
     when :string_literal
       content = extract_string_content(node)
-      content ? "s:#{content}" : nil
+      content ? "s:#{unescape_string_literal(content)}" : nil
     when :symbol_literal
       sym = node[1]
       sym.is_a?(Array) && sym[0] == :symbol && sym[1].is_a?(Array) ? "s:#{ident_name(sym[1])}" : nil
@@ -1178,6 +1182,21 @@ class TestExtractor
         { "true" => "b:true", "false" => "b:false", "nil" => "x:nil" }[kw[1]]
       end
     end
+  end
+
+  # Process standard double-quoted escapes so the token matches the TS twin,
+  # whose StringLiteral `.text` is the *parsed* value (real newline for `\n`).
+  # Ripper's `@tstring_content` is raw source and does not expose the quote
+  # style, so a single-quoted `'\n'` (literally backslash-n) is unescaped too —
+  # assertions essentially never rely on that distinction.
+  ESCAPES = {
+    "n" => "\n", "t" => "\t", "r" => "\r", "s" => " ", "0" => "\0",
+    "a" => "\a", "b" => "\b", "e" => "\e", "f" => "\f", "v" => "\v",
+    "\\" => "\\", '"' => '"', "'" => "'", "#" => "#"
+  }.freeze
+
+  def unescape_string_literal(text)
+    text.gsub(/\\(.)/m) { ESCAPES.fetch($1, "\\#{$1}") }
   end
 
   # ---- String extraction helpers ----

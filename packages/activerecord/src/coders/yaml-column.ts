@@ -16,7 +16,10 @@ type ClassLike = new (...args: unknown[]) => unknown;
  */
 class SafeCoder {
   dump(object: unknown): string {
-    return yamlStringify(object);
+    // `directives: true` emits the `---` document-start marker so collection
+    // payloads match Ruby's `YAML.dump` byte-for-byte ("---\n- ok\n"). Bare
+    // scalars still differ ("---\nstr\n" vs Ruby's "--- str\n").
+    return yamlStringify(object, { directives: true });
   }
 
   load(payload: unknown): unknown {

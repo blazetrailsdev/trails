@@ -156,7 +156,17 @@ export function accessedFields(this: AttributeRecord): string[] {
  *
  * Mirrors: ActiveRecord::AttributeMethods::GeneratedAttributeMethods
  */
-export class GeneratedAttributeMethods {}
+export class GeneratedAttributeMethods {
+  // Rails names the module by `const_set(:GeneratedAttributeMethods, ...)`
+  // under the model class, so `mod.inspect` reads e.g.
+  // "Topic::GeneratedAttributeMethods". TS has no const_set; carry the owner's
+  // name instead and reproduce the same inspect string.
+  constructor(private readonly ownerName?: string) {}
+
+  inspect(): string {
+    return `${this.ownerName}::GeneratedAttributeMethods`;
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Class methods — mirrors ActiveRecord::AttributeMethods::ClassMethods
@@ -256,7 +266,7 @@ export function dangerousAttributeMethods(): Set<string> {
  * ancestry does.
  */
 export function initializeGeneratedModules(this: AttributeMethodsHost): void {
-  this._generatedAttributeMethods = new GeneratedAttributeMethods();
+  this._generatedAttributeMethods = new GeneratedAttributeMethods(this.name);
   this._attributeMethodsGenerated = false;
   this._aliasAttributesMassGenerated = false;
   _coreInitializeGeneratedModules.call(
