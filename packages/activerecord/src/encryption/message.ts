@@ -21,7 +21,7 @@ export class Message {
     this.headers.set(key, value);
   }
 
-  addHeaders(props: Record<string, unknown>): void {
+  addHeaders(props: Record<string, unknown> | Properties): void {
     this.headers.add(props);
   }
 

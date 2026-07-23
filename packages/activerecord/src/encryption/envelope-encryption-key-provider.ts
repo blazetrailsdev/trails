@@ -27,7 +27,10 @@ export class EnvelopeEncryptionKeyProvider {
   encryptionKey(): Key {
     const randomSecret = this.generateRandomSecret();
     const key = new Key(randomSecret);
-    key.publicTags = { encrypted_data_key: this.encryptDataKey(randomSecret) };
+    key.publicTags.encryptedDataKey = this.encryptDataKey(randomSecret);
+    if (Configurable.config.storeKeyReferences) {
+      key.publicTags.encryptedDataKeyId = this.activePrimaryKey.id;
+    }
     return key;
   }
 
@@ -54,7 +57,7 @@ export class EnvelopeEncryptionKeyProvider {
 
   /** @internal */
   private decryptDataKey(encryptedMessage: Message): string | null {
-    const encryptedDataKey = headerString(encryptedMessage.headers.get("encrypted_data_key"));
+    const encryptedDataKey = headerString(encryptedMessage.headers.encryptedDataKey);
     if (!encryptedDataKey) return null;
     try {
       return new Encryptor({ compress: false }).decrypt(encryptedDataKey, {

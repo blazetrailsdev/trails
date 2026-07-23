@@ -16,13 +16,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/envelope-encryption-key-provider.ts",
-    "rubyName": "encryption_key",
-    "call": "id",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/envelope-encryption-key-provider.ts",
     "rubyName": "generate_random_secret",
     "call": "generate_random_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

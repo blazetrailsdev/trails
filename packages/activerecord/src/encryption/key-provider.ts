@@ -6,10 +6,12 @@
 
 import { Key } from "./key.js";
 import { headerString } from "./encoding-helpers.js";
+import { Configurable } from "./configurable.js";
 import type { Message } from "./message.js";
 
 export class KeyProvider {
   private _keys: Key[];
+  private _encryptionKey: Key | undefined;
   private _keysGroupedById: Map<string, Key[]> | undefined;
 
   constructor(keys: Key | Key[]) {
@@ -17,17 +19,23 @@ export class KeyProvider {
   }
 
   encryptionKey(): Key {
-    return this._keys[this._keys.length - 1];
+    if (!this._encryptionKey) {
+      const key = this._keys[this._keys.length - 1];
+      if (Configurable.config.storeKeyReferences) {
+        key.publicTags.encryptedDataKeyId = key.id;
+      }
+      this._encryptionKey = key;
+    }
+    return this._encryptionKey;
   }
 
   decryptionKeys(message: Message): Key[] {
-    const keyRef = headerString(message.headers.get("k"));
-    if (keyRef) {
-      const grouped = this.keysGroupedById();
-      const found = grouped.get(keyRef);
-      if (found && found.length > 0) return found;
+    // Ruby truthiness: nil and false fall back to @keys; anything else is a reference.
+    const rawKeyId = message.headers.encryptedDataKeyId as unknown;
+    if (rawKeyId != null && rawKeyId !== false) {
+      return this.keysGroupedById().get(headerString(rawKeyId)!) ?? [];
     }
-    return [...this._keys];
+    return this._keys;
   }
 
   /** @internal */

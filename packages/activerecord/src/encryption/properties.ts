@@ -47,8 +47,9 @@ export class Properties {
     return this._data.has(key);
   }
 
-  add(props: Record<string, unknown>): void {
-    for (const [key, value] of Object.entries(props)) {
+  add(props: Record<string, unknown> | Properties): void {
+    const entries = props instanceof Properties ? props.entries() : Object.entries(props);
+    for (const [key, value] of entries) {
       this.set(key, value);
     }
   }
@@ -78,6 +79,22 @@ export class Properties {
       throw new EncryptedContentIntegrity("Can't override property 'e': already set");
     }
     this._data.set("e", value);
+  }
+
+  get encryptedDataKey(): string | undefined {
+    return this.get("k") as string | undefined;
+  }
+
+  set encryptedDataKey(value: string | undefined) {
+    this.set("k", value);
+  }
+
+  get encryptedDataKeyId(): string | undefined {
+    return this.get("i") as string | undefined;
+  }
+
+  set encryptedDataKeyId(value: string | undefined) {
+    this.set("i", value);
   }
 
   get iv(): string | undefined {
