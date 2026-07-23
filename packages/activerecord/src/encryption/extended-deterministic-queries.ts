@@ -3,9 +3,9 @@ import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attr
 import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 
 /**
- * What AdditionalValue needs from its type. Rails passes the full resolved
- * `type_for_attribute` type here — for a Serialized(Encrypted(...)) attribute
- * that's the outer Type::Serialized, not EncryptedAttributeType.
+ * What AdditionalValue needs from its type — one of the attribute's
+ * `previousTypes` (bare previous-scheme EncryptedAttributeTypes, as Rails'
+ * delegated `previous_types`).
  */
 export interface SerializableType {
   serialize(value: unknown): unknown;
@@ -169,14 +169,11 @@ export class EncryptedQuery {
       return value;
     }
 
-    // Rails (extended_deterministic_queries.rb:73-86): only String/Array
-    // arguments expand; anything else passes through untouched. Plaintext
-    // candidates stay raw at the head of the list — the PredicateBuilder
+    // Only String/Array arguments expand (extended_deterministic_queries.rb:74).
+    // Plaintexts stay raw at the head of the list — the PredicateBuilder
     // serializes them through the attribute's resolved type
-    // (HomogeneousIn#castedValues), which encrypts with the current scheme.
-    // Only previous-scheme candidates are AdditionalValue-wrapped; the
-    // support_unencrypted_data cleartext candidate arrives as one of those
-    // (previousTypes appends a clean-text scheme).
+    // (HomogeneousIn#castedValues), encrypting with the current scheme; only
+    // previous-scheme candidates are AdditionalValue-wrapped.
     if (typeof value === "string" || Array.isArray(value)) {
       const list = Array.isArray(value) ? value : [value];
       return [
@@ -237,10 +234,13 @@ export class RelationQueries {
       const type = encryptedTypeOf(getAttributeType(model, attrName));
       if (!type?.deterministic) continue;
       const values = wheres[attrName];
-      // Rails (extended_deterministic_queries.rb:114-117): an expanded list
-      // is raw plaintext at [0] followed only by AdditionalValues — collapse
-      // it back to the plaintext so the new record encrypts through the
-      // normal write path.
+      // An expanded list is raw plaintext at [0] followed only by
+      // AdditionalValues — collapse it back to the plaintext so the new
+      // record encrypts through the normal write path
+      // (extended_deterministic_queries.rb:115-117). The length guard is
+      // ours: `[].slice(1).every(...)` is vacuously true and would copy
+      // `undefined` into the scope for an empty (unreachable in Rails,
+      // where `[][1..]` is nil) where-list.
       if (
         Array.isArray(values) &&
         values.length > 0 &&

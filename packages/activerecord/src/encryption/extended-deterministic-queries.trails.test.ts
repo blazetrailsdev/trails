@@ -129,15 +129,13 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
       "Dune",
     );
     // Rails shape: raw plaintext first, AdditionalValues only for previous
-    // schemes. The current-scheme candidate is serialized downstream by the
-    // PredicateBuilder through the attribute's resolved type.
+    // schemes.
     expect(candidates[0]).toBe("Dune");
     expect(candidates.length).toBeGreaterThan(1);
     // The type the PredicateBuilder serializes IN-list scalars through
     // (HomogeneousIn#castedValues → attribute typeCaster) must be the full
-    // resolved type, so the candidate matches the write-path ciphertext
-    // (coder dump applied before encryption). Deterministic encryption makes
-    // the equality check meaningful.
+    // resolved type, so the raw candidate encrypts to the write-path
+    // ciphertext (coder dump applied before encryption).
     const arelAttr = (
       EncryptedSerializedBook as unknown as {
         arelTable: { get(name: string): { typeCaster: unknown } };

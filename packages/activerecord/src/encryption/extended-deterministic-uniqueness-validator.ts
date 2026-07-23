@@ -114,16 +114,18 @@ export class EncryptedUniquenessValidator {
   }
 
   /**
-   * Returns all ciphertext variants for a value across current and
-   * previous encryption schemes. Used by uniqueness validation to
-   * check for duplicates across scheme migrations.
+   * Returns the query candidates for a value across current and previous
+   * encryption schemes: the raw plaintext (current scheme, encrypted
+   * downstream by the PredicateBuilder) plus an AdditionalValue per previous
+   * scheme. Used by uniqueness validation to check for duplicates across
+   * scheme migrations.
    */
   static allCiphertextsFor(klass: any, attribute: string, value: unknown): unknown[] {
-    // Rails shape: the current-scheme candidate stays as raw plaintext at
-    // index 0 (the PredicateBuilder serializes it through the attribute's
-    // resolved type); only previous-scheme candidates are
-    // AdditionalValue-wrapped. Gating reaches the inner type via
-    // encryptedTypeOf — Rails' DelegateClass delegation.
+    // The current-scheme candidate stays as raw plaintext at index 0 — the
+    // PredicateBuilder serializes it through the attribute's resolved type;
+    // only previous-scheme candidates are AdditionalValue-wrapped. Gating
+    // reaches the inner type via encryptedTypeOf (Rails' DelegateClass
+    // delegation).
     const fullType = getAttributeType(klass, attribute) as SerializableType | undefined;
     const type = encryptedTypeOf(fullType);
     if (!fullType || !type?.deterministic) {
