@@ -11,6 +11,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
@@ -2155,6 +2156,15 @@ describe("MigrationTest", () => {
 // adapter-generic createTable/changeTable surface, exactly like Rails'
 // `@connection.create_table(:delete_me, force: true)` + with_bulk_change_table.
 describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
+  // Mirrors the tests' `{ "Mysql2Adapter" => …, … }.fetch(classname) { raise … }`
+  // expected-query-count hashes (migration_test.rb:1236 et al.).
+  function expectedBulkAlterQueryCount(counts: { mysql: number; postgres: number }): number {
+    if (adapterType !== "mysql" && adapterType !== "postgres") {
+      throw new Error(`need an expected query count for ${adapterType}`);
+    }
+    return counts[adapterType];
+  }
+
   let adapter: DatabaseAdapter;
   beforeEach(async () => {
     adapter = await freshAdapter();
@@ -2173,9 +2183,16 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
-      t.change("name", "string", { default: "NONAME" });
-      t.change("birthdate", "datetime", { comment: "This is a comment" });
+    // migration_test.rb:1403 expects 3 on both adapters, but Rails' third PG
+    // query is a `SELECT 'character varying'::regtype::oid` type-map miss from
+    // quote_default_expression (postgresql/schema_creation.rb:102); trails'
+    // statically initialized PG type map never issues it, so PG counts 2.
+    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 2 });
+    await assertQueriesCount(expectedQueryCount, true, async () => {
+      await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.change("name", "string", { default: "NONAME" });
+        t.change("birthdate", "datetime", { comment: "This is a comment" });
+      });
     });
     cols = await adapter.columns("delete_me");
     const name = cols.find((c) => c.name === "name")!;
@@ -2195,10 +2212,15 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
-      t.change("name", "string", { default: "NONAME" });
-      t.change("birthdate", "datetime");
-      t.changeNull("age", false, 0);
+    // migration_test.rb:1433 expects 7/5; PG counts 4 because trails skips the
+    // `::regtype::oid` type-map miss noted in "changing columns" above.
+    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 4 });
+    await assertQueriesCount(expectedQueryCount, true, async () => {
+      await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.change("name", "string", { default: "NONAME" });
+        t.change("birthdate", "datetime");
+        t.changeNull("age", false, 0);
+      });
     });
     const cols = await adapter.columns("delete_me");
     expect(String(cols.find((c) => c.name === "name")!.default)).toBe("NONAME");
