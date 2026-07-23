@@ -12,12 +12,15 @@ function config(overrides: Record<string, unknown> = {}): HashConfig {
 }
 
 describe("MySQLDatabaseTasks", () => {
-  it("test_charset_defaults_to_utf8mb4", () => {
-    expect(new MySQLDatabaseTasks(config()).charset()).toBe("utf8mb4");
-  });
-
-  it("test_charset_reads_encoding_from_config", () => {
-    expect(new MySQLDatabaseTasks(config({ encoding: "latin1" })).charset()).toBe("latin1");
+  it("test_db_retrieves_charset", async () => {
+    const tasks = new MySQLDatabaseTasks(config());
+    const charsetMock = vi.fn(async () => "utf8mb4");
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({ charset: charsetMock });
+    await expect(tasks.charset()).resolves.toBe("utf8mb4");
+    expect(charsetMock).toHaveBeenCalledOnce();
   });
 
   it("test_db_retrieves_collation", async () => {

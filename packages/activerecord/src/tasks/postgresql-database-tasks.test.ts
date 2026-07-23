@@ -12,12 +12,15 @@ function config(overrides: Record<string, unknown> = {}): HashConfig {
 }
 
 describe("PostgreSQLDatabaseTasks", () => {
-  it("test_charset_defaults_to_utf8", () => {
-    expect(new PostgreSQLDatabaseTasks(config()).charset()).toBe("utf8");
-  });
-
-  it("test_charset_reads_encoding_from_config", () => {
-    expect(new PostgreSQLDatabaseTasks(config({ encoding: "UTF8" })).charset()).toBe("UTF8");
+  it("test_db_retrieves_charset", async () => {
+    const tasks = new PostgreSQLDatabaseTasks(config());
+    const encodingMock = vi.fn(async () => "UTF8");
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({ encoding: encodingMock });
+    await expect(tasks.charset()).resolves.toBe("UTF8");
+    expect(encodingMock).toHaveBeenCalledOnce();
   });
 
   it("test_db_retrieves_collation", async () => {

@@ -121,8 +121,8 @@ export class PostgreSQLDatabaseTasks {
     );
   }
 
-  charset(): string {
-    return this.encoding();
+  async charset(): Promise<string> {
+    return (await this.connection()).encoding();
   }
 
   async collation(): Promise<string> {
