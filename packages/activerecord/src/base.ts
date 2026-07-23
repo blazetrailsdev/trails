@@ -1201,6 +1201,14 @@ export class Base extends Model {
       return;
     }
     super.attribute(name, typeName, options);
+    // Rails' `attribute` ends in `reload_schema_from_cache` (attributes.rb),
+    // which nils `@attribute_names` recursively; drop the memo on this class
+    // and its descendants so the new declaration is visible.
+    for (const klass of [this, ...this.descendants]) {
+      if (Object.prototype.hasOwnProperty.call(klass, "_attributeNamesMemo")) {
+        Reflect.deleteProperty(klass, "_attributeNamesMemo");
+      }
+    }
     // A newly declared attribute may be virtual (no DB column); force the next
     // ensureSchemaLoaded to re-run virtual reconciliation (model-schema.ts
     // reconcileVirtualAttributes) instead of skipping it via the one-shot guard.

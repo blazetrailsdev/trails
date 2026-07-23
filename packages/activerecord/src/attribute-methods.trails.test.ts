@@ -225,4 +225,56 @@ describe("AttributeMethodsTest (trails)", () => {
     const w = new Widget({});
     expect((w as { color: unknown }).color).toBe("fixed");
   });
+
+  // Rails' class-level `attribute_names` is `@attribute_names ||= ...freeze`
+  // (attribute_methods.rb:236-241), invalidated by reload_schema_from_cache.
+  // These guard the trails port of that memo and its cold-cache carve-out.
+  it("class attributeNames is memoized and frozen", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.attributeNames();
+    expect(first).toContain("title");
+    expect(Object.isFrozen(first)).toBe(true);
+    expect(Topic.attributeNames()).toBe(first);
+  });
+
+  it("resetColumnInformation invalidates the class attributeNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.attributeNames();
+    (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
+    // The reset also drops the shared cache's per-table entry; re-reflect so
+    // the comparison sees real columns (and the suite's warm-cache invariant
+    // is restored for later tests).
+    await Topic.loadSchema();
+    const second = Topic.attributeNames();
+    expect(second).not.toBe(first);
+    expect(second).toEqual(first);
+  });
+
+  it("subclass does not inherit the parent's attributeNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const parentNames = Topic.attributeNames();
+    class ImportantTopic extends Topic {}
+    // Rails nils @attribute_names in `inherited`; the subclass memoizes its
+    // own array rather than reading the parent's.
+    expect(ImportantTopic.attributeNames()).not.toBe(parentNames);
+  });
+
+  it("does not memoize the cold-cache fail-open attributeNames answer", async () => {
+    class NonExistentTable extends Base {
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    // Cold cache: the table has never hit a dataSourceExists check, so the
+    // table_exists? half of the guard fails open (documented inherent
+    // deviation — Rails' sync DB hit would return []).
+    expect(NonExistentTable.attributeNames()).toEqual(["name"]);
+    // The async pipeline records dataSourceExists=false; the cold answer
+    // must not have been memoized, so the guard now closes.
+    await NonExistentTable.loadSchema();
+    expect(NonExistentTable.attributeNames()).toEqual([]);
+  });
 });

@@ -1552,6 +1552,13 @@ export function tableName(this: SchemaHost, value?: string): string {
       // chain and would otherwise never reflect its own table. Shadow the
       // inherited flag with an own `false` so the next load re-reflects.
       (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
+      // Rails' reset_column_information also nils @attribute_names; drop the
+      // memo now (rather than waiting for the reload's revision bump) so
+      // reads between the rename and the next load don't see the old table's
+      // names.
+      if (Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")) {
+        Reflect.deleteProperty(this, "_attributeNamesMemo");
+      }
     }
   }
   return resolveTableName.call(this as any);
