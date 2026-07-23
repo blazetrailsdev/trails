@@ -1045,7 +1045,19 @@ export class SchemaDumper {
   /** @internal */
   checkParts(check: { expression: string; name?: string; validate?: boolean }): string[] {
     const parts: string[] = [JSON.stringify(check.expression)];
-    if (check.name) parts.push(`name: ${JSON.stringify(check.name)}`);
+    const rawChkPattern = (this.constructor as typeof SchemaDumper).chkIgnorePattern;
+    const chkIgnorePattern =
+      rawChkPattern.global || rawChkPattern.sticky
+        ? new RegExp(rawChkPattern.source, rawChkPattern.flags.replace(/[gy]/g, ""))
+        : rawChkPattern;
+    // Mirrors Rails' export_name_on_schema_dump? — delegate to the constraint
+    // object when available (CheckConstraintDefinition incorporates the
+    // chk_rails_ ignore-pattern check), else fall back.
+    const exportName =
+      "isExportNameOnSchemaDump" in (check as object)
+        ? (check as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump
+        : check.name != null && !chkIgnorePattern.test(check.name);
+    if (exportName && check.name) parts.push(`name: ${JSON.stringify(check.name)}`);
     if (check.validate === false) parts.push("validate: false");
     return parts;
   }
