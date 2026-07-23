@@ -834,7 +834,10 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  quoteDefaultExpression(value: unknown, column?: unknown): string {
+  // Widened return: PG's override resolves cast types with a live regtype
+  // query (postgresql/quoting.rb:195), so the surface is awaitable; this
+  // base implementation stays synchronous.
+  quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
     if (value === undefined) return "";
     if (typeof value === "function") {
       const result = (value as () => unknown)();

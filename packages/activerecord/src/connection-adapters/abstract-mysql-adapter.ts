@@ -977,7 +977,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   ): Promise<void> {
     const createIndex = await this.buildCreateIndexDefinition(tableName, columnName, options);
     if (!createIndex) return;
-    await this._execMutation(this.schemaStatements().schemaCreation.accept(createIndex));
+    await this._execMutation(await this.schemaStatements().schemaCreation.accept(createIndex));
   }
 
   /**

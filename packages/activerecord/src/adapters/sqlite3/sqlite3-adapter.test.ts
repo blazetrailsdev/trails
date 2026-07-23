@@ -127,8 +127,8 @@ describeIfSqlite("SQLite3AdapterTest", () => {
   // quote_default_expression serializes through the column's cast type exactly
   // once (abstract/quoting.rb:161); a structured json default must not be
   // double-encoded to `'"{}"'` by both a pre-serialize and `super`'s serialize.
-  it("quote default expression serializes a structured json default once", () => {
-    expect(adapter.quoteDefaultExpression({}, { sqlType: "json" })).toEqual("'{}'");
+  it("quote default expression serializes a structured json default once", async () => {
+    expect(await adapter.quoteDefaultExpression({}, { sqlType: "json" })).toEqual("'{}'");
   });
 
   it("exec insert", async () => {

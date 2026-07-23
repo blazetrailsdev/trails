@@ -412,7 +412,7 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefinition", () => {
     const col = makeTextColumn({ defaultFunction: "uuid()" });
     const adapter = await makeAdapter(col);
     const cd = await adapter.buildChangeColumnDefinition("users", "uid", "string");
-    const sql = new SchemaCreation().accept(cd);
+    const sql = await new SchemaCreation().accept(cd);
     expect(sql).toContain("DEFAULT uuid()");
     expect(sql).not.toContain("DEFAULT 'uuid()'");
   });
@@ -593,7 +593,7 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefaultDefinition (#1568)", () =
 });
 
 describe("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)", () => {
-  function visit(cd: ChangeColumnDefaultDefinition): string {
+  function visit(cd: ChangeColumnDefaultDefinition): Promise<string> {
     return new MysqlSchemaCreation().accept(cd);
   }
 
@@ -608,17 +608,17 @@ describe("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)", () => 
 
   it("emits DROP DEFAULT for null default on a NOT NULL column", async () => {
     const cd = await buildFor(makeChangeColumnTextColumn({ null_: false }), null);
-    expect(visit(cd)).toBe("ALTER COLUMN `body` DROP DEFAULT");
+    expect(await visit(cd)).toBe("ALTER COLUMN `body` DROP DEFAULT");
   });
 
   it("emits SET DEFAULT NULL for null default on a nullable column", async () => {
     const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), null);
-    expect(visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT NULL");
+    expect(await visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT NULL");
   });
 
   it("emits SET DEFAULT <literal> for a non-null default", async () => {
     const cd = await buildFor(makeChangeColumnTextColumn({ null_: true }), "world");
-    expect(visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT 'world'");
+    expect(await visit(cd)).toBe("ALTER COLUMN `body` SET DEFAULT 'world'");
   });
 
   it("undefined → null normalization yields SET DEFAULT NULL, not a bare SET", async () => {
@@ -628,7 +628,7 @@ describe("AbstractMysqlAdapter — DROP vs SET DEFAULT fragment (#1568)", () => 
       from: "a",
       to: undefined,
     });
-    const sql = visit(cd);
+    const sql = await visit(cd);
     expect(sql).toBe("ALTER COLUMN `body` SET DEFAULT NULL");
     expect(sql.endsWith(" SET")).toBe(false);
   });

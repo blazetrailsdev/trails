@@ -17,7 +17,7 @@ import { quoteDefaultExpression } from "../abstract/quoting.js";
 export interface MysqlSchemaQuoter {
   quoteIdentifier(name: string): string;
   quoteTableName(name: string): string;
-  quoteDefaultExpression(value: unknown, column?: unknown): string;
+  quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string>;
   quote(value: unknown): string;
   quotedBinary(value: unknown): string;
 }

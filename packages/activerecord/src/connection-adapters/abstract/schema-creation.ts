@@ -103,8 +103,9 @@ export class SchemaCreation {
     return this.adapter.quoteTableName(name);
   }
 
-  /** @internal */
-  protected quoteDefaultExpression(value: unknown, column?: unknown): string {
+  /** @internal Awaitable: PG's quoter resolves cast types with a live
+   * regtype query (postgresql/quoting.rb:195). */
+  protected quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
     return this.adapter.quoteDefaultExpression(value, column);
   }
 
@@ -135,7 +136,11 @@ export class SchemaCreation {
     return o.map((c) => this.adapter.quoteIdentifier(c)).join(", ");
   }
 
-  accept(o: Definition): string {
+  // Async since the PG quoter's default-expression path issues a live regtype
+  // query (postgresql/quoting.rb:195); Rails' accept is sync only because Ruby
+  // blocks on the query. Visitors that can reach quoteDefaultExpression are
+  // async; the leaf visitors that cannot (indexes, FKs, constraints) stay sync.
+  async accept(o: Definition): Promise<string> {
     if (o instanceof TableDefinition) return this.visitTableDefinition(o);
     if (o instanceof AlterTable) return this.visitAlterTable(o);
     if (o instanceof AddColumnDefinition) return this.visitAddColumnDefinition(o);
@@ -146,12 +151,13 @@ export class SchemaCreation {
     throw new Error(`Unknown definition type: ${(o as any).constructor.name}`);
   }
 
-  protected visitTableDefinition(o: TableDefinition): string {
+  protected async visitTableDefinition(o: TableDefinition): Promise<string> {
     let sql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
     if (o.ifNotExists) sql += " IF NOT EXISTS";
     sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
-    const statements: string[] = o.columns.map((c) => this.visitColumnDefinition(c));
+    const statements: string[] = [];
+    for (const c of o.columns) statements.push(await this.visitColumnDefinition(c));
 
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
       statements.push(this.visitPrimaryKeyDefinition({ name: o.compositePrimaryKey }));
@@ -197,7 +203,7 @@ export class SchemaCreation {
     return [];
   }
 
-  protected visitColumnDefinition(o: ColumnDefinition): string {
+  protected async visitColumnDefinition(o: ColumnDefinition): Promise<string> {
     // Rails' `visit_ColumnDefinition` (abstract/schema_creation.rb:34) does an
     // unconditional `o.sql_type = type_to_sql(...)`. Trails diverges deliberately:
     // PG/MySQL `TableDefinition` helpers (`t.bit`, `t.inet`, `t.bigserial`,
@@ -222,21 +228,21 @@ export class SchemaCreation {
     }
     let sql = `${this.adapter.quoteIdentifier(o.name)} ${o.sqlType}`;
     if (o.type !== "primary_key") {
-      sql = this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);
+      sql = await this.addColumnOptionsBang(sql, this.columnOptions(o) as ColumnOptions);
     }
     return sql;
   }
 
-  protected visitAddColumnDefinition(o: AddColumnDefinition): string {
-    return `ADD ${this.accept(o.column)}`;
+  protected async visitAddColumnDefinition(o: AddColumnDefinition): Promise<string> {
+    return `ADD ${await this.accept(o.column)}`;
   }
 
-  protected visitAlterTable(o: AlterTable): string {
+  protected async visitAlterTable(o: AlterTable): Promise<string> {
     const table = this.adapter.quoteTableName(o.name);
     const parts: string[] = [];
 
     for (const add of o.adds) {
-      parts.push(this.visitAddColumnDefinition(add));
+      parts.push(await this.visitAddColumnDefinition(add));
     }
     for (const fk of o.foreignKeyAdds) {
       parts.push(this.visitAddForeignKey(fk));
@@ -259,7 +265,7 @@ export class SchemaCreation {
         parts.push(`ALTER COLUMN ${col} DROP DEFAULT`);
       } else {
         parts.push(
-          `ALTER COLUMN ${col} SET DEFAULT ${this.adapter.quoteDefaultExpression(change.defaultValue)}`,
+          `ALTER COLUMN ${col} SET DEFAULT ${await this.adapter.quoteDefaultExpression(change.defaultValue)}`,
         );
       }
     }
@@ -344,11 +350,11 @@ export class SchemaCreation {
     return `CONSTRAINT ${this.adapter.quoteIdentifier(o.name)} CHECK (${o.expression})`;
   }
 
-  addColumnOptions(sql: string, options: ColumnOptions): string {
+  async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     if (this.optionsIncludeDefault(options)) {
       // Rails: `sql << " DEFAULT #{quote_default_expression(...)}"`
       // (schema_creation.rb:150) — the keyword lives here, not in the quoter.
-      sql += ` DEFAULT ${this.adapter.quoteDefaultExpression(
+      sql += ` DEFAULT ${await this.adapter.quoteDefaultExpression(
         options.default,
         (options as Record<string, unknown>)["column"],
       )}`;
@@ -581,7 +587,7 @@ export class SchemaCreation {
   }
 
   /** @internal */
-  protected addColumnOptionsBang(sql: string, options: AddColumnOptions): string {
+  protected addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
     return this.addColumnOptions(sql, options);
   }
 

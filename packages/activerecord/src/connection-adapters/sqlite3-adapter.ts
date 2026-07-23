@@ -1031,7 +1031,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   // with side effects is not double-evaluated. In Rails `SqlLiteral < String`, so
   // a SqlLiteral result runs through the same `match?` regex — unwrap to its
   // string and apply the same paren-wrap branch rather than special-casing it.
-  override quoteDefaultExpression(value: unknown, column?: unknown): string {
+  // Return type carries the widened base union for the super call; this
+  // implementation itself never returns a Promise.
+  override quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
     if (typeof value === "function") {
       const result = (value as () => unknown)();
       const str = typeof result === "string" ? result : isSqlLiteral(result) ? result.value : null;

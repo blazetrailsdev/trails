@@ -1,4 +1,5 @@
-import { StringType, ValueType } from "@blazetrails/activemodel";
+import { IntegerType, StringType, ValueType } from "@blazetrails/activemodel";
+import { Array as OidArray } from "./postgresql/oid/array.js";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { HashLookupTypeMap } from "../type/hash-lookup-type-map.js";
@@ -94,28 +95,40 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
     await adapter.close().catch(() => undefined);
   });
 
-  it("reads `array` from ColumnDefinition.options for DDL paths", () => {
+  /** Stub Rails' `SELECT '<sql_type>'::regtype::oid` round-trip
+   * (postgresql/quoting.rb:195) with a warmed type map: `integer[]` resolves
+   * to the `_int4` array OID (1007), registered as OID::Array(integer) the way
+   * the type-map initializer's array pass would. */
+  function stubRegtypeLookup(): void {
+    adapter.typeMap.registerType(1007, new OidArray(new IntegerType()) as never);
+    vi.spyOn(adapter, "schemaQuery").mockResolvedValue([{ oid: 1007 }]);
+  }
+
+  it("reads `array` from ColumnDefinition.options for DDL paths", async () => {
     // Simulates a ColumnDefinition built by addColumn/changeColumn:
     // array lives on `.options`, sqlType is the `[]`-suffixed form.
+    stubRegtypeLookup();
     const columnDef = { sqlType: "integer[]", options: { array: true } };
-    expect(adapter.quoteDefaultExpression([1, 2, 3], columnDef)).toBe("'{1,2,3}'");
+    expect(await adapter.quoteDefaultExpression([1, 2, 3], columnDef)).toBe("'{1,2,3}'");
   });
 
-  it("reads `array` from a live Column instance", () => {
+  it("reads `array` from a live Column instance", async () => {
+    stubRegtypeLookup();
     const column = { sqlType: "integer", array: true };
-    expect(adapter.quoteDefaultExpression([4, 5, 6], column)).toBe("'{4,5,6}'");
+    expect(await adapter.quoteDefaultExpression([4, 5, 6], column)).toBe("'{4,5,6}'");
   });
 
-  it("normalizes `integer[]` sqlType so the integer subtype resolves", () => {
-    // If normalization were missing, the `integer[]` lookup would
-    // miss and the element subtype would fall back to ValueType,
-    // emitting the floats verbatim ('{1.7,2.3}'). IntegerType#serialize
-    // truncates to integers, so '{1,2}' confirms the subtype lookup hit.
+  it("normalizes `integer[]` sqlType so the integer subtype resolves", async () => {
+    // The regtype round-trip resolves `integer[]` to the array OID whose
+    // registered type is OID::Array(integer). If it fell to ValueType instead,
+    // the floats would be emitted verbatim ('{1.7,2.3}'); IntegerType#serialize
+    // truncates to integers, so '{1,2}' confirms the subtype resolved.
+    stubRegtypeLookup();
     const columnDef = { sqlType: "integer[]", options: { array: true } };
-    expect(adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe("'{1,2}'");
+    expect(await adapter.quoteDefaultExpression([1.7, 2.3], columnDef)).toBe("'{1,2}'");
   });
 
-  it("resolves a live column's cast type by oid/fmod, not by formatted name", () => {
+  it("resolves a live column's cast type by oid/fmod, not by formatted name", async () => {
     // Rails keys lookup_cast_type_from_column on (oid, fmod, sql_type)
     // (postgresql/quoting.rb:191). Registering a distinguishable type under
     // an OID whose sqlType would otherwise resolve elsewhere proves the OID
@@ -125,10 +138,10 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
       serialize: () => "99",
     } as never);
     const column = { oid: 918_273, fmod: -1, sqlType: "numeric", array: false };
-    expect(adapter.quoteDefaultExpression(1.5, column)).toBe("'99'");
+    expect(await adapter.quoteDefaultExpression(1.5, column)).toBe("'99'");
   });
 
-  it("forwards fmod so precision-carrying types resolve", () => {
+  it("forwards fmod so precision-carrying types resolve", async () => {
     // fmod is how numeric(10,2) recovers its precision/scale; dropping it
     // would silently hand the factory -1.
     let seen: number | undefined;
@@ -142,7 +155,7 @@ describe("PostgreSQLAdapter#quoteDefaultExpression", () => {
       seen = fmod;
       return { serialize: (v: unknown) => v };
     }) as never);
-    adapter.quoteDefaultExpression("x", { oid: 918_274, fmod: 655_366, sqlType: "numeric" });
+    await adapter.quoteDefaultExpression("x", { oid: 918_274, fmod: 655_366, sqlType: "numeric" });
     expect(seen).toBe(655_366);
     spy.mockRestore();
   });

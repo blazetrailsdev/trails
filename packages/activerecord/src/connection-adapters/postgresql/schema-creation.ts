@@ -97,8 +97,8 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override visitAlterTable(o: any): string {
-    let sql = super.visitAlterTable(o);
+  protected override async visitAlterTable(o: any): Promise<string> {
+    let sql = await super.visitAlterTable(o);
     const pgParts: string[] = [];
     if (Array.isArray(o.constraintValidations)) {
       for (const name of o.constraintValidations) pgParts.push(this.visitValidateConstraint(name));
@@ -203,7 +203,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       | Parameters<AbstractSchemaCreation["accept"]>[0]
       | ChangeColumnDefinition
       | ChangeColumnDefaultDefinition,
-  ): string {
+  ): Promise<string> {
     if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
     if (o instanceof ChangeColumnDefaultDefinition)
       return this.visitChangeColumnDefaultDefinition(o);
@@ -211,7 +211,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitChangeColumnDefinition(o: ChangeColumnDefinition): string {
+  protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
     const column = o.column;
     column.sqlType = this.typeToSql(column.type, column.options);
     const quotedName = this.adapter.quoteIdentifier(o.name);
@@ -237,7 +237,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
         // Mirrors Rails postgresql/schema_creation.rb:99 — pass column to
         // quote_default_expression so array/typeMap-aware serialization
         // is preserved on ALTER COLUMN SET DEFAULT.
-        sql += `, ALTER COLUMN ${quotedName} SET DEFAULT ${this.adapter.quoteDefaultExpression(options["default"], column)}`;
+        sql += `, ALTER COLUMN ${quotedName} SET DEFAULT ${await this.adapter.quoteDefaultExpression(options["default"], column)}`;
       }
     }
 
@@ -249,19 +249,21 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitChangeColumnDefaultDefinition(o: ChangeColumnDefaultDefinition): string {
+  protected async visitChangeColumnDefaultDefinition(
+    o: ChangeColumnDefaultDefinition,
+  ): Promise<string> {
     const col = this.adapter.quoteIdentifier(o.column.name);
     // Mirrors Rails postgresql/schema_creation.rb:110 — column is passed
     // to quote_default_expression so PG's typeMap/array branch fires.
     const action =
       o.default == null
         ? "DROP DEFAULT"
-        : `SET DEFAULT ${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
+        : `SET DEFAULT ${await this.adapter.quoteDefaultExpression(o.default, o.column)}`;
     return `ALTER COLUMN ${col} ${action}`;
   }
 
   /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): string {
+  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
       sql += ` COLLATE ${this.adapter.quoteIdentifier(String(opts["collation"]))}`;

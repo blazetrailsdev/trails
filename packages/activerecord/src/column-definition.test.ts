@@ -28,22 +28,22 @@ class DummyCreation extends SchemaCreation {
 describe("ColumnDefinitionTest", () => {
   const viz = new DummyCreation();
 
-  it("should not include default clause when default is null", () => {
+  it("should not include default clause when default is null", async () => {
     const columnDef = new ColumnDefinition("title", "string", { limit: 20 });
-    expect(viz.accept(columnDef)).toBe("title varchar(20)");
+    expect(await viz.accept(columnDef)).toBe("title varchar(20)");
   });
 
-  it("should include default clause when default is present", () => {
+  it("should include default clause when default is present", async () => {
     const columnDef = new ColumnDefinition("title", "string", { limit: 20, default: "Hello" });
-    expect(viz.accept(columnDef)).toBe("title varchar(20) DEFAULT 'Hello'");
+    expect(await viz.accept(columnDef)).toBe("title varchar(20) DEFAULT 'Hello'");
   });
 
-  it("should specify not null if null option is false", () => {
+  it("should specify not null if null option is false", async () => {
     const columnDef = new ColumnDefinition("title", "string", {
       limit: 20,
       default: "Hello",
       null: false,
     });
-    expect(viz.accept(columnDef)).toBe("title varchar(20) DEFAULT 'Hello' NOT NULL");
+    expect(await viz.accept(columnDef)).toBe("title varchar(20) DEFAULT 'Hello' NOT NULL");
   });
 });
