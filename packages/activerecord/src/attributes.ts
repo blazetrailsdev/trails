@@ -86,9 +86,6 @@ export function defineAttribute(
 ): void {
   // STI subclasses share the base's _attributeDefinitions — route to the
   // base to avoid forking a subclass-local map that drifts from the base.
-  // Only when the table is genuinely shared: an own-table descendant
-  // (`self.table_name = "tickets"` under an STI ancestor) has its own schema,
-  // so its declarations must stay on itself.
   if (sharesStiBaseTable(this)) {
     const stiBase = getStiBase(this);
     (stiBase as AnyClass).defineAttribute(name, castType, options);
