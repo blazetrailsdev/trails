@@ -12,8 +12,10 @@ import {
   MISPLACED_MIN_HITS,
   buildEntitiesByName,
   significantMissingCalls,
+  jsEnumerableAliases,
   narrowCallsApplies,
 } from "./compare.js";
+import { rubyMethodToTs } from "./conventions.js";
 import type { ApiManifest, ClassInfo, MethodInfo, PackageInfo } from "./types.js";
 
 function cls(file: string, name: string, superclass?: string): ClassInfo {
@@ -177,6 +179,75 @@ describe("significantMissingCalls", () => {
     // assign_attributes is flagged (wide admits it though it's outside `sig`);
     // super is structurally excluded even by the wide predicate.
     expect(missing).toEqual(["assign_attributes → assignAttributes"]);
+  });
+
+  describe("JS enumerable aliases", () => {
+    const wide = { has: (k: string) => k !== "super" };
+
+    it("does not flag any? when the TS body calls some", () => {
+      // Rails ConnectionPool#connected? → `@connections.any?(&:connected?)`;
+      // trails ports it as `_connections.some((c) => c.isConnected())`.
+      const missing = significantMissingCalls(
+        "connected?",
+        ["any?"],
+        new Set(["some", "isConnected"]),
+        () => true,
+        rubyMethodToTs,
+        wide,
+      );
+      expect(missing).toEqual([]);
+    });
+
+    it("does not flag all?/include?/select when the TS body uses the JS analogue", () => {
+      const missing = significantMissingCalls(
+        "check",
+        ["all?", "include?", "select"],
+        new Set(["every", "includes", "filter"]),
+        () => true,
+        rubyMethodToTs,
+        wide,
+      );
+      expect(missing).toEqual([]);
+    });
+
+    it("still flags an enumerable call the TS body makes in no form", () => {
+      const missing = significantMissingCalls(
+        "check",
+        ["any?"],
+        new Set(["every"]),
+        () => true,
+        rubyMethodToTs,
+        wide,
+      );
+      expect(missing).toEqual(["any? → isAny|any"]);
+    });
+
+    it("aliases never widen which calls are considered ported", () => {
+      // Gate 2 (isPortedWithArgs) sees only the naming-convention candidates,
+      // so an alias can never introduce a mismatch that did not exist before.
+      const missing = significantMissingCalls(
+        "check",
+        ["any?"],
+        new Set(),
+        (c) => c === "some",
+        rubyMethodToTs,
+        wide,
+      );
+      expect(missing).toEqual([]);
+    });
+  });
+});
+
+describe("jsEnumerableAliases", () => {
+  it("maps the core Ruby Enumerable names to their JS analogues", () => {
+    expect(jsEnumerableAliases("any?")).toContain("some");
+    expect(jsEnumerableAliases("all?")).toContain("every");
+    expect(jsEnumerableAliases("include?")).toContain("includes");
+    expect(jsEnumerableAliases("select")).toContain("filter");
+  });
+
+  it("returns an empty list for a name with no JS analogue", () => {
+    expect(jsEnumerableAliases("run_callbacks")).toEqual([]);
   });
 });
 
