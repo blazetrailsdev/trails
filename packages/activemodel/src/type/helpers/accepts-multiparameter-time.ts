@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { ArgumentError } from "../../attribute-assignment.js";
 import { Type } from "../value.js";
 
 /**
@@ -94,36 +95,50 @@ export class AcceptsMultiparameterTime {
     const minute = num("5", 0);
     const second = num("6", 0);
 
+    // Decompose fractional seconds into the three Temporal sub-second
+    // components (each 0-999) using integer arithmetic to avoid floating-
+    // point rounding errors. Carry 1e9 ns into wholeSecond explicitly.
+    let wholeSecond = Math.trunc(second);
+    let totalNanoseconds = Math.round((second - wholeSecond) * 1_000_000_000);
+    if (totalNanoseconds === 1_000_000_000) {
+      wholeSecond += 1;
+      totalNanoseconds = 0;
+    }
+    const millisecond = Math.trunc(totalNanoseconds / 1_000_000);
+    const microsecond = Math.trunc((totalNanoseconds % 1_000_000) / 1_000);
+    const nanosecond = totalNanoseconds % 1_000;
+    const timeParts = { hour, minute, second: wholeSecond, millisecond, microsecond, nanosecond };
     try {
-      // Decompose fractional seconds into the three Temporal sub-second
-      // components (each 0-999) using integer arithmetic to avoid floating-
-      // point rounding errors. Carry 1e9 ns into wholeSecond explicitly.
-      let wholeSecond = Math.trunc(second);
-      let totalNanoseconds = Math.round((second - wholeSecond) * 1_000_000_000);
-      if (totalNanoseconds === 1_000_000_000) {
-        wholeSecond += 1;
-        totalNanoseconds = 0;
-      }
-      const millisecond = Math.trunc(totalNanoseconds / 1_000_000);
-      const microsecond = Math.trunc((totalNanoseconds % 1_000_000) / 1_000);
-      const nanosecond = totalNanoseconds % 1_000;
       const pdt = Temporal.PlainDateTime.from(
-        {
-          year,
-          month,
-          day,
-          hour,
-          minute,
-          second: wholeSecond,
-          millisecond,
-          microsecond,
-          nanosecond,
-        },
+        { year, month, day, ...timeParts },
         { overflow: "reject" },
       );
       return this.type.cast(pdt);
     } catch {
-      return null;
+      // Rails assembles via ::Time.public_send(default_timezone, *values).
+      // Time.utc/local rolls *within-range* calendar overflow (Nov 31 → Dec 1,
+      // Feb 29 in a common year → Mar 1) but raises ArgumentError outside its
+      // accepted domain (month 13, mday 32, hour 25 — verified on Ruby 3.3),
+      // which AR surfaces as MultiparameterAssignmentErrors. Roll over only
+      // inside that accepted domain; otherwise raise to match Time's strictness.
+      if (
+        month >= 1 &&
+        month <= 12 &&
+        day >= 1 &&
+        day <= 31 &&
+        hour >= 0 &&
+        hour <= 23 &&
+        minute >= 0 &&
+        minute <= 59 &&
+        wholeSecond >= 0 &&
+        wholeSecond <= 60
+      ) {
+        const rolled = Temporal.PlainDate.from({ year, month: 1, day: 1 })
+          .add({ months: month - 1, days: day - 1 })
+          .toPlainDateTime(timeParts);
+        return this.type.cast(rolled);
+      }
+      throw new ArgumentError("argument out of range");
     }
   }
 }

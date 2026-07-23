@@ -1,4 +1,8 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import {
+  AcceptsMultiparameterTime,
+  isNumericKeyHash,
+} from "./helpers/accepts-multiparameter-time.js";
 import { looseDateParse } from "./helpers/loose-date-parse.js";
 import {
   DateInfinity,
@@ -33,6 +37,9 @@ export class DateType extends ValueType<DateCastResult> {
     if (value instanceof Temporal.PlainDate) return value;
     // Accept PlainDateTime from multiparameter assignment — extract the date part.
     if (value instanceof Temporal.PlainDateTime) return value.toPlainDate();
+    // Numeric-keyed hash written raw by multiparameter assignment — mirrors
+    // AcceptsMultiparameterTime::InstanceMethods#cast's Hash branch.
+    if (isNumericKeyHash(value)) return this.valueFromMultiparameterAssignment(value);
     // boundary: cast accepts Date input from legacy callers / custom types
     // and bridges into Temporal.PlainDate via the UTC calendar components.
     if (value instanceof Date) {
@@ -143,9 +150,27 @@ export class DateType extends ValueType<DateCastResult> {
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
-    values: Record<number, number | null | undefined>,
+    values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    return this.newDate(values[1], values[2], values[3]);
+    // `super` — the AcceptsMultiparameterTime wrapper's Time assembly, which
+    // rolls within-range calendar overflow the way Time.local does (Nov 31 →
+    // Dec 1). The wrapper's `this.type.cast(pdt)` round-trip performs the
+    // `new_date(time.year, time.mon, time.mday)` narrowing via castValue's
+    // PlainDateTime branch.
+    return new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value —
+   * a Hash value is validated by assembling it (raising on invalid input).
+   */
+  override assertValidValue(value: unknown): void {
+    if (isNumericKeyHash(value)) this.valueFromMultiparameterAssignment(value);
+  }
+
+  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
+  override isValueConstructedByMassAssignment(value: unknown): boolean {
+    return isNumericKeyHash(value);
   }
 
   /**

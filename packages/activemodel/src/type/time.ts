@@ -117,4 +117,17 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
       "5": 0,
     }).cast(values) as Temporal.PlainTime | null;
   }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value —
+   * a Hash value is validated by assembling it (raising on invalid input).
+   */
+  override assertValidValue(value: unknown): void {
+    if (isNumericKeyHash(value)) this.valueFromMultiparameterAssignment(value);
+  }
+
+  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
+  override isValueConstructedByMassAssignment(value: unknown): boolean {
+    return isNumericKeyHash(value);
+  }
 }
