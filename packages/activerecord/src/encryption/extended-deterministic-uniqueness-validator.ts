@@ -1,5 +1,4 @@
-import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
-import { EncryptableRecord, getAttributeType } from "./encryptable-record.js";
+import { EncryptableRecord, getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 import { AdditionalValue, ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
 import { withoutEncryption } from "./context.js";
 
@@ -95,8 +94,8 @@ export class EncryptedUniquenessValidator {
     const deterministicAttrs = EncryptableRecord.deterministicEncryptedAttributes(klass);
     if (!deterministicAttrs.has(attribute)) return;
 
-    const encryptedType = getAttributeType(klass, attribute);
-    if (!(encryptedType instanceof EncryptedAttributeType)) return;
+    const encryptedType = encryptedTypeOf(getAttributeType(klass, attribute));
+    if (!encryptedType) return;
 
     // When ExtendedDeterministicQueries is installed it already expands the
     // WHERE clause to cover all previous-scheme ciphertexts, and buildRelation
@@ -116,8 +115,8 @@ export class EncryptedUniquenessValidator {
    * check for duplicates across scheme migrations.
    */
   static allCiphertextsFor(klass: any, attribute: string, value: unknown): unknown[] {
-    const type = getAttributeType(klass, attribute);
-    if (!(type instanceof EncryptedAttributeType) || !type.deterministic) {
+    const type = encryptedTypeOf(getAttributeType(klass, attribute));
+    if (!type?.deterministic) {
       return [value];
     }
 

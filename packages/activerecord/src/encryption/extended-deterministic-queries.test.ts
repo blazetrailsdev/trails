@@ -438,8 +438,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueries::RelationQuerie
       }
     }
     (Contact as any)._encryptedAttributes = new Set(["email"]);
-    const defs = (Contact as any)._attributeDefinitions as Map<string, { type: unknown }>;
-    defs.set("email", { type });
+    (Contact as any).decorateAttributes(["email"], () => type);
 
     const avCurrent = new AdditionalValue("plain@example.com", type);
     const avPrev = new AdditionalValue("plain@example.com", prevType);

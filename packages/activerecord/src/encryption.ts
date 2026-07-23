@@ -6,11 +6,12 @@
  *
  * In Rails, `encrypts` uses `decorate_attributes` which defers type
  * wrapping via `PendingDecorator` — the actual wrapping happens when
- * `_default_attributes` is first resolved. We mirror this with
- * `_pendingEncryptions`: `encrypts()` records the request, and
- * `applyPendingEncryptions()` runs during construction and after
- * schema reflection, wrapping any attributes that haven't been
- * wrapped yet.
+ * `_default_attributes` is resolved, and `type_for_attribute` is the only
+ * lookup surface. We mirror that directly: `encryptAttribute` pushes the
+ * durable decorator once at declaration time and type inspections resolve
+ * through `typeForAttribute`. The `_pendingEncryptions` buffer only drives
+ * `applyPendingEncryptions()` bookkeeping (column-size validation re-runs
+ * after schema reflection + the frozen-encryption validator install).
  *
  * All actual encryption flows through the Rails-faithful scheme-based
  * `EncryptedAttributeType` under `./encryption/`. A custom `{ encryptor }`
@@ -19,12 +20,15 @@
  */
 
 import { registerEncryptionHooks } from "./encryption-hooks.js";
-import { EncryptedAttributeType } from "./encryption/encrypted-attribute-type.js";
 import { Scheme, type SchemeOptions } from "./encryption/scheme.js";
 import type { EncryptorLike } from "./encryption/encryptor.js";
 import { Aes256Gcm as AesGcmCipher } from "./encryption/cipher/aes256-gcm.js";
 export { Cipher } from "./encryption/cipher.js";
-import { EncryptableRecord } from "./encryption/encryptable-record.js";
+import {
+  EncryptableRecord,
+  getAttributeType,
+  encryptedTypeOf,
+} from "./encryption/encryptable-record.js";
 import { Configurable } from "./encryption/configurable.js";
 import { Contexts } from "./encryption/contexts.js";
 import {
@@ -187,9 +191,9 @@ interface PendingEncryption {
  * defaultEncryptor fallback are preserved on the primary path.
  *
  * The actual type wrapping is deferred (Rails' `decorate_attributes` /
- * PendingDecorator) — `encryptAttribute` records pending encryptions that
- * `applyPendingEncryptions` applies when the attribute definitions are first
- * used and re-applies on every `_defaultAttributes` rebuild.
+ * PendingDecorator) — `encryptAttribute` pushes the durable decorator once at
+ * declaration time; the wrapped type materializes on `_defaultAttributes`
+ * replay and is read through `typeForAttribute`.
  */
 export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): void {
   let options: EncryptsOptions = {};
@@ -215,30 +219,18 @@ export function encrypts(klass: any, ...args: Array<string | EncryptsOptions>): 
 }
 
 /**
- * Apply any pending encryption decorations to the class's attribute
- * definitions. Wraps the existing cast type with the scheme-based
- * `EncryptedAttributeType`.
+ * Post-declaration / post-reflection bookkeeping for encrypted attributes.
+ *
+ * The type wrapping itself is NOT done here: `encryptAttribute` pushes the
+ * durable PendingDecorator once at declaration time, and every type inspection
+ * resolves through `typeForAttribute` (Rails' single lookup surface) — there is
+ * no eager `_attributeDefinitions` re-wrap to maintain. What remains is the
+ * bookkeeping Rails runs from `load_schema!` / `validate`: column-size
+ * validation re-runs and the frozen-encryption validator install.
  */
 export function applyPendingEncryptions(klass: any): void {
   const pending: PendingEncryption[] | undefined = klass._pendingEncryptions;
   if (!pending || pending.length === 0) return;
-
-  // Copy-on-write so a subclass's pending encryption never mutates an inherited
-  // definitions map. The `decorateAttributes` path does its own copy-on-write
-  // (#4981); this still covers the plain-model branch of registerEncryptedType,
-  // which writes `_attributeDefinitions` directly.
-  if (!Object.prototype.hasOwnProperty.call(klass, "_attributeDefinitions")) {
-    klass._attributeDefinitions = new Map(klass._attributeDefinitions);
-  }
-
-  // Route the actual type wrapping through the shared scheme-based primitive
-  // (mirrors Rails: one EncryptableRecord#encrypts declaration path). On a Base
-  // subclass registerEncryptedType uses the replay-safe decorateAttributes
-  // decorator and skips attributes whose column hasn't been reflected yet — the
-  // persistent _pendingEncryptions buffer re-invokes this once it appears.
-  for (const { name, scheme } of pending) {
-    EncryptableRecord.registerEncryptedType(klass, name, scheme);
-  }
 
   // Re-run column-size validation after schema reflection so limits learned
   // from the DB (not declared via attribute()) are also picked up. Safe even
@@ -279,8 +271,9 @@ export function isEncryptedAttribute(klass: any, attr: string): boolean {
     if (pending?.some((p) => p.name === attr)) return true;
     const defs = current._attributeDefinitions;
     if (defs) {
-      const def = defs.get(attr);
-      if (def?.type instanceof EncryptedAttributeType) return true;
+      // Mock-model arm: real Base subclasses no longer hold wrapped defs (the
+      // eager view is retired) — their declarations hit the pending arm above.
+      if (encryptedTypeOf(defs.get(attr)?.type)) return true;
     }
     current = Object.getPrototypeOf(current);
   }
@@ -298,8 +291,8 @@ export function encryptedAttributeQ(record: any, attributeName: string): boolean
   // Resolve attribute aliases (mirrors Rails' attribute_aliases lookup).
   const resolved = klass._attributeAliases?.[attributeName] ?? attributeName;
   if (!klass._encryptedAttributes?.has(resolved)) return false;
-  const type = klass._attributeDefinitions?.get(resolved)?.type;
-  if (!(type instanceof EncryptedAttributeType)) return false;
+  const type = encryptedTypeOf(getAttributeType(klass, resolved));
+  if (!type) return false;
   const rawValue = record.readAttributeBeforeTypeCast(resolved);
   return type.isEncrypted(rawValue);
 }
@@ -362,9 +355,10 @@ export async function decryptRecord(record: any): Promise<void> {
 
   const assignments: Record<string, unknown> = {};
   for (const attr of encryptedAttrs) {
-    const type = klass._attributeDefinitions?.get(attr)?.type;
+    const type = getAttributeType(klass, attr) as { deserialize?: (v: unknown) => unknown };
+    const encryptedType = encryptedTypeOf(type);
     const raw = record.readAttributeBeforeTypeCast(attr);
-    if (type instanceof EncryptedAttributeType && type.isEncrypted(raw)) {
+    if (encryptedType?.isEncrypted(raw) && type?.deserialize) {
       assignments[attr] = type.deserialize(raw);
     } else {
       assignments[attr] = record.readAttribute(attr);

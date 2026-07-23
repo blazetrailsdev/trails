@@ -572,7 +572,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     } as any;
     await Book.loadSchema();
 
-    const type = Book._attributeDefinitions.get("name").type;
+    const type = Book.typeForAttribute("name");
     expect(type._default).toBe("<untitled>");
 
     Configurable.config.supportUnencryptedData = false;

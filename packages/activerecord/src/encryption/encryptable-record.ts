@@ -177,13 +177,20 @@ export class EncryptableRecord {
   }
 
   static deterministicEncryptedAttributes(modelClass: any): Set<string> {
+    // Memoized per class like Rails' `@deterministic_encrypted_attributes ||=`
+    // (encryptable_record.rb:58-61); own-property-guarded so STI subclasses
+    // compute their own. Invalidated by `encryptAttribute` on new declarations.
+    if (Object.prototype.hasOwnProperty.call(modelClass, "_deterministicEncryptedAttributes")) {
+      return modelClass._deterministicEncryptedAttributes;
+    }
     const result = new Set<string>();
     for (const name of this.encryptedAttributes(modelClass)) {
-      const type = getAttributeType(modelClass, name);
-      if (type instanceof EncryptedAttributeType && type.deterministic) {
+      const type = encryptedTypeOf(getAttributeType(modelClass, name));
+      if (type?.deterministic) {
         result.add(name);
       }
     }
+    modelClass._deterministicEncryptedAttributes = result;
     return result;
   }
 
@@ -211,6 +218,7 @@ export class EncryptableRecord {
       modelClass._encryptedAttributes = new Set<string>(modelClass._encryptedAttributes ?? []);
     }
     modelClass._encryptedAttributes.add(name);
+    delete modelClass._deterministicEncryptedAttributes;
 
     // Build the per-attribute scheme (mirrors Rails scheme_for) unless the caller
     // supplied one. Each attribute gets its own scheme so per-attribute options
@@ -225,8 +233,8 @@ export class EncryptableRecord {
       // (encryptable_record.rb:87-92) and AttributeRegistration replays in
       // declaration order. The decorator resolves the column default at replay
       // time, so it needs no re-push after schema reflection. The
-      // `_pendingEncryptions` buffer remains for the eager
-      // `_attributeDefinitions` view + validator re-runs on rebuild.
+      // `_pendingEncryptions` buffer remains only for validator re-runs +
+      // frozen-validator install on rebuild (applyPendingEncryptions).
       this.registerPendingEncryption(modelClass, name, scheme);
       this.pushEncryptionDecorator(modelClass, name, scheme);
       encryptionHooks.applyPendingEncryptions(modelClass);
@@ -254,8 +262,8 @@ export class EncryptableRecord {
 
   /**
    * Record a pending encryption so `applyPendingEncryptions` (encryption.ts)
-   * decorates the attribute now and re-decorates on every `_defaultAttributes`
-   * rebuild. Own-property guarded like the encrypted-attribute Set.
+   * re-runs its bookkeeping on every `_defaultAttributes` rebuild. The `scheme`
+   * is kept in each entry for `encryptFixtureRows` (define-fixtures.ts).
    * @internal
    */
   static registerPendingEncryption(modelClass: any, name: string, scheme: Scheme): void {
@@ -302,80 +310,14 @@ export class EncryptableRecord {
   }
 
   /**
-   * The single EncryptedAttributeType-wrapping primitive shared by both
-   * declaration paths, so `Base.encrypts` (via `applyPendingEncryptions`) and
-   * the scheme-based `encryptAttribute` register the wrapped type through one
-   * implementation:
-   *
-   * - Models exposing `decorateAttributes` (real Base subclasses driven by the
-   *   `Base.encrypts` → `applyPendingEncryptions` path) get their eager
-   *   `_attributeDefinitions` view wrapped/corrected here. The durable
-   *   PendingDecorator is NOT pushed from here — `pushEncryptionDecorator`
-   *   pushed it once at declaration time, preserving declaration order in the
-   *   pending queue. Skips when the def isn't present yet — the persistent
-   *   `_pendingEncryptions` buffer re-invokes this once the column is reflected.
-   * - Plain models (the scheme-based / mock-model test path) set
-   *   `_attributeDefinitions` directly, seeding a schema-sourced placeholder
-   *   when no def exists yet so `loadSchemaFromAdapter` can supply the real
-   *   cast type on the next pass.
-   *
-   * The `decorateAttributes` branch skips when the def is absent and does NOT
-   * buffer here — it relies on a persistent `_pendingEncryptions` buffer being
-   * re-applied once the column is reflected. `encryptAttribute` now maintains
-   * that buffer itself (via `registerPendingEncryption` before it calls
-   * `applyPendingEncryptions`), so the scheme path is replay-safe on its own —
-   * completing the RFC 0047 follow-up
-   * `encrypt-route-primary-attribute-through-encrypt-attribute`. This method is
-   * therefore only invoked from `applyPendingEncryptions` (durable path) or
-   * directly by `encryptAttribute` for plain mock models (immediate path).
+   * Register the EncryptedAttributeType for a plain mock model (the immediate
+   * path in `encryptAttribute` — callers without `decorateAttributes`). Real
+   * Base subclasses never come through here: their wrapping is the durable
+   * decorator pushed by `pushEncryptionDecorator`, resolved via
+   * `typeForAttribute`.
    * @internal
    */
   static registerEncryptedType(modelClass: any, name: string, scheme: Scheme): void {
-    // Mirrors Rails' `default: columns_hash[name.to_s]&.default` — thread the
-    // TRUE DB column default into the encrypted type so a plaintext default
-    // deserializes without an attempted decrypt (see EncryptedAttributeType's
-    // `@default && @default == value` guard in decryptAsText). The default comes
-    // from a query-free peek of the warm schema cache (columnDefaultFor /
-    // cachedColumnDefaultFor), NOT the reflected def's `defaultValue` (which an
-    // `attribute(name, { default })` override would poison) and NOT `columnsHash()`
-    // (which would warm the shared schema cache and perturb sibling tests).
-    if (typeof modelClass.decorateAttributes === "function") {
-      const def = modelClass._attributeDefinitions?.get?.(name);
-      if (!def) return;
-      // Resolve the default Rails threads: `columns_hash[name].default`. When the
-      // schema cache is warm the peek is authoritative (the TRUE column default,
-      // ignoring any `attribute()` override). Before reflection it isn't cached,
-      // so we fall back to the def default as a provisional value and correct it
-      // on the post-reflection replay.
-      const cached = this.cachedColumnDefaultFor(modelClass, name);
-      const authoritative = cached !== NOT_CACHED;
-      const columnDefault = authoritative ? (cached ?? undefined) : (def.defaultValue ?? undefined);
-      if (def.type instanceof EncryptedAttributeType) {
-        // Already wrapped. Re-wrap only to correct a provisional default once the
-        // authoritative column default is known and differs — otherwise stay put.
-        if (!authoritative || def.type._default === columnDefault) return;
-        modelClass._attributeDefinitions.set(name, {
-          ...def,
-          type: new EncryptedAttributeType({
-            scheme,
-            castType: def.type.castType,
-            default: columnDefault,
-          }),
-        });
-        return;
-      }
-      // NOTE: this writes only the eager `_attributeDefinitions` back-compat
-      // view. The durable PendingDecorator was already pushed at declaration
-      // time by `pushEncryptionDecorator` — pushing here (on rebuild) would move
-      // the encryption decorator to the queue tail, breaking declaration-order
-      // nesting relative to `serialize` (the encrypts-first case).
-      modelClass._attributeDefinitions.set(name, {
-        ...def,
-        type: new EncryptedAttributeType({ scheme, castType: def.type, default: columnDefault }),
-      });
-      return;
-    }
-
     // Get existing cast type from attribute definitions if available.
     // If already encrypted, unwrap to avoid double-encryption.
     const existingDef = modelClass._attributeDefinitions?.get?.(name);
@@ -614,8 +556,8 @@ export class EncryptableRecord {
     // Resolve attribute aliases before checking encrypted set.
     const resolvedName = klass._attributeAliases?.[attributeName] ?? attributeName;
     if (!klass._encryptedAttributes?.has(resolvedName)) return false;
-    const type = getAttributeType(klass, resolvedName);
-    if (!(type instanceof EncryptedAttributeType)) return false;
+    const type = encryptedTypeOf(getAttributeType(klass, resolvedName));
+    if (!type) return false;
     const raw = record.readAttributeBeforeTypeCast?.(resolvedName);
     return type.isEncrypted(raw);
   }
@@ -700,16 +642,18 @@ export class EncryptableRecord {
     const klass = record.constructor;
     const result: Record<string, unknown> = {};
     for (const name of klass._encryptedAttributes ?? new Set<string>()) {
-      const type = getAttributeType(klass, name);
+      const type = getAttributeType(klass, name) as { deserialize?: (v: unknown) => unknown };
+      const encryptedType = encryptedTypeOf(type);
       const raw = record.readAttributeBeforeTypeCast?.(name);
       // Only decrypt if actually encrypted — mirrors Rails' type.deserialize
       // which returns the raw value when support_unencrypted_data is true.
-      if (type instanceof EncryptedAttributeType && type.isEncrypted(raw)) {
+      if (encryptedType?.isEncrypted(raw) && type?.deserialize) {
         result[name] = type.deserialize(raw);
       } else {
         // Plaintext — return the cast value so typed columns (date, JSON, etc.)
         // keep their in-memory representation rather than the raw DB string.
-        result[name] = record.readAttribute?.(name) ?? raw;
+        result[name] =
+          typeof record.readAttribute === "function" ? record.readAttribute(name) : raw;
       }
     }
     return result;
@@ -733,9 +677,26 @@ export class EncryptableRecord {
 }
 
 /**
- * Get the attribute type from a model class's _attributeDefinitions.
+ * Resolve an attribute's type through `typeForAttribute` (Rails' single lookup
+ * surface); falls back to `_attributeDefinitions` for plain mock models.
  */
 export function getAttributeType(klass: any, name: string): unknown {
-  const def = klass._attributeDefinitions?.get?.(name);
-  return def?.type;
+  if (typeof klass?.typeForAttribute === "function") {
+    return klass.typeForAttribute(name);
+  }
+  return klass._attributeDefinitions?.get?.(name)?.type;
+}
+
+/**
+ * Find the EncryptedAttributeType inside a possibly-wrapped resolved type
+ * (e.g. `Serialized(Encrypted(binary))`). Stands in for Rails' DelegateClass
+ * delegation on Type::Serialized / NormalizedValueType.
+ */
+export function encryptedTypeOf(type: unknown): EncryptedAttributeType | undefined {
+  let current: any = type;
+  while (current) {
+    if (current instanceof EncryptedAttributeType) return current;
+    current = current.subtype ?? current.castType;
+  }
+  return undefined;
 }
