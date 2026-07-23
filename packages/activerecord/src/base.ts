@@ -42,7 +42,7 @@ import type { Relation } from "./relation.js";
 import {
   getInheritanceColumn,
   inheritanceColumnDisabled,
-  isStiSubclass,
+  sharesStiBaseTable,
   getStiBase,
   instantiateSti,
   stiName,
@@ -1194,8 +1194,11 @@ export class Base extends Model {
     // shared `class_attribute`. Route the registration through the STI
     // base so `Circle.attribute("radius", ...)` lands on `Shape._attributeDefinitions`
     // instead of forking a subclass-local map that later schema
-    // reflection on the base wouldn't see.
-    if (isStiSubclass(this)) {
+    // reflection on the base wouldn't see. Gated on the table actually being
+    // shared: an own-table descendant under an STI ancestor
+    // (`self.table_name = "tickets"`) owns an independent schema, so its
+    // declarations must stay on itself.
+    if (sharesStiBaseTable(this)) {
       const stiBase = getStiBase(this);
       stiBase.attribute(name, typeName, options);
       return;

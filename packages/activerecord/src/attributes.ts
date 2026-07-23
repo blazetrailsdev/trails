@@ -16,7 +16,7 @@ import {
   resetDefaultAttributes as amResetDefaultAttributes,
   registerWithSuperclass,
 } from "@blazetrails/activemodel";
-import { isStiSubclass, getStiBase } from "./inheritance.js";
+import { getStiBase, sharesStiBaseTable } from "./inheritance.js";
 import { encryptionHooks } from "./encryption-hooks.js";
 import { lookup as typeLookup } from "./type.js";
 import { cachedColumnsHash } from "./model-schema.js";
@@ -86,7 +86,10 @@ export function defineAttribute(
 ): void {
   // STI subclasses share the base's _attributeDefinitions — route to the
   // base to avoid forking a subclass-local map that drifts from the base.
-  if (isStiSubclass(this)) {
+  // Only when the table is genuinely shared: an own-table descendant
+  // (`self.table_name = "tickets"` under an STI ancestor) has its own schema,
+  // so its declarations must stay on itself.
+  if (sharesStiBaseTable(this)) {
     const stiBase = getStiBase(this);
     (stiBase as AnyClass).defineAttribute(name, castType, options);
     return;
@@ -179,7 +182,7 @@ export function _defaultAttributes(this: AnyClass): AttributeSet {
   // so cache invalidation from Base.attribute/defineAttribute (routed to the
   // base) stays coherent across siblings. The subclass's own declarations are
   // layered on afterwards (see below).
-  const stiSubclass = isStiSubclass(this);
+  const stiSubclass = sharesStiBaseTable(this);
   const cacheHost = stiSubclass ? (getStiBase(this) as AnyClass) : this;
 
   if (!cacheHost._cachedDefaultAttributes) {
