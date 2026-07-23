@@ -343,8 +343,6 @@ describe("AttributeMethodsTest", () => {
     }
     const topic = new Target({ title: "Budget" }) as any;
     expect(topic.title).toBe("Budget");
-    // Rails: assert_not_respond_to / assert_raise(NoMethodError) for
-    // title_hello_world; in JS an undeclared property reads as undefined.
     expect(topic.titleHelloWorld).toBeUndefined();
   });
   it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
@@ -477,8 +475,6 @@ describe("AttributeMethodsTest", () => {
     }
     const topic = new TopicClass({ title: "New topic" }) as any;
     TopicClass.undefineAttributeMethods();
-    // Rails races 5 threads through method_missing; JS is single-threaded, so
-    // one read after undefine covers the regenerate-on-access path.
     expect(topic.title).toBe("New topic");
   });
   it("#method_missing define methods on the fly in a thread safe way, even when decorated", async () => {
@@ -487,8 +483,6 @@ describe("AttributeMethodsTest", () => {
         this.tableName = "topics";
         this.attribute("title", "string");
       }
-      // Rails: `def title; "title:#{super}"; end` — `super` reaches the
-      // generated reader; readAttribute is that reader's body here.
       get title(): string {
         return `title:${this.readAttribute("title")}`;
       }
@@ -566,7 +560,6 @@ describe("AttributeMethodsTest", () => {
     expect(obj.subjectWas()).toBeNull();
   });
   it("#alias_attribute with an overridden original method from a module does not use the overridden original method", async () => {
-    // Ruby `include`-d module override → methods assigned onto the prototype.
     const titleWasOverride = {
       titleWas() {
         return "overridden_title_was";
@@ -878,9 +871,7 @@ describe("AttributeMethodsTest", () => {
   it("read overridden attribute", async () => {
     const Topic = makeTopic();
     const topic = new Topic({ title: "a" });
-    // Rails: `def topic.title() "b" end` — a singleton override of the reader.
     Object.defineProperty(topic, "title", { get: () => "b" });
-    // Rails `topic[:title]` bypasses the override and reads the attribute.
     expect(topic.readAttribute("title")).toBe("a");
   });
 
@@ -1115,8 +1106,6 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute_before_type_cast with aliased attribute", async () => {
-    // Rails alias `new_bank_balance` → trails camelCase `newBankBalance`
-    // (documented naming deviation).
     const model = new NumericData({ newBankBalance: "abcd" } as any) as any;
     expect(model.readAttributeBeforeTypeCast("newBankBalance")).toBe("abcd");
   });
@@ -1161,9 +1150,6 @@ describe("AttributeMethodsTest", () => {
   it("method overrides in multi-level subclasses", async () => {
     class Level1 extends Developer {
       static {
-        // Rails: `def name; "dev:#{read_attribute(:name)}"; end` — Developer
-        // `declare`s name as a property, so TS rejects an accessor override in
-        // class syntax; define it imperatively instead.
         Object.defineProperty(this.prototype, "name", {
           get(this: Developer) {
             return `dev:${this.readAttribute("name")}`;
@@ -1234,9 +1220,6 @@ describe("AttributeMethodsTest", () => {
         this.tableName = "topics";
         this.attribute("title", "string");
       }
-      // Rails `privatize("title")` replaces the generated reader with a
-      // private method returning "I'm private"; TS has no runtime privacy, so
-      // the overriding reader stands in and the writer stays generated.
       get title(): string {
         return "I'm private";
       }
@@ -1245,7 +1228,6 @@ describe("AttributeMethodsTest", () => {
       }
     }
     const topic = new Target({ title: "The pros and cons of programming naked." }) as any;
-    // Rails: `topic.send(:title)` bypasses privacy and hits the override.
     expect(topic.title).toBe("I'm private");
   });
 

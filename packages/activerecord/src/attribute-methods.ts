@@ -157,10 +157,6 @@ export function accessedFields(this: AttributeRecord): string[] {
  * Mirrors: ActiveRecord::AttributeMethods::GeneratedAttributeMethods
  */
 export class GeneratedAttributeMethods {
-  // Rails names the module by `const_set(:GeneratedAttributeMethods, ...)`
-  // under the model class, so `mod.inspect` reads e.g.
-  // "Topic::GeneratedAttributeMethods". TS has no const_set; carry the owner's
-  // name instead and reproduce the same inspect string.
   constructor(private readonly ownerName?: string) {}
 
   inspect(): string {

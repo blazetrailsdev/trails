@@ -1162,8 +1162,6 @@ class TestExtractor
     return nil unless node.is_a?(Array)
     case node[0]
     when :@int, :@float
-      # Strip `_` digit separators (`123_456`) — the TS twin's NumericLiteral
-      # `.text` is already separator-free, so raw source would false-mismatch.
       "n:#{node[1].delete('_')}"
     when :unary
       # `-3` / `-1.5` — unary minus over a numeric leaf; other unaries are non-literal.
@@ -1184,11 +1182,6 @@ class TestExtractor
     end
   end
 
-  # Process standard double-quoted escapes so the token matches the TS twin,
-  # whose StringLiteral `.text` is the *parsed* value (real newline for `\n`).
-  # Ripper's `@tstring_content` is raw source and does not expose the quote
-  # style, so a single-quoted `'\n'` (literally backslash-n) is unescaped too —
-  # assertions essentially never rely on that distinction.
   ESCAPES = {
     "n" => "\n", "t" => "\t", "r" => "\r", "s" => " ", "0" => "\0",
     "a" => "\a", "b" => "\b", "e" => "\e", "f" => "\f", "v" => "\v",
