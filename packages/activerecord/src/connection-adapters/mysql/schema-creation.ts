@@ -234,10 +234,10 @@ export class SchemaCreation extends AbstractSchemaCreation {
     if (o.ifNotExists) sql += " IF NOT EXISTS";
     sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
-    // Mirrors the abstract visitor's map-then-await-in-order shape.
+    // Mirrors the abstract visitor's sequential map-to-thunks shape.
     const statements: string[] = [];
-    for (const pending of o.columns.map((c) => this.visitColumnDefinition(c))) {
-      statements.push(await pending);
+    for (const visit of o.columns.map((c) => () => this.visitColumnDefinition(c))) {
+      statements.push(await visit());
     }
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
       const cols = o.compositePrimaryKey.map((k) => this.adapter.quoteIdentifier(k)).join(", ");

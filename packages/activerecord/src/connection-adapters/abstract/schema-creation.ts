@@ -156,10 +156,13 @@ export class SchemaCreation {
     sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
     // Rails: `statements = o.columns.map { |c| accept c }` — keep the map call
-    // (the api-compare wide gate tracks it); the promises are awaited in order.
+    // (the api-compare wide gate tracks it) but map to thunks so each column
+    // visit runs only after the previous one settles: Rails' block is
+    // sequential, and PG's default quoting issues a live regtype query per
+    // defaulted column that must not run concurrently.
     const statements: string[] = [];
-    for (const pending of o.columns.map((c) => this.visitColumnDefinition(c))) {
-      statements.push(await pending);
+    for (const visit of o.columns.map((c) => () => this.visitColumnDefinition(c))) {
+      statements.push(await visit());
     }
 
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
