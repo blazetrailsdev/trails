@@ -274,8 +274,13 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    expect((Circle as unknown as { _columnsHash: unknown })._columnsHash).toBeUndefined();
-    expect((Circle as unknown as { _columns: unknown })._columns).toBeUndefined();
+    // The subclass's OWN stale caches are deleted so the base's freshly built
+    // (load-time-filtered) _columnsHash shines through via the prototype chain.
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_columns")).toBe(false);
+    expect(
+      Object.keys((Circle as unknown as { _columnsHash: Record<string, unknown> })._columnsHash),
+    ).toEqual(["guid"]);
   });
 
   it("resetColumnInformation on STI subclass resets the STI base", () => {

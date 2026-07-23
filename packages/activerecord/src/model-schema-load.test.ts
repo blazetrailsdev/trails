@@ -231,7 +231,10 @@ describe("loadSchemaFromAdapter integration details", () => {
     (Post as unknown as { adapter: unknown }).adapter = adapter;
     await Post.loadSchema();
 
-    expect((Post as unknown as { _columnsHash: unknown })._columnsHash).toBeUndefined();
+    // Rails load_schema! replaces @columns_hash with the freshly filtered hash
+    // (stale entry gone); @columns stays nil until `columns` derives it.
+    const columnsHash = (Post as unknown as { _columnsHash: Record<string, unknown> })._columnsHash;
+    expect(Object.keys(columnsHash)).toEqual(["guid"]);
     expect((Post as unknown as { _columns: unknown })._columns).toBeUndefined();
   });
 
