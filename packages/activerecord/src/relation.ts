@@ -165,11 +165,7 @@ import { AliasTracker } from "./associations/alias-tracker.js";
  */
 export type LoadedRelation<R> = Omit<R, "then">;
 
-/**
- * Argument accepted by the `Enumerable` predicate forms (`any?`, `one?`,
- * `none?`): either Ruby's block (a predicate) or a pattern matched with the
- * case-equality operator — here a model class, i.e. `instanceof`.
- */
+/** @internal */
 export type EnumerablePattern<T extends Base> =
   | ((record: T) => boolean)
   | (new (...args: never[]) => Base);
@@ -2268,9 +2264,6 @@ export class Relation<T extends Base> {
   /**
    * Check if there are multiple matching records.
    *
-   * Rails' `many?` takes no pattern argument (only a block), so this accepts a
-   * predicate but not the class-pattern form.
-   *
    * Mirrors: ActiveRecord::Relation#many?
    */
   async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
@@ -2292,13 +2285,7 @@ export class Relation<T extends Base> {
     return (await this.limitedCount()) === 1;
   }
 
-  /**
-   * Number of loaded records matching an `Enumerable` pattern argument — a
-   * predicate (Ruby's block form) or a model class, which Ruby matches with
-   * the case-equality operator (`Post === record`, i.e. `instanceof`).
-   *
-   * @internal
-   */
+  /** @internal */
   async _countMatching(pattern: EnumerablePattern<T>): Promise<number> {
     const records = await this.toArray();
     if ((pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true) {
