@@ -140,11 +140,6 @@ describe("Relation#where — composite-key form", () => {
   });
 
   it("qualified composite cols bind through the joined table's type, not the base table's", () => {
-    // Rails' Array-key branch re-roots per key via
-    // `associated_table(key).predicate_builder` (predicate_builder.rb:88-98),
-    // so a qualified col's bind type comes from the joined table. Typing
-    // `comments.post_id` against `posts` (which has no `post_id`) would fall
-    // back to the default ValueType and leave "2" an uncast string.
     const rel = (Post as any).all();
     const node: any = rel.predicateBuilder.buildComposite(
       ["posts.id", "comments.post_id"],
@@ -155,8 +150,27 @@ describe("Relation#where — composite-key form", () => {
     const bind = right.right.value;
     expect(bind.name).toBe("post_id");
     expect(bind.valueForDatabase).toBe(2);
-    // The unqualified col still types against the base table.
     expect(left.left.relation.name).toBe("posts");
+  });
+
+  it("qualified single-column composite resolves its IN(...) attribute on the joined table", () => {
+    const rel = (Post as any).all();
+    const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [[1], [2]]);
+    expect(node.left.relation.name).toBe("comments");
+    expect(node.left.name).toBe("post_id");
+  });
+
+  it("qualified composite cols match rows through a join", async () => {
+    const post: any = await (Post as any).create({ title: "joined", body: "b", author_id: 1 });
+    const other: any = await (Post as any).create({ title: "unjoined", body: "b", author_id: 1 });
+    await (Comment as any).create({ post_id: post.id, body: "c" });
+    await (Comment as any).create({ post_id: other.id, body: "c2" });
+
+    const rows = await (Post as any)
+      .joins("comments")
+      .where(["posts.id", "comments.post_id"], [[post.id, post.id]])
+      .toArray();
+    expect(rows.map((r: any) => r.title)).toEqual(["joined"]);
   });
 
   it("single-column composite uses IN(...) (not OR-chain) for compactness", () => {

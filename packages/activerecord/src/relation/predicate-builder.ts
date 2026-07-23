@@ -455,14 +455,6 @@ export class PredicateBuilder {
     // semantics — see method docstring).
     const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
     if (validTuples.length === 0) return null;
-    // Re-root qualified cols (`"comments.post_id"`) on the referenced
-    // table the way Rails' Array-key branch does — it recurses through
-    // `associated_table(key).predicate_builder`, so both the attribute
-    // AND the bind's type come from the joined table's metadata
-    // (predicate_builder.rb:88-98). Reading the bind type off the base
-    // builder instead would type an absent column through the default
-    // `ValueType` (silent no-op cast), or a same-named base column
-    // through the wrong type.
     const resolved = cols.map((col) => {
       const idx = col.lastIndexOf(".");
       if (idx === -1) return { attribute: this.table.arelTable.get(col), builder: this };
@@ -488,10 +480,8 @@ export class PredicateBuilder {
     // Pre-resolve `Attribute[]` once outside the per-tuple loop —
     // each `arelTable.get` allocates a fresh `Arel::Attribute`.
     // Reusing the resolved attrs keeps large tuple lists
-    // allocation-light. Column names are read straight off the
-    // builder's arel table (or, for a qualified col, the re-rooted
-    // associated table's), the way Rails' array-key branch of
-    // expand_from_hash does via `self[key, value]`.
+    // allocation-light.
+    //
     // Per-tuple AND uses the pairwise `reduce(&:and)` shape (nested
     // binary `And` chain), matching Rails' `grouping_queries`
     // (predicate_builder.rb:157) — not a flat n-ary `And`. SQL output
