@@ -32,6 +32,30 @@ describe("Ruby extractor literal quote style", () => {
     }
   }
 
+  function rubyQuoteStyles(source: string): Array<[number[], string]> {
+    const dir = fs.mkdtempSync(path.join(os.tmpdir(), "quote-rb-"));
+    try {
+      const p = path.join(dir, "source.rb");
+      fs.writeFileSync(p, source);
+      const driver = `
+        require_relative ${JSON.stringify(RUBY_SCRIPT)}
+        require "json"
+        styles = TestExtractor.new.send(:build_quote_styles, File.read(${JSON.stringify(p)}))
+        puts JSON.generate(styles.map { |pos, style| [pos, style.to_s] })
+      `;
+      return JSON.parse(execFileSync("ruby", ["-e", driver], { encoding: "utf-8" }));
+    } finally {
+      fs.rmSync(dir, { recursive: true, force: true });
+    }
+  }
+
+  it("keeps a dynamic symbol from unbalancing the enclosing literal's stack", () => {
+    // `:"x"` / `%s(y)` close with tstring_end, so they must also open the stack
+    // — otherwise they pop an entry belonging to a still-open outer literal.
+    const styles = rubyQuoteStyles(`x = "a#{:"b"}c"\ny = %s(d)\nz = :e\n`);
+    expect(styles.map(([, style]) => style)).toEqual(["double", "double", "double", "single"]);
+  });
+
   it("keeps escape sequences raw in single-quoted heredocs", () => {
     const v = rubyAssertionValues(
       [

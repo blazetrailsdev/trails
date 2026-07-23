@@ -1203,6 +1203,10 @@ class TestExtractor
       when :on_tstring_beg, :on_words_beg, :on_qwords_beg,
            :on_symbols_beg, :on_qsymbols_beg, :on_regexp_beg, :on_backtick
         open_stack.push(delimiter_style(tok))
+      when :on_symbeg
+        # A bare symbol (`:foo`, token ":") has no closing token; only the
+        # quoting forms (`:"..."`, `:'...'`, `%s(...)`) close with tstring_end.
+        open_stack.push(delimiter_style(tok)) unless tok == ":"
       when :on_tstring_end, :on_label_end, :on_regexp_end
         open_stack.pop
       when :on_heredoc_beg
@@ -1217,8 +1221,8 @@ class TestExtractor
   end
 
   def delimiter_style(tok)
-    return :single if tok.start_with?("'")
-    return :single if tok.match?(/\A%[qwi]/)
+    return :single if tok.start_with?("'", ":'")
+    return :single if tok.match?(/\A%[qwis]/)
     return :single if tok.start_with?("<<") && tok.include?("'")
     :double
   end
