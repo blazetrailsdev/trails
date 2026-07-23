@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi } from "vitest";
 import { Base } from "./index.js";
+import { reconcileVirtualAttributes } from "./model-schema.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { assertNoQueriesMatch } from "./testing/query-assertions.js";
@@ -36,6 +37,31 @@ describe("virtual attribute reconciliation warms the schema cache", () => {
 
     // reconcile reflected through the shared cache, so it is now warm
     expect(conn.schemaCache.getCachedColumnsHash("posts")).toBeDefined();
+  });
+
+  it("warm-cache reconciliation invalidates a columnNames memo taken off the synthesized fallback", async () => {
+    class Post extends Base {
+      static {
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+        this.attribute("body", "text");
+        this.attribute("virtual_field", "string", { default: "v" });
+      }
+    }
+    const conn = Post.connection;
+    await conn.schemaCache.clearDataSourceCacheBang(conn.pool ?? conn, "posts");
+
+    // Cold cache: loadSchema's synthesized fallback sets `_schemaLoaded` from
+    // the declared attributes, so this memoizes the synthesized list.
+    const cold = Post.columnNames();
+    expect(cold).not.toContain("tags_count");
+
+    // The write path's reconciliation warms the shared cache and clears
+    // `_schemaLoaded` without a `_schemaRevision` bump — the memo must be
+    // dropped with it, not keep serving the pre-warm synthesized list until
+    // some later `loadSchema` happens to bump the revision.
+    await reconcileVirtualAttributes.call(Post as never, true);
+    expect(Post.columnNames()).toContain("tags_count");
   });
 
   it("a second save on a cold-cache virtual-attribute model issues no schema-introspection query", async () => {
