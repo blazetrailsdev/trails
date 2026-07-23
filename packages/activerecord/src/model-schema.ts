@@ -48,7 +48,7 @@ function reflectionAdapter(klass: any): any {
 // (Shape → Circle → Ticket → VIPTicket, Ticket = "tickets"): the schema host for
 // VIPTicket is Ticket, not Shape. Walk to the topmost ancestor that still shares
 // the receiver's table instead.
-function stiSchemaHost<T extends { tableName: string }>(klass: T): T {
+export function stiSchemaHost<T extends { tableName: string }>(klass: T): T {
   if (!isStiSubclass(klass)) return klass;
   const table = klass.tableName;
   let host = klass;

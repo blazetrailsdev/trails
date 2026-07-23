@@ -514,25 +514,6 @@ export function abstractClass(this: typeof Base, value?: boolean): boolean {
 }
 
 /**
- * Whether a model is an STI descendant that actually shares its STI base's
- * table. A descendant is free to set its own `table_name` (Rails' "own-table
- * descendant" — e.g. `Ticket < Circle < Shape` with `self.table_name =
- * "tickets"`), in which case it owns an independent schema: its columns,
- * attribute declarations and default-attribute cache must NOT be routed to the
- * STI base. `isStiSubclass` alone is true for those, so every base-redirect
- * that is really about a *shared table* must gate on this predicate instead.
- *
- * @internal
- */
-export function sharesStiBaseTable(modelClass: object): boolean {
-  if (!isStiSubclass(modelClass)) return false;
-  const base = getStiBase(modelClass);
-  if (base === modelClass) return false;
-  const own = (modelClass as typeof Base).tableName;
-  return own == null || own === base.tableName;
-}
-
-/**
  * Get the STI base class for a model.
  */
 export function getStiBase(modelClass: object): typeof Base {

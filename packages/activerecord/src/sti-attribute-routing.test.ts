@@ -182,4 +182,26 @@ describe("STI subclass attribute() routing", () => {
     // Inherited (shared-ancestor) declarations remain visible on the descendant.
     expect(Ticket._attributeDefinitions.get("radius")?.type.name).toBe("integer");
   });
+  it("own-table descendant does not clobber the STI base's attributesBuilder cache", () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+      static {
+        this.inheritanceColumn = "type";
+        this.attribute("radius", "integer");
+      }
+    }
+    class Ticket extends Shape {
+      static override tableName = "tickets";
+      static {
+        this.attribute("priority", "integer");
+      }
+    }
+
+    const shapeBuilder = Shape.attributesBuilder();
+    const ticketBuilder = Ticket.attributesBuilder();
+
+    expect(ticketBuilder).not.toBe(shapeBuilder);
+    expect(Shape.attributesBuilder()).toBe(shapeBuilder);
+    expect(Object.prototype.hasOwnProperty.call(Ticket, "_attributesBuilder")).toBe(true);
+  });
 });

@@ -42,7 +42,6 @@ import type { Relation } from "./relation.js";
 import {
   getInheritanceColumn,
   inheritanceColumnDisabled,
-  sharesStiBaseTable,
   getStiBase,
   instantiateSti,
   stiName,
@@ -1195,9 +1194,9 @@ export class Base extends Model {
     // base so `Circle.attribute("radius", ...)` lands on `Shape._attributeDefinitions`
     // instead of forking a subclass-local map that later schema
     // reflection on the base wouldn't see.
-    if (sharesStiBaseTable(this)) {
-      const stiBase = getStiBase(this);
-      stiBase.attribute(name, typeName, options);
+    const schemaHost = ModelSchema.stiSchemaHost(this as unknown as { tableName: string });
+    if ((schemaHost as unknown as typeof Base) !== this) {
+      (schemaHost as unknown as typeof Base).attribute(name, typeName, options);
       return;
     }
     super.attribute(name, typeName, options);
