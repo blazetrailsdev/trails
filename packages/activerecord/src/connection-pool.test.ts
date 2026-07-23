@@ -486,8 +486,12 @@ it("pin connection connected?", async () => {
 });
 
 it("isConnected probes each pooled connection's connected state", async () => {
-  const pool = makeTransactionAwarePool();
+  const pool = makePool();
   const conn = await pool.checkout();
+  // Rails' checkout is lazy for non-pinned connections (checkout_and_verify
+  // only runs clean!); verify! is the Rails-named way to establish the raw
+  // connection so connected? flips true, as the pinned paths do.
+  await conn.verifyBang();
   expect(pool.isConnected()).toBe(true);
   pool.checkin(conn);
   conn.disconnectBang();

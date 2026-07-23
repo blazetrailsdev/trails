@@ -89,6 +89,24 @@ function makePool(size: number = 5): ConnectionPool {
   return makeAmbientPool({ pool: size });
 }
 
+it("verifyBang on a checked-out adapter establishes the raw connection on every lane", async () => {
+  // Rails checkout is lazy for non-pinned connections (checkout_and_verify
+  // runs clean! only — connection_pool.rb:942; verify! fires solely on the
+  // pinned paths, connection_pool.rb:336/:554). verify! is the Rails-named
+  // entry that establishes the raw handle, so post-checkout
+  // `verifyBang` must leave `connected?` true against the real lane adapter.
+  const pool = makePool();
+  const conn = await pool.checkout();
+  try {
+    await conn.verifyBang();
+    expect(conn.isConnected()).toBe(true);
+    expect(pool.isConnected()).toBe(true);
+  } finally {
+    pool.checkin(conn);
+    await closePoolConnections(pool);
+  }
+});
+
 it("with connection prevent permanent checkout releases connection", async () => {
   const pool = makePool();
   await pool.leaseConnection();
