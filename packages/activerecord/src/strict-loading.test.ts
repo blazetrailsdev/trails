@@ -809,6 +809,7 @@ describe("StrictLoadingTest", () => {
     developer!.strictLoadingBang();
 
     setActionOnStrictLoadingViolation("log");
+    expect(actionOnStrictLoadingViolation).toBe("log");
     let logged = false;
     const sub = Notifications.subscribe("strict_loading_violation.active_record", () => {
       logged = true;

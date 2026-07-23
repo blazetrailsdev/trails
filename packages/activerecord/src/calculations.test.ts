@@ -4,6 +4,7 @@ import "./encryption.js";
 import { describe, it, expect } from "vitest";
 import { sql as arelSql, star as arelStar } from "@blazetrails/arel";
 import { adapterType } from "./test-adapter.js";
+import { captureSql } from "./testing/sql-capture.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 // Opt into the canonical-model autoload index so association targets resolve by
 // name on first reference — no manual `registerModel`.
@@ -97,8 +98,8 @@ describe("CalculationsTest", () => {
 
   it("should return integer average if db returns such", async () => {
     const value = await Book.average("status");
-    expect(typeof value).toBe("number");
-    expect(value).toBeCloseTo(1.0);
+    expect(value).toBe(1.0);
+    expect(value).toBeTypeOf("number");
   });
 
   it("should return float average if db returns such", async () => {
@@ -299,11 +300,10 @@ describe("CalculationsTest", () => {
   });
 
   it("limit should apply before count", async () => {
-    // Rails: Account.order(:id).limit(4).count(:firm_id) == 3
     // accounts 1..4: account 2 has null firm_id → count(:firm_id) = 3
     const accounts = Account.order("id").limit(4);
-    expect(await accounts.count()).toBe(4);
     expect(await accounts.count("firm_id")).toBe(3);
+    expect(await accounts.select("firm_id").count()).toBe(3);
   });
 
   it("limit should apply before count arel attribute", async () => {
@@ -340,8 +340,11 @@ describe("CalculationsTest", () => {
   });
 
   it("no order by when counting all", async () => {
-    const count = await Account.order({ id: "desc" }).limit(10).count();
-    expect(typeof count).toBe("number");
+    const queries = await captureSql(async () => {
+      await Account.order({ id: "desc" }).limit(10).count();
+    });
+    expect(queries.length).toBe(1);
+    expect(queries[0]).not.toMatch(/ORDER BY/);
   });
 
   it("count on invalid columns raises", async () => {

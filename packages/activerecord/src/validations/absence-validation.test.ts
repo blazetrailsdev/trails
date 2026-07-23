@@ -5,6 +5,9 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
+import { Human } from "../test-helpers/models/human.js";
+import { Face } from "../test-helpers/models/face.js";
+import { seedAssociationCache } from "../test-helpers/seed-association-cache.js";
 
 fixtures({});
 
@@ -25,9 +28,19 @@ describe("AbsenceValidationTest", () => {
     expect(await t.isValid()).toBe(false);
   });
   it("has one marked for destruction", async () => {
-    const { Topic } = makeModel();
-    const t = new Topic({ body: "" });
-    expect(await t.isValid()).toBe(true);
+    class Boy extends Human {
+      static name = "Boy";
+    }
+    Boy.validatesAbsenceOf("face");
+
+    const boy = new Boy();
+    const face = new Face();
+    seedAssociationCache(boy, "face", face);
+    expect(await boy.isValid()).toBe(false);
+    expect(boy.errors.get("face").length).toBe(1);
+
+    face.markForDestruction();
+    expect(await boy.isValid()).toBe(true);
   });
   it("has many marked for destruction", async () => {
     const { Topic } = makeModel();

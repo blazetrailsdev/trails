@@ -244,10 +244,13 @@ describe("SchemaCacheTest", () => {
 
   it("columns for existent table", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer"), makeColumn("name", "text")]);
-    const cols = await cache.columns(null, "users");
-    expect(cols).toHaveLength(2);
-    expect(cols![0].name).toBe("id");
+    cache.setColumns("courses", [
+      makeColumn("id", "integer"),
+      makeColumn("name", "text"),
+      makeColumn("college_id", "integer"),
+    ]);
+    const cols = await cache.columns(null, "courses");
+    expect(cols!.length).toBe(3);
   });
 
   it("columns for non existent table", () => {
@@ -259,11 +262,13 @@ describe("SchemaCacheTest", () => {
 
   it("columns hash for existent table", async () => {
     const cache = new SchemaCache();
-    cache.setColumns("users", [makeColumn("id", "integer"), makeColumn("name", "text")]);
-    const hash = await cache.columnsHash(null, "users");
-    expect(hash).toBeDefined();
-    expect(hash!["id"]).toBeInstanceOf(Column);
-    expect(hash!["name"].sqlType).toBe("text");
+    cache.setColumns("courses", [
+      makeColumn("id", "integer"),
+      makeColumn("name", "text"),
+      makeColumn("college_id", "integer"),
+    ]);
+    const hash = await cache.columnsHash(null, "courses");
+    expect(Object.keys(hash!).length).toBe(3);
   });
 
   it("columns hash for non existent table", () => {

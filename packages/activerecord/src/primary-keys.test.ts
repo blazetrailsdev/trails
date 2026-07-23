@@ -389,8 +389,6 @@ describe("PrimaryKeysTest", () => {
   });
 
   it.skipIf(adapterType !== "postgres")("serial with quoted sequence name", async () => {
-    // Rails: assert_equal "nextval('"mixed_case_monkeys_monkeyID_seq"'::regclass)", column.default_function
-    //        assert_predicate column, :serial?
     // columnsHash() reads from the model's schema cache which is cleared by
     // clearSchemaCache after each test; use connection.columns() directly so the
     // PG adapter's full column introspection (with defaultFunction) is always fresh.
@@ -401,14 +399,13 @@ describe("PrimaryKeysTest", () => {
     }[];
     const col = cols.find((c) => c.name === "monkeyID");
     expect(col).toBeDefined();
-    expect(col!.defaultFunction).toMatch(/nextval/);
-    expect(col!.serial).toBe(true);
+    expect(col!.defaultFunction).toBe("nextval('\"mixed_case_monkeys_monkeyID_seq\"'::regclass)");
+    expect(col!.serial).toBeTruthy();
   });
 
   it.skipIf(adapterType !== "postgres")("serial with unquoted sequence name", async () => {
-    // Rails: assert_equal "nextval('topics_id_seq'::regclass)", column.default_function
-    //        assert_predicate column, :serial?
-    // Same issue as above — use connection.columns() for fresh PG introspection.
+    // Same schema-cache issue as above — use connection.columns() for fresh PG
+    // introspection.
     const cols = (await (Base.connection as any).columns("topics")) as {
       name: string;
       defaultFunction?: string;
@@ -416,8 +413,8 @@ describe("PrimaryKeysTest", () => {
     }[];
     const col = cols.find((c) => c.name === "id");
     expect(col).toBeDefined();
-    expect(col!.defaultFunction).toMatch(/nextval/);
-    expect(col!.serial).toBe(true);
+    expect(col!.defaultFunction).toBe("nextval('topics_id_seq'::regclass)");
+    expect(col!.serial).toBeTruthy();
   });
 });
 

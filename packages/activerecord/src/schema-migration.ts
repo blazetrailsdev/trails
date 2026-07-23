@@ -61,10 +61,13 @@ export class SchemaMigration {
     await this._adapter.dropTable(this.tableName, { ifExists: true });
   }
 
-  async createVersion(version: string): Promise<void> {
+  // Rails: connection.insert(im, "...", primary_key, version) — returns the
+  // supplied id value, i.e. the version (schema_migration.rb:19-25).
+  async createVersion(version: string): Promise<string> {
     const im = new InsertManager(this.arelTable);
     im.insert([[this.arelTable.get(this.primaryKey), version]]);
     await this._adapter.execute(this._adapter.toSql(im));
+    return version;
   }
 
   async deleteVersion(version: string): Promise<void> {
@@ -113,7 +116,7 @@ export class SchemaMigration {
   }
 
   async recordVersion(version: string): Promise<void> {
-    return this.createVersion(version);
+    await this.createVersion(version);
   }
 
   static normalizeMigrationNumber(number: string | number): string {

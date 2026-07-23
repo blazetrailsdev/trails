@@ -53,10 +53,10 @@ describe("ReadOnlyTest", () => {
 
   it("cant save readonly record", async () => {
     const dev = await Developer.find(developers("david").id);
-    expect(dev.isReadonly()).toBe(false);
+    expect(dev.isReadonly()).toBeFalsy();
 
     dev.readonlyBang();
-    expect(dev.isReadonly()).toBe(true);
+    expect(dev.isReadonly()).toBeTruthy();
 
     // In-memory writes remain allowed; only persistence is blocked. The
     // 25-char name violates Developer's `length: { in: [3, 20] }` validation,
@@ -65,12 +65,20 @@ describe("ReadOnlyTest", () => {
     // rather than raising ReadOnlyRecord. Resetting to a valid name then
     // surfaces the readonly guard.
     (dev as Record<string, unknown>).name = "Luscious forbidden fruit.";
-    expect(await dev.save()).toBe(false);
+    expect(await dev.save()).toBeFalsy();
     (dev as Record<string, unknown>).name = "Forbidden.";
 
-    await expect(dev.save()).rejects.toThrow("Developer is marked as readonly");
-    await expect(dev.saveBang()).rejects.toThrow("Developer is marked as readonly");
-    await expect(dev.destroy()).rejects.toThrow("Developer is marked as readonly");
+    const catchError = (p: Promise<unknown>) =>
+      p.then(
+        () => null,
+        (err: unknown) => err as Error,
+      );
+    let e = await catchError(dev.save());
+    expect(e?.message).toBe("Developer is marked as readonly");
+    e = await catchError(dev.saveBang());
+    expect(e?.message).toBe("Developer is marked as readonly");
+    e = await catchError(dev.destroy());
+    expect(e?.message).toBe("Developer is marked as readonly");
   });
 
   it("cant touch readonly record", async () => {

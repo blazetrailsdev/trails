@@ -34,6 +34,8 @@ import { Tagging as CanonicalTagging } from "./test-helpers/models/tagging.js";
 import { Subscriber as CanonicalSubscriber } from "./test-helpers/models/subscriber.js";
 import { Developer as CanonicalDeveloper } from "./test-helpers/models/developer.js";
 import { Tag as CanonicalTag } from "./test-helpers/models/tag.js";
+import { Car as CanonicalCar } from "./test-helpers/models/car.js";
+import { Toy } from "./test-helpers/models/toy.js";
 import {
   Company as CanonicalCompany,
   Firm as CanonicalFirm,
@@ -694,20 +696,15 @@ describe("FinderTest", () => {
   });
 
   it("find one message on primary key", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
     try {
-      await Topic.find(0);
+      await CanonicalCar.find(0);
       expect.unreachable("should throw");
     } catch (e: any) {
       expect(e).toBeInstanceOf(RecordNotFound);
       expect(e.id).toBe(0);
       expect(e.primaryKey).toBe("id");
-      expect(e.model).toBe("Topic");
-      expect(e.message).toBe("Couldn't find Topic with 'id'=0");
+      expect(e.model).toBe("Car");
+      expect(e.message).toBe("Couldn't find Car with 'id'=0");
     }
   });
 
@@ -1125,11 +1122,17 @@ describe("FinderTest", () => {
     expect(found).toBeDefined();
   });
   it("find some message with custom primary key", async () => {
-    const { Post } = makeModel();
-    const p1 = await Post.create({ title: "cpk_a" });
-    const p2 = await Post.create({ title: "cpk_b" });
-    const results = await Post.where({ id: [p1.id, p2.id] });
-    expect(results.length).toBe(2);
+    class MercedesCar extends Toy {
+      static _primaryKey = "name";
+    }
+    const e = await MercedesCar.find("Hello", "World!").then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect(e).toBeInstanceOf(RecordNotFound);
+    expect((e as Error).message).toBe(
+      "Couldn't find all MercedesCars with 'name': (Hello, World!) (found 0 results, but was looking for 2).",
+    );
   });
   it("#skip_query_cache! for #exists?", async () => {
     const { Post } = makeModel();

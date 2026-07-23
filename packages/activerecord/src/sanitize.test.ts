@@ -51,8 +51,8 @@ describe("SanitizeTest", () => {
         this.attribute("title", "string");
       }
     }
-    const sql = Post.sanitizeSqlArray("SELECT 1");
-    expect(sql).toBe("SELECT 1");
+    const sql = Post.sanitizeSqlArray("");
+    expect(sql).toBe("");
   });
 
   it("sanitize sql like", () => {

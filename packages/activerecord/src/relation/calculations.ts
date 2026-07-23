@@ -985,10 +985,16 @@ export async function performCount(
     // Inherit select-value column when no explicit column is provided (same logic
     // as the non-limit path below — mirrors Rails execute_simple_calculation).
     const selectColsLimited = (this as any)._selectColumns as unknown[] | null | undefined;
+    // A single plain-identifier string select (`select("firm_id")`) counts that
+    // column too — Rails' select_for_count compiles string select values via
+    // arel_columns. Raw SQL fragments (commas/spaces) stay out: Rails raises on
+    // those and trails' divergence there is tracked separately.
     const singleSelectColLimited =
       !rawEffectiveCol &&
       selectColsLimited?.length === 1 &&
-      selectColsLimited[0] instanceof Nodes.Node
+      (selectColsLimited[0] instanceof Nodes.Node ||
+        (typeof selectColsLimited[0] === "string" &&
+          /^[a-zA-Z_][a-zA-Z0-9_.]*$/.test(selectColsLimited[0])))
         ? selectColsLimited[0]
         : null;
     const effectiveCol = rawEffectiveCol ?? singleSelectColLimited ?? undefined;

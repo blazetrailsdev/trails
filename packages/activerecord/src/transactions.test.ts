@@ -544,7 +544,11 @@ describe("TransactionTest", () => {
     };
 
     first.approved = true;
-    await expect(first.save()).rejects.toThrow("Make the transaction rollback");
+    const e = await first.save().then(
+      () => null,
+      (err: unknown) => err,
+    );
+    expect((e as Error).message).toBe("Make the transaction rollback");
     expect(((await Topic.find(1)) as any).approved).toBe(false);
   });
 
@@ -1253,8 +1257,7 @@ describe("TransactionTest", () => {
 
     await txn.rollback();
 
-    txn.state.commitBang();
-    expect(txn.state.committed).toBe(true);
+    expect(txn.state.commitBang()).toBe("committed");
   });
 
   it("mark transaction state as rolledback", async () => {
@@ -1264,8 +1267,7 @@ describe("TransactionTest", () => {
 
     await txn.commit();
 
-    txn.state.rollbackBang();
-    expect(txn.state.rolledBack).toBe(true);
+    expect(txn.state.rollbackBang()).toBe("rolledback");
   });
 
   it("mark transaction state as nil", async () => {
@@ -1275,9 +1277,7 @@ describe("TransactionTest", () => {
 
     await txn.commit();
 
-    // Rails asserts `transaction.state.nullify!` returns nil; nullifyBang()
-    // returns void — the TS equivalent of nil.
-    expect(txn.state.nullifyBang()).toBeUndefined();
+    expect(txn.state.nullifyBang()).toBeNull();
   });
 });
 
