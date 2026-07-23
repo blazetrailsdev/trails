@@ -910,8 +910,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build via block before save", async () => {
-    // Rails: first_firm has 2 existing clients_of_firm; building one more
-    // via block makes assert_equal 3 after save + reload.
     const { Company, Client } = makeModels();
     const company = await Company.create({ name: "Acme" });
     await Client.create({ name: "Summit", client_of: company.id });
@@ -924,7 +922,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build many via block before save", async () => {
-    // Rails: 2 existing clients_of_firm + 2 built via block = assert_equal 4.
     const { Company, Client } = makeModels();
     const company = await Company.create({ name: "Acme" });
     await Client.create({ name: "Summit", client_of: company.id });
@@ -966,8 +963,6 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("replace on duplicated object", async () => {
-    // Rails: firm.clients = [existing client, Client.new] → assert_equal 2
-    // clients after save + reload.
     const { Company, Client } = makeModels();
     const company = await Company.create({ name: "Acme" });
     const c1 = await Client.create({ name: "Orig", client_of: company.id });
