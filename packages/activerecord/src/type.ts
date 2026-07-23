@@ -139,14 +139,18 @@ export function adapterNameFrom(model: AdapterNameSource): AdapterName {
   // which is available without a live connection, and raises when the model has
   // no pool at all. Type lookups here run at declare time (before any pool is
   // established in unit tests), so an absent config degrades to :sqlite rather
-  // than raising; a present config always wins over the live connection.
-  let config: { adapter?: string } | undefined;
+  // than raising; a configured adapter always wins over the live connection.
+  // `DatabaseConfig#adapter` is `string | undefined`, and Rails' `.to_sym` would
+  // raise on a nil adapter — an adapter-less config carries no more information
+  // than no config at all, so it takes the same fallback path rather than
+  // silently normalizing undefined to sqlite.
+  let adapter: string | undefined;
   try {
-    config = model.connectionDbConfig?.();
+    adapter = model.connectionDbConfig?.()?.adapter;
   } catch {
-    config = undefined;
+    adapter = undefined;
   }
-  if (config) return adapterNameFromConfig(config.adapter);
+  if (adapter) return adapterNameFromConfig(adapter);
   return (
     ((model.connection as DatabaseAdapter | null | undefined)?.adapterName as
       | AdapterName

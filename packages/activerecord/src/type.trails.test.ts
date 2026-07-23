@@ -35,6 +35,14 @@ describe("Type.adapterNameFrom", () => {
       }),
     ).toBe("mysql");
     expect(adapterNameFrom({ connection: { adapterName: "postgres" } })).toBe("postgres");
+    // DatabaseConfig#adapter is `string | undefined`; an adapter-less config is
+    // no more informative than no config at all.
+    expect(
+      adapterNameFrom({
+        connectionDbConfig: () => ({}),
+        connection: { adapterName: "postgres" },
+      }),
+    ).toBe("postgres");
     expect(adapterNameFrom({})).toBe("sqlite");
   });
 });
