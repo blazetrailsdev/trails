@@ -9,7 +9,7 @@ export interface DeflaterOptions {
     headers: Record<string, any>,
     body: any,
   ) => boolean;
-  sync?: boolean;
+  sync?: boolean | null;
 }
 
 export class Deflater {
@@ -23,13 +23,13 @@ export class Deflater {
         body: any,
       ) => boolean)
     | null;
-  private sync: boolean;
+  private sync: boolean | null;
 
   constructor(app: any, opts: DeflaterOptions = {}) {
     this.app = app;
     this.include = opts.include || null;
     this.condition = opts.if || null;
-    this.sync = opts.sync !== false;
+    this.sync = opts.sync !== undefined ? opts.sync : true;
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {

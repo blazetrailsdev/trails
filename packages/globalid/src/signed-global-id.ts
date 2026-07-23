@@ -32,7 +32,7 @@ let _classExpiresIn: number | null | undefined;
 export interface SignedGlobalIDOptions {
   app?: string;
   /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
-  for?: string;
+  for?: string | null;
   /** Number of seconds until expiration. `null` explicitly disables expiration (Rails: `expires_in: nil`). */
   expiresIn?: number | null;
   /** Explicit expiration time. `null` explicitly disables expiration (Rails: `expires_at: nil`). */
@@ -50,7 +50,7 @@ export interface SignedGlobalIDOptions {
  * and can't embed `app` or arbitrary extra URI params.
  */
 export interface FromUriOptions {
-  for?: string;
+  for?: string | null;
   expiresIn?: number | null;
   expiresAt?: Temporal.Instant | null;
   verifier?: MessageVerifier;
@@ -58,7 +58,7 @@ export interface FromUriOptions {
 
 export interface ParseOptions {
   /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
-  for?: string;
+  for?: string | null;
   /** Optional — falls back to `SignedGlobalID.verifier` when omitted. */
   verifier?: MessageVerifier;
 }
@@ -69,14 +69,14 @@ export class ExpiredMessage extends Error {}
 /** @internal */
 interface SgidPayload {
   gid: string;
-  purpose: string;
+  purpose: string | null;
   expires_at: string | null;
 }
 
 export class SignedGlobalID {
   /** The raw GID URI string, e.g. `gid://MyApp/User/1` */
   readonly uri: string;
-  readonly purpose: string;
+  readonly purpose: string | null;
   readonly expiresAt: Temporal.Instant | undefined;
 
   private readonly verifier: MessageVerifier;
@@ -87,7 +87,7 @@ export class SignedGlobalID {
 
   private constructor(
     uri: string,
-    purpose: string,
+    purpose: string | null,
     expiresAt: Temporal.Instant | undefined,
     verifier: MessageVerifier,
   ) {
@@ -204,8 +204,8 @@ export class SignedGlobalID {
   }
 
   /** Mirrors: SignedGlobalID.pick_purpose. */
-  static pickPurpose(options: { for?: string }): string {
-    return options.for ?? DEFAULT_PURPOSE;
+  static pickPurpose(options: { for?: string | null }): string | null {
+    return options.for !== undefined ? options.for : DEFAULT_PURPOSE;
   }
 
   // ─── Verify dispatch (Rails private class methods) ────────────────────────

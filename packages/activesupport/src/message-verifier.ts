@@ -40,11 +40,11 @@ interface MessageVerifierOptions {
 interface GenerateOptions {
   expiresIn?: number; // seconds
   expiresAt?: Temporal.Instant;
-  purpose?: string;
+  purpose?: string | null;
 }
 
 interface VerifyOptions {
-  purpose?: string;
+  purpose?: string | null;
 }
 
 export class MessageVerifier {
