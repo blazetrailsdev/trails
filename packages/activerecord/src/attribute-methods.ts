@@ -15,6 +15,7 @@ import { queryAttribute as _queryAttribute } from "./attribute-methods/query.js"
 // toKey/id: inline to avoid a circular dependency (primary-key.ts imports
 // dangerousAttributeMethods from this file)
 import { reload as _reload } from "./persistence.js";
+import { cachedTableExists } from "./model-schema.js";
 import {
   serializableHash as _serializableHash,
   attributeNamesForSerialization as _attrNamesForSerialization,
@@ -628,12 +629,12 @@ interface AttributeNamesHost {
  * declaration order.
  */
 export function attributeNames(this: AttributeNamesHost): string[] {
-  // Rails attribute_methods.rb:236-241: `if !abstract_class? && table_exists?`
-  // — an abstract class has no attribute names at all. The table_exists? half
-  // is unportable here (trails' tableExists is async); an absent table's
-  // columnsHash is empty, so Rails' NonExistentTable case (base_test.rb:1638)
-  // still yields [] via the declared/columnNames merge below.
-  if (this.abstractClass) return [];
+  // Rails attribute_methods.rb:236-241: `if !abstract_class? && table_exists?`.
+  // trails' tableExists is async, so the table_exists? half runs off the
+  // schema cache's already-resolved answer — `false` only after a
+  // dataSourceExists miss; a cold/unknown table falls through (fail-open,
+  // where Rails' sync DB hit would return []).
+  if (this.abstractClass || cachedTableExists.call(this as never) === false) return [];
   const declared = [...this._attributeDefinitions.keys()];
   const columnNames = this.columnNames?.() ?? [];
   if (columnNames.length === 0) return declared;

@@ -289,6 +289,16 @@ export class SchemaCache {
   }
 
   /**
+   * Synchronous, query-free read of an already-resolved data-source existence
+   * check. `undefined` when this table has never been checked (a warm cache
+   * only seeds `true` for tables it saw — an unchecked absent table is not
+   * `false` here until `dataSourceExists` misses on it).
+   */
+  getCachedDataSourceExists(name: string): boolean | undefined {
+    return this._dataSourceExists.get(name);
+  }
+
+  /**
    * Synchronous, query-free read of an already-cached primary key. Returns
    * `undefined` when the table's primary key has not been reflected yet (the
    * caller should fall back to the convention default), or the cached value

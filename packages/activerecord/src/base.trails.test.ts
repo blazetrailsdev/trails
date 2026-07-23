@@ -299,6 +299,23 @@ describe("BasicsTest (trails)", () => {
   });
 });
 
+describe("attribute_names table_exists? guard (trails)", () => {
+  fixtures([]);
+
+  it("attributeNames is [] for a declared attribute once the cache resolves the table absent", async () => {
+    class DeclaredNonExistent extends Base {
+      static tableName = "non_existent_tables";
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    // Populate the schema cache's dataSourceExists=false entry — the sync
+    // stand-in for Rails' table_exists? DB hit (attribute_methods.rb:236-241).
+    expect(await DeclaredNonExistent.tableExists()).toBe(false);
+    expect(DeclaredNonExistent.attributeNames()).toEqual([]);
+  });
+});
+
 // Rails removes ignored columns only from schema/default `attribute_types`
 // (`columns_hash.except(*ignored_columns)`), NOT from a raw result row: a
 // `SELECT *` that projects an ignored column still lands it in `@attributes`
