@@ -212,7 +212,9 @@ export function makeEncryptedPost(adapter: DatabaseAdapter) {
       this._tableName = "posts";
       this.attribute("id", "integer");
       this.attribute("title", "string");
-      this.attribute("body", "string");
+      // Rails' posts.body is a text column — keep the declared type faithful so
+      // type_for_attribute(:body).type reflects :text.
+      this.attribute("body", "text");
       this.adapter = adapter;
       this.encrypts("title");
       this.encrypts("body");

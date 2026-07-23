@@ -32,6 +32,8 @@ import { create as createReflection } from "./reflection.js";
 import { Customer } from "./test-helpers/models/customer.js";
 import { Organization } from "./test-helpers/models/organization.js";
 import { Author } from "./test-helpers/models/author.js";
+import { Hotel as CanonicalHotel } from "./test-helpers/models/hotel.js";
+import { ShardedComment } from "./test-helpers/models/sharded.js";
 
 import { UnknownPrimaryKey, NameError } from "./errors.js";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -983,16 +985,14 @@ describe("ReflectionTest", () => {
     expect(hotels).toHaveLength(1);
   });
   it("reflect on association accepts symbols", () => {
-    const { Author } = makeModels();
-    const ref = reflectOnAssociation(Author, "books");
+    const ref = reflectOnAssociation(CanonicalHotel, "departments");
     expect(ref).not.toBeNull();
-    expect(ref!.name).toBe("books");
+    expect(ref!.name).toBe("departments");
   });
   it("reflect on association accepts strings", () => {
-    const { Author } = makeModels();
-    const ref = reflectOnAssociation(Author, "books");
+    const ref = reflectOnAssociation(CanonicalHotel, "departments");
     expect(ref).not.toBeNull();
-    expect(ref!.name).toBe("books");
+    expect(ref!.name).toBe("departments");
   });
   it("reflect on missing source assocation raise exception", () => {
     // Mirrors Rails test/cases/reflection_test.rb: Hotel has_many :lost_items,
@@ -1080,18 +1080,11 @@ describe("ReflectionTest", () => {
     expect(Object.keys(cols).length).toBeGreaterThan(0);
   });
 
-  it("human name for column", () => {
-    class Article extends Base {
-      declare body_text: string | null;
-
-      static {
-        this._tableName = "refl_articles";
-        this.attribute("body_text", "string");
-      }
-    }
-    const cols = (Article as any).columnsHash();
-    expect(cols["body_text"]).toBeDefined();
-    expect(cols["body_text"].name).toBe("body_text");
+  it("human name for column", async () => {
+    await CanonicalTopic.loadSchema();
+    expect((CanonicalTopic as any).columnForAttribute("author_name").humanName()).toBe(
+      "Author name",
+    );
   });
 
   it("integer columns", () => {
@@ -1632,17 +1625,9 @@ describe("ReflectionTest", () => {
   });
 
   it("association primary key uses explicit primary key option as first priority", () => {
-    class Author extends Base {
-      declare name: string | null;
-
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    Associations.hasMany.call(Author, "books", { primaryKey: "custom_id" });
-    const ref = reflectOnAssociation(Author, "books");
+    const ref = reflectOnAssociation(ShardedComment, "blogPostById");
     expect(ref).not.toBeNull();
-    expect(ref!.options.primaryKey).toBe("custom_id");
+    expect(ref!.associationPrimaryKey).toBe("id");
   });
 
   it("belongs to reflection with query constraints infers correct foreign key", () => {

@@ -282,7 +282,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.previousSchemes = [];
     Configurable.config.previous = [
       { encryptor: new TestEncryptor({ det: "cipher_det" }), deterministic: true } as SchemeOptions,
-      { encryptor: new TestEncryptor({ nondet: "cipher_nondet" }) } as SchemeOptions,
+      { encryptor: new TestEncryptor({ "STEPHEN KING": "cipher_nondet" }) } as SchemeOptions,
     ];
 
     const modelClass = { _attributeDefinitions: new Map() };
@@ -293,7 +293,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
 
     const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
     expect(type.previousTypes).toHaveLength(1);
-    expect(type.deserialize("cipher_nondet")).toBe("nondet");
+    expect(type.deserialize("cipher_nondet")).toBe("STEPHEN KING");
     expect(() => type.deserialize("cipher_det")).toThrow(DecryptionError);
   });
 
@@ -392,7 +392,10 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     Configurable.config.supportUnencryptedData = false;
     Configurable.config.previousSchemes = [];
     Configurable.config.previous = [
-      { encryptor: new TestEncryptor({ det: "cipher_det" }), deterministic: true } as SchemeOptions,
+      {
+        encryptor: new TestEncryptor({ "STEPHEN KING": "cipher_det" }),
+        deterministic: true,
+      } as SchemeOptions,
       { encryptor: new TestEncryptor({ nondet: "cipher_nondet" }) } as SchemeOptions,
     ];
 
@@ -406,7 +409,7 @@ describe("ActiveRecord::Encryption::EncryptionSchemesTest", () => {
     const type = modelClass._attributeDefinitions.get("name")?.type as EncryptedAttributeType;
     // Only the deterministic global previous scheme is wired in.
     expect(type.previousTypes).toHaveLength(1);
-    expect(type.deserialize("cipher_det")).toBe("det");
+    expect(type.deserialize("cipher_det")).toBe("STEPHEN KING");
     expect(() => type.deserialize("cipher_nondet")).toThrow(DecryptionError);
   });
 });

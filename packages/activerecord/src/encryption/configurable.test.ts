@@ -102,11 +102,11 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
 
     try {
       // Named class: filter key is "underscore(ClassName).attribute"
-      class EncryptedPost {}
-      const modelClass = Object.assign(EncryptedPost, { _attributeDefinitions: new Map() });
-      EncryptableRecord.encrypts(modelClass, "title");
+      class NamedPirate {}
+      const modelClass = Object.assign(NamedPirate, { _attributeDefinitions: new Map() });
+      EncryptableRecord.encrypts(modelClass, "catchphrase");
 
-      expect(filterParameters).toContain("encrypted_post.title");
+      expect(filterParameters).toContain("named_pirate.catchphrase");
     } finally {
       dispose();
     }
@@ -124,9 +124,9 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     try {
       // Truly anonymous class (empty .name): filter key is just the attribute name
       const modelClass = Object.assign(class {}, { _attributeDefinitions: new Map() });
-      EncryptableRecord.encrypts(modelClass, "secret");
+      EncryptableRecord.encrypts(modelClass, "catchphrase");
 
-      expect(filterParameters).toContain("secret");
+      expect(filterParameters).toContain("catchphrase");
       expect(filterParameters.every((f) => !f.includes("."))).toBe(true);
     } finally {
       dispose();
@@ -134,7 +134,7 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
   });
 
   it("exclude the installation of autofiltered params", () => {
-    Configurable.config.addToFilterParameters = false;
+    Configurable.config.excludeFromFilterParameters = ["catchphrase"];
 
     const filterParameters: string[] = [];
     const autoFilteredParameters = new AutoFilteredParameters(filterParameters);
@@ -145,14 +145,13 @@ describe("ActiveRecord::Encryption::ConfigurableTest", () => {
     });
 
     try {
-      class AnotherModel {}
-      const modelClass = Object.assign(AnotherModel, { _attributeDefinitions: new Map() });
-      EncryptableRecord.encrypts(modelClass, "email");
+      const modelClass = Object.assign(class {}, { _attributeDefinitions: new Map() });
+      EncryptableRecord.encrypts(modelClass, "catchphrase");
 
-      // addToFilterParameters = false → nothing is added
-      expect(filterParameters).toHaveLength(0);
+      expect(filterParameters).toEqual([]);
     } finally {
       dispose();
+      Configurable.config.excludeFromFilterParameters = [];
     }
   });
 

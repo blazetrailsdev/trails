@@ -5,16 +5,16 @@ import { EncryptionError } from "./errors.js";
 describe("ActiveRecord::Encryption::ReadOnlyNullEncryptorTest", () => {
   it("decrypt returns the encrypted message", () => {
     const enc = new ReadOnlyNullEncryptor();
-    expect(enc.decrypt("hello")).toBe("hello");
+    expect(enc.decrypt("some text")).toBe("some text");
   });
 
   it("encrypt raises an Encryption", () => {
     const enc = new ReadOnlyNullEncryptor();
-    expect(() => enc.encrypt("hello")).toThrow(EncryptionError);
+    expect(() => enc.encrypt("some text")).toThrow(EncryptionError);
   });
 
   it("encrypted? returns false", () => {
-    expect(new ReadOnlyNullEncryptor().isEncrypted("hello")).toBe(false);
+    expect(new ReadOnlyNullEncryptor().isEncrypted("some text")).toBe(false);
   });
 
   it("binary? returns false", () => {
