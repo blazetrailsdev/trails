@@ -5,7 +5,6 @@ import {
   star,
   SelectManager,
   InsertManager,
-  UpdateManager,
   Nodes,
   Visitors,
   EmptyJoinError,
@@ -425,9 +424,9 @@ describe("SelectManagerTest", () => {
 
   describe("order", () => {
     it("chains", () => {
-      const mgr = new UpdateManager();
-      mgr.table(users);
-      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+      const table = new Table("users");
+      const mgr = new SelectManager();
+      expect(mgr.order(table.get("id"))).toBe(mgr);
     });
   });
 
@@ -630,8 +629,9 @@ describe("SelectManagerTest", () => {
     });
 
     it("chains", () => {
-      const mgr = users.project(star);
-      expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
+      const table = new Table("users");
+      const mgr = new SelectManager();
+      expect(mgr.group(table.get("id"))).toBe(mgr);
     });
   });
 
@@ -899,9 +899,8 @@ describe("SelectManagerTest", () => {
 
   describe("take", () => {
     it("chains", () => {
-      const um = new UpdateManager();
-      const result = um.table(users);
-      expect(result).toBe(um);
+      const mgr = new SelectManager();
+      expect(mgr.take(1)).toBe(mgr);
     });
   });
 
@@ -923,13 +922,19 @@ describe("SelectManagerTest", () => {
       const mgr = users.project(star).where(sub);
       expect(mgr.toSql()).toContain("WHERE");
     });
+
+    it("chains", () => {
+      const table = new Table("users");
+      const mgr = new SelectManager();
+      mgr.from(table);
+      expect(mgr.project(table.get("id")).where(table.get("id").eq(1))).toBe(mgr);
+    });
   });
 
   describe("comment", () => {
     it("chains", () => {
-      const mgr = new SelectManager(users);
-      const result = mgr.project(star);
-      expect(result).toBe(mgr);
+      const mgr = new SelectManager();
+      expect(mgr.comment("selecting")).toBe(mgr);
     });
   });
 
@@ -937,6 +942,13 @@ describe("SelectManagerTest", () => {
     it("makes sql", () => {
       const mgr = users.project(star);
       expect(mgr.toSql()).toBe('SELECT * FROM "users"');
+    });
+
+    it("chains", () => {
+      const table = new Table("users");
+      const mgr = new SelectManager();
+      expect(mgr.from(table).project(table.get("id"))).toBe(mgr);
+      expect(mgr.toSql()).toBe('SELECT "users"."id" FROM "users"');
     });
   });
 
@@ -957,13 +969,34 @@ describe("SelectManagerTest", () => {
       mgr.distinct(false);
       expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeNull();
     });
+
+    it("chains", () => {
+      const mgr = new SelectManager();
+      expect(mgr.distinct()).toBe(mgr);
+      expect(mgr.distinct(false)).toBe(mgr);
+    });
   });
 
   describe("distinct_on", () => {
     it("sets the quantifier", () => {
-      const mgr = users.project(star);
-      mgr.distinct();
-      expect(mgr.toSql()).toContain("DISTINCT");
+      const mgr = new SelectManager();
+      const table = new Table("users");
+
+      mgr.distinctOn(table.get("id"));
+      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toEqual(
+        new Nodes.DistinctOn(table.get("id")),
+      );
+
+      mgr.distinctOn(false);
+      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeNull();
+    });
+
+    it("chains", () => {
+      const mgr = new SelectManager();
+      const table = new Table("users");
+
+      expect(mgr.distinctOn(table.get("id"))).toBe(mgr);
+      expect(mgr.distinctOn(false)).toBe(mgr);
     });
   });
 

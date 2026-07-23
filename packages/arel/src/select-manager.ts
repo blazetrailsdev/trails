@@ -318,8 +318,8 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#distinct_on
    */
-  distinctOn(value: Node): this {
-    this.core.setQuantifier = new DistinctOn(value);
+  distinctOn(value: Node | false | null): this {
+    this.core.setQuantifier = value === false || value == null ? null : new DistinctOn(value);
     return this;
   }
 
