@@ -20,12 +20,15 @@ describe("PostgreSQLDatabaseTasks", () => {
     expect(new PostgreSQLDatabaseTasks(config({ encoding: "UTF8" })).charset()).toBe("UTF8");
   });
 
-  it("test_collation_reads_from_config", () => {
-    expect(new PostgreSQLDatabaseTasks(config({ collation: "C" })).collation()).toBe("C");
-  });
-
-  it("test_collation_returns_null_when_unset", () => {
-    expect(new PostgreSQLDatabaseTasks(config()).collation()).toBeNull();
+  it("test_db_retrieves_collation", async () => {
+    const tasks = new PostgreSQLDatabaseTasks(config());
+    const collationMock = vi.fn(async () => "en_US.UTF-8");
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({ collation: collationMock });
+    await expect(tasks.collation()).resolves.toBe("en_US.UTF-8");
+    expect(collationMock).toHaveBeenCalledOnce();
   });
 
   it("test_using_database_configurations_is_true", () => {

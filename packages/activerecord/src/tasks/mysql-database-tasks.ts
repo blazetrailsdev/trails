@@ -5,7 +5,7 @@
  */
 
 import { getFs, getChildProcessAsync, type SpawnSyncResult } from "@blazetrails/activesupport";
-import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { Mysql2Adapter } from "../connection-adapters/mysql2-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
@@ -117,8 +117,8 @@ export class MySQLDatabaseTasks {
     return String(this.configurationHash.encoding ?? "utf8mb4");
   }
 
-  collation(): string | null {
-    return (this.configurationHash.collation as string) ?? null;
+  async collation(): Promise<string> {
+    return (await this.connection()).collation();
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
@@ -317,8 +317,8 @@ export class MySQLDatabaseTasks {
     return env;
   }
 
-  private async connection(): Promise<DatabaseAdapter> {
-    return Base.connectionPool().leaseConnection();
+  private async connection(): Promise<Mysql2Adapter> {
+    return (await Base.connectionPool().leaseConnection()) as Mysql2Adapter;
   }
 
   private async runCmd(cmd: string, args: string[], action: string, stdin?: string): Promise<void> {

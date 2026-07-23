@@ -20,14 +20,15 @@ describe("MySQLDatabaseTasks", () => {
     expect(new MySQLDatabaseTasks(config({ encoding: "latin1" })).charset()).toBe("latin1");
   });
 
-  it("test_collation_reads_from_config", () => {
-    expect(new MySQLDatabaseTasks(config({ collation: "utf8mb4_general_ci" })).collation()).toBe(
-      "utf8mb4_general_ci",
-    );
-  });
-
-  it("test_collation_returns_null_when_unset", () => {
-    expect(new MySQLDatabaseTasks(config()).collation()).toBeNull();
+  it("test_db_retrieves_collation", async () => {
+    const tasks = new MySQLDatabaseTasks(config());
+    const collationMock = vi.fn(async () => "utf8mb4_general_ci");
+    vi.spyOn(
+      tasks as unknown as { connection(): Promise<unknown> },
+      "connection",
+    ).mockResolvedValue({ collation: collationMock });
+    await expect(tasks.collation()).resolves.toBe("utf8mb4_general_ci");
+    expect(collationMock).toHaveBeenCalledOnce();
   });
 
   it("test_using_database_configurations_is_true", () => {

@@ -12,6 +12,7 @@ import {
   type SpawnSyncResult,
 } from "@blazetrails/activesupport";
 import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { PostgreSQLAdapter } from "../connection-adapters/postgresql-adapter.js";
 import type { DatabaseConfig } from "../database-configurations/database-config.js";
 import { DatabaseAlreadyExists } from "../errors.js";
 import { Base } from "../base.js";
@@ -124,8 +125,8 @@ export class PostgreSQLDatabaseTasks {
     return this.encoding();
   }
 
-  collation(): string | null {
-    return (this.configurationHash.collation as string) ?? null;
+  async collation(): Promise<string> {
+    return (await this.connection()).collation();
   }
 
   async purge(): Promise<void> {
@@ -272,8 +273,8 @@ export class PostgreSQLDatabaseTasks {
     return String(this.configurationHash.encoding ?? defaultEncoding());
   }
 
-  private async connection(): Promise<DatabaseAdapter> {
-    return Base.connectionPool().leaseConnection();
+  private async connection(): Promise<PostgreSQLAdapter> {
+    return (await Base.connectionPool().leaseConnection()) as PostgreSQLAdapter;
   }
 
   private async closeAdapter(adapter: DatabaseAdapter): Promise<void> {
