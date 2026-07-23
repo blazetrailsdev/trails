@@ -627,6 +627,9 @@ interface AttributeNamesHost {
  * declaration order.
  */
 export function attributeNames(this: AttributeNamesHost): string[] {
+  // Rails attribute_methods.rb:236-241: `if !abstract_class? && table_exists?`
+  // — an abstract class has no attribute names at all.
+  if ((this as { abstractClass?: boolean }).abstractClass) return [];
   const declared = [...this._attributeDefinitions.keys()];
   const columnNames = this.columnNames?.() ?? [];
   if (columnNames.length === 0) return declared;

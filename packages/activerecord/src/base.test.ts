@@ -1612,7 +1612,9 @@ describe("BasicsTest", () => {
         this.attribute("name", "string");
       }
     }
-    expect(AbstractModel.attributeNames()).toContain("name");
+    // Rails base_test.rb test_attribute_names_on_abstract_class:
+    // `assert_equal [], AbstractCompany.attribute_names`.
+    expect(AbstractModel.attributeNames()).toEqual([]);
   });
   it("table name with 2 abstract subclasses", () => {
     class AbstractBase extends Base {

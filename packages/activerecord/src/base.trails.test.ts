@@ -283,6 +283,21 @@ describe("BasicsTest (trails)", () => {
     const exists = await Ghost.tableExists();
     expect(exists).toBe(true);
   });
+
+  it("columnNames raises TableNotSpecified on an abstract class", () => {
+    // Rails column_names is `columns.map(&:name)` with no abstract-class
+    // fallback — load_schema! raises TableNotSpecified (model_schema.rb:444-446,
+    // 561). Guards against reintroducing the invented attribute-walk branch.
+    class AbstractIntrospected extends Base {
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+      }
+    }
+    expect(() => AbstractIntrospected.columnNames()).toThrow(
+      "AbstractIntrospected has no table configured",
+    );
+  });
 });
 
 // Rails removes ignored columns only from schema/default `attribute_types`

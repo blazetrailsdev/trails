@@ -208,19 +208,6 @@ export function buildWhereNodeFromConstraints(
  * (`columns.map(&:name)`, i.e. the `columns_hash` keys).
  */
 export function columnNames(this: typeof Base): string[] {
-  // Abstract classes have no concrete table, and `columnsHash` throws for them.
-  // Fall back to the declared (non-virtual) attribute names so introspecting an
-  // abstract model doesn't blow up — matches the pre-columnsHash behavior.
-  if (this.abstractClass) {
-    const ignored = new Set(this.ignoredColumns ?? []);
-    const out: string[] = [];
-    for (const [name, def] of this._attributeDefinitions) {
-      if (ignored.has(name)) continue;
-      if ((def as { virtual?: boolean }).virtual) continue;
-      out.push(name);
-    }
-    return out;
-  }
   return Object.keys(this.columnsHash());
 }
 
