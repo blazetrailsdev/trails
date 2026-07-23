@@ -113,8 +113,8 @@ export class MySQLDatabaseTasks {
     await this.create(saved);
   }
 
-  charset(): string {
-    return String(this.configurationHash.encoding ?? "utf8mb4");
+  async charset(): Promise<string> {
+    return (await this.connection()).charset();
   }
 
   async collation(): Promise<string> {
