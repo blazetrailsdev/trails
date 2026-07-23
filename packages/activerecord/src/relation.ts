@@ -6224,12 +6224,6 @@ export class Relation<T extends Base> {
   }
 
   /**
-   * Check if there are no matching records. Rails' `none?` returns true for a
-   * null relation (`@none`), defers to `Enumerable#none?` when a block is
-   * given (loading the relation), and otherwise falls through to `empty?` —
-   * i.e. it answers "is the result set empty" with a query, not just the
-   * NullRelation flag.
-   *
    * Mirrors: ActiveRecord::Relation#none?
    */
   async isNone(predicate?: (record: T) => boolean): Promise<boolean> {
