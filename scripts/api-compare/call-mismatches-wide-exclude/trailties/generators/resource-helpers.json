@@ -11,6 +11,6 @@
     "tsFile": "generators/resource-helpers.ts",
     "rubyName": "controller_file_path",
     "call": "join",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails resource_helpers.rb:46-48 joins `(controller_class_path + [controller_file_name]).join(\"/\")`; trails resource-helpers.ts:38-39 performs the identical `[...].join(\"/\")` — the extractor credits the controllerClassPath/controllerFileName reads but not calls whose receiver is an array literal, so `join` goes unrecorded (confirmed against output/ts-api.json)."
   }
 ]

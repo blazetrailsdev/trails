@@ -18,14 +18,14 @@
     "tsFile": "encryption/encrypted-attribute-type.ts",
     "rubyName": "decryption_options",
     "call": "compact",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails encrypted_attribute_type.rb:158-160 builds `{key_provider:}.compact`; trails encrypted-attribute-type.ts:368-373 inserts the key conditionally instead of compacting."
   },
   {
     "package": "activerecord",
     "tsFile": "encryption/encrypted-attribute-type.ts",
     "rubyName": "encryption_options",
     "call": "compact",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails encrypted_attribute_type.rb:154-156 builds the options hash and `.compact`s; trails encrypted-attribute-type.ts:361-366 inserts keyProvider conditionally instead of compacting."
   },
   {
     "package": "activerecord",

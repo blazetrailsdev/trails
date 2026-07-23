@@ -25,6 +25,6 @@
     "tsFile": "no-touching.ts",
     "rubyName": "no_touching?",
     "call": "applied_to?",
-    "reason": "Ruby-side value-accessor read: the flagged name is an attr/getter read that only became gate-subject once extractCalls credited property reads. trails reads the corresponding state directly as a property or getter, frequently under a different field name (e.g. `preload_values` -> `_preloadAssociations`), so no same-named call is recorded. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails no_touching.rb:53-55 calls `NoTouching.applied_to?(self.class)`; trails no-touching.ts:51+ isNoTouching reads the module-level `_noTouchingDepth` map directly."
   }
 ]

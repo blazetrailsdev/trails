@@ -32,7 +32,7 @@
     "tsFile": "signed-global-id.ts",
     "rubyName": "pick_purpose",
     "call": "fetch",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails signed_global_id.rb:24-26 uses `options.fetch :for, DEFAULT_PURPOSE` — key-present semantics, so an explicit `for: nil` yields a nil purpose; trails signed-global-id.ts:207-209 uses `options.for ?? DEFAULT_PURPOSE`, which coerces an explicit null back to the default. Divergence tracked in story fetch-nil-presence-divergences-globalid-rack."
   },
   {
     "package": "globalid",

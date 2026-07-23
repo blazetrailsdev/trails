@@ -74,7 +74,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "clear_reloadable_connections",
     "call": "disconnect!",
-    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous reload-clear \u2014 including `conn.disconnectBang()` \u2014 to the private `_clearReloadableConnections` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+    "reason": "clearReloadableConnections is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous reload-clear — including `conn.disconnectBang()` — to the private `_clearReloadableConnections` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
   },
   {
     "package": "activerecord",
@@ -109,7 +109,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "connected?",
     "call": "any?",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails connection_pool.rb:427-429 is `@connections.any?(&:connected?)`; trails connection-pool.ts:570-572 isConnected checks `_connections.length > 0` — pool membership stands in for the per-connection connected? probe (part of the pool async/sync convergence surface)."
   },
   {
     "package": "activerecord",
@@ -186,7 +186,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool.ts",
     "rubyName": "flush",
     "call": "disconnect!",
-    "reason": "flush is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous eviction \u2014 including `conn.disconnectBang()` \u2014 to the private `_flush` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
+    "reason": "flush is now async (converge-connection-pool-lifecycle-async); it delegates the synchronous eviction — including `conn.disconnectBang()` — to the private `_flush` core so the public method can await the returned async-close drains. Same call, moved into the shared sync helper."
   },
   {
     "package": "activerecord",

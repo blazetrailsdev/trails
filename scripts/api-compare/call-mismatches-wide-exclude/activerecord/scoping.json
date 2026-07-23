@@ -39,6 +39,6 @@
     "tsFile": "scoping.ts",
     "rubyName": "scope_attributes?",
     "call": "any?",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails scoping/default.rb:55-57 is `super || default_scopes.any? || respond_to?(:default_scope)`; trails scoping.ts:144-146 isScopeAttributes returns `!!this.currentScope` — only the super (scoping.rb:22-24) arm; the default_scopes.any? arm is unported. Omission tracked in story scope-attributes-predicate-ignores-default-scopes."
   }
 ]

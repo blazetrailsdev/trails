@@ -4,6 +4,6 @@
     "tsFile": "generators/rails/script/script-generator.ts",
     "rubyName": "depth",
     "call": "size",
-    "reason": "Ruby core/Enumerable idiom with a native JS form (e.g. `each` -> for-of, `fetch`/`key?` -> index + `in`, `match?` -> RegExp#test, `clear` -> `length = 0`, `present?`/`blank?` -> truthiness). The port performs the same operation under a JS-native spelling, so no same-named call appears. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails script_generator.rb:13-15 reads `class_path.size + 1`; trails script-generator.ts:23-25 reads `classPathParts.length + 1`."
   }
 ]
