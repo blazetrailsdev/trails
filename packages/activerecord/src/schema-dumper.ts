@@ -331,6 +331,14 @@ class AdapterSchemaSource implements SchemaSource {
   }
 }
 
+export function statelessTest(pattern: RegExp, value: string): boolean {
+  const safe =
+    pattern.global || pattern.sticky
+      ? new RegExp(pattern.source, pattern.flags.replace(/[gy]/g, ""))
+      : pattern;
+  return safe.test(value);
+}
+
 /**
  * Generates the schema DSL string from a SchemaSource. Mirrors
  * Rails' base `ActiveRecord::SchemaDumper` class.
@@ -1045,15 +1053,11 @@ export class SchemaDumper {
   /** @internal */
   checkParts(check: { expression: string; name?: string; validate?: boolean }): string[] {
     const parts: string[] = [JSON.stringify(check.expression)];
-    const rawChkPattern = (this.constructor as typeof SchemaDumper).chkIgnorePattern;
-    const chkIgnorePattern =
-      rawChkPattern.global || rawChkPattern.sticky
-        ? new RegExp(rawChkPattern.source, rawChkPattern.flags.replace(/[gy]/g, ""))
-        : rawChkPattern;
+    const chkIgnorePattern = (this.constructor as typeof SchemaDumper).chkIgnorePattern;
     const exportName =
       "isExportNameOnSchemaDump" in (check as object)
         ? (check as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump
-        : check.name != null && !chkIgnorePattern.test(check.name);
+        : check.name != null && !statelessTest(chkIgnorePattern, check.name);
     if (exportName && check.name) parts.push(`name: ${JSON.stringify(check.name)}`);
     if (check.validate === false) parts.push("validate: false");
     return parts;
@@ -1076,12 +1080,7 @@ export class SchemaDumper {
       deferrable?: boolean | string;
       validate?: boolean;
     };
-    const rawFkPattern = (this.constructor as typeof SchemaDumper).fkIgnorePattern;
-    // Strip g/y flags to avoid mutating shared lastIndex state across iterations.
-    const fkIgnorePattern =
-      rawFkPattern.global || rawFkPattern.sticky
-        ? new RegExp(rawFkPattern.source, rawFkPattern.flags.replace(/[gy]/g, ""))
-        : rawFkPattern;
+    const fkIgnorePattern = (this.constructor as typeof SchemaDumper).fkIgnorePattern;
     for (const fk of fks as Fk[]) {
       const fromExpr = JSON.stringify(this.removePrefixAndSuffix(fk.fromTable ?? tableName));
       const toExpr = JSON.stringify(this.removePrefixAndSuffix(fk.toTable));
@@ -1093,7 +1092,7 @@ export class SchemaDumper {
       const exportName =
         "isExportNameOnSchemaDump" in (fk as object)
           ? (fk as unknown as { isExportNameOnSchemaDump: boolean }).isExportNameOnSchemaDump
-          : fk.name != null && !fkIgnorePattern.test(fk.name);
+          : fk.name != null && !statelessTest(fkIgnorePattern, fk.name);
       if (exportName && fk.name) opts.push(`name: ${JSON.stringify(fk.name)}`);
       if (fk.onUpdate) opts.push(`onUpdate: ${JSON.stringify(fk.onUpdate)}`);
       if (fk.onDelete) opts.push(`onDelete: ${JSON.stringify(fk.onDelete)}`);
