@@ -642,19 +642,14 @@ export class EncryptableRecord {
     const klass = record.constructor;
     const result: Record<string, unknown> = {};
     for (const name of klass._encryptedAttributes ?? new Set<string>()) {
+      // Mirrors Rails build_decrypt_attribute_assignments
+      // (encryptable_record.rb:214-220): type.deserialize(ciphertext_for(name))
+      // unconditionally — for plaintext rows ciphertextFor returns the
+      // DB-serialized value and deserialize (support_unencrypted_data)
+      // passes it through cast.
       const type = getAttributeType(klass, name) as { deserialize?: (v: unknown) => unknown };
-      const encryptedType = encryptedTypeOf(type);
-      const raw = record.readAttributeBeforeTypeCast?.(name);
-      // Only decrypt if actually encrypted — mirrors Rails' type.deserialize
-      // which returns the raw value when support_unencrypted_data is true.
-      if (encryptedType?.isEncrypted(raw) && type?.deserialize) {
-        result[name] = type.deserialize(raw);
-      } else {
-        // Plaintext — return the cast value so typed columns (date, JSON, etc.)
-        // keep their in-memory representation rather than the raw DB string.
-        result[name] =
-          typeof record.readAttribute === "function" ? record.readAttribute(name) : raw;
-      }
+      const encryptedValue = this.ciphertextFor(record, name);
+      result[name] = type?.deserialize ? type.deserialize(encryptedValue) : encryptedValue;
     }
     return result;
   }
