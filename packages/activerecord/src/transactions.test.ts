@@ -1572,8 +1572,6 @@ describe("TransactionTest", () => {
   });
 
   it("prepared statement materializes transaction", async (ctx) => {
-    // Rails wraps this in `if lease_connection.prepared_statements`
-    // (transactions_test.rb:1562); mirror the guard at runtime.
     const conn = (await Topic.leaseConnection()) as any;
     ctx.skip(!conn.preparedStatements);
     await Topic.first();
