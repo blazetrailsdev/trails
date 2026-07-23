@@ -1,4 +1,4 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, beforeAll } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { IntegerType } from "@blazetrails/activemodel";
 import { Nodes, Table, Visitors } from "@blazetrails/arel";
@@ -6,6 +6,13 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Author } from "../test-helpers/models/author.js";
 import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
+import {
+  CpkBook,
+  CpkChapter,
+  CpkOrderWithSingularBookChapters,
+} from "../test-helpers/models/cpk.js";
+import { registerModel } from "../associations.js";
+import type { Base } from "../index.js";
 import { escapeRegExp, quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
@@ -98,6 +105,41 @@ describe("association hash expansion grouping shape", () => {
     expect(or).toBeInstanceOf(Nodes.Or);
     expect(or.children).toHaveLength(2);
     for (const child of or.children) expect(child).toBeInstanceOf(Nodes.And);
+  });
+
+  beforeAll(() => {
+    [CpkOrderWithSingularBookChapters, CpkBook, CpkChapter].forEach((m) =>
+      registerModel(m as unknown as typeof Base),
+    );
+  });
+
+  it("through-association composite primary key routes tuples like Rails' array-key branch", () => {
+    const rel = CpkOrderWithSingularBookChapters.where({
+      chapters: [[1, 2]],
+    }) as unknown as HasWhereClause;
+    // One tuple → one query group → predicates spliced flat, one per PK column.
+    const preds = rel._whereClause.predicates;
+    expect(preds).toHaveLength(2);
+    for (const pred of preds) expect(pred).not.toBeInstanceOf(Nodes.Grouping);
+
+    const multi = CpkOrderWithSingularBookChapters.where({
+      chapters: [
+        [1, 2],
+        [3, 4],
+      ],
+    }) as unknown as HasWhereClause;
+    const multiPreds = multi._whereClause.predicates;
+    expect(multiPreds).toHaveLength(1);
+    expect(multiPreds[0]).toBeInstanceOf(Nodes.Grouping);
+    const or = (multiPreds[0] as Nodes.Grouping).expr as Nodes.Or;
+    expect(or).toBeInstanceOf(Nodes.Or);
+    expect(or.children).toHaveLength(2);
+  });
+
+  it("through-association composite primary key raises on a non-tuple value", () => {
+    expect(() => CpkOrderWithSingularBookChapters.where({ chapters: [1, 2] })).toThrow(
+      'Expected corresponding value for ["author_id", "id"] to be an Array',
+    );
   });
 
   it("through-association single query group stays flat, without an And wrapper", () => {

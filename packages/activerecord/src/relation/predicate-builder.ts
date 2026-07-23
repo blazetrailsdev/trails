@@ -218,26 +218,22 @@ export class PredicateBuilder {
       }
       return this.groupingQueries(queryGroups);
     }
-    // Through: bare recursion on the associated builder with the associated
-    // model's primary key (Rails predicate_builder.rb:110-113 — `next
-    // associated_table.predicate_builder.expand_from_hash(primary_key =>
-    // value)`). No value pre-normalization (the recursion's column arm coerces
-    // records/arrays/relations) and no wrapping — `next` inside `flat_map`
-    // splices the predicates flat, keeping each one addressable for
-    // `WhereClause#extract_attributes` / `rewhere`.
     if (associatedTable.isThroughAssociation?.()) {
-      const rawPk = associatedTable.klass?.primaryKey ?? "id";
+      const rawPk = associatedTable.primaryKey;
       const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
       if (Array.isArray(rawPk)) {
-        // Composite PK: JS object keys can't be arrays, so mirror the array-key
-        // branch of Rails' expand_from_hash inline (predicate_builder.rb:92-97):
-        // one recursion per ids tuple, zipped against the key columns, then
-        // grouping_queries.
+        // JS object keys can't be arrays, so a composite primary key is routed
+        // to an inline mirror of Rails' array-key branch of expand_from_hash
+        // (predicate_builder.rb:87-97) instead of the recursive call below.
+        if (rawPk.length === 1) {
+          const flat = Array.isArray(value) ? value.flat(Infinity) : value;
+          return assocPb.expandFromHash({ [rawPk[0]]: flat });
+        }
         const values = Array.isArray(value) ? value : [value];
         const queryGroups: Nodes.Node[][] = values.map((idsSet) => {
           if (!Array.isArray(idsSet)) {
             throw argumentError(
-              `Expected corresponding value for [${rawPk.join(", ")}] to be an Array`,
+              `Expected corresponding value for [${rawPk.map((c) => `"${c}"`).join(", ")}] to be an Array`,
             );
           }
           const zipped: Record<string, unknown> = {};
