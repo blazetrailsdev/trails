@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { concatRecordsLoop, findFromTarget } from "./collection-association.js";
+import { CollectionAssociation, concatRecordsLoop } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import {
@@ -3842,7 +3842,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * database. Mirrors `CollectionProxy#find_from_target?`
    * (collection_proxy.rb:1154), a one-line delegation to
    * `@association.find_from_target?` — this proxy *is* its own association, so
-   * the shared {@link findFromTarget} body binds to it directly.
+   * the delegation borrows `CollectionAssociation`'s body directly instead of
+   * re-implementing the clause list, passing `_targetLoaded` as the loaded
+   * flag (the proxy's inherited `Relation#isLoaded` tracks something else).
    *
    * Deliberately NOT routed through `owner.association(name)`: that wrapper is
    * a secondary copy whose loaded flag is synthesized from
@@ -3853,7 +3855,10 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * @internal
    */
   isFindFromTarget(): boolean {
-    return findFromTarget.call(this, this._targetLoaded);
+    return CollectionAssociation.prototype.isFindFromTarget.call(
+      this as unknown as CollectionAssociation,
+      this._targetLoaded,
+    );
   }
 
   /**
