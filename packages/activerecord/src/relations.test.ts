@@ -1383,13 +1383,32 @@ describe("RelationTest", () => {
   });
 
   it("any", async () => {
-    const any = await Post.all().isAny();
-    expect(any).toBe(true);
+    const postsRel = Post.all();
+
+    await assertQueriesCount(3, false, async () => {
+      expect(await postsRel.isAny()).toBe(true); // Uses COUNT()
+      expect(await postsRel.where({ id: null }).isAny()).toBe(false);
+
+      expect(await postsRel.isAny((p) => (p.id as number) > 0)).toBe(true);
+      expect(await postsRel.isAny((p) => (p.id as number) <= 0)).toBe(false);
+
+      expect(await postsRel.isAny(Post)).toBe(true);
+      expect(await postsRel.isAny(Comment)).toBe(false);
+    });
+
+    expect(postsRel.isLoaded).toBe(true);
   });
 
   it("many", async () => {
-    const many = await Post.all().isMany();
-    expect(many).toBe(true);
+    const postsRel = Post.all();
+
+    await assertQueriesCount(2, false, async () => {
+      expect(await postsRel.isMany()).toBe(true); // Uses COUNT()
+      expect(await postsRel.isMany((p) => (p.id as number) > 0)).toBe(true);
+      expect(await postsRel.isMany((p) => (p.id as number) < 2)).toBe(false);
+    });
+
+    expect(postsRel.isLoaded).toBe(true);
   });
 
   it("many with limits", async () => {
@@ -1422,8 +1441,21 @@ describe("RelationTest", () => {
 
   it("one", async () => {
     const postsRel = Post.all();
-    expect(await postsRel.isOne()).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await postsRel.isOne()).toBe(false); // Uses COUNT()
+    });
+
     expect(postsRel.isLoaded).toBe(false);
+
+    await assertQueriesCount(1, false, async () => {
+      expect(await postsRel.isOne((p) => (p.id as number) < 3)).toBe(false);
+      expect(await postsRel.isOne((p) => p.id === 1)).toBe(true);
+
+      expect(await postsRel.isOne(Post)).toBe(false);
+      expect(await postsRel.isOne(Comment)).toBe(false);
+    });
+
+    expect(postsRel.isLoaded).toBe(true);
   });
 
   it("one with destroy", async () => {

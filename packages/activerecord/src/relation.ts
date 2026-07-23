@@ -166,6 +166,15 @@ import { AliasTracker } from "./associations/alias-tracker.js";
 export type LoadedRelation<R> = Omit<R, "then">;
 
 /**
+ * Argument accepted by the `Enumerable` predicate forms (`any?`, `one?`,
+ * `none?`): either Ruby's block (a predicate) or a pattern matched with the
+ * case-equality operator — here a model class, i.e. `instanceof`.
+ */
+export type EnumerablePattern<T extends Base> =
+  | ((record: T) => boolean)
+  | (new (...args: never[]) => Base);
+
+/**
  * Enforce Rails' `extract_options!` shape on variadic `explain(...)`
  * inputs: at most one hash option, and if present it must be the last
  * positional argument. This keeps adapters (especially MySQL, whose
@@ -2249,7 +2258,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#any?
    */
-  async isAny(): Promise<boolean> {
+  async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
+    if (this._isEmptyRelation()) return false;
+    if (pattern !== undefined) return (await this._countMatching(pattern)) > 0;
     if (this._loaded) return this._records.length > 0;
     return this.exists();
   }
@@ -2257,9 +2268,14 @@ export class Relation<T extends Base> {
   /**
    * Check if there are multiple matching records.
    *
+   * Rails' `many?` takes no pattern argument (only a block), so this accepts a
+   * predicate but not the class-pattern form.
+   *
    * Mirrors: ActiveRecord::Relation#many?
    */
-  async isMany(): Promise<boolean> {
+  async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
+    if (this._isEmptyRelation()) return false;
+    if (predicate !== undefined) return (await this._countMatching(predicate)) > 1;
     if (this._loaded) return this._records.length > 1;
     return (await this.limitedCount()) > 1;
   }
@@ -2269,9 +2285,27 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#one?
    */
-  async isOne(): Promise<boolean> {
+  async isOne(pattern?: EnumerablePattern<T>): Promise<boolean> {
+    if (this._isEmptyRelation()) return false;
+    if (pattern !== undefined) return (await this._countMatching(pattern)) === 1;
     if (this._loaded) return this._records.length === 1;
     return (await this.limitedCount()) === 1;
+  }
+
+  /**
+   * Number of loaded records matching an `Enumerable` pattern argument — a
+   * predicate (Ruby's block form) or a model class, which Ruby matches with
+   * the case-equality operator (`Post === record`, i.e. `instanceof`).
+   *
+   * @internal
+   */
+  async _countMatching(pattern: EnumerablePattern<T>): Promise<number> {
+    const records = await this.toArray();
+    if ((pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true) {
+      const klass = pattern as new (...args: never[]) => Base;
+      return records.filter((record) => record instanceof klass).length;
+    }
+    return records.filter(pattern as (record: T) => boolean).length;
   }
 
   /**
@@ -6246,18 +6280,9 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#none?
    */
-  async isNone(
-    pattern?: ((record: T) => boolean) | (new (...args: never[]) => Base),
-  ): Promise<boolean> {
+  async isNone(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return true;
-    if (pattern !== undefined) {
-      const records = await this.toArray();
-      if ((pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true) {
-        const klass = pattern as new (...args: never[]) => Base;
-        return !records.some((record) => record instanceof klass);
-      }
-      return !records.some(pattern as (record: T) => boolean);
-    }
+    if (pattern !== undefined) return (await this._countMatching(pattern)) === 0;
     return this.isEmpty();
   }
 
