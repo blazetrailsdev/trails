@@ -218,30 +218,40 @@ export class PredicateBuilder {
       }
       return this.groupingQueries(queryGroups);
     }
-    // Through: delegate with the associated model's primary key (Rails: through_association? path).
     if (associatedTable.isThroughAssociation?.()) {
-      const rawPk = associatedTable.klass?.primaryKey ?? "id";
-      if (Array.isArray(rawPk)) {
-        throw new Error(
-          "Through-association with composite primary key is not yet supported (Slot B). " +
-            "Use explicit FK conditions instead.",
-        );
-      }
-      // Normalize value through AssociationQueryValue so records are coerced to their PKs,
-      // arrays of records become id lists, and Relations become subqueries — matching Rails'
-      // build() which does `value = value.id if value.respond_to?(:id)` before dispatching.
-      const normalizedQueries = new AssociationQueryValue(
-        { joinForeignKey: rawPk, joinPrimaryKey: rawPk },
-        value,
-      ).queries();
+      const rawPk = associatedTable.primaryKey;
       const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
-      const queryGroups: Nodes.Node[][] = [];
-      for (const query of normalizedQueries) {
-        const inner = assocPb.expandFromHash(query);
-        if (inner.length === 0) continue;
-        queryGroups.push(inner);
+      if (Array.isArray(rawPk)) {
+        // JS object keys can't be arrays, so a composite primary key is routed
+        // to an inline mirror of Rails' array-key branch of expand_from_hash
+        // (predicate_builder.rb:87-97) instead of the recursive call below.
+        if (rawPk.length === 1) {
+          const flat = Array.isArray(value) ? value.flat(Infinity) : value;
+          return assocPb.expandFromHash({ [rawPk[0]]: flat });
+        }
+        // Ruby `Array(value)`: nil → [], array stays, scalar wraps.
+        const values =
+          value === null || value === undefined ? [] : Array.isArray(value) ? value : [value];
+        const queryGroups: Nodes.Node[][] = values.map((idsSet) => {
+          if (!Array.isArray(idsSet)) {
+            throw argumentError(
+              `Expected corresponding value for [${rawPk.map((c) => `"${c}"`).join(", ")}] to be an Array`,
+            );
+          }
+          const zipped: Record<string, unknown> = {};
+          rawPk.forEach((col, i) => {
+            zipped[col] = idsSet[i];
+          });
+          return assocPb.expandFromHash(zipped);
+        });
+        return assocPb.groupingQueries(queryGroups);
       }
-      return this.groupingQueries(queryGroups);
+      // A klass-less through target makes primaryKey null; Rails passes the
+      // literal `{nil => value}` into the recursion, where the nil key falls
+      // through to `self[nil, value]` and produces degenerate SQL. The JS
+      // computed key coerces null to the string "null" — an equally degenerate
+      // column reference, so no guard beyond this note.
+      return assocPb.expandFromHash({ [rawPk as string]: value });
     }
     // Core non-polymorphic, non-through path.
     const queries = new AssociationQueryValue(associatedTable, value).queries();
