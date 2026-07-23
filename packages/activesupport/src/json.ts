@@ -46,6 +46,13 @@ function asJsonValue(value: unknown, options: NormalizedOptions): unknown {
 
   if (Array.isArray(value)) return value.map((v) => asJsonValue(v, options));
 
+  // HashWithIndifferentAccess is a Hash subclass in Ruby, so it takes the
+  // Hash#as_json path; unwrap via toHash() so its contents — not its
+  // Map-backed internals — are traversed.
+  if (typeof (value as { toHash?: unknown }).toHash === "function") {
+    return asJsonValue((value as { toHash(): unknown }).toHash(), options);
+  }
+
   // Only true Hashes (plain objects / Maps) get `only`/`except` key filtering.
   // Other objects (Date, RegExp, BigNumber-likes, …) carry their own `as_json`
   // string form, so leave them for `JSON.stringify` to serialize via `toJSON`
@@ -62,6 +69,18 @@ function asJsonValue(value: unknown, options: NormalizedOptions): unknown {
       if (keep.has(k)) out[String(k)] = asJsonValue(v, options);
     }
     return out;
+  }
+
+  // Rails' `Object#as_json` is `instance_values.as_json(options)` — a generic
+  // object becomes a hash of its instance variables and the traversal recurses
+  // into each of them (core_ext/object/json.rb:62-64). Objects carrying their
+  // own `toJSON` (Date, …) keep their native JSON form, as above. This
+  // recursion is what lets a nested type instance hit `Type#asJson`'s raise
+  // (value.rb:145) — e.g. an encryption AdditionalValue's `type` reaching a
+  // serialized coder's dump — instead of stringify silently dumping the
+  // type's internals.
+  if (typeof value === "object" && typeof (value as { toJSON?: unknown }).toJSON !== "function") {
+    return asJsonValue({ ...value }, options);
   }
 
   return value;
@@ -91,8 +110,11 @@ function filterHashKeys(keys: unknown[], options: NormalizedOptions): Set<unknow
 }
 
 export namespace ActiveSupportJSON {
+  // Rails: `ActiveSupport::JSON.encode` runs the `as_json` traversal
+  // unconditionally, options or not (encoding.rb:22-25) — the options-only
+  // shortcut would skip `asJson` raises (e.g. Type#asJson) on nested objects.
   export function encode(value: unknown, options?: EncodeOptions): string {
-    const resolved = options === undefined ? value : asJsonValue(value, normalizeOptions(options));
+    const resolved = asJsonValue(value, normalizeOptions(options ?? {}));
     return JSON.stringify(resolved) ?? "null";
   }
 
