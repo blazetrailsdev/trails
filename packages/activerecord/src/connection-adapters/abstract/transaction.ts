@@ -101,14 +101,16 @@ export class TransactionState {
     return "rolledback";
   }
 
-  fullRollbackBang(): void {
+  fullRollbackBang(): "fully_rolledback" {
     this._children?.forEach((c) => c.rollbackBang());
     this._state = "fully_rolledback";
+    return "fully_rolledback";
   }
 
-  invalidateBang(): void {
+  invalidateBang(): "invalidated" {
     this._children?.forEach((c) => c.invalidateBang());
     this._state = "invalidated";
+    return "invalidated";
   }
 
   commitBang(): "committed" {
@@ -116,8 +118,9 @@ export class TransactionState {
     return "committed";
   }
 
-  fullCommitBang(): void {
+  fullCommitBang(): "fully_committed" {
     this._state = "fully_committed";
+    return "fully_committed";
   }
 
   nullifyBang(): null {
