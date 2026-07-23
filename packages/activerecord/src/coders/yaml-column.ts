@@ -69,6 +69,11 @@ class SafeCoder {
     }
     const proto = Object.getPrototypeOf(value);
     if (proto === Object.prototype || proto === null) {
+      // Only values are recursed, not keys: unlike Psych's mapping-node visit
+      // (which checks both), a plain-object key in JS is always a string scalar,
+      // so no disallowed class can hide there. A Map or other non-plain object
+      // isn't Object.prototype-proto'd and falls through to the permitted-class
+      // check below, raising just like an unpermitted value would.
       for (const element of Object.values(value)) this.assertDumpable(element, seen);
       return;
     }
