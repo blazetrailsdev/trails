@@ -32,6 +32,13 @@ describe("ExclusionConstraintDefinition", () => {
     expect(named.exportNameOnSchemaDump()).toBe(true);
     expect(unnamed.exportNameOnSchemaDump()).toBe(false);
   });
+
+  it("exportNameOnSchemaDump returns false for auto-generated names matching exclIgnorePattern", () => {
+    const autoNamed = new ExclusionConstraintDefinition("t", "x WITH =", {
+      name: "excl_rails_74c9160f55",
+    });
+    expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
+  });
 });
 
 describe("UniqueConstraintDefinition", () => {
@@ -56,6 +63,13 @@ describe("UniqueConstraintDefinition", () => {
     const unnamed = new UniqueConstraintDefinition("t", "col", {});
     expect(named.exportNameOnSchemaDump()).toBe(true);
     expect(unnamed.exportNameOnSchemaDump()).toBe(false);
+  });
+
+  it("exportNameOnSchemaDump returns false for auto-generated names matching uniqueIgnorePattern", () => {
+    const autoNamed = new UniqueConstraintDefinition("t", "col", {
+      name: "uniq_rails_1e07660b77",
+    });
+    expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
   });
 
   it("definedFor matches by name", () => {
