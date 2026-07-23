@@ -32,7 +32,7 @@
     "tsFile": "signed-global-id.ts",
     "rubyName": "pick_purpose",
     "call": "fetch",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails signed_global_id.rb:24-26 uses `options.fetch :for, DEFAULT_PURPOSE` — key-present semantics, so an explicit `for: nil` yields a nil purpose; trails signed-global-id.ts:207-209 uses `options.for ?? DEFAULT_PURPOSE`, which coerces an explicit null back to the default. Divergence tracked in story fetch-nil-presence-divergences-globalid-rack."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails signed_global_id.rb:24-26 uses `options.fetch :for, DEFAULT_PURPOSE` — key-present semantics; trails pickPurpose mirrors it with `options.for !== undefined ? options.for : DEFAULT_PURPOSE`, so an explicit `for: null` yields a null purpose and only an absent key takes the default. Converged; no Hash#fetch analogue in TS, hence the flagged call."
   },
   {
     "package": "globalid",

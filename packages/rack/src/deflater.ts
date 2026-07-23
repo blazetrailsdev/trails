@@ -9,7 +9,8 @@ export interface DeflaterOptions {
     headers: Record<string, any>,
     body: any,
   ) => boolean;
-  sync?: boolean;
+  /** Explicit `null` is honored (falsy — streaming sync off), matching Ruby's key-present `options.fetch(:sync, true)`. */
+  sync?: boolean | null;
 }
 
 export class Deflater {
@@ -23,13 +24,15 @@ export class Deflater {
         body: any,
       ) => boolean)
     | null;
-  private sync: boolean;
+  private sync: boolean | null;
 
   constructor(app: any, opts: DeflaterOptions = {}) {
     this.app = app;
     this.include = opts.include || null;
     this.condition = opts.if || null;
-    this.sync = opts.sync !== false;
+    // Ruby: `@sync = options.fetch(:sync, true)` — key-present semantics, so
+    // an explicit null stays null (falsy); only an absent key takes the default.
+    this.sync = opts.sync !== undefined ? opts.sync : true;
   }
 
   async call(env: Record<string, any>): Promise<[number, Record<string, any>, any]> {

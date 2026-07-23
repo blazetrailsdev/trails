@@ -17,12 +17,15 @@ export class Verifier {
   }
 
   /** Sign and serialize `data` into a URL-safe token. */
-  generate(data: unknown, options?: { purpose?: string; expiresAt?: Temporal.Instant }): string {
+  generate(
+    data: unknown,
+    options?: { purpose?: string | null; expiresAt?: Temporal.Instant },
+  ): string {
     return this.inner.generate(data, options);
   }
 
   /** Verify a token and return the decoded payload, or null on invalid signature. */
-  verified(message: string, options?: { purpose?: string }): unknown {
+  verified(message: string, options?: { purpose?: string | null }): unknown {
     return this.inner.verified(message, options);
   }
 
