@@ -393,3 +393,32 @@ export class HasOnePersistedAssignmentError extends ActiveRecordError {
     this.association = association;
   }
 }
+
+/**
+ * Thrown when a collection association (`has_many` / HABTM) is assigned with
+ * the native `=` setter — `owner.items = [...]`, `owner.itemIds = [...]`, or a
+ * mass-assignment key — on a *persisted* owner. The collection analogue of
+ * {@link HasOnePersistedAssignmentError}, and a deliberate trails-only
+ * deviation with no Rails counterpart: Rails'
+ * `CollectionAssociation#replace` diffs against the loaded target and runs the
+ * deletes + inserts inline in a transaction (`replace_records`,
+ * collection_association.rb:242), which is synchronous DB I/O JS cannot do
+ * from a property setter. Rather than deferring those writes to the owner's
+ * next `save()` — where a deferred delete can race an interim insert — we
+ * throw loudly and name the awaitable Rails-named replacements. See RFC
+ * 0068-awaitable-has-one-setter ("Why 'loud' beats 'deferred'").
+ */
+export class CollectionPersistedAssignmentError extends ActiveRecordError {
+  readonly association: string;
+
+  constructor(association: string) {
+    super(
+      `Cannot assign collection association \`${association}\` with \`=\` on a ` +
+        `persisted record: Rails replaces the collection at assignment time, ` +
+        `which requires \`await\` in JS. Use \`await owner.${association}.replace([...])\` ` +
+        `(or \`.concat(...)\` / \`.destroy(...)\`).`,
+    );
+    this.name = "CollectionPersistedAssignmentError";
+    this.association = association;
+  }
+}

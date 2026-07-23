@@ -169,18 +169,24 @@ export function assignAssociationIfMatch(
         replace?: (v: unknown[]) => void;
         writer?: (v: unknown) => void;
         queueWrite?: (v: unknown) => void;
+        queueIdsWrite?: (v: unknown) => unknown;
       }
     | null
     | undefined;
   if (!proxy) return false;
   if (assoc.type === "hasMany" || assoc.type === "hasAndBelongsToMany") {
-    if (typeof proxy.replace !== "function") return false;
-    // Rails fidelity: pass the value through unchanged. The normal writer
-    // path (`record.items = value` → CollectionAssociation#writer →
-    // #replace) does not Array.wrap — Rails' replace calls `.each` on the
-    // argument and raises on nil / scalars. Coercing here would silently
-    // accept inputs the regular writer rejects.
-    proxy.replace(value as unknown[]);
+    // Mass-assignment can't await, so it shares the native `=` setter's
+    // `queueWrite` dispatch: in-memory replace on an unpersisted owner, and a
+    // throw (`CollectionPersistedAssignmentError`) on a persisted one — Rails
+    // replaces the collection inline at assignment, which needs `await` in JS.
+    // Callers use `await owner.#{name}.replace([...])` instead (RFC 0068).
+    //
+    // Rails fidelity: pass the value through unchanged. The writer path does
+    // not Array.wrap — Rails' replace calls `.each` on the argument and raises
+    // on nil / scalars. Coercing here would silently accept inputs the regular
+    // writer rejects.
+    if (typeof proxy.queueWrite !== "function") return false;
+    proxy.queueWrite(value as unknown[]);
     return true;
   }
   if (assoc.type === "hasOne") {

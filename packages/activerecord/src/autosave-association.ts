@@ -311,14 +311,16 @@ export function validOptions(): string[] {
 }
 
 // Post-commit flush for association instances that still queue a deferred
-// `_pendingReplace` — collection associations (has_many / HABTM,
-// CollectionAssociation#persistReplace). Neither singular has_one path relies on
-// this any more: the direct has_one converged onto
-// `autosaveHasOne` -> `removeDisplaced`, and has_one *through* onto
-// `autosaveHasOne` -> `persistThroughRecord` (Rails' `save_has_one_association`
-// through arm), both of which run during the save and clear their markers, so by
-// the time this runs post-commit those singular markers are already null and the
-// loop skips them.
+// `_pendingReplace`. Collection associations no longer participate: their
+// persisted-owner assignment throws (`CollectionPersistedAssignmentError`) and
+// the awaitable `CollectionAssociation#writer` persists inline, so they no
+// longer define `persistReplace` at all (RFC 0068). The sole remaining matcher
+// of the duck-type below is `HasOneThroughAssociation`, which still defines
+// both `persistReplace` (has-one-through-association.ts) and `_pendingReplace`.
+// Its marker is normally consumed during the save (`autosaveHasOne` ->
+// `persistThroughRecord`, Rails' `save_has_one_association` through arm), so by
+// post-commit it is usually null and the loop no-ops — this is deliberately
+// kept as its safety net for a marker that survives the save, not dead code.
 export async function flushPendingReplaces(record: Base): Promise<void> {
   const instances: Map<string, unknown> = (record as any)._associationInstances;
   if (!instances?.values) return;

@@ -300,6 +300,7 @@ export {
   EagerLoadPolymorphicError,
   DeleteRestrictionError,
   HasOnePersistedAssignmentError,
+  CollectionPersistedAssignmentError,
 } from "./associations/errors.js";
 export {
   AbstractReflection,

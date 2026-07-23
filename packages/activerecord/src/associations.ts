@@ -3825,11 +3825,9 @@ export async function setHasMany(record: Base, assocName: string, targets: Base[
   // options override — the previous one was dead (it duplicated the reflection
   // at every call site and went unread once the diff moved into `replace`).
   const assoc = record.association(assocName) as unknown as {
-    replace(records: Base[]): void;
-    persistReplace(): Promise<void>;
+    writer(records: Base[]): Promise<void>;
   };
-  assoc.replace(targets);
-  await assoc.persistReplace();
+  await assoc.writer(targets);
 }
 
 export async function touchBelongsToParents(record: Base): Promise<void> {

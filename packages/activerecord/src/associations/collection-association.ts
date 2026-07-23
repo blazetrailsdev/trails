@@ -7,9 +7,21 @@ import { foreignKeyPresentFor } from "./foreign-association.js";
 import { throughForeignKeyPresent } from "./through-association.js";
 import type { AssociationReflection } from "../reflection.js";
 import { RecordNotSaved, Rollback } from "../errors.js";
+import { CollectionPersistedAssignmentError } from "./errors.js";
 import { raiseNotFoundAll } from "../relation/finder-methods.js";
 import { normalizeAssociationKey } from "./key-normalization.js";
 import { polymorphicName } from "../inheritance.js";
+
+/**
+ * The persisted-owner DB work `replace` defers to its awaitable caller: the
+ * assigned collection plus the baseline to diff it against (`wasLoaded` says
+ * whether that baseline is trustworthy or must be re-read from the DB).
+ */
+export interface ReplacePlan {
+  newTarget: Base[];
+  originalTarget: Base[];
+  wasLoaded: boolean;
+}
 
 /**
  * Base class for has_many and has_and_belongs_to_many associations.
@@ -34,7 +46,6 @@ export class CollectionAssociation extends Association {
   // CollectionProxy through-branch reads this to avoid pruning its loaded
   // target when the removal was actually aborted. Read externally by the proxy.
   _lastRemoveAborted = false;
-  _pendingReplace: { newTarget: Base[]; originalTarget: Base[]; wasLoaded: boolean } | null = null;
   // trails-specific (RFC 0030): memoized named-scope relations built off the
   // proxy (`things.someScope()`). Rails has NO such cache — `scope :name`
   // rebuilds a fresh relation on every call (named.rb:174-178), so two
@@ -55,9 +66,66 @@ export class CollectionAssociation extends Association {
   /**
    * Implements the writer method, e.g. foo.items= for Foo.has_many :items.
    * Replaces the entire collection.
+   *
+   * Awaitable: mirrors Rails' `CollectionAssociation#writer` → `replace`
+   * (collection_association.rb:46-48, :242), which for a *persisted* owner
+   * runs the diffed deletes + inserts inline in a transaction. That is DB I/O,
+   * so this returns a Promise — the sync property setter cannot reach it and
+   * uses {@link queueWrite} instead (RFC 0068).
    */
-  writer(records: Base[]): void {
+  async writer(records: Base[]): Promise<void> {
+    const plan = this.replace(records);
+    if (plan) await this.persistReplacePlan(plan);
+  }
+
+  /**
+   * Writer for the JS property setter (`owner.items = [...]`,
+   * builder/collection-association.ts `defineWriters`) and mass-assignment,
+   * neither of which can `await`.
+   *
+   * - **Unpersisted owner:** in-memory `replace`, exactly as Rails does no I/O
+   *   for a new-record owner (the FK isn't known yet); autosave persists at the
+   *   owner's first `save()`.
+   * - **Persisted owner:** THROW. Rails replaces inline at assignment; JS
+   *   cannot do synchronous DB I/O from a property setter, so rather than
+   *   deferring the writes to the owner's next `save()` (where a deferred
+   *   delete can race an interim insert) we throw and name the awaitable
+   *   Rails-named replacement (`await owner.items.replace([...])`).
+   */
+  queueWrite(records: Base[]): void {
+    // Rails' `replace` raises a class mismatch for every element as its very
+    // first statement (collection_association.rb:242), before any load or
+    // persist — and so before the persisted-owner deviation below. That guard
+    // is synchronous, so preserve its ordering even on this non-awaitable
+    // path: `firm.clients = [1]` must report `AssociationTypeMismatch`, and
+    // `firm.clients = null` must fail here (Rails: NoMethodError from
+    // `nil.each`; here: TypeError from iterating null) on BOTH owner arms,
+    // ahead of the persisted-owner throw.
+    for (const val of records) (this as any).raiseOnTypeMismatchBang(val);
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+      throw new CollectionPersistedAssignmentError(this.reflection.name);
+    }
     this.replace(records);
+  }
+
+  /**
+   * The `#{singular}Ids=` analogue of {@link queueWrite}. Resolving ids to
+   * records is itself a query, so even the unpersisted-owner arm is async.
+   *
+   * The unpersisted arm returns a promise the property setter must discard —
+   * an id that doesn't resolve (`raiseNotFoundAll`) surfaces as an unhandled
+   * rejection, not a catchable throw, and an immediate `save()` can race the
+   * in-flight resolution. This is the pre-existing shape (the setter always
+   * called `idsWriter` un-awaited) and the story's acceptance criteria keep
+   * unpersisted-owner assignment working, so it is retained rather than made
+   * a second persisted-style throw; callers who need the result awaitable use
+   * `await owner.association(name).idsWriter(ids)`.
+   */
+  queueIdsWrite(ids: unknown[]): Promise<void> {
+    if ((this.owner as { isPersisted?: () => boolean }).isPersisted?.()) {
+      throw new CollectionPersistedAssignmentError(this.reflection.name);
+    }
+    return this.idsWriter(ids);
   }
 
   /**
@@ -201,15 +269,17 @@ export class CollectionAssociation extends Association {
       );
     }
 
-    this.replace(records);
-    await this.persistReplace();
+    // Rails' `ids_writer` ends in `replace(records)` (collection_association.rb:83).
+    // Mirror that direct call, then run the persisted-owner half `replace`
+    // defers (the awaitable `writer` does the same two steps).
+    const plan = this.replace(records);
+    if (plan) await this.persistReplacePlan(plan);
   }
 
   override reset(): void {
     super.reset();
     this.target = [];
     this._associationIds = null;
-    this._pendingReplace = null;
     // Drop the trails-specific named-scope memo (see `_namedScopeRelations`) so
     // the next `things.someScope()` rebuilds against the reset collection. (This
     // sits alongside Rails' `reset`, which clears @target/@association_ids; the
@@ -429,8 +499,18 @@ export class CollectionAssociation extends Association {
   /**
    * Replace this collection with other_array. Performs a diff and
    * delete/add only records that have changed.
+   *
+   * In-memory only. For a *new* owner that is the whole of Rails' behaviour
+   * (`replace_records` without a save — the FK isn't known yet), so the
+   * owner's first `save()` autosaves the target and nothing else is needed.
+   * For a *persisted* owner Rails additionally runs the diffed deletes +
+   * inserts in a transaction; that DB work cannot happen here (this is
+   * synchronous, and reached from the property setter), so it is returned as a
+   * plan for the awaitable {@link writer} to execute via
+   * {@link persistReplacePlan}. Returns `null` when there is nothing to
+   * persist.
    */
-  replace(otherArray: Base[]): void {
+  replace(otherArray: Base[]): ReplacePlan | null {
     // The writer path (`firm.clients = [...]`, `firm.client_ids = [...]`, mass
     // assignment) mutates `target` directly rather than going through
     // `setTarget`, so it needs the in-flight guard applied here too —
@@ -503,25 +583,21 @@ export class CollectionAssociation extends Association {
           }
         }
         this.loadedBang();
-        // Preserve the first originalTarget (what's in the DB) across multiple
-        // replace() calls before save(). Only update newTarget so the final flush
-        // diffs against the real persisted state, not an intermediate in-memory one.
-        if (this._pendingReplace) {
-          if (wasLoaded && arraysEqual(otherArray, this._pendingReplace.originalTarget)) {
-            this._pendingReplace = null; // reverted to DB state — nothing to flush
-          } else {
-            this._pendingReplace.newTarget = [...otherArray];
-          }
-        } else {
-          this._pendingReplace = { newTarget: [...otherArray], originalTarget, wasLoaded };
-        }
+        return { newTarget: [...otherArray], originalTarget, wasLoaded };
       }
     }
+    return null;
   }
 
-  async persistReplace(): Promise<void> {
-    const pending = this._pendingReplace;
-    if (!pending || this.owner.isNewRecord()) return;
+  /**
+   * Run the persisted-owner half of {@link replace}: the diffed deletes +
+   * inserts, in a transaction (Rails' `replace_records`,
+   * collection_association.rb:242). Awaited inline by {@link writer} — the
+   * in-memory `replace` above has already mutated `target`, so this restores
+   * the captured baseline for the duration of the diff.
+   */
+  protected async persistReplacePlan(pending: ReplacePlan): Promise<void> {
+    if (this.owner.isNewRecord()) return;
     // If the association wasn't loaded at assignment time, fetch the persisted
     // baseline directly via doAsyncFindTarget to avoid the loadedBang short-circuit
     // and without mutating this.target (mirrors Rails' load_target in replace).
@@ -544,8 +620,6 @@ export class CollectionAssociation extends Association {
         this.target = currentTarget;
       }
     });
-    // Clear only after success — leave intact on error so save() retry can re-attempt
-    this._pendingReplace = null;
   }
 
   /**
