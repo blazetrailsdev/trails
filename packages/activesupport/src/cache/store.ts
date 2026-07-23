@@ -485,7 +485,10 @@ export abstract class Store {
    * prefix (`.*`).
    */
   protected keyMatcher(pattern: RegExp, options?: StoreOptions): RegExp {
-    const ns = options?.namespace ?? this.options.namespace;
+    // Same per-call override semantics as namespaceKey below: Rails'
+    // key_matcher reads options[:namespace] from the merged options with no
+    // store-level fallback (cache.rb:779-790), so an explicit nil wins.
+    const ns = options && "namespace" in options ? options.namespace : this.options.namespace;
     const prefix = typeof ns === "function" ? (ns as () => string)() : (ns as string | undefined);
     if (prefix) {
       let source = pattern.source;

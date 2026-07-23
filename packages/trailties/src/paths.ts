@@ -6,6 +6,7 @@ export interface PathOptions {
   glob?: string;
   loadPath?: boolean;
   eagerLoad?: boolean;
+  exclude?: string[];
 }
 
 // Port of railties/lib/rails/paths.rb. Autoload APIs are intentionally
@@ -40,19 +41,19 @@ export class Root {
   }
 
   /** Mirrors Rails `Paths::Root#eager_load` (`filter_by(&:eager_load?)`,
-   * paths.rb): existent paths of eager-load entries, minus those claimed by a
-   * non-eager-load child entry. */
+   * paths.rb:93-110): existent directories of eager-load entries, minus those
+   * claimed by a non-eager-load child entry. */
   async eagerLoad(): Promise<string[]> {
     const out: string[] = [];
     for (const node of this.allPaths()) {
       if (!node.isEagerLoad()) continue;
-      const paths = await node.existent();
+      const dirs = await node.existentDirectories();
       const excluded = new Set<string>();
       for (const child of node.children()) {
         if (child.isEagerLoad()) continue;
-        for (const p of await child.existent()) excluded.add(p);
+        for (const d of await child.existentDirectories()) excluded.add(d);
       }
-      for (const p of paths) if (!excluded.has(p)) out.push(p);
+      for (const d of dirs) if (!excluded.has(d)) out.push(d);
     }
     return Array.from(new Set(out));
   }
@@ -80,6 +81,7 @@ export class Path {
   private _root: Root;
   private _loadPath = false;
   private _eagerLoad = false;
+  private _exclude: string[] | undefined;
 
   constructor(root: Root, current: string, paths: string[], options: PathOptions = {}) {
     this._root = root;
@@ -88,6 +90,7 @@ export class Path {
     this.glob = options.glob;
     this._loadPath = !!options.loadPath;
     this._eagerLoad = !!options.eagerLoad;
+    this._exclude = options.exclude;
   }
 
   children(): Path[] {
@@ -129,7 +132,10 @@ export class Path {
     for (const raw of this._paths) {
       const abs = path.resolve(this._root.path, raw);
       if (this.glob && (await isDir(fs, abs))) {
-        const files = await fsGlob(this.glob, { cwd: abs });
+        // Mirrors Rails Path#files_in (paths.rb:238-240): the exclude list is
+        // subtracted from the relative glob results before joining.
+        let files = await fsGlob(this.glob, { cwd: abs });
+        if (this._exclude) files = files.filter((f) => !this._exclude!.includes(f));
         out.push(...files.map((f) => path.join(abs, f)).sort());
       } else {
         out.push(abs);

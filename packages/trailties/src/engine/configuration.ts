@@ -55,7 +55,11 @@ export class EngineConfiguration extends RailtieConfiguration {
   paths(): Root {
     if (this._paths) return this._paths;
     const paths = new Root(this._root);
-    paths.add("app", { eagerLoad: true, glob: "{*,*/concerns}" });
+    paths.add("app", {
+      eagerLoad: true,
+      glob: "{*,*/concerns}",
+      exclude: ["assets", this.javascriptPath],
+    });
     paths.add("app/assets", { glob: "*" });
     paths.add("app/controllers", { eagerLoad: true });
     paths.add("app/channels", { eagerLoad: true });
