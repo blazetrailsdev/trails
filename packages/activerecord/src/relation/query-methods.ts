@@ -3013,8 +3013,14 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // `joinConstraints` makes a merged join onto an already-joined table collide
   // and alias. `plan.aliases` is the tracker threaded in from `build_from`
   // (Rails' `aliases` argument), whose counts the caller folded in. Invoked
-  // lazily (see JoinEmissionPlan#tracker) only where a JoinDependency emits.
-  const sharedTracker = plan.tracker;
+  // lazily (see JoinEmissionPlan#tracker) only where a JoinDependency emits;
+  // `trackerWasBuilt` records that a forcing site actually ran, gating the
+  // aliases writeback below.
+  let trackerWasBuilt = false;
+  const sharedTracker = (): AliasTracker => {
+    trackerWasBuilt = true;
+    return plan.tracker();
+  };
   const references = (this as any)._aliasableReferences();
 
   // Rails build_joins (query_methods.rb:1881-1897) emits ALL named association
@@ -3098,7 +3104,14 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // source and a sibling explicit `:post` join in the SAME outer JoinDependency
   // would both re-alias `posts` to the same candidate and collide — the outer
   // tracker must learn what the nested scope build already claimed.
-  if (plan.aliases) {
+  // Only when a JoinDependency emission actually forced the tracker: Rails'
+  // `build_joins` skips `alias_tracker` entirely when the
+  // `named_joins.empty? && stashed_joins.empty?` guard fails, even with
+  // `aliases` supplied (query_methods.rb:1893) — a joinless nested
+  // `join_scope.arel(aliases)` build claims nothing in the caller's hash, and
+  // forcing the thunk here would re-open the `connectionPool()` raise on a
+  // connectionless model that the lazy tracker exists to avoid.
+  if (plan.aliases && trackerWasBuilt) {
     for (const [name, count] of sharedTracker().aliases) {
       if (count > (plan.aliases.aliases.get(name) ?? 0)) plan.aliases.aliases.set(name, count);
     }
