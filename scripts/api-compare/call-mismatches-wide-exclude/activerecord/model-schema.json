@@ -184,9 +184,16 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
-    "rubyName": "reset_column_information",
-    "call": "reload_schema_from_cache",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "reload_schema_from_cache",
+    "call": "each",
+    "reason": "Rails recurses `subclasses.each`; trails bumps _schemaRevision instead, which STI subclass overlays check to re-sync lazily."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "model-schema.ts",
+    "rubyName": "reload_schema_from_cache",
+    "call": "subclasses",
+    "reason": "Rails recurses `subclasses.each`; trails bumps _schemaRevision instead, which STI subclass overlays check to re-sync lazily."
   },
   {
     "package": "activerecord",
