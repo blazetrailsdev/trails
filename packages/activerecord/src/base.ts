@@ -298,7 +298,7 @@ function _withTransactionCallbackOrder(
 import {
   Default as DefaultScoping,
   defaultScope as _defaultScope,
-  hasDefaultScopeOverride,
+  isScopeAttributes as _isScopeAttributes,
   unscoped as _unscoped,
 } from "./scoping/default.js";
 import * as NamedScoping from "./scoping/named.js";
@@ -587,22 +587,12 @@ async function performClassUpdate(
  * only write scope attrs for keys NOT in the explicit set.
  */
 function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
-  // Mirrors Rails' `Scoping::Default::ClassMethods#scope_attributes?`
-  // (scoping/default.rb): `super || default_scopes.any? || respond_to?(:default_scope)`,
-  // where `super` is `Scoping::ClassMethods#scope_attributes?` (`current_scope`).
-  // A default scope seeds its `where` equalities onto new records too, not only
-  // an explicit current scope. The third term — `respond_to?(:default_scope)` —
-  // is true for a model that defines its own `default_scope` method (the
-  // proc/method form, `def self.default_scope`) rather than registering via the
-  // `default_scope { }` macro (which appends to `defaultScopes`). The macro is
-  // private in Rails, so `respond_to?` is false for ordinary models; only the
-  // method-form override flips it true. `hasDefaultScopeOverride` mirrors that
-  // by walking the static chain for a `defaultScope` that isn't the inherited
-  // macro. The all_queries flag is irrelevant here — `all` (and thus
+  // `scope_attributes?` (Scoping::Default::ClassMethods) — a default scope
+  // seeds its `where` equalities onto new records too, not only an explicit
+  // current scope. The all_queries flag is irrelevant here: `all` (and thus
   // `scope_for_create`) applies every default scope, so both all_queries and
   // non-all_queries `where` conditions propagate on create.
-  const c = ctor as any;
-  return !!c.currentScope || (c.defaultScopes?.length ?? 0) > 0 || hasDefaultScopeOverride(ctor);
+  return (ctor as any).isScopeAttributes();
 }
 
 /**
@@ -2281,6 +2271,11 @@ export class Base extends Model {
    * Mirrors: ActiveRecord::Scoping::ClassMethods#scope_registry
    */
   static scopeRegistry = _scopeRegistry;
+
+  /**
+   * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#scope_attributes?
+   */
+  static isScopeAttributes = _isScopeAttributes;
 
   // -- Finders (class methods) --
 

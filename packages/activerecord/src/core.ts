@@ -31,7 +31,6 @@ import { Map as TypeCasterMap } from "./type-caster/map.js";
 import { buildPkWhereNode, columnsHash } from "./model-schema.js";
 import { StatementCache } from "./statement-cache.js";
 import { RangeError as ActiveModelRangeError } from "@blazetrails/activemodel";
-import { hasDefaultScopeOverride } from "./scoping/default.js";
 
 /**
  * The Core module interface — methods mixed into every AR model.
@@ -883,9 +882,7 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
   // which applies the default scope's eager joins. Mirrors the `findBy` guard.
   if (
     ids.length === 1 &&
-    !(this as any).currentScope &&
-    ((this as any).defaultScopes?.length ?? 0) === 0 &&
-    !hasDefaultScopeOverride(this) &&
+    !(this as any).isScopeAttributes() &&
     this.primaryKey != null &&
     !this.compositePrimaryKey &&
     !Array.isArray(ids[0]) &&
@@ -1084,8 +1081,7 @@ async function findByThroughCache(
   // default scope can add includes/references/order the StatementCache fast path
   // can't reproduce (it builds a bare `where(...).limit(1)`), so defer the whole
   // lookup to the relation path, which applies the default scope's eager joins.
-  const ctor = this as any;
-  if (ctor.currentScope || (ctor.defaultScopes?.length ?? 0) > 0 || hasDefaultScopeOverride(this)) {
+  if ((this as any).isScopeAttributes()) {
     return this.all().findBy(conditions);
   }
   const keys = Object.keys(conditions);

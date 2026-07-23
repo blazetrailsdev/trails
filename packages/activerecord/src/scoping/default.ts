@@ -1,7 +1,7 @@
 import { ArgumentError } from "@blazetrails/activemodel";
 import type { Base } from "../base.js";
 import type { Relation } from "../relation.js";
-import { ScopeRegistry } from "../scoping.js";
+import { ScopeRegistry, isScopeAttributes as baseIsScopeAttributes } from "../scoping.js";
 
 /**
  * Manages evaluating and applying default scopes.
@@ -191,6 +191,23 @@ export function unscoped<T extends typeof Base, R>(
     return rel.scoping(block);
   }
   return rel;
+}
+
+/**
+ * Are there attributes associated with this scope? Overrides the base
+ * `Scoping::ClassMethods#scope_attributes?` (current scope only) with the
+ * default-scope arms, so a model with a `default_scope` seeds its `where`
+ * equalities onto new records even with no current scope. The third arm —
+ * Rails' `respond_to?(:default_scope)` — covers the method-form override
+ * (`def self.default_scope`) rather than the private `default_scope { }`
+ * macro, which instead appends to `defaultScopes`.
+ *
+ * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#scope_attributes?
+ */
+export function isScopeAttributes(this: any): boolean {
+  return (
+    baseIsScopeAttributes.call(this) || isDefaultScopes.call(this) || hasDefaultScopeOverride(this)
+  );
 }
 
 /**
