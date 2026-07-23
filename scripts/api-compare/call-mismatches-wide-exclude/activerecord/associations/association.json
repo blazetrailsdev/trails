@@ -318,14 +318,14 @@
     "package": "activerecord",
     "tsFile": "associations/association.ts",
     "rubyName": "violates_strict_loading?",
-    "call": "strict_loading_n_plus_one_only?",
+    "call": "strict_loading?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "associations/association.ts",
     "rubyName": "violates_strict_loading?",
-    "call": "strict_loading?",
+    "call": "strict_loading_n_plus_one_only?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

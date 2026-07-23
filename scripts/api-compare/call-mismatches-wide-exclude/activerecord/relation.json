@@ -80,8 +80,22 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "_substitute_values",
+    "call": "build_bind_attribute",
+    "reason": "Satisfied by QueryAttribute.withCastValue: Rails build_bind_attribute (predicate_builder.rb:67-69) is a PRESERVING constructor because QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails QueryAttribute#typeCast casts its input, so calling buildBindAttribute here would cast twice."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "_substitute_values",
     "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "_substitute_values",
+    "call": "predicate_builder",
+    "reason": "Satisfied by QueryAttribute.withCastValue: Rails build_bind_attribute (predicate_builder.rb:67-69) is a PRESERVING constructor because QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails QueryAttribute#typeCast casts its input, so calling buildBindAttribute here would cast twice."
   },
   {
     "package": "activerecord",
@@ -234,14 +248,14 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
-    "call": "joins_values",
+    "call": "joins!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "apply_join_dependency",
-    "call": "joins!",
+    "call": "joins_values",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -885,14 +899,14 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "calculate",
-    "call": "distinct_select?",
+    "call": "distinct!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "calculate",
-    "call": "distinct!",
+    "call": "distinct_select?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -1143,13 +1157,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "create_or_find_by",
-    "call": "with_connection",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "create!",
     "call": "collect",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -1166,6 +1173,13 @@
     "tsFile": "relation.ts",
     "rubyName": "create!",
     "call": "scoping",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "create_or_find_by",
+    "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -1543,14 +1557,14 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_queries",
-    "call": "strict_loading_value",
+    "call": "strict_loading!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "exec_queries",
-    "call": "strict_loading!",
+    "call": "strict_loading_value",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -3152,6 +3166,20 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
+    "rubyName": "update!",
+    "call": "each",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
+    "rubyName": "update!",
+    "call": "model",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "relation.ts",
     "rubyName": "update_all",
     "call": "apply_join_dependency",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -3327,20 +3355,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "update!",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "update!",
-    "call": "model",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "using_limitable_reflections?",
     "call": "none?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -3372,19 +3386,5 @@
     "rubyName": "where",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "_substitute_values",
-    "call": "build_bind_attribute",
-    "reason": "Satisfied by QueryAttribute.withCastValue: Rails build_bind_attribute (predicate_builder.rb:67-69) is a PRESERVING constructor because QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails QueryAttribute#typeCast casts its input, so calling buildBindAttribute here would cast twice."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "_substitute_values",
-    "call": "predicate_builder",
-    "reason": "Satisfied by QueryAttribute.withCastValue: Rails build_bind_attribute (predicate_builder.rb:67-69) is a PRESERVING constructor because QueryAttribute#type_cast is identity (query_attribute.rb:22-24); trails QueryAttribute#typeCast casts its input, so calling buildBindAttribute here would cast twice."
   }
 ]

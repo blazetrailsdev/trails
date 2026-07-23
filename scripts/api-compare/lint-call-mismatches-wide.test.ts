@@ -88,9 +88,7 @@ describe("split baseline round-trip", () => {
     const relation = JSON.parse(
       await fs.readFile(path.join(dir, "activerecord", "relation.json"), "utf-8"),
     ) as ExcludeEntry[];
-    expect(relation.map(keyOf)).toEqual(
-      [...relation].map(keyOf).sort((a, b) => a.localeCompare(b)),
-    );
+    expect(relation.map(keyOf)).toEqual([...relation].map(keyOf).sort());
   });
 
   it("deletes a converged source file (never leaves []) and prunes its empty dirs", async () => {
@@ -135,5 +133,47 @@ describe("loadSplitBaseline on a missing directory", () => {
   it("returns an empty baseline rather than throwing", async () => {
     const missing = path.join(os.tmpdir(), "wide-baseline-does-not-exist-xyz");
     expect(await loadSplitBaseline(missing)).toEqual([]);
+  });
+});
+
+describe("emission order", () => {
+  let dir: string;
+  beforeEach(async () => {
+    dir = await fs.mkdtemp(path.join(os.tmpdir(), "wide-baseline-order-"));
+  });
+  afterEach(async () => {
+    await fs.rm(dir, { recursive: true, force: true });
+  });
+
+  const read = async (rel: string) => JSON.parse(await fs.readFile(path.join(dir, rel), "utf-8"));
+
+  // Punctuation-differing keys are where ICU collation and code-unit order part
+  // ways; `permit!` must precede `permit_any_in_array` because "!" < "_".
+  it("sorts by code units, not locale collation", async () => {
+    await writeSplitBaseline(
+      [
+        entry("actioncontroller", "metal/strong-parameters.ts", "permit_any_in_array", "each"),
+        entry("actioncontroller", "metal/strong-parameters.ts", "permit!", "wrap"),
+      ],
+      dir,
+    );
+    const written = await read(path.join("actioncontroller", "metal/strong-parameters.json"));
+    expect(written.map((e: ExcludeEntry) => e.rubyName)).toEqual([
+      "permit!",
+      "permit_any_in_array",
+    ]);
+  });
+
+  it("emits byte-identical files whatever order the entries arrive in", async () => {
+    const entries = [
+      entry("activerecord", "relation.ts", "where", "first"),
+      entry("activerecord", "relation.ts", "_substitute_values", "build_bind_attribute"),
+      entry("activerecord", "relation.ts", "empty?", "loaded?"),
+    ];
+    await writeSplitBaseline(entries, dir);
+    const first = await fs.readFile(path.join(dir, "activerecord", "relation.json"), "utf-8");
+    await writeSplitBaseline([...entries].reverse(), dir);
+    const second = await fs.readFile(path.join(dir, "activerecord", "relation.json"), "utf-8");
+    expect(second).toBe(first);
   });
 });

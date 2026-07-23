@@ -25,8 +25,10 @@
  * ── Split baseline layout ───────────────────────────────────────────────────
  * The baseline is NOT one file: it is a directory (call-mismatches-wide-exclude/)
  * that mirrors the source tree, one JSON file per `tsFile`, at
- * `<dir>/<package>/<tsFile with .ts→.json>`. Each file is a sorted (keyOf) JSON
- * array of exactly that source file's entries. This makes the merge-conflict
+ * `<dir>/<package>/<tsFile with .ts→.json>`. Each file is a JSON array of
+ * exactly that source file's entries, sorted by the code-unit `compareKeys`
+ * order (see lint-call-mismatches.ts) so a reseed rewrites only the files whose
+ * entries actually changed. This makes the merge-conflict
  * boundary match the unit of work: an agent converging relation.ts only touches
  * activerecord/relation.json, not a shared 47k-line monolith. The loader globs
  * and concatenates every file; `--write` partitions the reseed back out by
@@ -55,10 +57,10 @@ import {
   type Artifact,
   type CallMismatchKey,
   type ExcludeEntry,
+  compareKeys,
   diffAgainstBaseline,
   findDuplicateKeys,
   flattenArtifact,
-  keyOf,
   missingScope,
   reseed,
 } from "./lint-call-mismatches.js";
@@ -194,8 +196,10 @@ async function loadArtifact(): Promise<Artifact> {
   return readJson<Artifact>(ARTIFACT_PATH);
 }
 
+// Emission order for every baseline file (and every console listing): the
+// shared code-unit `compareKeys` order documented in lint-call-mismatches.ts.
 function sortKeys<T extends CallMismatchKey>(entries: T[]): T[] {
-  return [...entries].sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+  return [...entries].sort(compareKeys);
 }
 
 async function main(write: boolean): Promise<number> {

@@ -493,14 +493,14 @@
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "member",
-    "call": "shallow_scope",
+    "call": "shallow?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "actiondispatch",
     "tsFile": "routing/mapper.ts",
     "rubyName": "member",
-    "call": "shallow?",
+    "call": "shallow_scope",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

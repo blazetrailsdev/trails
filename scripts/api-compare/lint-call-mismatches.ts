@@ -170,8 +170,25 @@ export function diffAgainstBaseline(
   };
 }
 
+/**
+ * Total order on baseline entries: ascending UTF-16 code-unit order of
+ * `keyOf` (`package tsFile rubyName call`). Deliberately NOT `localeCompare`:
+ * ICU collation is locale- and ICU-version-dependent and treats punctuation as
+ * secondary, so `permit!` vs `permit_any_in_array` (and any other key pair
+ * differing only in `!`/`_`/`?`) sorts differently depending on who runs
+ * `--write`. That made a reseed driven by one package rewrite the entry order
+ * of untouched packages' baseline files. Code-unit order has none of that
+ * environment dependence, and `keyOf` is unique per entry (findDuplicateKeys
+ * enforces it), so the order is total — no tie-break needed.
+ */
+export function compareKeys(a: CallMismatchKey, b: CallMismatchKey): number {
+  const ka = keyOf(a);
+  const kb = keyOf(b);
+  return ka < kb ? -1 : ka > kb ? 1 : 0;
+}
+
 function sortEntries<T extends CallMismatchKey>(entries: T[]): T[] {
-  return [...entries].sort((a, b) => keyOf(a).localeCompare(keyOf(b)));
+  return [...entries].sort(compareKeys);
 }
 
 // Rebuild the baseline from the live artifact: keep each still-flagging call,

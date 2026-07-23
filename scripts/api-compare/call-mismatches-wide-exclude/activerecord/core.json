@@ -37,16 +37,16 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "connection_class_for_self",
-    "call": "connection_class?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "rubyName": "connection_class?",
+    "call": "connection_class",
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:234-236 delegates to the connection_class reader (core.rb:230-232); trails core.ts:535-539 is a combined accessor reading the `_connectionClass` field directly."
   },
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "connection_class?",
-    "call": "connection_class",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:234-236 delegates to the connection_class reader (core.rb:230-232); trails core.ts:535-539 is a combined accessor reading the `_connectionClass` field directly."
+    "rubyName": "connection_class_for_self",
+    "call": "connection_class?",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
