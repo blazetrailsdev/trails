@@ -1615,6 +1615,11 @@ describe("BasicsTest", () => {
     // Rails: `assert_equal [], AbstractCompany.attribute_names` (base_test.rb:1642).
     expect(AbstractModel.attributeNames()).toEqual([]);
   });
+  it("attribute names on table not exists", () => {
+    // Rails: `assert_equal [], NonExistentTable.attribute_names` (base_test.rb:1638).
+    class NonExistentTable extends Base {}
+    expect(NonExistentTable.attributeNames()).toEqual([]);
+  });
   it("table name with 2 abstract subclasses", () => {
     class AbstractBase extends Base {
       static {

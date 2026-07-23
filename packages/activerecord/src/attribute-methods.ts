@@ -629,7 +629,10 @@ interface AttributeNamesHost {
  */
 export function attributeNames(this: AttributeNamesHost): string[] {
   // Rails attribute_methods.rb:236-241: `if !abstract_class? && table_exists?`
-  // — an abstract class has no attribute names at all.
+  // — an abstract class has no attribute names at all. The table_exists? half
+  // is unportable here (trails' tableExists is async); an absent table's
+  // columnsHash is empty, so Rails' NonExistentTable case (base_test.rb:1638)
+  // still yields [] via the declared/columnNames merge below.
   if (this.abstractClass) return [];
   const declared = [...this._attributeDefinitions.keys()];
   const columnNames = this.columnNames?.() ?? [];
