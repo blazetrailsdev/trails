@@ -134,6 +134,17 @@ export class TimeZoneConverter extends ValueType<unknown> {
     return this._subtype.serialize(resolved);
   }
 
+  // Rails' DelegateClass(Type::Value) auto-forwards these to the subtype; the
+  // eager assert at write_from_user time is how MultiparameterAssignmentErrors
+  // surface at assignment for zone-aware attributes.
+  override assertValidValue(value: unknown): void {
+    this._subtype.assertValidValue(value);
+  }
+
+  override isValueConstructedByMassAssignment(value: unknown): boolean {
+    return this._subtype.isValueConstructedByMassAssignment(value);
+  }
+
   override isChanged(oldValue: unknown, newValue: unknown, _raw?: unknown): boolean {
     const oldInstant =
       oldValue instanceof TimeWithZone
@@ -240,6 +251,19 @@ function setTimeZoneWithoutConversion(value: unknown): unknown {
   }
   if (value instanceof TimeWithZone) {
     return value.inTimeZone(zone);
+  }
+  if (value instanceof Temporal.PlainTime) {
+    // Time-only columns: the subtype casts the multiparameter hash to a
+    // PlainTime. Rails' Type::Time keeps a full ::Time on the dummy date
+    // 2000-01-01; re-interpret the wall-clock on that dummy date in the
+    // current zone so the aware wrapper still yields a TimeWithZone.
+    const base = zone.local(2000, 1, 1, value.hour, value.minute, value.second, value.millisecond);
+    const subMs = value.microsecond * 1000 + value.nanosecond;
+    if (subMs === 0) return base;
+    return new TimeWithZone(
+      Temporal.Instant.fromEpochNanoseconds(base.utc().epochNanoseconds + BigInt(subMs)),
+      zone,
+    );
   }
   return value;
 }

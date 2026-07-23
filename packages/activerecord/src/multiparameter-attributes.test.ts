@@ -686,13 +686,6 @@ describe("MultiParameterAttributeTest", () => {
       "written_on(4i)": "13",
       "written_on(5i)": "55",
     });
-    // DEVIATION: Rails writes the raw numeric-keyed hash and lets the type's
-    // AcceptsMultiparameterTime cast assemble it, so came_from_user? is false
-    // (value_constructed_by_mass_assignment? sees the hash). Trails assembles
-    // the value in multiparameter-attribute-assignment.ts before writeAttribute,
-    // so the attribute sees a plain user-written Instant → cameFromUser is true.
-    // Converging the assignment path to type-side casting is tracked as a
-    // follow-up story (multiparameter-assignment-type-side-cast).
-    expect(topic.cameFromUser("written_on")).toBe(true);
+    expect(topic.cameFromUser("written_on")).toBe(false);
   });
 });

@@ -1,9 +1,6 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { looseDateParse } from "./helpers/loose-date-parse.js";
-import {
-  AcceptsMultiparameterTime,
-  isNumericKeyHash,
-} from "./helpers/accepts-multiparameter-time.js";
+import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { ValueType } from "./value.js";
 
 export class TimeType extends ValueType<Temporal.PlainTime> {
@@ -44,7 +41,7 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
     // Accept PlainDateTime from multiparameter assignment — extract the time part.
     if (value instanceof Temporal.PlainDateTime)
       return this._applySecondsPrecision(value.toPlainTime());
-    if (isNumericKeyHash(value)) return this.valueFromMultiparameterAssignment(value);
+    if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
     const parts = looseDateParse(str);
@@ -116,5 +113,18 @@ export class TimeType extends ValueType<Temporal.PlainTime> {
       "4": 0,
       "5": 0,
     }).cast(values) as Temporal.PlainTime | null;
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value —
+   * a Hash value is validated by assembling it (raising on invalid input).
+   */
+  override assertValidValue(value: unknown): void {
+    if (isHash(value)) this.valueFromMultiparameterAssignment(value);
+  }
+
+  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
+  override isValueConstructedByMassAssignment(value: unknown): boolean {
+    return isHash(value);
   }
 }

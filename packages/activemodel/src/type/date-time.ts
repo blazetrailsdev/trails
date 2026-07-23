@@ -6,10 +6,7 @@ import {
   type DateNegativeInfinity as DateNegativeInfinityType,
 } from "./internal/sentinels.js";
 import { ArgumentError } from "../attribute-assignment.js";
-import {
-  AcceptsMultiparameterTime,
-  isNumericKeyHash,
-} from "./helpers/accepts-multiparameter-time.js";
+import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { configuredTimezone } from "./helpers/timezone.js";
 import { ValueType } from "./value.js";
 
@@ -31,7 +28,7 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     if (value instanceof Date) {
       return this._applySecondsPrecision(Temporal.Instant.fromEpochMilliseconds(value.getTime()));
     }
-    if (isNumericKeyHash(value)) return this.valueFromMultiparameterAssignment(value);
+    if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     const str = String(value).trim();
     if (str === "") return null;
     return this.parseString(str);
@@ -114,6 +111,20 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
     return new AcceptsMultiparameterTime(this, { "4": 0, "5": 0 }).cast(
       values,
     ) as DateTimeCastResult | null;
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value.
+   * Runs eagerly at write_from_user time — this is how Rails surfaces
+   * MultiparameterAssignmentErrors at assignment (missing keys 1..3 raise).
+   */
+  override assertValidValue(value: unknown): void {
+    if (isHash(value)) this.valueFromMultiparameterAssignment(value);
+  }
+
+  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
+  override isValueConstructedByMassAssignment(value: unknown): boolean {
+    return isHash(value);
   }
 
   private _applySecondsPrecision(value: Temporal.Instant): Temporal.Instant {

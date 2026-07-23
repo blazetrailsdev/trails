@@ -1,4 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { looseDateParse } from "./helpers/loose-date-parse.js";
 import {
   DateInfinity,
@@ -33,6 +34,8 @@ export class DateType extends ValueType<DateCastResult> {
     if (value instanceof Temporal.PlainDate) return value;
     // Accept PlainDateTime from multiparameter assignment — extract the date part.
     if (value instanceof Temporal.PlainDateTime) return value.toPlainDate();
+    // Mirrors AcceptsMultiparameterTime::InstanceMethods#cast's Hash branch.
+    if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     // boundary: cast accepts Date input from legacy callers / custom types
     // and bridges into Temporal.PlainDate via the UTC calendar components.
     if (value instanceof Date) {
@@ -143,9 +146,25 @@ export class DateType extends ValueType<DateCastResult> {
    * @internal Rails-private helper.
    */
   protected valueFromMultiparameterAssignment(
-    values: Record<number, number | null | undefined>,
+    values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    return this.newDate(values[1], values[2], values[3]);
+    // Rails' `super` — AcceptsMultiparameterTime's Time assembly, which rolls
+    // within-range overflow like Time.local (Nov 31 → Dec 1).
+    const time = new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
+    return time && this.newDate(time.year, time.month, time.day);
+  }
+
+  /**
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value —
+   * a Hash value is validated by assembling it (raising on invalid input).
+   */
+  override assertValidValue(value: unknown): void {
+    if (isHash(value)) this.valueFromMultiparameterAssignment(value);
+  }
+
+  /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
+  override isValueConstructedByMassAssignment(value: unknown): boolean {
+    return isHash(value);
   }
 
   /**

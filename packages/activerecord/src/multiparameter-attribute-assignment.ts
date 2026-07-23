@@ -10,7 +10,6 @@
  * Rails source: activerecord/lib/active_record/attribute_assignment.rb
  */
 
-import { Temporal } from "@blazetrails/activesupport/temporal";
 import { AttributeAssignmentError, MultiparameterAssignmentErrors } from "./errors.js";
 
 // Read _aggregateReflections directly to avoid a circular dependency:
@@ -68,7 +67,11 @@ export function extractMultiparameterCallstack(attrs: Record<string, unknown>): 
       } else {
         castValue = isBlank(value) ? null : value;
       }
-      if (!(name in multiparams)) multiparams[name] = Object.create(null);
+      // Inner parts maps use a normal prototype: their keys are regex-guaranteed
+      // digits (no pollution vector), and the hash is written to the attribute,
+      // where a null-prototype object would make String(hash) throw for
+      // non-date columns (Rails' hash.to_s never raises).
+      if (!(name in multiparams)) multiparams[name] = {};
       multiparams[name][pos] = castValue;
     } else {
       regular[key] = value;
@@ -95,7 +98,7 @@ export function executeMultiparameterAssignment(
       if (aggregation) {
         assignAggregation(instance as any, name, partsMap, aggregation);
       } else {
-        assignDateTimeAttribute(instance, name, partsMap, modelClass);
+        assignDateTimeAttribute(instance, name, partsMap);
       }
     } catch (e) {
       errors.push(
@@ -133,143 +136,12 @@ function assignDateTimeAttribute(
   instance: { writeAttribute(name: string, value: unknown): void },
   name: string,
   partsMap: Record<number, unknown>,
-  modelClass: any,
 ): void {
-  const colType = modelClass.typeForAttribute?.(name);
-  const typeName: string = colType?.type?.() ?? "";
-
-  let maxPos: number;
-  if (typeName === "date") {
-    maxPos = 3;
-  } else if (typeName === "datetime" || typeName === "timestamp" || typeName === "time") {
-    maxPos = 6;
-  } else {
-    maxPos = Math.min(Math.max(...Object.keys(partsMap).map(Number)), MAX_MULTIPARAMETER_INDEX);
-  }
-
-  // Track which positions were explicitly provided (even if blank) vs. absent entirely.
-  // Rails casts blank strings via .to_i → 0 (non-nil), so blank-but-present date parts
-  // trigger a rescued ArgumentError (→ nil). Absent date parts with time parts present
-  // trigger an unrescued TypeError (→ MultiparameterAssignmentErrors). We mirror this by
-  // distinguishing "key in partsMap" (provided, possibly blank) from key absent.
-  const values = Array.from({ length: maxPos }, (_, i) => {
-    const pos = i + 1;
-    return pos in partsMap ? (partsMap[pos] ?? null) : undefined;
-  });
-
-  if (values.every((v) => v === undefined || isBlank(v))) {
-    instance.writeAttribute(name, null);
-    return;
-  }
-
-  const assembled = assembleValue(values, typeName);
-  instance.writeAttribute(name, assembled);
-}
-
-function parseIntStrict(s: string | null, fieldName: string): number | null {
-  if (s === null) return null;
-  const n = parseInt(s, 10);
-  if (isNaN(n)) throw new Error(`Invalid ${fieldName} value: ${JSON.stringify(s)}`);
-  return n;
-}
-
-function buildDate(year: number, month: number, day: number): Temporal.PlainDate {
-  try {
-    return Temporal.PlainDate.from({ year, month, day }, { overflow: "reject" });
-  } catch {
-    // Rails' `read_date` rescues an invalid `Date.new(*set_values)` and falls
-    // back to `instantiate_time_object(set_values).to_date` — i.e. it lets the
-    // overflowing components roll over the way `Time.local` does (Nov 31 → Dec 1,
-    // Feb 29 in a common year → Mar 1). But `Time.utc/local` only accepts month
-    // in 1..12 and mday in 1..31, rolling *within-range* calendar overflow and
-    // raising `ArgumentError` otherwise (verified on Ruby 3.3: mday 0, mday 32,
-    // month 13 all raise "out of range"), which Rails surfaces as a
-    // MultiparameterAssignmentErrors. Roll over only inside that accepted
-    // domain; otherwise re-raise to match Time's strictness.
-    if (month >= 1 && month <= 12 && day >= 1 && day <= 31) {
-      return Temporal.PlainDate.from({ year, month: 1, day: 1 }).add({
-        months: month - 1,
-        days: day - 1,
-      });
-    }
-    throw new Error(`Invalid date: ${year}-${month}-${day}`);
-  }
-}
-
-function buildDateTime(
-  year: number,
-  month: number,
-  day: number,
-  hour: number,
-  min: number,
-  sec: number,
-): Temporal.PlainDateTime {
-  try {
-    return Temporal.PlainDateTime.from(
-      { year, month, day, hour, minute: min, second: sec },
-      { overflow: "reject" },
-    );
-  } catch {
-    throw new Error(`Invalid datetime: ${year}-${month}-${day} ${hour}:${min}:${sec}`);
-  }
-}
-
-function assembleValue(parts: unknown[], typeName: string): unknown {
-  const str = (v: unknown): string | null =>
-    v === null || v === undefined || String(v).trim() === "" ? null : String(v).trim();
-
-  if (typeName === "date") {
-    const [ys, ms, ds] = parts.map(str);
-    if (!ys || !ms || !ds) return null;
-    const year = parseIntStrict(ys, "year"),
-      month = parseIntStrict(ms, "month"),
-      day = parseIntStrict(ds, "day");
-    if (year === null || month === null || day === null) return null;
-    return buildDate(year, month, day);
-  }
-
-  if (typeName === "datetime" || typeName === "timestamp") {
-    // Check raw parts BEFORE str() conversion to distinguish:
-    // - undefined: key was absent from form params (Rails: nil → TypeError → raises)
-    // - null/blank: key present but empty string (Rails: 0 via .to_i → ArgumentError rescued → nil)
-    const datePartsAbsent = parts.slice(0, 3).some((v) => v === undefined);
-    // Check key presence (not value truthiness): blank time parts like (4i)=>""
-    // are cast to null but were still explicitly provided, matching Rails' .to_i → 0 path.
-    const timePartsPresent = parts.slice(3).some((v) => v !== undefined);
-    if (datePartsAbsent && timePartsPresent) {
-      throw new Error(
-        `Multiparameter datetime requires year, month, and day (got ${JSON.stringify(parts)})`,
-      );
-    }
-    const [ys, mos, ds, hs, mis, ss] = parts.map(str);
-    if (!ys || !mos || !ds) return null; // blank date parts → nil (Rails rescued ArgumentError)
-    const year = parseIntStrict(ys, "year")!,
-      month = parseIntStrict(mos, "month")!,
-      day = parseIntStrict(ds, "day")!;
-    const hour = hs !== null ? (parseIntStrict(hs, "hour") ?? 0) : 0;
-    const min = mis !== null ? (parseIntStrict(mis, "minute") ?? 0) : 0;
-    const sec = ss !== null ? (parseIntStrict(ss, "second") ?? 0) : 0;
-    return buildDateTime(year, month, day, hour, min, sec);
-  }
-
-  if (typeName === "time") {
-    const [ys, mos, ds, hs, mis, ss] = parts.map(str);
-    const hour = hs !== null ? (parseIntStrict(hs, "hour") ?? 0) : 0;
-    const min = mis !== null ? (parseIntStrict(mis, "minute") ?? 0) : 0;
-    const sec = ss !== null ? (parseIntStrict(ss, "second") ?? 0) : 0;
-    if (ys && mos && ds) {
-      const year = parseIntStrict(ys, "year"),
-        month = parseIntStrict(mos, "month"),
-        day = parseIntStrict(ds, "day");
-      if (year === null || month === null || day === null) return null;
-      return buildDateTime(year, month, day, hour, min, sec);
-    }
-    // Only time parts → PlainTime (no date context needed for time columns)
-    return Temporal.PlainTime.from({ hour, minute: min, second: sec }, { overflow: "reject" });
-  }
-
-  // Generic: return the first non-blank value
-  return parts.find((v) => !isBlank(v)) ?? null;
+  // Mirrors execute_callstack_for_multiparameter_attributes: all-nil parts → nil,
+  // else write the raw numeric-keyed hash — the type's AcceptsMultiparameterTime
+  // cast assembles it, keeping valueBeforeTypeCast the hash (came_from_user? false).
+  const values = Object.values(partsMap).every((v) => v === null) ? null : partsMap;
+  instance.writeAttribute(name, values);
 }
 
 function isBlank(v: unknown): boolean {
