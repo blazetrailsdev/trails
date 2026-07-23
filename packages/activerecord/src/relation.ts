@@ -2256,7 +2256,7 @@ export class Relation<T extends Base> {
    */
   async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return false;
-    if (pattern !== undefined) return (await this._countMatching(pattern)) > 0;
+    if (pattern !== undefined) return (await this.toArray()).some(this._patternMatcher(pattern));
     if (this._loaded) return this._records.length > 0;
     return this.exists();
   }
@@ -2268,7 +2268,7 @@ export class Relation<T extends Base> {
    */
   async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
     if (this._isEmptyRelation()) return false;
-    if (predicate !== undefined) return (await this._countMatching(predicate)) > 1;
+    if (predicate !== undefined) return (await this._countMatching(predicate, 2)) > 1;
     if (this._loaded) return this._records.length > 1;
     return (await this.limitedCount()) > 1;
   }
@@ -2280,19 +2280,28 @@ export class Relation<T extends Base> {
    */
   async isOne(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return false;
-    if (pattern !== undefined) return (await this._countMatching(pattern)) === 1;
+    if (pattern !== undefined) return (await this._countMatching(pattern, 2)) === 1;
     if (this._loaded) return this._records.length === 1;
     return (await this.limitedCount()) === 1;
   }
 
   /** @internal */
-  async _countMatching(pattern: EnumerablePattern<T>): Promise<number> {
-    const records = await this.toArray();
+  _patternMatcher(pattern: EnumerablePattern<T>): (record: T) => boolean {
     if ((pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true) {
       const klass = pattern as new (...args: never[]) => Base;
-      return records.filter((record) => record instanceof klass).length;
+      return (record) => record instanceof klass;
     }
-    return records.filter(pattern as (record: T) => boolean).length;
+    return pattern as (record: T) => boolean;
+  }
+
+  /** @internal */
+  async _countMatching(pattern: EnumerablePattern<T>, limit: number): Promise<number> {
+    const matches = this._patternMatcher(pattern);
+    let count = 0;
+    for (const record of await this.toArray()) {
+      if (matches(record) && ++count === limit) break;
+    }
+    return count;
   }
 
   /**
@@ -6269,7 +6278,7 @@ export class Relation<T extends Base> {
    */
   async isNone(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return true;
-    if (pattern !== undefined) return (await this._countMatching(pattern)) === 0;
+    if (pattern !== undefined) return !(await this.toArray()).some(this._patternMatcher(pattern));
     return this.isEmpty();
   }
 
