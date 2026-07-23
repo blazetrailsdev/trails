@@ -868,6 +868,11 @@ function clearStiSubclassLocalCaches(sub: SchemaHost): void {
   if (Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")) {
     scrubSchemaSourcedDefinitions(sub);
   }
+  // Rails' recursion reaches every descendant; deeper STI subclasses fork
+  // the same way, so walk them too.
+  for (const deeper of (sub as { subclasses?: SchemaHost[] }).subclasses ?? []) {
+    clearStiSubclassLocalCaches(deeper);
+  }
 }
 
 /**
@@ -915,6 +920,10 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   this._schemaRevision = (this._schemaRevision ?? 0) + 1;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
+  // Rails' reload_schema_from_cache also nils @attribute_names / @column_names
+  // (on the class and, via recursion, its descendants); the helper clears the
+  // memos for the receiver and every descendant in one pass.
+  clearAttributeNamesMemo(this);
   if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
     scrubSchemaSourcedDefinitions(this);
   }
