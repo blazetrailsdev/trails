@@ -353,17 +353,7 @@ export async function decryptRecord(record: any): Promise<void> {
   // raises Errors::Configuration when the context is frozen (protected mode).
   EncryptableRecord.validateEncryptionAllowed(record);
 
-  const assignments: Record<string, unknown> = {};
-  for (const attr of encryptedAttrs) {
-    const type = getAttributeType(klass, attr) as { deserialize?: (v: unknown) => unknown };
-    const encryptedType = encryptedTypeOf(type);
-    const raw = record.readAttributeBeforeTypeCast(attr);
-    if (encryptedType?.isEncrypted(raw) && type?.deserialize) {
-      assignments[attr] = type.deserialize(raw);
-    } else {
-      assignments[attr] = record.readAttribute(attr);
-    }
-  }
+  const assignments = EncryptableRecord.buildDecryptAttributeAssignments(record);
   await _withoutEncryption(() => record.updateColumns(assignments));
 }
 

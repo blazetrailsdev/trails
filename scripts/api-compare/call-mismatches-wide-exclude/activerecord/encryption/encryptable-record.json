@@ -38,13 +38,6 @@
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "build_decrypt_attribute_assignments",
-    "call": "ciphertext_for",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "build_decrypt_attribute_assignments",
     "call": "encrypted_attributes",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
