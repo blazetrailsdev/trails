@@ -909,7 +909,17 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * enrich it with the referenced column's type via an async columns() call.
    */
   private async _translateAndEnrich(e: unknown, sql: string, binds: unknown[]): Promise<Error> {
-    let translated = this._translateException(e, sql, binds);
+    let translated: Error = this._translateException(e, sql, binds);
+    if (translated instanceof MismatchedForeignKey) {
+      // A MismatchedForeignKey translated on the sql-less withRawConnection
+      // path (translateExceptionClass(e, null, null)) defers FK-name parsing
+      // to a queryParser rebuild in setQuery. Run that rebuild before the
+      // enrichment so the async column-type lookup sees the parsed names —
+      // Rails resolves the type synchronously inside
+      // mismatched_foreign_key_details, so its rebuilt message is always
+      // fully detailed. setQuery is a no-op when sql was already attached.
+      translated = translated.setQuery(sql, binds);
+    }
     if (translated instanceof MismatchedForeignKey) {
       translated = await this._enrichMismatchedForeignKey(translated);
     }
@@ -1315,10 +1325,14 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         } catch (e: any) {
           // The loop already translated for its retry classification; guard
           // against re-translating an ActiveRecordError (see execute()).
+          // A MismatchedForeignKey from the loop's sql-less translation still
+          // needs the sql-aware re-translate + enrichment — same as execute().
           const translated =
-            e instanceof ActiveRecordError
-              ? e
-              : await this._translateAndEnrich(e, driverSql, driverBinds);
+            e instanceof MismatchedForeignKey
+              ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
+              : e instanceof ActiveRecordError
+                ? e
+                : await this._translateAndEnrich(e, driverSql, driverBinds);
           throw translated;
         }
       });
