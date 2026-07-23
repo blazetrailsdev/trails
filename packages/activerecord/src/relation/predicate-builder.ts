@@ -501,7 +501,7 @@ export class PredicateBuilder {
    * — single-source `table.type(column_name)`, no fallback.
    */
   buildBindAttribute(columnName: string, value: unknown): QueryAttribute {
-    return new QueryAttribute(columnName, value, this.typeOf(columnName));
+    return new QueryAttribute(columnName, value, this.table.type(columnName) as BoundType);
   }
 
   resolveArelAttribute(
