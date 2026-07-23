@@ -74,6 +74,18 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
+  it("gives the descendant its own column set for attribute access", () => {
+    const asked: string[] = [];
+    const { Ticket } = buildHierarchy(asked);
+
+    expect([...Ticket.columnNames()].sort()).toEqual(["id", "subject"]);
+    expect(
+      Ticket.columns()
+        .map((c: { name: string }) => c.name)
+        .sort(),
+    ).toEqual(["id", "subject"]);
+  });
+
   it("still redirects a genuine STI subclass to the base's shared table", () => {
     const asked: string[] = [];
     const { Shape, Circle } = buildHierarchy(asked);
