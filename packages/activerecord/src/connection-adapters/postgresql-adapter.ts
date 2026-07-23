@@ -989,6 +989,67 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Mirrors: PostgreSQL::Quoting#lookup_cast_type (postgresql/quoting.rb:195):
+   * `super(query_value("SELECT #{quote(sql_type)}::regtype::oid", "SCHEMA").to_i)`
+   * — resolves a sql_type string to its OID with a live regtype round-trip,
+   * then looks up the OID-keyed type map (the abstract lookup_cast_type is
+   * `type_map.lookup(key)`). Async where Rails is sync; the synchronous
+   * SchemaCreation visitor chain consumes the result through
+   * {@link preResolveDefaultCastTypes} at the async DDL entry points.
+   * @internal
+   */
+  async lookupCastType(sqlType: string): Promise<Type> {
+    const rows = await this.schemaQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`);
+    const first = rows[0];
+    const oid = first == null ? Number.NaN : Number(Object.values(first)[0]);
+    return this.typeMap.lookup(oid);
+  }
+
+  /**
+   * Cast types resolved ahead of a DDL statement build, keyed by the
+   * ColumnDefinition whose DEFAULT clause will consume them. Stands in for
+   * Rails calling lookup_cast_type live inside quote_default_expression
+   * (abstract/quoting.rb:161): trails' SchemaCreation visitor chain is
+   * synchronous, so the async DDL entry points resolve each type up front —
+   * the same regtype query, still issued while the statement is being built —
+   * and quoteDefaultExpression reads it back from here.
+   */
+  private readonly preResolvedDefaultCastTypes = new WeakMap<object, Type>();
+
+  /**
+   * Pre-resolves the regtype cast type for each ColumnDefinition whose
+   * DEFAULT clause the synchronous SchemaCreation visitor is about to
+   * quote, issuing one `SELECT '<sql_type>'::regtype::oid` query per
+   * default — exactly the queries Rails' quote_default_expression →
+   * lookup_cast_type path issues on DDL over ColumnDefinitions. The guards
+   * mirror the visitor's: primary_key columns never reach
+   * addColumnOptions, and optionsIncludeDefault treats an undefined
+   * default (or null-with-NOT-NULL) as absent.
+   * @internal
+   */
+  async preResolveDefaultCastTypes(
+    columns: Iterable<{
+      type?: unknown;
+      sqlType?: string | null;
+      options?: object;
+    }>,
+  ): Promise<void> {
+    for (const column of columns) {
+      if (column.type === "primary_key") continue;
+      const options = (column.options ?? {}) as { default?: unknown; null?: boolean | null };
+      if (options.default === undefined) continue;
+      if (options.null === false && options.default === null) continue;
+      const sqlType =
+        column.sqlType ??
+        this.typeToSql(
+          String(column.type),
+          options as Parameters<PostgreSQLAdapter["typeToSql"]>[1],
+        );
+      this.preResolvedDefaultCastTypes.set(column, await this.lookupCastType(sqlType));
+    }
+  }
+
+  /**
    * Mirrors: PostgreSQLAdapter#case_insensitive_comparison (via AbstractAdapter).
    * Async override: looks up the column type and checks pg_proc before emitting LOWER.
    * @internal
@@ -3644,12 +3705,20 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             serialize?(v: unknown): unknown;
           } | null;
         }
-        // No OID means a ColumnDefinition from a DDL path, whose sqlType is
-        // the `[]`-suffixed form typeToSql emitted (`integer[]`). Strip it so
-        // the element typname resolves — normalizeFormatType deliberately
-        // preserves `[]` for the type-casting path, so the strip belongs
-        // here at the call site rather than in the shared helper. The
-        // element subtype is then wrapped in OidArray downstream.
+        // No OID means a ColumnDefinition from a DDL path. Rails resolves
+        // its sql_type with a live `::regtype::oid` query — lookup_cast_type
+        // (postgresql/quoting.rb:195) — which the async DDL entry points
+        // replicate up front via preResolveDefaultCastTypes; consume that
+        // resolution here.
+        const pre = col != null ? self.preResolvedDefaultCastTypes.get(col) : undefined;
+        if (pre) return pre as { serialize?(v: unknown): unknown };
+        // Static fallback for direct synchronous callers that skipped
+        // pre-resolution (unit-level visitor tests, non-DDL paths): the
+        // sqlType is the `[]`-suffixed form typeToSql emitted (`integer[]`).
+        // Strip it so the element typname resolves — normalizeFormatType
+        // deliberately preserves `[]` for the type-casting path, so the
+        // strip belongs here at the call site rather than in the shared
+        // helper. The element subtype is then wrapped in OidArray downstream.
         const base = (c.sqlType ?? "").replace(/\[\]\s*$/, "");
         return self.lookupCastTypeFromColumn({ sqlType: base }) as {
           serialize?(v: unknown): unknown;
@@ -4847,18 +4916,25 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
     );
   }
 
-  /** @internal */
-  addColumnForAlter(
+  /**
+   * Rails' add_column_for_alter is synchronous; async here so the pending
+   * DEFAULT's regtype cast type can be pre-resolved (postgresql/quoting.rb:195)
+   * before the synchronous visitor quotes it — bulkChangeTable awaits every
+   * *ForAlter result, so the signature change is absorbed there.
+   * @internal
+   */
+  async addColumnForAlter(
     tableName: string,
     columnName: string,
     type: string,
     options: Record<string, unknown> = {},
-  ): unknown {
+  ): Promise<unknown> {
     const col = this.createTableDefinition(tableName).newColumnDefinition(
       columnName,
       type,
       options,
     );
+    await this.preResolveDefaultCastTypes([col]);
     const sql = `ADD COLUMN ${this.schemaCreation.accept(col)}`;
     return "comment" in options
       ? [
@@ -4868,19 +4944,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       : sql;
   }
 
-  /** @internal */
-  changeColumnForAlter(
+  /**
+   * Rails' change_column_for_alter is synchronous; async for the same
+   * regtype pre-resolution reason as addColumnForAlter above. Unlike the
+   * add path, the visitor only quotes a non-nil default (nil emits DROP
+   * DEFAULT), so nil skips the query — as in Rails.
+   * @internal
+   */
+  async changeColumnForAlter(
     tableName: string,
     columnName: string,
     type: string,
     options: Record<string, unknown> = {},
-  ): unknown[] {
+  ): Promise<unknown[]> {
     const changeDef = this.buildChangeColumnDefinition(
       tableName,
       columnName,
       type,
       options as Parameters<typeof this.buildChangeColumnDefinition>[3],
     );
+    if (changeDef.column.options.default != null) {
+      await this.preResolveDefaultCastTypes([changeDef.column]);
+    }
     const sqls: unknown[] = [this.schemaCreation.accept(changeDef)];
     if ("comment" in options)
       sqls.push(() =>
