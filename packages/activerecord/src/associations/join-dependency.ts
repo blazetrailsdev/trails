@@ -81,8 +81,8 @@ function getModelColumns(modelClass: any): string[] {
       ch = undefined;
     }
   }
-  // columnNames() is now plain `Object.keys(columnsHash())`, so when
-  // columnsHash() threw above (abstract / no table) it would throw here too.
+  // No columnNames() fallback: it would throw exactly like the caught
+  // columnsHash() above (abstract / no table).
   const cols: string[] = ch ? Object.keys(ch) : [];
   // A falsy primaryKey ("" / null) marks a no-primary-key model — there is no
   // PK column to fold into the SELECT list, so leave the columns as-is.

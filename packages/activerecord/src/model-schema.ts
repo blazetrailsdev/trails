@@ -205,7 +205,10 @@ export function buildWhereNodeFromConstraints(
  * Return column names for a model, excluding ignored columns.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_names
- * (`columns.map(&:name)`, i.e. the `columns_hash` keys).
+ * (`columns.map(&:name)`). Reads `columnsHash()` keys rather than `columns()`
+ * because trails applies the `ignoredColumns` filter at read time in
+ * `columnsHash()` (Rails filters at load), and `columns()`' `_columns` memo
+ * would bypass it after an `ignoredColumns=` reassignment.
  */
 export function columnNames(this: typeof Base): string[] {
   return Object.keys(this.columnsHash());
