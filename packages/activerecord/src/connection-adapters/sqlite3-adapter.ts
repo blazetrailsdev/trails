@@ -1663,9 +1663,33 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    const sqlType = this.typeToSql(type, options);
+    const baseType = this._baseColumnType(type, options);
+    const generatedAs = typeof options?.as === "string" ? options.as : null;
+    if (isInvalidAlterTableType(type, options ?? {})) {
+      const isPk = Boolean(options?.primaryKey) || type === "primary_key";
+      await this.alterTable(tableName, (columns) => {
+        columns[columnName] = {
+          name: columnName,
+          type: baseType,
+          collation: options?.collation ?? null,
+          generatedAs,
+          generatedStored: Boolean(options?.stored),
+          notnull: options?.null === false || isPk ? 1 : 0,
+          dflt_value:
+            options?.default !== undefined && generatedAs === null
+              ? this.quoteDefault(this.serializeDefaultForColumn(options.default, baseType))
+              : null,
+          pk: isPk ? 1 : 0,
+        };
+      });
+      return;
+    }
+    const sqlType = baseType;
     let sql = `ALTER TABLE ${quoteTableName(tableName)} ADD COLUMN ${quoteColumnName(columnName)} ${sqlType}`;
     if (options?.collation) sql += ` COLLATE ${quoteColumnName(String(options.collation))}`;
+    if (generatedAs !== null) {
+      sql += ` GENERATED ALWAYS AS (${generatedAs}) ${options?.stored ? "STORED" : "VIRTUAL"}`;
+    }
     if (options?.null === false) sql += " NOT NULL";
     if (options?.default !== undefined) {
       sql += ` DEFAULT ${this.quoteDefault(this.serializeDefaultForColumn(options.default, sqlType))}`;
@@ -1950,6 +1974,14 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         binds: [],
       });
     }
+  }
+
+  // The declared type of a `t.virtual` column comes from its :type option
+  // (SQLite3::TableDefinition resolves :virtual that way; no type when the
+  // option is absent).
+  private _baseColumnType(type: string, options?: Record<string, unknown>): string {
+    if (type !== "virtual") return this.typeToSql(type, options);
+    return options?.type ? this.typeToSql(String(options.type), options) : "";
   }
 
   private typeToSql(type: string, options?: Record<string, unknown>): string {
@@ -2349,14 +2381,30 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     const { schema, bare: bareTable } = this._splitTableName(tableName);
     const pragmaPrefix = schema ? `${quoteColumnName(schema)}.` : "";
     const qTable = quoteTableName(tableName);
+    // table_info hides GENERATED columns; table_xinfo exposes them with
+    // hidden 2 (virtual) / 3 (stored) so the rebuild preserves them (Rails
+    // rebuilds from columns(from) and re-adds them with as:/stored:,
+    // sqlite3_adapter.rb:623).
+    const infoPragma = this.supportsVirtualColumns() ? "table_xinfo" : "table_info";
     const tableInfoStmt = await this.driver.prepare(
-      `PRAGMA ${pragmaPrefix}table_info(${quoteColumnName(bareTable)})`,
+      `PRAGMA ${pragmaPrefix}${infoPragma}(${quoteColumnName(bareTable)})`,
     );
-    const tableInfo = (await tableInfoStmt.all()) as Array<Record<string, unknown>>;
+    const tableInfo = ((await tableInfoStmt.all()) as Array<Record<string, unknown>>).filter(
+      (col) => Number(col.hidden ?? 0) !== 1,
+    );
 
+    const hasGenerated = tableInfo.some((col) => Number(col.hidden ?? 0) >= 2);
+    const reflected = hasGenerated ? await this.columns(tableName) : [];
     const columns: Record<string, Record<string, unknown>> = {};
     for (const col of tableInfo) {
-      columns[col.name as string] = { ...col };
+      const entry: Record<string, unknown> = { ...col };
+      if (Number(col.hidden ?? 0) >= 2) {
+        const meta = reflected.find((r) => r.name === col.name);
+        entry.generatedAs = meta?.defaultFunction ?? null;
+        entry.generatedStored = Number(col.hidden) === 3;
+        entry.dflt_value = null;
+      }
+      columns[col.name as string] = entry;
     }
 
     modify(columns);
@@ -2399,6 +2447,9 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       let def = `${quoteColumnName(name)} ${col.type ?? "TEXT"}`;
       const collation = col.collation === undefined ? existingCollations.get(name) : col.collation;
       if (collation) def += ` COLLATE ${quoteColumnName(String(collation))}`;
+      if (col.generatedAs) {
+        def += ` GENERATED ALWAYS AS (${col.generatedAs})${col.generatedStored ? " STORED" : " VIRTUAL"}`;
+      }
       if (!compositePk && col.pk) def += " PRIMARY KEY";
       if (col.notnull) def += " NOT NULL";
       if (col.dflt_value !== null && col.dflt_value !== undefined) {
@@ -2480,7 +2531,11 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
       }
     }
 
+    // Generated columns can't be inserted into — exclude them from the copy
+    // (Rails: columns_to_copy rejects columns with an :as option,
+    // sqlite3_adapter.rb:645).
     const originalColNames = tableInfo
+      .filter((c) => Number(c.hidden ?? 0) < 2)
       .map((c) => c.name as string)
       .filter((n) => colNames.includes(n));
 
@@ -3148,7 +3203,7 @@ function hasDefaultFunction(defaultValue: unknown, default_: string): boolean {
 function isInvalidAlterTableType(type: string, options: Record<string, unknown>): boolean {
   return (
     type === "primary_key" ||
-    Boolean(options["primary_key"]) ||
+    Boolean(options["primaryKey"]) ||
     (options["null"] === false && options["default"] == null) ||
     (type === "virtual" && Boolean(options["stored"]))
   );
