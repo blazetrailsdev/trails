@@ -11,6 +11,7 @@ import { SchemaMigration } from "./schema-migration.js";
 import type { MigrationProxy } from "./migration.js";
 import { ConcurrentMigrationError } from "./migration.js";
 import { adapterType } from "./test-adapter.js";
+import { assertQueriesCount } from "./testing/query-assertions.js";
 import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
@@ -2173,9 +2174,18 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
-      t.change("name", "string", { default: "NONAME" });
-      t.change("birthdate", "datetime", { comment: "This is a comment" });
+    // migration_test.rb:1403 — Mysql2Adapter 3 (columns + primary key + bulk
+    // change), PostgreSQLAdapter 3. Rails' third PG query is a
+    // `SELECT 'character varying'::regtype::oid` type-map miss issued by
+    // quote_default_expression while composing the ALTER; trails' PG type map
+    // is statically initialized and never issues that lookup, so the PG count
+    // here is 2 (bulk change + comment).
+    const expectedQueryCount = { mysql: 3, postgres: 2 }[adapterType as "mysql" | "postgres"];
+    await assertQueriesCount(expectedQueryCount, true, async () => {
+      await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.change("name", "string", { default: "NONAME" });
+        t.change("birthdate", "datetime", { comment: "This is a comment" });
+      });
     });
     cols = await adapter.columns("delete_me");
     const name = cols.find((c) => c.name === "name")!;
@@ -2195,10 +2205,18 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
-      t.change("name", "string", { default: "NONAME" });
-      t.change("birthdate", "datetime");
-      t.changeNull("age", false, 0);
+    // migration_test.rb:1433 — Mysql2Adapter 7 (four schema-info queries +
+    // bulk change + UPDATE + NOT NULL), PostgreSQLAdapter 5. As in "changing
+    // columns" above, one of Rails' PG queries is the `::regtype::oid`
+    // type-map miss trails never issues, so the PG count here is 4
+    // (bulk change + columns lookup + UPDATE + NOT NULL).
+    const expectedQueryCount = { mysql: 7, postgres: 4 }[adapterType as "mysql" | "postgres"];
+    await assertQueriesCount(expectedQueryCount, true, async () => {
+      await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
+        t.change("name", "string", { default: "NONAME" });
+        t.change("birthdate", "datetime");
+        t.changeNull("age", false, 0);
+      });
     });
     const cols = await adapter.columns("delete_me");
     expect(String(cols.find((c) => c.name === "name")!.default)).toBe("NONAME");
