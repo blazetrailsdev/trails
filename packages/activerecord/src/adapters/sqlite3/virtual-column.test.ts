@@ -10,21 +10,17 @@ import { itIfSupports } from "../../test-helpers/supports.js";
 
 let adapter: AbstractSQLite3Adapter;
 
-// Rails setup: @connection.create_table :virtual_columns, force: true —
-// the raw DDL below is what that create_table emits on SQLite.
 beforeEach(async () => {
   adapter = new BetterSQLite3Adapter(":memory:");
   await adapter.exec(
     `CREATE TABLE "virtual_columns" ("id" integer PRIMARY KEY AUTOINCREMENT NOT NULL, "name" varchar, "upper_name" varchar GENERATED ALWAYS AS (UPPER(name)) STORED, "lower_name" varchar GENERATED ALWAYS AS (LOWER(name)) VIRTUAL, "octet_name" integer GENERATED ALWAYS AS (LENGTH(name)) VIRTUAL, "mutated_name" varchar GENERATED ALWAYS AS (REPLACE(name, 'l', 'L')) VIRTUAL, "column1" integer)`,
   );
-  // Rails setup: VirtualColumn.create(name: "Rails", column1: 10)
   await adapter.executeMutation(
     `INSERT INTO "virtual_columns" ("name", "column1") VALUES ('Rails', 10)`,
   );
 });
 
 afterEach(async () => {
-  // Rails teardown: @connection.drop_table :virtual_columns, if_exists: true
   await adapter.exec(`DROP TABLE IF EXISTS "virtual_columns"`).catch(() => undefined);
   await adapter.close();
 });

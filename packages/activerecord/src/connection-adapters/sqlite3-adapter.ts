@@ -1661,9 +1661,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     type: string,
     options?: Record<string, unknown>,
   ): Promise<void> {
-    // Mirrors: SQLite3Adapter#add_column — ALTER TABLE cannot add a primary
-    // key, a NOT NULL column without a default, or a STORED generated column,
-    // so those route through the full table rebuild (Rails: alter_table).
     if (isInvalidAlterTableType(type, options ?? {})) {
       const fragment = this._addColumnSqlFragment(type, options);
       const isPk = Boolean(options?.primaryKey) || type === "primary_key";
@@ -1671,8 +1668,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
         columns[columnName] = {
           name: columnName,
           type: fragment,
-          // Rails' new_column_definition forces null: false on primary keys
-          // (abstract/schema_definitions.rb:571).
           notnull: options?.null === false || isPk ? 1 : 0,
           dflt_value:
             options?.default !== undefined && type !== "virtual"
@@ -1974,16 +1969,18 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     }
   }
 
-  // Column-definition SQL for addColumn, including the GENERATED clause for
-  // `t.virtual` columns (Rails renders these via SchemaCreation from the
-  // ColumnDefinition's :as/:stored options).
+  // Mirrors: SQLite3::SchemaCreation#add_column_options! — the GENERATED
+  // clause is keyed off the :as option, with :stored picking STORED/VIRTUAL.
   private _addColumnSqlFragment(type: string, options?: Record<string, unknown>): string {
-    if (type !== "virtual") return this.typeToSql(type, options);
-    if (typeof options?.as !== "string") {
-      throw new Error("virtual columns require an :as option");
-    }
-    const base = options.type ? `${this.typeToSql(String(options.type), options)} ` : "";
-    return `${base}GENERATED ALWAYS AS (${options.as}) ${options.stored ? "STORED" : "VIRTUAL"}`;
+    const base =
+      type === "virtual"
+        ? options?.type
+          ? this.typeToSql(String(options.type), options)
+          : ""
+        : this.typeToSql(type, options);
+    if (typeof options?.as !== "string") return base;
+    const generated = `GENERATED ALWAYS AS (${options.as}) ${options.stored ? "STORED" : "VIRTUAL"}`;
+    return base ? `${base} ${generated}` : generated;
   }
 
   private typeToSql(type: string, options?: Record<string, unknown>): string {

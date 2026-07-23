@@ -21,8 +21,6 @@ beforeEach(() => {
   adapter = new BetterSQLite3Adapter(":memory:");
 });
 
-// Rails with_example_table default definition:
-//   id integer PRIMARY KEY AUTOINCREMENT, number integer
 async function createExampleTable(): Promise<void> {
   await adapter.exec(
     `CREATE TABLE "ex" ("id" integer PRIMARY KEY AUTOINCREMENT, "number" integer)`,
@@ -35,7 +33,7 @@ afterEach(async () => {
   // multi-table DROP, so one IF EXISTS statement per name; this balances
   // require-table-teardown and is behavior-neutral on the fresh per-test adapter.
   await adapter.exec(
-    `DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS typed; DROP TABLE IF EXISTS no_pk; DROP TABLE IF EXISTS bin_esc; DROP TABLE IF EXISTS enc_test; DROP TABLE IF EXISTS def_vals; DROP TABLE IF EXISTS strict_items; DROP TABLE IF EXISTS custom_pk_src; DROP TABLE IF EXISTS custom_pk_dest; DROP TABLE IF EXISTS cpk_src; DROP TABLE IF EXISTS cpk_dest; DROP TABLE IF EXISTS custom_pk; DROP TABLE IF EXISTS change_pk; DROP TABLE IF EXISTS add_col_pk; DROP TABLE IF EXISTS barcodes; DROP TABLE IF EXISTS test; DROP TABLE IF EXISTS testings; DROP TABLE IF EXISTS rowid_test; DROP TABLE IF EXISTS rowid_lower; DROP TABLE IF EXISTS text_pk; DROP TABLE IF EXISTS mixed_case; DROP TABLE IF EXISTS auto_inc; DROP TABLE IF EXISTS cpk; DROP TABLE IF EXISTS ex; DROP TABLE IF EXISTS json_defs`,
+    `DROP TABLE IF EXISTS items; DROP TABLE IF EXISTS typed; DROP TABLE IF EXISTS no_pk; DROP TABLE IF EXISTS bin_esc; DROP TABLE IF EXISTS enc_test; DROP TABLE IF EXISTS def_vals; DROP TABLE IF EXISTS strict_items; DROP TABLE IF EXISTS custom_pk_src; DROP TABLE IF EXISTS custom_pk_dest; DROP TABLE IF EXISTS cpk_src; DROP TABLE IF EXISTS cpk_dest; DROP TABLE IF EXISTS custom_pk; DROP TABLE IF EXISTS change_pk; DROP TABLE IF EXISTS barcodes; DROP TABLE IF EXISTS test; DROP TABLE IF EXISTS testings; DROP TABLE IF EXISTS rowid_test; DROP TABLE IF EXISTS rowid_lower; DROP TABLE IF EXISTS text_pk; DROP TABLE IF EXISTS mixed_case; DROP TABLE IF EXISTS auto_inc; DROP TABLE IF EXISTS cpk; DROP TABLE IF EXISTS ex; DROP TABLE IF EXISTS json_defs`,
   );
   await adapter.close();
   Notifications.unsubscribeAll();
