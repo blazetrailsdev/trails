@@ -6,14 +6,15 @@
 
 import { getCrypto } from "@blazetrails/activesupport";
 import { KeyGenerator } from "./key-generator.js";
+import { Properties } from "./properties.js";
 
 export class Key {
   secret: string;
-  publicTags: Record<string, unknown>;
+  publicTags: Properties;
 
   constructor(secret: string) {
     this.secret = secret;
-    this.publicTags = {};
+    this.publicTags = new Properties();
   }
 
   get id(): string {

@@ -27,7 +27,7 @@ export class EnvelopeEncryptionKeyProvider {
   encryptionKey(): Key {
     const randomSecret = this.generateRandomSecret();
     const key = new Key(randomSecret);
-    key.publicTags = { encrypted_data_key: this.encryptDataKey(randomSecret) };
+    key.publicTags.set("encrypted_data_key", this.encryptDataKey(randomSecret));
     return key;
   }
 

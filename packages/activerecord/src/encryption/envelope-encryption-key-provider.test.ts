@@ -30,7 +30,7 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
     const primaryProvider = new KeyProvider(makeKey());
     const provider = new EnvelopeEncryptionKeyProvider(primaryProvider);
     const key = provider.encryptionKey();
-    expect(key.publicTags.encrypted_data_key).toBeTruthy();
+    expect(key.publicTags.get("encrypted_data_key")).toBeTruthy();
   });
 
   it("decryption_key_for returns the decryption key for a message that was encrypted with a generated encryption key", () => {

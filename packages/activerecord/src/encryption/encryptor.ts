@@ -5,6 +5,7 @@
  */
 
 import { Message } from "./message.js";
+import type { Properties } from "./properties.js";
 import { MessageSerializer, type MessageSerializerLike } from "./message-serializer.js";
 import { getEncryptionContext } from "./context.js";
 import { Configurable } from "./configurable.js";
@@ -40,8 +41,10 @@ export interface EncryptorLike {
 }
 
 export interface KeyProviderLike {
-  encryptionKey(): { secret: string; publicTags?: Record<string, unknown> };
-  decryptionKeys(message: Message): Array<{ secret: string; publicTags?: Record<string, unknown> }>;
+  encryptionKey(): { secret: string; publicTags?: Record<string, unknown> | Properties };
+  decryptionKeys(
+    message: Message,
+  ): Array<{ secret: string; publicTags?: Record<string, unknown> | Properties }>;
 }
 
 export class Encryptor {
@@ -216,9 +219,7 @@ export class Encryptor {
     const message = this.cipher().encrypt(cipherInput, { key, ...cipherOptions });
     if (compressed) message.addHeader("c", true);
     if (encKeyObj.publicTags) {
-      for (const [k, v] of Object.entries(encKeyObj.publicTags)) {
-        message.addHeader(k, v);
-      }
+      message.addHeaders(encKeyObj.publicTags);
     }
     return message;
   }

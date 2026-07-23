@@ -3,10 +3,10 @@ import { Key } from "./key.js";
 
 describe("ActiveRecord::Encryption::KeyTest", () => {
   it("A key can store a secret and public tags", () => {
-    const key = new Key("my-secret");
-    key.publicTags = { keyId: "abc" };
-    expect(key.secret).toBe("my-secret");
-    expect(key.publicTags).toEqual({ keyId: "abc" });
+    const key = new Key("the secret");
+    key.publicTags.set("key", "the key reference");
+    expect(key.secret).toBe("the secret");
+    expect(key.publicTags.get("key")).toBe("the key reference");
   });
 
   it(".derive_from instantiates a key with its secret derived from the passed password", () => {
