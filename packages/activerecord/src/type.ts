@@ -19,10 +19,9 @@ import {
 } from "@blazetrails/activemodel";
 export { Type } from "@blazetrails/activemodel";
 import { AdapterSpecificRegistry } from "./type/adapter-specific-registry.js";
-import type {
-  AdapterName,
-  AbstractAdapter as DatabaseAdapter,
-} from "./connection-adapters/abstract-adapter.js";
+import type { AdapterName } from "./connection-adapters/abstract-adapter.js";
+import { adapterNameFromConfig } from "./connection-adapters/abstract-adapter.js";
+
 import { Date } from "./type/date.js";
 import { DateTime } from "./type/date-time.js";
 import { Time } from "./type/time.js";
@@ -58,7 +57,14 @@ export const Value = ValueType;
 
 let _registry = new AdapterSpecificRegistry();
 let _defaultValue: Type | undefined;
-let _currentAdapterResolver: (() => AdapterName) | undefined;
+let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
+
+/**
+ * The subset of `ActiveRecord::Base` that adapter-name resolution reads.
+ */
+export interface AdapterNameSource {
+  connectionDbConfig?: () => { adapter?: string } | undefined;
+}
 
 _registry.register("big_integer", BigIntegerType, { override: false });
 _registry.register("binary", BinaryType, { override: false });
@@ -92,8 +98,10 @@ export function setRegistry(r: AdapterSpecificRegistry): void {
   _defaultValue = undefined;
 }
 
-// Called by Base to wire the real connection adapter into type lookups.
-export function setCurrentAdapterResolver(resolver: () => AdapterName): void {
+// Called by Base (base.ts) to supply `ActiveRecord::Base` itself, which Rails'
+// private `current_adapter_name` references directly; a resolver keeps type.ts
+// free of an import cycle back into base.ts.
+export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): void {
   _currentAdapterResolver = resolver;
 }
 
@@ -124,20 +132,25 @@ export function defaultValue(): Type {
  *
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
-export function adapterNameFrom(model: { connection?: unknown }): AdapterName {
-  return (
-    ((model.connection as DatabaseAdapter | null | undefined)?.adapterName as
-      | AdapterName
-      | undefined) ?? "sqlite"
-  );
+export function adapterNameFrom(model: AdapterNameSource): AdapterName {
+  // Rails reads `model.connection_db_config.adapter` and lets the missing-pool
+  // error propagate. Here `lookup()` calls this on every type resolution —
+  // including at module load, before any connection is established — so an
+  // unconfigured model degrades to the sqlite default instead of raising.
+  try {
+    const configAdapter = model.connectionDbConfig?.()?.adapter;
+    if (configAdapter != null) return adapterNameFromConfig(configAdapter);
+  } catch {
+    // no pool configured for this model yet
+  }
+  return "sqlite";
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.
-// When Base wires setCurrentAdapterResolver(), it reads the real connection adapter.
 /** @internal */
-export function currentAdapterName(getBase?: () => { connection?: unknown }): AdapterName {
-  if (getBase) return adapterNameFrom(getBase());
-  return _currentAdapterResolver?.() ?? "sqlite";
+export function currentAdapterName(): AdapterName {
+  const base = _currentAdapterResolver?.();
+  return base ? adapterNameFrom(base) : "sqlite";
 }
 
 // Override ActiveModel's type registry with AR-specific types so that

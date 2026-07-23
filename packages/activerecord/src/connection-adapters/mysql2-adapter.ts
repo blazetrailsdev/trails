@@ -119,7 +119,8 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    *
    * `super` registers the shared MySQL types. On top of that the concrete
    * mysql2 adapter resolves char/varchar/enum/set through
-   * `Type.lookup(:string, adapter: :mysql2)`, which returns the adapter-scoped
+   * `Type.lookup(:string, adapter: :mysql2)` — trails keys registrations by the
+   * normalized `AdapterName` family, so `adapter: "mysql"` — which returns the adapter-scoped
    * `StringType` whose boolean coercions are `"1"`/`"0"` rather than the
    * ActiveModel default `"t"`/`"f"` (see the module-level `Type.register` calls
    * below), so a boolean assigned to a string column round-trips as 1/0.
@@ -135,10 +136,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
     super.initializeTypeMap(m);
     m.registerType(/char/i, undefined, (sqlType) => {
       const limit = this.extractLimit(sqlType);
-      return Type.lookup("string", { adapter: "mysql2", limit });
+      return Type.lookup("string", { adapter: "mysql", limit });
     });
-    m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql2" }));
-    m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql2" }));
+    m.registerType(/^enum/i, Type.lookup("string", { adapter: "mysql" }));
+    m.registerType(/^set/i, Type.lookup("string", { adapter: "mysql" }));
   }
 
   // Cached liveness state — true until a failure is observed (ping fail,
@@ -2299,19 +2300,21 @@ dirtiesQueryCache(Mysql2Adapter, "execQuery", "execute");
 // mysql2 `:string`/`:immutable_string` types coerce booleans to `"1"`/`"0"`
 // (not the ActiveModel default `"t"`/`"f"`) so a boolean assigned to a string
 // column round-trips as 1/0; `initializeTypeMap` resolves char/varchar/enum/set
-// through `Type.lookup(:string, adapter: :mysql2)`.
-Type.register("immutable_string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+// through `Type.lookup(:string, adapter: :mysql2)` — trails keys registrations
+// by the normalized `AdapterName` family, so `adapter: "mysql"`, which is what
+// `Type.currentAdapterName()` resolves to under a mysql2 configuration.
+Type.register("immutable_string", null, { adapter: "mysql" }, (_symbol, args?) => {
   return new ImmutableStringType({
     trueString: "1",
     falseString: "0",
     ...((args as Record<string, unknown>) ?? {}),
   });
 });
-Type.register("string", null, { adapter: "mysql2" }, (_symbol, args?) => {
+Type.register("string", null, { adapter: "mysql" }, (_symbol, args?) => {
   return new StringType({
     trueString: "1",
     falseString: "0",
     ...((args as Record<string, unknown>) ?? {}),
   });
 });
-Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql2" });
+Type.register("unsigned_integer", UnsignedInteger, { adapter: "mysql" });
