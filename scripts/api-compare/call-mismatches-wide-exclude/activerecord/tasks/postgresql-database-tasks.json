@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "collation",
-    "call": "connection",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql_database_tasks.rb:36-38 reads the live `connection.collation`; trails postgresql-database-tasks.ts:127-129 reads `configurationHash.collation` — configured value, not the database's. Divergence tracked in story database-tasks-collation-reads-config."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
     "rubyName": "create",
     "call": "create_database",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
