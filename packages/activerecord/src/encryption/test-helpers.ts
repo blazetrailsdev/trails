@@ -228,6 +228,8 @@ export function makeEncryptedBook(adapter: DatabaseAdapter) {
   return class EncryptedBook extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
@@ -240,6 +242,8 @@ export function makeEncryptedBookWithDowncaseName(adapter: DatabaseAdapter) {
   return class EncryptedBookWithDowncaseName extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
@@ -252,6 +256,8 @@ export function makeEncryptedBookThatIgnoresCase(adapter: DatabaseAdapter) {
   return class EncryptedBookThatIgnoresCase extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.attribute("original_name", "string");
@@ -289,6 +295,8 @@ export function makeEncryptedBookWithCustomCompressor(adapter: DatabaseAdapter) 
   return class EncryptedBookWithCustomCompressor extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string");
       this.adapter = adapter;
@@ -313,6 +321,8 @@ export function makeBookThatWillFailToEncryptName(adapter: DatabaseAdapter) {
   return class BookThatWillFailToEncryptName extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string");
       this.adapter = adapter;
@@ -357,6 +367,8 @@ export function makeEncryptedTrafficLightWithStoreState(adapter: DatabaseAdapter
       this._tableName = "traffic_lights";
       this.attribute("id", "integer");
       this.attribute("state", "json");
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       // Canonical `traffic_lights.long_state` is `text NOT NULL`; the parent
       // Rails TrafficLight serializes it as an Array (traffic_light.rb:4), so the
       // fixture mirrors that with the same serialize/Array coder the canonical
@@ -403,6 +415,8 @@ export function makeMsgPackTextBook(adapter: DatabaseAdapter) {
   return class MsgPackTextBook extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
@@ -419,6 +433,8 @@ export function makeUnencryptedBook(adapter: DatabaseAdapter) {
   return class UnencryptedBook extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
@@ -434,6 +450,8 @@ export function makeEncryptedBookWithUniquenessValidation(adapter: DatabaseAdapt
   return class EncryptedBookWithUniquenessValidation extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "string", { default: "<untitled>" });
       this.adapter = adapter;
@@ -451,6 +469,8 @@ export function makeEncryptedBookAttribute(adapter: DatabaseAdapter) {
   return class EncryptedBookAttribute extends Base {
     static {
       this._tableName = "encrypted_books";
+      this.attribute("created_at", "datetime");
+      this.attribute("updated_at", "datetime");
       this.attribute("id", "integer");
       this.attribute("name", "date");
       this.adapter = adapter;

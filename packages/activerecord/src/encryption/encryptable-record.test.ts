@@ -531,6 +531,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = class ReflectionOnlyEncryptedBook extends Base {
       static {
         this._tableName = "encrypted_books";
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
         this.adapter = adapter;
         this.encrypts("name", { deterministic: true });
       }
@@ -561,6 +563,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Book = class OverriddenDefaultEncryptedBook extends Base {
       static {
         this._tableName = "encrypted_books";
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
         this.adapter = adapter;
         this.attribute("name", "string", { default: "OVERRIDE" });
         this.encrypts("name", { deterministic: true });
@@ -890,6 +894,8 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const BookDate = class extends Base {
       static {
         this._tableName = "encrypted_books";
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
         this.attribute("id", "integer");
         this.attribute("name", "string");
         this.adapter = adp;

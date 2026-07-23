@@ -838,6 +838,9 @@ describe("QueryCacheMutableParamTest", () => {
   class JsonObj extends Base {
     static {
       this._tableName = "json_objs";
+      // Declared `payload` suppresses reflection of the scratch table, so the
+      // post-INSERT id write-back needs `id` declared for strict _writeAttribute.
+      this.attribute("id", "integer");
       this.attribute("payload", "json");
     }
   }
