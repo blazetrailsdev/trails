@@ -548,10 +548,12 @@ async function groupedAggregate(
     return result;
   }
 
+  // Rails: `col_name.try(:type_caster) || type_for(col_name) { column_types.fetch(...) }`
+  // (calculations.rb:567-570) — an Arel attribute group field carries its own
+  // table's type caster, ahead of the model lookup and the result's column types.
   const keyFieldName = qualifiedGroupFieldForModel(rel, effectiveGroupCol);
-  const keyType = ((keyFieldName === null
-    ? null
-    : pluckCastTypeForKnownColumn(rel, keyFieldName)) ??
+  const keyType = ((groupNode instanceof Nodes.Attribute ? groupNode.typeCaster : null) ??
+    (keyFieldName === null ? null : pluckCastTypeForKnownColumn(rel, keyFieldName)) ??
     queryResult.columnTypes?.["group_key"] ??
     null) as { deserialize?(v: unknown): unknown } | null;
   const result = new Map<unknown, unknown>();
