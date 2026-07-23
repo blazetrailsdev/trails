@@ -3,6 +3,7 @@ import { Column } from "./mysql/column.js";
 import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
+  type ColumnDefinition,
 } from "./abstract/schema-definitions.js";
 import { parseTableOptions } from "./abstract-mysql-adapter.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./mysql/schema-creation.js";
@@ -588,7 +589,7 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefaultDefinition (#1568)", () =
 
   it("preserves the column's null option on the built ColumnDefinition", async () => {
     const cd = await build(makeChangeColumnTextColumn({ null_: false }), "x");
-    expect(cd.column.options.null).toBe(false);
+    expect((cd.column as ColumnDefinition).options.null).toBe(false);
   });
 });
 

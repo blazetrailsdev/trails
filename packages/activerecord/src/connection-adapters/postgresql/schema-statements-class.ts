@@ -7,7 +7,6 @@ import {
   ChangeColumnDefinition,
   ChangeColumnDefaultDefinition,
   CheckConstraintDefinition,
-  ColumnDefinition,
   ForeignKeyDefinition,
   TableDefinition as AbstractTableDefinition,
   type AddForeignKeyOptions,
@@ -1007,14 +1006,15 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     columnName: string,
     defaultOrChanges: unknown,
   ): Promise<ChangeColumnDefaultDefinition | undefined> {
+    // Mirrors PostgreSQL::SchemaStatements#build_change_column_default_definition:
+    // carry the live reflected Column (with oid/fmod) into the definition so
+    // the visitor's quoteDefaultExpression resolves the cast type via the OID
+    // type-map key — no regtype SCHEMA query, and fmod-dependent types
+    // (e.g. numeric precision/scale) keep their modifier.
     const col = (await this.columns(tableName)).find((c) => c.name === columnName);
     if (!col) return undefined;
     const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
-    const cd = new ColumnDefinition(columnName, (col.type ?? "string") as ColumnType, {
-      array: col.array || undefined,
-    });
-    cd.sqlType = col.sqlType ?? undefined;
-    return new ChangeColumnDefaultDefinition(cd, defaultValue);
+    return new ChangeColumnDefaultDefinition(col, defaultValue);
   }
 
   override async changeColumnNull(

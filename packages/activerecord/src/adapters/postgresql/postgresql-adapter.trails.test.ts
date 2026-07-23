@@ -25,6 +25,7 @@ import {
   ValueTooLong,
 } from "../../errors.js";
 import { withSecondAdapter } from "../../test-helpers/second-connection.js";
+import { Column as PgColumn } from "../../connection-adapters/postgresql/column.js";
 
 // Run `fn` with `ext` guaranteed disabled; restore the pre-state (enabled
 // or disabled) on exit even if `fn` throws before tearing down whatever it
@@ -1221,8 +1222,35 @@ describeIfPg("PostgreSQLAdapter", () => {
       const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "tags", "{}");
       expect(def).toBeDefined();
       expect(def!.column.name).toBe("tags");
-      expect(def!.column.options.array).toBe(true);
+      expect((def!.column as PgColumn).array).toBe(true);
       expect(def!.column.sqlType).toMatch(/text/i);
+    });
+
+    it("carries the live reflected Column with oid and fmod", async () => {
+      // Rails passes column_for(...)'s live Column straight into
+      // ChangeColumnDefaultDefinition, so the visitor's default quoting
+      // resolves via the (oid, fmod) type-map key — no regtype query.
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", 42);
+      const col = def!.column as PgColumn;
+      expect(col).toBeInstanceOf(PgColumn);
+      expect(col.oid).toBe(23); // int4
+      expect(col.fmod).not.toBeNull();
+    });
+
+    it("quotes the default via the OID key without a regtype SCHEMA query", async () => {
+      const def = await adapter.buildChangeColumnDefaultDefinition("bcd_test", "score", 42);
+      const spy = vi.spyOn(
+        adapter as unknown as { schemaQuery(sql: string): Promise<unknown[]> },
+        "schemaQuery",
+      );
+      try {
+        const sql = await adapter.schemaCreation.accept(def!);
+        expect(sql).toContain("SET DEFAULT 42");
+        const regtypeQueries = spy.mock.calls.filter(([q]) => /regtype/.test(String(q)));
+        expect(regtypeQueries).toEqual([]);
+      } finally {
+        spy.mockRestore();
+      }
     });
 
     it("extracts :to from a {from:, to:} change hash", async () => {
