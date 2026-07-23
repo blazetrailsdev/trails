@@ -230,3 +230,38 @@ describe("multi-field grouped bigint sum", () => {
     expect(keys.every((k) => k[1] === 2n ** 62n)).toBe(true);
   });
 });
+
+// ==========================================================================
+// Grouped calculation HAVING — composite-FK belongs_to arm
+//
+// Rails routes every grouped calculation through `execute_grouped_calculation`,
+// which builds from the relation's own arel so `having_clause` rides along
+// regardless of key arity (calculations.rb:553-556). trails splits the
+// composite-FK belongs_to case into its own `groupedCompositeAssoc` arm, which
+// has no Rails counterpart to port a test from — this guards that the arm keeps
+// emitting HAVING.
+// ==========================================================================
+
+describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
+  fixtures([]);
+
+  it("filters groups keyed by the associated composite-PK record", async () => {
+    const { CpkBook, CpkAuthor, CpkChapter } = await import("./test-helpers/models/cpk.js");
+    await CpkAuthor.create({ id: 1, name: "Author One" });
+    await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 1 });
+    await CpkBook.create({ id: [1, 2], title: "Beta", revision: 2 });
+    await CpkChapter.create({ id: [1, 10], book_id: 1, title: "ch-1" });
+    await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
+    await CpkChapter.create({ id: [1, 12], book_id: 2, title: "ch-3" });
+
+    const result = (await CpkChapter.group("book").having("COUNT(*) > 1").count()) as Map<
+      unknown,
+      number
+    >;
+
+    const entries = [...result.entries()] as [{ id: unknown[] } | null, number][];
+    expect(entries).toHaveLength(1);
+    expect(entries[0][0]?.id).toEqual([1, 1]);
+    expect(entries[0][1]).toBe(2);
+  });
+});
