@@ -4,13 +4,6 @@
     "tsFile": "errors.ts",
     "rubyName": "set_query",
     "call": "call",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails errors.rb has two overloads: 213-220 (plain assign, ported at trails errors.ts:268-275) and 275-289 (rebuilds the exception via `@query_parser.call(sql)`); trails has no query_parser machinery. Omission tracked in story errors-set-query-query-parser-overload."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "errors.ts",
-    "rubyName": "set_query",
-    "call": "new",
-    "reason": "Constructor idiom: Ruby `X.new` ports to TS `new X()`, which extractCalls records as a construction/type reference rather than a named call. The construction is present in the port. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
+    "reason": "Proc-invocation idiom: Rails' `@query_parser.call(sql)` (errors.rb:282) ports to a direct function invocation `this._queryParser(sql)` (MismatchedForeignKey#setQuery), which extractCalls does not record as a named `call`. The overload itself is ported (story errors-set-query-query-parser-overload)."
   }
 ]

@@ -249,7 +249,7 @@ export class SoleRecordExceeded extends ActiveRecordError {
 export class StatementInvalid extends AdapterError {
   sql?: string;
   binds?: unknown[];
-  private _querySet = false;
+  protected _querySet = false;
 
   constructor(
     message?: string,
@@ -265,7 +265,7 @@ export class StatementInvalid extends AdapterError {
     this._querySet = options?.sql != null;
   }
 
-  setQuery(sql: string, binds: unknown[]): this {
+  setQuery(sql: string, binds: unknown[]): StatementInvalid {
     if (!this._querySet) {
       this.sql = sql;
       this.binds = binds;
@@ -453,6 +453,7 @@ export interface MismatchedForeignKeyOptions {
   primaryKey?: string;
   primaryKeySqlType?: string;
   primaryKeyType?: string;
+  queryParser?: (sql: string) => Partial<MismatchedForeignKeyOptions>;
 }
 
 /**
@@ -473,9 +474,13 @@ export class MismatchedForeignKey extends StatementInvalid {
     "message" | "sql" | "binds" | "connectionPool" | "cause"
   >;
 
+  private readonly _originalMessage?: string;
+  private readonly _queryParser?: (sql: string) => Partial<MismatchedForeignKeyOptions>;
+
   constructor(options: MismatchedForeignKeyOptions = {}) {
     const {
       message: originalMessage,
+      queryParser,
       table,
       foreignKey,
       targetTable,
@@ -495,14 +500,18 @@ export class MismatchedForeignKey extends StatementInvalid {
         `(For example \`t.${type} :${foreignKey}\`).`,
       ].join(" ");
     } else {
-      const fallback =
+      msg =
         "There is a mismatch between the foreign key and primary key column types. " +
         "Verify that the foreign key column type and the primary key of the associated table match types.";
-      msg = originalMessage ? `${fallback} ${originalMessage}` : fallback;
+    }
+    if (originalMessage) {
+      msg += `\nOriginal message: ${originalMessage}`;
     }
 
     super(msg, rest);
     this.name = "MismatchedForeignKey";
+    this._originalMessage = originalMessage;
+    this._queryParser = queryParser;
     this.fkDetails = {
       table,
       foreignKey,
@@ -511,6 +520,22 @@ export class MismatchedForeignKey extends StatementInvalid {
       primaryKeySqlType,
       primaryKeyType,
     };
+  }
+
+  override setQuery(sql: string, binds: unknown[]): StatementInvalid {
+    if (this._queryParser && !this._querySet) {
+      const exception = new MismatchedForeignKey({
+        message: this._originalMessage,
+        sql,
+        binds,
+        connectionPool: this.connectionPool,
+        cause: this.cause,
+        ...this._queryParser(sql),
+      });
+      exception.stack = this.stack;
+      return exception;
+    }
+    return super.setQuery(sql, binds);
   }
 }
 
