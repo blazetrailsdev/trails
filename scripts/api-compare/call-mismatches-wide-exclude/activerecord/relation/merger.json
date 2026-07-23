@@ -38,15 +38,15 @@
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_joins",
-    "call": "joins_values",
-    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+    "call": "joins!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_joins",
-    "call": "joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
   },
   {
     "package": "activerecord",
@@ -136,15 +136,15 @@
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
-    "call": "left_outer_joins_values",
-    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
+    "call": "left_outer_joins!",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_outer_joins",
-    "call": "left_outer_joins!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+    "call": "left_outer_joins_values",
+    "reason": "Wide call-set flag: Merger#mergeJoins/#mergeOuterJoins are thin wrappers delegating to the shared foldMergeJoins/foldMergeOuterJoins helper (merge-joins.ts); the Rails call is satisfied inside the helper. PR #4676."
   },
   {
     "package": "activerecord",
@@ -185,14 +185,14 @@
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
-    "call": "includes_values",
+    "call": "includes!",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
-    "call": "includes!",
+    "call": "includes_values",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
   },
   {
@@ -206,14 +206,14 @@
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
-    "call": "preload_values",
+    "call": "preload!",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
   },
   {
     "package": "activerecord",
     "tsFile": "relation/merger.ts",
     "rubyName": "merge_preloads",
-    "call": "preload!",
+    "call": "preload_values",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails merger.rb:96-115; trails merger.ts:92-94 delegates to foldMergePreloads (relation/merge-preloads.ts), which performs the same body: length===0 empty? guards, same-model union via unionAppend, else reflectOnAllAssociations().find on className with preload/includes nesting — the reads happen on `_preloadAssociations`/`_includesAssociations` fields inside the helper."
   },
   {

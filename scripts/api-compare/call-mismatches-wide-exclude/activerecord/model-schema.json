@@ -142,6 +142,13 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
+    "rubyName": "reload_schema_from_cache",
+    "call": "each",
+    "reason": "Rails iterates `subclasses.each`; trails recurses with a for-of over the same `subclasses` list."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "model-schema.ts",
     "rubyName": "reset_column_information",
     "call": "clear_cache!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -180,13 +187,6 @@
     "rubyName": "reset_column_information",
     "call": "initialize_find_by_cache",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
-    "rubyName": "reload_schema_from_cache",
-    "call": "each",
-    "reason": "Rails iterates `subclasses.each`; trails recurses with a for-of over the same `subclasses` list."
   },
   {
     "package": "activerecord",

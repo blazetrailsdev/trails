@@ -23,20 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-handling.ts",
-    "rubyName": "connected_to_all_shards",
-    "call": "map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-handling.ts",
-    "rubyName": "connected_to_many",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-handling.ts",
     "rubyName": "connected_to?",
     "call": "current_role",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -46,6 +32,20 @@
     "tsFile": "connection-handling.ts",
     "rubyName": "connected_to?",
     "call": "current_shard",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "connected_to_all_shards",
+    "call": "map",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "connection-handling.ts",
+    "rubyName": "connected_to_many",
+    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -37,13 +37,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/mime-negotiation.ts",
-    "rubyName": "format_from_path_extension",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-negotiation.ts",
     "rubyName": "format=",
     "call": "lookup_by_extension",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -67,6 +60,13 @@
     "tsFile": "http/mime-negotiation.ts",
     "rubyName": "format=",
     "call": "to_s",
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
+  },
+  {
+    "package": "actiondispatch",
+    "tsFile": "http/mime-negotiation.ts",
+    "rubyName": "format_from_path_extension",
+    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

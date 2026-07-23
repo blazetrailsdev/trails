@@ -18,7 +18,7 @@
     "tsFile": "connection-adapters/postgresql/quoting.ts",
     "rubyName": "quote_default_expression",
     "call": "include?",
-    "reason": "Vetted: ported as `value.includes(\"()\")` (quoting.rb:159). Ruby `include?` maps to the TS candidates `include`/`isInclude`, which JS strings do not have \u2014 `String#includes` is the exact equivalent."
+    "reason": "Vetted: ported as `value.includes(\"()\")` (quoting.rb:159). Ruby `include?` maps to the TS candidates `include`/`isInclude`, which JS strings do not have — `String#includes` is the exact equivalent."
   },
   {
     "package": "activerecord",
