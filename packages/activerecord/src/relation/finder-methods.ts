@@ -284,7 +284,7 @@ interface FinderRelation {
   _clone(): any;
   _whereClause: { isEmpty(): boolean };
   /** Relation#arel — the built SelectManager (relation.ts). */
-  arel(): { whereSql(engine: unknown): string | null };
+  arel(): { whereSql(engine: unknown): Nodes.SqlLiteral | null };
   where(conditions: unknown, ...rest: unknown[]): any;
   findBy(conditions: unknown): Promise<any>;
   findByBang(conditions: unknown): Promise<any>;
@@ -323,7 +323,7 @@ export async function performFind(this: FinderRelation, ...args: unknown[]): Pro
   // default-scope predicates.
   const conditions = this._whereClause.isEmpty()
     ? ""
-    : ` [${this.arel().whereSql(this._modelClass) ?? ""}]`;
+    : ` [${this.arel().whereSql(this._modelClass)?.value ?? ""}]`;
 
   // Composite PK: OR over per-tuple WHERE conditions. The
   // `Array.isArray(pk)` guard narrows `pk` to `string[]` via
@@ -690,7 +690,7 @@ export function raiseRecordNotFoundExceptionBang(
   // wheres, which Ruby interpolates as "" — hence the `?? ""`.
   const conditions = this._whereClause.isEmpty()
     ? ""
-    : ` [${this.arel().whereSql(this._modelClass) ?? ""}]`;
+    : ` [${this.arel().whereSql(this._modelClass)?.value ?? ""}]`;
 
   const name = this._modelClass.name;
   const k = key ?? String(this._modelClass.primaryKey);

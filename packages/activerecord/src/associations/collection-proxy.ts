@@ -3445,9 +3445,11 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     const conditionsClause = (): string => {
       const scope = this.scope() as unknown as {
         _whereClause: { isEmpty(): boolean };
-        arel(): { whereSql(engine: unknown): string | null };
+        arel(): { whereSql(engine: unknown): Nodes.SqlLiteral | null };
       };
-      return scope._whereClause.isEmpty() ? "" : ` [${scope.arel().whereSql(targetModel) ?? ""}]`;
+      return scope._whereClause.isEmpty()
+        ? ""
+        : ` [${scope.arel().whereSql(targetModel)?.value ?? ""}]`;
     };
 
     // Composite + any-multi: always use the "Couldn't find all" shape

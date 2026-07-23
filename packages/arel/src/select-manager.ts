@@ -361,11 +361,9 @@ export class SelectManager extends TreeManager {
    *
    * Mirrors: Arel::SelectManager#where_sql
    */
-  whereSql(engine: ArelEngine | null = _engine.current): string | null {
+  whereSql(engine: ArelEngine | null = _engine.current): SqlLiteral | null {
     if (this.core.wheres.length === 0) return null;
-    const predicate =
-      this.core.wheres.length === 1 ? this.core.wheres[0] : new And(this.core.wheres);
-    return `WHERE ${predicate.toSql(engine)}`;
+    return new SqlLiteral(`WHERE ${new And(this.core.wheres).toSql(engine)}`);
   }
 
   /**

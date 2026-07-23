@@ -1392,7 +1392,7 @@ describe("SelectManagerTest", () => {
     it("copies where", () => {
       const mgr = new SelectManager(users);
       mgr.project(star).where(users.get("id").eq(1)).where(users.get("name").eq("Alice"));
-      const whereSql = mgr.whereSql();
+      const whereSql = mgr.whereSql()?.value;
       expect(whereSql).toContain("WHERE");
       expect(whereSql).toContain("AND");
       expect(mgr.constraints.length).toBe(2);
@@ -1400,6 +1400,23 @@ describe("SelectManagerTest", () => {
   });
 
   describe("where_sql", () => {
+    it("gives me back the where sql", () => {
+      const mgr = new SelectManager();
+      mgr.from(users);
+      mgr.where(users.get("id").eq(10));
+      const sql = mgr.whereSql();
+      expect(sql).toBeInstanceOf(Nodes.SqlLiteral);
+      expect(sql?.value).toBe('WHERE "users"."id" = 10');
+    });
+
+    it("joins wheres with AND", () => {
+      const mgr = new SelectManager();
+      mgr.from(users);
+      mgr.where(users.get("id").eq(10));
+      mgr.where(users.get("id").eq(11));
+      expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10 AND "users"."id" = 11');
+    });
+
     it("returns nil when there are no wheres", () => {
       const mgr = new SelectManager(users).project(star);
       expect(mgr.whereSql()).toBeNull();
