@@ -67,17 +67,19 @@ describe("QueryLogsTest", () => {
 
   // Unit tests — Rails' `escape_sql_comment` is exercised directly, no fixtures.
   it("escaping good comment", () => {
-    expect(escapeComment("app:MyApp")).toBe("app:MyApp");
+    expect(escapeComment("app:foo")).toBe("app:foo");
   });
 
   it("escaping good comment with custom separator", () => {
-    expect(escapeComment("app=MyApp")).toBe("app=MyApp");
+    queryLogs.formatter = "sqlcommenter";
+
+    expect(escapeComment("app='foo'")).toBe("app='foo'");
   });
 
   it("escaping bad comments", () => {
-    expect(escapeComment("*/")).toBe("* /");
-    expect(escapeComment("/*")).toBe("/ *");
-    expect(escapeComment("/* evil */")).toBe("/ * evil * /");
+    expect(escapeComment("*/; DROP TABLE USERS;/*")).toBe("* /; DROP TABLE USERS;/ *");
+    expect(escapeComment("**//; DROP TABLE USERS;/*")).toBe("** //; DROP TABLE USERS;/ *");
+    expect(escapeComment("* *//; DROP TABLE USERS;//* *")).toBe("* * //; DROP TABLE USERS;// * *");
   });
 
   // Rails executes `select id from posts`; trails drives the equivalent raw

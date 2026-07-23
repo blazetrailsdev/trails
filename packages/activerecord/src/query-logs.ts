@@ -304,17 +304,12 @@ export class QueryLogs implements QueryTransformer {
   }
 }
 
-// Sanitize a string for safe inclusion in a SQL comment by neutralising
-// any internal "*/" and "/*" sequences (turns them into "* /" / "/ *").
-//
-// Partial port of ActiveRecord::QueryLogs#escape_sql_comment
-// (query_logs.rb:219-228). Rails additionally strips a leading
-// `\A\s*/\*\+?\s?` and a trailing `\s?\*/\s*\Z` before escaping; trails
-// intentionally omits that strip so bare-marker inputs round-trip
-// through escape rather than collapsing to an empty string — the
-// existing "escaping bad comments" test cases encode that.
+// Mirrors: ActiveRecord::QueryLogs#escape_sql_comment
 export function escapeComment(content: string): string {
-  return String(content).replace(/\*\//g, "* /").replace(/\/\*/g, "/ *");
+  return String(content)
+    .replace(/^\s*\/\*\+?\s?|\s?\*\/\s*$/g, "")
+    .replace(/\*\//g, "* /")
+    .replace(/\/\*/g, "/ *");
 }
 
 /**
