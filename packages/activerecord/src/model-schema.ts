@@ -1749,7 +1749,7 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
 }
 
 /** @internal */
-function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
+export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   this._columnsHash = undefined;
   this._columns = undefined;
   this._attributesBuilder = undefined;

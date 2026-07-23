@@ -4,6 +4,7 @@ import { Type, ValueType } from "@blazetrails/activemodel";
 import { isWillSaveChangeToAttribute, attributeInDatabase } from "../attribute-methods/dirty.js";
 import { queryConstraintsList, _updateRecord as persistenceUpdateRecord } from "../persistence.js";
 import { attributesWithValues } from "../attribute-methods.js";
+import { reloadSchemaFromCache } from "../model-schema.js";
 
 /**
  * Optimistic locking support for ActiveRecord models.
@@ -26,6 +27,7 @@ export function lockingColumn(modelClass: typeof Base): string {
  * Set the column name used for optimistic locking.
  */
 export function setLockingColumn(modelClass: typeof Base, column: string): void {
+  reloadSchemaFromCache.call(modelClass as any);
   (modelClass as any)._lockingColumn = column;
 }
 
@@ -157,7 +159,7 @@ export async function incrementBang(
  * Mirrors: ActiveRecord::Locking::Optimistic::ClassMethods#reset_locking_column
  */
 export function resetLockingColumn(this: LockingHost): void {
-  this._lockingColumn = DEFAULT_LOCKING_COLUMN;
+  setLockingColumn(this as unknown as typeof Base, DEFAULT_LOCKING_COLUMN);
 }
 
 /**
