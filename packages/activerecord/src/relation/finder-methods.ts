@@ -284,7 +284,7 @@ interface FinderRelation {
   _clone(): any;
   _whereClause: { isEmpty(): boolean };
   /** Relation#arel — the built SelectManager (relation.ts). */
-  arel(): { whereSql(engine: unknown): { value: string } | null };
+  arel(): { whereSql(engine: unknown): Nodes.SqlLiteral | null };
   where(conditions: unknown, ...rest: unknown[]): any;
   findBy(conditions: unknown): Promise<any>;
   findByBang(conditions: unknown): Promise<any>;
