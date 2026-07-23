@@ -24,15 +24,9 @@ export interface ReplacePlan {
 }
 
 /**
- * Host shape for {@link findFromTarget} — the two objects that carry a
- * collection's target: the `CollectionAssociation` and the `CollectionProxy`
- * (which is its own association, see `CollectionProxy#_association`).
- *
- * Loadedness is passed in rather than read off the host: the association
- * exposes it as `isLoaded()`, the proxy as its `loaded` getter over
- * `_targetLoaded` — and the proxy also inherits an unrelated `Relation#isLoaded`
- * over `_loaded`, so reading either name off the host would pick the wrong flag
- * on one of them.
+ * Host shape for {@link findFromTarget}: the `CollectionAssociation` and the
+ * `CollectionProxy` (which is its own association — `CollectionProxy#_association`
+ * returns `this`).
  *
  * @internal
  */
@@ -46,14 +40,17 @@ export interface FindFromTargetHost {
  * The single body behind `CollectionAssociation#isFindFromTarget` and
  * `CollectionProxy#isFindFromTarget`. Mirrors
  * ActiveRecord::Associations::CollectionAssociation#find_from_target?
- * (collection_association.rb:308): loaded, owner strict-loading-all,
- * reflection strict-loading, owner new record, or any target record
- * new/changed.
+ * (collection_association.rb:308).
  *
- * Note the final clause is Rails' `record.changed?`, NOT `has_changes_to_save?`
- * — different mutation sources (`mutations_from_user` vs
+ * The final clause is Rails' `record.changed?`, NOT `has_changes_to_save?` —
+ * different mutation sources (`mutations_from_user` vs
  * `mutations_from_database`), even though both currently resolve to
  * `_dirty.changed` here.
+ *
+ * `loaded` is a parameter rather than a host member because the two hosts spell
+ * it differently, and the proxy additionally inherits an unrelated
+ * `Relation#isLoaded` over `_loaded` — so any single name read off the host
+ * would pick the wrong flag on one of them.
  *
  * @internal
  */
@@ -787,9 +784,7 @@ export class CollectionAssociation extends Association {
    * going to the database. Mirrors
    * ActiveRecord::Associations::CollectionAssociation#find_from_target?
    * (collection_association.rb:308). The clause list lives in
-   * {@link findFromTarget} so `CollectionProxy#isFindFromTarget` — Rails'
-   * one-line delegation at collection_proxy.rb:1154 — shares this exact body
-   * instead of hand-maintaining a copy.
+   * {@link findFromTarget}, shared with `CollectionProxy#isFindFromTarget`.
    */
   isFindFromTarget(): boolean {
     return findFromTarget.call(this, this.isLoaded());

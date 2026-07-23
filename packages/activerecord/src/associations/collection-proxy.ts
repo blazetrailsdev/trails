@@ -3841,16 +3841,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * Whether find should read the in-memory target rather than querying the
    * database. Mirrors `CollectionProxy#find_from_target?`
    * (collection_proxy.rb:1154), a one-line delegation to
-   * `@association.find_from_target?`: this proxy *is* its own association
-   * (`_association` returns `this`), so the delegation is the shared
-   * {@link findFromTarget} body bound to this proxy, which supplies `owner`,
-   * `reflection`, `target` and the `loaded` getter over `_targetLoaded`.
+   * `@association.find_from_target?` — this proxy *is* its own association, so
+   * the shared {@link findFromTarget} body binds to it directly.
    *
    * Deliberately NOT routed through `owner.association(name)`: that wrapper is
    * a secondary copy whose loaded flag is synthesized from
    * `Base#_associationCache`, so a merely-seeded (concat'd but unloaded) proxy
-   * surfaces there as `loaded?` — which would make `find_from_target?` true
-   * where Rails says false. The proxy owns `_target`/`_targetLoaded`.
+   * surfaces there as loaded — making `find_from_target?` true where Rails says
+   * false. `_targetLoaded` is the proxy's own flag and the faithful one.
    *
    * @internal
    */
@@ -4306,32 +4304,4 @@ function primaryKeyToken(record: Base): string | null {
   }
   if (id == null) return null;
   return String(id);
-}
-
-/** @internal */
-function findNthFromLast(proxy: CollectionProxy<any>, index: number): Promise<any> {
-  const records = (proxy as any)._association?.target;
-  if (Array.isArray(records)) {
-    // index=1 → last (records[-1]), index=2 → second-to-last (records[-2]), etc.
-    // Matches Rails: records[-index] == records[length - index]
-    return Promise.resolve(records[records.length - index] ?? null);
-  }
-  // Mirror finder-methods.ts: reverse order then take a positive offset
-  // (negative offset is not valid SQL on most adapters)
-  return (proxy as any)
-    .reverseOrder?.()
-    .offset(index - 1)
-    .limit(1)
-    .toArray()
-    .then((r: any[]) => r[0] ?? null);
-}
-
-/** @internal */
-function isNullScope(proxy: CollectionProxy<any>): boolean {
-  return !!(proxy as any)._association?.isNullScope?.();
-}
-
-/** @internal */
-function execQueries(proxy: CollectionProxy<any>): Promise<any[]> {
-  return proxy.loadTarget();
 }
