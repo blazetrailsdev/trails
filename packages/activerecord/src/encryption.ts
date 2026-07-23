@@ -353,17 +353,7 @@ export async function decryptRecord(record: any): Promise<void> {
   // raises Errors::Configuration when the context is frozen (protected mode).
   EncryptableRecord.validateEncryptionAllowed(record);
 
-  // Mirrors Rails build_decrypt_attribute_assignments
-  // (encryptable_record.rb:214-220): type.deserialize(ciphertext_for(name))
-  // unconditionally — for plaintext rows ciphertextFor returns the
-  // DB-serialized value and deserialize (support_unencrypted_data) passes it
-  // through cast.
-  const assignments: Record<string, unknown> = {};
-  for (const attr of encryptedAttrs) {
-    const type = getAttributeType(klass, attr) as { deserialize?: (v: unknown) => unknown };
-    const encryptedValue = EncryptableRecord.ciphertextFor(record, attr);
-    assignments[attr] = type?.deserialize ? type.deserialize(encryptedValue) : encryptedValue;
-  }
+  const assignments = EncryptableRecord.buildDecryptAttributeAssignments(record);
   await _withoutEncryption(() => record.updateColumns(assignments));
 }
 
