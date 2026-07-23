@@ -408,6 +408,43 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     expect(Company.columnNames()).toContain("rating");
   });
 
+  it("an STI subclass's own columns memo is rebuilt when the base re-reflects", async () => {
+    class Company extends Base {
+      static override tableName = "companies";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Firm extends Company {
+      static {
+        registerSubclass(this);
+        this.ignoredColumns = ["rating"];
+      }
+    }
+    const first = Firm.columnsHash();
+    expect(Firm.columnsHash()).toBe(first);
+
+    // The virtual-attribute reconciliation path clears only the base's
+    // `_columnsHash`/`_schemaLoaded`; the next load re-applies the reflected
+    // columns and must not leave the subclass on its pre-reflection memo.
+    const internals = Company as unknown as {
+      _columnsHash?: unknown;
+      _columns?: unknown;
+      _schemaLoaded?: boolean;
+      _schemaLoadPromise?: Promise<void>;
+    };
+    internals._columnsHash = undefined;
+    internals._columns = undefined;
+    internals._schemaLoaded = false;
+    internals._schemaLoadPromise = undefined;
+    expect(Company.columnNames()).toContain("rating");
+
+    const rebuilt = Firm.columnsHash();
+    expect(rebuilt).not.toBe(first);
+    expect(Object.keys(rebuilt)).not.toContain("rating");
+    expect(Object.keys(Company.columnsHash())).toContain("rating");
+  });
+
   it("an ignored column still declared via attribute() casts and responds on SELECT *", async () => {
     const { AttributedDeveloper } = await import("./test-helpers/models/developer.js");
     const dev = await AttributedDeveloper.create();

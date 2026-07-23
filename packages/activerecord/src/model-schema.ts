@@ -247,13 +247,16 @@ export interface ColumnLike {
   [key: string]: unknown;
 }
 
-/**
- * True when `host` must keep its own `_columnsHash`/`_columns` rather than
- * share the STI base's: an STI subclass that declared its own
- * `ignoredColumns` filters a different column set than the base does.
- */
 function ownsColumnMemo(host: SchemaHost): boolean {
   return isStiSubclass(host) && Object.prototype.hasOwnProperty.call(host, "_ignoredColumns");
+}
+
+function columnMemo<K extends "_columnsHash" | "_columns">(
+  host: SchemaHost,
+  key: K,
+): SchemaHost[K] | undefined {
+  if (ownsColumnMemo(host) && !Object.prototype.hasOwnProperty.call(host, key)) return undefined;
+  return host[key];
 }
 
 /**
@@ -266,18 +269,8 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   loadSchema.call(this as SchemaHost);
 
   const memoHost = this as unknown as SchemaHost;
-  // Rails keeps `@columns_hash` as a per-class ivar, each class's `load_schema!`
-  // filtering with that class's own `ignored_columns` (model_schema.rb:427-433).
-  // trails reflects onto the STI base, so a subclass with its own
-  // `ignoredColumns` must not read (or write) the base's memo — it keeps its
-  // own, invalidated with the base's by `applyColumnsHash` /
-  // `reloadSchemaFromCache`.
   const ownsMemo = ownsColumnMemo(memoHost);
-  const memo = ownsMemo
-    ? Object.prototype.hasOwnProperty.call(memoHost, "_columnsHash")
-      ? memoHost._columnsHash
-      : undefined
-    : memoHost._columnsHash;
+  const memo = columnMemo(memoHost, "_columnsHash");
   if (memo != null) return memo as Record<string, ColumnLike>;
 
   // STI-aware adapter + table resolution: adapter may live on the base
@@ -746,19 +739,13 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
  * Rails: @columns ||= columns_hash.values.freeze
  */
 export function columns(this: SchemaHost): any[] {
-  // Per-class memo (Rails' `@columns`) when this class filters with its own
-  // `ignoredColumns`; otherwise the STI base owns the memo so subclasses
-  // inherit it — and a base reset propagates — via the prototype chain.
-  const ownsMemo = ownsColumnMemo(this);
-  if (ownsMemo) {
-    if (Object.prototype.hasOwnProperty.call(this, "_columns") && this._columns) {
-      return this._columns;
-    }
+  const memo = columnMemo(this, "_columns");
+  if (memo) return memo;
+  if (ownsColumnMemo(this)) {
     const own = Object.values((this as unknown as typeof Base).columnsHash());
     if (this._schemaLoaded) this._columns = own;
     return own;
   }
-  if (this._columns) return this._columns;
   loadSchema.call(this);
   const hash = getColumnsHash(this);
   const cacheHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
@@ -904,11 +891,6 @@ function clearStiSubclassLocalCaches(sub: SchemaHost): void {
   }
 }
 
-/**
- * Delete own `_columnsHash`/`_columns` memos on every same-table STI
- * descendant of `host`, so a class that keeps its own memo (see
- * `ownsColumnMemo`) rebuilds it from the freshly reflected columns.
- */
 function invalidateStiDescendantColumnMemos(host: SchemaHost): void {
   for (const sub of (host as { subclasses?: SchemaHost[] }).subclasses ?? []) {
     if (!sharesStiBaseTable(sub)) continue;
@@ -1159,7 +1141,8 @@ export function loadSchema(this: SchemaHost): void {
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
-  if (host._columnsHash != null) return host._columnsHash;
+  const memo = columnMemo(host, "_columnsHash");
+  if (memo != null) return memo;
   const ch = (host as any).columnsHash;
   if (typeof ch === "function") return ch.call(host) ?? {};
   return {};
@@ -1374,10 +1357,6 @@ function applyColumnsHash(
   };
   invalidate(host, { deleteOwn: false });
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
-  // Descendants that keep their own `_columnsHash`/`_columns` (subclasses with
-  // their own `ignoredColumns`) would otherwise hold a memo built from the
-  // pre-reflection columns. Mirrors reload_schema_from_cache's recursion into
-  // `descendants`.
   invalidateStiDescendantColumnMemos(host);
   host._columnsHash = filteredHash;
 
