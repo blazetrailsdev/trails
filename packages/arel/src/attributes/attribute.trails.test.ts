@@ -108,6 +108,55 @@ describe("AttributeTest (trails)", () => {
     });
   });
 
+  // Rails' `type casting` suite only exercises the caster through #eq
+  // (attributes/attribute_test.rb:1123+); it never pins that #in / #notIn
+  // list elements are wrapped as Casted and rendered through the caster.
+  // The port reimplements that wrapping in predications.ts' array arm, so
+  // these compile-level checks are TS-only coverage.
+  describe("type casting", () => {
+    it("type casts IN list elements through the attribute", () => {
+      const fakeCaster = {
+        typeCastForDatabase(attrName: string, value: unknown) {
+          return attrName === "id" ? Number(value) : value;
+        },
+      };
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const condition = table.get("id").in(["1", "2"]);
+
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe('"foo"."id" IN (1, 2)');
+    });
+
+    it("type casts NOT IN list elements through the attribute", () => {
+      const fakeCaster = {
+        typeCastForDatabase(attrName: string, value: unknown) {
+          return attrName === "id" ? Number(value) : value;
+        },
+      };
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const condition = table.get("id").notIn(["1", "2"]);
+
+      expect(new Visitors.ToSql(testConnection).compile(condition)).toBe(
+        '"foo"."id" NOT IN (1, 2)',
+      );
+    });
+
+    it("builds Casted nodes so a null in an IN list casts through the column", () => {
+      const fakeCaster = {
+        typeCastForDatabase(_attrName: string, value: unknown) {
+          return value === null ? 0 : value;
+        },
+      };
+      const table = new Table("foo", { typeCaster: fakeCaster });
+      const attr = table.get("id");
+      const node = attr.in([null]);
+      const right = (node.right as unknown as Nodes.Node[])[0];
+
+      expect(right).toBeInstanceOf(Nodes.Casted);
+      expect((right as Nodes.Casted).attribute).toBe(attr);
+      expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"foo"."id" IN (0)');
+    });
+  });
+
   describe("relationName", () => {
     it("returns a plain string name unchanged", () => {
       expect(relationName("users")).toBe("users");
