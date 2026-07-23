@@ -209,15 +209,6 @@ export function buildWhereNodeFromConstraints(
  * the `ignoredColumns` filter at read time in `columnsHash()` (Rails filters
  * at load), and `columns()`' `_columns` memo would bypass it after an
  * `ignoredColumns=` reassignment.
- *
- * The memo is revision-stamped like `attributeNames`' (attribute-methods.ts):
- * the reset paths that bump `_schemaRevision` (resetColumnInformation,
- * applyColumnsHash) invalidate it — including subclass memos the base's reset
- * can't reach — and the non-bumping paths (`ignoredColumns=`, `tableName=`,
- * `attribute()`) drop it via `clearAttributeNamesMemo`, mirroring Rails'
- * `reload_schema_from_cache` nilling `@column_names` recursively. Cold
- * (pre-load) reads are never memoized: the schema cache can warm without a
- * revision bump to invalidate a memo taken off the synthesized fallback.
  */
 export function columnNames(this: typeof Base): string[] {
   const host = this as unknown as SchemaHost;
@@ -228,8 +219,6 @@ export function columnNames(this: typeof Base): string[] {
   const names = Object.keys(this.columnsHash());
   if (host._schemaLoaded) {
     const frozen = Object.freeze(names);
-    // Re-read the revision: `columnsHash()` above can run the first sync
-    // `loadSchema` → `applyColumnsHash`, which bumps it mid-call.
     host._columnNamesMemo = { revision: host._schemaRevision ?? 0, names: frozen };
     return frozen as string[];
   }

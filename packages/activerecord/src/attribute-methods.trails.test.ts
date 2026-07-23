@@ -296,7 +296,6 @@ describe("AttributeMethodsTest (trails)", () => {
     await Topic.loadSchema();
     const first = Topic.columnNames();
     (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
-    // Restore the suite's warm-cache invariant for later tests.
     await Topic.loadSchema();
     const second = Topic.columnNames();
     expect(second).not.toBe(first);
