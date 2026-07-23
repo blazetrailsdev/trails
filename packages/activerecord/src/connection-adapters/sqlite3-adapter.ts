@@ -456,8 +456,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     name: string = "SQL",
   ): Promise<Record<string, unknown>[]> {
     sql = this.preprocessQuery(sql);
-    // Rails order in with_raw_connection: lazy connect! first, then
-    // materialize_transactions (abstract_adapter.rb:985-987).
     await this.ensureConnected();
     await this.materializeTransactions();
 
@@ -620,7 +618,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
     // preprocessQuery runs Rails' check_if_write_query, which raises
     // ReadOnlyError while writes are prevented — see isPreventingWrites below.
     sql = this.preprocessQuery(sql);
-    // Same lazy connect!-before-materialize order as `execute` above.
     await this.ensureConnected();
     await this.materializeTransactions();
     const payload = this._notificationPayload(sql, binds, name);
@@ -2891,11 +2888,6 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
    */
   private async ensureConnected(): Promise<void> {
     if (this._asyncConnectPending) await this.completeAsyncConnect();
-    // Mirrors with_raw_connection's `connect! if @raw_connection.nil? &&
-    // reconnect_can_restore_state?` (abstract_adapter.rb:985): the sqlite
-    // execute path bypasses withRawConnection, so the lazy reconnect after
-    // `disconnect!` lands here. `driver` plays @raw_connection — a closed
-    // handle is its nil state — and connect! is verify! (abstract_adapter.rb:778).
     else if (!this.isActive() && this.isReconnectCanRestoreState()) await this.verifyBang();
   }
 
