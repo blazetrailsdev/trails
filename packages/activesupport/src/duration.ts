@@ -138,10 +138,14 @@ export class Duration {
     return new Duration(result, this._variable);
   }
 
+  // Mirrors Rails `/` with a Numeric (duration.rb:297-305): divides each
+  // part, preserving the receiver's variable flag.
   dividedBy(n: number): Duration {
-    // When dividing by a number, Rails converts to total seconds and creates a seconds-only Duration
-    const totalSecs = this.inSeconds();
-    return new Duration({ seconds: totalSecs / n }, this._variable);
+    const result = zeroParts();
+    for (const key of PART_ORDER) {
+      result[key] = this.parts[key] / n;
+    }
+    return new Duration(result, this._variable);
   }
 
   negate(): Duration {
