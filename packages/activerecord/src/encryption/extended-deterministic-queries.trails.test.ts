@@ -16,6 +16,7 @@ import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 import "../encryption.js";
 import { Base } from "../base.js";
 import { Relation } from "../relation.js";
+import { DisallowedClass } from "../coders/yaml-column.js";
 
 fixtures([], { useTransactionalTests: false });
 
@@ -33,7 +34,7 @@ const PREVIOUS_KEY = Buffer.alloc(32, "y").toString("base64");
  * EncryptedAttributeType, or the expansion ciphertext diverges from the
  * write path and the lookup silently misses.
  */
-function buildSerializedBook({ previousSchemes = false } = {}) {
+function buildSerializedBook({ previousSchemes = false, coder = "json" } = {}) {
   class EncryptedSerializedBook extends Base {
     static {
       this._tableName = "books";
@@ -53,7 +54,7 @@ function buildSerializedBook({ previousSchemes = false } = {}) {
           ? { previousSchemes: [new Scheme({ deterministic: true, key: PREVIOUS_KEY })] }
           : {}),
       });
-      this.serialize("name", { coder: "json" });
+      this.serialize("name", { coder });
     }
   }
   return EncryptedSerializedBook;
@@ -62,6 +63,7 @@ function buildSerializedBook({ previousSchemes = false } = {}) {
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails extras)", () => {
   let EncryptedSerializedBook: ReturnType<typeof buildSerializedBook>;
   let PreviousSchemeSerializedBook: ReturnType<typeof buildSerializedBook>;
+  let PreviousSchemeYamlBook: ReturnType<typeof buildSerializedBook>;
 
   const savedConfig = {
     extendQueries: Configurable.config.extendQueries,
@@ -91,6 +93,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
 
     EncryptedSerializedBook = buildSerializedBook();
     PreviousSchemeSerializedBook = buildSerializedBook({ previousSchemes: true });
+    PreviousSchemeYamlBook = buildSerializedBook({ previousSchemes: true, coder: "YAML" });
     // Warm the books table once so the first create doesn't race the
     // test-adapter's schema-recovery path (see the port suite's note).
     await EncryptedSerializedBook.where("1=1");
@@ -146,6 +149,29 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
       .previousTypes[0];
     const av = new AdditionalValue("Dune", prevType);
     expect(() => fullType.serialize(av)).toThrow(NoMethodError);
+  });
+
+  // Rails-verified (vendored Rails, sqlite3, extend_queries installed): with
+  // the YAML coder, the previous-scheme AdditionalValue reaches
+  // Coders::YAMLColumn#dump and Psych's safe_dump raises
+  // `Psych::DisallowedClass: Tried to dump unspecified class:
+  // ActiveRecord::Encryption::ExtendedDeterministicQueries::AdditionalValue`.
+  // Like the JSON path, the raise fires before any payload or SQL exists, so
+  // no scheme/key material can land in a bind.
+  it("raises Psych::DisallowedClass when a previous-scheme candidate reaches the YAML coder", async () => {
+    await expect(PreviousSchemeYamlBook.findBy({ name: "Dune" })).rejects.toThrow(DisallowedClass);
+    await expect(PreviousSchemeYamlBook.where({ name: "Dune" }).first()).rejects.toThrow(
+      DisallowedClass,
+    );
+
+    const fullType = getAttributeType(PreviousSchemeYamlBook, "name") as {
+      serialize(v: unknown): unknown;
+    };
+    const prevType = encryptedTypeOf(getAttributeType(PreviousSchemeYamlBook, "name"))!
+      .previousTypes[0];
+    const av = new AdditionalValue("Dune", prevType);
+    expect(() => fullType.serialize(av)).toThrow(DisallowedClass);
+    expect(() => fullType.serialize(av)).toThrow(/Tried to dump unspecified class/);
   });
 
   it("uniqueness ciphertext generation serializes through the full resolved type", () => {

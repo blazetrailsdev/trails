@@ -7,6 +7,7 @@ import {
   isTypeIncompatibleWithSerialize,
   buildColumnSerializer,
 } from "./attribute-methods/serialization.js";
+import type { YamlColumnOptions } from "./coders/yaml-column.js";
 
 interface InnerCoder {
   dump(value: unknown): string | null;
@@ -52,6 +53,8 @@ type CoderOption = "json" | "array" | "hash" | InnerCoder | (new (...args: any[]
 export interface SerializeOptions {
   coder?: CoderOption;
   type?: "Array" | "Hash" | typeof Array | typeof Object | (new (...args: any[]) => any);
+  /** Rails `serialize :x, coder: YAML, yaml: { permitted_classes: [...] }`. */
+  yaml?: YamlColumnOptions;
 }
 
 /**
@@ -113,7 +116,7 @@ function resolveSerializer(
     objectType = t;
   }
 
-  const coder = buildColumnSerializer(attribute, rawCoder, objectType) as Coder;
+  const coder = buildColumnSerializer(attribute, rawCoder, objectType, options.yaml) as Coder;
   return { coder, coderIdentity, objectType };
 }
 

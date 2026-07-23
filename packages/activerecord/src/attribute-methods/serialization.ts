@@ -9,7 +9,7 @@
 
 import { JSON as CodersJSON } from "../coders/json.js";
 import { ColumnSerializer as CodersColumnSerializer } from "../coders/column-serializer.js";
-import { YAMLColumn } from "../coders/yaml-column.js";
+import { YAMLColumn, type YamlColumnOptions } from "../coders/yaml-column.js";
 
 export interface Serialization {
   serialize(attribute: string, options?: { coder?: unknown }): void;
@@ -101,16 +101,15 @@ export function buildColumnSerializer(
   attrName: string,
   coder: unknown,
   type: unknown,
-  _yaml?: Record<string, unknown>,
+  yaml?: YamlColumnOptions,
 ): unknown {
   const resolvedCoder = coder === globalThis.JSON ? CodersJSON : coder;
 
   // Mirrors Rails' `coder == ::YAML || coder == Coders::YAMLColumn`. The string
   // "YAML" is the trails analog of Ruby's `::YAML` module constant. Rails forwards
-  // `**(yaml || {})` (permitted_classes/unsafe_load) into the YAMLColumn ctor; those
-  // Psych safe-load keywords have no JS analog, so the `_yaml` option set is dropped.
+  // `**(yaml || {})` (permitted_classes/unsafe_load) into the YAMLColumn ctor.
   if (resolvedCoder === "YAML" || resolvedCoder === YAMLColumn) {
-    return new YAMLColumn(attrName, type as new (...args: unknown[]) => unknown);
+    return new YAMLColumn(attrName, type as new (...args: unknown[]) => unknown, yaml ?? {});
   }
 
   if (typeof resolvedCoder === "function" && !("load" in resolvedCoder)) {
