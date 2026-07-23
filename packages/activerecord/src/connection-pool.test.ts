@@ -486,7 +486,10 @@ it("pin connection connected?", async () => {
 });
 
 it("isConnected probes each pooled connection's connected state", async () => {
-  const pool = makeTransactionAwarePool();
+  // Runs against the real lane adapter (not the double): checkout now
+  // establishes the raw connection on handout, so isConnected is true here
+  // on every lane, and false again once the member is disconnected.
+  const pool = makePool();
   const conn = await pool.checkout();
   expect(pool.isConnected()).toBe(true);
   pool.checkin(conn);
