@@ -631,8 +631,8 @@ function collectionWriterPromise(
 ): Promise<void> | undefined {
   const ctor = self.constructor as typeof Base;
   for (const ref of reflectOnAllAssociations(ctor)) {
-    if (!ref.isCollection?.()) continue;
-    const name = String((ref as any).nameString ?? ref.name);
+    if (!ref.isCollection()) continue;
+    const name = String(ref.name);
     if (key === name) {
       return self.association(name).writer(value);
     }
