@@ -489,6 +489,30 @@ describe("SelectManagerTest", () => {
     expect(join.right).toBe("bar");
   });
 
+  it("should create join nodes with a full outer join klass", () => {
+    const mgr = new SelectManager();
+    const join = mgr.createJoin("foo", "bar", Nodes.FullOuterJoin);
+    expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
+  });
+
+  it("should create join nodes with an outer join klass", () => {
+    const mgr = new SelectManager();
+    const join = mgr.createJoin("foo", "bar", Nodes.OuterJoin);
+    expect(join).toBeInstanceOf(Nodes.OuterJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
+  });
+
+  it("should create join nodes with a right outer join klass", () => {
+    const mgr = new SelectManager();
+    const join = mgr.createJoin("foo", "bar", Nodes.RightOuterJoin);
+    expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
+    expect(join.left).toBe("foo");
+    expect(join.right).toBe("bar");
+  });
+
   describe("join", () => {
     it("responds to join", () => {
       const left = new Table("users");
@@ -597,6 +621,14 @@ describe("SelectManagerTest", () => {
   });
 
   describe("group", () => {
+    it("takes multiple args", () => {
+      const table = new Table("users");
+      const mgr = new SelectManager();
+      mgr.from(table);
+      mgr.group(table.get("id"), table.get("name"));
+      expect(mgr.toSql()).toBe('SELECT FROM "users" GROUP BY "users"."id", "users"."name"');
+    });
+
     it("chains", () => {
       const mgr = users.project(star);
       expect(mgr.where(users.get("id").eq(1))).toBe(mgr);
@@ -912,6 +944,18 @@ describe("SelectManagerTest", () => {
     it("returns the join source of the select core", () => {
       const mgr = users.project(star);
       expect(mgr.source).toBeDefined();
+    });
+  });
+
+  describe("distinct", () => {
+    it("sets the quantifier", () => {
+      const mgr = new SelectManager();
+
+      mgr.distinct();
+      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeInstanceOf(Nodes.Distinct);
+
+      mgr.distinct(false);
+      expect(mgr.ast.cores[mgr.ast.cores.length - 1].setQuantifier).toBeNull();
     });
   });
 
@@ -1234,32 +1278,6 @@ describe("SelectManagerTest", () => {
       expect(mgr.orders.length).toBe(2);
       expect(mgr.toSql()).toContain("ORDER BY");
     });
-  });
-
-  it("should create join nodes with a full outer join klass", () => {
-    const mgr = new SelectManager(users);
-    const join = mgr.createJoin(
-      posts,
-      users.get("id").eq(posts.get("user_id")),
-      Nodes.FullOuterJoin,
-    );
-    expect(join).toBeInstanceOf(Nodes.FullOuterJoin);
-  });
-
-  it("should create join nodes with an outer join klass", () => {
-    const mgr = new SelectManager(users);
-    const join = mgr.createJoin(posts, users.get("id").eq(posts.get("user_id")), Nodes.OuterJoin);
-    expect(join).toBeInstanceOf(Nodes.OuterJoin);
-  });
-
-  it("should create join nodes with a right outer join klass", () => {
-    const mgr = new SelectManager(users);
-    const join = mgr.createJoin(
-      posts,
-      users.get("id").eq(posts.get("user_id")),
-      Nodes.RightOuterJoin,
-    );
-    expect(join).toBeInstanceOf(Nodes.RightOuterJoin);
   });
 
   describe("join", () => {
