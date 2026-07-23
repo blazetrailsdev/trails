@@ -2287,7 +2287,7 @@ describe("ArelQuoter / defaultQuoter wiring", () => {
   });
 
   it("stub quoter: quoteTableName output appears in compiled SQL", () => {
-    const stubQuoter: Visitors.ArelQuoter = {
+    const stubQuoter: Visitors.ArelConnection = {
       quoteTableName: (name) => `<<${name}>>`,
       quoteColumnName: (name) => `<<${name}>>`,
       quoteString: (s) => s.replace(/'/g, "''"),

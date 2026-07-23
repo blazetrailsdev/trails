@@ -2064,7 +2064,7 @@ export function buildFixtureSql(
   // quoting is dialect-correct rather than using the global default quoter.
   const visitor =
     ((this as any)?.visitor as Visitors.ToSql | undefined) ??
-    new Visitors.ToSql(this as unknown as Visitors.ArelQuoter);
+    new Visitors.ToSql(this as unknown as Visitors.ArelConnection);
   return visitor.compile(manager.ast);
 }
 
