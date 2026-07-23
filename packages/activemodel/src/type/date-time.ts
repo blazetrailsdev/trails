@@ -117,10 +117,9 @@ export class DateTimeType extends ValueType<DateTimeCastResult> {
   }
 
   /**
-   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value —
-   * a Hash value is validated by assembling it (raising on missing keys /
-   * out-of-range components). Eager: runs at write_from_user time, which is
-   * how Rails surfaces MultiparameterAssignmentErrors at assignment.
+   * Mirrors: AcceptsMultiparameterTime::InstanceMethods#assert_valid_value.
+   * Runs eagerly at write_from_user time — this is how Rails surfaces
+   * MultiparameterAssignmentErrors at assignment (missing keys 1..3 raise).
    */
   override assertValidValue(value: unknown): void {
     if (isNumericKeyHash(value)) this.valueFromMultiparameterAssignment(value);

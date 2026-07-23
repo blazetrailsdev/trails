@@ -133,11 +133,9 @@ function assignDateTimeAttribute(
   name: string,
   partsMap: Record<number, unknown>,
 ): void {
-  // Mirrors Rails' execute_callstack_for_multiparameter_attributes: an all-nil
-  // parts hash collapses to nil; otherwise the raw numeric-keyed hash is written
-  // and the type's AcceptsMultiparameterTime cast assembles the value. Writing
-  // the hash (not an assembled Temporal value) keeps valueBeforeTypeCast the
-  // hash, so came_from_user? is false via isValueConstructedByMassAssignment.
+  // Mirrors execute_callstack_for_multiparameter_attributes: all-nil parts → nil,
+  // else write the raw numeric-keyed hash — the type's AcceptsMultiparameterTime
+  // cast assembles it, keeping valueBeforeTypeCast the hash (came_from_user? false).
   const values = Object.values(partsMap).every((v) => v === null) ? null : partsMap;
   instance.writeAttribute(name, values);
 }

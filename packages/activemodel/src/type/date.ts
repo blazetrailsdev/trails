@@ -37,8 +37,7 @@ export class DateType extends ValueType<DateCastResult> {
     if (value instanceof Temporal.PlainDate) return value;
     // Accept PlainDateTime from multiparameter assignment — extract the date part.
     if (value instanceof Temporal.PlainDateTime) return value.toPlainDate();
-    // Numeric-keyed hash written raw by multiparameter assignment — mirrors
-    // AcceptsMultiparameterTime::InstanceMethods#cast's Hash branch.
+    // Mirrors AcceptsMultiparameterTime::InstanceMethods#cast's Hash branch.
     if (isNumericKeyHash(value)) return this.valueFromMultiparameterAssignment(value);
     // boundary: cast accepts Date input from legacy callers / custom types
     // and bridges into Temporal.PlainDate via the UTC calendar components.
@@ -152,10 +151,9 @@ export class DateType extends ValueType<DateCastResult> {
   protected valueFromMultiparameterAssignment(
     values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    // `super` — the AcceptsMultiparameterTime wrapper's Time assembly, which
-    // rolls within-range calendar overflow the way Time.local does (Nov 31 →
-    // Dec 1). The wrapper's `this.type.cast(pdt)` round-trip performs the
-    // `new_date(time.year, time.mon, time.mday)` narrowing via castValue's
+    // Rails' `super` (AcceptsMultiparameterTime's Time assembly, which rolls
+    // within-range overflow like Time.local: Nov 31 → Dec 1); the wrapper's
+    // cast(pdt) round-trip is the `new_date` narrowing via castValue's
     // PlainDateTime branch.
     return new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
   }
