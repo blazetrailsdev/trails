@@ -24,6 +24,50 @@ export interface ReplacePlan {
 }
 
 /**
+ * Host shape for {@link findFromTarget} — the two objects that carry a
+ * collection's target: the `CollectionAssociation` and the `CollectionProxy`
+ * (which is its own association, see `CollectionProxy#_association`).
+ *
+ * Loadedness is passed in rather than read off the host: the association
+ * exposes it as `isLoaded()`, the proxy as its `loaded` getter over
+ * `_targetLoaded` — and the proxy also inherits an unrelated `Relation#isLoaded`
+ * over `_loaded`, so reading either name off the host would pick the wrong flag
+ * on one of them.
+ *
+ * @internal
+ */
+export interface FindFromTargetHost {
+  owner: Base;
+  reflection: { options: { strictLoading?: unknown } };
+  target: readonly Base[];
+}
+
+/**
+ * The single body behind `CollectionAssociation#isFindFromTarget` and
+ * `CollectionProxy#isFindFromTarget`. Mirrors
+ * ActiveRecord::Associations::CollectionAssociation#find_from_target?
+ * (collection_association.rb:308): loaded, owner strict-loading-all,
+ * reflection strict-loading, owner new record, or any target record
+ * new/changed.
+ *
+ * Note the final clause is Rails' `record.changed?`, NOT `has_changes_to_save?`
+ * — different mutation sources (`mutations_from_user` vs
+ * `mutations_from_database`), even though both currently resolve to
+ * `_dirty.changed` here.
+ *
+ * @internal
+ */
+export function findFromTarget(this: FindFromTargetHost, loaded: boolean): boolean {
+  return (
+    loaded ||
+    (this.owner.isStrictLoading() && this.owner.isStrictLoadingAll()) ||
+    !!this.reflection.options.strictLoading ||
+    this.owner.isNewRecord() ||
+    this.target.some((r) => r.isNewRecord() || r.changed)
+  );
+}
+
+/**
  * Base class for has_many and has_and_belongs_to_many associations.
  *
  * CollectionAssociation provides common CRUD methods for collections.
@@ -742,31 +786,13 @@ export class CollectionAssociation extends Association {
    * Returns true if find should search the loaded target rather than
    * going to the database. Mirrors
    * ActiveRecord::Associations::CollectionAssociation#find_from_target?
-   * (collection_association.rb:308): loaded, owner strict-loading-all,
-   * reflection strict-loading, owner new record, or any target record
-   * new/changed. Kept in clause-parity with `CollectionProxy#isFindFromTarget`.
-   *
-   * Note the final clause is Rails' `record.changed?`, NOT `has_changes_to_save?`
-   * — different mutation sources (`mutations_from_user` vs
-   * `mutations_from_database`), even though both currently resolve to
-   * `_dirty.changed` here.
-   *
-   * This method has no live callers: its only route in is the module-level
-   * `isFindFromTarget(proxy)` helper in collection-proxy.ts, which is reached
-   * solely from the module-level `findNthWithLimit` — itself referenced nowhere.
-   * The live implementation is `CollectionProxy#isFindFromTarget`, which reads
-   * the proxy's own `_target`/`_targetLoaded`. Kept here because api:compare
-   * maps `find_from_target?` to the Rails-layout file. Verified dead by making
-   * this body throw: 382 collection-proxy/has-many tests still pass.
+   * (collection_association.rb:308). The clause list lives in
+   * {@link findFromTarget} so `CollectionProxy#isFindFromTarget` — Rails'
+   * one-line delegation at collection_proxy.rb:1154 — shares this exact body
+   * instead of hand-maintaining a copy.
    */
   isFindFromTarget(): boolean {
-    return (
-      this.isLoaded() ||
-      (this.owner.isStrictLoading() && this.owner.isStrictLoadingAll()) ||
-      !!this.reflection.options.strictLoading ||
-      this.owner.isNewRecord() ||
-      this.target.some((r) => r.isNewRecord() || r.changed)
-    );
+    return findFromTarget.call(this, this.isLoaded());
   }
 
   override isCollection(): boolean {
