@@ -329,7 +329,7 @@ export class DisableJoinsAssociationScope extends AssociationScope {
       // scope is already a never-match. Skip the wrap: the fresh DJAR
       // would only copy `_whereClause.predicates` and lose `_isNone`,
       // causing a full-table SELECT instead of an empty result.
-      if ((scope as { isNone: () => boolean }).isNone()) return scope;
+      if ((scope as { _isNone: boolean })._isNone) return scope;
       // Loaded-chain wrap: DJAR loads via SQL, then re-groups by the
       // join key and re-emits in `ids` order so callers see the
       // through-table ordering (SQL `IN(...)` / composite OR-of-AND

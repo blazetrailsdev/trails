@@ -1403,9 +1403,21 @@ describe("RelationTest", () => {
 
   it("none?", async () => {
     const postsRel = Post.all();
-    expect(await postsRel.isNone()).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await postsRel.isNone()).toBe(false); // Uses COUNT()
+    });
+
     expect(postsRel.isLoaded).toBe(false);
-    expect(postsRel.isLoaded).toBe(false);
+
+    await assertQueriesCount(1, false, async () => {
+      expect(await postsRel.isNone((p) => (p.id as number) < 0)).toBe(true);
+      expect(await postsRel.isNone((p) => p.id === 1)).toBe(false);
+
+      expect(await postsRel.isNone(Comment)).toBe(true);
+      expect(await postsRel.isNone(Post)).toBe(false);
+    });
+
+    expect(postsRel.isLoaded).toBe(true);
   });
 
   it("one", async () => {

@@ -3254,28 +3254,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   }
 
   /**
-   * True if the collection has no records.
-   *
-   * Mirrors: ActiveRecord::Associations::CollectionProxy#none?
-   */
-  // @ts-expect-error Rails Relation#none? fires a query (Enumerable#none?
-  //   via each); our Relation#isNone only checks the NullRelation flag, so the
-  //   CollectionProxy override widens the param/return to the collection form.
-  async isNone(predicate?: (record: T) => boolean): Promise<boolean> {
-    if (predicate !== undefined) {
-      const records = await this.loadTarget();
-      for (const r of records) {
-        if (predicate(r)) return false;
-      }
-      return true;
-    }
-    // Rails CollectionProxy#none? (no block) is `empty?` — `size.zero?` — so it
-    // honors an active counter cache / loaded target / cached ids exactly like
-    // isEmpty rather than always firing a COUNT.
-    return this.isEmpty();
-  }
-
-  /**
    * True if the collection has exactly one record.
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#one?

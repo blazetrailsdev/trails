@@ -2460,15 +2460,8 @@
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "none?",
-    "call": "empty?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag — the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "none?",
     "call": "present?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag — the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
+    "reason": "Confirmed equivalent: Rails relation.rb:378-383 guards `return super if args.present? || block_given?` — the `present?` is Ruby's Array#present? on the varargs. trails isNone (relation.ts) expresses the same guard as `pattern !== undefined` (a single optional param, no splat to test for presence), so no `present?` call exists. Extractor flags the missing call name — false positive, no omission."
   },
   {
     "package": "activerecord",

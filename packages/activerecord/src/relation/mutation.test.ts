@@ -181,7 +181,7 @@ describe("RelationMutationTest", () => {
   it("none!", async () => {
     const rel = relation();
     expect(rel.noneBang()).toBe(rel);
-    expect(rel.isNone()).toBe(true);
+    expect(await rel.isNone()).toBe(true);
     expect(rel.isNullRelation()).toBe(true);
   });
 
