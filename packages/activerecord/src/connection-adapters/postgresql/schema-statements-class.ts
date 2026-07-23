@@ -972,20 +972,13 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // sees the new default rather than a stale (always-warm) entry. Safe to clear
     // first: the column lookup below queries pg_catalog directly, not the cache.
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    const quotedTable = this._qt(tableName);
-    const quotedCol = this._qi(columnName);
-    const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
-    if (defaultValue == null) {
-      await this.adapter.execute(
-        `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,
-      );
-    } else {
-      const col = (await this.columns(tableName)).find((c) => c.name === columnName);
-      const expr = await this.adapter.quoteDefaultExpression(defaultValue, col);
-      await this.adapter.execute(
-        `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`,
-      );
-    }
+    // Mirrors postgresql/schema_statements.rb:486: route through
+    // change_column_default_for_alter so the non-bulk path shares the
+    // builder + visit_ChangeColumnDefaultDefinition machinery with bulk
+    // change_table.
+    await this.adapter.execute(
+      `ALTER TABLE ${this._qt(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
+    );
   }
 
   buildChangeColumnDefinition(
