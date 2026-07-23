@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import os from "os";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) sets the vitest worker count
 // via TEST_FORKS below. The advisory-lock slot pool is sized SEPARATELY, with
@@ -80,7 +81,18 @@ const SQLITE_DRIVER_TESTS = [
 ];
 
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
-const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
+// Clamp to vitest's own host-derived ceiling (numCpus - 1): while the root
+// maxForks cap was a per-project no-op, that ceiling is what every run
+// actually used, and the suite's timeouts are tuned to it — on the 4-vCPU CI
+// runner, honoring AR_DB_FORKS=8 outright oversubscribes PG enough to push
+// the full-DB schema-dump tests past their 5s timeout. The env vars can only
+// lower the cap, never raise it past the host. The advisory-slot pool still
+// sizes from AR_DB_FORKS (ar-db-slots.ts), so it can only over-provision.
+const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
+const TEST_FORKS = Math.min(
+  Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6,
+  _hostForkCap,
+);
 
 const alias = {
   "@blazetrails/activesupport/message-verifier": path.resolve(
