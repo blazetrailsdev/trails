@@ -10,6 +10,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, ReadonlyAttributeError, registerModel } from "./index.js";
 import { formatForInspect } from "./attribute-inspection.js";
+import { registerSubclass } from "./inheritance.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Minivan } from "./test-helpers/models/minivan.js";
@@ -246,6 +247,28 @@ describe("AttributeMethodsTest (trails)", () => {
     const second = Topic.attributeNames();
     expect(second).not.toBe(first);
     expect(second).toEqual(first);
+  });
+
+  it("tableName= invalidates the attributeNames memo on descendants", async () => {
+    class Topic extends Base {}
+    class ImportantTopic extends Topic {
+      static {
+        registerSubclass(this);
+      }
+    }
+    await Topic.loadSchema();
+    Topic.attributeNames();
+    const subNames = ImportantTopic.attributeNames();
+    Topic.tableName = "posts";
+    expect(ImportantTopic.attributeNames()).not.toBe(subNames);
+  });
+
+  it("ignoredColumns= invalidates the attributeNames memo", async () => {
+    class Topic extends Base {}
+    await Topic.loadSchema();
+    const first = Topic.attributeNames();
+    Topic.ignoredColumns = ["approved"];
+    expect(Topic.attributeNames()).not.toBe(first);
   });
 
   it("subclass does not inherit the parent's attributeNames memo", async () => {

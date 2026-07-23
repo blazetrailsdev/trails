@@ -554,6 +554,23 @@ interface SchemaHost {
   hookAttributeType?(name: string, type: Type): Type;
 }
 
+/**
+ * Drop the memoized class-level `attributeNames` on `host` and its
+ * descendants — Rails' `reload_schema_from_cache` nils `@attribute_names`
+ * recursively (model_schema.rb:553-568). Used by the invalidation paths that
+ * don't bump `_schemaRevision` (`attribute`, `table_name=`, `ignored_columns=`).
+ *
+ * @internal
+ */
+export function clearAttributeNamesMemo(host: SchemaHost): void {
+  const descendants = (host as { descendants?: SchemaHost[] }).descendants ?? [];
+  for (const klass of [host, ...descendants]) {
+    if (Object.prototype.hasOwnProperty.call(klass, "_attributeNamesMemo")) {
+      Reflect.deleteProperty(klass, "_attributeNamesMemo");
+    }
+  }
+}
+
 export function deriveJoinTableName(this: SchemaHost, otherTableName: string): string {
   const tables = [underscore(this.name), otherTableName].sort();
   return tables.join("_");
@@ -1552,11 +1569,10 @@ export function tableName(this: SchemaHost, value?: string): string {
       // chain and would otherwise never reflect its own table. Shadow the
       // inherited flag with an own `false` so the next load re-reflects.
       (this as { _schemaLoaded?: boolean })._schemaLoaded = false;
-      // Rails' reset_column_information also nils @attribute_names; drop the
-      // memo now so reads before the next load don't see the old table's names.
-      if (Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")) {
-        Reflect.deleteProperty(this, "_attributeNamesMemo");
-      }
+      // Rails' reset_column_information also nils @attribute_names (on the
+      // class and, recursively, its descendants); drop the memos now so reads
+      // before the next load don't see the old table's names.
+      clearAttributeNamesMemo(this);
     }
   }
   return resolveTableName.call(this as any);
@@ -1590,6 +1606,9 @@ export function sequenceName(this: SchemaHost, value?: string | null): string | 
 export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
   if (value !== undefined) {
     this._ignoredColumns = value;
+    // Rails' ignored_columns= runs reload_schema_from_cache
+    // (model_schema.rb:366-368), which nils @attribute_names recursively.
+    clearAttributeNamesMemo(this);
     for (const col of value) {
       if (col in this.prototype) {
         Object.defineProperty(this.prototype, col, {
