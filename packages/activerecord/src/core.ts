@@ -1006,8 +1006,6 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       // (not the aggregate "in [...]"), and a hit is wrapped back into a
       // 1-element array because `expects_array` is true.
       const single = compactedIds[0];
-      // Rails find_one passes the id raw — `where(primary_key => id)`; the
-      // QueryAttribute bind owns casting at compile time (predicate_builder.rb).
       const record = await this.all()
         .where({ [this.primaryKey as string]: single })
         .first();
@@ -1021,13 +1019,12 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       }
       return [record];
     }
-    // Rails find_some_ordered passes the ids raw to `where(primary_key => ids)`
-    // (the bind casts); only the in_order_of step below casts, via
-    // `ids.map { model.type_for_attribute(primary_key).cast(id) }`
-    // (finder_methods.rb:576).
     const records = await this.all()
       .where({ [this.primaryKey as string]: compactedIds })
       .toArray();
+    // Rails find_some_ordered casts only for the in_order_of mapping:
+    // `ids.map { model.type_for_attribute(primary_key).cast(id) }`
+    // (finder_methods.rb:576) — the WHERE ids stay raw for the bind to cast.
     const pkType = this.typeForAttribute(this.primaryKey as string);
     const castIds = compactedIds.map((i) => pkType.cast(i));
     // Key by pkMatchKey so a BigInt PK matches the number/string id passed in
@@ -1047,8 +1044,6 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     // in_order_of: return in input order
     return castIds.map((cid) => idToRecord.get(pkMatchKey(cid))!);
   }
-  // Rails find_one: the id flows raw into `where(primary_key => id)` — the
-  // QueryAttribute bind casts/serializes at compile time (predicate_builder.rb).
   const record = await this.all()
     .where({ [this.primaryKey as string]: id })
     .first();

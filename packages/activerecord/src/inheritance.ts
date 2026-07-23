@@ -22,8 +22,6 @@ function castInheritanceColumnValue(
 ): unknown {
   // Rails: type_for_attribute(inheritCol).cast(value) — handles non-string
   // inputs (numbers/booleans) by coercing through the column's type.
-  // typeForAttribute is total (unknown names yield a Value-default type),
-  // so no fallback is needed.
   const casted = (
     modelClass.typeForAttribute(inheritCol) as { cast(value: unknown): unknown }
   ).cast(value);
