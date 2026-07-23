@@ -18,6 +18,7 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../associations.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor } from "../test-helpers/models/cpk.js";
+import { sql as arelSql } from "@blazetrails/arel";
 import { captureSql } from "../testing/sql-capture.js";
 
 describe("CpkBook grouped calculation over a composite-key belongs_to applies order", () => {
@@ -29,6 +30,11 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
     [CpkBook, CpkOrder, CpkAuthor].forEach((m) => registerModel(m));
   });
 
+  // An aggregate order expression must go through `Arel.sql`: a bare
+  // "COUNT(*) DESC" string is a non-attribute argument, so `disallowRawSql`
+  // rejects it once `allowUnsafeRawSql` is disabled (as it is under the full
+  // suite run).
+  //
   // Three orders in shop 1. Book counts per order: 1 → 1, 2 → 3, 3 → 2.
   // Grouping by the composite belongs_to and ordering by COUNT(*) DESC makes
   // the ordered top-2 orders (2, 3) differ from the unordered/insertion-order
@@ -61,10 +67,10 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
     await seedOrders();
     let result: Map<unknown, number> = new Map();
     const sqls = await captureSql(async () => {
-      result = (await CpkBook.group("order").order("COUNT(*) DESC").limit(2).count()) as Map<
-        unknown,
-        number
-      >;
+      result = (await CpkBook.group("order")
+        .order(arelSql("COUNT(*) DESC"))
+        .limit(2)
+        .count()) as Map<unknown, number>;
     });
 
     const counts = [...result.entries()].map(([order, count]) => [
@@ -83,10 +89,10 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
 
   it("group by a composite-key belongs_to with order and offset skips the ordered groups", async () => {
     await seedOrders();
-    const result = (await CpkBook.group("order").order("COUNT(*) DESC").offset(2).count()) as Map<
-      unknown,
-      number
-    >;
+    const result = (await CpkBook.group("order")
+      .order(arelSql("COUNT(*) DESC"))
+      .offset(2)
+      .count()) as Map<unknown, number>;
 
     const counts = [...result.entries()].map(([order, count]) => [
       (order as CpkOrder | null)?.id,
