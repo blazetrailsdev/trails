@@ -654,9 +654,19 @@ describe("NestedThroughAssociationsTest", () => {
     expect(subSpecialComment.length).toBeGreaterThan(0);
   });
 
-  // 3-level nested through (specialComments→specialCommentsRatings→taggings) direct-load returns empty.
-  // DEFERRED (RFC 0030): tracked by nested-through-sti-reflection-load.
-  it.todo("has many through with sti on nested through reflection");
+  it("has many through with sti on nested through reflection", async () => {
+    const stiComments = posts("sti_comments");
+    const specialRatingTagging = taggings("special_comment_rating");
+
+    const taggingsResult = await stiComments.specialCommentsRatingsTaggings.toArray();
+    expect(taggingsResult.map((t) => t.id)).toEqual([specialRatingTagging.id]);
+
+    const scope = Post.joins("specialCommentsRatingsTaggings").where({ id: stiComments.id });
+    const emptyComment = await scope.where({ "comments.type": "Comment" });
+    expect(emptyComment).toHaveLength(0);
+    const specialComment = await scope.where({ "comments.type": "SpecialComment" });
+    expect(specialComment.length).toBeGreaterThan(0);
+  });
 
   it("nested has many through writers should raise error", async () => {
     const david = authors("david");
