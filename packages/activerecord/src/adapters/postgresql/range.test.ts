@@ -66,6 +66,13 @@ describeIfPg("PostgreSQLAdapter", () => {
         this.attribute("id", "integer");
       }
     }
+    // Mirrors Rails' setup `PostgresqlRange.reset_column_information`
+    // (range_test.rb): the adapter's schema cache still holds the previous
+    // test's columns for `postgresql_ranges`, whose floatrange/stringrange
+    // OIDs were reassigned by the drop+recreate above. Clearing the data-source
+    // cache re-reflects columns against the live catalog so the custom range
+    // types resolve to their current OIDs.
+    PostgresqlRangesCls.resetColumnInformation();
     await PostgresqlRangesCls.loadSchema();
     PostgresqlRanges = PostgresqlRangesCls;
 
