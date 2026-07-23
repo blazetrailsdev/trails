@@ -165,13 +165,9 @@ export const fakeRecordConnection: ArelConnection = {
  * (`test/cases/arel/helper.rb:19-20`), and `FakeRecord::Connection#initialize`
  * builds its visitor as `Arel::Visitors::ToSql.new(self)` (`fake_record.rb:36`)
  * — so the double's `'t'`/`'f'` quoting is what the whole suite compiles
- * through. trails is not there yet: `test-setup-engine.ts` still installs a
- * generic `ToSql` suite-wide, because switching the default would change the
- * expected SQL of every boolean assertion at once. Tracked by story
- * `arel-suite-engine-is-fake-record-base`.
- *
- * Until then this is opt-in, for the cases whose Rails counterpart asserts a
- * FakeRecord rendering.
+ * through. trails mirrors that: `test-setup-engine.ts` installs this engine as
+ * `Table.engine` suite-wide, so every bare `.toSql()` in the arel suite renders
+ * through the FakeRecord quoting double, exactly as in Rails.
  *
  * @internal
  */
