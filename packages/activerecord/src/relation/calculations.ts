@@ -451,6 +451,10 @@ async function singleAggregate(
   rel._applyJoinsToManager(manager, eagerJd);
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
+  // `execute_simple_calculation` runs the relation's own arel too, and
+  // `build_arel` applies the having clause with no GROUP BY guard — an ungrouped
+  // `having("sum(x) > n").sum(:x)` is unusual but valid, and Rails emits it.
+  applyHavingToManager(rel, manager);
 
   const colType = resolveColType(rel, column);
   const [rawSql, managerBinds] = compileManagerWithBinds(rel, manager);
@@ -468,21 +472,31 @@ async function singleAggregate(
 }
 
 /**
- * Rails' `execute_grouped_calculation` builds the grouped query from the
- * relation's own arel, so `having_clause` rides along (calculations.rb:553-556),
- * and folds the relation's own `select_values` into the projection whenever the
- * having clause is non-empty (calculations.rb:542) — that is what makes an
- * aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`) referencable
- * from HAVING. Our arms project explicitly rather than reusing `build_arel`, so
- * both steps are applied here.
+ * Both calculation arms run `select_all` on the relation's own arel, and
+ * `build_arel` emits `arel.having(having_clause.ast) unless having_clause.empty?`
+ * unconditionally — with or without a GROUP BY (query_methods.rb:1756). Our arms
+ * project explicitly instead of reusing `build_arel`, so the having clause has to
+ * be re-applied by hand.
  * @internal
  */
 function applyHavingToManager(rel: CalculationRelation, manager: any): void {
   const having = rel.havingClause;
-  if (having.isEmpty()) return;
+  if (!having.isEmpty()) manager.having(having.ast);
+}
+
+/**
+ * `execute_grouped_calculation` folds the relation's own `select_values` into the
+ * projection whenever the having clause is non-empty (calculations.rb:542) — that
+ * is what makes an aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`)
+ * referencable from HAVING. Grouped only: `execute_simple_calculation` REPLACES
+ * `select_values` with the lone aggregate (calculations.rb:484), so the ungrouped
+ * arm must not fold.
+ * @internal
+ */
+function foldSelectValuesForHaving(rel: CalculationRelation, manager: any): void {
+  if (rel.havingClause.isEmpty()) return;
   const extraSelects = arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[];
   if (extraSelects.length > 0) manager.project(...extraSelects);
-  manager.having(having.ast);
 }
 
 async function groupedAggregate(
@@ -543,6 +557,7 @@ async function groupedAggregate(
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
   for (const n of groupNodes) manager.group(n);
+  foldSelectValuesForHaving(rel, manager);
   applyHavingToManager(rel, manager);
   // Rails `execute_grouped_calculation` runs `select_all` on the relation's own
   // arel, which retains order_values — without the ORDER BY, LIMIT/OFFSET pick
@@ -687,6 +702,7 @@ async function groupedCompositeAssoc(
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
   for (const n of groupNodes) manager.group(n);
+  foldSelectValuesForHaving(rel, manager);
   applyHavingToManager(rel, manager);
 
   if (rel._limitValue !== null) manager.take(rel._limitValue);

@@ -265,3 +265,28 @@ describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
     expect(entries[0][1]).toBe(2);
   });
 });
+
+// ==========================================================================
+// Ungrouped calculation HAVING
+//
+// `execute_simple_calculation` runs the relation's own arel (calculations.rb:485)
+// and `build_arel` emits `arel.having(having_clause.ast) unless
+// having_clause.empty?` with no GROUP BY guard (query_methods.rb:1756), so an
+// ungrouped `having(...)` reaches the SQL. Rails has no test for it — trails
+// projects explicitly instead of reusing `build_arel`, so the clause has to be
+// re-applied by hand and needs a guard.
+// ==========================================================================
+
+describe("ungrouped calculation HAVING", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("emits HAVING with no GROUP BY and filters the single aggregate row", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    // The whole-table sum survives the satisfied predicate; the unsatisfied one
+    // drops the only row, leaving sum-of-no-rows.
+    const total = (await Account.sum("credit_limit")) as number;
+    expect(total).toBeGreaterThan(100);
+    expect(await Account.having("sum(credit_limit) > 100").sum("credit_limit")).toBe(total);
+    expect(await Account.having("sum(credit_limit) > 100000").sum("credit_limit")).toBe(0);
+  });
+});
