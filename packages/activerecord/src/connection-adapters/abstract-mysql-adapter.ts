@@ -29,6 +29,7 @@ import {
   InvalidForeignKey,
   LockWaitTimeout,
   MismatchedForeignKey,
+  type MismatchedForeignKeyOptions,
   NotNullViolation,
   QueryCanceled,
   RangeError as ARRangeError,
@@ -1559,12 +1560,23 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    */
   protected mismatchedForeignKey(
     message: string,
-    sql: string,
+    sql: string | null,
     binds: unknown[],
     cause: unknown,
   ): MismatchedForeignKey {
-    const details = this.mismatchedForeignKeyDetails(message, sql);
-    return new MismatchedForeignKey({ message, sql, binds, cause, ...details });
+    // Mirrors Rails' `if sql / else query_parser` split: on the sql-less
+    // translation path (with_raw_connection calls translateExceptionClass
+    // with sql: null), FK-detail parsing is deferred until setQuery.
+    if (sql) {
+      const details = this.mismatchedForeignKeyDetails(message, sql);
+      return new MismatchedForeignKey({ message, sql, binds, cause, ...details });
+    }
+    return new MismatchedForeignKey({
+      message,
+      binds,
+      cause,
+      queryParser: (parsedSql) => this.mismatchedForeignKeyDetails(message, parsedSql),
+    });
   }
 
   /**
@@ -1577,7 +1589,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
   protected mismatchedForeignKeyDetails(
     message: string,
     sql: string,
-  ): Partial<ConstructorParameters<typeof MismatchedForeignKey>[0]> {
+  ): Partial<MismatchedForeignKeyOptions> {
     // Extract the referencing column name from MySQL's error message when
     // available (MySQL 8+ includes it: "Referencing column 'x' and referenced")
     const fkFromMsg = /Referencing column '(\w+)' and referenced/i.exec(message)?.[1];
