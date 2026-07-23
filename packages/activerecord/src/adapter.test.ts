@@ -1199,14 +1199,7 @@ describe.skipIf(inMemoryDb())("AdapterConnectionTest", () => {
     await connection.execute("SELECT 1", [], "SQL", { allowRetry: true });
   });
 
-  // SURFACED DEVIATION (RFC 0023, story
-  // adapter-configure-connection-failure-propagation): when configure_connection
-  // raises during a (re)connect, trails' abstract reconnect/verify lifecycle does
-  // not surface the original ConnectionFailed — it leaves the raw handle closed
-  // (attemptConfigureConnection disconnects) and the subsequent query then throws
-  // `StatementInvalid: The database connection is not open`. Rails re-raises the
-  // ConnectionFailed (adapter_test.rb:852). Un-skip once that propagation is fixed.
-  it.skip("disconnect and recover on #configure_connection failure", async () => {
+  it("disconnect and recover on #configure_connection failure", async () => {
     const pool = (connection as unknown as { pool: { newConnection(): DatabaseAdapter } }).pool;
     const fresh = pool.newConnection();
     try {

@@ -29,6 +29,7 @@ import { captureUnwrappedExecute, dirtiesQueryCache } from "./abstract/query-cac
 import { execInsertReturningReadback } from "./abstract/database-statements.js";
 import { StatementPool as GenericStatementPool } from "./statement-pool.js";
 import {
+  ActiveRecordError,
   StatementInvalid,
   RecordNotUnique,
   InvalidForeignKey,
@@ -2793,6 +2794,7 @@ export class AbstractSQLite3Adapter extends AbstractAdapter implements DatabaseA
   }
 
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    if (e instanceof ActiveRecordError) return e;
     const msg = e instanceof Error ? e.message : String(e);
     // Wrap non-Error throws so translateException always receives an Error.
     // Preserve the original value as .cause and copy .code so code-based

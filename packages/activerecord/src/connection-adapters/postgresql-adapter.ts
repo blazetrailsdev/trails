@@ -50,6 +50,7 @@ import type { InsertBuilder } from "../insert-all.js";
 import type { AdapterName } from "./abstract-adapter.js";
 import type { PostgreSQLAdapterOptions } from "./pool-config.js";
 import {
+  ActiveRecordError,
   AdapterError,
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -1402,7 +1403,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
     try {
-      await this._maybeConfigureConnection(client);
+      await this.configureConnection(client);
       // Re-check teardown after every await: a concurrent reconnect
       // can null _rawConnection while configure is in flight.
       if (this._closed || this._rawConnection !== client) {
@@ -2841,16 +2842,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
-   * Mirrors Rails' `connect!` establishing `@raw_connection`. Eagerly opens
-   * and configures the single pg.Client (via `connect()`) so the base
-   * `withRawConnection` loop yields `this._connection` directly — no lazy
-   * per-iteration re-acquire. Called pre-loop by the base when `_connection`
-   * is null and the transaction state is restorable.
+   * Mirrors Rails' `connect!` (abstract_adapter.rb:778), which is just
+   * `verify!`: with no raw connection, verifyBang drives
+   * `reconnectBang({ restoreTransactions: true })` — the retry loop that gives
+   * a configure_connection failure its connection_retries re-attempts
+   * (adapter_test.rb:852) — and eagerly populates `this._connection` so the
+   * base `withRawConnection` loop yields it directly. Called pre-loop by the
+   * base when `_connection` is null and the transaction state is restorable.
    *
    * @internal
    */
   override async connectBang(): Promise<void> {
-    await this.connect();
+    await this.verifyBang();
   }
 
   /**
@@ -4459,6 +4462,7 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * `ConnectionAdapters::PostgreSQL::DatabaseStatements#translate_exception`.
    */
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    if (e instanceof ActiveRecordError) return e;
     const build = (): Error => {
       if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
       const code = (e as { code?: string }).code;

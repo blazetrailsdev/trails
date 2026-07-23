@@ -20,6 +20,7 @@ import type { AdapterName } from "./abstract-adapter.js";
 import { AbstractAdapter, Version } from "./abstract-adapter.js";
 import type { Column } from "./column.js";
 import {
+  ActiveRecordError,
   AdapterError,
   ConnectionFailed,
   ConnectionNotEstablished,
@@ -1659,6 +1660,7 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
    * `ConnectionAdapters::AbstractMysqlAdapter#translate_exception`.
    */
   protected _translateException(e: unknown, sql: string, binds: unknown[]): Error {
+    if (e instanceof ActiveRecordError) return e;
     if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });
     const errno = (e as { errno?: number }).errno;
     const msg = e.message;
