@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import os from "os";
 
 // AR_DB_FORKS (read in test-setup-worker-db.ts) sets the vitest worker count
 // via TEST_FORKS below. The advisory-lock slot pool is sized SEPARATELY, with
@@ -80,7 +81,18 @@ const SQLITE_DRIVER_TESTS = [
 ];
 
 const _parsedForks = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
-const TEST_FORKS = Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6;
+// Clamp to vitest's own host-derived ceiling (numCpus - 1): while the root
+// maxForks cap was a per-project no-op, that ceiling is what every run
+// actually used, and the suite's timeouts are tuned to it — on the 4-vCPU CI
+// runner, honoring AR_DB_FORKS=8 outright oversubscribes PG enough to push
+// the full-DB schema-dump tests past their 5s timeout. The env vars can only
+// lower the cap, never raise it past the host. The advisory-slot pool still
+// sizes from AR_DB_FORKS (ar-db-slots.ts), so it can only over-provision.
+const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);
+const TEST_FORKS = Math.min(
+  Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : 6,
+  _hostForkCap,
+);
 
 const alias = {
   "@blazetrails/activesupport/message-verifier": path.resolve(
@@ -284,6 +296,13 @@ export default defineConfig({
   resolve: { alias },
   test: {
     globals: true,
+    // MUST live at the ROOT config: vitest 3's shared fork pool sizes itself
+    // from the root `poolOptions.forks.maxForks` only (createForksPool never
+    // consults per-project poolOptions — a project-level `maxForks` is a
+    // silent no-op and the cap falls back to `numCpus - 1`, which on a
+    // many-core host forks every file at once and exhausts the AR_DB
+    // advisory-slot pool: "all N GET_LOCK slots are held").
+    poolOptions: { forks: { maxForks: TEST_FORKS } },
     // In the isolated trails-tsc coverage run, the build-views/watch tests are
     // CPU-pegged in tsc under v8 instrumentation long enough to starve vitest's
     // reporter heartbeat, surfacing a `Timeout calling "onTaskUpdate"` worker
@@ -370,7 +389,6 @@ export default defineConfig({
           // tracking removal).
           hookTimeout: 30_000,
           pool: "forks",
-          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
       {
@@ -382,7 +400,6 @@ export default defineConfig({
           name: "sqlite-drivers",
           include: SQLITE_DRIVER_TESTS,
           exclude: [...SHARED_EXCLUDE],
-          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
       {
@@ -409,7 +426,6 @@ export default defineConfig({
           // Arel's suite needs `Arel::Table.engine` set, exactly as Rails' does
           // (it runs under activerecord, where the engine is ActiveRecord::Base).
           setupFiles: ["./packages/arel/src/test-setup-engine.ts"],
-          poolOptions: { forks: { maxForks: TEST_FORKS } },
         },
       },
     ],
