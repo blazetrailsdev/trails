@@ -24,6 +24,22 @@ export function isHash(value: unknown): value is Record<string, unknown> {
   return proto === Object.prototype || proto === null;
 }
 
+// Ruby Time's month-name coercion table (time.c months[]).
+const MONTH_ABBREVIATIONS = [
+  "jan",
+  "feb",
+  "mar",
+  "apr",
+  "may",
+  "jun",
+  "jul",
+  "aug",
+  "sep",
+  "oct",
+  "nov",
+  "dec",
+];
+
 export class AcceptsMultiparameterTime {
   readonly type: Type;
   /** @internal */
@@ -84,12 +100,25 @@ export class AcceptsMultiparameterTime {
     const absent = (k: string) => filled[k] === undefined || filled[k] === null || filled[k] === "";
     if (absent("1") || absent("2") || absent("3")) return null;
 
-    // Extract each slot by key. Rails uses to_i (non-numeric → 0); mirror that for NaN.
+    // Extract each slot by key with ::Time.utc/local's argument coercion
+    // (verified on Ruby 3.3): nil → the slot default; Numeric truncates except
+    // the seconds slot (Time.utc(...,5.5) keeps the fraction); String goes
+    // through strict Integer() — "2004abc", "5.5", and "" all raise
+    // ArgumentError — except the month slot, which also accepts 3-letter
+    // month-name abbreviations case-insensitively ("JAN" works, "june" raises).
     const num = (key: string, fallback: number): number => {
       const v = filled[key];
-      if (v === undefined || v === null || v === "") return fallback;
-      const n = typeof v === "number" ? v : Number(v);
-      return Number.isNaN(n) ? 0 : n;
+      if (v === undefined || v === null) return fallback;
+      if (typeof v === "number") return key === "6" ? v : Math.trunc(v);
+      const s = String(v).trim();
+      if (key === "2") {
+        const monthIndex = MONTH_ABBREVIATIONS.indexOf(s.toLowerCase());
+        if (monthIndex !== -1) return monthIndex + 1;
+      }
+      if (!/^[+-]?\d+$/.test(s)) {
+        throw new ArgumentError(`invalid value for Integer(): ${JSON.stringify(v)}`);
+      }
+      return parseInt(s, 10);
     };
 
     const year = num("1", 0);
