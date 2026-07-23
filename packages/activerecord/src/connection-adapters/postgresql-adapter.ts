@@ -3605,12 +3605,28 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /**
+   * Mirrors: PostgreSQL::Quoting#lookup_cast_type (postgresql/quoting.rb:195).
+   * Resolves a sql_type string to its OID with a live
+   * `SELECT '<sql_type>'::regtype::oid` SCHEMA query, then looks the OID up in
+   * the type map (Rails' `super` = abstract `type_map.lookup(oid)`). The PG
+   * type map is keyed by OID and short typname, so DDL-formatted names like
+   * `character varying` resolve only through this regtype round-trip — which
+   * also handles typmods (`(255)`), `[]` array suffixes, enums, and domains.
+   * @internal
+   */
+  private async lookupCastType(sqlType: string): Promise<Type> {
+    const rows = await this.schemaQuery(`SELECT ${this.quote(sqlType)}::regtype::oid`);
+    return this.typeMap.lookup(Number(rows[0]?.oid));
+  }
+
+  /**
    * Mirrors: ActiveRecord::ConnectionAdapters::PostgreSQL::Quoting#quote_default_expression.
    * Routes through the array- and typeMap-aware `pgQuoteDefaultExpression`
    * so DEFAULT clauses on array columns and OID-backed types serialize
-   * correctly.
+   * correctly. Async: a ColumnDefinition (no OID) resolves its cast type via
+   * `lookupCastType`'s live regtype query, as Rails does.
    */
-  override quoteDefaultExpression(value: unknown, column?: unknown): string {
+  override quoteDefaultExpression(value: unknown, column?: unknown): Promise<string> {
     const col = column as
       | {
           sqlType?: string | null;
@@ -3633,7 +3649,10 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
         sqlType?: string | null;
         oid?: number | null;
         fmod?: number | null;
-      }): { serialize?(v: unknown): unknown } | null {
+      }):
+        | { serialize?(v: unknown): unknown }
+        | null
+        | Promise<{ serialize?(v: unknown): unknown } | null> {
         // A live Column carries an OID, so hand it straight through: Rails
         // keys the lookup on (oid, fmod, sql_type) (quoting.rb:191), and for
         // an array column that OID resolves to OID::Array(subtype) — an
@@ -3644,16 +3663,11 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
             serialize?(v: unknown): unknown;
           } | null;
         }
-        // No OID means a ColumnDefinition from a DDL path, whose sqlType is
-        // the `[]`-suffixed form typeToSql emitted (`integer[]`). Strip it so
-        // the element typname resolves — normalizeFormatType deliberately
-        // preserves `[]` for the type-casting path, so the strip belongs
-        // here at the call site rather than in the shared helper. The
-        // element subtype is then wrapped in OidArray downstream.
-        const base = (c.sqlType ?? "").replace(/\[\]\s*$/, "");
-        return self.lookupCastTypeFromColumn({ sqlType: base }) as {
-          serialize?(v: unknown): unknown;
-        } | null;
+        // No OID means a ColumnDefinition from a DDL path: Rails resolves its
+        // sql_type with the live regtype query (postgresql/quoting.rb:195),
+        // which handles typmods and `[]` array suffixes server-side — an
+        // array sql_type resolves to the array type's OID directly.
+        return self.lookupCastType(c.sqlType ?? "");
       },
     };
     return pgQuoteDefaultExpression.call(
@@ -4848,18 +4862,18 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /** @internal */
-  addColumnForAlter(
+  async addColumnForAlter(
     tableName: string,
     columnName: string,
     type: string,
     options: Record<string, unknown> = {},
-  ): unknown {
+  ): Promise<unknown> {
     const col = this.createTableDefinition(tableName).newColumnDefinition(
       columnName,
       type,
       options,
     );
-    const sql = `ADD COLUMN ${this.schemaCreation.accept(col)}`;
+    const sql = `ADD COLUMN ${await this.schemaCreation.accept(col)}`;
     return "comment" in options
       ? [
           sql,
@@ -4869,19 +4883,19 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
   }
 
   /** @internal */
-  changeColumnForAlter(
+  async changeColumnForAlter(
     tableName: string,
     columnName: string,
     type: string,
     options: Record<string, unknown> = {},
-  ): unknown[] {
+  ): Promise<unknown[]> {
     const changeDef = this.buildChangeColumnDefinition(
       tableName,
       columnName,
       type,
       options as Parameters<typeof this.buildChangeColumnDefinition>[3],
     );
-    const sqls: unknown[] = [this.schemaCreation.accept(changeDef)];
+    const sqls: unknown[] = [await this.schemaCreation.accept(changeDef)];
     if ("comment" in options)
       sqls.push(() =>
         this.changeColumnComment(tableName, columnName, options.comment as string | null),

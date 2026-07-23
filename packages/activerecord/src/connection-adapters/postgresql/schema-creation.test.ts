@@ -102,17 +102,17 @@ describe("PostgreSQL SchemaCreation", () => {
     ).toMatch(/^ADD CONSTRAINT/);
   });
 
-  it("visitChangeColumnDefaultDefinition", () => {
+  it("visitChangeColumnDefaultDefinition", async () => {
     const col = new ColumnDefinition("x", "string");
     expect(
-      s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, null)),
+      await s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, null)),
     ).toContain("DROP DEFAULT");
     expect(
-      s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, "v")),
+      await s().visitChangeColumnDefaultDefinition(new ChangeColumnDefaultDefinition(col, "v")),
     ).toContain("SET DEFAULT");
   });
 
-  it("visitChangeColumnDefaultDefinition: uuid function default stays bare", () => {
+  it("visitChangeColumnDefaultDefinition: uuid function default stays bare", async () => {
     // postgresql/quoting.rb:159-160 — a `()`-bearing string default on a
     // uuid column must reach the DDL as a call, not as `'uuid_generate_v4()'`.
     const col = new ColumnDefinition("id", "uuid");
@@ -122,28 +122,33 @@ describe("PostgreSQL SchemaCreation", () => {
     host.adapter.quoteDefaultExpression = (v: unknown, c: unknown) =>
       quoteDefaultExpression.call(null as never, v, c as never);
     expect(
-      host.visitChangeColumnDefaultDefinition(
+      await host.visitChangeColumnDefaultDefinition(
         new ChangeColumnDefaultDefinition(col, "uuid_generate_v4()"),
       ),
     ).toBe('ALTER COLUMN "id" SET DEFAULT uuid_generate_v4()');
   });
 
-  it("visitChangeColumnDefinition: ALTER COLUMN TYPE", () => {
+  it("visitChangeColumnDefinition: ALTER COLUMN TYPE", async () => {
     const col = new ColumnDefinition("price", "decimal", { precision: 10, scale: 2 });
-    expect(s().visitChangeColumnDefinition(new ChangeColumnDefinition(col, "price"))).toMatch(
+    expect(await s().visitChangeColumnDefinition(new ChangeColumnDefinition(col, "price"))).toMatch(
       /ALTER COLUMN "price" TYPE/,
     );
   });
 
-  it("addColumnOptionsBang: COLLATE + STORED + throws for virtual", () => {
+  it("addColumnOptionsBang: COLLATE + STORED + throws for virtual", async () => {
     const col = new ColumnDefinition("n", "string");
-    expect(s().addColumnOptionsBang("n", { collation: "en_US" })).toContain('COLLATE "en_US"');
-    expect(s().addColumnOptionsBang("n", { as: "a||b", stored: true, column: col })).toContain(
-      "STORED",
+    expect(await s().addColumnOptionsBang("n", { collation: "en_US" })).toContain(
+      'COLLATE "en_US"',
     );
-    expect(() => s().addColumnOptionsBang("n", { as: "a||b", stored: false, column: col })).toThrow(
-      "VIRTUAL",
-    );
+    expect(
+      await s().addColumnOptionsBang("n", { as: "a||b", stored: true, column: col }),
+    ).toContain("STORED");
+    // async wrapper: the visitor surface is Promise-returning, but the
+    // VIRTUAL guard (_pgGeneratedClause) currently throws synchronously —
+    // rejects.toThrow covers both shapes.
+    await expect(async () =>
+      s().addColumnOptionsBang("n", { as: "a||b", stored: false, column: col }),
+    ).rejects.toThrow("VIRTUAL");
   });
 
   it("visitExclusionConstraintDefinition: deferrable true → DEFERRABLE without INITIALLY", () => {
@@ -170,7 +175,7 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(sql).not.toContain("CONSTRAINT");
   });
 
-  it("visitAlterTable: constraint validations and exclusion adds are comma-separated from FK adds", () => {
+  it("visitAlterTable: constraint validations and exclusion adds are comma-separated from FK adds", async () => {
     const fk = new ForeignKeyDefinition(
       "users",
       "posts",
@@ -185,7 +190,7 @@ describe("PostgreSQL SchemaCreation", () => {
     const at = new AlterTable("users") as any;
     at.foreignKeyAdds.push(fk);
     at.constraintValidations = ["some_constraint"];
-    const sql = s().visitAlterTable(at);
+    const sql = await s().visitAlterTable(at);
     expect(sql).toContain("ADD CONSTRAINT");
     expect(sql).toContain(", VALIDATE CONSTRAINT");
   });

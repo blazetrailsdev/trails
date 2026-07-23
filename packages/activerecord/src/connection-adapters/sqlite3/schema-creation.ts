@@ -24,7 +24,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  override addColumnOptions(sql: string, options: ColumnOptions): string {
+  override addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     const opts = options as Record<string, unknown>;
     if (opts["collation"]) {
       sql += ` COLLATE "${opts["collation"]}"`;
@@ -37,7 +37,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): string {
+  protected override addColumnOptionsBang(sql: string, options: ColumnOptions): Promise<string> {
     return this.addColumnOptions(sql, options);
   }
 }

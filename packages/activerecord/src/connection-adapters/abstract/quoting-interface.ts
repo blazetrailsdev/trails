@@ -42,8 +42,12 @@ export interface Quoting {
   /** Mirrors: Quoting#quote_table_name_for_assignment (`UPDATE ... SET col = ...`). */
   quoteTableNameForAssignment(table: string, attr: string): string;
 
-  /** Mirrors: Quoting#quote_default_expression (DDL DEFAULT clause). */
-  quoteDefaultExpression(value: unknown, column?: unknown): string;
+  /** Mirrors: Quoting#quote_default_expression (DDL DEFAULT clause).
+   * Awaitable: PG's override resolves the column's cast type with a live
+   * `SELECT '<sql_type>'::regtype::oid` query (postgresql/quoting.rb:195),
+   * so callers must `await` the result; the other adapters return plain
+   * strings. */
+  quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string>;
 
   /** Mirrors: Quoting#quoted_true. Abstract/PG/MySQL: `"TRUE"`; SQLite: `"1"`. */
   quotedTrue(): string;

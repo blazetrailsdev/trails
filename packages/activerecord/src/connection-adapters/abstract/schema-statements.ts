@@ -319,7 +319,7 @@ export class SchemaStatements {
     // supportsIndexSortOrder gate, which yields false on a cold connection
     // (mirrors addIndex's warm-up). Memoized → no-op when already warm.
     await this.adapter.getDatabaseVersion?.();
-    await this.adapter.execute(this.schemaCreation.accept(td));
+    await this.adapter.execute(await this.schemaCreation.accept(td));
 
     // Rails: if supports_comments? && !supports_comments_in_create?
     //   change_table_comment(table_name, comment) if options[:comment].present?
@@ -414,7 +414,7 @@ export class SchemaStatements {
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.adapter.execute(this.schemaCreation.accept(addColumnDef));
+    await this.adapter.execute(await this.schemaCreation.accept(addColumnDef));
   }
 
   async removeColumn(
@@ -478,7 +478,7 @@ export class SchemaStatements {
       columns,
       options as Record<string, unknown>,
     );
-    await this.adapter.execute(this.schemaCreation.accept(createIndex));
+    await this.adapter.execute(await this.schemaCreation.accept(createIndex));
   }
 
   async removeIndex(
@@ -551,7 +551,7 @@ export class SchemaStatements {
       const defaultClause =
         options.default === undefined
           ? ""
-          : ` DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`;
+          : ` DEFAULT ${await this.adapter.quoteDefaultExpression(options.default)}`;
       await this.adapter.execute(
         `ALTER TABLE ${table} MODIFY COLUMN ${col} ${sqlType}${nullable}${defaultClause}`,
       );
@@ -564,7 +564,7 @@ export class SchemaStatements {
       }
       if (options.default !== undefined) {
         clauses.push(
-          `ALTER COLUMN ${col} SET DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`,
+          `ALTER COLUMN ${col} SET DEFAULT ${await this.adapter.quoteDefaultExpression(options.default)}`,
         );
       }
       await this.adapter.execute(`ALTER TABLE ${table} ${clauses.join(", ")}`);
@@ -573,7 +573,7 @@ export class SchemaStatements {
       const defaultClause =
         options.default === undefined
           ? ""
-          : ` DEFAULT ${this.adapter.quoteDefaultExpression(options.default)}`;
+          : ` DEFAULT ${await this.adapter.quoteDefaultExpression(options.default)}`;
       await this.adapter.execute(
         `ALTER TABLE ${table} ALTER COLUMN ${col} TYPE ${sqlType}${nullable}${defaultClause}`,
       );
@@ -670,7 +670,7 @@ export class SchemaStatements {
     // default like `{ to: 1 }` without :from is the literal default.
     const defaultVal = this.extractNewDefaultValue(options);
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    const clause = this.adapter.quoteDefaultExpression(defaultVal);
+    const clause = await this.adapter.quoteDefaultExpression(defaultVal);
     await this.adapter.execute(
       `ALTER TABLE ${this._qi(tableName)} ALTER COLUMN ${this._qi(columnName)} SET DEFAULT ${clause || "NULL"}`,
     );
@@ -683,7 +683,7 @@ export class SchemaStatements {
     defaultValue?: unknown,
   ): Promise<void> {
     if (!allowNull && defaultValue !== undefined) {
-      const quoted = this.adapter.quoteDefaultExpression(defaultValue);
+      const quoted = await this.adapter.quoteDefaultExpression(defaultValue);
       await this.adapter.execute(
         `UPDATE ${this._qi(tableName)} SET ${this._qi(columnName)} = ${quoted} WHERE ${this._qi(columnName)} IS NULL`,
       );
@@ -842,7 +842,7 @@ export class SchemaStatements {
     // table_name_prefix/suffix to to_table and re-runs foreign_key_options
     // idempotently (column/name already filled above), mirroring Rails.
     at.addForeignKey(toTable, opts as Partial<AddForeignKeyOptions>);
-    await this.adapter.execute(this.schemaCreation.accept(at));
+    await this.adapter.execute(await this.schemaCreation.accept(at));
   }
 
   async removeForeignKey(
@@ -891,7 +891,7 @@ export class SchemaStatements {
     // (MySQL/MariaDB `DROP FOREIGN KEY`) rather than a hardcoded `DROP CONSTRAINT`.
     const at = this.createAlterTable(fromTable);
     at.dropForeignKey(fk.name);
-    await this.adapter.execute(this.schemaCreation.accept(at));
+    await this.adapter.execute(await this.schemaCreation.accept(at));
   }
 
   async addCheckConstraint(
@@ -917,7 +917,7 @@ export class SchemaStatements {
     const validate = options.validate !== false;
     const chkDef = new CheckConstraintDefinition(tableName, expression, name, validate);
     await this.adapter.execute(
-      `ALTER TABLE ${this._qi(tableName)} ADD ${this.schemaCreation.accept(chkDef)}`,
+      `ALTER TABLE ${this._qi(tableName)} ADD ${await this.schemaCreation.accept(chkDef)}`,
     );
   }
 
@@ -963,7 +963,7 @@ export class SchemaStatements {
     // (MySQL `DROP CHECK`) rather than a hardcoded `DROP CONSTRAINT`.
     const at = this.createAlterTable(tableName);
     at.dropCheckConstraint(chk.name);
-    await this.adapter.execute(this.schemaCreation.accept(at));
+    await this.adapter.execute(await this.schemaCreation.accept(at));
   }
 
   async addTimestamps(tableName: string, options: ColumnOptions = {}): Promise<void> {
@@ -974,7 +974,7 @@ export class SchemaStatements {
     // the combined ALTER TABLE; non-bulk adapters fall back to two sequential addColumn calls.
     // trails' SQLite3Adapter still defines its own addTimestamps override for direct callers.
     if ((this.adapter as any).supportsBulkAlter?.() === true) {
-      const fragments = this.addTimestampsForAlter(tableName, options);
+      const fragments = await this.addTimestampsForAlter(tableName, options);
       await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
       return;
     }
@@ -1795,7 +1795,7 @@ export class SchemaStatements {
   async removeConstraint(tableName: string, constraintName: string): Promise<void> {
     const at = new AlterTable(tableName);
     at.dropConstraint(constraintName);
-    await this.adapter.execute(this.schemaCreation.accept(at));
+    await this.adapter.execute(await this.schemaCreation.accept(at));
   }
 
   async dumpSchemaInformation(): Promise<string | null> {
@@ -2602,24 +2602,31 @@ export class SchemaStatements {
     columnName: string,
     type: ColumnType,
     options: ColumnOptions = {},
-  ): string {
+  ): Promise<string> {
     const td = this.createTableDefinition(tableName);
     const cd = td.newColumnDefinition(columnName, type, options);
     return this.schemaCreation.accept(new AddColumnDefinition(cd));
   }
 
-  /** @internal */
-  changeColumnDefaultForAlter(
-    _tableName: string,
+  /** @internal Mirrors change_column_default_for_alter (schema_statements.rb:1843):
+   * routes through the adapter's build_change_column_default_definition (which
+   * attaches the reflected column, so PG's column-aware default quoting fires)
+   * and the schema-creation visitor. The base builder raises NotImplementedError
+   * as in Rails; PG and MySQL override it. */
+  async changeColumnDefaultForAlter(
+    tableName: string,
     columnName: string,
     defaultOrChanges: unknown,
-  ): string {
-    const newDefault = this.extractNewDefaultValue(defaultOrChanges);
-    const col = this.adapter.quoteIdentifier(columnName);
-    if (newDefault == null) {
-      return `ALTER COLUMN ${col} DROP DEFAULT`;
-    }
-    return `ALTER COLUMN ${col} SET DEFAULT ${this.adapter.quoteDefaultExpression(newDefault)}`;
+  ): Promise<string> {
+    const cd = await this.buildChangeColumnDefaultDefinition(
+      tableName,
+      columnName,
+      defaultOrChanges,
+    );
+    // ChangeColumnDefaultDefinition is dispatched by the PG/MySQL visitor
+    // subclasses' accept overrides, not the abstract union — same as Rails,
+    // where only those adapters define visit_ChangeColumnDefaultDefinition.
+    return (this.schemaCreation as { accept(o: unknown): Promise<string> }).accept(cd);
   }
 
   /** @internal */
@@ -2647,15 +2654,15 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  addTimestampsForAlter(tableName: string, options: ColumnOptions = {}): string[] {
+  async addTimestampsForAlter(tableName: string, options: ColumnOptions = {}): Promise<string[]> {
     const opts: ColumnOptions = { ...options };
     if (opts.null == null) opts.null = false;
     if (!("precision" in opts) && (this.adapter as any).supportsDatetimeWithPrecision?.()) {
       opts.precision = 6;
     }
     return [
-      this.addColumnForAlter(tableName, "created_at", "datetime", opts),
-      this.addColumnForAlter(tableName, "updated_at", "datetime", opts),
+      await this.addColumnForAlter(tableName, "created_at", "datetime", opts),
+      await this.addColumnForAlter(tableName, "updated_at", "datetime", opts),
     ];
   }
 

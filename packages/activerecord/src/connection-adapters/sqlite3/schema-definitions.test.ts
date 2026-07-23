@@ -29,22 +29,22 @@ describe("SQLite3::TableDefinition", () => {
     expect(col.type).toBe("string");
   });
 
-  it("drops the type for a virtual column with no type option (Rails no-fallback)", () => {
+  it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
     const td = new TableDefinition("articles", { id: false });
     td.column("full_name", "virtual" as any, { as: "a || b" } as any);
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
-    const sql = new SchemaCreation("sqlite", (td as any)._adapter).accept(td);
+    const sql = await new SchemaCreation("sqlite", (td as any)._adapter).accept(td);
     expect(sql).toContain('"full_name"  GENERATED ALWAYS AS (a || b)');
     expect(sql).not.toContain("varchar");
     expect(sql).not.toContain("VARCHAR");
   });
 
-  it("emits GENERATED ALWAYS AS ... STORED via visitor", () => {
+  it("emits GENERATED ALWAYS AS ... STORED via visitor", async () => {
     const td = new TableDefinition("items", { id: false });
     td.column("x", "integer");
     td.column("expr", "integer", { as: "x + 1", stored: true } as any);
-    const sql = new SchemaCreation("sqlite", (td as any)._adapter).accept(td);
+    const sql = await new SchemaCreation("sqlite", (td as any)._adapter).accept(td);
     expect(sql).toContain("GENERATED ALWAYS AS (x + 1) STORED");
   });
 });

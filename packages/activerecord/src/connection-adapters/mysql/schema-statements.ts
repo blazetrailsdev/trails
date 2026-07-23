@@ -60,7 +60,7 @@ export class MysqlSchemaStatements extends BaseSchemaStatements {
       return;
     }
     const createDef = new CreateIndexDefinition(idx, false, algorithmClause);
-    await this.adapter.execute(this.schemaCreation.accept(createDef));
+    await this.adapter.execute(await this.schemaCreation.accept(createDef));
   }
 
   override async dropTable(

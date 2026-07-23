@@ -73,9 +73,12 @@ export interface DefaultExpressionColumn {
  * branch actually uses.
  */
 export interface CastTypeLookup {
-  lookupCastTypeFromColumn(column: DefaultExpressionColumn): {
-    serialize?(value: unknown): unknown;
-  } | null;
+  lookupCastTypeFromColumn(
+    column: DefaultExpressionColumn,
+  ):
+    | { serialize?(value: unknown): unknown }
+    | null
+    | Promise<{ serialize?(value: unknown): unknown } | null>;
 }
 
 export function quoteTableName(name: string): string {
@@ -164,12 +167,14 @@ export function quote(this: QuotingDispatchHost, value: unknown): string {
   return abstractQuote.call(this, value);
 }
 
-export function quoteDefaultExpression(
+// Async: the ColumnDefinition (no-OID) path awaits the live regtype lookup
+// (postgresql/quoting.rb:195) that Ruby blocks on.
+export async function quoteDefaultExpression(
   this: QuotingDispatchHost,
   value: unknown,
   column?: DefaultExpressionColumn | null,
   castTypeLookup?: CastTypeLookup | null,
-): string {
+): Promise<string> {
   if (value === undefined) return "";
   if (typeof value === "function") {
     const result = (value as () => unknown)();
@@ -191,7 +196,7 @@ export function quoteDefaultExpression(
 
   let serialized: unknown = value;
   if (column != null && "array" in column) {
-    const castType = castTypeLookup?.lookupCastTypeFromColumn(column) ?? null;
+    const castType = (await castTypeLookup?.lookupCastTypeFromColumn(column)) ?? null;
     if (column.array === true && globalThis.Array.isArray(value)) {
       // Rails routes JS arrays through OID::Array.serialize so each
       // element is cast by the element subtype before quoting. Trails'

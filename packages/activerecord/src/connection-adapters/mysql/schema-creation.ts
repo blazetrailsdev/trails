@@ -191,9 +191,9 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected override visitAddColumnDefinition(o: AddColumnDefinition): string {
+  protected override async visitAddColumnDefinition(o: AddColumnDefinition): Promise<string> {
     return this.addColumnPositionBang(
-      super.visitAddColumnDefinition(o),
+      await super.visitAddColumnDefinition(o),
       this.columnOptions(o.column) as MysqlColumnOptions,
     );
   }
@@ -229,12 +229,16 @@ export class SchemaCreation extends AbstractSchemaCreation {
    *
    * @internal
    */
-  protected override visitTableDefinition(o: TableDefinition): string {
+  protected override async visitTableDefinition(o: TableDefinition): Promise<string> {
     let sql = `CREATE${this.tableModifierInCreate(o)} TABLE`;
     if (o.ifNotExists) sql += " IF NOT EXISTS";
     sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
-    const statements: string[] = o.columns.map((c) => this.visitColumnDefinition(c));
+    // Mirrors the abstract visitor's sequential map-to-thunks shape.
+    const statements: string[] = [];
+    for (const visit of o.columns.map((c) => () => this.visitColumnDefinition(c))) {
+      statements.push(await visit());
+    }
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
       const cols = o.compositePrimaryKey.map((k) => this.adapter.quoteIdentifier(k)).join(", ");
       statements.push(`PRIMARY KEY (${cols})`);
@@ -262,7 +266,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
       | Parameters<AbstractSchemaCreation["accept"]>[0]
       | ChangeColumnDefinition
       | ChangeColumnDefaultDefinition,
-  ): string {
+  ): Promise<string> {
     if (o instanceof ChangeColumnDefinition) return this.visitChangeColumnDefinition(o);
     if (o instanceof ChangeColumnDefaultDefinition)
       return this.visitChangeColumnDefaultDefinition(o);
@@ -270,18 +274,20 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  protected visitChangeColumnDefinition(o: ChangeColumnDefinition): string {
-    const sql = `CHANGE ${this.adapter.quoteIdentifier(o.name)} ${this.accept(o.column)}`;
+  protected async visitChangeColumnDefinition(o: ChangeColumnDefinition): Promise<string> {
+    const sql = `CHANGE ${this.adapter.quoteIdentifier(o.name)} ${await this.accept(o.column)}`;
     return this.addColumnPositionBang(sql, this.columnOptions(o.column) as MysqlColumnOptions);
   }
 
   /** @internal */
-  protected visitChangeColumnDefaultDefinition(o: ChangeColumnDefaultDefinition): string {
+  protected async visitChangeColumnDefaultDefinition(
+    o: ChangeColumnDefaultDefinition,
+  ): Promise<string> {
     let sql = `ALTER COLUMN ${this.adapter.quoteIdentifier(o.column.name)} `;
     if (o.default == null && o.column.options.null === false) {
       sql += "DROP DEFAULT";
     } else {
-      sql += `SET DEFAULT ${this.adapter.quoteDefaultExpression(o.default, o.column)}`;
+      sql += `SET DEFAULT ${await this.adapter.quoteDefaultExpression(o.default, o.column)}`;
     }
     return sql;
   }
@@ -342,7 +348,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
   }
 
   /** @internal */
-  override addColumnOptions(sql: string, options: ColumnOptions): string {
+  override async addColumnOptions(sql: string, options: ColumnOptions): Promise<string> {
     const mo = options as MysqlColumnOptions;
     const col = mo.column;
     if (col && /^\btimestamp\b/.test(col.sqlType ?? col.type ?? "") && !mo.primaryKey) {
@@ -367,14 +373,14 @@ export class SchemaCreation extends AbstractSchemaCreation {
     const optionsWithoutPk: ColumnOptions = mo.primaryKey
       ? { ...options, primaryKey: false }
       : options;
-    let withBase = super.addColumnOptions(sql, optionsWithoutPk);
+    let withBase = await super.addColumnOptions(sql, optionsWithoutPk);
     if (mo.onUpdate) withBase += ` ON UPDATE ${mo.onUpdate}`;
     if (mo.primaryKey) withBase += " PRIMARY KEY";
     return this.addSqlCommentBang(withBase, mo.comment);
   }
 
   /** @internal */
-  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): string {
+  protected override addColumnOptionsBang(sql: string, options: AddColumnOptions): Promise<string> {
     return this.addColumnOptions(sql, options);
   }
 

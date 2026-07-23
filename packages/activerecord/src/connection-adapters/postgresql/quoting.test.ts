@@ -69,7 +69,7 @@ describe("PostgreSQL quoting", () => {
     expect(quote(Infinity)).toBe("'Infinity'");
   });
 
-  it("quotes arrays through the encoder's delimiter, not a hardcoded comma", () => {
+  it("quotes arrays through the encoder's delimiter, not a hardcoded comma", async () => {
     // box[] uses a `;` element delimiter; routing quote/typeCast through
     // encodeArray (which calls the OID encoder) keeps it type-correct rather
     // than diverging on a hardcoded `,`.
@@ -104,7 +104,7 @@ describe("PostgreSQL quoting", () => {
     expect(quote(new Range("2020-01-01", null, true))).toBe("'[2020-01-01,)'");
   });
 
-  it("serializes defaults for any PostgreSQL column, not only array columns", () => {
+  it("serializes defaults for any PostgreSQL column, not only array columns", async () => {
     const column = { sqlType: "integer", array: false };
     const typeMap = {
       lookupCastTypeFromColumn(col: { sqlType?: string | null }) {
@@ -113,70 +113,75 @@ describe("PostgreSQL quoting", () => {
       },
     };
 
-    expect(quoteDefaultExpression.call(HOST, 41, column, typeMap)).toBe("42");
+    expect(await quoteDefaultExpression.call(HOST, 41, column, typeMap)).toBe("42");
   });
 
-  it("quotes a binary default through PG's quotedBinary", () => {
+  it("quotes a binary default through PG's quotedBinary", async () => {
     // Binary self-dispatches through the host, so it must reach the bytea escape
     // form, not the abstract byte-string fallback. Cover both shapes here —
     // the raw Uint8Array trails' BinaryType#serialize actually returns, and the
     // BinaryData Rails' Binary#serialize returns (activemodel/.../binary.rb:31).
-    expect(quoteDefaultExpression.call(HOST, new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
-    expect(quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0x1f, 0x8b])))).toBe(
-      "'\\x1f8b'",
-    );
+    expect(await quoteDefaultExpression.call(HOST, new Uint8Array([0x1f, 0x8b]))).toBe("'\\x1f8b'");
+    expect(
+      await quoteDefaultExpression.call(HOST, new BinaryData(new Uint8Array([0x1f, 0x8b]))),
+    ).toBe("'\\x1f8b'");
   });
 
-  it("quotes a BC date default through PG's quotedDate", () => {
+  it("quotes a BC date default through PG's quotedDate", async () => {
     // Dates self-dispatch through the host, so they must reach PG's BC-suffixing
     // quotedDate (postgresql/quoting.rb:143), not the abstract formatter which
     // drops " BC".
-    expect(quoteDefaultExpression.call(HOST, Temporal.PlainDate.from("-000043-03-15"))).toBe(
+    expect(await quoteDefaultExpression.call(HOST, Temporal.PlainDate.from("-000043-03-15"))).toBe(
       "'0044-03-15 BC'",
     );
   });
 
-  it("quotes a binary default produced by BinaryType#serialize", () => {
+  it("quotes a binary default produced by BinaryType#serialize", async () => {
     // Guards the real quoteDefaultExpression path: whatever the type map's
     // serialize emits must still reach PG's bytea form.
     // `array` must be present: the serialize branch is gated on `"array" in column`.
     const column = { sqlType: "bytea", array: false };
     const typeMap = { lookupCastTypeFromColumn: () => new BinaryType() };
-    expect(quoteDefaultExpression.call(HOST, "ab", column, typeMap)).toBe("'\\x6162'");
+    expect(await quoteDefaultExpression.call(HOST, "ab", column, typeMap)).toBe("'\\x6162'");
   });
 
-  it("serializes array defaults via fallback OidArray when type map misses", () => {
+  it("serializes array defaults via fallback OidArray when type map misses", async () => {
     const column = { sqlType: "text[]", array: true };
     const nullTypeMap = {
       lookupCastTypeFromColumn() {
         return null;
       },
     };
-    expect(quoteDefaultExpression.call(HOST, [], column, nullTypeMap)).toBe("'{}'");
-    expect(quoteDefaultExpression.call(HOST, ["a", "b"], column, nullTypeMap)).toBe("'{a,b}'");
+    expect(await quoteDefaultExpression.call(HOST, [], column, nullTypeMap)).toBe("'{}'");
+    expect(await quoteDefaultExpression.call(HOST, ["a", "b"], column, nullTypeMap)).toBe(
+      "'{a,b}'",
+    );
   });
 
-  it("does not quote function default values for UUID columns", () => {
+  it("does not quote function default values for UUID columns", async () => {
     // Rails postgresql/quoting.rb:159-160. Both pgcrypto and uuid-ossp spellings
     // are exercised (uuid_test.rb:16 picks between them by extension support).
     const column = { type: "uuid", sqlType: "uuid" };
-    expect(quoteDefaultExpression.call(HOST, "gen_random_uuid()", column)).toBe(
+    expect(await quoteDefaultExpression.call(HOST, "gen_random_uuid()", column)).toBe(
       "gen_random_uuid()",
     );
-    expect(quoteDefaultExpression.call(HOST, "uuid_generate_v4()", column)).toBe(
+    expect(await quoteDefaultExpression.call(HOST, "uuid_generate_v4()", column)).toBe(
       "uuid_generate_v4()",
     );
     // A non-function string default on a uuid column is still quoted.
-    expect(quoteDefaultExpression.call(HOST, "11111111-1111-1111-1111-111111111111", column)).toBe(
-      "'11111111-1111-1111-1111-111111111111'",
-    );
+    expect(
+      await quoteDefaultExpression.call(HOST, "11111111-1111-1111-1111-111111111111", column),
+    ).toBe("'11111111-1111-1111-1111-111111111111'");
     // The branch is uuid-only — the same string on a text column is quoted.
     expect(
-      quoteDefaultExpression.call(HOST, "gen_random_uuid()", { type: "text", sqlType: "text" }),
+      await quoteDefaultExpression.call(HOST, "gen_random_uuid()", {
+        type: "text",
+        sqlType: "text",
+      }),
     ).toBe("'gen_random_uuid()'");
   });
 
-  it("does not apply array fallback when column.array is false", () => {
+  it("does not apply array fallback when column.array is false", async () => {
     const column = { sqlType: "text", array: false };
     const nullTypeMap = {
       lookupCastTypeFromColumn() {
@@ -184,10 +189,10 @@ describe("PostgreSQL quoting", () => {
       },
     };
     // A plain string value should still round-trip normally
-    expect(quoteDefaultExpression.call(HOST, "hello", column, nullTypeMap)).toBe("'hello'");
+    expect(await quoteDefaultExpression.call(HOST, "hello", column, nullTypeMap)).toBe("'hello'");
   });
 
-  it("serializes array defaults through the type map", () => {
+  it("serializes array defaults through the type map", async () => {
     const arrayType = new OidArray(stringSubtype);
     const column = { sqlType: "text[]", array: true };
     const typeMap = {
@@ -196,10 +201,10 @@ describe("PostgreSQL quoting", () => {
       },
     };
 
-    expect(quoteDefaultExpression.call(HOST, ["a", "b"], column, typeMap)).toBe("'{a,b}'");
+    expect(await quoteDefaultExpression.call(HOST, ["a", "b"], column, typeMap)).toBe("'{a,b}'");
   });
 
-  it("serializes array defaults via an element subtype (per-element coercion)", () => {
+  it("serializes array defaults via an element subtype (per-element coercion)", async () => {
     // Mirrors Rails postgresql/quoting.rb:161-163 where
     // lookup_cast_type_from_column returns OID::Array(IntegerType) and
     // serialize walks each element through Integer#serialize. Trails'
@@ -211,10 +216,12 @@ describe("PostgreSQL quoting", () => {
         return { cast: (v: unknown) => v, serialize: (v: unknown) => Number(v) + 100 };
       },
     };
-    expect(quoteDefaultExpression.call(HOST, [1, 2, 3], column, typeMap)).toBe("'{101,102,103}'");
+    expect(await quoteDefaultExpression.call(HOST, [1, 2, 3], column, typeMap)).toBe(
+      "'{101,102,103}'",
+    );
   });
 
-  it("passes raw array-literal string defaults through without scalar coercion", () => {
+  it("passes raw array-literal string defaults through without scalar coercion", async () => {
     // Regression: when the value is a PG array literal string (e.g.
     // `"{}"`) on an array column, the element-subtype lookup must NOT
     // run — IntegerType#serialize("{}") would coerce to NaN. Rails
@@ -226,8 +233,8 @@ describe("PostgreSQL quoting", () => {
         return { serialize: (v: unknown) => Number(v) };
       },
     };
-    expect(quoteDefaultExpression.call(HOST, "{}", column, typeMap)).toBe("'{}'");
-    expect(quoteDefaultExpression.call(HOST, "{1,2,3}", column, typeMap)).toBe("'{1,2,3}'");
+    expect(await quoteDefaultExpression.call(HOST, "{}", column, typeMap)).toBe("'{}'");
+    expect(await quoteDefaultExpression.call(HOST, "{1,2,3}", column, typeMap)).toBe("'{1,2,3}'");
   });
 
   it("supports nested function calls up to 2 levels deep", () => {

@@ -10,7 +10,7 @@ import {
 import { SchemaCreation as PgSchemaCreation } from "./schema-creation.js";
 
 describe("ExclusionConstraintDefinition", () => {
-  it("exposes options as accessors", () => {
+  it("exposes options as accessors", async () => {
     const defn = new ExclusionConstraintDefinition("products", "price WITH =, range WITH &&", {
       name: "price_check",
       using: "gist",
@@ -174,107 +174,107 @@ describe("AlterTable", () => {
 describe("TableDefinition#toSql", () => {
   // Rails generates CREATE TABLE SQL by accepting the TableDefinition into the
   // adapter's SchemaCreation visitor; there is no TableDefinition#to_sql.
-  const toSql = (td: TableDefinition): string => {
+  const toSql = (td: TableDefinition): Promise<string> => {
     const adapter = (td as any)._adapter;
     return new PgSchemaCreation("typeToSql" in adapter ? adapter : undefined).accept(td);
   };
 
-  it("emits UNLOGGED when unlogged: true", () => {
+  it("emits UNLOGGED when unlogged: true", async () => {
     const td = new TableDefinition("products", { id: false, unlogged: true });
     td.string("name");
-    expect(toSql(td)).toMatch(/^CREATE UNLOGGED TABLE/);
+    expect(await toSql(td)).toMatch(/^CREATE UNLOGGED TABLE/);
   });
 
-  it("does not emit UNLOGGED by default", () => {
+  it("does not emit UNLOGGED by default", async () => {
     const td = new TableDefinition("products", { id: false });
     td.string("name");
-    expect(toSql(td)).toMatch(/^CREATE TABLE/);
-    expect(toSql(td)).not.toContain("UNLOGGED");
+    expect(await toSql(td)).toMatch(/^CREATE TABLE/);
+    expect(await toSql(td)).not.toContain("UNLOGGED");
   });
 
-  it("drops the type for a virtual column with no type option (Rails no-fallback)", () => {
+  it("drops the type for a virtual column with no type option (Rails no-fallback)", async () => {
     const td = new TableDefinition("articles", { id: false });
     td.column("full_name", "virtual" as any, { as: "a || b", stored: true } as any);
     const col = td.columns.find((c) => c.name === "full_name")!;
     expect(col.type).toBeUndefined();
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain('"full_name"  GENERATED ALWAYS AS (a || b) STORED');
     expect(sql).not.toContain("varchar");
   });
 
-  it("emits exclusion constraint in CREATE TABLE", () => {
+  it("emits exclusion constraint in CREATE TABLE", async () => {
     const td = new TableDefinition("meetings", { id: false });
     td.exclusionConstraint("room WITH =, during WITH &&", { name: "no_overlap", using: "gist" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain(
       'CONSTRAINT "no_overlap" EXCLUDE USING gist (room WITH =, during WITH &&)',
     );
   });
 
-  it("emits unique constraint in CREATE TABLE", () => {
+  it("emits unique constraint in CREATE TABLE", async () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", deferrable: "deferred" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain(
       'CONSTRAINT "unique_pos" UNIQUE ("position") DEFERRABLE INITIALLY DEFERRED',
     );
   });
 
-  it("emits unique constraint with nulls not distinct", () => {
+  it("emits unique constraint with nulls not distinct", async () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", nullsNotDistinct: true });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain("NULLS NOT DISTINCT");
   });
 
-  it("emits unique constraint using index", () => {
+  it("emits unique constraint using index", async () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", usingIndex: "orders_pos_idx" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain('USING INDEX "orders_pos_idx"');
   });
 
-  it("emits DEFERRABLE without INITIALLY clause when deferrable: true", () => {
+  it("emits DEFERRABLE without INITIALLY clause when deferrable: true", async () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position", { name: "unique_pos", deferrable: true });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain('CONSTRAINT "unique_pos" UNIQUE ("position") DEFERRABLE');
     expect(sql).not.toContain("INITIALLY TRUE");
     expect(sql).not.toContain("INITIALLY");
   });
 
-  it("emits exclusion constraint without CONSTRAINT clause when name is omitted", () => {
+  it("emits exclusion constraint without CONSTRAINT clause when name is omitted", async () => {
     const td = new TableDefinition("meetings", { id: false });
     td.exclusionConstraint("room WITH =", { using: "gist" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain("EXCLUDE USING gist (room WITH =)");
     expect(sql).not.toContain('CONSTRAINT ""');
   });
 
-  it("emits unique constraint without CONSTRAINT clause when name is omitted", () => {
+  it("emits unique constraint without CONSTRAINT clause when name is omitted", async () => {
     const td = new TableDefinition("orders", { id: false });
     td.uniqueConstraint("position");
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain('UNIQUE ("position")');
     expect(sql).not.toContain('CONSTRAINT ""');
   });
 
-  it("handles constraint-only table with no columns (id: false)", () => {
+  it("handles constraint-only table with no columns (id: false)", async () => {
     const td = new TableDefinition("link_table", { id: false });
     td.uniqueConstraint("ref", { name: "unique_ref" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).not.toContain("(,");
     expect(sql).toContain('UNIQUE ("ref")');
   });
 
-  it("injects constraints before trailing table options clause", () => {
+  it("injects constraints before trailing table options clause", async () => {
     const td = new TableDefinition("logs", {
       id: false,
       options: "WITH (autovacuum_enabled = false)",
     });
     td.string("message");
     td.uniqueConstraint("message", { name: "unique_msg" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     // Constraint must appear inside the column list, before the trailing WITH clause
     const constraintPos = sql.indexOf('CONSTRAINT "unique_msg"');
     const withPos = sql.indexOf("WITH (");
@@ -282,18 +282,18 @@ describe("TableDefinition#toSql", () => {
     expect(constraintPos).toBeLessThan(withPos);
   });
 
-  it("skips constraint injection for CREATE TABLE ... AS queries", () => {
+  it("skips constraint injection for CREATE TABLE ... AS queries", async () => {
     const td = new TableDefinition("archived_orders", {
       id: false,
       as: "SELECT (1) AS id, amount FROM orders WHERE archived = true",
     });
     td.uniqueConstraint("id", { name: "unique_id" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).not.toContain("CONSTRAINT");
     expect(sql).toContain("AS SELECT");
   });
 
-  it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers (no-adapter fallback)", () => {
+  it("emits PG-specific long-tail column SQL types verbatim from pgColumn helpers (no-adapter fallback)", async () => {
     // No adapter provided → PgSchemaCreation falls back to abstract typeToSql,
     // whose default branch returns an unrecognized type verbatim (Rails parity:
     // `type.to_s` — it never uppercases). This matches the real-PostgreSQLAdapter
@@ -311,7 +311,7 @@ describe("TableDefinition#toSql", () => {
     td.money("price");
     td.oid("oid_col");
     td.tsrange("during");
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain('"net" cidr');
     expect(sql).toContain('"addr" inet');
     expect(sql).toContain('"props" hstore');
@@ -327,7 +327,7 @@ describe("TableDefinition#toSql", () => {
     expect(sql).toContain('"during" tsrange');
   });
 
-  it("emits PG-specific long-tail column SQL types lowercase when adapter provides typeToSql", () => {
+  it("emits PG-specific long-tail column SQL types lowercase when adapter provides typeToSql", async () => {
     // Stub adapter mirrors PostgreSQLAdapter.NATIVE_DATABASE_TYPES lowercase
     // output — verifies that the visitor delegates to the adapter's typeToSql.
     const stubAdapter = {
@@ -343,7 +343,7 @@ describe("TableDefinition#toSql", () => {
     td.macaddr("mac");
     td.tsvector("doc");
     td.money("price");
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain('"net" cidr');
     expect(sql).toContain('"addr" inet');
     expect(sql).toContain('"props" hstore');
@@ -352,11 +352,11 @@ describe("TableDefinition#toSql", () => {
     expect(sql).toContain('"price" money');
   });
 
-  it("handles default values containing doubled single-quotes without mis-parsing", () => {
+  it("handles default values containing doubled single-quotes without mis-parsing", async () => {
     const td = new TableDefinition("messages", { id: false });
     td.string("body", { default: "Bob's" });
     td.uniqueConstraint("body", { name: "unique_body" });
-    const sql = toSql(td);
+    const sql = await toSql(td);
     expect(sql).toContain("Bob''s");
     expect(sql).toContain('CONSTRAINT "unique_body"');
   });

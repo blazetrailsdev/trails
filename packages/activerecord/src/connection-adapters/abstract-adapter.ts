@@ -834,7 +834,8 @@ export class AbstractAdapter implements Quoting {
     return this.quoteTableName(`${table}.${attr}`);
   }
 
-  quoteDefaultExpression(value: unknown, column?: unknown): string {
+  // Return union: awaitable surface (PG's regtype lookup); this base stays sync.
+  quoteDefaultExpression(value: unknown, column?: unknown): string | Promise<string> {
     if (value === undefined) return "";
     if (typeof value === "function") {
       const result = (value as () => unknown)();

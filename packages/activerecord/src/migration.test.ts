@@ -23,7 +23,7 @@ import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgr
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
 import { SchemaCreation as SQLite3SchemaCreation } from "./connection-adapters/sqlite3/schema-creation.js";
 
-function emitTableSql(td: TableDefinition): string {
+function emitTableSql(td: TableDefinition): Promise<string> {
   const adapterName = (td as any)._adapterName;
   const adapter = (td as any)._adapter;
   // PG and SQLite visitors take a SchemaQuoter for identifier/default quoting, so
@@ -254,10 +254,10 @@ describe("MigrationTest", () => {
     }
   });
 
-  it("decimal scale without precision should raise", () => {
+  it("decimal scale without precision should raise", async () => {
     const td = new TableDefinition("products");
     td.decimal("price", { scale: 2 });
-    expect(() => emitTableSql(td)).toThrow(
+    await expect(emitTableSql(td)).rejects.toThrow(
       "Error adding decimal column: precision cannot be empty if scale is specified",
     );
   });
@@ -2231,11 +2231,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    // migration_test.rb:1403 expects 3 on both adapters, but Rails' third PG
-    // query is a `SELECT 'character varying'::regtype::oid` type-map miss from
-    // quote_default_expression (postgresql/schema_creation.rb:102); trails'
-    // statically initialized PG type map never issues it, so PG counts 2.
-    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 2 });
+    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 3 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });
@@ -2260,9 +2256,7 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "name")!.default).toBeFalsy();
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
-    // migration_test.rb:1433 expects 7/5; PG counts 4 because trails skips the
-    // `::regtype::oid` type-map miss noted in "changing columns" above.
-    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 4 });
+    const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 5 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
         t.change("name", "string", { default: "NONAME" });

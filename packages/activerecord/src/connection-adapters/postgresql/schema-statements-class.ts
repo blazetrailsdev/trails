@@ -915,7 +915,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // string; the only proc Rails appends here is the :comment change.
     this.pg.clearCacheBang();
     const changeColDef = this.buildChangeColumnDefinition(tableName, columnName, type, options);
-    const clause = this.pg.schemaCreation.accept(changeColDef);
+    const clause = await this.pg.schemaCreation.accept(changeColDef);
     // Route DDL through the public `execute` (not the raw `exec`) so the
     // dirties_query_cache wrapper clears the query cache on schema changes.
     await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${clause}`);
@@ -981,7 +981,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       );
     } else {
       const col = (await this.columns(tableName)).find((c) => c.name === columnName);
-      const expr = this.adapter.quoteDefaultExpression(defaultValue, col);
+      const expr = await this.adapter.quoteDefaultExpression(defaultValue, col);
       await this.adapter.execute(
         `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`,
       );
@@ -1044,7 +1044,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       // Rails guards the pre-ALTER UPDATE with `if column` — skip it when the
       // column can't be found rather than quoting against an undefined column.
       if (col) {
-        const expr = this.adapter.quoteDefaultExpression(defaultValue, col);
+        const expr = await this.adapter.quoteDefaultExpression(defaultValue, col);
         await this.adapter.execute(
           `UPDATE ${quotedTable} SET ${quotedCol} = ${expr} WHERE ${quotedCol} IS NULL`,
         );
@@ -1257,7 +1257,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // (now converged): it applies table_name_prefix/suffix and re-runs
     // foreign_key_options idempotently (column/name already filled above).
     at.addForeignKey(toTable, fkOptions as Partial<AddForeignKeyOptions>);
-    await this.pg.exec(this.pg.schemaCreation.accept(at));
+    await this.pg.exec(await this.pg.schemaCreation.accept(at));
   }
 
   override async checkConstraints(tableName: string): Promise<CheckConstraintDefinition[]> {
@@ -1454,7 +1454,7 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     const opts = this.uniqueConstraintOptions(tableName, columnName, options);
     const at = this.pg.createAlterTable(tableName) as PgAlterTable;
     at.addUniqueConstraint(columnName as string | string[], opts);
-    await this.pg.exec(this.pg.schemaCreation.accept(at));
+    await this.pg.exec(await this.pg.schemaCreation.accept(at));
   }
 
   async removeUniqueConstraint(

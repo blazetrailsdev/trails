@@ -299,18 +299,18 @@ describe("ReferenceDefinition helpers", () => {
 });
 
 describe("TableDefinition#toSql blank type guard", () => {
-  it("throws a descriptive error for an empty custom type", () => {
+  it("throws a descriptive error for an empty custom type", async () => {
     const td = new TableDefinition("t", { id: false });
     td.column("bad", "" as any);
-    expect(() => new SchemaCreation("sqlite").accept(td)).toThrow(
+    await expect(new SchemaCreation("sqlite").accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
     );
   });
 
-  it("throws a descriptive error for a whitespace-only custom type", () => {
+  it("throws a descriptive error for a whitespace-only custom type", async () => {
     const td = new TableDefinition("t", { id: false });
     td.column("bad", "   " as any);
-    expect(() => new SchemaCreation("sqlite").accept(td)).toThrow(
+    await expect(new SchemaCreation("sqlite").accept(td)).rejects.toThrow(
       /Column "bad" has an empty or blank type/,
     );
   });
