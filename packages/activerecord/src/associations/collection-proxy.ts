@@ -2332,6 +2332,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
             } else {
               await record.saveBang(); // << always raises on new-record failure
             }
+          } else if (record.hasChangesToSave) {
+            // Second arm of Rails' `record.new_record? || record.has_changes_to_save?`
+            // gate (has_many_through_association.rb:27): a persisted-but-dirty target
+            // is saved before the join row is written, and `return unless super`
+            // leaves it out of the target when that save fails.
+            if (bang) {
+              await record.saveBang();
+            } else if (!(await record.save())) {
+              return false;
+            }
           }
           // Create the join record. A composite source FK arises when the join's
           // source belongs_to resolves a multi-column key — e.g. `belongs_to :tag`
