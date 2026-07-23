@@ -537,15 +537,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "out of scope (matches the migration/compatibility exclusion). The non-legacy " +
       "schema-dump emission is covered by the passing sibling tests.",
   },
-  // --- Deferred: tracked by focused RFC 0030 stories; remove when they converge ---
-  {
-    testFile: "adapters/postgresql/timestamp_test.rb",
-    tests: ["group by date"],
-    reason:
-      "Deferred: grouped-calculation result keys are String()-ified (Record) while Rails " +
-      "keys are type-cast objects (assert_kind_of Time). Tracked: RFC 0030 story " +
-      "grouped-calculation-typed-keys — remove this entry when it converges.",
-  },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
     testFile: "adapters/postgresql/hstore_test.rb",

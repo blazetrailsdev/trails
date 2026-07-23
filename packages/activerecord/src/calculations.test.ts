@@ -72,7 +72,14 @@ describe("CalculationsTest", () => {
 
   it("should count with group by qualified name on loaded", async () => {
     const accounts = Account.group("accounts.id");
-    const expected: Record<number, number> = { 1: 1, 2: 1, 3: 1, 4: 1, 5: 1, 6: 1 };
+    const expected = new Map([
+      [1, 1],
+      [2, 1],
+      [3, 1],
+      [4, 1],
+      [5, 1],
+      [6, 1],
+    ]);
     expect(await accounts.count()).toEqual(expected);
 
     await accounts.toArray();
@@ -155,61 +162,62 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by field", async () => {
-    const c = await Account.group("firm_id").sum("credit_limit");
-    expect((c as Record<number, number>)[1]).toBeDefined();
-    expect((c as Record<number, number>)[6]).toBeDefined();
-    expect((c as Record<number, number>)[2]).toBeDefined();
+    const c = (await Account.group("firm_id").sum("credit_limit")) as Map<unknown, number>;
+    expect(c.get(1)).toBeDefined();
+    expect(c.get(6)).toBeDefined();
+    expect(c.get(2)).toBeDefined();
   });
 
   it("should group by arel attribute", async () => {
-    const c = await Account.group(Account.arelTable.get("firm_id")).sum(
+    const c = (await Account.group(Account.arelTable.get("firm_id")).sum(
       Account.arelTable.get("credit_limit"),
-    );
-    expect((c as Record<number, number>)[1]).toBeDefined();
-    expect((c as Record<number, number>)[6]).toBeDefined();
-    expect((c as Record<number, number>)[2]).toBeDefined();
+    )) as Map<unknown, number>;
+    expect(c.get(1)).toBeDefined();
+    expect(c.get(6)).toBeDefined();
+    expect(c.get(2)).toBeDefined();
   });
 
   it("should group by multiple fields", async () => {
     const c = await Account.group("firm_id", "credit_limit").count();
     // Rails: 6 unique (firm_id, credit_limit) combos; each count is 1.
-    const total = Object.values(c as object).reduce((sum: number, v) => sum + (v as number), 0);
+    const total = [...(c as Map<unknown, number>).values()].reduce((sum, v) => sum + v, 0);
     expect(total).toBe(6);
   });
 
   it("should group by multiple fields when table name is too long", async () => {
     // Rails: TooLongTableName — canonical Account stands in; asserts multi-field GROUP BY works.
     const res = await Account.group("firm_id", "credit_limit").count();
-    expect(typeof res).toBe("object");
+    expect(res).toBeInstanceOf(Map);
   });
 
   it("should group by multiple fields having functions", async () => {
     const c = await Topic.group("author_name", "COALESCE(type, title)").count();
-    expect(typeof c).toBe("object");
+    expect(c).toBeInstanceOf(Map);
     // Rails: 5 topics each with unique (author_name, COALESCE(type,title)) combo
-    const total = Object.values(c as object).reduce((sum: number, v) => sum + (v as number), 0);
+    const total = [...(c as Map<unknown, number>).values()].reduce((sum, v) => sum + v, 0);
     expect(total).toBe(5);
   });
 
   it("should group by summed field", async () => {
-    const expected: Record<string | number, number> = { 1: 50, 2: 60, 6: 105, 9: 53 };
-    const c = (await Account.group("firm_id").sum("credit_limit")) as Record<number, number>;
-    expect(c[null as unknown as number]).toBe(50);
-    expect(c[1]).toBe(50);
-    expect(c[2]).toBe(60);
-    expect(c[6]).toBe(105);
-    expect(c[9]).toBe(53);
-    void expected;
+    const expected = new Map<unknown, number>([
+      [null, 50],
+      [1, 50],
+      [6, 105],
+      [2, 60],
+      [9, 53],
+    ]);
+    const c = await Account.group("firm_id").sum("credit_limit");
+    expect(c).toEqual(expected);
   });
 
   it("group by multiple same field", async () => {
     const accounts = Account.group("firm_id");
-    const c = (await accounts.sum("credit_limit")) as Record<number, number>;
-    expect(c[null as unknown as number]).toBe(50);
-    expect(c[1]).toBe(50);
-    expect(c[2]).toBe(60);
-    expect(c[6]).toBe(105);
-    expect(c[9]).toBe(53);
+    const c = (await accounts.sum("credit_limit")) as Map<unknown, number>;
+    expect(c.get(null)).toBe(50);
+    expect(c.get(1)).toBe(50);
+    expect(c.get(2)).toBe(60);
+    expect(c.get(6)).toBe(105);
+    expect(c.get(9)).toBe(53);
   });
 
   it("should generate valid sql with joins and group", async () => {
@@ -228,8 +236,8 @@ describe("CalculationsTest", () => {
     const company = (await Company.where({ id: developer.id }).first())!;
     const c = await (company as any).contracts.group("id").count();
     const totalCount = await (company as any).contracts.count();
-    expect(Object.keys(c as object).length).toBe(totalCount);
-    for (const [, v] of Object.entries(c as Record<string, number>)) {
+    expect((c as Map<unknown, number>).size).toBe(totalCount);
+    for (const [, v] of c as Map<unknown, number>) {
       expect(v).toBe(1);
     }
   });
@@ -237,38 +245,33 @@ describe("CalculationsTest", () => {
   it("should not use alias for grouped field", async () => {
     // Rails: asserts GROUP BY uses accounts.firm_id (not an alias) and order("accounts_firm_id") works.
     // In trails, use the qualified column name for ORDER BY since auto-alias translation may not apply.
-    const c = (await Account.group("firm_id")
-      .order("accounts.firm_id")
-      .sum("credit_limit")) as Record<number, number>;
-    const keys = Object.keys(c)
-      .map(Number)
-      .filter((k) => !isNaN(k));
+    const c = (await Account.group("firm_id").order("accounts.firm_id").sum("credit_limit")) as Map<
+      unknown,
+      number
+    >;
+    const keys = [...c.keys()].filter((k): k is number => typeof k === "number");
     expect(keys.sort((a, b) => a - b)).toEqual([1, 2, 6, 9]);
   });
 
   it("should order by grouped field", async () => {
-    const c = (await Account.group("firm_id").order("firm_id").sum("credit_limit")) as Record<
-      number,
+    const c = (await Account.group("firm_id").order("firm_id").sum("credit_limit")) as Map<
+      unknown,
       number
     >;
-    const keys = Object.keys(c)
-      .map(Number)
-      .filter((k) => !isNaN(k));
+    const keys = [...c.keys()].filter((k): k is number => typeof k === "number");
     expect(keys).toEqual([1, 2, 6, 9]);
   });
 
   it("should order by calculation", async () => {
     const c = (await Account.group("firm_id")
       .order("sum_credit_limit desc, firm_id")
-      .sum("credit_limit")) as Record<number, number>;
-    const values = Object.values(c);
+      .sum("credit_limit")) as Map<unknown, number>;
+    const values = [...c.values()];
     expect(values).toContain(105);
     expect(values).toContain(60);
     expect(values).toContain(53);
     expect(values.filter((v) => v === 50).length).toBe(2);
-    const keys = Object.keys(c)
-      .map(Number)
-      .filter((k) => !isNaN(k));
+    const keys = [...c.keys()].filter((k): k is number => typeof k === "number");
     expect(keys).toEqual(expect.arrayContaining([6, 2, 9, 1]));
   });
 
@@ -277,9 +280,8 @@ describe("CalculationsTest", () => {
       .group("firm_id")
       .order("firm_id")
       .limit(2)
-      .sum("credit_limit")) as Record<number, number>;
-    const keys = Object.keys(c).map(Number);
-    expect(keys).toEqual([1, 2]);
+      .sum("credit_limit")) as Map<unknown, number>;
+    expect([...c.keys()]).toEqual([1, 2]);
   });
 
   it("should limit calculation with offset", async () => {
@@ -288,9 +290,8 @@ describe("CalculationsTest", () => {
       .order("firm_id")
       .limit(2)
       .offset(1)
-      .sum("credit_limit")) as Record<number, number>;
-    const keys = Object.keys(c).map(Number);
-    expect(keys).toEqual([2, 6]);
+      .sum("credit_limit")) as Map<unknown, number>;
+    expect([...c.keys()]).toEqual([2, 6]);
   });
 
   it("order should apply before count", async () => {
@@ -423,18 +424,18 @@ describe("CalculationsTest", () => {
     const result = (await Post.leftJoins("comments")
       .group("comments.post_id")
       .distinct()
-      .count("author_id")) as Record<number, number>;
-    expect(typeof result).toBe("object");
-    expect(Object.keys(result).length).toBeGreaterThan(0);
+      .count("author_id")) as Map<unknown, number>;
+    expect(result).toBeInstanceOf(Map);
+    expect(result.size).toBeGreaterThan(0);
   });
 
   it("distinct count with group by and order and limit", async () => {
     // Rails: Account.group(:firm_id).distinct.order("1 DESC").limit(1).count == { 6 => 2 }
     // firm_id=6 has 2 accounts (ids 3+5); it is the group with the highest count.
-    const result = (await Account.group("firm_id").count()) as Record<number, number>;
+    const result = (await Account.group("firm_id").count()) as Map<unknown, number>;
     // firm_id=6 should have count 2; all others have count 1
-    expect(result[6]).toBe(2);
-    expect(Object.values(result).filter((v) => v === 1).length).toBeGreaterThan(0);
+    expect(result.get(6)).toBe(2);
+    expect([...result.values()].filter((v) => v === 1).length).toBeGreaterThan(0);
   });
 
   it("count for a composite primary key model", async () => {
@@ -445,9 +446,9 @@ describe("CalculationsTest", () => {
   it("group by count for a composite primary key model", async () => {
     const book = cpkBooks("cpk_great_author_first_book");
     const authorId = book.author_id;
-    const expected: Record<number, number> = {
-      [authorId]: (await CpkBook.where({ author_id: authorId }).count()) as number,
-    };
+    const expected = new Map([
+      [authorId, (await CpkBook.where({ author_id: authorId }).count()) as number],
+    ]);
     const result = await CpkBook.where({ author_id: authorId }).group("author_id").count();
     expect(result).toEqual(expected);
   });
@@ -461,11 +462,11 @@ describe("CalculationsTest", () => {
   it("should group by summed field having condition", async () => {
     const c = (await Account.group("firm_id")
       .having("sum(credit_limit) > 50")
-      .sum("credit_limit")) as Record<number, number>;
+      .sum("credit_limit")) as Map<unknown, number>;
     // firm_id=6 sum=105 and firm_id=2 sum=60 satisfy sum > 50
-    expect(c[6]).toBe(105);
-    expect(c[2]).toBe(60);
-    expect(c[9]).toBe(53);
+    expect(c.get(6)).toBe(105);
+    expect(c.get(2)).toBe(60);
+    expect(c.get(9)).toBe(53);
   });
 
   it.skipIf(adapterType === "postgres")(
@@ -474,9 +475,9 @@ describe("CalculationsTest", () => {
       const c = (await Account.select("MIN(credit_limit) AS min_credit_limit")
         .group("firm_id")
         .having("min_credit_limit > 50")
-        .sum("credit_limit")) as Record<number, number>;
-      expect(c[2]).toBe(60);
-      expect(c[9]).toBe(53);
+        .sum("credit_limit")) as Map<unknown, number>;
+      expect(c.get(2)).toBe(60);
+      expect(c.get(9)).toBe(53);
     },
   );
 
@@ -508,46 +509,46 @@ describe("CalculationsTest", () => {
   });
 
   it("should return type casted values with group and expression", async () => {
-    const result = await Account.group("firm_name").sum("0.01 * credit_limit");
-    expect((result as Record<string, number>)["37signals"]).toBeCloseTo(0.5);
+    const result = (await Account.group("firm_name").sum("0.01 * credit_limit")) as Map<
+      unknown,
+      number
+    >;
+    expect(result.get("37signals")).toBeCloseTo(0.5);
   });
 
   it("should group by summed field with conditions", async () => {
-    const c = (await Account.where("firm_id > 1").group("firm_id").sum("credit_limit")) as Record<
-      number,
+    const c = (await Account.where("firm_id > 1").group("firm_id").sum("credit_limit")) as Map<
+      unknown,
       number
     >;
-    expect(c[1]).toBeUndefined();
-    expect(c[6]).toBe(105);
-    expect(c[2]).toBe(60);
+    expect(c.get(1)).toBeUndefined();
+    expect(c.get(6)).toBe(105);
+    expect(c.get(2)).toBe(60);
   });
 
   it("should group by summed field with conditions and having", async () => {
     const c = (await Account.where("firm_id > 1")
       .group("firm_id")
       .having("sum(credit_limit) > 50")
-      .sum("credit_limit")) as Record<number, number>;
-    expect(c[6]).toBe(105);
-    expect(c[2]).toBe(60);
-    expect(c[9]).toBe(53);
-    expect(c[1]).toBeUndefined();
+      .sum("credit_limit")) as Map<unknown, number>;
+    expect(c.get(6)).toBe(105);
+    expect(c.get(2)).toBe(60);
+    expect(c.get(9)).toBe(53);
+    expect(c.get(1)).toBeUndefined();
   });
 
   it("should group by fields with table alias", async () => {
-    const c = (await Account.group("accounts.firm_id").sum("credit_limit")) as Record<
-      number,
-      number
-    >;
-    expect(c[1]).toBe(50);
-    expect(c[6]).toBe(105);
-    expect(c[2]).toBe(60);
+    const c = (await Account.group("accounts.firm_id").sum("credit_limit")) as Map<unknown, number>;
+    expect(c.get(1)).toBe(50);
+    expect(c.get(6)).toBe(105);
+    expect(c.get(2)).toBe(60);
   });
 
   it("should calculate grouped with longer field", async () => {
-    const c = (await Account.group("firm_id").sum("credit_limit")) as Record<number, number>;
-    expect(c[1]).toBe(50);
-    expect(c[6]).toBe(105);
-    expect(c[2]).toBe(60);
+    const c = (await Account.group("firm_id").sum("credit_limit")) as Map<unknown, number>;
+    expect(c.get(1)).toBe(50);
+    expect(c.get(6)).toBe(105);
+    expect(c.get(2)).toBe(60);
   });
 
   it("should calculate with invalid field", async () => {
@@ -556,10 +557,10 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped with invalid field", async () => {
-    const c = (await Account.group("accounts.firm_id").count()) as Record<number, number>;
-    expect(c[1]).toBe(1);
-    expect(c[6]).toBe(2);
-    expect(c[2]).toBe(1);
+    const c = (await Account.group("accounts.firm_id").count()) as Map<unknown, number>;
+    expect(c.get(1)).toBe(1);
+    expect(c.get(6)).toBe(2);
+    expect(c.get(2)).toBe(1);
   });
 
   it("should calculate grouped association with invalid field", async () => {
@@ -609,19 +610,19 @@ describe("CalculationsTest", () => {
   });
 
   it("should calculate grouped by function", async () => {
-    const c = (await Company.group("UPPER(type)").count()) as Record<string, number>;
-    expect(c[null as unknown as string]).toBe(2);
-    expect(c["DEPENDENTFIRM"]).toBe(1);
-    expect(c["CLIENT"]).toBe(5);
-    expect(c["FIRM"]).toBe(3);
+    const c = (await Company.group("UPPER(type)").count()) as Map<unknown, number>;
+    expect(c.get(null)).toBe(2);
+    expect(c.get("DEPENDENTFIRM")).toBe(1);
+    expect(c.get("CLIENT")).toBe(5);
+    expect(c.get("FIRM")).toBe(3);
   });
 
   it("should calculate grouped by function with table alias", async () => {
-    const c = (await Company.group("UPPER(companies.type)").count()) as Record<string, number>;
-    expect(c[null as unknown as string]).toBe(2);
-    expect(c["DEPENDENTFIRM"]).toBe(1);
-    expect(c["CLIENT"]).toBe(5);
-    expect(c["FIRM"]).toBe(3);
+    const c = (await Company.group("UPPER(companies.type)").count()) as Map<unknown, number>;
+    expect(c.get(null)).toBe(2);
+    expect(c.get("DEPENDENTFIRM")).toBe(1);
+    expect(c.get("CLIENT")).toBe(5);
+    expect(c.get("FIRM")).toBe(3);
   });
 
   it("should not overshadow enumerable sum", async () => {
@@ -652,18 +653,18 @@ describe("CalculationsTest", () => {
   it("should group by scoped field", async () => {
     const rc = companies("rails_core");
     const firm = (await Company.where({ id: rc.id }).first())! as any;
-    const c = (await firm.companies.group("name").sum("id")) as Record<string, number>;
-    expect(Number(c["Leetsoft"])).toBe(7);
-    expect(Number(c["Jadedpixel"])).toBe(8);
+    const c = (await firm.companies.group("name").sum("id")) as Map<unknown, number>;
+    expect(Number(c.get("Leetsoft"))).toBe(7);
+    expect(Number(c.get("Jadedpixel"))).toBe(8);
   });
 
   it("should group by summed field through association and having", async () => {
     const rc = companies("rails_core");
     const firm = (await Company.where({ id: rc.id }).first())! as any;
-    const c = (await firm.companies.group("name").sum("id")) as Record<string, number>;
+    const c = (await firm.companies.group("name").sum("id")) as Map<unknown, number>;
     // Companies under rails_core: Leetsoft (id=7) and Jadedpixel (id=8)
-    expect(Number(c["Leetsoft"])).toBe(7);
-    expect(Number(c["Jadedpixel"])).toBe(8);
+    expect(Number(c.get("Leetsoft"))).toBe(7);
+    expect(Number(c.get("Jadedpixel"))).toBe(8);
   });
 
   it("should count selected field with include", async () => {
@@ -715,16 +716,17 @@ describe("CalculationsTest", () => {
   });
 
   it("should count manual select with group with count all", async () => {
-    const expected: Record<string, number> = { null: 1, "1": 1, "2": 1, "6": 2, "9": 1 };
-    const actual = (await Account.select("DISTINCT accounts.firm_id")
+    const expected = new Map<unknown, number>([
+      [null, 1],
+      [1, 1],
+      [2, 1],
+      [6, 2],
+      [9, 1],
+    ]);
+    const actual = await Account.select("DISTINCT accounts.firm_id")
       .group("accounts.firm_id")
-      .count()) as Record<number, number>;
-    expect(actual[null as unknown as number]).toBe(1);
-    expect(actual[1]).toBe(1);
-    expect(actual[2]).toBe(1);
-    expect(actual[6]).toBe(2);
-    expect(actual[9]).toBe(1);
-    void expected;
+      .count();
+    expect(actual).toEqual(expected);
   });
 
   it("should count manual with count all", async () => {
@@ -786,33 +788,35 @@ describe("CalculationsTest", () => {
   });
 
   it("should count field in joined table with group by", async () => {
-    const c = (await Account.group("accounts.firm_id")
-      .joins("firm")
-      .count("companies.id")) as Record<number, number>;
-    expect(Object.keys(c).map(Number)).toEqual(expect.arrayContaining([1, 6, 2, 9]));
+    const c = (await Account.group("accounts.firm_id").joins("firm").count("companies.id")) as Map<
+      unknown,
+      number
+    >;
+    expect([...c.keys()]).toEqual(expect.arrayContaining([1, 6, 2, 9]));
   });
 
   it("should count field in joined table with group by when tables share column names", async () => {
-    const counts = (await Company.joins("account").group("accounts.status").count()) as Record<
-      string,
+    const counts = (await Company.joins("account").group("accounts.status").count()) as Map<
+      unknown,
       number
     >;
-    expect(counts["active"]).toBe(2);
-    expect(counts["trial"]).toBe(2);
-    expect(counts["suspended"]).toBe(1);
+    expect(counts.get("active")).toBe(2);
+    expect(counts.get("trial")).toBe(2);
+    expect(counts.get("suspended")).toBe(1);
   });
 
   it("should count field of root table with conflicting group by column", async () => {
     // Rails: Post.joins(:comments).group(:post_id).count == { 1=>2, 2=>1, 4=>5, 5=>3, 7=>1 }
     // Also tests group("comments.post_id") which avoids the ambiguous column qualification.
-    const expected = { 1: 2, 2: 1, 4: 5, 5: 3, 7: 1 };
-    const result = (await Post.joins("comments").group("comments.post_id").count()) as Record<
-      number,
-      number
-    >;
-    expect(Object.fromEntries(Object.entries(result).map(([k, v]) => [Number(k), v]))).toEqual(
-      expected,
-    );
+    const expected = new Map([
+      [1, 2],
+      [2, 1],
+      [4, 5],
+      [5, 3],
+      [7, 1],
+    ]);
+    const result = await Post.joins("comments").group("comments.post_id").count();
+    expect(result).toEqual(expected);
   });
 
   it("count with no parameters isnt deprecated", async () => {
@@ -940,11 +944,10 @@ describe("CalculationsTest", () => {
   it("sum with grouped calculation", async () => {
     // Rails: Post.group(:tags_count).sum == { 0 => 0, 1 => 0, 3 => 0 }
     // (posts have tags_count of 0, 1, or 3; sum without a column returns {group => 0})
-    const result = await Post.group("tags_count").count();
-    expect(typeof result).toBe("object");
+    const result = (await Post.group("tags_count").count()) as Map<unknown, number>;
+    expect(result).toBeInstanceOf(Map);
     // tags_count values in fixtures: 0, 1, 3
-    const keys = Object.keys(result as object).map(Number);
-    expect(keys).toEqual(expect.arrayContaining([0, 1, 3]));
+    expect([...result.keys()]).toEqual(expect.arrayContaining([0, 1, 3]));
   });
 
   it("from option with specified index", async () => {
@@ -957,12 +960,12 @@ describe("CalculationsTest", () => {
 
   it("distinct is honored when used with count operation after group", async () => {
     const approvedTopicsCount = (
-      (await Topic.group("approved").count("author_name")) as Record<string, number>
-    )["true"];
+      (await Topic.group("approved").count("author_name")) as Map<unknown, number>
+    ).get(true);
     expect(approvedTopicsCount).toBe(4);
     const distinctAuthorsForApprovedCount = (
-      (await Topic.group("approved").distinct().count("author_name")) as Record<string, number>
-    )["true"];
+      (await Topic.group("approved").distinct().count("author_name")) as Map<unknown, number>
+    ).get(true);
     expect(distinctAuthorsForApprovedCount).toBe(3);
   });
 
@@ -1348,7 +1351,10 @@ describe("CalculationsTest", () => {
   it.skipIf(adapterType !== "postgres")(
     "group by with order by virtual count attribute",
     async () => {
-      const expected = { SpecialPost: 1, StiPost: 2 };
+      const expected = new Map([
+        ["SpecialPost", 1],
+        ["StiPost", 2],
+      ]);
       // Rails `order(:count)`: the Symbol qualifies to `"posts"."count"`, which PG
       // resolves via functional notation as `count(posts.*)` — the "virtual count
       // attribute". A bare string would stay raw SQL and fail to parse.
@@ -1365,8 +1371,8 @@ describe("CalculationsTest", () => {
       .order({ type: "desc" })
       .limit(2)
       .count("comments.id");
-    expect(typeof actual).toBe("object");
-    expect(Object.keys(actual as object).length).toBe(2);
+    expect(actual).toBeInstanceOf(Map);
+    expect((actual as Map<unknown, number>).size).toBe(2);
   });
 
   it("group by with offset", async () => {
@@ -1375,8 +1381,8 @@ describe("CalculationsTest", () => {
       .order({ type: "desc" })
       .offset(1)
       .count("comments.id");
-    expect(typeof actual).toBe("object");
-    expect(Object.keys(actual as object).length).toBeGreaterThanOrEqual(1);
+    expect(actual).toBeInstanceOf(Map);
+    expect((actual as Map<unknown, number>).size).toBeGreaterThanOrEqual(1);
   });
 
   it("group by with limit and offset", async () => {
@@ -1386,16 +1392,15 @@ describe("CalculationsTest", () => {
       .offset(1)
       .limit(1)
       .count("comments.id");
-    expect(typeof actual).toBe("object");
-    expect(Object.keys(actual as object).length).toBe(1);
+    expect(actual).toBeInstanceOf(Map);
+    expect((actual as Map<unknown, number>).size).toBe(1);
   });
 
   it("group by with quoted count and order by alias", async () => {
     // Rails: Post.group(:type).order("count_posts_id").count(Arel.sql('"posts"."id"'))
-    const actual = await Post.group("type").count("posts.id");
-    expect(typeof actual).toBe("object");
-    const keys = Object.keys(actual as object);
-    expect(keys).toEqual(expect.arrayContaining(["Post", "SpecialPost", "StiPost"]));
+    const actual = (await Post.group("type").count("posts.id")) as Map<unknown, number>;
+    expect(actual).toBeInstanceOf(Map);
+    expect([...actual.keys()]).toEqual(expect.arrayContaining(["Post", "SpecialPost", "StiPost"]));
   });
 
   it("pluck not auto table name prefix if column included", async () => {
@@ -1663,18 +1668,17 @@ describe("CalculationsTest", () => {
     });
     const result = (await ShipPart.joins("trinkets")
       .group("ship_parts.name")
-      .sum("ship_parts.id")) as Record<string, number>;
-    expect(Number(result["has trinket"])).toBe(Number(part.id));
+      .sum("ship_parts.id")) as Map<unknown, number>;
+    expect(Number(result.get("has trinket"))).toBe(Number(part.id));
     void treasure;
   });
 
   it("calculation grouped by association doesnt error when no records have association", async () => {
     await Client.updateAll({ client_of: null });
-    const result = (await Client.group("client_of").count()) as Record<string, number>;
+    const result = (await Client.group("client_of").count()) as Map<unknown, number>;
     // All clients have null firm after update; null key maps to total count
     const total = await Client.count();
-    const nilCount = result[null as unknown as string] ?? result["null"] ?? 0;
-    expect(nilCount).toBe(total);
+    expect(result.get(null) ?? 0).toBe(total);
   });
 
   it("should reference correct aliases while joining tables of has many through association", async () => {
@@ -1716,7 +1720,12 @@ describe("CalculationsTest", () => {
 
   it("group by attribute with custom type", async () => {
     const result = await Book.group("status").count();
-    expect(result).toEqual({ proposed: 2, published: 2 });
+    expect(result).toEqual(
+      new Map([
+        ["proposed", 2],
+        ["published", 2],
+      ]),
+    );
   });
 
   it("aggregate attribute on enum type", async () => {
@@ -1726,16 +1735,30 @@ describe("CalculationsTest", () => {
     expect(await Book.sum("difficulty")).toBe(1);
     expect(await Book.minimum("difficulty")).toBe(0);
     expect(await Book.maximum("difficulty")).toBe(1);
-    expect(await Book.group("status").sum("status")).toEqual({ proposed: 0, published: 4 });
-    expect(await Book.group("status").sum("difficulty")).toEqual({ proposed: 0, published: 1 });
-    expect(await Book.group("status").minimum("difficulty")).toEqual({
-      proposed: 0,
-      published: 0,
-    });
-    expect(await Book.group("status").maximum("difficulty")).toEqual({
-      proposed: 0,
-      published: 1,
-    });
+    expect(await Book.group("status").sum("status")).toEqual(
+      new Map([
+        ["proposed", 0],
+        ["published", 4],
+      ]),
+    );
+    expect(await Book.group("status").sum("difficulty")).toEqual(
+      new Map([
+        ["proposed", 0],
+        ["published", 1],
+      ]),
+    );
+    expect(await Book.group("status").minimum("difficulty")).toEqual(
+      new Map([
+        ["proposed", 0],
+        ["published", 0],
+      ]),
+    );
+    expect(await Book.group("status").maximum("difficulty")).toEqual(
+      new Map([
+        ["proposed", 0],
+        ["published", 1],
+      ]),
+    );
   });
 
   it("minimum and maximum on non numeric type", async () => {
@@ -1744,12 +1767,12 @@ describe("CalculationsTest", () => {
     const max = await Topic.maximum("last_read");
     expect(String(min)).toContain("2004-04-15");
     expect(String(max)).toContain("2004-04-15");
-    const minByApproved = (await Topic.group("approved").minimum("last_read")) as Record<
-      string,
+    const minByApproved = (await Topic.group("approved").minimum("last_read")) as Map<
+      unknown,
       unknown
     >;
-    expect(String(minByApproved["false"])).toContain("2004-04-15");
-    expect(minByApproved["true"]).toBeNull();
+    expect(String(minByApproved.get(false))).toContain("2004-04-15");
+    expect(minByApproved.get(true)).toBeNull();
   });
 
   it("minimum and maximum on time attributes", async () => {

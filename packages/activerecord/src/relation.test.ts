@@ -551,7 +551,13 @@ describe("RelationTest", () => {
     expect(sql).toContain(`INNER JOIN ${canonicalQuoteTableName("comments")}`);
     expect(sql).toContain(joinString);
 
-    expect(await merged.count()).toEqual({ 2: 1, 4: 3, 5: 1 });
+    expect(await merged.count()).toEqual(
+      new Map([
+        [2, 1],
+        [4, 3],
+        [5, 1],
+      ]),
+    );
   });
 
   it("relation merging with merged joins as symbols", async () => {
@@ -561,7 +567,7 @@ describe("RelationTest", () => {
       .merge(specialCommentsWithRatings);
     const merged = (authors("david") as any).posts.merge(postsWithSpecialCommentsWithRatings);
 
-    expect(await merged.count()).toEqual({ 4: 2 });
+    expect(await merged.count()).toEqual(new Map([[4, 2]]));
   });
 
   it("relation merging with merged symbol joins keeps inner joins", async () => {

@@ -14,10 +14,11 @@ import {
 import { SchemaDumper } from "../../connection-adapters/abstract/schema-dumper.js";
 import { DateTime as OidDateTime } from "../../connection-adapters/postgresql/oid/date-time.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
+import { Topic } from "../../test-helpers/models/topic.js";
 import { withTimezoneConfig } from "../../test-helper.js";
 import { Base } from "../../index.js";
 
-fixtures({}, { useTransactionalTests: false });
+fixtures(["topics"], { useTransactionalTests: false });
 
 describeIfPg("PostgreSQLAdapter", () => {
   let adapter: PostgreSQLAdapter;
@@ -314,14 +315,14 @@ describeIfPg("PostgreSQLAdapter", () => {
   });
 
   describe("PostgreSQLTimestampFixtureTest", () => {
-    it.skip("group by date", () => {
-      // BLOCKED: grouped-calculation key typing. Rails' Topic.group(...).count
-      // hash keys are type-cast values (`assert_kind_of Time, k`); trails'
-      // groupedAggregate returns Record<string, unknown>, whose keys are
-      // String()-ified even when the group column deserializes to Temporal
-      // (calculations.ts groupedAggregate). Converging needs a typed-Map
-      // result shape for expression groups.
-      // DEFERRED (RFC 0030): tracked by grouped-calculation-typed-keys.
+    it("group by date", async () => {
+      const keys = [
+        ...(
+          (await Topic.group("date_trunc('month', created_at)").count()) as Map<unknown, number>
+        ).keys(),
+      ];
+      expect(keys.length).toBeGreaterThan(0);
+      for (const k of keys) expect(k).toBeInstanceOf(Temporal.Instant);
     });
     it("load infinity and beyond", async () => {
       class Dev extends Base {

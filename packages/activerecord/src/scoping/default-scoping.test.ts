@@ -568,8 +568,8 @@ describe("DefaultScopingTest", () => {
 
   it("default scope select ignored by grouped aggregations", async () => {
     const all = await Developer.all();
-    const expected: Record<string, number> = {};
-    for (const d of all as any[]) expected[d.salary] = (expected[d.salary] ?? 0) + 1;
+    const expected = new Map<unknown, number>();
+    for (const d of all as any[]) expected.set(d.salary, (expected.get(d.salary) ?? 0) + 1);
     const received = await DeveloperWithSelect.group("salary").count();
     expect(received).toEqual(expected);
   });

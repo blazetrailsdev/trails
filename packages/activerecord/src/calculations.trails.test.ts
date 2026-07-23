@@ -136,3 +136,29 @@ describe("lookupCastTypeFromJoinDependencies integration", () => {
     expect(castType?.constructor.name).not.toBe("ValueType");
   });
 });
+
+// ==========================================================================
+// Grouped-calculation key typing via an Arel attribute's type caster
+//
+// trails-specific regression (no verbatim Rails test): Rails resolves each
+// group column's key type as `col_name.try(:type_caster) || type_for(col_name)`
+// (calculations.rb:567-570), so grouping by an Arel attribute keys the result
+// by the attribute's own decorated type — an enum keys by its labels, not the
+// raw stored integers. Guards the `groupNode instanceof Nodes.Attribute`
+// branch in groupedAggregate.
+// ==========================================================================
+
+describe("grouped calculation keyed via Arel attribute type caster", () => {
+  fixtures(["books"]);
+
+  it("keys an enum group given as an Arel attribute by its labels", async () => {
+    const { Book } = await import("./test-helpers/models/book.js");
+    const result = await Book.group(Book.arelTable.get("status")).count();
+    expect(result).toEqual(
+      new Map([
+        ["proposed", 2],
+        ["published", 2],
+      ]),
+    );
+  });
+});

@@ -3512,23 +3512,23 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#calculate
    */
-  async calculate(operation: "count", column?: string): Promise<number | Record<string, number>>;
+  async calculate(operation: "count", column?: string): Promise<number | Map<unknown, number>>;
   async calculate(
     operation: "sum",
     column: string,
-  ): Promise<number | bigint | Record<string, number | bigint>>;
+  ): Promise<number | bigint | Map<unknown, number | bigint>>;
   async calculate(
     operation: "average",
     column: string,
-  ): Promise<unknown | null | Record<string, unknown>>;
+  ): Promise<unknown | null | Map<unknown, unknown>>;
   async calculate(
     operation: "minimum" | "maximum",
     column: string,
-  ): Promise<unknown | null | Record<string, unknown>>;
+  ): Promise<unknown | null | Map<unknown, unknown>>;
   async calculate(
     operation: "count" | "sum" | "average" | "minimum" | "maximum",
     column?: string,
-  ): Promise<unknown | null | Record<string, unknown>> {
+  ): Promise<unknown | null | Map<unknown, unknown>> {
     switch (operation) {
       case "count":
         return this.count(column);
