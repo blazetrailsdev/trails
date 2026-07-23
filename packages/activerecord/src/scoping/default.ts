@@ -206,7 +206,9 @@ export function isScopeAttributes(this: {
   defaultScopes?: DefaultScope[];
 }): boolean {
   return (
-    baseIsScopeAttributes.call(this) || isDefaultScopes.call(this) || hasDefaultScopeOverride(this)
+    baseIsScopeAttributes.call(this) ||
+    (this.defaultScopes?.length ?? 0) > 0 ||
+    hasDefaultScopeOverride(this)
   );
 }
 

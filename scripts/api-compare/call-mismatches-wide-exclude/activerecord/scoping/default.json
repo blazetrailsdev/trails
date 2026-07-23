@@ -30,6 +30,13 @@
   {
     "package": "activerecord",
     "tsFile": "scoping/default.ts",
+    "rubyName": "scope_attributes?",
+    "call": "any?",
+    "reason": "Ruby Array#any? has no ported counterpart: `default_scopes.any?` (scoping/default.rb:56) ports to the `defaultScopes.length` check in isScopeAttributes."
+  },
+  {
+    "package": "activerecord",
+    "tsFile": "scoping/default.ts",
     "rubyName": "unscoped",
     "call": "relation",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

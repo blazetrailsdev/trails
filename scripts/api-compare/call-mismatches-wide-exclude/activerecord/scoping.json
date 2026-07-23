@@ -33,12 +33,5 @@
     "rubyName": "populate_with_current_scope_attributes",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "scoping.ts",
-    "rubyName": "scope_attributes?",
-    "call": "any?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails scoping/default.rb:55-57 is `super || default_scopes.any? || respond_to?(:default_scope)`; trails scoping.ts:144-146 isScopeAttributes returns `!!this.currentScope` — only the super (scoping.rb:22-24) arm; the default_scopes.any? arm is unported. Omission tracked in story scope-attributes-predicate-ignores-default-scopes."
   }
 ]
