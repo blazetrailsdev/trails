@@ -40,6 +40,28 @@ const MONTH_ABBREVIATIONS = [
   "dec",
 ];
 
+/**
+ * Split non-negative seconds into whole seconds + truncated nanoseconds using
+ * the double's exact binary value (mantissa * 2^exponent), mirroring Ruby
+ * Time's Float → Rational conversion. Negative or non-finite input falls back
+ * to a plain trunc — the caller's domain check raises for it anyway.
+ */
+function exactSecondsToNanoseconds(second: number): { whole: number; ns: number } {
+  if (!(second >= 0) || !Number.isFinite(second)) {
+    return { whole: Math.trunc(second), ns: 0 };
+  }
+  const dv = new DataView(new ArrayBuffer(8));
+  dv.setFloat64(0, second);
+  const bits = dv.getBigUint64(0);
+  const expBits = Number((bits >> 52n) & 0x7ffn);
+  let mantissa = bits & 0xf_ffff_ffff_ffffn;
+  if (expBits !== 0) mantissa |= 1n << 52n;
+  const exponent = expBits === 0 ? -1074 : expBits - 1075;
+  let totalNs = mantissa * 1_000_000_000n;
+  totalNs = exponent >= 0 ? totalNs << BigInt(exponent) : totalNs >> BigInt(-exponent);
+  return { whole: Number(totalNs / 1_000_000_000n), ns: Number(totalNs % 1_000_000_000n) };
+}
+
 export class AcceptsMultiparameterTime {
   readonly type: Type;
   /** @internal */
@@ -128,15 +150,12 @@ export class AcceptsMultiparameterTime {
     const minute = num("5", 0);
     const second = num("6", 0);
 
-    // Decompose fractional seconds into the three Temporal sub-second
-    // components (each 0-999) using integer arithmetic to avoid floating-
-    // point rounding errors. Carry 1e9 ns into wholeSecond explicitly.
-    let wholeSecond = Math.trunc(second);
-    let totalNanoseconds = Math.round((second - wholeSecond) * 1_000_000_000);
-    if (totalNanoseconds === 1_000_000_000) {
-      wholeSecond += 1;
-      totalNanoseconds = 0;
-    }
+    // Ruby converts the seconds Float to an exact Rational and truncates:
+    // Time.utc(...,0.9999999999).nsec == 999_999_999 (never carried into the
+    // next second), and Time.utc(...,0.7).nsec == 699_999_999 because 0.7's
+    // exact binary value is 0.69999999999999995…. Decompose the double's bits
+    // so the truncation operates on that exact value, not an FP product.
+    const { whole: wholeSecond, ns: totalNanoseconds } = exactSecondsToNanoseconds(second);
     const millisecond = Math.trunc(totalNanoseconds / 1_000_000);
     const microsecond = Math.trunc((totalNanoseconds % 1_000_000) / 1_000);
     const nanosecond = totalNanoseconds % 1_000;
