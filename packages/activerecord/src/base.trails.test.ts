@@ -283,6 +283,37 @@ describe("BasicsTest (trails)", () => {
     const exists = await Ghost.tableExists();
     expect(exists).toBe(true);
   });
+
+  it("columnNames raises TableNotSpecified on an abstract class", () => {
+    // Rails column_names has no abstract-class fallback — load_schema! raises
+    // TableNotSpecified. Guards against reintroducing the attribute-walk branch.
+    class AbstractIntrospected extends Base {
+      static {
+        this.abstractClass = true;
+        this.attribute("name", "string");
+      }
+    }
+    expect(() => AbstractIntrospected.columnNames()).toThrow(
+      "AbstractIntrospected has no table configured",
+    );
+  });
+});
+
+describe("attribute_names table_exists? guard (trails)", () => {
+  fixtures([]);
+
+  it("attributeNames is [] for a declared attribute once the cache resolves the table absent", async () => {
+    class DeclaredNonExistent extends Base {
+      static tableName = "non_existent_tables";
+      static {
+        this.attribute("name", "string");
+      }
+    }
+    // Populate the schema cache's dataSourceExists=false entry — the sync
+    // stand-in for Rails' table_exists? DB hit (attribute_methods.rb:236-241).
+    expect(await DeclaredNonExistent.tableExists()).toBe(false);
+    expect(DeclaredNonExistent.attributeNames()).toEqual([]);
+  });
 });
 
 // Rails removes ignored columns only from schema/default `attribute_types`

@@ -205,22 +205,12 @@ export function buildWhereNodeFromConstraints(
  * Return column names for a model, excluding ignored columns.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_names
- * (`columns.map(&:name)`, i.e. the `columns_hash` keys).
+ * (`columns.map(&:name)`). Reads `columnsHash()` keys rather than `columns()`
+ * because trails applies the `ignoredColumns` filter at read time in
+ * `columnsHash()` (Rails filters at load), and `columns()`' `_columns` memo
+ * would bypass it after an `ignoredColumns=` reassignment.
  */
 export function columnNames(this: typeof Base): string[] {
-  // Abstract classes have no concrete table, and `columnsHash` throws for them.
-  // Fall back to the declared (non-virtual) attribute names so introspecting an
-  // abstract model doesn't blow up — matches the pre-columnsHash behavior.
-  if (this.abstractClass) {
-    const ignored = new Set(this.ignoredColumns ?? []);
-    const out: string[] = [];
-    for (const [name, def] of this._attributeDefinitions) {
-      if (ignored.has(name)) continue;
-      if ((def as { virtual?: boolean }).virtual) continue;
-      out.push(name);
-    }
-    return out;
-  }
   return Object.keys(this.columnsHash());
 }
 
@@ -1612,6 +1602,26 @@ export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
 /** Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_defaults */
 export function columnDefaults(this: SchemaHost): Record<string, unknown> {
   return this._defaultAttributes().deepDup().toHash();
+}
+
+/**
+ * Synchronous, cache-only view of `tableExists`: `false` only when the schema
+ * cache has already resolved this table as absent, `undefined` when unknown
+ * (cold cache / no adapter). Sync callers of Rails' `table_exists?` guard
+ * (class-level `attribute_names`) use this since `tableExists` is async.
+ *
+ * @internal
+ */
+export function cachedTableExists(this: SchemaHost): boolean | undefined {
+  let conn: any;
+  try {
+    conn = reflectionAdapter(this);
+  } catch {
+    return undefined;
+  }
+  const cache = conn?.schemaCache;
+  if (!cache || typeof cache.getCachedDataSourceExists !== "function") return undefined;
+  return cache.getCachedDataSourceExists(this.tableName);
 }
 
 export async function tableExists(this: SchemaHost): Promise<boolean> {
