@@ -305,6 +305,24 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(lines[0]).toContain(`using: "gist"`);
       expect(lines[0]).toContain(`name: "excl_rooms_price"`);
     });
+
+    it("omits name for auto-generated names matching exclIgnorePattern", async () => {
+      const { ExclusionConstraintDefinition } = await import("./schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        exclusionConstraints: async () => [
+          new ExclusionConstraintDefinition("rooms", "price WITH =", {
+            using: "gist",
+            name: "excl_rails_74c9160f55",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const lines: string[] = [];
+      await dumper.exclusionConstraintsInCreate("rooms", lines);
+      expect(lines[0]).toContain(`await ctx.addExclusionConstraint("rooms", "price WITH ="`);
+      expect(lines[0]).not.toContain("name:");
+    });
   });
 
   describe("uniqueConstraintsInCreate", () => {
@@ -325,6 +343,23 @@ describe("PostgreSQL::SchemaDumper", () => {
       expect(lines[0]).toContain(`await ctx.addUniqueConstraint("users", ["email"]`);
       expect(lines[0]).toContain(`nullsNotDistinct: true`);
       expect(lines[0]).toContain(`name: "uniq_users_email"`);
+    });
+
+    it("omits name for auto-generated names matching uniqueIgnorePattern", async () => {
+      const { UniqueConstraintDefinition } = await import("./schema-definitions.js");
+      const adapter = {
+        ...emptySource,
+        uniqueConstraints: async () => [
+          new UniqueConstraintDefinition("users", ["email"], {
+            name: "uniq_rails_1e07660b77",
+          }),
+        ],
+      };
+      const dumper = new (SchemaDumper as any)(adapter);
+      const lines: string[] = [];
+      await dumper.uniqueConstraintsInCreate("users", lines);
+      expect(lines[0]).toContain(`await ctx.addUniqueConstraint("users", ["email"]`);
+      expect(lines[0]).not.toContain("name:");
     });
 
     it("emits nothing when no unique constraints", async () => {
