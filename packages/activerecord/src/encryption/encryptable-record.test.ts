@@ -471,7 +471,11 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
   });
 
   it("forced encoding for deterministic attributes will replace invalid characters", async () => {
-    // ASCII encoding replaces chars > 0x7F with "?".
+    // Rails feeds invalid UTF-8 bytes ("Hello \x93\xfa".b) and expects U+FFFD
+    // replacement. JS strings are always valid UTF-16 — invalid byte sequences
+    // cannot exist — so the UTF-8 forced encoding is a no-op here. The ASCII
+    // path exercises the same replacement machinery: like Ruby's
+    // String#encode("US-ASCII", replace), chars > 0x7F become "?".
     Configurable.config.forcedEncodingForDeterministicEncryption = "ASCII";
     const Book = makeEncryptedBook(await freshAdapter());
     new Book();
@@ -788,7 +792,7 @@ describe("ActiveRecord::Encryption::EncryptableRecordTest", () => {
     const Post = makeEncryptedPost(await freshAdapter());
     new Post();
     expect(Book.typeForAttribute("name").type()).toBe("string");
-    expect(Post.typeForAttribute("body").type()).toBe("string");
+    expect(Post.typeForAttribute("body").type()).toBe("text");
   });
 
   it("encrypts normalized data", async () => {

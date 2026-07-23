@@ -10,17 +10,17 @@ function generateKey(): string {
 describe("ActiveRecord::Encryption::EncryptingOnlyEncryptorTest", () => {
   it("decrypt returns the passed data", () => {
     const enc = new EncryptingOnlyEncryptor();
-    expect(enc.decrypt("hello")).toBe("hello");
+    expect(enc.decrypt("Some data")).toBe("Some data");
   });
 
   it("encrypt encrypts the passed data", () => {
     const enc = new EncryptingOnlyEncryptor();
     const key = generateKey();
-    const encrypted = enc.encrypt("hello", { key });
-    expect(encrypted).not.toBe("hello");
+    const encrypted = enc.encrypt("Some data", { key });
+    expect(encrypted).not.toBe("Some data");
     const realEnc = new Encryptor();
     const decrypted = realEnc.decrypt(encrypted, { key });
-    expect(decrypted).toBe("hello");
+    expect(decrypted).toBe("Some data");
   });
 
   it("extends Encryptor", () => {

@@ -61,8 +61,8 @@ describe("ReaperTest", () => {
 
   it("reaping frequency configuration", () => {
     const pool = makePool();
-    const reaper = new Reaper(pool, 100);
-    expect(reaper.frequency).toBe(100);
+    const reaper = new Reaper(pool, 10.01);
+    expect(reaper.frequency).toBe(10.01);
   });
 
   it("connection pool starts reaper", () => {

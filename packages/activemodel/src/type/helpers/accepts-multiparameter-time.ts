@@ -56,7 +56,7 @@ export class AcceptsMultiparameterTime {
     this.type.cast(value);
   }
 
-  valueConstructedByMassAssignment(value: unknown): boolean {
+  isValueConstructedByMassAssignment(value: unknown): boolean {
     return this.isMultiparameterHash(value);
   }
 
@@ -136,5 +136,5 @@ export interface InstanceMethods {
   serializeCastValue(value: unknown): unknown;
   cast(value: unknown): unknown;
   assertValidValue(value: unknown): void;
-  valueConstructedByMassAssignment(value: unknown): boolean;
+  isValueConstructedByMassAssignment(value: unknown): boolean;
 }

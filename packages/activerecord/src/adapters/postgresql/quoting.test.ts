@@ -49,8 +49,10 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote string", async () => {
-      const rows = await adapter.execute("SELECT ? AS val", ["hello"]);
-      expect(rows[0].val).toBe("hello");
+      // Rails asserts quote_string("'") == "''" (escaped content, no wrapping
+      // quotes). Trails' quoteString wraps — round-trip the same "'" datum.
+      const rows = await adapter.execute("SELECT ? AS val", ["'"]);
+      expect(rows[0].val).toBe("'");
     });
 
     it("quote column name", async () => {
@@ -109,8 +111,8 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("quote integer", async () => {
-      const rows = await adapter.execute("SELECT 42::integer AS val");
-      expect(rows[0].val).toBe(42);
+      // Rails: @conn.quote(42) returns the SQL literal text "42".
+      expect(adapter.quote(42)).toBe("42");
     });
 
     it("quote big decimal", async () => {
