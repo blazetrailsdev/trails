@@ -1,7 +1,3 @@
-// TS-only unit coverage: the abstract definition getters must read the
-// configurable SchemaDumper ignore patterns at call time (Rails'
-// export_name_on_schema_dump? reads SchemaDumper.fk_ignore_pattern /
-// .chk_ignore_pattern), not a hardcoded copy of the default regex.
 import { describe, it, expect, afterEach } from "vitest";
 import { ForeignKeyDefinition, CheckConstraintDefinition } from "./schema-definitions.js";
 import { SchemaDumper } from "../../schema-dumper.js";
