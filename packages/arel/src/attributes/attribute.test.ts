@@ -650,7 +650,6 @@ describe("AttributeTest", () => {
       const mgr1 = users.project(users.get("id"));
       const mgr2 = users.project(users.get("id"));
       const union = mgr1.union(mgr2);
-      // Rails' #not_in Union test itself calls #in and asserts IN — mirror it.
       const node = users.get("id").in(union);
       expect(visitor.compile(node)).toBe(
         '"users"."id" IN (( SELECT "users"."id" FROM "users" UNION SELECT "users"."id" FROM "users" ))',
