@@ -7,31 +7,10 @@
 
 import { ValueType } from "@blazetrails/activemodel";
 
-// `PG::TextEncoder::Array` quotes on content, never on type: an element is
-// wrapped only when leaving it bare would be ambiguous — empty, `NULL`
-// (case-insensitively), or carrying the `,` delimiter, whitespace, quote or
-// backslash. Anything else is emitted bare, so `["a"]` encodes to `{a}`.
-// Whitespace is spelled out rather than `\s` because pg tests bytes with
-// `isspace()`, which excludes the non-ASCII spaces `\s` would match.
 const STRUCTURAL_CHARS = /[{}"\\ \t\n\r\v\f]/;
-// `/i` on a non-unicode pattern folds ASCII only, mirroring pg's
-// `pg_strcasecmp(ptr, "NULL")`; `toUpperCase()` would be a Unicode-aware fold,
-// a wider net than pg casts. The difference is unobservable by construction —
-// no codepoint in all of Unicode uppercases to `N`, `U` or `L`, so no input
-// can tell the two apart.
 const NULL_LITERAL = /^null$/i;
 
-// The `PG::TextEncoder::Array` element rule, taking the already-`type_cast`ed
-// element text. `delimiter` is `OID::Array`'s, which Rails hands ruby-pg
-// alongside the same text (`oid/array.rb:15-19`): the `","` default or `";"`
-// for `box[]`. It is never empty — the type map is the only construction site
-// — so the `includes(delimiter)` test needs no empty-string guard, exactly as
-// `parseArray`'s delimiter scan doesn't.
 function encodeArrayElement(text: string | null, delimiter: string): string {
-  // Rendering nil as the bare `NULL` token is the encoder's job, not
-  // `type_cast`'s — the latter returns nil unchanged (`when nil, Numeric,
-  // String then value`, `abstract/quoting.rb:101`). Keeping the split here is
-  // what makes the `"NULL"` string quotable while real nil stays bare.
   if (text === null) return "NULL";
   if (
     text === "" ||
@@ -199,8 +178,6 @@ export class Array extends ValueType<unknown> {
     return this.subtype.cast(value);
   }
 
-  // Stands in for Rails' `@pg_encoder = PG::TextEncoder::Array.new(...)`
-  // (`oid/array.rb:19`), which is the ruby-pg C extension, not Rails code.
   encode(values: readonly unknown[]): string {
     const items = values.map((value) => {
       if (value == null) return encodeArrayElement(null, this.delimiter);
