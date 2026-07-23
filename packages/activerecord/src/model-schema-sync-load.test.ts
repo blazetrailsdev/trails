@@ -2,7 +2,6 @@ import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
 import { resetColumnInformation } from "./model-schema.js";
-import { SchemaReflection } from "./connection-adapters/schema-cache.js";
 
 class UuidType extends ValueType {
   override readonly name = "uuid" as unknown as "value";
@@ -320,11 +319,10 @@ describe("sync loadSchema / columnsHash", () => {
   });
 
   // A schemaCache that starts warm and tracks whether resetColumnInformation
-  // cleared it (cold) or refreshed it in place (stays warm), so columnsHash's
-  // warm branch is exercised for both.
+  // cleared it.
   function makeResettableAdapter(cols: Record<string, unknown>) {
     let warm = true;
-    const calls = { refresh: 0, clear: 0 };
+    const calls = { clear: 0 };
     return {
       calls,
       isWarm: () => warm,
@@ -338,52 +336,13 @@ describe("sync loadSchema / columnsHash", () => {
             calls.clear += 1;
             warm = false;
           },
-          refreshBang: async () => {
-            calls.refresh += 1;
-            warm = true;
-          },
         },
         lookupCastTypeFromColumn: () => null,
       },
     };
   }
 
-  it("resetColumnInformation re-establishes the eager warm in place under eagerLoadSchemaCache", () => {
-    const prev = SchemaReflection.eagerLoadSchemaCache;
-    SchemaReflection.eagerLoadSchemaCache = true;
-    try {
-      class Post extends Base {
-        static override tableName = "posts";
-        static {
-          // A virtual attribute() with no backing DB column — must NOT leak
-          // into columnNames() after the reset.
-          this.attribute("extra", "string");
-        }
-      }
-      const cols = { id: { sqlType: "integer", name: "id", default: null } };
-      const built = makeResettableAdapter(cols);
-      (Post as unknown as { adapter: unknown }).adapter = built.adapter;
-      expect(Post.columnNames()).toEqual(["id"]);
-
-      // Assigning the adapter already runs one reset; count only the explicit
-      // reset below.
-      built.calls.refresh = 0;
-      built.calls.clear = 0;
-      (resetColumnInformation as unknown as (this: typeof Base) => void).call(Post);
-
-      // Refreshed in place (not cleared): the entry stays warm, so a
-      // synchronous columnNames() still excludes the virtual attribute.
-      expect(built.calls.refresh).toBe(1);
-      expect(built.calls.clear).toBe(0);
-      expect(built.isWarm()).toBe(true);
-      expect(Post.columnNames()).toEqual(["id"]);
-    } finally {
-      SchemaReflection.eagerLoadSchemaCache = prev;
-    }
-  });
-
   it("resetColumnInformation clears the data source cache when eager warming is off (default)", () => {
-    expect(SchemaReflection.eagerLoadSchemaCache).toBe(false);
     class Post extends Base {
       static override tableName = "posts";
     }
@@ -392,12 +351,10 @@ describe("sync loadSchema / columnsHash", () => {
     (Post as unknown as { adapter: unknown }).adapter = built.adapter;
     Post.columnsHash();
 
-    built.calls.refresh = 0;
     built.calls.clear = 0;
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Post);
 
     expect(built.calls.clear).toBe(1);
-    expect(built.calls.refresh).toBe(0);
     expect(built.isWarm()).toBe(false);
   });
 });
