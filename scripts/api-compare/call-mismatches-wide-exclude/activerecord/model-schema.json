@@ -186,14 +186,7 @@
     "tsFile": "model-schema.ts",
     "rubyName": "reload_schema_from_cache",
     "call": "each",
-    "reason": "Rails recurses `subclasses.each`; trails bumps _schemaRevision instead, which STI subclass overlays check to re-sync lazily."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
-    "rubyName": "reload_schema_from_cache",
-    "call": "subclasses",
-    "reason": "Rails recurses `subclasses.each`; trails bumps _schemaRevision instead, which STI subclass overlays check to re-sync lazily."
+    "reason": "Rails iterates `subclasses.each`; trails recurses with a for-of over the same `subclasses` list."
   },
   {
     "package": "activerecord",

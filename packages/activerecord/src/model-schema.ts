@@ -845,46 +845,60 @@ export function resetColumnInformation(this: SchemaHost): void {
 }
 
 /**
+ * Drop an STI subclass's own (forked) schema caches so it re-inherits the
+ * base's freshly-rebuilt ones via the prototype chain. Deletes own properties
+ * rather than assigning undefined/false, so no shadowing survives, and scrubs
+ * schema-sourced entries from any subclass-forked `_attributeDefinitions`
+ * (from a prior attribute() / decorateAttributes / encrypts call) — without
+ * this, schema defs leak past the reset on subclasses that forked their own
+ * map.
+ */
+function clearStiSubclassLocalCaches(sub: SchemaHost): void {
+  for (const key of [
+    "_columnsHash",
+    "_columns",
+    "_attributesBuilder",
+    "_schemaLoaded",
+    "_cachedDefaultAttributes",
+    "_virtualAttributesReconciled",
+    "_returningColumnsForInsertCache",
+  ]) {
+    if (Object.prototype.hasOwnProperty.call(sub, key)) Reflect.deleteProperty(sub, key);
+  }
+  if (Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")) {
+    scrubSchemaSourcedDefinitions(sub);
+  }
+}
+
+/**
+ * Drop schema-sourced attribute defs (and their generated accessors) so the
+ * next load re-reflects them; user-declared defs (source === "user") are
+ * preserved, matching Rails where user-provided attributes survive reload.
+ */
+function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
+  for (const [name, def] of Array.from(host._attributeDefinitions)) {
+    if ((def.userProvided ?? true) === false || def.source === "schema") {
+      host._attributeDefinitions.delete(name);
+      if (Object.prototype.hasOwnProperty.call(host.prototype, name)) {
+        delete host.prototype[name];
+      }
+    }
+  }
+}
+
+/**
  * @internal
  * Mirrors: ActiveRecord::ModelSchema#reload_schema_from_cache — the narrow,
  * cache-preserving invalidation (nils the class-level schema memos so the next
- * load re-reflects, from the still-warm schema cache). Rails recurses over
- * `subclasses`; trails instead bumps `_schemaRevision`, which every STI
- * subclass overlay checks, so descendants re-sync lazily without recursion.
+ * load re-reflects, from the still-warm schema cache), recursing over tracked
+ * subclasses as Rails does (`subclasses.each`, model_schema.rb:566).
  */
 export function reloadSchemaFromCache(this: SchemaHost): void {
   // STI subclasses share the base's defs. Redirect the reload to the base
   // so schema-sourced defs and accessors are actually cleared; clear the
   // subclass-local caches too so any forked metadata is dropped.
   if (isStiSubclass(this)) {
-    // Delete own properties rather than assigning undefined/false, so
-    // the subclass inherits the base's freshly-rebuilt caches via the
-    // prototype chain instead of shadowing them.
-    for (const key of [
-      "_columnsHash",
-      "_columns",
-      "_attributesBuilder",
-      "_schemaLoaded",
-      "_cachedDefaultAttributes",
-      "_virtualAttributesReconciled",
-      "_returningColumnsForInsertCache",
-    ]) {
-      if (Object.prototype.hasOwnProperty.call(this, key)) Reflect.deleteProperty(this, key);
-    }
-    // Scrub schema-sourced entries from any subclass-forked
-    // _attributeDefinitions too (from a prior attribute() /
-    // decorateAttributes / encrypts call). Without this, schema defs
-    // leak past the reset on subclasses that forked their own map.
-    if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
-      for (const [name, def] of Array.from(this._attributeDefinitions)) {
-        if ((def.userProvided ?? true) === false || def.source === "schema") {
-          this._attributeDefinitions.delete(name);
-          if (Object.prototype.hasOwnProperty.call(this.prototype, name)) {
-            delete this.prototype[name];
-          }
-        }
-      }
-    }
+    clearStiSubclassLocalCaches(this);
     reloadSchemaFromCache.call(getStiBase(this) as SchemaHost);
     return;
   }
@@ -901,13 +915,19 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   this._schemaRevision = (this._schemaRevision ?? 0) + 1;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-  if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) return;
-  for (const [name, def] of Array.from(this._attributeDefinitions)) {
-    if ((def.userProvided ?? true) === false || def.source === "schema") {
-      this._attributeDefinitions.delete(name);
-      if (Object.prototype.hasOwnProperty.call(this.prototype, name)) {
-        delete this.prototype[name];
-      }
+  if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
+    scrubSchemaSourcedDefinitions(this);
+  }
+  // Rails: `subclasses.each { |descendant| descendant.send(:reload_schema_from_cache) }`.
+  // STI subclasses get their local forks cleared directly rather than via a
+  // recursive call — recursing into one would redirect right back to this base
+  // (the branch above) and loop; their shared-overlay resync rides the
+  // `_schemaRevision` bump. Non-STI subclasses (own table) recurse as in Rails.
+  for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
+    if (isStiSubclass(sub)) {
+      clearStiSubclassLocalCaches(sub);
+    } else {
+      reloadSchemaFromCache.call(sub);
     }
   }
 }
