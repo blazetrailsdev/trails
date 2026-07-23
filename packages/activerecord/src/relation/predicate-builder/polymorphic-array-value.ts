@@ -11,6 +11,8 @@
  */
 import type { Base } from "../../base.js";
 import { polymorphicName } from "../../inheritance.js";
+import { rubyInspectArray } from "../ruby-inspect.js";
+import { ArgumentError } from "@blazetrails/activemodel";
 export class PolymorphicArrayValue {
   private readonly _associatedTable: {
     joinForeignKey: string | string[];
@@ -55,13 +57,21 @@ export class PolymorphicArrayValue {
         // Composite FK: Ruby uses the FK array itself as the hash key
         // (`query[associated_table.join_foreign_key] = ids`), which
         // expand_from_hash later zips per tuple. JS object keys can't be
-        // arrays, so zip each id tuple across the FK columns here — one
-        // query per tuple; queries are ORed by groupingQueries.
+        // arrays, so pre-expand here with the same validation and zip
+        // semantics (predicate_builder.rb:93-96): each ids_set must be an
+        // Array, and `key.zip(ids_set)` iterates only the FK columns —
+        // short tuples pad with nil, extra values are dropped. One query
+        // per tuple; queries are ORed by groupingQueries.
         for (const tuple of ids) {
+          if (!Array.isArray(tuple)) {
+            throw new ArgumentError(
+              `Expected corresponding value for ${rubyInspectArray(fk)} to be an Array`,
+            );
+          }
           const q: Record<string, unknown> = {};
           if (type) q[this.associatedTable.joinForeignType] = type;
-          (tuple as unknown[]).forEach((id, i) => {
-            q[fk[i]] = id;
+          fk.forEach((col, i) => {
+            q[col] = tuple[i] ?? null;
           });
           result.push(q);
         }
