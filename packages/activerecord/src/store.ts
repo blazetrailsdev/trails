@@ -2,6 +2,7 @@ import { ConfigurationError } from "./errors.js";
 import type { Base } from "./base.js";
 import { HashWithIndifferentAccess } from "@blazetrails/activesupport";
 import { buildColumnSerializer } from "./attribute-methods/serialization.js";
+import type { YamlColumnOptions } from "./coders/yaml-column.js";
 import { getOrCreateModuleCarrier } from "./module-carrier.js";
 
 // Injected by base.ts to break the store→serialize→json→store circular dep.
@@ -324,7 +325,7 @@ export interface StoreOptions {
   prefix?: boolean | string;
   suffix?: boolean | string;
   coder?: unknown;
-  yaml?: Record<string, unknown>;
+  yaml?: YamlColumnOptions;
 }
 
 /**

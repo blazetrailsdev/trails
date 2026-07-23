@@ -34,10 +34,13 @@ export class DisallowedClass extends globalThis.Error {
  * @internal
  */
 class SafeCoder {
-  constructor(private readonly permittedClasses: unknown[] = []) {}
+  constructor(
+    private readonly permittedClasses: unknown[] = [],
+    private readonly unsafeLoad: boolean | null = null,
+  ) {}
 
   dump(object: unknown): string {
-    if (!useYamlUnsafeLoad) this.assertDumpable(object);
+    if (!(this.unsafeLoad ?? useYamlUnsafeLoad)) this.assertDumpable(object);
     return yamlStringify(object, { directives: true });
   }
 
@@ -93,7 +96,21 @@ class SafeCoder {
  * @internal
  */
 export class YAMLColumn extends ColumnSerializer {
-  constructor(attrName: string, objectClass: ClassLike = Object as unknown as ClassLike) {
-    super(attrName, new SafeCoder(), objectClass);
+  constructor(
+    attrName: string,
+    objectClass: ClassLike = Object as unknown as ClassLike,
+    { permittedClasses = [], unsafeLoad = null }: YamlColumnOptions = {},
+  ) {
+    super(attrName, new SafeCoder(permittedClasses ?? [], unsafeLoad), objectClass);
   }
+}
+
+/**
+ * The `yaml:` option set Rails' `serialize` forwards into the YAMLColumn ctor
+ * (`**(yaml || {})`, serialization.rb:215) — camelCase analogs of Psych's
+ * `permitted_classes:` / `unsafe_load:` keywords.
+ */
+export interface YamlColumnOptions {
+  permittedClasses?: unknown[];
+  unsafeLoad?: boolean | null;
 }

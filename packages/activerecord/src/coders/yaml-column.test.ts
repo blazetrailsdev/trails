@@ -1,10 +1,11 @@
 import { describe, it, expect, afterEach } from "vitest";
 import { YAMLColumn, DisallowedClass } from "./yaml-column.js";
 import { setUseYamlUnsafeLoad } from "../ar-config.js";
+import { Temporal } from "@blazetrails/activesupport/temporal";
 
-// Trails-only round-trip coverage. The YAMLColumnTest / YAMLColumnTestWithSafeLoad
-// blocks below stay Ruby-only (Psych safe-load / permitted-classes have no JS
-// analog); these assert the dump/load contract the store coder relies on.
+// Trails-only round-trip coverage plus the ported safe-dump restriction. The
+// remaining YAMLColumnTest / YAMLColumnTestWithSafeLoad skips stay Ruby-only
+// (Psych safe-LOAD / permitted-classes-on-load have no JS analog).
 describe("YAMLColumn round-trip", () => {
   it("dumps and loads a plain hash", () => {
     const coder = new YAMLColumn("params");
@@ -88,8 +89,11 @@ describe("YAMLColumnTestWithSafeLoad", () => {
   it.skip("yaml column permitted classes are consumed by safe load", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
   });
-  it.skip("yaml column permitted classes are consumed by safe dump", () => {
-    // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
+  it("yaml column permitted classes are consumed by safe dump", () => {
+    // Rails: `assert_raises(Psych::DisallowedClass) { coder.dump([Time.new]) }`.
+    // Temporal is the trails Time analog; it's outside the permitted set.
+    const coder = new YAMLColumn("attr_name");
+    expect(() => coder.dump([Temporal.Now.instant()])).toThrow(DisallowedClass);
   });
   it.skip("yaml column permitted classes option", () => {
     // PERMANENT-SKIP: Ruby-only (see scripts/api-compare/unported-files.ts) — yaml
