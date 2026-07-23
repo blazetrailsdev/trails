@@ -1403,10 +1403,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
       }
     }
     try {
-      // Route through the public overridable `configureConnection` (which
-      // delegates to `_maybeConfigureConnection`), mirroring Rails' connect →
-      // attempt_configure_connection → configure_connection so per-instance
-      // overrides (adapter_test.rb:852) are honored.
       await this.configureConnection(client);
       // Re-check teardown after every await: a concurrent reconnect
       // can null _rawConnection while configure is in flight.
@@ -4466,10 +4462,6 @@ export class PostgreSQLAdapter extends AbstractAdapter implements DatabaseAdapte
    * `ConnectionAdapters::PostgreSQL::DatabaseStatements#translate_exception`.
    */
   private _translateException(e: unknown, sql: string, binds: unknown[]): Error {
-    // Mirrors Rails' translate_exception_class pass-through: an exception
-    // that is already an ActiveRecordError (e.g. ConnectionFailed raised by
-    // configure_connection during reconnect, adapter_test.rb:852) is re-raised
-    // as-is, never wrapped in StatementInvalid.
     if (e instanceof ActiveRecordError) return e;
     const build = (): Error => {
       if (!(e instanceof Error)) return new StatementInvalid(String(e), { sql, binds, cause: e });

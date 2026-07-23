@@ -817,11 +817,6 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
         try {
           await this.configureConnection();
         } catch (configureError) {
-          // Mirrors Rails' attempt_configure_connection (abstract_adapter.rb:
-          // 1216): a configure_connection failure tears the connection down
-          // (`disconnect!`) and re-raises, so the handle is never left
-          // half-configured and the next attempt reconnects from scratch
-          // (adapter_test.rb:852).
           this.disconnectBang();
           throw configureError;
         }
