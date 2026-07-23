@@ -56,6 +56,23 @@ function unreachableOnFakeRecord(name: string): () => never {
   };
 }
 
+// Ruby `Time#to_s` — `"YYYY-MM-DD HH:MM:SS +ZZZZ"` (space-separated, no
+// fractional seconds, four-digit zone offset). Used by the FakeRecord double's
+// `else` arm below for the Time analogues, whose own `toString` is ISO.
+function rubyTimeToS(zdt: Temporal.ZonedDateTime): string {
+  const p = (n: number): string => String(n).padStart(2, "0");
+  // Truncate to whole minutes: Ruby's `%z` drops sub-minute seconds from
+  // historical LMT offsets (Europe/Paris 1900, `+00:09:21`, renders `+0009`).
+  const offsetMinutes = Math.trunc(zdt.offsetNanoseconds / 60_000_000_000);
+  const sign = offsetMinutes < 0 ? "-" : "+";
+  const abs = Math.abs(offsetMinutes);
+  const offset = `${sign}${p(Math.floor(abs / 60))}${p(abs % 60)}`;
+  // Ruby renders BCE years sign-then-zero-padded: `Time.new(-1, ...).to_s` is
+  // `-0001-01-01 ...`; a bare padStart on the signed string would emit `00-1`.
+  const year = `${zdt.year < 0 ? "-" : ""}${String(Math.abs(zdt.year)).padStart(4, "0")}`;
+  return `${year}-${p(zdt.month)}-${p(zdt.day)} ${p(zdt.hour)}:${p(zdt.minute)}:${p(zdt.second)} ${offset}`;
+}
+
 /**
  * Port of the Arel suite's `FakeRecord::Connection` quoting
  * (`test/cases/arel/support/fake_record.rb:55-90`).
@@ -113,6 +130,19 @@ export const fakeRecordConnection: ArelConnection = {
     if (thing instanceof Temporal.PlainDateTime) {
       const p = (n: number): string => String(n).padStart(2, "0");
       return `'${String(thing.year).padStart(4, "0")}-${p(thing.month)}-${p(thing.day)} ${p(thing.hour)}:${p(thing.minute)}:${p(thing.second)}'`;
+    }
+    // fake_record.rb has no explicit `Time` arm: a Ruby `Time` falls to `else`
+    // and renders via `to_s` — `"2024-01-01 00:00:00 +0000"` (attribute_test.rb:273
+    // interpolates `'#{current_time}'` and asserts that shape). The Temporal
+    // analogues stringify as ISO (`2024-01-01T00:00:00Z`), so `String(thing)`
+    // in the fallback would diverge; hand-render Ruby's `Time#to_s` shape
+    // instead. An Instant carries no zone and renders in UTC (`+0000`), like a
+    // `Time` under `TZ=UTC`.
+    if (thing instanceof Temporal.Instant) {
+      return `'${rubyTimeToS(thing.toZonedDateTimeISO("UTC"))}'`;
+    }
+    if (thing instanceof Temporal.ZonedDateTime) {
+      return `'${rubyTimeToS(thing)}'`;
     }
     return `'${String(thing).replace(/'/g, "\\'")}'`;
   },
