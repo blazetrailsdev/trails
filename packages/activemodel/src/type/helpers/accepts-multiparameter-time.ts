@@ -13,11 +13,15 @@ import { Type } from "../value.js";
  * into a single Temporal.PlainDateTime and delegates to the wrapped type,
  * which extracts what it needs (PlainDate, PlainTime, or PlainDateTime).
  */
-/** @internal */
-export function isNumericKeyHash(value: unknown): value is Record<string, unknown> {
-  if (typeof value !== "object" || value === null || Array.isArray(value)) return false;
-  const keys = Object.keys(value as Record<string, unknown>);
-  return keys.length > 0 && keys.every((k) => /^\d+$/.test(k));
+/**
+ * Ruby `value.is_a?(Hash)` analogue — a plain object (including null-prototype
+ * objects, which the multiparameter extractor produces).
+ * @internal
+ */
+export function isHash(value: unknown): value is Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) return false;
+  const proto = Object.getPrototypeOf(value);
+  return proto === Object.prototype || proto === null;
 }
 
 export class AcceptsMultiparameterTime {
@@ -62,7 +66,7 @@ export class AcceptsMultiparameterTime {
   }
 
   private isMultiparameterHash(value: unknown): boolean {
-    return isNumericKeyHash(value);
+    return isHash(value);
   }
 
   private castFromMultiparameter(hash: Record<string, unknown>): unknown {

@@ -103,12 +103,12 @@ describe("TimeZoneConverterTest", () => {
     expect(result).toBeInstanceOf(Temporal.Instant);
   });
 
-  it("cast returns null for plain object with non-multiparameter keys", () => {
+  it("cast raises for plain object with non-multiparameter keys", () => {
     setZone("Eastern Time (US & Canada)");
     const converter = new TimeZoneConverter(new DateTime());
-    // A plain object that isn't a valid multiparameter hash → subtype returns null → null
-    const result = converter.cast({ date: "2024-06-15" });
-    expect(result).toBeNull();
+    // Rails: the Hash branch delegates to DateTime#value_from_multiparameter_assignment,
+    // which raises when keys 1/2/3 are missing.
+    expect(() => converter.cast({ date: "2024-06-15" })).toThrow("doesn't contain necessary keys");
   });
 
   it("deserialize wraps Temporal.Instant from subtype in TimeWithZone", () => {

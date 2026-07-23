@@ -1,8 +1,5 @@
 import { Temporal } from "@blazetrails/activesupport/temporal";
-import {
-  AcceptsMultiparameterTime,
-  isNumericKeyHash,
-} from "./helpers/accepts-multiparameter-time.js";
+import { AcceptsMultiparameterTime, isHash } from "./helpers/accepts-multiparameter-time.js";
 import { looseDateParse } from "./helpers/loose-date-parse.js";
 import {
   DateInfinity,
@@ -38,7 +35,7 @@ export class DateType extends ValueType<DateCastResult> {
     // Accept PlainDateTime from multiparameter assignment — extract the date part.
     if (value instanceof Temporal.PlainDateTime) return value.toPlainDate();
     // Mirrors AcceptsMultiparameterTime::InstanceMethods#cast's Hash branch.
-    if (isNumericKeyHash(value)) return this.valueFromMultiparameterAssignment(value);
+    if (isHash(value)) return this.valueFromMultiparameterAssignment(value);
     // boundary: cast accepts Date input from legacy callers / custom types
     // and bridges into Temporal.PlainDate via the UTC calendar components.
     if (value instanceof Date) {
@@ -163,12 +160,12 @@ export class DateType extends ValueType<DateCastResult> {
    * a Hash value is validated by assembling it (raising on invalid input).
    */
   override assertValidValue(value: unknown): void {
-    if (isNumericKeyHash(value)) this.valueFromMultiparameterAssignment(value);
+    if (isHash(value)) this.valueFromMultiparameterAssignment(value);
   }
 
   /** Mirrors: AcceptsMultiparameterTime::InstanceMethods#value_constructed_by_mass_assignment? */
   override isValueConstructedByMassAssignment(value: unknown): boolean {
-    return isNumericKeyHash(value);
+    return isHash(value);
   }
 
   /**
