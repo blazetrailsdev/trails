@@ -780,7 +780,7 @@ describe("HasManyAssociationsTest", () => {
     await firm.reload();
     const clients = await firm.clients;
     expect(clients.length).toBe(2);
-    expect(clients.includes(companies("first_client"))).toBe(false);
+    expect(clients.some((c: any) => c.isEqual(companies("first_client")))).toBe(false);
   });
 
   it("association size calculation works with default scoped selects when not previously fetched", async () => {
