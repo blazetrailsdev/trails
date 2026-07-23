@@ -6,6 +6,9 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { singularize } from "@blazetrails/activesupport";
+import { reflectOnAllAssociations } from "./reflection.js";
+import type { Base } from "./base.js";
 import {
   ArgumentError,
   sanitizeForMassAssignment,
@@ -621,6 +624,25 @@ async function assignUpdateAttributes(self: any, attrs: Record<string, unknown>)
   if (pending.length) await Promise.all(pending);
 }
 
+function collectionWriterPromise(
+  self: any,
+  key: string,
+  value: unknown,
+): Promise<void> | undefined {
+  const ctor = self.constructor as typeof Base;
+  for (const ref of reflectOnAllAssociations(ctor)) {
+    if (!ref.isCollection()) continue;
+    const name = String(ref.name);
+    if (key === name) {
+      return self.association(name).writer(value);
+    }
+    if (key === `${singularize(name)}Ids`) {
+      return self.association(name).idsWriter(value);
+    }
+  }
+  return undefined;
+}
+
 function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<void> | void {
   const configs = self.constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
@@ -638,6 +660,8 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<
     self.id = value;
     return;
   }
+  const collectionWrite = collectionWriterPromise(self, key, value);
+  if (collectionWrite) return collectionWrite;
   // Dispatch through prototype setter for generated writers (e.g. *Ids writers
   // from CollectionAssociation builder). Mirrors Rails' public_send("#{key}=").
   // *Ids writers are async (they query the DB to resolve records); return the
