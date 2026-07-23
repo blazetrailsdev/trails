@@ -205,10 +205,6 @@ export function buildWhereNodeFromConstraints(
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#column_names
  * (`@column_names ||= columns.map(&:name).freeze`, model_schema.rb:478-480).
- * Reads `columnsHash()` keys rather than `columns()` because trails applies
- * the `ignoredColumns` filter at read time in `columnsHash()` (Rails filters
- * at load), and `columns()`' `_columns` memo would bypass it after an
- * `ignoredColumns=` reassignment.
  */
 export function columnNames(this: typeof Base): string[] {
   const host = this as unknown as SchemaHost;
@@ -216,7 +212,7 @@ export function columnNames(this: typeof Base): string[] {
     ? host._columnNamesMemo
     : undefined;
   if (memo && memo.revision === (host._schemaRevision ?? 0)) return memo.names as string[];
-  const names = Object.keys(this.columnsHash());
+  const names = this.columns().map((c: { name: string }) => c.name);
   if (host._schemaLoaded) {
     const frozen = Object.freeze(names);
     host._columnNamesMemo = { revision: host._schemaRevision ?? 0, names: frozen };
@@ -259,6 +255,13 @@ export interface ColumnLike {
 export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   // load_schema! raises TableNotSpecified for abstract (table-less) classes.
   loadSchema.call(this as SchemaHost);
+
+  const memoHost = this as unknown as SchemaHost;
+  const hasOwnIgnored =
+    isStiSubclass(this) && Object.prototype.hasOwnProperty.call(this, "_ignoredColumns");
+  if (!hasOwnIgnored && memoHost._columnsHash != null) {
+    return memoHost._columnsHash as Record<string, ColumnLike>;
+  }
 
   // STI-aware adapter + table resolution: adapter may live on the base
   // OR the concrete subclass. Use the same candidate-list logic the
@@ -725,6 +728,9 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
  * Rails: @columns ||= columns_hash.values.freeze
  */
 export function columns(this: SchemaHost): any[] {
+  if (isStiSubclass(this) && Object.prototype.hasOwnProperty.call(this, "_ignoredColumns")) {
+    return Object.values((this as unknown as typeof Base).columnsHash());
+  }
   if (this._columns) return this._columns;
   loadSchema.call(this);
   const hash = getColumnsHash(this);
@@ -1161,6 +1167,7 @@ function applyColumnsHash(
   }
 
   const ignored = new Set(host._ignoredColumns ?? []);
+  const filteredHash: Record<string, unknown> = {};
   for (const [name, column] of Object.entries(hash)) {
     if (ignored.has(name)) {
       // Remove the prototype accessor unconditionally so `name in record`
@@ -1184,6 +1191,7 @@ function applyColumnsHash(
       }
       continue;
     }
+    filteredHash[name] = column;
     const existing = host._attributeDefinitions.get(name);
     if (existing && (existing.userProvided ?? true)) {
       // A user-declared type override (e.g. an enum) preserves its type across
@@ -1294,6 +1302,7 @@ function applyColumnsHash(
   };
   invalidate(host, { deleteOwn: false });
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
+  host._columnsHash = filteredHash;
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
   // durable decorator was pushed at declaration; `typeForAttribute` resolves it)
@@ -1474,6 +1483,8 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
           // keeps serving the pre-warm list.
           if (host._schemaLoaded) {
             host._schemaLoaded = false;
+            host._columnsHash = undefined;
+            host._columns = undefined;
             clearAttributeNamesMemo(host);
           }
           return new Set(names);
@@ -1628,10 +1639,8 @@ export function sequenceName(this: SchemaHost, value?: string | null): string | 
 
 export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
   if (value !== undefined) {
-    this._ignoredColumns = value;
-    // Rails' ignored_columns= runs reload_schema_from_cache
-    // (model_schema.rb:366-368), which nils @attribute_names recursively.
-    clearAttributeNamesMemo(this);
+    reloadSchemaFromCache.call(this);
+    this._ignoredColumns = value.map(String);
     for (const col of value) {
       if (col in this.prototype) {
         Object.defineProperty(this.prototype, col, {
@@ -1741,11 +1750,26 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
 
 /** @internal */
 function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
-  resetColumnInformation.call(this);
-  if (recursive) {
-    const subclasses: SchemaHost[] = (this as any).subclasses ?? [];
-    for (const sub of subclasses) {
-      reloadSchemaFromCache.call(sub, true);
+  this._columnsHash = undefined;
+  this._columns = undefined;
+  this._attributesBuilder = undefined;
+  this._returningColumnsForInsertCache = undefined;
+  (this as { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
+  this._schemaLoaded = false;
+  (this as { _schemaLoadPromise?: unknown })._schemaLoadPromise = undefined;
+  clearAttributeNamesMemo(this);
+  if (!recursive) return;
+  const descendants = (this as { descendants?: SchemaHost[] }).descendants ?? [];
+  for (const sub of descendants) {
+    for (const key of [
+      "_columnsHash",
+      "_columns",
+      "_attributesBuilder",
+      "_returningColumnsForInsertCache",
+      "_cachedDefaultAttributes",
+      "_schemaLoaded",
+    ]) {
+      if (Object.prototype.hasOwnProperty.call(sub, key)) Reflect.deleteProperty(sub, key);
     }
   }
 }
