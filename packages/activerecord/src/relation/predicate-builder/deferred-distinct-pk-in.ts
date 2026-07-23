@@ -93,4 +93,41 @@ export class DeferredIdsNotIn extends Nodes.NotIn {
   ) {
     super(attribute, inlineSubquery);
   }
+
+  // Inherited NotIn#invert would build a plain In carrying only the
+  // display-fallback subquery and drop literalIds/innerRelations, so the load
+  // pipeline would never materialize the ids (see DeferredDistinctPkIn#invert).
+  invert(): DeferredIdsIn {
+    return new DeferredIdsIn(
+      this.left as Nodes.Attribute,
+      this.right as Nodes.Node,
+      this.literalIds,
+      this.innerRelations,
+    );
+  }
+}
+
+/**
+ * Positive counterpart produced only by `DeferredIdsNotIn#invert` — no builder
+ * records it directly. Carries the same deferred payload so the load pipeline
+ * materializes it to a literal `attribute.in([...ids])`.
+ */
+export class DeferredIdsIn extends Nodes.In {
+  constructor(
+    attribute: Nodes.Attribute,
+    inlineSubquery: Nodes.Node,
+    readonly literalIds: unknown[],
+    readonly innerRelations: { ids(): Promise<unknown[]> }[],
+  ) {
+    super(attribute, inlineSubquery);
+  }
+
+  invert(): DeferredIdsNotIn {
+    return new DeferredIdsNotIn(
+      this.left as Nodes.Attribute,
+      this.right as Nodes.Node,
+      this.literalIds,
+      this.innerRelations,
+    );
+  }
 }

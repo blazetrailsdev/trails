@@ -149,6 +149,7 @@ import { JoinDependency } from "./associations/join-dependency.js";
 import {
   DeferredDistinctPkIn,
   DeferredDistinctPkNotIn,
+  DeferredIdsIn,
   DeferredIdsNotIn,
 } from "./relation/predicate-builder/deferred-distinct-pk-in.js";
 import { invokeScopeLambda } from "./associations/association-scope.js";
@@ -4967,7 +4968,7 @@ export class Relation<T extends Base> {
         const ids = await node.innerRelation._materializeDistinctPkIds();
         predicates[i] =
           node instanceof DeferredDistinctPkNotIn ? attribute.notIn(ids) : attribute.in(ids);
-      } else if (node instanceof DeferredIdsNotIn) {
+      } else if (node instanceof DeferredIdsNotIn || node instanceof DeferredIdsIn) {
         const attribute = node.left as Nodes.Attribute;
         // Rails `excluding`/`without`: one predicate over
         // `records + relations.flat_map(&:ids)` (query_methods.rb:1583-1588).
@@ -4985,7 +4986,8 @@ export class Relation<T extends Base> {
         // (query_methods.rb:1587) — instead of hardcoding `NOT IN`, so the
         // materialized array shares the `where.not` array-negation logic
         // (e.g. the single-id `!=` collapse) rather than diverging.
-        predicates[i] = this.predicateBuilder.build(attribute, ids).invert();
+        const built = this.predicateBuilder.build(attribute, ids);
+        predicates[i] = node instanceof DeferredIdsNotIn ? built.invert() : built;
       }
     }
   }
