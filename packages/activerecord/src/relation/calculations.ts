@@ -306,9 +306,14 @@ function needsBigintCast(rel: CalculationRelation): boolean {
  * needsBigintCast() is true. Aliases are quoted to match SQLite's
  * identifier quoting convention.
  */
-function wrapBigintAgg(innerSql: string, grouped = false, aggAlias = "val"): string {
-  if (grouped) {
-    return `SELECT "group_key", CAST("${aggAlias}" AS TEXT) AS "${aggAlias}" FROM (${innerSql}) AS "_bigint_agg"`;
+function wrapBigintAgg(
+  innerSql: string,
+  groupAliases: string[] | null = null,
+  aggAlias = "val",
+): string {
+  if (groupAliases) {
+    const keys = groupAliases.map((a) => `"${a}"`).join(", ");
+    return `SELECT ${keys}, CAST("${aggAlias}" AS TEXT) AS "${aggAlias}" FROM (${innerSql}) AS "_bigint_agg"`;
   }
   return `SELECT CAST("val" AS TEXT) AS "val" FROM (${innerSql}) AS "_bigint_agg"`;
 }
@@ -466,22 +471,34 @@ async function groupedAggregate(
 ): Promise<Map<unknown, unknown>> {
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
-  const groupCol = rel._groupColumns[0];
-  // Rails: a single group field that reflects to a belongs_to association
-  // groups by the association's foreign key, then maps the result keys back to
-  // the loaded associated records (calculations.rb:execute_grouped_calculation).
-  const association = resolveGroupAssociation(rel, groupCol);
+  // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
+  // group field, uniq'ing only when there is more than one. A belongs_to
+  // reflection is attempted from a LONE field, which then expands to that
+  // association's foreign key; the result is keyed by the loaded associated
+  // records rather than by the raw key values.
+  let groupFields: unknown[] = rel._groupColumns;
+  if (groupFields.length > 1) groupFields = [...new Set(groupFields)];
+  const association =
+    groupFields.length === 1 ? resolveGroupAssociation(rel, groupFields[0]) : null;
   if (association && Array.isArray(association.foreignKey)) {
     return groupedCompositeAssoc(rel, association, fn, column, coerceNumeric);
   }
-  const effectiveGroupCol = association ? (association.foreignKey as string) : groupCol;
+  if (association) groupFields = [association.foreignKey as string];
   // Mirror Rails `execute_grouped_calculation`, which resolves group fields via
   // the plural `arel_columns` — so a `from(subquery, alias)` leaves the group
   // column unqualified (matching the subquery alias) instead of pinning it to
   // the original model table, and a raw Arel node passes straight through.
-  const groupNode = arelColumns.call(rel as never, [effectiveGroupCol])[0] as Nodes.Node;
+  const groupNodes = arelColumns.call(rel as never, groupFields) as Nodes.Node[];
+  // One alias per field, standing in for Rails' `column_alias_tracker.alias_for`.
+  // A lone field keeps the bare `group_key` the belongs_to arm below reads by
+  // name; these aliases are fixed-length, so unlike Rails they never need
+  // truncating for a long table name.
+  const aliases =
+    groupNodes.length === 1 ? ["group_key"] : groupNodes.map((_, i) => `group_key_${i}`);
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
-  const groupKeyAlias = new Nodes.As(groupNode, new Nodes.SqlLiteral("group_key"));
+  const groupKeyAliases = groupNodes.map(
+    (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])),
+  );
   // Rails aliases the aggregate as `column_alias_for("#{operation} #{column_name}")`
   // — e.g. `sum_credit_limit`, `count_all` — so order("sum_credit_limit desc")
   // can reference it (calculations.rb:537). A raw Arel node keeps "val".
@@ -489,7 +506,7 @@ async function groupedAggregate(
     typeof column === "string"
       ? columnAliasFor(`${fn} ${column.toLowerCase()}`.replace(/\*/g, "all"))
       : "val";
-  const manager = table.project(groupKeyAlias, aggNode.as(aggAlias));
+  const manager = table.project(...groupKeyAliases, aggNode.as(aggAlias));
   // Rails `calculate` (calculations.rb:217-238) folds the eager JoinDependency
   // into `joins_values` via `apply_join_dependency` before dispatching to the
   // grouped/simple calculation. Fold it into the shared `build_joins` port so
@@ -503,7 +520,7 @@ async function groupedAggregate(
   rel._applyJoinsToManager(manager, eagerJdGa);
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
-  manager.group(groupNode);
+  for (const n of groupNodes) manager.group(n);
   // Rails `execute_grouped_calculation` runs `select_all` on the relation's own
   // arel, which retains order_values — without the ORDER BY, LIMIT/OFFSET pick
   // arbitrary groups on PG/MySQL.
@@ -517,7 +534,7 @@ async function groupedAggregate(
   const [withCtes, ctedBinds] = prependCtes(rel, rawSql, managerBinds);
   const sql =
     isBigintColumn(rel, fn, column) && needsBigintCast(rel)
-      ? wrapBigintAgg(withCtes, true, aggAlias)
+      ? wrapBigintAgg(withCtes, aliases, aggAlias)
       : withCtes;
   const opName = fn.charAt(0).toUpperCase() + fn.slice(1);
   const queryResult = await rel
@@ -549,23 +566,31 @@ async function groupedAggregate(
   }
 
   // Rails: `col_name.try(:type_caster) || type_for(col_name) { column_types.fetch(...) }`
-  // (calculations.rb:567-570) — an Arel attribute group field carries its own
-  // table's type caster, ahead of the model lookup and the result's column types.
-  const keyFieldName = qualifiedGroupFieldForModel(rel, effectiveGroupCol);
-  const keyType = ((groupNode instanceof Nodes.Attribute ? groupNode.typeCaster : null) ??
-    (keyFieldName === null ? null : pluckCastTypeForKnownColumn(rel, keyFieldName)) ??
-    queryResult.columnTypes?.["group_key"] ??
-    null) as { deserialize?(v: unknown): unknown } | null;
+  // (calculations.rb:567-570), resolved per group field — an Arel attribute group
+  // field carries its own table's type caster, ahead of the model lookup and the
+  // result's column types.
+  const keyTypes = groupNodes.map((node, i) => {
+    const fieldName = qualifiedGroupFieldForModel(rel, groupFields[i]);
+    return ((node instanceof Nodes.Attribute ? node.typeCaster : null) ??
+      (fieldName === null ? null : pluckCastTypeForKnownColumn(rel, fieldName)) ??
+      queryResult.columnTypes?.[aliases[i]] ??
+      null) as { deserialize?(v: unknown): unknown } | null;
+  });
   const result = new Map<unknown, unknown>();
   for (const row of rows) {
-    const raw = row.group_key;
-    const key =
-      raw == null
+    // Rails `key = group_aliases.map { ... }; key = key.first if key.size == 1`
+    // (calculations.rb:583-584). JS arrays compare by reference as Map keys, so
+    // callers locate a multi-field key by its component values, not identity.
+    const key = aliases.map((alias, i) => {
+      const raw = row[alias];
+      const keyType = keyTypes[i];
+      return raw == null
         ? null
         : typeof keyType?.deserialize === "function"
           ? keyType.deserialize(raw)
           : raw;
-    result.set(key, aggOf(row[aggAlias]));
+    });
+    result.set(key.length === 1 ? key[0] : key, aggOf(row[aggAlias]));
   }
   return result;
 }
@@ -591,8 +616,8 @@ function qualifiedGroupFieldForModel(rel: CalculationRelation, field: unknown): 
  * Rails' `model._reflect_on_association(field).belongs_to?` guard — only
  * belongs_to associations are grouped by foreign key and keyed by record.
  */
-function resolveGroupAssociation(rel: CalculationRelation, groupCol: string): any {
-  if (rel._groupColumns.length !== 1 || typeof groupCol !== "string") return null;
+function resolveGroupAssociation(rel: CalculationRelation, groupCol: unknown): any {
+  if (typeof groupCol !== "string") return null;
   const reflection = (rel._modelClass as any)._reflectOnAssociation?.(groupCol);
   if (!reflection || !reflection.belongsTo?.()) return null;
   // Rails (calculations.rb:521) does `group_fields = Array(association.foreign_key)`

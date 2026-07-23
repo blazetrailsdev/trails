@@ -178,24 +178,39 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by multiple fields", async () => {
-    const c = await Account.group("firm_id", "credit_limit").count();
-    // Rails: 6 unique (firm_id, credit_limit) combos; each count is 1.
-    const total = [...(c as Map<unknown, number>).values()].reduce((sum, v) => sum + v, 0);
-    expect(total).toBe(6);
+    const c = await Account.group("firm_id", "credit_limit").count("*");
+    for (const firmAndLimit of [
+      [null, 50],
+      [1, 50],
+      [6, 50],
+      [6, 55],
+      [9, 53],
+      [2, 60],
+    ]) {
+      expect([...(c as Map<unknown, number>).keys()]).toContainEqual(firmAndLimit);
+    }
   });
 
   it("should group by multiple fields when table name is too long", async () => {
-    // Rails: TooLongTableName — canonical Account stands in; asserts multi-field GROUP BY works.
+    // Rails: TooLongTableName — canonical Account stands in (the canonical schema
+    // has no toooooooo_long_* table). trails aliases group keys `group_key_<i>`
+    // rather than deriving them from the column, so table-name length can never
+    // overflow an alias; what survives porting is the tuple-keying assertion.
     const res = await Account.group("firm_id", "credit_limit").count();
-    expect(res).toBeInstanceOf(Map);
+    expect([...(res as Map<unknown, number>).entries()]).toContainEqual([[6, 50], 1]);
+    expect([...(res as Map<unknown, number>).entries()]).toContainEqual([[6, 55], 1]);
   });
 
   it("should group by multiple fields having functions", async () => {
-    const c = await Topic.group("author_name", "COALESCE(type, title)").count();
-    expect(c).toBeInstanceOf(Map);
-    // Rails: 5 topics each with unique (author_name, COALESCE(type,title)) combo
-    const total = [...(c as Map<unknown, number>).values()].reduce((sum, v) => sum + v, 0);
-    expect(total).toBe(5);
+    const c = (await Topic.group("author_name", "COALESCE(type, title)").count("*")) as Map<
+      unknown,
+      number
+    >;
+    const entries = [...c.entries()];
+    expect(entries).toContainEqual([["Carl", "The Third Topic of the day"], 1]);
+    expect(entries).toContainEqual([["Mary", "Reply"], 1]);
+    expect(entries).toContainEqual([["David", "The First Topic"], 1]);
+    expect(entries).toContainEqual([["Carl", "Reply"], 1]);
   });
 
   it("should group by summed field", async () => {

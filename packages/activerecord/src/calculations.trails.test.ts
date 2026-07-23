@@ -162,3 +162,71 @@ describe("grouped calculation keyed via Arel attribute type caster", () => {
     );
   });
 });
+
+// ==========================================================================
+// Multi-field grouped-calculation key shape
+//
+// trails-specific regression (no verbatim Rails test asserts these two rules
+// in isolation): Rails uniqs group_fields only when there is more than one
+// (calculations.rb:516), and unwraps the key tuple to a scalar only when a
+// single group field survives (calculations.rb:583-584). Guards against a
+// regression to the old single-field collapse, where every non-association
+// grouped calculation reduced to `_groupColumns[0]`.
+// ==========================================================================
+
+describe("multi-field grouped calculation key shape", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("uniqs repeated group fields and keys by a scalar", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const result = (await Account.group("firm_id", "firm_id").count()) as Map<unknown, number>;
+    // Both fields collapse to one, so keys stay scalar rather than [n, n].
+    expect([...result.keys()].every((k) => !Array.isArray(k))).toBe(true);
+    expect(result.get(6)).toBe(2);
+  });
+
+  it("does not collapse distinct groups sharing their first field", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const single = (await Account.group("firm_id").count()) as Map<unknown, number>;
+    const multi = (await Account.group("firm_id", "credit_limit").count()) as Map<unknown, number>;
+    expect(single.get(6)).toBe(2);
+    // firm 6's two accounts have distinct credit limits, so they split in two.
+    const firmSix = [...multi.entries()].filter(([k]) => (k as unknown[])[0] === 6);
+    expect(firmSix.map(([, v]) => v)).toEqual([1, 1]);
+    expect(firmSix.map(([k]) => (k as unknown[])[1]).sort()).toEqual([50, 55]);
+  });
+});
+
+// ==========================================================================
+// Multi-field grouped SUM over a bigint column
+//
+// trails-specific regression (no Rails analogue — Ruby has no Number
+// precision cliff): SQLite returns a large SUM as a lossy double, so
+// groupedAggregate wraps the query in a CAST(... AS TEXT) that must re-project
+// EVERY group key alias. Guards wrapBigintAgg's grouped branch against
+// dropping the trailing keys once there is more than one group field.
+// ==========================================================================
+
+describe("multi-field grouped bigint sum", () => {
+  fixtures([]);
+
+  it("carries every group key through the bigint text-cast wrap", async () => {
+    const { NumericData } = await import("./test-helpers/models/numeric-data.js");
+    await NumericData.create({ world_population: 2n ** 62n, my_house_population: 1n });
+    await NumericData.create({ world_population: 2n ** 62n, my_house_population: 2n });
+
+    const result = (await NumericData.group("my_house_population", "world_population").sum(
+      "atoms_in_universe",
+    )) as Map<unknown, unknown>;
+
+    const keys = [...result.keys()] as unknown[][];
+    expect(keys).toHaveLength(2);
+    // Both key components survive the wrap — the old single-alias wrap would
+    // have dropped world_population and collapsed the tuple.
+    expect(keys.every((k) => Array.isArray(k) && k.length === 2)).toBe(true);
+    // BigIntegerType only widens to bigint past the safe-integer range, so the
+    // small key stays a Number while the 2^62 key comes back as a bigint.
+    expect(keys.map((k) => k[0]).sort()).toEqual([1, 2]);
+    expect(keys.every((k) => k[1] === 2n ** 62n)).toBe(true);
+  });
+});
