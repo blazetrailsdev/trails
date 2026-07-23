@@ -319,7 +319,7 @@ describe("sync loadSchema / columnsHash", () => {
   });
 
   // A schemaCache that starts warm and tracks whether resetColumnInformation
-  // cleared it, so columnsHash's warm branch is exercised.
+  // cleared it.
   function makeResettableAdapter(cols: Record<string, unknown>) {
     let warm = true;
     const calls = { clear: 0 };
@@ -343,9 +343,6 @@ describe("sync loadSchema / columnsHash", () => {
   }
 
   it("resetColumnInformation clears the data source cache when eager warming is off (default)", () => {
-    // Converged with Rails' reset_column_information: the entry is cleared
-    // unconditionally (`clear_data_source_cache!`) — no eager-warm-gated
-    // refresh-in-place branch. eagerLoadSchemaCache is boot-time only.
     class Post extends Base {
       static override tableName = "posts";
     }
