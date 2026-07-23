@@ -9,6 +9,7 @@
 import { describe, it, expect } from "vitest";
 import { Base, UnknownPrimaryKey } from "./index.js";
 import { quoteSqlValue } from "./base.js";
+import { registerSubclass } from "./inheritance.js";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Type } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/fixtures.js";
@@ -378,6 +379,33 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     expect(Firm.columns().map((c: { name: string }) => c.name)).not.toContain("rating");
     expect(Firm.columnNames()).not.toContain("rating");
     expect(Company.columns().map((c: { name: string }) => c.name)).toContain("rating");
+  });
+
+  it("an STI subclass's own ignoredColumns memoizes per class and reloads with the base", async () => {
+    class Company extends Base {
+      static override tableName = "companies";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Firm extends Company {
+      static {
+        registerSubclass(this);
+        this.ignoredColumns = ["rating"];
+      }
+    }
+    const first = Firm.columnsHash();
+    expect(Firm.columnsHash()).toBe(first);
+    expect(Firm.columns()).toBe(Firm.columns());
+    expect(Company.columnsHash()).not.toBe(first);
+
+    Company.resetColumnInformation();
+    await Company.loadSchema();
+    const afterReset = Firm.columnsHash();
+    expect(afterReset).not.toBe(first);
+    expect(Object.keys(afterReset)).not.toContain("rating");
+    expect(Firm.columns().map((c: { name: string }) => c.name)).not.toContain("rating");
+    expect(Company.columnNames()).toContain("rating");
   });
 
   it("an ignored column still declared via attribute() casts and responds on SELECT *", async () => {
