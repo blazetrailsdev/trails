@@ -229,7 +229,9 @@ export class PredicateBuilder {
           const flat = Array.isArray(value) ? value.flat(Infinity) : value;
           return assocPb.expandFromHash({ [rawPk[0]]: flat });
         }
-        const values = Array.isArray(value) ? value : [value];
+        // Ruby `Array(value)`: nil → [], array stays, scalar wraps.
+        const values =
+          value === null || value === undefined ? [] : Array.isArray(value) ? value : [value];
         const queryGroups: Nodes.Node[][] = values.map((idsSet) => {
           if (!Array.isArray(idsSet)) {
             throw argumentError(
@@ -244,7 +246,12 @@ export class PredicateBuilder {
         });
         return assocPb.groupingQueries(queryGroups);
       }
-      return assocPb.expandFromHash({ [rawPk]: value });
+      // A klass-less through target makes primaryKey null; Rails passes the
+      // literal `{nil => value}` into the recursion, where the nil key falls
+      // through to `self[nil, value]` and produces degenerate SQL. The JS
+      // computed key coerces null to the string "null" — an equally degenerate
+      // column reference, so no guard beyond this note.
+      return assocPb.expandFromHash({ [rawPk as string]: value });
     }
     // Core non-polymorphic, non-through path.
     const queries = new AssociationQueryValue(associatedTable, value).queries();

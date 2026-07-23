@@ -140,6 +140,8 @@ describe("association hash expansion grouping shape", () => {
     expect(() => CpkOrderWithSingularBookChapters.where({ chapters: [1, 2] })).toThrow(
       'Expected corresponding value for ["author_id", "id"] to be an Array',
     );
+    // Ruby `Array(nil)` is [] — a nil value yields zero query groups, not a raise.
+    expect(() => CpkOrderWithSingularBookChapters.where({ chapters: null })).not.toThrow();
   });
 
   it("through-association single query group stays flat, without an And wrapper", () => {
