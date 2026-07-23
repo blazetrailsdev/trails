@@ -95,7 +95,10 @@ function checkPirateAfterSaveFailure(pirate: Rec): void {
 }
 
 describe("DirtyTest", () => {
-  fixtures([]);
+  // "field named field" issues DDL (create/drop of `testings`, mirroring
+  // Rails' in-test create_table); run it outside the wrapping transaction so
+  // MySQL's DDL implicit-commit can't break the fixture rollback.
+  fixtures([], { usesTransaction: ["field named field"] });
 
   // Canonical-schema shield. This suite rides the preloaded canonical tables
   // (people / topics / pirates / parrots / aircraft / numeric_data) rather than

@@ -899,20 +899,25 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   {
     testFile: "dirty_test.rb",
+    tests: ["string attribute should compare with typecast symbol after update"],
+    reason:
+      "The test's whole point is that a Ruby symbol (`create!(catchphrase: " +
+      ':foo)` / `update_column :catchphrase, :foo`) type-casts to the string "foo" ' +
+      "and so compares clean against the persisted value. JS has no " +
+      'auto-coercing symbol; substituting "foo" would test "foo" == "foo" ' +
+      "vacuously, exercising no cast.",
+  },
+  {
+    testFile: "dirty_test.rb",
     tests: [
-      "string attribute should compare with typecast symbol after update",
       "in place mutation detection",
       "in place mutation for binary",
       "mutating and then assigning doesn't remove the change",
     ],
     reason:
-      "All four hinge on Ruby-only mutation/coercion of strings: the symbol " +
-      'test\'s whole point is that `:foo` type-casts to "foo" and compares ' +
-      'clean (JS has no auto-coercing symbol; substituting "foo" tests ' +
-      '"foo" == "foo" vacuously), and the other three mutate a string in ' +
-      'place (`catchphrase << " matey!"`, `data << "bar"` on a serialized ' +
-      "binary). JS strings are immutable — there is no in-place string " +
-      "mutation to detect.",
+      'All three mutate a string in place (`catchphrase << " matey!"`, ' +
+      '`data << "bar"` on a serialized binary; dirty_test.rb:668/689/799). ' +
+      "JS strings are immutable — there is no in-place string mutation to detect.",
   },
   {
     testFile: "dirty_test.rb",
