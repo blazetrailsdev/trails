@@ -99,10 +99,10 @@ export class PredicateBuilder {
     conditions: Record<string, unknown>,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
-    return this.buildFromHashInternal(this.convertDotNotationToHash(conditions), block);
+    return this.expandFromHash(this.convertDotNotationToHash(conditions), block);
   }
 
-  private buildFromHashInternal(
+  protected expandFromHash(
     conditions: Record<string, unknown>,
     block?: (tableName: string) => unknown,
   ): Nodes.Node[] {
@@ -133,7 +133,7 @@ export class PredicateBuilder {
           key,
           block as (name: string) => never,
         ).predicateBuilder;
-        nodes.push(...assocPb.buildFromHash(value));
+        nodes.push(...assocPb.expandFromHash(value));
       } else if (this.table.isAssociatedWith(key)) {
         const assocNodes = this.buildFromHashAssociation(
           this.table.associatedTable(key),
@@ -172,7 +172,7 @@ export class PredicateBuilder {
       const [columnName, aggregateAttr] = mapping[0];
       // Rails: `object.respond_to?(aggr) ? object.public_send(aggr) : object`.
       const mapped = values.map((object) => extractAggregateAttr(object, aggregateAttr, false));
-      return this.buildFromHash({ [columnName]: mapped });
+      return [this.build(this.table.arelTable.get(columnName), mapped)];
     }
     // Multi-mapping: one AND-group per object over every mapped column, ORed
     // together (grouping_queries), mirroring expand_from_hash.
@@ -212,7 +212,7 @@ export class PredicateBuilder {
       ).queries();
       const queryGroups: Nodes.Node[][] = [];
       for (const query of queries) {
-        const inner = this.buildFromHash(query);
+        const inner = this.expandFromHash(query);
         if (inner.length === 0) continue;
         queryGroups.push(inner);
       }
@@ -235,7 +235,7 @@ export class PredicateBuilder {
         value,
       ).queries();
       const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
-      const inner = normalizedQueries.flatMap((q) => assocPb.buildFromHash(q));
+      const inner = normalizedQueries.flatMap((q) => assocPb.expandFromHash(q));
       if (inner.length === 0) return [];
       return [inner.length === 1 ? inner[0] : new Nodes.And(inner)];
     }
@@ -247,7 +247,7 @@ export class PredicateBuilder {
       if (isSameHash(query, attributes)) {
         queryGroups.push([this.build(this.table.arelTable.get(key), value)]);
       } else {
-        const inner = this.buildFromHash(query);
+        const inner = this.expandFromHash(query);
         if (inner.length === 0) continue;
         queryGroups.push(inner);
       }
@@ -578,13 +578,6 @@ export class PredicateBuilder {
     return (
       typeof value === "object" && value !== null && "_modelClass" in value && "toArel" in value
     );
-  }
-
-  protected expandFromHash(
-    attributes: Record<string, unknown>,
-    block?: (key: string) => any,
-  ): Nodes.Node[] {
-    return this.buildFromHash(attributes);
   }
 
   private convertDotNotationToHash(attributes: Record<string, unknown>): Record<string, unknown> {

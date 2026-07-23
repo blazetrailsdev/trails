@@ -3,6 +3,9 @@ import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js
 import { IntegerType } from "@blazetrails/activemodel";
 import { Table, Visitors } from "@blazetrails/arel";
 import { Company, Firm } from "../test-helpers/models/company.js";
+import { Author } from "../test-helpers/models/author.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+import { escapeRegExp, quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
 
@@ -53,5 +56,19 @@ describe("PredicateBuilder positive-equality bind typing", () => {
     );
     expect(sql).not.toContain("1=0");
     expect(binds).toHaveLength(1);
+  });
+});
+
+describe("PredicateBuilder nested-hash recursion skips dot re-normalization", () => {
+  fixtures(["authors", "posts", "comments"]);
+
+  it("treats a dotted key inside a nested hash as a literal column on the associated table", () => {
+    const sql = Author.where({ posts: { "comments.body": "hi" } }).toSql();
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteTableName("posts"))}\\.${escapeRegExp(quoteColumnName("comments.body"))}`,
+      ),
+    );
+    expect(sql).not.toContain(quoteTableName("comments.body"));
   });
 });
