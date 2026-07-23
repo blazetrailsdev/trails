@@ -2284,23 +2284,6 @@ export class Base extends Model {
 
   // -- Finders (class methods) --
 
-  /** @internal Cast a value through its attribute's adapter-resolved type. */
-  static _castAttributeValue(key: string, value: unknown): unknown {
-    if (typeof value !== "string") return value;
-    let def = this._attributeDefinitions.get(key);
-    if (!def && typeof this.primaryKey === "string" && key === this.primaryKey) {
-      // Mirror Rails: `find` casts the id through the column type that
-      // `load_schema!` always populates (model_schema.rb load_schema!). The
-      // schema cache is always warm (RFC 0031), so this sync (re)load reflects
-      // the PK's real adapter-resolved type, keeping input-cast aligned with
-      // the read path (PG int8→BigInt, not number) without a DB query.
-      (ModelSchema.loadSchema as any).call(this);
-      def = this._attributeDefinitions.get(key);
-    }
-    if (def) return def.type.cast(value);
-    return value;
-  }
-
   // Overloads match Rails' behavior:
   //   find(id)          → single record
   //   find([id, ...])   → array of records (plural PK)

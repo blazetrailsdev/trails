@@ -22,13 +22,9 @@ function castInheritanceColumnValue(
 ): unknown {
   // Rails: type_for_attribute(inheritCol).cast(value) — handles non-string
   // inputs (numbers/booleans) by coercing through the column's type.
-  // Falls back to Base._castAttributeValue (string-only) for compatibility.
-  const attrType = modelClass.typeForAttribute(inheritCol) as {
-    cast(value: unknown): unknown;
-  } | null;
-  const casted = attrType
-    ? attrType.cast(value)
-    : modelClass._castAttributeValue(inheritCol, value);
+  const casted = (
+    modelClass.typeForAttribute(inheritCol) as { cast(value: unknown): unknown }
+  ).cast(value);
   if (casted == null) return casted;
   // Normalize to a primitive string (handles String wrapper objects) so
   // findStiClass downstream can match against modelRegistry keys.

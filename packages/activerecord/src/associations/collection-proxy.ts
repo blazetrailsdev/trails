@@ -3420,20 +3420,18 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
     // Cast incoming ids through the target model's attribute types so
     // in-memory find matches Relation.find's WHERE-condition casting
-    // (e.g. proxy.find("1") on an integer PK). For composite keys,
-    // cast each tuple element by its PK column.
-    const castFn = (
-      targetModel as typeof Base & {
-        _castAttributeValue?: (attributeName: string, value: unknown) => unknown;
-      }
-    )._castAttributeValue;
+    // (e.g. proxy.find("1") on an integer PK — the DB path's QueryAttribute
+    // bind casts at compile time, so the loaded-target path must cast too).
+    // For composite keys, cast each tuple element by its PK column.
+    const typeFor = (col: string): { cast(value: unknown): unknown } =>
+      targetModel.typeForAttribute(col);
     const castId = (id: unknown): unknown => {
       if (composite) {
         const cols = pk;
         const values = id as unknown[];
-        return castFn ? cols.map((c, i) => castFn.call(targetModel, c, values[i])) : values;
+        return cols.map((c, i) => typeFor(c).cast(values[i]));
       }
-      return castFn ? castFn.call(targetModel, pk, id) : id;
+      return typeFor(pk).cast(id);
     };
 
     // Index records by PK once — O(records + ids) instead of

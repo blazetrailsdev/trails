@@ -412,7 +412,7 @@ interface CoreHost {
   arelTable?: any;
   prototype: any;
   all(): any;
-  _castAttributeValue(key: string, value: unknown): unknown;
+  typeForAttribute(name: string): { cast(value: unknown): unknown };
   ensureSchemaLoaded(): Promise<void>;
 }
 
@@ -1006,9 +1006,8 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       // (not the aggregate "in [...]"), and a hit is wrapped back into a
       // 1-element array because `expects_array` is true.
       const single = compactedIds[0];
-      const castSingle = this._castAttributeValue(this.primaryKey as string, single);
       const record = await this.all()
-        .where({ [this.primaryKey as string]: castSingle })
+        .where({ [this.primaryKey as string]: single })
         .first();
       if (!record) {
         throw new RecordNotFound(
@@ -1020,10 +1019,14 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       }
       return [record];
     }
-    const castIds = compactedIds.map((i) => this._castAttributeValue(this.primaryKey as string, i));
     const records = await this.all()
-      .where({ [this.primaryKey as string]: castIds })
+      .where({ [this.primaryKey as string]: compactedIds })
       .toArray();
+    // Rails find_some_ordered casts only for the in_order_of mapping:
+    // `ids.map { model.type_for_attribute(primary_key).cast(id) }`
+    // (finder_methods.rb:576) — the WHERE ids stay raw for the bind to cast.
+    const pkType = this.typeForAttribute(this.primaryKey as string);
+    const castIds = compactedIds.map((i) => pkType.cast(i));
     // Key by pkMatchKey so a BigInt PK matches the number/string id passed in
     // (a raw-value Map would miss `1n` vs `1` and spuriously raise below).
     const idToRecord = new Map<unknown, any>();
@@ -1041,9 +1044,8 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     // in_order_of: return in input order
     return castIds.map((cid) => idToRecord.get(pkMatchKey(cid))!);
   }
-  const castId = this._castAttributeValue(this.primaryKey as string, id);
   const record = await this.all()
-    .where({ [this.primaryKey as string]: castId })
+    .where({ [this.primaryKey as string]: id })
     .first();
   if (!record) {
     throw new RecordNotFound(
