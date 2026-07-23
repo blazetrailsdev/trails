@@ -2208,22 +2208,6 @@ export class RuntimeReflection extends AbstractReflection {
 }
 
 // ---------------------------------------------------------------------------
-// Column reflection (unchanged from before)
-// ---------------------------------------------------------------------------
-
-export class ColumnReflection {
-  readonly name: string;
-  readonly type: string | null;
-  readonly defaultValue: unknown;
-
-  constructor(name: string, type: string | null, defaultValue: unknown) {
-    this.name = name;
-    this.type = type;
-    this.defaultValue = defaultValue;
-  }
-}
-
-// ---------------------------------------------------------------------------
 // Factory & public API
 // ---------------------------------------------------------------------------
 
@@ -2384,26 +2368,6 @@ export function clearReflectionsCache(modelClass: typeof Base): void {
 // ---------------------------------------------------------------------------
 // Public helper functions
 // ---------------------------------------------------------------------------
-
-export function columns(modelClass: typeof Base): ColumnReflection[] {
-  // Rails' `columns` is the database column objects (`columns_hash.values`,
-  // model_schema.rb:432-434) — sourced from the schema, never from attribute-level
-  // decoration. Reading `_attributeDefinitions[].type` here would report the
-  // decorated cast-type wrapper (serialize/encrypts/normalizes/enum) instead
-  // of the column's own type.
-  return Object.values(modelClass.columnsHash()).map(
-    (col) => new ColumnReflection(col.name, col.type ?? null, col.default),
-  );
-}
-
-export function columnNames(modelClass: typeof Base): string[] {
-  return Array.from(modelClass._attributeDefinitions.keys());
-}
-
-export function contentColumns(modelClass: typeof Base): ColumnReflection[] {
-  const contentNames = new Set(modelClass.contentColumns());
-  return columns(modelClass).filter((col) => contentNames.has(col.name));
-}
 
 export function _reflectOnAssociation(
   modelClass: typeof Base,
