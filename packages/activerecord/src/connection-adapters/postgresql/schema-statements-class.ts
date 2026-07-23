@@ -970,22 +970,12 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     // Invalidate the cached reflection before mutating (matching the other DDL
     // methods, e.g. addColumn) so a subsequent columnsHash()/columnDefaults read
     // sees the new default rather than a stale (always-warm) entry. Safe to clear
-    // first: the column lookup below queries pg_catalog directly, not the cache.
+    // first: buildChangeColumnDefaultDefinition's column lookup queries
+    // pg_catalog directly, not the cache.
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    const quotedTable = this._qt(tableName);
-    const quotedCol = this._qi(columnName);
-    const defaultValue = this.extractNewDefaultValue(defaultOrChanges);
-    if (defaultValue == null) {
-      await this.adapter.execute(
-        `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} DROP DEFAULT`,
-      );
-    } else {
-      const col = (await this.columns(tableName)).find((c) => c.name === columnName);
-      const expr = await this.adapter.quoteDefaultExpression(defaultValue, col);
-      await this.adapter.execute(
-        `ALTER TABLE ${quotedTable} ALTER COLUMN ${quotedCol} SET DEFAULT ${expr}`,
-      );
-    }
+    await this.adapter.execute(
+      `ALTER TABLE ${this._qt(tableName)} ${await this.changeColumnDefaultForAlter(tableName, columnName, defaultOrChanges)}`,
+    );
   }
 
   buildChangeColumnDefinition(
