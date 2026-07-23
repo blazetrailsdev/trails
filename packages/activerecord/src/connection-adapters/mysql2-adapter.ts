@@ -1644,13 +1644,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    */
   override async reconnect(): Promise<void> {
     if (this._permanentlyClosed) throw new Error("Mysql2Adapter: client is permanently closed");
-    // Never-connected adapter with a current-generation lazy connect already in
-    // flight (e.g. the pool's fire-and-forget eager schema warm racing the
-    // per-checkout verifyBang): adopt that connect instead of discarding it.
-    // There is no live handle to tear down — the in-flight attempt IS the
-    // fresh connection Rails' `connect` would open — and advancing the
-    // generation here would strand the concurrent caller with a spurious
-    // "connection was closed during connect".
+    // A never-connected adapter with a current-generation lazy connect in
+    // flight (eager schema warm racing the per-checkout verifyBang) adopts
+    // that connect: advancing the generation would strand the concurrent
+    // caller with a spurious "connection was closed during connect".
     if (
       this._client === null &&
       this._connectingPromise &&

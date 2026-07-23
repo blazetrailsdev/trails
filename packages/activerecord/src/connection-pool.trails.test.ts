@@ -90,11 +90,6 @@ function makePool(size: number = 5): ConnectionPool {
 }
 
 it("checkout establishes the raw connection before handing out the adapter", async () => {
-  // Rails checkout→verify!→connect semantics: immediately after
-  // `pool.checkout` the adapter's raw connection is established
-  // (abstract_adapter.rb `connected?` = `!@raw_connection.nil?`), so
-  // `pool.connected?` is true. Guards against the lazy-connect handout where
-  // `isConnected` stayed false until the first query.
   const pool = makePool();
   const conn = await pool.checkout();
   try {

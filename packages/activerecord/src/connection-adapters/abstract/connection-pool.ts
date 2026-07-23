@@ -822,15 +822,10 @@ export class ConnectionPool implements ReapablePool {
   }
 
   /**
-   * Rails hands checked-out connections back verified: immediately after
-   * `ConnectionPool#checkout` the adapter's raw connection is established
-   * (`connected?` true), because `verify!` reconnects a not-`active?`
-   * connection on handout. Trails' raw connect is lazy AND async, so a fresh
-   * adapter leaving `checkoutAndVerify` still has no raw handle; drive the
-   * async `verifyBang` here on the (already-async) checkout path so the
-   * handed-out adapter is established, mirroring the pinned branch above. On
-   * failure, mirror `checkout_and_verify`'s rescue: remove from the pool,
-   * disconnect, re-raise.
+   * Rails hands checked-out connections back with the raw connection
+   * established (checkout→verify!→connect); trails' raw connect is lazy and
+   * async, so drive `verifyBang` on the async checkout path, mirroring
+   * `checkout_and_verify`'s rescue (remove + disconnect!) on failure.
    *
    * @internal
    */
