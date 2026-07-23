@@ -1810,7 +1810,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
         this.validates("catchphrase", { presence: true });
-        this.hasOne("deepShip", { autosave: true });
+        // The FK derived from the association name would be `deep_pirate_id`;
+        // the real `ships` column is `pirate_id`. The bridge used to swallow
+        // the phantom write; strict _writeAttribute surfaces it.
+        this.hasOne("deepShip", { autosave: true, foreignKey: "pirate_id" });
       }
     }
     registerModel("DeepPirate", DeepPirate);

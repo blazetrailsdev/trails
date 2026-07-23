@@ -992,6 +992,7 @@ describe("AssociationScope", () => {
 
       static {
         this._tableName = "pst_galleries";
+        this.attribute("id", "integer");
         this.attribute("pst_gallery_id", "integer");
         this.attribute("imageable_id", "integer");
         this.attribute("imageable_type", "string");

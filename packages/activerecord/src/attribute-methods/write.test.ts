@@ -24,12 +24,13 @@ describe("WriteTest", () => {
       }
     }
     const p = new Post({ body: "original" });
-    // _writeAttribute("content", ...) writes to the "content" slot directly.
-    // Neither writeAttribute nor _writeAttribute resolve aliases today;
-    // that redirect will live in a future AR-level writeAttribute override.
-    p._writeAttribute("content", "via alias");
+    // Rails _write_attribute (write.rb:42) skips alias resolution, so the
+    // alias name misses the attribute set and write_from_user raises
+    // MissingAttributeError instead of redirecting to "body".
+    expect(() => p._writeAttribute("content", "via alias")).toThrow(
+      "can't write unknown attribute `content`",
+    );
     expect(p._readAttribute("body")).toBe("original");
-    expect(p._readAttribute("content")).toBe("via alias");
   });
 
   it("_write_attribute bypasses readonly check", () => {

@@ -42,6 +42,9 @@ import { fixtures } from "../test-helpers/fixtures.js";
 class StvAuthor extends Base {
   static {
     this._tableName = "stv_authors";
+    // No real table — strict _writeAttribute needs a declared slot for the
+    // dummy `id = 1` assignment below.
+    this.attribute("id", "integer");
   }
 }
 class StvComment extends Base {

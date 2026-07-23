@@ -60,6 +60,8 @@ describe("ActiveRecord::Encryption::ContextsTest", () => {
     EncryptedBook = class EncryptedBook extends Base {
       static {
         this._tableName = "encrypted_books";
+        this.attribute("created_at", "datetime");
+        this.attribute("updated_at", "datetime");
         this.attribute("id", "integer");
         this.attribute("name", "string", { default: "<untitled>", limit: 1024 });
         this.encrypts("name", { deterministic: true });
