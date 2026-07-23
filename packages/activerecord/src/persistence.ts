@@ -6,6 +6,9 @@
  */
 
 import { Temporal } from "@blazetrails/activesupport/temporal";
+import { singularize } from "@blazetrails/activesupport";
+import { reflectOnAllAssociations } from "./reflection.js";
+import type { Base } from "./base.js";
 import {
   ArgumentError,
   sanitizeForMassAssignment,
@@ -621,6 +624,31 @@ async function assignUpdateAttributes(self: any, attrs: Record<string, unknown>)
   if (pending.length) await Promise.all(pending);
 }
 
+/**
+ * If `key` is a collection association's plural writer (`posts=`) or ids writer
+ * (`postIds=`), return the awaitable replace promise; otherwise `undefined`.
+ * Used by `#update`/`#update!` to bypass the throwing sync property setter and
+ * persist the replace inline inside the update transaction (see call site).
+ */
+function collectionWriterPromise(
+  self: any,
+  key: string,
+  value: unknown,
+): Promise<void> | undefined {
+  const ctor = self.constructor as typeof Base;
+  for (const ref of reflectOnAllAssociations(ctor)) {
+    if (!ref.isCollection?.()) continue;
+    const name = String((ref as any).nameString ?? ref.name);
+    if (key === name) {
+      return self.association(name).writer(value);
+    }
+    if (key === `${singularize(name)}Ids`) {
+      return self.association(name).idsWriter(value);
+    }
+  }
+  return undefined;
+}
+
 function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<void> | void {
   const configs = self.constructor?._nestedAttributeConfigs as
     | { associationName: string }[]
@@ -638,6 +666,18 @@ function assignUpdateAttribute(self: any, key: string, value: unknown): Promise<
     self.id = value;
     return;
   }
+  // Collection association writers (`posts=`, `postIds=`). Rails routes these
+  // through `public_send` → `replace`, which for a *persisted* owner runs the
+  // diffed deletes + inserts inline (collection_association.rb:242). The JS
+  // property setter cannot `await` that DB I/O, so `defineWriters` installs a
+  // setter that throws `CollectionPersistedAssignmentError` on a persisted
+  // owner (RFC 0068). But `#update`/`#update!` already run inside
+  // `with_transaction_returning_status` and can `await`, so route straight to
+  // the awaitable `writer`/`idsWriter` here — the replace joins the update
+  // transaction and rolls back with it if the subsequent `save` fails, exactly
+  // as `author.update(name: nil, post_ids: [])` does in Rails.
+  const collectionWrite = collectionWriterPromise(self, key, value);
+  if (collectionWrite) return collectionWrite;
   // Dispatch through prototype setter for generated writers (e.g. *Ids writers
   // from CollectionAssociation builder). Mirrors Rails' public_send("#{key}=").
   // *Ids writers are async (they query the DB to resolve records); return the
