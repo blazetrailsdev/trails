@@ -44,7 +44,10 @@ export class PolymorphicArrayValue {
   queries(): Record<string, unknown>[] {
     const fk = this.associatedTable.joinForeignKey;
     if (this.values.length === 0) {
-      return [{ [Array.isArray(fk) ? fk[0] : fk]: this.values }];
+      if (Array.isArray(fk)) {
+        return [Object.fromEntries(fk.map((col) => [col, this.values]))];
+      }
+      return [{ [fk]: this.values }];
     }
     const result: Record<string, unknown>[] = [];
     for (const [type, ids] of this.typeToIdsMapping()) {

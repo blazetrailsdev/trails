@@ -352,7 +352,7 @@ describe("BelongsToAssociationsTest", () => {
       const client = await Client.find(3);
       await client.loadBelongsTo("firm");
     });
-    expect(sqlLog.every((sql) => !/order by/i.test(sql))).toBe(true);
+    expect(sqlLog.filter((sql) => /order by/i.test(sql))).toEqual([]);
   });
 
   it("belongs to with primary key", async () => {
@@ -1130,7 +1130,7 @@ describe("BelongsToAssociationsTest", () => {
     }
 
     const reloadedAt = (await invoice.reload()).updated_at as Temporal.Instant;
-    expect(Temporal.Instant.compare(reloadedAt, initial)).not.toBe(0);
+    expect(reloadedAt.equals(initial)).toBe(false);
   });
 
   it("belongs to with touch option on touch and removed parent", async () => {

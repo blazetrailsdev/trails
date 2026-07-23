@@ -35,7 +35,6 @@ export class BelongsToAssociation extends SingularAssociation {
     switch (dependent) {
       case "destroy":
         if (typeof (target as any).destroy === "function") {
-          // Rails: raise ActiveRecord::Rollback unless target.destroy
           if ((await (target as any).destroy()) === false) {
             throw new Rollback();
           }
