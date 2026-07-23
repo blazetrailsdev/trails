@@ -1,7 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 import { testConnection } from "../test-helpers/connection.js";
-import { Table, star, SelectManager, Nodes, Visitors } from "../index.js";
+import { Table, star, Nodes, Visitors } from "../index.js";
 
 describe("AttributeTest", () => {
   const users = new Table("users");
@@ -563,14 +563,14 @@ describe("AttributeTest", () => {
 
   describe("#not_between", () => {
     it("can be constructed with a standard range", () => {
-      const node = users.get("age").notBetween(18, 65);
+      const node = users.get("age").notBetween([18, 65]);
       expect(node).toBeInstanceOf(Nodes.Grouping);
       expect((node as Nodes.Grouping).expr).toBeInstanceOf(Nodes.Or);
       expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" > 65)');
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("age").notBetween(-Infinity, 65);
+      const node = users.get("age").notBetween([-Infinity, 65]);
       expect(node).toBeInstanceOf(Nodes.GreaterThan);
       expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
@@ -636,11 +636,6 @@ describe("AttributeTest", () => {
       const inner = (node as Nodes.Grouping).expr as Nodes.Or;
       expect(inner.children[1]).toBeInstanceOf(Nodes.GreaterThanOrEqual);
       expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
-    });
-
-    it("can be constructed with a Union", () => {
-      const node = users.get("age").notBetween(1, 100);
-      expect(node).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
@@ -917,324 +912,6 @@ describe("AttributeTest", () => {
       expect((right as Nodes.Casted).attribute).toBe(attr);
       expect(new Visitors.ToSql(testConnection).compile(node)).toBe('"foo"."id" IN (0)');
     });
-  });
-
-  it("notEq(null) generates IS NOT NULL", () => {
-    expect(users.project(star).where(users.get("name").notEq(null)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."name" IS NOT NULL',
-    );
-  });
-
-  it("gteq generates >=", () => {
-    expect(users.project(star).where(users.get("age").gteq(10)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" >= 10',
-    );
-  });
-
-  it("lteq generates <=", () => {
-    expect(users.project(star).where(users.get("age").lteq(10)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" <= 10',
-    );
-  });
-
-  it("in generates IN", () => {
-    expect(
-      users
-        .project(star)
-        .where(users.get("id").in([1, 2, 3]))
-        .toSql(),
-    ).toBe('SELECT * FROM "users" WHERE "users"."id" IN (1, 2, 3)');
-  });
-
-  it("in with empty array generates 1=0 (always false)", () => {
-    expect(users.project(star).where(users.get("id").in([])).toSql()).toBe(
-      'SELECT * FROM "users" WHERE 1=0',
-    );
-  });
-
-  it("notIn with empty array generates 1=1 (always true)", () => {
-    expect(users.project(star).where(users.get("id").notIn([])).toSql()).toBe(
-      'SELECT * FROM "users" WHERE 1=1',
-    );
-  });
-
-  it("between generates BETWEEN", () => {
-    expect(users.project(star).where(users.get("age").between(18, 65)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" BETWEEN 18 AND 65',
-    );
-  });
-
-  it("notBetween generates NOT BETWEEN", () => {
-    // Mirrors Rails: not_between renders as `(col < begin OR col > end)`.
-    expect(users.project(star).where(users.get("age").notBetween(18, 65)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE ("users"."age" < 18 OR "users"."age" > 65)',
-    );
-  });
-
-  it("and combines with AND", () => {
-    const cond = users.get("name").eq("dean").and(users.get("age").gt(21));
-    expect(users.project(star).where(cond).toSql()).toBe(
-      `SELECT * FROM "users" WHERE "users"."name" = 'dean' AND "users"."age" > 21`,
-    );
-  });
-
-  it("or combines with OR wrapped in Grouping", () => {
-    const cond = users.get("name").eq("dean").or(users.get("name").eq("sam"));
-    expect(users.project(star).where(cond).toSql()).toBe(
-      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' OR "users"."name" = 'sam')`,
-    );
-  });
-
-  it("not negates", () => {
-    const cond = users.get("name").eq("dean").not();
-    expect(users.project(star).where(cond).toSql()).toBe(
-      `SELECT * FROM "users" WHERE NOT ("users"."name" = 'dean')`,
-    );
-  });
-
-  it("eqAny generates OR group", () => {
-    const result = users
-      .project(star)
-      .where(users.get("name").eqAny(["dean", "sam"]))
-      .toSql();
-    expect(result).toBe(
-      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' OR "users"."name" = 'sam')`,
-    );
-  });
-
-  it("eqAll generates AND group", () => {
-    const result = users
-      .project(star)
-      .where(users.get("name").eqAll(["dean", "sam"]))
-      .toSql();
-    expect(result).toBe(
-      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' AND "users"."name" = 'sam')`,
-    );
-  });
-
-  it("gtAny generates OR group", () => {
-    const result = users
-      .project(star)
-      .where(users.get("age").gtAny([10, 20]))
-      .toSql();
-    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."age" > 10 OR "users"."age" > 20)`);
-  });
-
-  it("ltAll generates AND group", () => {
-    const result = users
-      .project(star)
-      .where(users.get("age").ltAll([50, 100]))
-      .toSql();
-    expect(result).toBe(`SELECT * FROM "users" WHERE ("users"."age" < 50 AND "users"."age" < 100)`);
-  });
-
-  it("matchesAny generates OR group", () => {
-    const result = users
-      .project(star)
-      .where(users.get("name").matchesAny(["%dean%", "%sam%"]))
-      .toSql();
-    expect(result).toBe(
-      `SELECT * FROM "users" WHERE ("users"."name" LIKE '%dean%' OR "users"."name" LIKE '%sam%')`,
-    );
-  });
-
-  it("does not mutate input array", () => {
-    const input = [1, 2, 3];
-    const copy = [...input];
-    users.get("id").eqAny(input);
-    expect(input).toEqual(copy);
-  });
-
-  it("lower", () => {
-    const name = users.get("name");
-    const fn = name.lower();
-    const mgr = new SelectManager(users);
-    mgr.project(fn);
-    const sql = mgr.toSql();
-    expect(sql).toContain("LOWER");
-    expect(sql).toContain('"name"');
-  });
-
-  it("generates a `||` Concat infix node", () => {
-    // Mirrors Rails: Predications#concat builds Nodes::Concat (the SQL
-    // standard `||` operator), not a CONCAT(...) function call.
-    const node = users.attr("first_name").concat(users.attr("last_name"));
-    expect(node).toBeInstanceOf(Nodes.Concat);
-    const sql = visitor.compile(node);
-    expect(sql).toContain('"users"."first_name"');
-    expect(sql).toContain("||");
-    expect(sql).toContain('"users"."last_name"');
-  });
-
-  it("should handle nil for notEq", () => {
-    const result = users.project(star).where(users.get("name").notEq(null)).toSql();
-    expect(result).toBe('SELECT * FROM "users" WHERE "users"."name" IS NOT NULL');
-  });
-
-  it("should create a Grouping node from or", () => {
-    const node = users.get("id").eq(1).or(users.get("id").eq(2));
-    expect(node).toBeInstanceOf(Nodes.Grouping);
-  });
-
-  it("should generate ORs in sql from eq", () => {
-    const cond = users.get("id").eq(1).or(users.get("id").eq(2));
-    const result = users.project(star).where(cond).toSql();
-    expect(result).toBe('SELECT * FROM "users" WHERE ("users"."id" = 1 OR "users"."id" = 2)');
-  });
-
-  it("should create a Grouping node from and wrapped in grouping via eqAll", () => {
-    const node = users.get("name").eqAll(["dean", "sam"]);
-    expect(node).toBeInstanceOf(Nodes.Grouping);
-  });
-
-  it("should generate ANDs in sql from eqAll", () => {
-    const result = users
-      .project(star)
-      .where(users.get("name").eqAll(["dean", "sam"]))
-      .toSql();
-    expect(result).toBe(
-      `SELECT * FROM "users" WHERE ("users"."name" = 'dean' AND "users"."name" = 'sam')`,
-    );
-  });
-
-  it("should accept various data types for gt", () => {
-    expect(users.project(star).where(users.get("age").gt(10)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."age" > 10',
-    );
-  });
-
-  it("should generate the proper SQL for AVG", () => {
-    expect(users.project(users.get("age").average()).toSql()).toBe(
-      'SELECT AVG("users"."age") FROM "users"',
-    );
-  });
-
-  it("should generate proper SQL for MAX", () => {
-    expect(users.project(users.get("age").maximum()).toSql()).toBe(
-      'SELECT MAX("users"."age") FROM "users"',
-    );
-  });
-
-  it("should generate proper SQL for MIN", () => {
-    expect(users.project(users.get("age").minimum()).toSql()).toBe(
-      'SELECT MIN("users"."age") FROM "users"',
-    );
-  });
-
-  it("should generate the proper SQL for SUM", () => {
-    expect(users.project(users.get("age").sum()).toSql()).toBe(
-      'SELECT SUM("users"."age") FROM "users"',
-    );
-  });
-
-  it("should take a distinct param for count", () => {
-    expect(users.project(users.get("name").count(true)).toSql()).toBe(
-      'SELECT COUNT(DISTINCT "users"."name") FROM "users"',
-    );
-  });
-
-  it("should handle nil for eq", () => {
-    expect(users.project(star).where(users.get("name").eq(null)).toSql()).toBe(
-      'SELECT * FROM "users" WHERE "users"."name" IS NULL',
-    );
-  });
-
-  it("should not eat input for eqAny", () => {
-    const input = [1, 2, 3];
-    const copy = [...input];
-    users.get("id").eqAny(input);
-    expect(input).toEqual(copy);
-  });
-
-  it("should not eat input for eqAll", () => {
-    const input = [1, 2, 3];
-    const copy = [...input];
-    users.get("id").eqAll(input);
-    expect(input).toEqual(copy);
-  });
-
-  it("can be constructed with a list for IN", () => {
-    expect(
-      users
-        .project(star)
-        .where(users.get("id").in([1, 2, 3]))
-        .toSql(),
-    ).toBe('SELECT * FROM "users" WHERE "users"."id" IN (1, 2, 3)');
-  });
-
-  it("should create a Contains node via InfixOperation", () => {
-    const node = users.get("tags").contains("foo");
-    expect(node).toBeInstanceOf(Nodes.InfixOperation);
-    expect(node.operator).toBe("@>");
-  });
-
-  it("should create an Overlaps node via InfixOperation", () => {
-    const node = users.get("tags").overlaps("bar");
-    expect(node).toBeInstanceOf(Nodes.InfixOperation);
-    expect(node.operator).toBe("&&");
-  });
-
-  it("should produce sql for attribute", () => {
-    const visitor = new Visitors.ToSql(testConnection);
-    const attr = users.get("name");
-    expect(visitor.compile(attr)).toBe('"users"."name"');
-  });
-
-  it("can be constructed with a subquery for IN", () => {
-    const subquery = users.project(users.get("id"));
-    const node = users.get("id").in(subquery);
-    const visitor = new Visitors.ToSql(testConnection);
-    expect(visitor.compile(node)).toBe('"users"."id" IN (SELECT "users"."id" FROM "users")');
-  });
-
-  it("can be constructed with a standard range for between", () => {
-    const node = users.get("age").between({ begin: 18, end: 65 });
-    const visitor = new Visitors.ToSql(testConnection);
-    expect(visitor.compile(node)).toBe('"users"."age" BETWEEN 18 AND 65');
-  });
-
-  it("is equal with equal ivars (same table and column)", () => {
-    const a = users.get("name");
-    const b = users.get("name");
-    expect(a.name).toBe(b.name);
-    expect(a.relation).toBe(b.relation);
-  });
-
-  it("average should be compatible with Addition", () => {
-    const node = users.get("age").add(1);
-    expect(node).toBeInstanceOf(Nodes.Grouping);
-    expect(node.expr).toBeInstanceOf(Nodes.Addition);
-  });
-
-  it("count should be compatible with Addition", () => {
-    const count = users.get("id").count();
-    expect(count).toBeInstanceOf(Nodes.Count);
-  });
-
-  it("maximum should be compatible with node", () => {
-    const node = users.get("age").maximum();
-    expect(node).toBeInstanceOf(Nodes.Max);
-  });
-
-  it("minimum should be compatible with node", () => {
-    const node = users.get("age").minimum();
-    expect(node).toBeInstanceOf(Nodes.Min);
-  });
-
-  it("attribute node should be compatible with Subtraction", () => {
-    const node = users.get("age").subtract(1);
-    expect(node).toBeInstanceOf(Nodes.Grouping);
-    expect(node.expr).toBeInstanceOf(Nodes.Subtraction);
-  });
-
-  it("attribute node should be compatible with Multiplication", () => {
-    const node = users.get("age").multiply(2);
-    expect(node).toBeInstanceOf(Nodes.Multiplication);
-  });
-
-  it("attribute node should be compatible with Division", () => {
-    const node = users.get("age").divide(2);
-    expect(node).toBeInstanceOf(Nodes.Division);
   });
 
   describe("#gt_any", () => {

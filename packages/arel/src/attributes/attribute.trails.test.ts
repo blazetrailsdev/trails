@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { testConnection } from "../test-helpers/connection.js";
-import { Table, Nodes, Visitors, relationName } from "../index.js";
+import { Table, star, Nodes, Visitors, relationName } from "../index.js";
 
 // TS-only coverage for the `when Enumerable` arm of Attribute#in / #notIn
 // (arel/predications.rb:65-74, 112-121). Ruby's Enumerable spans Set, Hash and
@@ -86,6 +86,24 @@ describe("AttributeTest (trails)", () => {
       const map = new Map<string, number>([["a", 1]]);
       expect(attribute.notIn(map)).toEqual(
         new Nodes.NotIn(attribute, [new Nodes.Casted(["a", 1], attribute)]),
+      );
+    });
+  });
+
+  // Ruby's Range has no two-argument spelling — Rails' between/not_between
+  // only accept a Range, so the (begin, end) overload below is a TS-only
+  // convenience signature with no Rails-side test.
+  describe("two-argument between overload", () => {
+    it("between generates BETWEEN", () => {
+      expect(users.project(star).where(users.get("age").between(18, 65)).toSql()).toBe(
+        'SELECT * FROM "users" WHERE "users"."age" BETWEEN 18 AND 65',
+      );
+    });
+
+    it("notBetween generates NOT BETWEEN", () => {
+      // Mirrors Rails: not_between renders as `(col < begin OR col > end)`.
+      expect(users.project(star).where(users.get("age").notBetween(18, 65)).toSql()).toBe(
+        'SELECT * FROM "users" WHERE ("users"."age" < 18 OR "users"."age" > 65)',
       );
     });
   });
