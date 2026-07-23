@@ -92,6 +92,10 @@ interface CalculationRelation {
   _isDistinct: boolean;
   _groupColumns: string[];
   _whereClause: { isContradiction(): boolean };
+  /** Mirrors `Relation#having_clause`; grouped calculations ride the relation's own arel. */
+  havingClause: { isEmpty(): boolean; ast: Nodes.Node };
+  /** Mirrors `Relation#select_values`; folded into a grouped projection when HAVING is present. */
+  selectValues: (string | symbol | Nodes.Node)[];
   _ctes: Array<{ name: string; expression: Nodes.Node; recursive: boolean }>;
   _applyJoinsToManager(manager: any, eagerJd?: JoinDependency): void;
   _applyWheresToManager(manager: any, table: any): void;
@@ -463,6 +467,24 @@ async function singleAggregate(
   return castAggValue(val, fn, colType, coerceNumeric);
 }
 
+/**
+ * Rails' `execute_grouped_calculation` builds the grouped query from the
+ * relation's own arel, so `having_clause` rides along (calculations.rb:553-556),
+ * and folds the relation's own `select_values` into the projection whenever the
+ * having clause is non-empty (calculations.rb:542) — that is what makes an
+ * aliased select (`select("MIN(x) AS min_x").having("min_x > 50")`) referencable
+ * from HAVING. Our arms project explicitly rather than reusing `build_arel`, so
+ * both steps are applied here.
+ * @internal
+ */
+function applyHavingToManager(rel: CalculationRelation, manager: any): void {
+  const having = rel.havingClause;
+  if (having.isEmpty()) return;
+  const extraSelects = arelColumns.call(rel as never, rel.selectValues as never[]) as Nodes.Node[];
+  if (extraSelects.length > 0) manager.project(...extraSelects);
+  manager.having(having.ast);
+}
+
 async function groupedAggregate(
   rel: CalculationRelation,
   fn: AggFn,
@@ -521,6 +543,7 @@ async function groupedAggregate(
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
   for (const n of groupNodes) manager.group(n);
+  applyHavingToManager(rel, manager);
   // Rails `execute_grouped_calculation` runs `select_all` on the relation's own
   // arel, which retains order_values — without the ORDER BY, LIMIT/OFFSET pick
   // arbitrary groups on PG/MySQL.
@@ -664,6 +687,7 @@ async function groupedCompositeAssoc(
   rel._applyWheresToManager(manager, table);
   applyFromToManager(rel, manager);
   for (const n of groupNodes) manager.group(n);
+  applyHavingToManager(rel, manager);
 
   if (rel._limitValue !== null) manager.take(rel._limitValue);
   if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
