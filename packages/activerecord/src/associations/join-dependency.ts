@@ -843,6 +843,7 @@ export class JoinDependency {
     parent: JoinPart,
     child: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
+    tracker: AliasTracker,
   ): void {
     if (child.throughGroup) {
       this._resolveThroughGroup(parent, child.throughGroup, joinType);
@@ -883,7 +884,7 @@ export class JoinDependency {
     const referenced = this._references.get(child.immediateAssocName);
     const lookupName = referenced ?? child.tableName;
     const parentTableName = (parent.baseKlass as any)?.tableName ?? (parent as any).table;
-    const alias = this._aliasTracker.aliasNameForTable(lookupName, () =>
+    const alias = tracker.aliasNameForTable(lookupName, () =>
       child.reflection.aliasCandidate(parentTableName),
     );
     this._rebuildChildJoin(parent, child, alias ?? lookupName);
@@ -1076,7 +1077,11 @@ export class JoinDependency {
     child: JoinPart,
     joinType: typeof Nodes.InnerJoin | typeof Nodes.OuterJoin,
   ): Nodes.Join[] {
-    this._resolveChildAlias(parent, child, joinType);
+    // Rails passes the `alias_tracker` attr_reader into
+    // `child.join_constraints(..., alias_tracker)` (join_dependency.rb:193);
+    // `_resolveChildAlias` is our emit-time port of that call's aliasing
+    // block, so thread the same reader through it.
+    this._resolveChildAlias(parent, child, joinType, this.aliasTracker);
     const joins: Nodes.Join[] = [];
     const arelJoin = child.arelJoin;
     if (arelJoin) {

@@ -12,19 +12,5 @@
     "rubyName": "scope",
     "call": "last_scope_chain",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/disable-joins-association-scope.ts",
-    "rubyName": "scope",
-    "call": "unscoped",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/disable-joins-association-scope.ts",
-    "rubyName": "scope",
-    "call": "alias_tracker",
-    "reason": "Rails builds/reads the tracker via Relation#alias_tracker; trails constructs it through its own path at this site (AliasTracker.create / buildMergedJoinAliasTracker / stored _aliasTracker). Routing these sites through the converged Relation#aliasTracker is tracked in story alias-tracker-callsites-bypass-relation-alias-tracker (RFC 0032)."
   }
 ]

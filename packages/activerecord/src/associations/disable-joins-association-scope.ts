@@ -1,3 +1,4 @@
+import type { AliasTracker } from "./alias-tracker.js";
 import {
   AssociationScope,
   ReflectionProxy,
@@ -117,8 +118,17 @@ export class DisableJoinsAssociationScope extends AssociationScope {
     // never cross an `await` boundary, or Promise/A+ unwraps it via
     // the Relation thenable (`.then` → `toArray`). Build sync, box,
     // return the box.
+    // Rails: `unscoped = association.klass.unscoped` then
+    // `get_chain(source_reflection, association, unscoped.alias_tracker)`
+    // (disable_joins_association_scope.rb:9-10) — the tracker comes from the
+    // converged `Relation#aliasTracker` (relation.rb:1307-1309). DJAS never
+    // emits joins, so the tracker only names repeat-visit `ReflectionProxy`
+    // aliased tables during the chain walk.
+    const unscoped = klass.unscoped() as { aliasTracker: () => AliasTracker };
     return DisableJoinsAssociationRelation.deferred(klass, async () => {
-      const reverseChain = this.getChain(sourceReflection).slice().reverse();
+      const reverseChain = this.getChain(sourceReflection, unscoped.aliasTracker())
+        .slice()
+        .reverse();
       const [lastReflection, lastOrdered, lastJoinIds] = await this._lastScopeChain(
         reverseChain,
         owner,

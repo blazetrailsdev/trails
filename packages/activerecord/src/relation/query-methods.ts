@@ -33,7 +33,7 @@ import { sanitizeLimit } from "../connection-adapters/abstract/database-statemen
 import { columnNameWithOrderMatcher as abstractOrderMatcher } from "../connection-adapters/abstract/sql-formatting.js";
 import { JoinDependency } from "../associations/join-dependency.js";
 import type { AliasTracker } from "../associations/alias-tracker.js";
-import { buildMergedJoinAliasTracker } from "./merged-join-alias-tracker.js";
+import { seedJoinClauseAliases } from "./merged-join-alias-tracker.js";
 import { threadedConnectionFor } from "../connection-handling.js";
 import { wrapWithScopeProxy } from "./delegation.js";
 import { foreignKey } from "@blazetrails/activesupport";
@@ -197,6 +197,9 @@ interface QueryMethodsHost {
   // are read-only getters derived from it via `_isNamedJoinValue`.
   _joinsValues: (AssociationSpec | string | Nodes.Join)[];
   joinsValues: (AssociationSpec | string | Nodes.Join)[];
+  // Converged Rails `Relation#alias_tracker(joins, aliases)` (relation.rb:1307);
+  // `buildJoins` reads it to build the shared `build_joins` tracker.
+  aliasTracker(joins?: Nodes.Node[], aliases?: Map<string, number>): AliasTracker;
   _isNamedJoinValue(v: unknown): boolean;
   readonly _joinValues: (string | Nodes.Join)[];
   _leftOuterJoinsValues: AssociationSpec[];
@@ -2953,6 +2956,19 @@ export interface JoinEmissionPlan {
   namedJoins: AssociationSpec[];
   /** Tracker threaded in from `build_from`; absent on the live path. */
   aliases?: AliasTracker;
+  /**
+   * The shared tracker, built by the caller via the converged
+   * `Relation#aliasTracker(leading_joins + join_nodes, aliases)`
+   * (query_methods.rb:1894) and seeded with the resolved `_joinClauses`
+   * tables (`seedJoinClauseAliases`). A memoized thunk, not an instance:
+   * Rails only builds `alias_tracker` inside the
+   * `unless named_joins.empty? && stashed_joins.empty?` guard
+   * (query_methods.rb:1893), so a relation with no join dependencies to emit
+   * must never touch it — `Relation#aliasTracker` reads
+   * `model.connectionPool()`, which raises `ConnectionNotDefined` on a
+   * connectionless model.
+   */
+  tracker: () => AliasTracker;
 }
 
 /**
@@ -2987,18 +3003,24 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
 
   // One AliasTracker shared across every JoinDependency, mirroring Rails' single
   // `build_joins` `alias_tracker(leading_joins + join_nodes, aliases)`
-  // (query_methods.rb:1891). Seeding it with the leading-join + join-node tables
-  // means a JoinDependency joining a table already claimed by a leading/raw join
-  // node is re-aliased to its `alias_candidate`. Each dependency claims and
-  // aliases its tables lazily at emit-time in `makeConstraints`, so threading
-  // this one tracker through every `joinConstraints` makes a merged join onto an
-  // already-joined table collide and alias. `plan.aliases` is the tracker
-  // threaded in from `build_from` (Rails' `aliases` argument), folded in below.
-  const sharedTracker = buildMergedJoinAliasTracker(
-    this as any,
-    [...plan.leadingJoins, ...plan.joinNodes],
-    plan.aliases?.aliases,
-  );
+  // (query_methods.rb:1891). Built by the caller (`buildJoins` /
+  // `_applyJoinsToManager`, the two halves of the `build_joins` split) via the
+  // converged `Relation#aliasTracker` and threaded in on the plan. Seeding it
+  // with the leading-join + join-node tables means a JoinDependency joining a
+  // table already claimed by a leading/raw join node is re-aliased to its
+  // `alias_candidate`. Each dependency claims and aliases its tables lazily at
+  // emit-time in `makeConstraints`, so threading this one tracker through every
+  // `joinConstraints` makes a merged join onto an already-joined table collide
+  // and alias. `plan.aliases` is the tracker threaded in from `build_from`
+  // (Rails' `aliases` argument), whose counts the caller folded in. Invoked
+  // lazily (see JoinEmissionPlan#tracker) only where a JoinDependency emits;
+  // `trackerWasBuilt` records that a forcing site actually ran, gating the
+  // aliases writeback below.
+  let trackerWasBuilt = false;
+  const sharedTracker = (): AliasTracker => {
+    trackerWasBuilt = true;
+    return plan.tracker();
+  };
   const references = (this as any)._aliasableReferences();
 
   // Rails build_joins (query_methods.rb:1881-1897) emits ALL named association
@@ -3048,7 +3070,7 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
         : ([[] as AssociationSpec[], Nodes.InnerJoin] as const);
   if (namedJoins.length > 0 || plan.stashedJoins.length > 0) {
     const jd = constructJoinDependency.call(this, namedJoins, joinType);
-    for (const node of jd.joinConstraints(plan.stashedJoins, sharedTracker, references))
+    for (const node of jd.joinConstraints(plan.stashedJoins, sharedTracker(), references))
       manager.appendJoinNode(node);
   }
 
@@ -3056,13 +3078,13 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // same shared tracker, so a join onto an already-joined table aliases at
   // emit-time in makeConstraints (`authors_categorizations`).
   for (const jd of this._namedInnerJoinDeps) {
-    for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
+    for (const node of jd.joinConstraints([], sharedTracker())) manager.appendJoinNode(node);
   }
 
   // Cross-klass merged left-outer JoinDependencies (Rails merge_outer_joins):
   // emitted against the same shared tracker.
   for (const jd of this._leftOuterJoinDeps) {
-    for (const node of jd.joinConstraints([], sharedTracker)) manager.appendJoinNode(node);
+    for (const node of jd.joinConstraints([], sharedTracker())) manager.appendJoinNode(node);
   }
 
   // Rails' single `buckets[:join_node]` array is populated raw joins_values Join
@@ -3082,8 +3104,15 @@ export function emitJoinPlan(this: QueryMethodsHost, manager: any, plan: JoinEmi
   // source and a sibling explicit `:post` join in the SAME outer JoinDependency
   // would both re-alias `posts` to the same candidate and collide — the outer
   // tracker must learn what the nested scope build already claimed.
-  if (plan.aliases) {
-    for (const [name, count] of sharedTracker.aliases) {
+  // Only when a JoinDependency emission actually forced the tracker: Rails'
+  // `build_joins` skips `alias_tracker` entirely when the
+  // `named_joins.empty? && stashed_joins.empty?` guard fails, even with
+  // `aliases` supplied (query_methods.rb:1893) — a joinless nested
+  // `join_scope.arel(aliases)` build claims nothing in the caller's hash, and
+  // forcing the thunk here would re-open the `connectionPool()` raise on a
+  // connectionless model that the lazy tracker exists to avoid.
+  if (plan.aliases && trackerWasBuilt) {
+    for (const [name, count] of sharedTracker().aliases) {
       if (count > (plan.aliases.aliases.get(name) ?? 0)) plan.aliases.aliases.set(name, count);
     }
   }
@@ -3105,12 +3134,29 @@ export function buildJoins(this: QueryMethodsHost, arel: any, aliases?: AliasTra
   // Subquery path: buckets fold eager into stashed_join. Delegate emission to
   // the shared `build_joins` port.
   const buckets = buildJoinBuckets.call(this);
+  const leadingJoins = buckets.leading_join as Nodes.Join[];
+  const joinNodes = buckets.join_node as Nodes.Join[];
+  // Rails: `alias_tracker = alias_tracker(leading_joins + join_nodes, aliases)`
+  // (query_methods.rb:1894) — the converged `Relation#aliasTracker`, built
+  // lazily behind the same `unless named_joins.empty? && stashed_joins.empty?`
+  // guard Rails builds it under (see JoinEmissionPlan#tracker). The
+  // `_joinClauses` seeding is trails-only compensation for raw join clauses
+  // living outside `joins_values` (see merged-join-alias-tracker.ts).
+  let memoTracker: AliasTracker | undefined;
+  const tracker = (): AliasTracker => {
+    if (!memoTracker) {
+      memoTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
+      seedJoinClauseAliases(this, memoTracker);
+    }
+    return memoTracker;
+  };
   emitJoinPlan.call(this, arel, {
-    leadingJoins: buckets.leading_join as Nodes.Join[],
-    joinNodes: buckets.join_node as Nodes.Join[],
+    leadingJoins,
+    joinNodes,
     stashedJoins: buckets.stashed_join as JoinDependency[],
     namedJoins: buckets.named_join as AssociationSpec[],
     aliases,
+    tracker,
   });
 }
 

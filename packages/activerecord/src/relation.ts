@@ -70,6 +70,7 @@ import {
   type OrderArg,
 } from "./relation/query-methods.js";
 import * as _qm from "./relation/query-methods.js";
+import { seedJoinClauseAliases } from "./relation/merged-join-alias-tracker.js";
 import {
   Batches,
   ensureValidOptionsForBatchingBang as _ensureValidOptionsForBatchingBang,
@@ -3325,6 +3326,23 @@ export class Relation<T extends Base> {
     // a CTE symbol, already routed into `joinNodes` above. Rails returns early there
     // too (`buckets[:named_join] = left_joins` with an empty `left_joins`); the
     // empty-named early return emits the same SQL as the stash-fold path.
+    // Rails: `alias_tracker = alias_tracker(leading_joins + join_nodes, aliases)`
+    // (query_methods.rb:1894) — the converged `Relation#aliasTracker`, built
+    // once here (this method is the live-path half of the `build_joins` split)
+    // and threaded through either emit below. Lazy behind the same
+    // `unless named_joins.empty? && stashed_joins.empty?` guard Rails builds it
+    // under (see JoinEmissionPlan#tracker) — a joinless relation on a
+    // connectionless model must not touch `connectionPool()`. The
+    // `_joinClauses` seeding is trails-only compensation for raw join clauses
+    // living outside `joins_values` (see merged-join-alias-tracker.ts).
+    let memoTracker: AliasTracker | undefined;
+    const tracker = (): AliasTracker => {
+      if (!memoTracker) {
+        memoTracker = this.aliasTracker([...leadingJoins, ...joinNodes], aliases?.aliases);
+        seedJoinClauseAliases(this as any, memoTracker);
+      }
+      return memoTracker;
+    };
     if (pureLeftOuter && this._leftOuterJoinsValues.length > 0) {
       _qm.emitJoinPlan.call(this as any, manager, {
         leadingJoins,
@@ -3332,6 +3350,7 @@ export class Relation<T extends Base> {
         stashedJoins: [...leftStashed],
         namedJoins: leftAssociations as any,
         aliases,
+        tracker,
       });
       return;
     }
@@ -3356,6 +3375,7 @@ export class Relation<T extends Base> {
       stashedJoins,
       namedJoins: [],
       aliases,
+      tracker,
     });
   }
 
