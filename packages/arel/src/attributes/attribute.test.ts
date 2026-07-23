@@ -1247,7 +1247,9 @@ describe("AttributeTest", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("id").gtAny([1, 2]));
-      expect(mgr.toSql()).toContain("OR");
+      expect(mgr.toSql()).toBe(
+        `SELECT "users"."id" FROM "users" WHERE ("users"."id" > 1 OR "users"."id" > 2)`,
+      );
     });
   });
 
@@ -1261,7 +1263,9 @@ describe("AttributeTest", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("id").notEqAll([1, 2]));
-      expect(mgr.toSql()).toContain("AND");
+      expect(mgr.toSql()).toBe(
+        `SELECT "users"."id" FROM "users" WHERE ("users"."id" != 1 AND "users"."id" != 2)`,
+      );
     });
   });
 
@@ -1275,7 +1279,9 @@ describe("AttributeTest", () => {
       const relation = new Table("users");
       const mgr = relation.project(relation.get("id"));
       mgr.where(relation.get("id").notEqAny([1, 2]));
-      expect(mgr.toSql()).toContain("OR");
+      expect(mgr.toSql()).toBe(
+        `SELECT "users"."id" FROM "users" WHERE ("users"."id" != 1 OR "users"."id" != 2)`,
+      );
     });
   });
 });
