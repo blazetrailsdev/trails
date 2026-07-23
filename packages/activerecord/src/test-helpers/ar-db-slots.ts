@@ -1,8 +1,10 @@
 /**
  * Advisory-slot pool sizing for the parallel AR DB test harness.
  *
- * `AR_DB_FORKS` is the vitest worker count (it drives `maxForks` in
- * vitest.config.ts). The advisory-lock **slot pool** — the set of per-worker
+ * `AR_DB_FORKS` is the requested vitest worker count (vitest.config.ts feeds it
+ * into `maxForks`, clamped down to the host's `numCpus - 1` ceiling — so a
+ * value above that ceiling only over-provisions this pool). The advisory-lock
+ * **slot pool** — the set of per-worker
  * slot DBs provisioned by globalSetup and claimed by each worker in
  * test-setup-worker-db.ts — is sized SEPARATELY, with headroom over the worker
  * count, so a worker that vitest recycles in between files always finds a free
