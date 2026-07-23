@@ -909,7 +909,10 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
    * enrich it with the referenced column's type via an async columns() call.
    */
   private async _translateAndEnrich(e: unknown, sql: string, binds: unknown[]): Promise<Error> {
-    let translated = this._translateException(e, sql, binds);
+    let translated: Error = this._translateException(e, sql, binds);
+    if (translated instanceof MismatchedForeignKey) {
+      translated = translated.setQuery(sql, binds);
+    }
     if (translated instanceof MismatchedForeignKey) {
       translated = await this._enrichMismatchedForeignKey(translated);
     }
@@ -1316,9 +1319,11 @@ export class Mysql2Adapter extends AbstractMysqlAdapter implements DatabaseAdapt
           // The loop already translated for its retry classification; guard
           // against re-translating an ActiveRecordError (see execute()).
           const translated =
-            e instanceof ActiveRecordError
-              ? e
-              : await this._translateAndEnrich(e, driverSql, driverBinds);
+            e instanceof MismatchedForeignKey
+              ? await this._translateAndEnrich(e.cause ?? e, driverSql, driverBinds)
+              : e instanceof ActiveRecordError
+                ? e
+                : await this._translateAndEnrich(e, driverSql, driverBinds);
           throw translated;
         }
       });
