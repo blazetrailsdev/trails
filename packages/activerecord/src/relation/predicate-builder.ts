@@ -218,30 +218,37 @@ export class PredicateBuilder {
       }
       return this.groupingQueries(queryGroups);
     }
-    // Through: delegate with the associated model's primary key (Rails: through_association? path).
+    // Through: bare recursion on the associated builder with the associated
+    // model's primary key (Rails predicate_builder.rb:110-113 — `next
+    // associated_table.predicate_builder.expand_from_hash(primary_key =>
+    // value)`). No value pre-normalization (the recursion's column arm coerces
+    // records/arrays/relations) and no wrapping — `next` inside `flat_map`
+    // splices the predicates flat, keeping each one addressable for
+    // `WhereClause#extract_attributes` / `rewhere`.
     if (associatedTable.isThroughAssociation?.()) {
       const rawPk = associatedTable.klass?.primaryKey ?? "id";
-      if (Array.isArray(rawPk)) {
-        throw new Error(
-          "Through-association with composite primary key is not yet supported (Slot B). " +
-            "Use explicit FK conditions instead.",
-        );
-      }
-      // Normalize value through AssociationQueryValue so records are coerced to their PKs,
-      // arrays of records become id lists, and Relations become subqueries — matching Rails'
-      // build() which does `value = value.id if value.respond_to?(:id)` before dispatching.
-      const normalizedQueries = new AssociationQueryValue(
-        { joinForeignKey: rawPk, joinPrimaryKey: rawPk },
-        value,
-      ).queries();
       const assocPb: PredicateBuilder = associatedTable.predicateBuilder;
-      const queryGroups: Nodes.Node[][] = [];
-      for (const query of normalizedQueries) {
-        const inner = assocPb.expandFromHash(query);
-        if (inner.length === 0) continue;
-        queryGroups.push(inner);
+      if (Array.isArray(rawPk)) {
+        // Composite PK: JS object keys can't be arrays, so mirror the array-key
+        // branch of Rails' expand_from_hash inline (predicate_builder.rb:92-97):
+        // one recursion per ids tuple, zipped against the key columns, then
+        // grouping_queries.
+        const values = Array.isArray(value) ? value : [value];
+        const queryGroups: Nodes.Node[][] = values.map((idsSet) => {
+          if (!Array.isArray(idsSet)) {
+            throw argumentError(
+              `Expected corresponding value for [${rawPk.join(", ")}] to be an Array`,
+            );
+          }
+          const zipped: Record<string, unknown> = {};
+          rawPk.forEach((col, i) => {
+            zipped[col] = idsSet[i];
+          });
+          return assocPb.expandFromHash(zipped);
+        });
+        return assocPb.groupingQueries(queryGroups);
       }
-      return this.groupingQueries(queryGroups);
+      return assocPb.expandFromHash({ [rawPk]: value });
     }
     // Core non-polymorphic, non-through path.
     const queries = new AssociationQueryValue(associatedTable, value).queries();
