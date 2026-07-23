@@ -140,10 +140,11 @@ describe("TestDestroyAsPartOfAutosaveAssociation", () => {
     const { Pirate, Ship } = makePirateShip();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
-    ship.name = "Black Pearl";
+    ship.name = "NewName";
     cacheAssoc(pirate, "ship", ship);
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    expect(await pirate.save()).toBeTruthy();
+    const reloaded = await Ship.find(ship.id);
+    expect(reloaded.name).toBe("NewName");
   });
 
   it("should not save changed has one unchanged object if child is saved", async () => {
@@ -909,21 +910,29 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("build via block before save", async () => {
+    // Rails: first_firm has 2 existing clients_of_firm; building one more
+    // via block makes assert_equal 3 after save + reload.
     const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const client = new Client({ name: "Block" });
+    const company = await Company.create({ name: "Acme" });
+    await Client.create({ name: "Summit", client_of: company.id });
+    await Client.create({ name: "Microsoft", client_of: company.id });
+    const client = new Client({ name: "Another Client" });
     cacheAssoc(company, "clients", [client]);
-    await company.save();
-    expect(client.isNewRecord()).toBe(false);
+    expect(await company.save()).toBeTruthy();
+    expect(client.isPersisted()).toBeTruthy();
+    expect(Number(await Client.where({ client_of: company.id }).count())).toBe(3);
   });
 
   it("build many via block before save", async () => {
+    // Rails: 2 existing clients_of_firm + 2 built via block = assert_equal 4.
     const { Company, Client } = makeModels();
-    const company = new Company({ name: "Acme" });
-    const clients = [new Client({ name: "X" }), new Client({ name: "Y" })];
+    const company = await Company.create({ name: "Acme" });
+    await Client.create({ name: "Summit", client_of: company.id });
+    await Client.create({ name: "Microsoft", client_of: company.id });
+    const clients = [new Client({ name: "changed" }), new Client({ name: "changed" })];
     cacheAssoc(company, "clients", clients);
-    await company.save();
-    clients.forEach((c) => expect(c.isNewRecord()).toBe(false));
+    expect(await company.save()).toBeTruthy();
+    expect(Number(await Client.where({ client_of: company.id }).count())).toBe(4);
   });
 
   it("collection-proxy build without load autosaves built children (Slot B)", async () => {
@@ -957,13 +966,15 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
   });
 
   it("replace on duplicated object", async () => {
+    // Rails: firm.clients = [existing client, Client.new] → assert_equal 2
+    // clients after save + reload.
     const { Company, Client } = makeModels();
     const company = await Company.create({ name: "Acme" });
     const c1 = await Client.create({ name: "Orig", client_of: company.id });
-    const c2 = new Client({ name: "Dup" });
-    cacheAssoc(company, "clients", [c2]);
-    await company.save();
-    expect(c2.isNewRecord()).toBe(false);
+    const c2 = new Client({ name: "New Client" });
+    cacheAssoc(company, "clients", [c1, c2]);
+    expect(await company.save()).toBeTruthy();
+    expect(Number(await Client.where({ client_of: company.id }).count())).toBe(2);
   });
 
   it("should not load the associated model", async () => {
@@ -1613,8 +1624,10 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it("should still work without an associated model", async () => {
     const { Pirate } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const saved = await pirate.save();
-    expect(saved).toBe(true);
+    pirate.catchphrase = "Arr";
+    await pirate.save();
+    const reloaded = await Pirate.find(pirate.id);
+    expect(reloaded.catchphrase).toBe("Arr");
   });
 
   it("should automatically save the associated model", async () => {
@@ -1640,10 +1653,12 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
   it("should automatically save bang the associated model", async () => {
     const { Pirate, Ship } = makeModels();
     const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "Jolly Roger" });
+    const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
+    ship.name = "The Vile Serpent";
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
-    expect(ship.isNewRecord()).toBe(false);
+    const reloaded = await Ship.find(ship.id);
+    expect(reloaded.name).toBe("The Vile Serpent");
   });
 
   it("should automatically save bang the associated model if it sets the inverse record", async () => {
@@ -2371,8 +2386,10 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
   it("should still work without an associated model", async () => {
     const { Ship } = makeModels();
     const ship = await Ship.create({ name: "Pearl" });
-    const saved = await ship.save();
-    expect(saved).toBe(true);
+    ship.name = "The Vile Serpent";
+    await ship.save();
+    const reloaded = await Ship.find(ship.id);
+    expect(reloaded.name).toBe("The Vile Serpent");
   });
 
   it("should automatically save the associated model", async () => {
@@ -2387,11 +2404,13 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
 
   it("should automatically save bang the associated model", async () => {
     const { Pirate, Ship } = makeModels();
-    const pirate = new Pirate({ catchphrase: "Ahoy" });
-    const ship = new Ship({ name: "Rover" });
+    const pirate = await Pirate.create({ catchphrase: "Yarr" });
+    const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
+    pirate.catchphrase = "Arr";
     cacheAssoc(ship, "pirate", pirate);
     await ship.save();
-    expect(pirate.isNewRecord()).toBe(false);
+    const reloaded = await Pirate.find(pirate.id);
+    expect(reloaded.catchphrase).toBe("Arr");
   });
 
   it("should automatically validate the associated model", async () => {
@@ -3451,8 +3470,8 @@ describe("TestAutosaveAssociationsInGeneral", () => {
     cacheAssoc(ship, "prisoners", [prisoner]);
     cacheAssoc(prisoner, "ship", ship);
 
-    expect(await ship.isValid()).toBe(false);
-    expect(ship.errors.where("name")).toHaveLength(1);
+    expect(await ship.isValid()).toBeFalsy();
+    expect(ship.errors.where("name").length).toBe(1);
   });
 });
 
