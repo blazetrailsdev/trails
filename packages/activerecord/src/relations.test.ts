@@ -1415,6 +1415,9 @@ describe("RelationTest", () => {
     await assertQueriesCount(1, false, async () => {
       expect(await postsRel.isNone((p) => (p.id as number) < 0)).toBe(true);
       expect(await postsRel.isNone((p) => p.id === 1)).toBe(false);
+
+      expect(await postsRel.isNone(Comment)).toBe(true);
+      expect(await postsRel.isNone(Post)).toBe(false);
     });
 
     expect(postsRel.isLoaded).toBe(true);

@@ -6226,11 +6226,17 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#none?
    */
-  async isNone(predicate?: (record: T) => boolean): Promise<boolean> {
+  async isNone(
+    pattern?: ((record: T) => boolean) | (new (...args: never[]) => Base),
+  ): Promise<boolean> {
     if (this._isEmptyRelation()) return true;
-    if (predicate !== undefined) {
+    if (pattern !== undefined) {
       const records = await this.toArray();
-      return !records.some(predicate);
+      if ((pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true) {
+        const klass = pattern as new (...args: never[]) => Base;
+        return !records.some((record) => record instanceof klass);
+      }
+      return !records.some(pattern as (record: T) => boolean);
     }
     return this.isEmpty();
   }
