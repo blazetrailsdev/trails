@@ -1660,6 +1660,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
       ? `${this.pg.quoteIdentifier(schema)}.${this.pg.quoteIdentifier(enumName)}`
       : this.pg.quoteIdentifier(enumName);
     await this.pg.exec(`ALTER TYPE ${qualifiedName} RENAME TO ${this.pg.quoteIdentifier(newName)}`);
+    // Mirrors Rails rename_enum: `exec_query(...).tap { reload_type_map }`
+    // (postgresql_adapter.rb:584).
+    await this.pg.reloadTypeMap();
   }
 
   async addEnumValue(
@@ -1684,6 +1687,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.pg.exec(
       `ALTER TYPE ${qualifiedName} ADD VALUE${ifNotExists} ${this.pg.quoteLiteral(value)}${position}`,
     );
+    // Mirrors Rails add_enum_value: `exec_query(...).tap { reload_type_map }`
+    // (postgresql_adapter.rb:602).
+    await this.pg.reloadTypeMap();
   }
 
   async renameEnumValue(name: string, options: { from: string; to: string }): Promise<void> {
@@ -1694,6 +1700,9 @@ export class PostgreSQLSchemaStatements extends SchemaStatements {
     await this.pg.exec(
       `ALTER TYPE ${qualifiedName} RENAME VALUE ${this.pg.quoteLiteral(options.from)} TO ${this.pg.quoteLiteral(options.to)}`,
     );
+    // Mirrors Rails rename_enum_value: `exec_query(...).tap { reload_type_map }`
+    // (postgresql_adapter.rb:614-616).
+    await this.pg.reloadTypeMap();
   }
 
   // ---------------------------------------------------------------------------
