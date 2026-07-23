@@ -495,10 +495,17 @@ export abstract class Store {
     return pattern;
   }
 
-  protected namespaceKey(key: string, options?: StoreOptions): string {
-    const ns = options?.namespace ?? this.options.namespace;
-    const namespace =
-      typeof ns === "function" ? (ns as () => string)() : (ns as string | undefined);
+  /** Mirrors Rails `Cache::Store#namespace_key` (cache.rb:948-968): a per-call
+   * `:namespace` key wins even when its value is nil (`call_options&.key?`,
+   * not a nil-coalescing fallback), and callable namespaces are invoked.
+   * Rails' UTF-8 re-encoding of the key has no JS analogue. */
+  protected namespaceKey(key: string, callOptions?: StoreOptions): string {
+    let ns =
+      callOptions && "namespace" in callOptions ? callOptions.namespace : this.options.namespace;
+    if (typeof ns === "function") {
+      ns = (ns as () => string)();
+    }
+    const namespace = ns as string | null | undefined;
     return namespace ? `${namespace}:${key}` : key;
   }
 

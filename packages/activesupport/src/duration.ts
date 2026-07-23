@@ -36,6 +36,10 @@ const PART_ORDER: (keyof DurationParts)[] = [
   "seconds",
 ];
 
+// Mirrors Rails VARIABLE_PARTS (duration.rb:131): the calendar units whose
+// wall-clock length varies (DST, month/year length).
+const VARIABLE_PARTS: (keyof DurationParts)[] = ["years", "months", "weeks", "days"];
+
 function zeroParts(): DurationParts {
   return { years: 0, months: 0, weeks: 0, days: 0, hours: 0, minutes: 0, seconds: 0 };
 }
@@ -50,8 +54,15 @@ function mergeParts(a: DurationParts, b: DurationParts): DurationParts {
 
 export class Duration {
   readonly parts: DurationParts;
+  private readonly _variable: boolean;
 
-  constructor(parts: Partial<DurationParts> = {}) {
+  // Mirrors Rails `Duration#initialize(value, parts, variable = nil)`
+  // (duration.rb:226-234). Deviations: trails carries no separate `@value`
+  // (totals derive from `parts` via inSeconds()), and `parts` stays a full
+  // fixed record instead of Rails' zero-rejected sparse hash — the nonzero
+  // filter in the `variable` computation below stands in for
+  // `@parts.reject! { |k, v| v.zero? }`.
+  constructor(parts: Partial<DurationParts> = {}, variable: boolean | null = null) {
     this.parts = {
       years: parts.years ?? 0,
       months: parts.months ?? 0,
@@ -61,6 +72,7 @@ export class Duration {
       minutes: parts.minutes ?? 0,
       seconds: parts.seconds ?? 0,
     };
+    this._variable = variable ?? VARIABLE_PARTS.some((part) => this.parts[part] !== 0);
   }
 
   // ---------------------------------------------------------------------------
@@ -261,14 +273,10 @@ export class Duration {
     return klass === Duration || this instanceof (klass as any);
   }
 
-  // variable? — true when duration contains calendar units (days, weeks, months, years)
+  /** Mirrors Rails `Duration#variable?` (duration.rb:477-479): reads the
+   * `@variable` flag computed (or passed) at construction. */
   isVariable(): boolean {
-    return (
-      this.parts.years !== 0 ||
-      this.parts.months !== 0 ||
-      this.parts.weeks !== 0 ||
-      this.parts.days !== 0
-    );
+    return this._variable;
   }
 
   // ISO 8601 output

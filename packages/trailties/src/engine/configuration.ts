@@ -55,13 +55,13 @@ export class EngineConfiguration extends RailtieConfiguration {
   paths(): Root {
     if (this._paths) return this._paths;
     const paths = new Root(this._root);
-    paths.add("app", { glob: "{*,*/concerns}" });
+    paths.add("app", { eagerLoad: true, glob: "{*,*/concerns}" });
     paths.add("app/assets", { glob: "*" });
-    paths.add("app/controllers");
-    paths.add("app/channels");
-    paths.add("app/helpers");
-    paths.add("app/models");
-    paths.add("app/mailers");
+    paths.add("app/controllers", { eagerLoad: true });
+    paths.add("app/channels", { eagerLoad: true });
+    paths.add("app/helpers", { eagerLoad: true });
+    paths.add("app/models", { eagerLoad: true });
+    paths.add("app/mailers", { eagerLoad: true });
     paths.add("app/views");
     paths.add("lib", { loadPath: true });
     paths.add("lib/assets", { glob: "*" });
@@ -95,8 +95,11 @@ export class EngineConfiguration extends RailtieConfiguration {
   allAutoloadOncePaths(): string[] {
     return [...this.autoloadOncePaths];
   }
-  /** @internal */
-  allEagerLoadPaths(): string[] {
-    return [...this.eagerLoadPaths];
+  /** Mirrors Rails `all_eager_load_paths` (engine/configuration.rb:133-135):
+   * `eager_load_paths + paths.eager_load`. Async because trails'
+   * `Paths::Root#eagerLoad` resolves existent paths via async fs.
+   * @internal */
+  async allEagerLoadPaths(): Promise<string[]> {
+    return [...this.eagerLoadPaths, ...(await this.paths().eagerLoad())];
   }
 }

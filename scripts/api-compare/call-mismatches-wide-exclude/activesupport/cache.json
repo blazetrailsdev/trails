@@ -88,14 +88,14 @@
     "tsFile": "cache.ts",
     "rubyName": "namespace_key",
     "call": "call",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cache.rb:948-968 supports per-call :namespace overrides (call_options.key?) and callable namespaces (namespace.call); trails cache/entry-record.ts:19-21 namespaceKey takes an already-resolved string namespace — callers resolve options first, and callable namespaces are unported. Gap tracked in story activesupport-activemodel-omissions-from-wide-verify."
+    "reason": "Converged (RFC 0032): trails store.ts namespaceKey invokes callable namespaces via `ns = (ns as () => string)()` — a call expression on a local, which the extractor does not record as a named call."
   },
   {
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "namespace_key",
     "call": "key?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cache.rb:948-968 supports per-call :namespace overrides (call_options.key?) and callable namespaces (namespace.call); trails cache/entry-record.ts:19-21 namespaceKey takes an already-resolved string namespace — callers resolve options first, and callable namespaces are unported. Gap tracked in story activesupport-activemodel-omissions-from-wide-verify."
+    "reason": "Converged (RFC 0032): trails store.ts namespaceKey checks the per-call override with the `\"namespace\" in callOptions` operator — the JS spelling of Ruby's `key?`; the extractor sees no call."
   },
   {
     "package": "activesupport",

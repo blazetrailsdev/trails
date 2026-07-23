@@ -5,11 +5,12 @@ export interface PathOptions {
   with?: string | string[];
   glob?: string;
   loadPath?: boolean;
+  eagerLoad?: boolean;
 }
 
-// Port of railties/lib/rails/paths.rb. Autoload / eager-load APIs are
-// intentionally omitted (ESM + bundlers cover those concerns); only
-// load_path / load_paths are kept.
+// Port of railties/lib/rails/paths.rb. Autoload APIs are intentionally
+// omitted (ESM + bundlers cover those concerns); load_path / load_paths and
+// eager_load are kept.
 export class Root {
   path: string | null;
   _entries: Map<string, Path> = new Map();
@@ -38,6 +39,24 @@ export class Root {
     return Array.from(new Set(this._entries.values()));
   }
 
+  /** Mirrors Rails `Paths::Root#eager_load` (`filter_by(&:eager_load?)`,
+   * paths.rb): existent paths of eager-load entries, minus those claimed by a
+   * non-eager-load child entry. */
+  async eagerLoad(): Promise<string[]> {
+    const out: string[] = [];
+    for (const node of this.allPaths()) {
+      if (!node.isEagerLoad()) continue;
+      const paths = await node.existent();
+      const excluded = new Set<string>();
+      for (const child of node.children()) {
+        if (child.isEagerLoad()) continue;
+        for (const p of await child.existent()) excluded.add(p);
+      }
+      for (const p of paths) if (!excluded.has(p)) out.push(p);
+    }
+    return Array.from(new Set(out));
+  }
+
   async loadPaths(): Promise<string[]> {
     const out: string[] = [];
     for (const node of this.allPaths()) {
@@ -60,6 +79,7 @@ export class Path {
   private _current: string;
   private _root: Root;
   private _loadPath = false;
+  private _eagerLoad = false;
 
   constructor(root: Root, current: string, paths: string[], options: PathOptions = {}) {
     this._root = root;
@@ -67,6 +87,7 @@ export class Path {
     this._paths = [...paths];
     this.glob = options.glob;
     this._loadPath = !!options.loadPath;
+    this._eagerLoad = !!options.eagerLoad;
   }
 
   children(): Path[] {
@@ -81,6 +102,13 @@ export class Path {
   }
   isLoadPath(): boolean {
     return this._loadPath;
+  }
+
+  eagerLoadBang(): void {
+    this._eagerLoad = true;
+  }
+  isEagerLoad(): boolean {
+    return this._eagerLoad;
   }
 
   push(p: string): void {

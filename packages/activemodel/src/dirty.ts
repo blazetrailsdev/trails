@@ -108,9 +108,11 @@ export class DirtyTracker {
     this.snapshot(attributes);
   }
 
-  asJson(): Record<string, [unknown, unknown]> {
-    return this.changes;
-  }
+  // Rails `Dirty#as_json` (dirty.rb:264-268) exists only to hide the
+  // mutation-tracker ivars from Ruby's default serializer; trails
+  // `Model#asJson` serializes attributes via serializableHash and never sees
+  // the tracker, so that exclusion is inherent and no tracker-level asJson
+  // exists here.
 
   changesApplied(
     currentAttributes: Map<string, unknown> | { snapshotValues(): Map<string, unknown> },

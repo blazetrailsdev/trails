@@ -32,7 +32,11 @@ export class MemoryStore extends Store implements CacheStore {
   private data: Map<string, MemoryRecord> = new Map();
   private sizeLimit: number;
 
-  constructor(options?: { sizeLimit?: number; namespace?: string; expiresIn?: number }) {
+  constructor(options?: {
+    sizeLimit?: number;
+    namespace?: string | (() => string);
+    expiresIn?: number;
+  }) {
     super(options ?? {});
     this.sizeLimit = options?.sizeLimit ?? Infinity;
   }
