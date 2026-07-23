@@ -95,12 +95,8 @@ export class DeferredIdsNotIn extends Nodes.NotIn {
   }
 
   // Inherited NotIn#invert would build a plain In carrying only the
-  // display-fallback pk-select subquery, dropping literalIds/innerRelations —
-  // the load pipeline would never materialize the ids, and on MySQL the
-  // leftover `IN (SELECT ... LIMIT ...)` display shape is exactly what the
-  // marker exists to avoid. Nothing builds an inverted excluding marker today,
-  // but `WhereClause#invert` is the single negation mechanism (#5064), so any
-  // future invert of a merged/rewhere'd clause reaches here.
+  // display-fallback subquery and drop literalIds/innerRelations, so the load
+  // pipeline would never materialize the ids (see DeferredDistinctPkIn#invert).
   invert(): DeferredIdsIn {
     return new DeferredIdsIn(
       this.left as Nodes.Attribute,

@@ -21,13 +21,10 @@ describe("DeferredIdsNotIn inversion (trails)", () => {
   it("inverting a WhereClause containing the marker preserves the deferred ids", () => {
     const original = marker();
     const inverted = new WhereClause([original]).invert().predicates[0];
-    // Must not decay to a plain In: the load pipeline materializes only the
-    // marker classes, so a plain node would silently drop literalIds and
-    // innerRelations and leave the display-fallback subquery in the SQL.
     expect(inverted).toBeInstanceOf(DeferredIdsIn);
     const invertedMarker = inverted as DeferredIdsIn;
-    expect(invertedMarker.literalIds).toEqual([1, 2]);
-    expect(invertedMarker.innerRelations).toEqual(original.innerRelations);
+    expect(invertedMarker.literalIds).toBe(original.literalIds);
+    expect(invertedMarker.innerRelations).toBe(original.innerRelations);
     expect(invertedMarker.left).toBe(original.left);
     expect(invertedMarker.right).toBe(original.right);
   });
@@ -36,7 +33,7 @@ describe("DeferredIdsNotIn inversion (trails)", () => {
     const original = marker();
     const roundTripped = original.invert().invert();
     expect(roundTripped).toBeInstanceOf(DeferredIdsNotIn);
-    expect(roundTripped.literalIds).toEqual([1, 2]);
-    expect(roundTripped.innerRelations).toEqual(original.innerRelations);
+    expect(roundTripped.literalIds).toBe(original.literalIds);
+    expect(roundTripped.innerRelations).toBe(original.innerRelations);
   });
 });

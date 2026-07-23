@@ -4986,7 +4986,6 @@ export class Relation<T extends Base> {
         // (query_methods.rb:1587) — instead of hardcoding `NOT IN`, so the
         // materialized array shares the `where.not` array-negation logic
         // (e.g. the single-id `!=` collapse) rather than diverging.
-        // `DeferredIdsIn` (an inverted marker) stays positive: no `.invert()`.
         const built = this.predicateBuilder.build(attribute, ids);
         predicates[i] = node instanceof DeferredIdsNotIn ? built.invert() : built;
       }
