@@ -631,30 +631,30 @@ interface AttributeNamesHost {
  * declaration order.
  */
 export function attributeNames(this: AttributeNamesHost): string[] {
-  // Rails' `@attribute_names ||=` memo, per-class like a Ruby ivar: an own
-  // property only (a subclass never reads its parent's memo — Rails nils
-  // `@attribute_names` in `inherited`). Stamped with the STI base's
-  // `_schemaRevision` so the reset paths that clear `_columns`/`_columnsHash`
-  // (resetColumnInformation, applyColumnsHash) invalidate it — including
-  // subclass memos the base's reset can't reach — without extra bookkeeping.
-  const revision = this._schemaRevision ?? 0;
+  // Rails' `@attribute_names ||= ...freeze` memo, own-property per class (a
+  // subclass never reads its parent's memo — Rails nils `@attribute_names` in
+  // `inherited`), revision-stamped so the reset paths that clear
+  // `_columns`/`_columnsHash` (resetColumnInformation, applyColumnsHash)
+  // invalidate it, including subclass memos the base's reset can't reach.
   const memo = Object.prototype.hasOwnProperty.call(this, "_attributeNamesMemo")
     ? this._attributeNamesMemo
     : undefined;
-  if (memo && memo.revision === revision) return memo.names as string[];
+  if (memo && memo.revision === (this._schemaRevision ?? 0)) return memo.names as string[];
   // Rails attribute_methods.rb:236-241: `if !abstract_class? && table_exists?`.
-  // trails' tableExists is async, so the table_exists? half runs off the
-  // schema cache's already-resolved answer — `false` only after a
-  // dataSourceExists miss; a cold/unknown table (`undefined`) falls through
-  // (fail-open, where Rails' sync DB hit would return []). Inherent
-  // deviation: a sync API cannot make the DB hit, and failing closed would
-  // break every adapter-less attribute-only model. The async schema pipeline
-  // (loadSchemaFromAdapter → dataSourceExists) seeds the negative entry, so
-  // the guard closes once `loadSchema()` has been awaited.
+  // trails' tableExists is async, so the table_exists? half runs off the schema
+  // cache's already-resolved answer — `false` only after a dataSourceExists
+  // miss; a cold/unknown table (`undefined`) falls through. Accepted inherent
+  // deviation from Rails' sync-DB-hit `[]`: a sync API cannot make the DB hit,
+  // and failing closed would break every adapter-less attribute-only model.
+  // The async pipeline (loadSchemaFromAdapter → dataSourceExists) seeds the
+  // negative entry, closing the guard once `loadSchema()` has been awaited —
+  // which is why the fail-open answer must never be memoized: that resolution
+  // happens without a `_schemaRevision` bump to invalidate it.
   const exists = cachedTableExists.call(this as never);
   if (this.abstractClass || exists === false) {
-    this._attributeNamesMemo = { revision, names: Object.freeze([]) };
-    return [];
+    const frozen = Object.freeze([] as string[]);
+    this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
+    return frozen as string[];
   }
   const declared = [...this._attributeDefinitions.keys()];
   const columnNames = this.columnNames?.() ?? [];
@@ -667,16 +667,10 @@ export function attributeNames(this: AttributeNamesHost): string[] {
     const virtuals = declared.filter((name) => !columnSet.has(name));
     names = [...orderedColumns, ...virtuals];
   }
-  // Never memoize the fail-open cold-cache answer (`exists === undefined`):
-  // a later `loadSchema()` can resolve the table as absent without bumping
-  // `_schemaRevision` (loadSchemaFromAdapter returns before applyColumnsHash
-  // on a dataSourceExists miss), which would pin the wrong names forever.
   if (exists !== undefined) {
-    // Rails freezes the memoized array; return the same frozen instance.
-    // Re-read the revision: computing `columnNames()` above can run the
-    // first sync `loadSchema` → `applyColumnsHash`, which bumps it —
-    // stamping the entry value keeps the memo valid for the next call.
     const frozen = Object.freeze(names);
+    // Re-read the revision: `columnNames()` above can run the first sync
+    // `loadSchema` → `applyColumnsHash`, which bumps it mid-call.
     this._attributeNamesMemo = { revision: this._schemaRevision ?? 0, names: frozen };
     return frozen as string[];
   }

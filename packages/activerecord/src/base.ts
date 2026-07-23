@@ -1201,9 +1201,8 @@ export class Base extends Model {
       return;
     }
     super.attribute(name, typeName, options);
-    // Rails' `attribute` ends in `reload_schema_from_cache` (attributes.rb),
-    // which nils `@attribute_names` recursively; drop the memo on this class
-    // and its descendants so the new declaration is visible.
+    // Rails' `attribute` ends in `reload_schema_from_cache`, which nils
+    // `@attribute_names` recursively.
     for (const klass of [this, ...this.descendants]) {
       if (Object.prototype.hasOwnProperty.call(klass, "_attributeNamesMemo")) {
         Reflect.deleteProperty(klass, "_attributeNamesMemo");

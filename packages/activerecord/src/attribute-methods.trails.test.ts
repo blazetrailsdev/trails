@@ -226,9 +226,6 @@ describe("AttributeMethodsTest (trails)", () => {
     expect((w as { color: unknown }).color).toBe("fixed");
   });
 
-  // Rails' class-level `attribute_names` is `@attribute_names ||= ...freeze`
-  // (attribute_methods.rb:236-241), invalidated by reload_schema_from_cache.
-  // These guard the trails port of that memo and its cold-cache carve-out.
   it("class attributeNames is memoized and frozen", async () => {
     class Topic extends Base {}
     await Topic.loadSchema();
@@ -243,9 +240,8 @@ describe("AttributeMethodsTest (trails)", () => {
     await Topic.loadSchema();
     const first = Topic.attributeNames();
     (Topic as unknown as { resetColumnInformation(): void }).resetColumnInformation();
-    // The reset also drops the shared cache's per-table entry; re-reflect so
-    // the comparison sees real columns (and the suite's warm-cache invariant
-    // is restored for later tests).
+    // The reset drops the shared cache's per-table entry; re-reflect so the
+    // suite's warm-cache invariant is restored for later tests.
     await Topic.loadSchema();
     const second = Topic.attributeNames();
     expect(second).not.toBe(first);
@@ -257,8 +253,6 @@ describe("AttributeMethodsTest (trails)", () => {
     await Topic.loadSchema();
     const parentNames = Topic.attributeNames();
     class ImportantTopic extends Topic {}
-    // Rails nils @attribute_names in `inherited`; the subclass memoizes its
-    // own array rather than reading the parent's.
     expect(ImportantTopic.attributeNames()).not.toBe(parentNames);
   });
 
@@ -268,12 +262,10 @@ describe("AttributeMethodsTest (trails)", () => {
         this.attribute("name", "string");
       }
     }
-    // Cold cache: the table has never hit a dataSourceExists check, so the
-    // table_exists? half of the guard fails open (documented inherent
-    // deviation — Rails' sync DB hit would return []).
+    // Cold cache fails open (documented inherent deviation — Rails' sync DB
+    // hit would return []); loadSchema seeds dataSourceExists=false, and the
+    // cold answer must not have been memoized, so the guard then closes.
     expect(NonExistentTable.attributeNames()).toEqual(["name"]);
-    // The async pipeline records dataSourceExists=false; the cold answer
-    // must not have been memoized, so the guard now closes.
     await NonExistentTable.loadSchema();
     expect(NonExistentTable.attributeNames()).toEqual([]);
   });
