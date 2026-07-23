@@ -109,14 +109,6 @@ export abstract class Type<T = unknown> {
     throw new NoMethodError("Unimplemented");
   }
 
-  // `JSON.stringify`'s analogue of the `as_json` hook Rails' JSON encoder
-  // reaches on every nested object: a type buried inside a coder-dumped value
-  // must hit the value.rb:145 raise, not silently dump its internals
-  // (scheme/key material) into the payload.
-  toJSON(): never {
-    return this.asJson();
-  }
-
   /**
    * Mirrors: ActiveModel::Type::Value#cast_value (value.rb:155-157)
    *
