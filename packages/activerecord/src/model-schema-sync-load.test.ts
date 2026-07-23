@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { ValueType } from "@blazetrails/activemodel";
 import { Base } from "./base.js";
+import { registerSubclass } from "./inheritance.js";
 import { resetColumnInformation } from "./model-schema.js";
 
 class UuidType extends ValueType {
@@ -279,6 +280,71 @@ describe("sync loadSchema / columnsHash", () => {
     expect(
       Object.keys((Circle as unknown as { _columnsHash: Record<string, unknown> })._columnsHash),
     ).toEqual(["guid"]);
+  });
+
+  it("resetColumnInformation on the base deletes a tracked STI subclass's own schema memos", () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Circle extends Shape {
+      static {
+        registerSubclass(this);
+      }
+    }
+
+    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    Circle.columnsHash();
+
+    // Fork every schema memo onto the subclass (as ignoredColumns= or direct
+    // assignment would) — a base reset must delete the own props so the
+    // subclass re-inherits fresh caches instead of serving stale data.
+    const memoKeys = [
+      "_columnsHash",
+      "_columns",
+      "_attributesBuilder",
+      "_schemaLoaded",
+      "_cachedDefaultAttributes",
+      "_returningColumnsForInsertCache",
+    ];
+    for (const key of memoKeys)
+      (Circle as unknown as Record<string, unknown>)[key] = { stale: true };
+
+    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
+
+    for (const key of memoKeys) {
+      expect(Object.prototype.hasOwnProperty.call(Circle, key), key).toBe(false);
+    }
+    // Re-reflection through the base shines through the prototype chain.
+    expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
+  });
+
+  it("resetColumnInformation on the base reloads a tracked non-STI subclass's schema memos", () => {
+    class Post extends Base {
+      static override tableName = "posts";
+    }
+    class SpecialPost extends Post {
+      static override tableName = "special_posts";
+      static {
+        registerSubclass(this);
+      }
+    }
+
+    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    (Post as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    (SpecialPost as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    SpecialPost.columnsHash();
+    expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
+
+    // Rails' reload_schema_from_cache recurses over subclasses — the non-STI
+    // descendant's own memos must be nil'd by a reset on the base.
+    (resetColumnInformation as unknown as (this: typeof Base) => void).call(Post);
+
+    expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
+    expect((SpecialPost as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
   });
 
   it("resetColumnInformation on STI subclass resets the STI base", () => {
