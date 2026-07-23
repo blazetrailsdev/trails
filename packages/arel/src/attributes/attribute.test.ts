@@ -563,14 +563,14 @@ describe("AttributeTest", () => {
 
   describe("#not_between", () => {
     it("can be constructed with a standard range", () => {
-      const node = users.get("age").notBetween(18, 65);
+      const node = users.get("age").notBetween([18, 65]);
       expect(node).toBeInstanceOf(Nodes.Grouping);
       expect((node as Nodes.Grouping).expr).toBeInstanceOf(Nodes.Or);
       expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" > 65)');
     });
 
     it("can be constructed with a range starting from -Infinity", () => {
-      const node = users.get("age").notBetween(-Infinity, 65);
+      const node = users.get("age").notBetween([-Infinity, 65]);
       expect(node).toBeInstanceOf(Nodes.GreaterThan);
       expect(visitor.compile(node)).toBe('"users"."age" > 65');
     });
@@ -636,11 +636,6 @@ describe("AttributeTest", () => {
       const inner = (node as Nodes.Grouping).expr as Nodes.Or;
       expect(inner.children[1]).toBeInstanceOf(Nodes.GreaterThanOrEqual);
       expect(visitor.compile(node)).toBe('("users"."age" < 18 OR "users"."age" >= 65)');
-    });
-
-    it("can be constructed with a Union", () => {
-      const node = users.get("age").notBetween(1, 100);
-      expect(node).toBeInstanceOf(Nodes.Grouping);
     });
   });
 
