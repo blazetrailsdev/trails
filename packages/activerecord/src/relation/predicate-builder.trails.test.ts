@@ -3,6 +3,9 @@ import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js
 import { IntegerType } from "@blazetrails/activemodel";
 import { Table, Visitors } from "@blazetrails/arel";
 import { Company, Firm } from "../test-helpers/models/company.js";
+import { Author } from "../test-helpers/models/author.js";
+import { fixtures } from "../test-helpers/fixtures.js";
+import { escapeRegExp, quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
 
@@ -53,5 +56,25 @@ describe("PredicateBuilder positive-equality bind typing", () => {
     );
     expect(sql).not.toContain("1=0");
     expect(binds).toHaveLength(1);
+  });
+});
+
+// trails-specific regression guard (no Rails counterpart): Rails'
+// expand_from_hash recurses into a nested hash WITHOUT re-running
+// convert_dot_notation_to_hash (predicate_builder.rb:23-26 vs 99-101), so a
+// dotted key inside a nested hash is a literal column name on the associated
+// table — not a second association hop. trails used to recurse through the
+// public buildFromHash, re-splitting `"comments.body"` into a comments join.
+describe("PredicateBuilder nested-hash recursion skips dot re-normalization", () => {
+  fixtures(["authors", "posts", "comments"]);
+
+  it("treats a dotted key inside a nested hash as a literal column on the associated table", () => {
+    const sql = Author.where({ posts: { "comments.body": "hi" } }).toSql();
+    expect(sql).toMatch(
+      new RegExp(
+        `${escapeRegExp(quoteTableName("posts"))}\\.${escapeRegExp(quoteColumnName("comments.body"))}`,
+      ),
+    );
+    expect(sql).not.toContain(quoteTableName("comments.body"));
   });
 });
