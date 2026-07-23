@@ -546,14 +546,6 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "keys are type-cast objects (assert_kind_of Time). Tracked: RFC 0030 story " +
       "grouped-calculation-typed-keys — remove this entry when it converges.",
   },
-  {
-    testFile: "associations/nested_through_associations_test.rb",
-    tests: ["has many through with sti on nested through reflection"],
-    reason:
-      "Deferred: 3-level nested-through with an STI-scoped intermediate reflection " +
-      "direct-loads empty. Tracked: RFC 0030 story nested-through-sti-reflection-load — " +
-      "remove this entry when it converges.",
-  },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
     testFile: "adapters/postgresql/hstore_test.rb",
