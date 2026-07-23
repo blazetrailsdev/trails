@@ -50,13 +50,16 @@ describe("Mysql2Adapter configure-on-fresh-connect", () => {
     );
 
     await adapter.connectBang();
-    // reconnectBang's attemptConfigureConnection issues configureConnection()
-    // argless after the raw connect — the gate must make the connect-once work
-    // a no-op, but the (idempotent) timezone reseed still runs.
+    // connectBang routes through verifyBang → reconnectBang (Rails' connect! =
+    // verify!), so configureConnection runs twice on the eager path: once in
+    // _ensureClient and once via attemptConfigureConnection. The gate must make
+    // the connect-once work a no-op each extra time, but the (idempotent)
+    // timezone reseed still runs on every call — including the explicit one
+    // below.
     await adapter.configureConnection();
 
     expect(checkVersionSpy).toHaveBeenCalledTimes(1);
-    expect(timezoneSpy).toHaveBeenCalledTimes(2);
+    expect(timezoneSpy).toHaveBeenCalledTimes(3);
   });
 
   it("rejects the connect when the server version is below the 5.6.4 floor", async () => {
