@@ -162,3 +162,37 @@ describe("grouped calculation keyed via Arel attribute type caster", () => {
     );
   });
 });
+
+// ==========================================================================
+// Multi-field grouped-calculation key shape
+//
+// trails-specific regression (no verbatim Rails test asserts these two rules
+// in isolation): Rails uniqs group_fields only when there is more than one
+// (calculations.rb:516), and unwraps the key tuple to a scalar only when a
+// single group field survives (calculations.rb:583-584). Guards against a
+// regression to the old single-field collapse, where every non-association
+// grouped calculation reduced to `_groupColumns[0]`.
+// ==========================================================================
+
+describe("multi-field grouped calculation key shape", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("uniqs repeated group fields and keys by a scalar", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const result = (await Account.group("firm_id", "firm_id").count()) as Map<unknown, number>;
+    // Both fields collapse to one, so keys stay scalar rather than [n, n].
+    expect([...result.keys()].every((k) => !Array.isArray(k))).toBe(true);
+    expect(result.get(6)).toBe(2);
+  });
+
+  it("does not collapse distinct groups sharing their first field", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    const single = (await Account.group("firm_id").count()) as Map<unknown, number>;
+    const multi = (await Account.group("firm_id", "credit_limit").count()) as Map<unknown, number>;
+    expect(single.get(6)).toBe(2);
+    // firm 6's two accounts have distinct credit limits, so they split in two.
+    const firmSix = [...multi.entries()].filter(([k]) => (k as unknown[])[0] === 6);
+    expect(firmSix.map(([, v]) => v)).toEqual([1, 1]);
+    expect(firmSix.map(([k]) => (k as unknown[])[1]).sort()).toEqual([50, 55]);
+  });
+});

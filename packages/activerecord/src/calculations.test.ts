@@ -193,8 +193,9 @@ describe("CalculationsTest", () => {
 
   it("should group by multiple fields when table name is too long", async () => {
     // Rails: TooLongTableName — canonical Account stands in (the canonical schema
-    // has no toooooooo_long_* table); the point is that a multi-field GROUP BY
-    // keys by the full tuple rather than collapsing on the first field.
+    // has no toooooooo_long_* table). trails aliases group keys `group_key_<i>`
+    // rather than deriving them from the column, so table-name length can never
+    // overflow an alias; what survives porting is the tuple-keying assertion.
     const res = await Account.group("firm_id", "credit_limit").count();
     expect([...(res as Map<unknown, number>).entries()]).toContainEqual([[6, 50], 1]);
     expect([...(res as Map<unknown, number>).entries()]).toContainEqual([[6, 55], 1]);

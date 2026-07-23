@@ -472,14 +472,12 @@ async function groupedAggregate(
   rel._checkEagerLoadable();
   const table = rel._modelClass.arelTable;
   // Rails `execute_grouped_calculation` (calculations.rb:515-522) keeps EVERY
-  // group field, uniq'ing them only when there is more than one, and reflects a
-  // belongs_to association only from a lone field — which then expands to that
-  // association's (possibly composite) foreign key.
+  // group field, uniq'ing only when there is more than one. A belongs_to
+  // reflection is attempted from a LONE field, which then expands to that
+  // association's foreign key; the result is keyed by the loaded associated
+  // records rather than by the raw key values.
   let groupFields: unknown[] = rel._groupColumns;
   if (groupFields.length > 1) groupFields = [...new Set(groupFields)];
-  // Rails: a single group field that reflects to a belongs_to association
-  // groups by the association's foreign key, then maps the result keys back to
-  // the loaded associated records (calculations.rb:execute_grouped_calculation).
   const association =
     groupFields.length === 1 ? resolveGroupAssociation(rel, groupFields[0]) : null;
   if (association && Array.isArray(association.foreignKey)) {
@@ -491,11 +489,12 @@ async function groupedAggregate(
   // column unqualified (matching the subquery alias) instead of pinning it to
   // the original model table, and a raw Arel node passes straight through.
   const groupNodes = arelColumns.call(rel as never, groupFields) as Nodes.Node[];
-  // A lone group field keeps the bare `group_key` alias; multiple fields get one
-  // alias each, mirroring Rails' per-field `column_alias_tracker.alias_for`.
-  const aliases = groupNodes.map((_, i) =>
-    groupNodes.length === 1 ? "group_key" : `group_key_${i}`,
-  );
+  // One alias per field, standing in for Rails' `column_alias_tracker.alias_for`.
+  // A lone field keeps the bare `group_key` the belongs_to arm below reads by
+  // name; these aliases are fixed-length, so unlike Rails they never need
+  // truncating for a long table name.
+  const aliases =
+    groupNodes.length === 1 ? ["group_key"] : groupNodes.map((_, i) => `group_key_${i}`);
   const aggNode = buildAggNode(rel, fn, column, rel._isDistinct);
   const groupKeyAliases = groupNodes.map(
     (n, i) => new Nodes.As(n, new Nodes.SqlLiteral(aliases[i])),
