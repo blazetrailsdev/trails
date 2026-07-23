@@ -914,10 +914,13 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const company = await Company.create({ name: "Acme" });
     await Client.create({ name: "Summit", client_of: company.id });
     await Client.create({ name: "Microsoft", client_of: company.id });
-    const client = new Client({ name: "Another Client" });
-    cacheAssoc(company, "clients", [client]);
+    const newClient = (company as any).clients.build({}, (client: any) => {
+      client.name = "Another Client";
+    }) as Base;
+    expect((company as any).clients.loaded).toBeFalsy();
+    company.name += "-changed";
     expect(await company.save()).toBeTruthy();
-    expect(client.isPersisted()).toBeTruthy();
+    expect(newClient.isPersisted()).toBeTruthy();
     expect(Number(await Client.where({ client_of: company.id }).count())).toBe(3);
   });
 
@@ -926,8 +929,13 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
     const company = await Company.create({ name: "Acme" });
     await Client.create({ name: "Summit", client_of: company.id });
     await Client.create({ name: "Microsoft", client_of: company.id });
-    const clients = [new Client({ name: "changed" }), new Client({ name: "changed" })];
-    cacheAssoc(company, "clients", clients);
+    (company as any).clients.build(
+      [{ name: "Another Client" }, { name: "Another Client II" }],
+      (client: any) => {
+        client.name = "changed";
+      },
+    );
+    company.name += "-changed";
     expect(await company.save()).toBeTruthy();
     expect(Number(await Client.where({ client_of: company.id }).count())).toBe(4);
   });
@@ -964,12 +972,13 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociation", () => {
 
   it("replace on duplicated object", async () => {
     const { Company, Client } = makeModels();
-    const company = await Company.create({ name: "Acme" });
-    const c1 = await Client.create({ name: "Orig", client_of: company.id });
-    const c2 = new Client({ name: "New Client" });
-    cacheAssoc(company, "clients", [c1, c2]);
-    expect(await company.save()).toBeTruthy();
-    expect(Number(await Client.where({ client_of: company.id }).count())).toBe(2);
+    const original = await Company.create({ name: "New Firm" });
+    const firm = original.dup();
+    const existing = await Client.create({ name: "Summit", client_of: original.id });
+    const fresh = new Client({ name: "New Client" });
+    cacheAssoc(firm, "clients", [existing, fresh]);
+    expect(await firm.save()).toBeTruthy();
+    expect(Number(await Client.where({ client_of: firm.id }).count())).toBe(2);
   });
 
   it("should not load the associated model", async () => {
@@ -1651,7 +1660,7 @@ describe("TestAutosaveAssociationOnAHasOneAssociation", () => {
     const ship = await Ship.create({ name: "Nights Dirty Lightning", pirate_id: pirate.id });
     ship.name = "The Vile Serpent";
     cacheAssoc(pirate, "ship", ship);
-    await pirate.save();
+    await pirate.saveBang();
     const reloaded = await Ship.find(ship.id);
     expect(reloaded.name).toBe("The Vile Serpent");
   });
@@ -2403,7 +2412,7 @@ describe("TestAutosaveAssociationOnABelongsToAssociation", () => {
     const ship = await Ship.create({ name: "Pearl", pirate_id: pirate.id });
     pirate.catchphrase = "Arr";
     cacheAssoc(ship, "pirate", pirate);
-    await ship.save();
+    await ship.saveBang();
     const reloaded = await Pirate.find(pirate.id);
     expect(reloaded.catchphrase).toBe("Arr");
   });
