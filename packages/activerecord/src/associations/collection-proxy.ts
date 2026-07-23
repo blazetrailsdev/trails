@@ -1704,9 +1704,9 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
         const box = await this._djarForCount();
         if (!box) return 0;
         const djar = (box as { djar: unknown }).djar as {
-          count: () => Promise<number | Record<string, number>>;
+          count: (column?: string) => Promise<number | Record<string, number>>;
         };
-        const c = await djar.count();
+        const c = await djar.count(column);
         if (typeof c !== "number") {
           throw new Error("Grouped counts are not supported for association collection counts");
         }

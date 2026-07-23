@@ -777,8 +777,8 @@ describe("HasManyAssociationsTest", () => {
     const firm = (await HmFirm.first()) as any;
     firm.clients = [companies("second_client"), Client.new({ name: "New Client" })];
     await firm.save();
-    const reloaded = (await HmFirm.find(firm.id)) as any;
-    const clients = await reloaded.clients;
+    await firm.reload();
+    const clients = await firm.clients;
     expect(clients.length).toBe(2);
     expect(clients.includes(companies("first_client"))).toBe(false);
   });

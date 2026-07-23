@@ -1157,15 +1157,7 @@ function transaction(assoc: CollectionAssociation, block: () => Promise<void>): 
   return block();
 }
 
-/**
- * Membership test for Rails' `difference`/`intersection` in `replace_records`
- * and `replace_common_records_in_memory`. Ruby's Array#- / Array#& match via
- * `eql?`/`hash`, which ActiveRecord::Core defines by class + primary key — a
- * fixture instance and the loaded target instance of the same row ARE common.
- * A JS identity `includes` treated them as different, so a persisted-owner
- * replace destroyed the kept record and then failed to re-add it.
- * @internal
- */
+/** @internal */
 function includesRecord(records: Base[], record: Base): boolean {
   return records.some((r) => (r as unknown as { isEqual(o: unknown): boolean }).isEqual(record));
 }
