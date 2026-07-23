@@ -45,11 +45,13 @@ function buildHierarchy(asked: string[]) {
     static override tableName = "tickets";
   }
   registerSubclass(Ticket);
+  class VipTicket extends Ticket {}
+  registerSubclass(VipTicket);
 
-  for (const klass of [Shape, Circle, Ticket]) {
+  for (const klass of [Shape, Circle, Ticket, VipTicket]) {
     (klass as unknown as { adapter: unknown }).adapter = makeAdapter(tables, asked);
   }
-  return { Shape, Circle, Ticket };
+  return { Shape, Circle, Ticket, VipTicket };
 }
 
 describe("loadSchema — own-table descendant under an STI ancestor", () => {
@@ -84,6 +86,19 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
         .map((c: { name: string }) => c.name)
         .sort(),
     ).toEqual(["id", "subject"]);
+  });
+
+  it("redirects a shared-table subclass of an own-table descendant to that descendant", () => {
+    const asked: string[] = [];
+    const { Shape, Ticket, VipTicket } = buildHierarchy(asked);
+
+    const hash = VipTicket.columnsHash();
+
+    expect(Object.keys(hash).sort()).toEqual(["id", "subject"]);
+    expect((Ticket as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_schemaLoaded")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_attributeDefinitions")).toBe(false);
+    expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
   it("still redirects a genuine STI subclass to the base's shared table", () => {

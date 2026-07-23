@@ -43,15 +43,29 @@ function reflectionAdapter(klass: any): any {
   return threadedConnectionFor(klass) ?? klass.connection;
 }
 
-function sharesStiBaseTable(klass: { tableName: string }): boolean {
-  const base = getStiBase(klass) as unknown as { tableName: string };
-  return base === klass || base.tableName === klass.tableName;
-}
-
+// `getStiBase` climbs to the TOPMOST `_inheritanceColumn` ancestor, which is the
+// wrong schema host as soon as an intermediate descendant claims its own table
+// (Shape → Circle → Ticket → VIPTicket, Ticket = "tickets"): the schema host for
+// VIPTicket is Ticket, not Shape. Walk to the topmost ancestor that still shares
+// the receiver's table instead.
 function stiSchemaHost<T extends { tableName: string }>(klass: T): T {
-  return isStiSubclass(klass) && sharesStiBaseTable(klass)
-    ? (getStiBase(klass) as unknown as T)
-    : klass;
+  if (!isStiSubclass(klass)) return klass;
+  const table = klass.tableName;
+  let host = klass;
+  let current = Object.getPrototypeOf(klass) as (T & { _abstractClass?: boolean }) | null;
+  while (current && current !== (Function.prototype as unknown)) {
+    if (getAbstractClass.call(current as any)) break;
+    let ancestorTable: string | undefined;
+    try {
+      ancestorTable = current.tableName;
+    } catch {
+      break;
+    }
+    if (ancestorTable !== table) break;
+    host = current;
+    current = Object.getPrototypeOf(current) as typeof current;
+  }
+  return host;
 }
 
 /**
