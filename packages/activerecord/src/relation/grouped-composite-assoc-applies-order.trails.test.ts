@@ -95,4 +95,24 @@ describe("CpkBook grouped calculation over a composite-key belongs_to applies or
     // Ordered groups are (2 → 3), (3 → 2), (1 → 1); offset(2) leaves order 1.
     expect(counts).toEqual([[[1, 1], 1]]);
   });
+
+  it("group by a composite-key belongs_to with a group-key column order and limit returns the ordered groups", async () => {
+    await seedOrders();
+    // A bare column order (rather than an aggregate expression) must resolve
+    // against the model's table: descending order_id makes the top-2 groups
+    // (3, 2) rather than the insertion-order (1, 2).
+    const result = (await CpkBook.group("order").order("order_id DESC").limit(2).count()) as Map<
+      unknown,
+      number
+    >;
+
+    const counts = [...result.entries()].map(([order, count]) => [
+      (order as CpkOrder | null)?.id,
+      count,
+    ]);
+    expect(counts).toEqual([
+      [[1, 3], 2],
+      [[1, 2], 3],
+    ]);
+  });
 });
