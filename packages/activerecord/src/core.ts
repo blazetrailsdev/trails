@@ -412,7 +412,7 @@ interface CoreHost {
   arelTable?: any;
   prototype: any;
   all(): any;
-  _castAttributeValue(key: string, value: unknown): unknown;
+  typeForAttribute(name: string): { cast(value: unknown): unknown };
   ensureSchemaLoaded(): Promise<void>;
 }
 
@@ -1006,9 +1006,10 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       // (not the aggregate "in [...]"), and a hit is wrapped back into a
       // 1-element array because `expects_array` is true.
       const single = compactedIds[0];
-      const castSingle = this._castAttributeValue(this.primaryKey as string, single);
+      // Rails find_one passes the id raw — `where(primary_key => id)`; the
+      // QueryAttribute bind owns casting at compile time (predicate_builder.rb).
       const record = await this.all()
-        .where({ [this.primaryKey as string]: castSingle })
+        .where({ [this.primaryKey as string]: single })
         .first();
       if (!record) {
         throw new RecordNotFound(
@@ -1020,10 +1021,15 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
       }
       return [record];
     }
-    const castIds = compactedIds.map((i) => this._castAttributeValue(this.primaryKey as string, i));
+    // Rails find_some_ordered passes the ids raw to `where(primary_key => ids)`
+    // (the bind casts); only the in_order_of step below casts, via
+    // `ids.map { model.type_for_attribute(primary_key).cast(id) }`
+    // (finder_methods.rb:576).
     const records = await this.all()
-      .where({ [this.primaryKey as string]: castIds })
+      .where({ [this.primaryKey as string]: compactedIds })
       .toArray();
+    const pkType = this.typeForAttribute(this.primaryKey as string);
+    const castIds = compactedIds.map((i) => pkType.cast(i));
     // Key by pkMatchKey so a BigInt PK matches the number/string id passed in
     // (a raw-value Map would miss `1n` vs `1` and spuriously raise below).
     const idToRecord = new Map<unknown, any>();
@@ -1041,9 +1047,10 @@ export async function find(this: CoreHost, ...ids: unknown[]): Promise<any> {
     // in_order_of: return in input order
     return castIds.map((cid) => idToRecord.get(pkMatchKey(cid))!);
   }
-  const castId = this._castAttributeValue(this.primaryKey as string, id);
+  // Rails find_one: the id flows raw into `where(primary_key => id)` — the
+  // QueryAttribute bind casts/serializes at compile time (predicate_builder.rb).
   const record = await this.all()
-    .where({ [this.primaryKey as string]: castId })
+    .where({ [this.primaryKey as string]: id })
     .first();
   if (!record) {
     throw new RecordNotFound(
