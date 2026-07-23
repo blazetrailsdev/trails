@@ -187,7 +187,7 @@ describe("CalculationsTest", () => {
   it("should group by multiple fields when table name is too long", async () => {
     // Rails: TooLongTableName — canonical Account stands in; asserts multi-field GROUP BY works.
     const res = await Account.group("firm_id", "credit_limit").count();
-    expect(typeof res).toBe("object");
+    expect(res).toBeInstanceOf(Map);
   });
 
   it("should group by multiple fields having functions", async () => {
@@ -199,7 +199,6 @@ describe("CalculationsTest", () => {
   });
 
   it("should group by summed field", async () => {
-    // Rails: { nil => 50, 1 => 50, 6 => 105, 2 => 60, 9 => 53 }
     const expected = new Map<unknown, number>([
       [null, 50],
       [1, 50],

@@ -548,20 +548,6 @@ async function groupedAggregate(
     return result;
   }
 
-  // Rails keys the result hash by the group column's deserialized value
-  // (execute_grouped_calculation builds `key_types` from the model's attribute
-  // type, falling back to `calculated_data.column_types` for expressions the
-  // model doesn't own — e.g. `date_trunc('month', created_at)` keys are Time
-  // on PG), so a boolean column yields true/false keys rather than the raw
-  // driver 1/0, and a null group stays a null key.
-  // Rails resolves the key type as `col_name.try(:type_caster) || type_for(col_name)`:
-  // a qualified `other_table.column` group field becomes an Arel attribute of THAT
-  // table via `arel_columns`, so its type_caster wins and the model's own type for a
-  // same-named column is never consulted (calculations_test.rb: grouping Company by
-  // "accounts.status" keeps accounts' string values, not Company's integer enum).
-  // A bare or self-qualified field resolves through the model (`type_for` takes the
-  // last `.`-segment); anything else falls back to the result's column types —
-  // Rails' `calculated_data.column_types.fetch(aliaz, Type.default_value)`.
   const keyFieldName = qualifiedGroupFieldForModel(rel, effectiveGroupCol);
   const keyType = ((keyFieldName === null
     ? null
@@ -583,9 +569,12 @@ async function groupedAggregate(
 }
 
 /**
- * The model-attribute name a group field may resolve its key type through, or
- * null when the field is qualified to a different table (whose own type — via
- * the result's column types — must win) or isn't a plain column reference.
+ * The model-attribute name a group field resolves its key type through, or null
+ * when it must fall through to the result's column types. Mirrors Rails'
+ * `col_name.try(:type_caster) || type_for(col_name)`: a field qualified to a
+ * DIFFERENT table keeps that table's type (grouping Company by "accounts.status"
+ * keys by accounts' strings, not Company's integer enum), while a bare or
+ * self-qualified field resolves through the model by its last `.`-segment.
  */
 function qualifiedGroupFieldForModel(rel: CalculationRelation, field: unknown): string | null {
   if (typeof field !== "string") return null;
