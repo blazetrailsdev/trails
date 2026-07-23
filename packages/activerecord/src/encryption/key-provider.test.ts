@@ -80,7 +80,6 @@ describe("ActiveRecord::Encryption::KeyProviderTest", () => {
   });
 });
 
-// Mirrors ActiveRecord::EncryptionTestCase#assert_encryptor_works_with.
 function assertEncryptorWorksWith(keyProvider: KeyProvider): void {
   const encryptor = new Encryptor();
   const encryptedMessage = encryptor.encrypt("some text", { keyProvider });

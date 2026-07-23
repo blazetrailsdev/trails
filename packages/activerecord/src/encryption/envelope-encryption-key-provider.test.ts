@@ -1,4 +1,5 @@
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
+import { Configurable } from "./configurable.js";
 import { EnvelopeEncryptionKeyProvider } from "./envelope-encryption-key-provider.js";
 import { KeyProvider } from "./key-provider.js";
 import { Key } from "./key.js";
@@ -10,6 +11,10 @@ function makeKey(): Key {
 }
 
 describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
+  afterEach(() => {
+    Configurable.config.storeKeyReferences = false;
+  });
+
   it("encryption_key returns random encryption keys", () => {
     const primaryProvider = new KeyProvider(makeKey());
     const provider = new EnvelopeEncryptionKeyProvider(primaryProvider);
@@ -71,6 +76,7 @@ describe("ActiveRecord::Encryption::EnvelopeEncryptionKeyProviderTest", () => {
   });
 
   it("work with multiple keys when config.store_key_references is true", () => {
+    Configurable.config.storeKeyReferences = true;
     const primaryProvider = new KeyProvider([makeKey(), makeKey()]);
     const provider = new EnvelopeEncryptionKeyProvider(primaryProvider);
     const enc = new Encryptor({ compress: false });

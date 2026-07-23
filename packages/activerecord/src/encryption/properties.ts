@@ -81,7 +81,6 @@ export class Properties {
     this._data.set("e", value);
   }
 
-  // Mirrors Rails' DEFAULT_PROPERTIES accessor: encrypted_data_key_id ↔ "i".
   get encryptedDataKeyId(): string | undefined {
     return this.get("i") as string | undefined;
   }

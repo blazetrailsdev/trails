@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeAll, afterAll } from "vitest";
+import { describe, it, expect, beforeAll, afterAll, afterEach } from "vitest";
 import { DerivedSecretKeyProvider } from "./derived-secret-key-provider.js";
 import { Encryptor } from "./encryptor.js";
 import { Configurable } from "./configurable.js";
@@ -12,6 +12,9 @@ describe("ActiveRecord::Encryption::DerivedSecretKeyProviderTest", () => {
   afterAll(() => {
     Configurable.config.keyDerivationSalt = originalSalt;
   });
+  afterEach(() => {
+    Configurable.config.storeKeyReferences = false;
+  });
 
   it("will derive a key with the right length from the given password", () => {
     const provider = new DerivedSecretKeyProvider("my-password");
@@ -21,6 +24,7 @@ describe("ActiveRecord::Encryption::DerivedSecretKeyProviderTest", () => {
   });
 
   it("work with multiple keys when config.store_key_references is false", () => {
+    Configurable.config.storeKeyReferences = false;
     const provider = new DerivedSecretKeyProvider(["password1", "password2"]);
     const enc = new Encryptor({ compress: false });
     const encrypted = enc.encrypt("hello", { keyProvider: provider });
@@ -29,6 +33,7 @@ describe("ActiveRecord::Encryption::DerivedSecretKeyProviderTest", () => {
   });
 
   it("work with multiple keys when config.store_key_references is true", () => {
+    Configurable.config.storeKeyReferences = true;
     const provider = new DerivedSecretKeyProvider(["password1", "password2"]);
     const enc = new Encryptor({ compress: false });
     const encrypted = enc.encrypt("hello", { keyProvider: provider });
