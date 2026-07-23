@@ -21,7 +21,7 @@ import {
   NotImplementedError,
   type SQLWarning,
 } from "../errors.js";
-import { Notifications } from "@blazetrails/activesupport";
+import { IsolatedExecutionState, Notifications } from "@blazetrails/activesupport";
 import type { EventPayload } from "@blazetrails/activesupport";
 import { disablePreparedStatements } from "../ar-config.js";
 import { Result, type ColumnTypes } from "../result.js";
@@ -974,7 +974,7 @@ export class AbstractAdapter implements Quoting {
   }
 
   get preparedStatements(): boolean {
-    return this._preparedStatements;
+    return this._preparedStatements && !this.preparedStatementsDisabledCache.has(this);
   }
 
   set preparedStatements(value: boolean) {
@@ -1434,12 +1434,17 @@ export class AbstractAdapter implements Quoting {
   }
 
   async unpreparedStatement<T>(fn: () => Promise<T> | T): Promise<T> {
-    const was = this._preparedStatements;
-    this._preparedStatements = false;
+    // Rails' `cache = prepared_statements_disabled_cache.add?(object_id) if
+    // @prepared_statements` — `Set#add?` returns nil when already present, so
+    // only the outermost block clears the entry on exit.
+    let cache: Set<unknown> | undefined;
+    if (this._preparedStatements && !this.preparedStatementsDisabledCache.has(this)) {
+      cache = this.preparedStatementsDisabledCache.add(this);
+    }
     try {
       return await fn();
     } finally {
-      this._preparedStatements = was;
+      cache?.delete(this);
     }
   }
 
@@ -1710,10 +1715,12 @@ export class AbstractAdapter implements Quoting {
     return new Visitors.ToSql(this);
   }
 
-  private _preparedStatementsDisabledCache = new Set<unknown>();
-
   get preparedStatementsDisabledCache(): Set<unknown> {
-    return this._preparedStatementsDisabledCache;
+    // Rails: `IsolatedExecutionState[:active_record_prepared_statements_disabled_cache] ||= Set.new`
+    return IsolatedExecutionState.fetch(
+      "active_record_prepared_statements_disabled_cache",
+      () => new Set<unknown>(),
+    );
   }
 
   // --- Lifecycle ---
