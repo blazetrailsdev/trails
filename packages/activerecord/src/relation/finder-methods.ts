@@ -286,6 +286,10 @@ interface FinderRelation {
   /** Relation#arel — the built SelectManager (relation.ts). */
   arel(): { whereSql(engine: unknown): string | null };
   where(conditions: unknown, ...rest: unknown[]): any;
+  findBy(conditions: unknown): Promise<any>;
+  findByBang(conditions: unknown): Promise<any>;
+  /** @internal Relation#_conn — the leased adapter (relation.ts). */
+  _conn(): { isTransactionOpen(): boolean };
   limit(n: number): any;
   order(...args: any[]): any;
   reverseOrder(): any;
@@ -622,7 +626,7 @@ export async function performFindOrCreateByBang(
   // Rails (relation.rb:238): find_by(attributes) || create_or_find_by!(attributes)
   // — the create leg rides create_or_find_by! so a concurrent insert that wins
   // the race is recovered via its RecordNotUnique rescue instead of raising.
-  const existing = await (this as any).findBy(conditions);
+  const existing = await this.findBy(conditions);
   if (existing) return existing;
   return performCreateOrFindByBang.call(this, conditions, extra);
 }
@@ -658,7 +662,12 @@ export async function performCreateOrFindByBang(
     return result;
   } catch (error) {
     if (!(error instanceof RecordNotUnique)) throw error;
-    return this.where(conditions).lock().findByBang(conditions);
+    // Rails (relation.rb:292-296): with a transaction still open the winner is
+    // materialized + row-locked inside it; otherwise plain find_by!, no lock.
+    if (this._conn().isTransactionOpen()) {
+      return this.where(conditions).lock().findByBang(conditions);
+    }
+    return this.findByBang(conditions);
   }
 }
 

@@ -1694,11 +1694,17 @@ describe("RelationTest", () => {
       expect(results.length).toBeGreaterThan(0);
       return results.shift();
     };
-    vi.spyOn(relation, "findBy").mockImplementation(findByMock as any);
+    // Rails stubs find_by/find_by! on `relation` and the stub survives the
+    // retry's `where(attributes).lock` because Ruby's spawn is `clone` (the
+    // singleton class rides along); trails spawns a fresh Relation, so the
+    // stub lives on the prototype to cover the spawned retry relation too.
+    vi.spyOn(Relation.prototype as any, "findBy").mockImplementation(findByMock as any);
     // create_or_find_by always call find_by! on retry
-    vi.spyOn(relation, "findByBang").mockImplementation(findByMock as any);
+    vi.spyOn(Relation.prototype as any, "findByBang").mockImplementation(findByMock as any);
 
     expect((await relation.findOrCreateBy({ nick: "bob" })).id).toBe(bob.id);
+
+    expect(results).toHaveLength(0);
   });
 
   it("find or create by with create with", async () => {

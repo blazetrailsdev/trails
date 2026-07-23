@@ -4033,7 +4033,13 @@ export class Relation<T extends Base> {
       return result;
     } catch (e) {
       if (!(e instanceof RecordNotUnique)) throw e;
-      return this.where(conditions).lock().findByBang(conditions);
+      // Rails (relation.rb:277-281): with a transaction still open the winner
+      // is materialized + row-locked inside it; otherwise plain find_by!, no
+      // lock.
+      if (this._conn().isTransactionOpen()) {
+        return this.where(conditions).lock().findByBang(conditions);
+      }
+      return this.findByBang(conditions);
     }
   }
 
