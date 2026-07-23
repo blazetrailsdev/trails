@@ -1170,7 +1170,7 @@ class TestExtractor
       end
     when :string_literal
       content = extract_string_content(node)
-      content ? "s:#{unescape_string_literal(content)}" : nil
+      content ? "s:#{unescape_string_literal(content, double_quoted_literal?(node))}" : nil
     when :symbol_literal
       sym = node[1]
       sym.is_a?(Array) && sym[0] == :symbol && sym[1].is_a?(Array) ? "s:#{ident_name(sym[1])}" : nil
@@ -1184,11 +1184,33 @@ class TestExtractor
 
   ESCAPES = {
     "n" => "\n", "t" => "\t", "r" => "\r", "s" => " ",
-    "a" => "\a", "b" => "\b", "e" => "\e", "f" => "\f", "v" => "\v",
-    "\\" => "\\", '"' => '"', "'" => "'", "#" => "#"
+    "a" => "\a", "b" => "\b", "e" => "\e", "f" => "\f", "v" => "\v"
   }.freeze
 
-  def unescape_string_literal(text)
+  def double_quoted_literal?(node)
+    pos = first_tstring_pos(node)
+    return true unless pos
+    line, col = pos
+    before = @source_lines[line - 1].to_s[0...col]
+    return false if before.end_with?("'")
+    return false if before.match?(/%q.\z/)
+    true
+  end
+
+  def first_tstring_pos(node)
+    return nil unless node.is_a?(Array)
+    return node[2] if node[0] == :@tstring_content
+    node.each do |child|
+      next unless child.is_a?(Array)
+      pos = first_tstring_pos(child)
+      return pos if pos
+    end
+    nil
+  end
+
+  def unescape_string_literal(text, double_quoted = true)
+    return text.gsub(/\\([\\'])/, '\\1') unless double_quoted
+
     text.gsub(/\\(u\{[0-9a-fA-F ]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{1,2}|[0-7]{1,3}|.)/m) do
       seq = Regexp.last_match(1)
       if seq.start_with?("u{")
@@ -1200,7 +1222,7 @@ class TestExtractor
       elsif seq.match?(/\A[0-7]+\z/)
         seq.to_i(8).chr(Encoding::UTF_8)
       else
-        ESCAPES.fetch(seq, "\\#{seq}")
+        ESCAPES.fetch(seq, seq)
       end
     end
   end
