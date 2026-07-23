@@ -284,6 +284,15 @@ export default defineConfig({
   resolve: { alias },
   test: {
     globals: true,
+    // The worker cap MUST live at the ROOT config: vitest 3's shared fork pool
+    // sizes itself from `vitest.config.poolOptions.forks.maxForks` (see
+    // createForksPool in vitest/dist) and never consults the per-project
+    // `poolOptions`, so a project-level `maxForks` is a silent no-op and the
+    // effective cap becomes `numCpus - 1`. On a many-core host that let every
+    // test file fork at once, exhausting the AR_DB advisory-slot pool (first
+    // N files pin all N slots; every later file fails setup with
+    // "all N GET_LOCK slots are held").
+    poolOptions: { forks: { maxForks: TEST_FORKS } },
     // In the isolated trails-tsc coverage run, the build-views/watch tests are
     // CPU-pegged in tsc under v8 instrumentation long enough to starve vitest's
     // reporter heartbeat, surfacing a `Timeout calling "onTaskUpdate"` worker
