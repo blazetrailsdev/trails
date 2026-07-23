@@ -311,8 +311,7 @@ export class QueryLogs implements QueryTransformer {
 // (query_logs.rb:219-228). Rails additionally strips a leading
 // `\A\s*/\*\+?\s?` and a trailing `\s?\*/\s*\Z` before escaping; trails
 // intentionally omits that strip so bare-marker inputs round-trip
-// through escape rather than collapsing to an empty string — the
-// existing "escaping bad comments" test cases encode that.
+// through escape rather than collapsing to an empty string.
 export function escapeComment(content: string): string {
   return String(content).replace(/\*\//g, "* /").replace(/\/\*/g, "/ *");
 }
