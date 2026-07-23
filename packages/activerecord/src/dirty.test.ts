@@ -15,9 +15,10 @@
  * `locking.test.ts` for the same pattern.
  *
  * Test names mirror the Ruby method names verbatim (`test:compare` matches on
- * them). Tests blocked by a genuine trails gap or a JS-language limitation
- * (immutable strings, Ruby singleton methods) are `it.skip` with a precise
- * reason rather than silently adapted or stubbed.
+ * them). Tests blocked by a JS-language impossibility (immutable strings, Ruby
+ * symbol coercion, sync side-effecting getters over async persistence) are
+ * reclassified in scripts/api-compare/unported-files.ts rather than kept as
+ * counted `it.skip` stubs.
  */
 import { describe, it, expect, beforeAll, beforeEach, afterEach, vi } from "vitest";
 import { Base } from "./index.js";
@@ -25,6 +26,7 @@ import { ValueType } from "@blazetrails/activemodel";
 import { TimeWithZone, getZone } from "@blazetrails/activesupport";
 import { Temporal } from "@blazetrails/activesupport/temporal";
 
+import { MigrationContext } from "./migration.js";
 import { describeIfSupports } from "./test-helpers/supports.js";
 import { withTimezoneConfig } from "./test-helper.js";
 import { fixtures } from "./test-helpers/fixtures.js";
@@ -93,7 +95,10 @@ function checkPirateAfterSaveFailure(pirate: Rec): void {
 }
 
 describe("DirtyTest", () => {
-  fixtures([]);
+  // "field named field" issues DDL (create/drop of `testings`, mirroring
+  // Rails' in-test create_table); run it outside the wrapping transaction so
+  // MySQL's DDL implicit-commit can't break the fixture rollback.
+  fixtures([], { usesTransaction: ["field named field"] });
 
   // Canonical-schema shield. This suite rides the preloaded canonical tables
   // (people / topics / pirates / parrots / aircraft / numeric_data) rather than
@@ -487,15 +492,6 @@ describe("DirtyTest", () => {
     expect(topic.attributeChanged("approved")).toBe(false);
   });
 
-  it.skip("string attribute should compare with typecast symbol after update", () => {
-    // BLOCKED: Ruby language — the test's whole point is that a Ruby symbol
-    // (`create!(catchphrase: :foo)` / `update_column :catchphrase, :foo`) is
-    // type-cast to the string `"foo"` and so compares equal to the persisted
-    // value (not dirty). JS has no auto-coercing symbol; substituting `"foo"`
-    // would test `"foo" == "foo"` vacuously (no cast exercised). SCOPE: none —
-    // no faithful JS equivalent.
-  });
-
   it("partial update", async () => {
     const pirate = new Pirate() as Rec;
     pirate.catchphrase = "foo";
@@ -807,11 +803,23 @@ describe("DirtyTest", () => {
     expect(pirate.previousChanges).not.toHaveProperty("created_on");
   });
 
-  it.skip("field named field", () => {
-    // SKIP (by design): Rails creates a bespoke `testings` table with a column
-    // named `field` via in-test `create_table`. Adding it would reintroduce the
-    // per-test DDL this migration removes, for a column-name edge case unrelated
-    // to MySQL DDL cost. Column-name reflection is covered elsewhere.
+  it("field named field", async () => {
+    // Rails builds `testings` with in-test DDL (dirty_test.rb:610) — it is not
+    // a schema.rb fixture table, so mirroring that DDL here is the faithful
+    // port, not an invented bespoke table.
+    const Testings = class extends Base {
+      static tableName = "testings";
+    };
+    const ctx = new MigrationContext(Base.connection);
+    try {
+      await ctx.createTable("testings", { force: true }, (t) => {
+        t.string("field");
+      });
+      await Testings.loadSchema();
+      expect(() => new Testings().attributes).not.toThrow();
+    } finally {
+      await ctx.dropTable("testings", { ifExists: true });
+    }
   });
 
   it("datetime attribute can be updated with fractional seconds", async () => {
@@ -877,17 +885,6 @@ describe("DirtyTest", () => {
     });
   });
 
-  it.skip("in place mutation detection", () => {
-    // BLOCKED: JS language — Rails mutates a string in place (`catchphrase
-    // << " matey!"`). JS strings are immutable, so there is no in-place string
-    // mutation to detect. No trails equivalent exists or can.
-  });
-
-  it.skip("in place mutation for binary", () => {
-    // BLOCKED: JS language + serialization — relies on in-place mutation of a
-    // serialized binary string (`data << "bar"`). JS strings are immutable.
-  });
-
   it("changes is correct for subclass", async () => {
     // Rails overrides only the reader (`def catchphrase; super.upcase; end`),
     // keeping the generated writer. `declare catchphrase: string` on Pirate
@@ -920,11 +917,31 @@ describe("DirtyTest", () => {
     expect(pirate.changes).toEqual({ catchphrase: ["arrrr", newCatchphrase] });
   });
 
-  it.skip("changes is correct if override attribute reader", () => {
-    // BLOCKED: Ruby language — Rails defines a singleton method on one instance
-    // (`def pirate.catchphrase; super.upcase; end`). JS has no per-instance
-    // method-with-super override; the subclass form is covered by "changes is
-    // correct for subclass".
+  it("changes is correct if override attribute reader", async () => {
+    // Rails defines a singleton reader on one instance (`def pirate.catchphrase;
+    // super.upcase; end`), keeping the class writer. The JS analogue is an own
+    // accessor pair on that instance shadowing the prototype accessor — reader
+    // upcases, writer delegates. Same functionally-reader-only-override shape as
+    // "changes is correct for subclass", scoped to a single instance.
+    const pirate = (await Pirate.createBang({ catchphrase: "arrrr" })) as Rec;
+    Object.defineProperty(pirate, "catchphrase", {
+      configurable: true,
+      get(this: Pirate): string | null {
+        const v = this.readAttribute("catchphrase") as string | null;
+        return v == null ? v : v.toUpperCase();
+      },
+      set(this: Pirate, v: string | null) {
+        this.writeAttribute("catchphrase", v);
+      },
+    });
+
+    const newCatchphrase = "arrrr matey!";
+
+    pirate.catchphrase = newCatchphrase;
+    expect(pirate.attributeChanged("catchphrase")).toBe(true);
+
+    expect((pirate as any).catchphrase).toBe(newCatchphrase.toUpperCase());
+    expect(pirate.changes).toEqual({ catchphrase: ["arrrr", newCatchphrase] });
   });
 
   it("attribute_changed? doesn't compute in-place changes for unrelated attributes", async () => {
@@ -983,17 +1000,6 @@ describe("DirtyTest", () => {
       (record as any).nonPersistedAttributeWillChange();
       expect(await record.save()).toBe(true);
     });
-  });
-
-  it.skip("mutating and then assigning doesn't remove the change", () => {
-    // BLOCKED: JS language — opens with in-place string mutation
-    // (`catchphrase << " matey!"`); JS strings are immutable.
-  });
-
-  it.skip("getters with side effects are allowed", () => {
-    // BLOCKED: Ruby language — uses a singleton getter that calls
-    // `update_attribute` as a side effect (`def pirate.catchphrase ... end`).
-    // No per-instance method override in JS.
   });
 
   it("attributes assigned but not selected are dirty", async () => {
