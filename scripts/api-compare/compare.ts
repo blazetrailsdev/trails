@@ -159,35 +159,33 @@ const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
 // deciding whether the TS body already makes the call; they never widen which
 // Ruby calls are considered ported (see significantMissingCalls gate 2), so
 // adding one can never introduce a new mismatch.
-const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
+// Entries list ONLY the differently-named JS spelling: the convention name is
+// already a candidate, so `select → filter` needs just ["filter"]. Every alias
+// must be the whole call's analogue, not merely a plausible building block —
+// `min_by → reduce` would let any reduce anywhere silence a dropped min_by, so
+// such loose pairs are deliberately absent.
+export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   ["any?", ["some"]],
   ["all?", ["every"]],
   ["none?", ["some", "every"]],
-  ["one?", ["filter", "some"]],
+  ["one?", ["filter"]],
   ["include?", ["includes", "has"]],
   ["member?", ["includes", "has"]],
   ["key?", ["has"]],
   ["has_key?", ["has"]],
   ["select", ["filter"]],
-  ["filter", ["filter"]],
   ["reject", ["filter"]],
   ["detect", ["find"]],
   ["collect", ["map"]],
-  ["flat_map", ["flatMap"]],
   ["collect_concat", ["flatMap"]],
   ["each", ["forEach"]],
-  ["each_with_object", ["reduce"]],
   ["inject", ["reduce"]],
-  ["reduce", ["reduce"]],
   ["index", ["indexOf", "findIndex"]],
-  ["find_index", ["indexOf", "findIndex"]],
+  ["find_index", ["indexOf"]],
   ["sort_by", ["sort"]],
-  ["min_by", ["sort", "reduce"]],
-  ["max_by", ["sort", "reduce"]],
-  ["concat", ["concat", "push"]],
-  ["unshift", ["unshift"]],
-  ["slice", ["slice"]],
-  ["join", ["join"]],
+  // Ruby Array#concat mutates the receiver; the JS port is `push(...xs)`
+  // (Array#concat returns a new array, so it is NOT the analogue).
+  ["concat", ["push"]],
 ]);
 
 /** JS-native call names that count as making Ruby call `rubyCall`. */

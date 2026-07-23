@@ -13,6 +13,7 @@ import {
   buildEntitiesByName,
   significantMissingCalls,
   jsEnumerableAliases,
+  JS_ENUMERABLE_ALIASES,
   narrowCallsApplies,
 } from "./compare.js";
 import { rubyMethodToTs } from "./conventions.js";
@@ -248,6 +249,18 @@ describe("jsEnumerableAliases", () => {
 
   it("returns an empty list for a name with no JS analogue", () => {
     expect(jsEnumerableAliases("run_callbacks")).toEqual([]);
+  });
+
+  it("lists no alias that rubyMethodToTs already produces", () => {
+    // A redundant entry (e.g. select → ["select"]) is dead weight that reads
+    // as if it were doing work; the convention candidates are checked first.
+    for (const [rubyCall, aliases] of JS_ENUMERABLE_ALIASES) {
+      const candidates = rubyMethodToTs(rubyCall) ?? [];
+      expect({ rubyCall, redundant: aliases.filter((a) => candidates.includes(a)) }).toEqual({
+        rubyCall,
+        redundant: [],
+      });
+    }
   });
 });
 
