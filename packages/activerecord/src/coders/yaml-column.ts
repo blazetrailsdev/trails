@@ -16,7 +16,7 @@ type ClassLike = new (...args: unknown[]) => unknown;
  */
 class SafeCoder {
   dump(object: unknown): string {
-    return yamlStringify(object);
+    return yamlStringify(object, { directives: true });
   }
 
   load(payload: unknown): unknown {

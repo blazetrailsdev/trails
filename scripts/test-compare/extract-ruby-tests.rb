@@ -1162,13 +1162,15 @@ class TestExtractor
     return nil unless node.is_a?(Array)
     case node[0]
     when :@int, :@float
-      "n:#{node[1]}"
+      "n:#{node[1].delete('_')}"
     when :unary
       # `-3` / `-1.5` — unary minus over a numeric leaf; other unaries are non-literal.
-      node[1] == :-@ && node[2].is_a?(Array) && %i[@int @float].include?(node[2][0]) ? "n:-#{node[2][1]}" : nil
+      if node[1] == :-@ && node[2].is_a?(Array) && %i[@int @float].include?(node[2][0])
+        "n:-#{node[2][1].delete('_')}"
+      end
     when :string_literal
       content = extract_string_content(node)
-      content ? "s:#{content}" : nil
+      content ? "s:#{unescape_string_literal(content, double_quoted_literal?(node))}" : nil
     when :symbol_literal
       sym = node[1]
       sym.is_a?(Array) && sym[0] == :symbol && sym[1].is_a?(Array) ? "s:#{ident_name(sym[1])}" : nil
@@ -1176,6 +1178,51 @@ class TestExtractor
       kw = node[1]
       if kw.is_a?(Array) && kw[0] == :@kw
         { "true" => "b:true", "false" => "b:false", "nil" => "x:nil" }[kw[1]]
+      end
+    end
+  end
+
+  ESCAPES = {
+    "n" => "\n", "t" => "\t", "r" => "\r", "s" => " ",
+    "a" => "\a", "b" => "\b", "e" => "\e", "f" => "\f", "v" => "\v"
+  }.freeze
+
+  def double_quoted_literal?(node)
+    pos = first_tstring_pos(node)
+    return true unless pos
+    line, col = pos
+    before = @source_lines[line - 1].to_s[0...col]
+    return false if before.end_with?("'")
+    return false if before.match?(/%q.\z/)
+    true
+  end
+
+  def first_tstring_pos(node)
+    return nil unless node.is_a?(Array)
+    return node[2] if node[0] == :@tstring_content
+    node.each do |child|
+      next unless child.is_a?(Array)
+      pos = first_tstring_pos(child)
+      return pos if pos
+    end
+    nil
+  end
+
+  def unescape_string_literal(text, double_quoted = true)
+    return text.gsub(/\\([\\'])/, '\\1') unless double_quoted
+
+    text.gsub(/\\(u\{[0-9a-fA-F ]+\}|u[0-9a-fA-F]{4}|x[0-9a-fA-F]{1,2}|[0-7]{1,3}|.)/m) do
+      seq = Regexp.last_match(1)
+      if seq.start_with?("u{")
+        seq[2..-2].split.map { |cp| cp.to_i(16).chr(Encoding::UTF_8) }.join
+      elsif seq.start_with?("u")
+        seq[1..].to_i(16).chr(Encoding::UTF_8)
+      elsif seq.start_with?("x")
+        seq[1..].to_i(16).chr(Encoding::UTF_8)
+      elsif seq.match?(/\A[0-7]+\z/)
+        seq.to_i(8).chr(Encoding::UTF_8)
+      else
+        ESCAPES.fetch(seq, seq)
       end
     end
   end

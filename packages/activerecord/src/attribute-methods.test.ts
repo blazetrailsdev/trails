@@ -12,6 +12,12 @@ import { GeneratedAttributeMethods } from "./attribute-methods.js";
 import { inTimeZone } from "./test-helpers/in-time-zone.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { adapterType } from "./test-adapter.js";
+import { registerModel } from "./associations.js";
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { NumericData } from "./test-helpers/models/numeric-data.js";
+import { Developer, AuditLog, AuditLogRequired } from "./test-helpers/models/developer.js";
+
+registerModel([Developer, AuditLog, AuditLogRequired]);
 
 // ==========================================================================
 // AttributeMethodsTest — targets attribute_methods_test.rb
@@ -84,14 +90,8 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute_for_database", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("title", "string");
-        this.attribute("body", "string", { default: "" });
-      }
-    }
-    const p = (await Post.create({ title: "db-read" })) as any;
-    expect(p.readAttribute("title")).toBe("db-read");
+    const topic = new CanonicalTopic({ content: ["ok"] } as any) as any;
+    expect(topic.readAttributeForDatabase("content")).toBe("---\n- ok\n");
   });
 
   it("attributes_for_database", async () => {
@@ -294,9 +294,10 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("attribute_for_inspect with a long array", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "inspect_arr" });
-    expect(p.title).toBe("inspect_arr");
+    const t = new CanonicalTopic({} as any) as any;
+    t.content = Array.from({ length: 11 }, (_, i) => i + 1);
+
+    expect(t.attributeForInspect("content")).toBe("[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11]");
   });
   it("attribute_for_inspect with a non-primary key id attribute", async () => {
     const { Post } = makeModel();
@@ -334,9 +335,15 @@ describe("AttributeMethodsTest", () => {
     expect(p.title).toBe("json_pred");
   });
   it("undeclared attribute method does not affect respond_to? and method_missing", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "undecl" });
-    expect(p.title).toBe("undecl");
+    class Target extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+      }
+    }
+    const topic = new Target({ title: "Budget" }) as any;
+    expect(topic.title).toBe("Budget");
+    expect(topic.titleHelloWorld).toBeUndefined();
   });
   it("declared prefixed attribute method affects respond_to? and method_missing", async () => {
     const { Post } = makeModel();
@@ -460,14 +467,32 @@ describe("AttributeMethodsTest", () => {
     expect(p.title).toBe("redef_alias");
   });
   it("#method_missing define methods on the fly in a thread safe way", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "mm_safe" });
-    expect(p.title).toBe("mm_safe");
+    class TopicClass extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+      }
+    }
+    const topic = new TopicClass({ title: "New topic" }) as any;
+    TopicClass.undefineAttributeMethods();
+    expect(topic.title).toBe("New topic");
   });
   it("#method_missing define methods on the fly in a thread safe way, even when decorated", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "mm_decorated" });
-    expect(p.title).toBe("mm_decorated");
+    class TopicClass extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+      }
+      get title(): string {
+        return `title:${this.readAttribute("title")}`;
+      }
+      set title(v: string) {
+        this.writeAttribute("title", v);
+      }
+    }
+    const topic = new TopicClass({ title: "New topic" }) as any;
+    TopicClass.undefineAttributeMethods();
+    expect(topic.title).toBe("title:New topic");
   });
   it("inherited custom accessors with reserved names", async () => {
     const { Post } = makeModel();
@@ -490,14 +515,28 @@ describe("AttributeMethodsTest", () => {
     expect(p.id).toBeDefined();
   });
   it("generated attribute methods ancestors have correct module", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "ancestors" });
-    expect(p.title).toBe("ancestors");
+    const mod = (CanonicalTopic as any)._generatedAttributeMethods;
+    expect(mod.inspect()).toBe("Topic::GeneratedAttributeMethods");
   });
   it("#alias_attribute override methods defined in parent models", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_override" });
-    expect(p.title).toBe("alias_override");
+    class ParentModel extends Base {
+      static {
+        this.abstractClass = true;
+      }
+      get subject(): string {
+        return "Abstract Subject";
+      }
+    }
+    class Subclass extends ParentModel {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+        this.aliasAttribute("subject", "title");
+      }
+    }
+    const obj = new Subclass({}) as any;
+    obj.title = "hey";
+    expect(obj.subject).toBe("hey");
   });
   it("aliases to the same attribute name do not conflict with each other", async () => {
     const { Post } = makeModel();
@@ -505,14 +544,39 @@ describe("AttributeMethodsTest", () => {
     expect(p.title).toBe("alias_conflict");
   });
   it("#alias_attribute with an overridden original method does not use the overridden original method", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_orig" });
-    expect(p.title).toBe("alias_orig");
+    class ClassWithDeprecatedAliasAttributeBehavior extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+        this.aliasAttribute("subject", "title");
+      }
+      get titleWas(): string {
+        return "overridden_title_was";
+      }
+    }
+    const obj = new ClassWithDeprecatedAliasAttributeBehavior({}) as any;
+    obj.title = "hey";
+    expect(obj.subject).toBe("hey");
+    expect(obj.subjectWas()).toBeNull();
   });
   it("#alias_attribute with an overridden original method from a module does not use the overridden original method", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_mod" });
-    expect(p.title).toBe("alias_mod");
+    const titleWasOverride = {
+      titleWas() {
+        return "overridden_title_was";
+      },
+    };
+    class ClassWithDeprecatedAliasAttributeBehaviorFromModule extends Base {
+      static {
+        this.tableName = "topics";
+        this.attribute("title", "string");
+      }
+    }
+    Object.assign(ClassWithDeprecatedAliasAttributeBehaviorFromModule.prototype, titleWasOverride);
+    (ClassWithDeprecatedAliasAttributeBehaviorFromModule as any).aliasAttribute("subject", "title");
+    const obj = new ClassWithDeprecatedAliasAttributeBehaviorFromModule({}) as any;
+    obj.title = "hey";
+    expect(obj.subject).toBe("hey");
+    expect(obj.subjectWas()).toBeNull();
   });
   it("#alias_attribute with an overridden original method along with an overridden alias method uses the overridden alias method", async () => {
     const { Post } = makeModel();
@@ -530,9 +594,21 @@ describe("AttributeMethodsTest", () => {
     expect(p.id).toBeDefined();
   });
   it("#alias_attribute method on an abstract class is available on subclasses", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_abstract" });
-    expect(p.title).toBe("alias_abstract");
+    class Superclass extends Base {
+      static {
+        this.abstractClass = true;
+        this.aliasAttribute("idValue", "id");
+      }
+    }
+    class Subclass extends Superclass {
+      static {
+        this.tableName = "topics";
+        this.attribute("id", "integer");
+        this.attribute("title", "string");
+      }
+    }
+    const object = (Subclass as any).build({ id: 123_456 });
+    expect(object.idValue).toBe(123_456);
   });
   it("#alias_attribute with an _in_database method issues raises an error", async () => {
     const { Post } = makeModel();
@@ -550,9 +626,21 @@ describe("AttributeMethodsTest", () => {
     expect(p.id).toBeDefined();
   });
   it("#alias_attribute method on a STI class is available on subclasses", async () => {
-    const { Post } = makeModel();
-    const p = await Post.create({ title: "alias_sti" });
-    expect(p.title).toBe("alias_sti");
+    class Superclass extends Base {
+      static {
+        this.tableName = "comments";
+        this.attribute("body", "string");
+        this.aliasAttribute("text", "body");
+      }
+    }
+    class Subclass extends Superclass {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    class Subsubclass extends Subclass {}
+    const comment = (Subsubclass as any).build({ body: "Text" });
+    expect(comment.text).toBe("Text");
   });
   it("#alias_attribute with a manually defined method raises an error", async () => {
     const { Post } = makeModel();
@@ -782,8 +870,9 @@ describe("AttributeMethodsTest", () => {
 
   it("read overridden attribute", async () => {
     const Topic = makeTopic();
-    const t = await Topic.create({ title: "Saved" });
-    expect(t.title).toBe("Saved");
+    const topic = new Topic({ title: "a" });
+    Object.defineProperty(topic, "title", { get: () => "b" });
+    expect(topic.readAttribute("title")).toBe("a");
   });
 
   it("non-attribute read and write", async () => {
@@ -886,14 +975,10 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("write_attribute can write aliased attributes as well", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = Topic.new({}) as any;
-    t.writeAttribute("title", "written");
-    expect(t.readAttribute("title")).toBe("written");
+    const topic = new CanonicalTopic({ title: "Don't change the topic" }) as any;
+    topic.writeAttribute("heading", "New topic");
+
+    expect(topic.title).toBe("New topic");
   });
 
   it("write_attribute allows writing to aliased attributes", async () => {
@@ -1021,35 +1106,35 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("read_attribute_before_type_cast with aliased attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("views", "integer");
-      }
-    }
-    const t = Topic.new({ views: "42" }) as any;
-    // after type cast should be integer
-    expect(t.readAttribute("views")).toBe(42);
+    const model = new NumericData({ newBankBalance: "abcd" } as any) as any;
+    expect(model.readAttributeBeforeTypeCast("newBankBalance")).toBe("abcd");
   });
 
   it("read_attribute_for_database with aliased attribute", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
-    }
-    const t = (await Topic.create({ title: "for-db" })) as any;
-    expect(t.readAttribute("title")).toBe("for-db");
+    const topic = new CanonicalTopic({ title: "Hello" }) as any;
+    expect(topic.readAttributeForDatabase("heading")).toBe("Hello");
   });
 
   it("instance methods should be defined on the base class", async () => {
     class Topic extends Base {
       static {
+        this.attribute("id", "integer");
         this.attribute("title", "string");
       }
     }
-    const t = Topic.new({}) as any;
-    expect(typeof t.readAttribute).toBe("function");
-    expect(typeof t.writeAttribute).toBe("function");
+    class Subklass extends Topic {}
+
+    (Topic as any).defineAttributeMethods();
+
+    const instance = new Subklass({}) as any;
+    instance.id = 5;
+    expect(instance.id).toBe(5);
+    expect("id" in Subklass.prototype).toBe(true);
+
+    (Topic as any).undefineAttributeMethods();
+
+    expect(instance.id).toBe(5);
+    expect("id" in Subklass.prototype).toBe(true);
   });
 
   it("global methods are overwritten", async () => {
@@ -1063,14 +1148,24 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("method overrides in multi-level subclasses", async () => {
-    class Topic extends Base {
+    class Level1 extends Developer {
       static {
-        this.attribute("title", "string");
+        Object.defineProperty(this.prototype, "name", {
+          get(this: Developer) {
+            return `dev:${this.readAttribute("name")}`;
+          },
+          set(this: Developer, v: string) {
+            this.writeAttribute("name", v);
+          },
+          configurable: true,
+        });
       }
     }
-    class SpecialTopic extends Topic {}
-    const t = SpecialTopic.new({ title: "inherited" }) as any;
-    expect(t.title).toBe("inherited");
+    class Level2 extends Level1 {}
+    class Level3 extends Level2 {}
+    const dev = new Level3({ name: "arthurnn" }) as any;
+    await dev.saveBang();
+    expect((await dev.reload()).name).toBe("dev:arthurnn");
   });
 
   it("inherited custom accessors", async () => {
@@ -1120,13 +1215,20 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("attribute readers respect access control", async () => {
-    class Topic extends Base {
+    class Target extends Base {
       static {
+        this.tableName = "topics";
         this.attribute("title", "string");
       }
+      get title(): string {
+        return "I'm private";
+      }
+      set title(v: string) {
+        this.writeAttribute("title", v);
+      }
     }
-    const t = Topic.new({ title: "readable" }) as any;
-    expect(t.title).toBe("readable");
+    const topic = new Target({ title: "The pros and cons of programming naked." }) as any;
+    expect(topic.title).toBe("I'm private");
   });
 
   it("attribute writers respect access control", async () => {
@@ -1141,14 +1243,15 @@ describe("AttributeMethodsTest", () => {
   });
 
   it("bulk update raises ActiveRecord::UnknownAttributeError", async () => {
-    class Topic extends Base {
-      static {
-        this.attribute("title", "string");
-      }
+    let error: any;
+    try {
+      new CanonicalTopic({ hello: "world" } as any);
+    } catch (e) {
+      error = e;
     }
-    // unknown attributes are ignored or raise depending on implementation
-    const t = Topic.new({ title: "valid" } as any) as any;
-    expect(t.title).toBe("valid");
+    expect(error.record).toBeInstanceOf(CanonicalTopic);
+    expect(error.attribute).toBe("hello");
+    expect(error.message).toMatch("unknown attribute 'hello' for Topic.");
   });
 
   it("user-defined text attribute predicate", async () => {
