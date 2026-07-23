@@ -26,8 +26,6 @@ import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Company as CanonicalCompany } from "./test-helpers/models/company.js";
 import { PostRecord } from "./test-helpers/models/post.js";
 import { Subscriber } from "./test-helpers/models/subscriber.js";
-// Aliased: bespoke in-test `class Developer` declarations below would
-// otherwise collide and get esbuild-renamed (Developer2 → "developer2s").
 import {
   Developer as CanonicalDeveloper,
   SubDeveloper,
@@ -1462,8 +1460,6 @@ describe("BasicsTest", () => {
     expect(User.tableName).toBe("custom_table");
   });
   it("set table name with inheritance", () => {
-    // Rails: anonymous Class.new(ActiveRecord::Base) with `def k.name; "Foo";
-    // end` and `def k.table_name; super + "ks"; end`.
     class k extends Base {
       static get tableName(): string {
         return super.tableName + "ks";

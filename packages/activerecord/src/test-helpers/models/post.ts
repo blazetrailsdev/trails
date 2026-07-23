@@ -980,8 +980,6 @@ export class Postesque extends Base {
 export class PostRecord extends Base {
   declare comments: AssociationProxy<Comment>;
 
-  // Rails post.rb:429-433: `def model_name; ActiveModel::Name.new(self, nil,
-  // "Post"); end` — table name and association FKs derive from "Post".
   static get modelName(): ModelName {
     return new ModelName("Post", { klass: this as unknown as ModelLike });
   }
