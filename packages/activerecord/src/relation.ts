@@ -165,6 +165,11 @@ import { AliasTracker } from "./associations/alias-tracker.js";
  */
 export type LoadedRelation<R> = Omit<R, "then">;
 
+/** @internal */
+export type EnumerablePattern<T extends Base> =
+  | ((record: T) => boolean)
+  | (new (...args: never[]) => Base);
+
 /**
  * Enforce Rails' `extract_options!` shape on variadic `explain(...)`
  * inputs: at most one hash option, and if present it must be the last
@@ -2249,7 +2254,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#any?
    */
-  async isAny(): Promise<boolean> {
+  async isAny(pattern?: EnumerablePattern<T>): Promise<boolean> {
+    if (this._isEmptyRelation()) return false;
+    if (pattern !== undefined) return (await this.toArray()).some(this._patternMatcher(pattern));
     if (this._loaded) return this._records.length > 0;
     return this.exists();
   }
@@ -2259,7 +2266,9 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#many?
    */
-  async isMany(): Promise<boolean> {
+  async isMany(predicate?: (record: T) => boolean): Promise<boolean> {
+    if (this._isEmptyRelation()) return false;
+    if (predicate !== undefined) return (await this._countMatching(predicate, 2)) > 1;
     if (this._loaded) return this._records.length > 1;
     return (await this.limitedCount()) > 1;
   }
@@ -2269,9 +2278,30 @@ export class Relation<T extends Base> {
    *
    * Mirrors: ActiveRecord::Relation#one?
    */
-  async isOne(): Promise<boolean> {
+  async isOne(pattern?: EnumerablePattern<T>): Promise<boolean> {
+    if (this._isEmptyRelation()) return false;
+    if (pattern !== undefined) return (await this._countMatching(pattern, 2)) === 1;
     if (this._loaded) return this._records.length === 1;
     return (await this.limitedCount()) === 1;
+  }
+
+  /** @internal */
+  _patternMatcher(pattern: EnumerablePattern<T>): (record: T) => boolean {
+    if ((pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true) {
+      const klass = pattern as new (...args: never[]) => Base;
+      return (record) => record instanceof klass;
+    }
+    return pattern as (record: T) => boolean;
+  }
+
+  /** @internal */
+  async _countMatching(pattern: EnumerablePattern<T>, limit: number): Promise<number> {
+    const matches = this._patternMatcher(pattern);
+    let count = 0;
+    for (const record of await this.toArray()) {
+      if (matches(record) && ++count === limit) break;
+    }
+    return count;
   }
 
   /**
@@ -6246,18 +6276,9 @@ export class Relation<T extends Base> {
   /**
    * Mirrors: ActiveRecord::Relation#none?
    */
-  async isNone(
-    pattern?: ((record: T) => boolean) | (new (...args: never[]) => Base),
-  ): Promise<boolean> {
+  async isNone(pattern?: EnumerablePattern<T>): Promise<boolean> {
     if (this._isEmptyRelation()) return true;
-    if (pattern !== undefined) {
-      const records = await this.toArray();
-      if ((pattern as { _isActiveRecordBase?: unknown })._isActiveRecordBase === true) {
-        const klass = pattern as new (...args: never[]) => Base;
-        return !records.some((record) => record instanceof klass);
-      }
-      return !records.some(pattern as (record: T) => boolean);
-    }
+    if (pattern !== undefined) return !(await this.toArray()).some(this._patternMatcher(pattern));
     return this.isEmpty();
   }
 
