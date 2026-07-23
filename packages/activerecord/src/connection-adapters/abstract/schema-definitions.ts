@@ -2,6 +2,7 @@ import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
 import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
+import { SchemaDumper } from "../../schema-dumper.js";
 
 /**
  * @internal Shared identifier guard for MySQL bare-identifier emission
@@ -279,7 +280,7 @@ export class ForeignKeyDefinition {
 
   // Mirrors: ActiveRecord::ConnectionAdapters::ForeignKeyDefinition#export_name_on_schema_dump?
   get isExportNameOnSchemaDump(): boolean {
-    return !/^fk_rails_[0-9a-f]{10}$/.test(this.name);
+    return !SchemaDumper.fkIgnorePattern.test(this.name);
   }
 
   isDefinedFor(options: ForeignKeyLookupOptions = {}): boolean {
@@ -350,7 +351,7 @@ export class CheckConstraintDefinition {
   }
 
   get isExportNameOnSchemaDump(): boolean {
-    return this.name ? !/^chk_rails_[0-9a-f]{10}$/.test(this.name) : false;
+    return this.name ? !SchemaDumper.chkIgnorePattern.test(this.name) : false;
   }
 
   isDefinedFor(options: { name: string; expression?: string; validate?: boolean }): boolean {
