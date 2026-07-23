@@ -670,8 +670,11 @@ export function isOne<T extends typeof Base>(this: T): Promise<boolean> {
 /**
  * Mirrors: ActiveRecord::Querying#none? — delegates to all().none?
  */
-export function isNone<T extends typeof Base>(this: T): Promise<boolean> {
-  return this.all().isNone();
+export function isNone<T extends typeof Base>(
+  this: T,
+  ...args: Parameters<ReturnType<T["all"]>["isNone"]>
+): Promise<boolean> {
+  return this.all().isNone(...args);
 }
 
 /**
