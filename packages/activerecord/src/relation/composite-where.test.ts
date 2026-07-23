@@ -15,6 +15,8 @@ import { describe, it, expect, beforeAll } from "vitest";
 import { registerModel } from "../index.js";
 import { fixtures } from "../test-helpers/fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
+import { Post } from "../test-helpers/models/post.js";
+import { Comment } from "../test-helpers/models/comment.js";
 
 describe("Relation#where — composite-key form", () => {
   // Rails creates the CPK rows inline with `Cpk::Book.create!` — no cpk
@@ -23,7 +25,7 @@ describe("Relation#where — composite-key form", () => {
   fixtures([]);
 
   beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter].forEach((m) => registerModel(m));
+    [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment].forEach((m) => registerModel(m));
   });
 
   it("compiles `where(['c1','c2'], [[v1a,v1b], [v2a,v2b]])` to OR-of-AND of column equalities", async () => {
@@ -135,6 +137,26 @@ describe("Relation#where — composite-key form", () => {
     expect(rhs?.constructor?.name).toBe("BindParam");
     expect(rhs?.value?.name).toBe("author_id");
     expect(rhs?.value?.constructor?.name).toBe("QueryAttribute");
+  });
+
+  it("qualified composite cols bind through the joined table's type, not the base table's", () => {
+    // Rails' Array-key branch re-roots per key via
+    // `associated_table(key).predicate_builder` (predicate_builder.rb:88-98),
+    // so a qualified col's bind type comes from the joined table. Typing
+    // `comments.post_id` against `posts` (which has no `post_id`) would fall
+    // back to the default ValueType and leave "2" an uncast string.
+    const rel = (Post as any).all();
+    const node: any = rel.predicateBuilder.buildComposite(
+      ["posts.id", "comments.post_id"],
+      [[1, "2"]],
+    );
+    const [left, right] = node.expr.children;
+    expect(right.left.relation.name).toBe("comments");
+    const bind = right.right.value;
+    expect(bind.name).toBe("post_id");
+    expect(bind.valueForDatabase).toBe(2);
+    // The unqualified col still types against the base table.
+    expect(left.left.relation.name).toBe("posts");
   });
 
   it("single-column composite uses IN(...) (not OR-chain) for compactness", () => {

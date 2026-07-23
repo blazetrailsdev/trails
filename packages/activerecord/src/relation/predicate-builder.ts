@@ -455,12 +455,29 @@ export class PredicateBuilder {
     // semantics — see method docstring).
     const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
     if (validTuples.length === 0) return null;
+    // Re-root qualified cols (`"comments.post_id"`) on the referenced
+    // table the way Rails' Array-key branch does — it recurses through
+    // `associated_table(key).predicate_builder`, so both the attribute
+    // AND the bind's type come from the joined table's metadata
+    // (predicate_builder.rb:88-98). Reading the bind type off the base
+    // builder instead would type an absent column through the default
+    // `ValueType` (silent no-op cast), or a same-named base column
+    // through the wrong type.
+    const resolved = cols.map((col) => {
+      const idx = col.lastIndexOf(".");
+      if (idx === -1) return { attribute: this.table.arelTable.get(col), builder: this };
+      const associated = this.table.associatedTable(col.slice(0, idx));
+      return {
+        attribute: associated.arelTable.get(col.slice(idx + 1)),
+        builder: associated.predicateBuilder,
+      };
+    });
     // Single-column degenerate case: a single `IN (...)` predicate is
     // more compact than `c=v1 OR c=v2 OR ...` and typically optimizes
     // identically (or better) on indexed columns.
     if (cols.length === 1) {
       const values = validTuples.map((t) => t[0]);
-      return this.table.arelTable.get(cols[0]).in(values);
+      return resolved[0].attribute.in(values);
     }
     // Build equalities through `buildBindAttribute` so each value
     // becomes a `QueryAttribute` (= bind param) rather than an
@@ -472,10 +489,9 @@ export class PredicateBuilder {
     // each `arelTable.get` allocates a fresh `Arel::Attribute`.
     // Reusing the resolved attrs keeps large tuple lists
     // allocation-light. Column names are read straight off the
-    // builder's arel table, the way Rails' array-key branch of
-    // expand_from_hash does via `self[key, value]` — dotted keys are
-    // not split here (Rails doesn't either).
-    const attrs = cols.map((c) => this.table.arelTable.get(c));
+    // builder's arel table (or, for a qualified col, the re-rooted
+    // associated table's), the way Rails' array-key branch of
+    // expand_from_hash does via `self[key, value]`.
     // Per-tuple AND uses the pairwise `reduce(&:and)` shape (nested
     // binary `And` chain), matching Rails' `grouping_queries`
     // (predicate_builder.rb:157) — not a flat n-ary `And`. SQL output
@@ -489,7 +505,9 @@ export class PredicateBuilder {
     // Grouping — semantically a no-op (AND binds tighter than OR) that
     // keeps the emitted `(c1 = ? AND c2 = ?) OR (...)` form stable.
     const groupings: Nodes.Node[] = validTuples.map((tuple) => {
-      const eqs = attrs.map((attr, i) => attr.eq(this.buildBindAttribute(attr.name, tuple[i])));
+      const eqs = resolved.map(({ attribute, builder }, i) =>
+        attribute.eq(builder.buildBindAttribute(attribute.name, tuple[i])),
+      );
       return new Nodes.Grouping(eqs.reduce((left, right) => left.and(right)));
     });
     if (groupings.length === 1) return groupings[0];
