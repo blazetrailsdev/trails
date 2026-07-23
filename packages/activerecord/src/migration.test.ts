@@ -2232,9 +2232,12 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(cols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
     // migration_test.rb:1403 expects 3 on both adapters, but Rails' third PG
-    // query is a `SELECT 'character varying'::regtype::oid` type-map miss from
-    // quote_default_expression (postgresql/schema_creation.rb:102); trails'
-    // statically initialized PG type map never issues it, so PG counts 2.
+    // query is the `SELECT 'character varying'::regtype::oid` lookup that PG's
+    // lookup_cast_type (postgresql/quoting.rb:195) issues from
+    // quote_default_expression (postgresql/schema_creation.rb:102); trails
+    // resolves the sql_type statically (see normalizeFormatType in
+    // postgresql-adapter.ts — tracked deviation, RFC 0032 story
+    // converge-pg-lookup-cast-type-regtype-oid-query), so PG counts 2.
     const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 3, postgres: 2 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {
@@ -2261,7 +2264,8 @@ describeIfSupports("bulk_alter", "BulkAlterTableMigrationsTest", () => {
     expect(preCols.find((c) => c.name === "birthdate")!.type).toBe("date");
 
     // migration_test.rb:1433 expects 7/5; PG counts 4 because trails skips the
-    // `::regtype::oid` type-map miss noted in "changing columns" above.
+    // `::regtype::oid` lookup noted in "changing columns" above (tracked
+    // deviation, RFC 0032 story converge-pg-lookup-cast-type-regtype-oid-query).
     const expectedQueryCount = expectedBulkAlterQueryCount({ mysql: 7, postgres: 4 });
     await assertQueriesCount(expectedQueryCount, true, async () => {
       await adapter.changeTable("delete_me", { bulk: true }, (t: any) => {

@@ -5459,6 +5459,19 @@ const DEFAULT_FUNCTION_RE = /\w+\(.*\)|\(.*\)::\w+|CURRENT_DATE|CURRENT_TIMESTAM
  * don't have a static registration, so the lookup misses and returns
  * ValueType. Mapping them to the scalar typname (int4) would
  * incorrectly deserialize array values with a scalar type.
+ *
+ * DEVIATION (tracked, pending convergence — RFC 0032 story
+ * converge-pg-lookup-cast-type-regtype-oid-query): Rails' PG
+ * `lookup_cast_type(sql_type)` (postgresql/quoting.rb:195) resolves a
+ * sql_type string to an OID with a live `SELECT '<sql_type>'::regtype::oid`
+ * SCHEMA query before hitting the OID-keyed type map, so every DDL
+ * default-quoting on a ColumnDefinition issues that query. trails resolves
+ * the string statically through this alias table instead: the
+ * quoting/schema-creation visitor chain is synchronous and cannot await a
+ * query. Consequence: the bulk-alter tests in migration.test.ts count one
+ * fewer PG SCHEMA query than migration_test.rb (3→2, 5→4), and custom
+ * types (enums/domains) that only Rails' regtype round-trip would resolve
+ * fall through to ValueType here.
  */
 function normalizeFormatType(sqlType: string): string {
   if (/\[\]\s*$/.test(sqlType)) return sqlType;
