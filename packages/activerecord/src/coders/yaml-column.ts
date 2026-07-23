@@ -1,21 +1,43 @@
 import { parse as yamlParse, stringify as yamlStringify } from "@blazetrails/activesupport/yaml";
+import { useYamlUnsafeLoad, yamlColumnPermittedClasses } from "../ar-config.js";
 import { ColumnSerializer } from "./column-serializer.js";
 
 type ClassLike = new (...args: unknown[]) => unknown;
 
 /**
+ * Mirror of `Psych::DisallowedClass` — raised when `safe_dump` (or
+ * `safe_load`) encounters a class instance outside the permitted set. Rails
+ * hits this when an arbitrary object reaches a YAML column's coder, e.g. an
+ * encryption previous-scheme `AdditionalValue` reaching `Serialized#serialize`
+ * during extended deterministic query expansion — the raise fires before any
+ * payload exists, so no scheme/key material can leak into a dumped candidate.
+ */
+export class DisallowedClass extends globalThis.Error {
+  constructor(action: string, klassName: string) {
+    super(`Tried to ${action} unspecified class: ${klassName}`);
+    this.name = "Psych::DisallowedClass";
+  }
+}
+
+/**
  * Inner coder that does the raw YAML encode/decode. Rails wraps Psych's
- * safe_load/safe_dump with permitted-classes / unsafe-load options; those guard
- * against deserializing arbitrary Ruby objects and have no analog in trails
- * (the `yaml` package only ever produces plain JS values), so this degenerates
- * to a plain parse/stringify pair.
+ * safe_load/safe_dump with permitted-classes / unsafe-load options. The
+ * safe_load side has no analog in trails (the `yaml` package only ever
+ * produces plain JS values), so `load` degenerates to a plain parse — but the
+ * safe_dump side does: dumping a class instance that isn't in the permitted
+ * set raises `Psych::DisallowedClass`, exactly like Psych's `safe_dump`.
+ * `ActiveRecord.use_yaml_unsafe_load` switches to the unrestricted dump, like
+ * Rails' `::YAML.dump` branch.
  *
  * Mirrors: ActiveRecord::Coders::YAMLColumn::SafeCoder
  *
  * @internal
  */
 class SafeCoder {
+  constructor(private readonly permittedClasses: unknown[] = []) {}
+
   dump(object: unknown): string {
+    if (!useYamlUnsafeLoad) this.assertDumpable(object);
     return yamlStringify(object, { directives: true });
   }
 
@@ -26,6 +48,31 @@ class SafeCoder {
     // non-string never reaches here; like Rails (which raises on a non-String/IO
     // argument) we don't silently coerce bad input.
     return yamlParse(payload as string);
+  }
+
+  /**
+   * Psych `safe_dump` visitor analog: scalars, arrays, and plain hashes are
+   * always dumpable; any other object must be an instance of a permitted
+   * class (`permitted_classes` + `ActiveRecord.yaml_column_permitted_classes`)
+   * or the dump raises `Psych::DisallowedClass`.
+   */
+  private assertDumpable(value: unknown, seen = new Set<object>()): void {
+    if (value === null || typeof value !== "object") return;
+    if (seen.has(value)) return;
+    seen.add(value);
+    if (Array.isArray(value)) {
+      for (const element of value) this.assertDumpable(element, seen);
+      return;
+    }
+    const proto = Object.getPrototypeOf(value);
+    if (proto === Object.prototype || proto === null) {
+      for (const element of Object.values(value)) this.assertDumpable(element, seen);
+      return;
+    }
+    for (const permitted of [...this.permittedClasses, ...yamlColumnPermittedClasses]) {
+      if (typeof permitted === "function" && value instanceof permitted) return;
+    }
+    throw new DisallowedClass("dump", value.constructor?.name ?? "Object");
   }
 }
 

@@ -1,5 +1,6 @@
-import { describe, it, expect } from "vitest";
-import { YAMLColumn } from "./yaml-column.js";
+import { describe, it, expect, afterEach } from "vitest";
+import { YAMLColumn, DisallowedClass } from "./yaml-column.js";
+import { setUseYamlUnsafeLoad } from "../ar-config.js";
 
 // Trails-only round-trip coverage. The YAMLColumnTest / YAMLColumnTestWithSafeLoad
 // blocks below stay Ruby-only (Psych safe-load / permitted-classes have no JS
@@ -23,6 +24,33 @@ describe("YAMLColumn round-trip", () => {
     const coder = new YAMLColumn("params");
     const value = { a: [1, 2, { b: "x" }], c: { d: true } };
     expect(coder.load(coder.dump(value))).toEqual(value);
+  });
+
+  // Rails-verified (vendored Rails, Psych >= 5.1): safe_dump raises
+  // Psych::DisallowedClass on any class instance outside the permitted set —
+  // top-level or nested — while `ActiveRecord.use_yaml_unsafe_load = true`
+  // switches to the unrestricted `::YAML.dump` branch (yaml_column.rb:15-24).
+  describe("safe dump", () => {
+    afterEach(() => setUseYamlUnsafeLoad(false));
+
+    class Unpermitted {
+      secret = "s3cret";
+    }
+
+    it("raises DisallowedClass when dumping an unpermitted class instance", () => {
+      const coder = new YAMLColumn("params");
+      expect(() => coder.dump(new Unpermitted())).toThrow(DisallowedClass);
+      expect(() => coder.dump(new Unpermitted())).toThrow(
+        /Tried to dump unspecified class: Unpermitted/,
+      );
+      expect(() => coder.dump({ nested: [new Unpermitted()] })).toThrow(DisallowedClass);
+    });
+
+    it("dumps unpermitted class instances when use_yaml_unsafe_load is set", () => {
+      setUseYamlUnsafeLoad(true);
+      const coder = new YAMLColumn("params");
+      expect(coder.dump(new Unpermitted())).toContain("s3cret");
+    });
   });
 });
 
