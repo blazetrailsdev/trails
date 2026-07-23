@@ -51,6 +51,8 @@ for (const klass of [
   CpkOrder,
   CpkAuthor,
   CpkChapter,
+  Author,
+  Book,
 ]) {
   registerModel(klass as any);
 }
@@ -80,6 +82,9 @@ describe("TransactionTest", () => {
       "rollback dirty changes",
       "rollback dirty changes multiple saves",
       "rollback dirty changes then retry save",
+      "rollback dirty changes then retry save on new record with autosave association",
+      "update should rollback on failure",
+      "update should rollback on failure!",
       "rolling back in a callback rollbacks before save",
       "restore frozen state after double destroy",
       "restore new record after double save",
@@ -377,8 +382,18 @@ describe("TransactionTest", () => {
     expect((await topic.reload()).title).toBe(topic.title);
   });
 
-  it.skip("rollback dirty changes then retry save on new record with autosave association", () => {
-    // Autosave collection associations (`author.books << book`) not yet ported.
+  it("rollback dirty changes then retry save on new record with autosave association", async () => {
+    const author = Author.new({ name: "DHH" }) as any;
+    const book = (await Book.createBang({})) as any;
+    await author.books.push(book);
+
+    await author.transaction(async () => {
+      await author.saveBang();
+      throw new Rollback();
+    });
+
+    await author.saveBang();
+    expect((await (await book.reload()).author).id).toBe(author.id);
   });
 
   it("persisted in a model with custom primary key after failed save", async () => {
@@ -588,13 +603,21 @@ describe("TransactionTest", () => {
     expect(author.isNewRecord()).toBe(false);
   });
 
-  it.skip("update should rollback on failure", () => {
-    // Autosave collection assignment (`author.update(post_ids: [])`) not yet
-    // ported — relies on has_many collection replacement + autosave rollback.
+  it("update should rollback on failure", async () => {
+    const author = (await Author.find(1)) as any;
+    const postsCount = await author.posts.size();
+    expect(postsCount).toBeGreaterThan(0);
+    const status = await author.update({ name: null, postIds: [] });
+    expect(status).toBeFalsy();
+    expect(await (await author.posts.reload()).size()).toBe(postsCount);
   });
 
-  it.skip("update should rollback on failure!", () => {
-    // See "update should rollback on failure" — same autosave collection gap.
+  it("update should rollback on failure!", async () => {
+    const author = (await Author.find(1)) as any;
+    const postsCount = await author.posts.size();
+    expect(postsCount).toBeGreaterThan(0);
+    await expect(author.updateBang({ name: null, postIds: [] })).rejects.toThrow(RecordInvalid);
+    expect(await (await author.posts.reload()).size()).toBe(postsCount);
   });
 
   it("cancellation from before destroy rollbacks in destroy", async () => {
@@ -1399,6 +1422,7 @@ describe("TransactionTest", () => {
       "releasing named savepoints",
       "empty transaction is not materialized",
       "unprepared statement materializes transaction",
+      "prepared statement materializes transaction",
       "nested transactions skip excess savepoints",
       "nested transactions after disable lazy transactions",
       "savepoint does not materialize transaction",
@@ -1550,8 +1574,16 @@ describe("TransactionTest", () => {
     expectedQueries.forEach((expected, i) => expect(actualQueries[i]).toMatch(expected));
   });
 
-  it.skip("prepared statement materializes transaction", () => {
-    // Requires prepared_statements-gated query monitoring not modeled here.
+  it("prepared statement materializes transaction", async (ctx) => {
+    const conn = (await Topic.leaseConnection()) as any;
+    ctx.skip(!conn.preparedStatements);
+    await Topic.first();
+
+    await assertQueriesMatch(/BEGIN|COMMIT/i, undefined, true, async () => {
+      await Topic.transaction(async () => {
+        await Topic.first();
+      });
+    });
   });
 
   it("savepoint does not materialize transaction", async () => {
