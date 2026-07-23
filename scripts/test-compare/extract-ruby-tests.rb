@@ -119,6 +119,7 @@ class TestExtractor
     @class_stack = []
     @test_cases = []
     @source_lines = source.lines
+    @quote_styles = build_quote_styles(source)
     @gate_stack = []
     @file_adapter_gate = dir_adapter_gate(rel_path)
     # Modules that define `def test_*` (e.g. an `ActiveSupport::Concern` mixed
@@ -1190,11 +1191,40 @@ class TestExtractor
   def double_quoted_literal?(node)
     pos = first_tstring_pos(node)
     return true unless pos
-    line, col = pos
-    before = @source_lines[line - 1].to_s[0...col]
-    return false if before.end_with?("'")
-    return false if before.match?(/%q.\z/)
-    true
+    @quote_styles.fetch(pos, :double) == :double
+  end
+
+  def build_quote_styles(source)
+    styles = {}
+    open_stack = []
+    heredocs = []
+    Ripper.lex(source).each do |pos, type, tok, _state|
+      case type
+      when :on_tstring_beg, :on_words_beg, :on_qwords_beg,
+           :on_symbols_beg, :on_qsymbols_beg, :on_regexp_beg, :on_backtick
+        open_stack.push(delimiter_style(tok))
+      when :on_symbeg
+        # A bare symbol (`:foo`, token ":") has no closing token; only the
+        # quoting forms (`:"..."`, `:'...'`, `%s(...)`) close with tstring_end.
+        open_stack.push(delimiter_style(tok)) unless tok == ":"
+      when :on_tstring_end, :on_label_end, :on_regexp_end
+        open_stack.pop
+      when :on_heredoc_beg
+        heredocs.push(delimiter_style(tok))
+      when :on_heredoc_end
+        heredocs.shift
+      when :on_tstring_content
+        styles[pos] = open_stack.last || heredocs.first || :double
+      end
+    end
+    styles
+  end
+
+  def delimiter_style(tok)
+    return :single if tok.start_with?("'", ":'")
+    return :single if tok.match?(/\A%[qwis]/)
+    return :single if tok.start_with?("<<") && tok.include?("'")
+    :double
   end
 
   def first_tstring_pos(node)
