@@ -155,8 +155,12 @@ export class SchemaCreation {
     if (o.ifNotExists) sql += " IF NOT EXISTS";
     sql += ` ${this.adapter.quoteTableName(o.tableName)}`;
 
+    // Rails: `statements = o.columns.map { |c| accept c }` — keep the map call
+    // (the api-compare wide gate tracks it); the promises are awaited in order.
     const statements: string[] = [];
-    for (const c of o.columns) statements.push(await this.visitColumnDefinition(c));
+    for (const pending of o.columns.map((c) => this.visitColumnDefinition(c))) {
+      statements.push(await pending);
+    }
 
     if (o.compositePrimaryKey && o.compositePrimaryKey.length > 0) {
       statements.push(this.visitPrimaryKeyDefinition({ name: o.compositePrimaryKey }));
