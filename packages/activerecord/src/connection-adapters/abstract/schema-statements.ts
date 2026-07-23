@@ -319,7 +319,7 @@ export class SchemaStatements {
     // supportsIndexSortOrder gate, which yields false on a cold connection
     // (mirrors addIndex's warm-up). Memoized → no-op when already warm.
     await this.adapter.getDatabaseVersion?.();
-    await this.preResolveDefaultCastTypes(td.columns);
+    await this.preResolvePendingDefaultCastTypes(td.columns);
     await this.adapter.execute(this.schemaCreation.accept(td));
 
     // Rails: if supports_comments? && !supports_comments_in_create?
@@ -415,14 +415,14 @@ export class SchemaStatements {
     const addColumnDef = await this.buildAddColumnDefinition(tableName, columnName, type, options);
     if (!addColumnDef) return;
     this.adapter.schemaCache?.clearDataSourceCacheBang(this.adapter.pool, tableName);
-    await this.preResolveDefaultCastTypes(addColumnDef.adds.map((add) => add.column));
+    await this.preResolvePendingDefaultCastTypes(addColumnDef.adds.map((add) => add.column));
     await this.adapter.execute(this.schemaCreation.accept(addColumnDef));
   }
 
   // PG resolves each pending DEFAULT's cast type with a live `::regtype::oid`
   // query (postgresql/quoting.rb:195) that the synchronous SchemaCreation
   // visitor cannot await; its adapter pre-resolves through this optional hook.
-  private async preResolveDefaultCastTypes(columns: ColumnDefinition[]): Promise<void> {
+  private async preResolvePendingDefaultCastTypes(columns: ColumnDefinition[]): Promise<void> {
     await (
       this.adapter as {
         preResolveDefaultCastTypes?: (columns: ColumnDefinition[]) => Promise<void>;
