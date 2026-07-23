@@ -1467,8 +1467,14 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
           // that stale view forever — leaving `columnNames()` reading the warm
           // cache's real columns while `attributeNames()` stays minimal. Drop
           // the flag so the next `loadSchema` re-reflects from the warm cache
-          // and merges the real columns into `_attributeDefinitions`.
-          if (host._schemaLoaded) host._schemaLoaded = false;
+          // and merges the real columns into `_attributeDefinitions`. The flag
+          // drop does not bump `_schemaRevision`, so also drop the name memos
+          // stamped against the synthesized view — otherwise `columnNames()`
+          // keeps serving the pre-warm list.
+          if (host._schemaLoaded) {
+            host._schemaLoaded = false;
+            clearAttributeNamesMemo(host);
+          }
           return new Set(names);
         }
       }
