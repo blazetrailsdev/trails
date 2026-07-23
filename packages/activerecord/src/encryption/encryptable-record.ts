@@ -177,6 +177,12 @@ export class EncryptableRecord {
   }
 
   static deterministicEncryptedAttributes(modelClass: any): Set<string> {
+    // Memoized per class like Rails' `@deterministic_encrypted_attributes ||=`
+    // (encryptable_record.rb:58-61); own-property-guarded so STI subclasses
+    // compute their own. Invalidated by `encryptAttribute` on new declarations.
+    if (Object.prototype.hasOwnProperty.call(modelClass, "_deterministicEncryptedAttributes")) {
+      return modelClass._deterministicEncryptedAttributes;
+    }
     const result = new Set<string>();
     for (const name of this.encryptedAttributes(modelClass)) {
       const type = encryptedTypeOf(getAttributeType(modelClass, name));
@@ -184,6 +190,7 @@ export class EncryptableRecord {
         result.add(name);
       }
     }
+    modelClass._deterministicEncryptedAttributes = result;
     return result;
   }
 
@@ -211,6 +218,7 @@ export class EncryptableRecord {
       modelClass._encryptedAttributes = new Set<string>(modelClass._encryptedAttributes ?? []);
     }
     modelClass._encryptedAttributes.add(name);
+    delete modelClass._deterministicEncryptedAttributes;
 
     // Build the per-attribute scheme (mirrors Rails scheme_for) unless the caller
     // supplied one. Each attribute gets its own scheme so per-attribute options
@@ -644,7 +652,8 @@ export class EncryptableRecord {
       } else {
         // Plaintext — return the cast value so typed columns (date, JSON, etc.)
         // keep their in-memory representation rather than the raw DB string.
-        result[name] = record.readAttribute?.(name) ?? raw;
+        result[name] =
+          typeof record.readAttribute === "function" ? record.readAttribute(name) : raw;
       }
     }
     return result;
