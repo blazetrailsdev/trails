@@ -103,6 +103,20 @@ function canonicalKey(value: unknown): string {
  */
 const NONSERIALIZABLE_SENTINEL = "\u0000serialized:";
 
+// Global-registry copy of encryption's ADDITIONAL_VALUE_BRAND
+// (encrypted-attribute-type.ts). Resolved via Symbol.for rather than an
+// import because encrypted-attribute-type.ts imports this module — the same
+// cycle the brand exists to break.
+const ADDITIONAL_VALUE_BRAND = Symbol.for("activerecord.encryption.AdditionalValue");
+
+function isAdditionalValue(value: unknown): boolean {
+  return (
+    typeof value === "object" &&
+    value !== null &&
+    (value as Record<symbol, unknown>)[ADDITIONAL_VALUE_BRAND] === true
+  );
+}
+
 /**
  * Recursively unwraps `toHash()`-bearing objects and sorts plain-object keys so
  * the resulting structure has a canonical, insertion-order-independent shape.
@@ -284,6 +298,12 @@ export class Serialized extends ValueType {
   }
 
   cast(value: unknown): unknown {
+    // Encryption AdditionalValue instances pass through cast unchanged so
+    // serialize() can unwrap them — same contract as
+    // EncryptedAttributeType.cast (see the brand's doc there). Needed here
+    // because a Serialized(Encrypted(...)) attribute's resolved type is this
+    // wrapper, so query expansion's AVs hit it first.
+    if (isAdditionalValue(value)) return value;
     // Rails: ActiveModel::Type::Helpers::Mutable#cast is always
     // `deserialize(serialize(value))`. Serializing first means a value the
     // coder can't round-trip (e.g. a non-Hash string like "somedata" through
@@ -294,6 +314,13 @@ export class Serialized extends ValueType {
 
   serialize(value: unknown): unknown {
     if (value === null || value === undefined) return null;
+    // Unwrap encryption AdditionalValues to their pre-computed ciphertext
+    // (computed through this full type at AV construction) instead of
+    // feeding the AV object to the coder. Mirrors what Rails'
+    // ExtendedEncryptableType prepend does for a bare EncryptedAttributeType;
+    // the AV-wrapped current value is a trails invention (Rails keeps the
+    // plaintext raw), so the wrapper type must honor it too.
+    if (isAdditionalValue(value)) return (value as { value: unknown }).value;
     if (this.isDefaultValue(value)) return null;
     const dumped = this.coder.dump(value);
     if (this.subtype.serialize) {

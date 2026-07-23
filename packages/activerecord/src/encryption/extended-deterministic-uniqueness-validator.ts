@@ -1,5 +1,9 @@
 import { EncryptableRecord, getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
-import { AdditionalValue, ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
+import {
+  AdditionalValue,
+  ExtendedDeterministicQueries,
+  type SerializableType,
+} from "./extended-deterministic-queries.js";
 import { withoutEncryption } from "./context.js";
 
 /**
@@ -115,13 +119,18 @@ export class EncryptedUniquenessValidator {
    * check for duplicates across scheme migrations.
    */
   static allCiphertextsFor(klass: any, attribute: string, value: unknown): unknown[] {
-    const type = encryptedTypeOf(getAttributeType(klass, attribute));
-    if (!type?.deterministic) {
+    // Rails resolves the FULL `type_for_attribute` type — for a
+    // Serialized(Encrypted(...)) attribute the coder dumps BEFORE encryption,
+    // matching the write path. `deterministic`/`previousTypes` reach the inner
+    // EncryptedAttributeType via delegation (encryptedTypeOf here).
+    const fullType = getAttributeType(klass, attribute) as SerializableType | undefined;
+    const type = encryptedTypeOf(fullType);
+    if (!fullType || !type?.deterministic) {
       return [value];
     }
 
     const results: Array<unknown | AdditionalValue> = [];
-    results.push(new AdditionalValue(value, type));
+    results.push(new AdditionalValue(value, fullType));
 
     for (const prevType of type.previousTypes) {
       results.push(new AdditionalValue(value, prevType));
