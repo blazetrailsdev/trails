@@ -496,12 +496,8 @@ export class PredicateBuilder {
     this.handlers.unshift([klass, handler]);
   }
 
-  /**
-   * Mirrors: `PredicateBuilder#build_bind_attribute` (predicate_builder.rb:67-69)
-   * — single-source `table.type(column_name)`, no fallback.
-   */
   buildBindAttribute(columnName: string, value: unknown): QueryAttribute {
-    return new QueryAttribute(columnName, value, this.typeOf(columnName));
+    return new QueryAttribute(columnName, value, this.table.type(columnName));
   }
 
   resolveArelAttribute(
