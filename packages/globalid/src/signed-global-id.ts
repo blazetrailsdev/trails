@@ -31,7 +31,7 @@ let _classExpiresIn: number | null | undefined;
 
 export interface SignedGlobalIDOptions {
   app?: string;
-  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). Explicit `null` disables purpose verification (Rails: `for: nil`). */
+  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string | null;
   /** Number of seconds until expiration. `null` explicitly disables expiration (Rails: `expires_in: nil`). */
   expiresIn?: number | null;
@@ -57,7 +57,7 @@ export interface FromUriOptions {
 }
 
 export interface ParseOptions {
-  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). Explicit `null` disables purpose verification (Rails: `for: nil`). */
+  /** Rails-canonical purpose option (`options.fetch :for, DEFAULT_PURPOSE`). */
   for?: string | null;
   /** Optional — falls back to `SignedGlobalID.verifier` when omitted. */
   verifier?: MessageVerifier;
@@ -203,12 +203,7 @@ export class SignedGlobalID {
     return v;
   }
 
-  /**
-   * Mirrors: SignedGlobalID.pick_purpose. Ruby's `options.fetch :for,
-   * DEFAULT_PURPOSE` is key-present: an explicit `for: nil` yields a nil
-   * purpose (purpose verification disabled), so only an absent/undefined
-   * key takes the default.
-   */
+  /** Mirrors: SignedGlobalID.pick_purpose. */
   static pickPurpose(options: { for?: string | null }): string | null {
     return options.for !== undefined ? options.for : DEFAULT_PURPOSE;
   }

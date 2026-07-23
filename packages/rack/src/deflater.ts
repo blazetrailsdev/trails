@@ -9,7 +9,6 @@ export interface DeflaterOptions {
     headers: Record<string, any>,
     body: any,
   ) => boolean;
-  /** Explicit `null` is honored (falsy — streaming sync off), matching Ruby's key-present `options.fetch(:sync, true)`. */
   sync?: boolean | null;
 }
 
@@ -30,8 +29,6 @@ export class Deflater {
     this.app = app;
     this.include = opts.include || null;
     this.condition = opts.if || null;
-    // Ruby: `@sync = options.fetch(:sync, true)` — key-present semantics, so
-    // an explicit null stays null (falsy); only an absent key takes the default.
     this.sync = opts.sync !== undefined ? opts.sync : true;
   }
 
