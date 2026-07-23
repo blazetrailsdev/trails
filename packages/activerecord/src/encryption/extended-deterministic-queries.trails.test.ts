@@ -122,14 +122,12 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     expect(await EncryptedSerializedBook.exists({ name: "Dune" })).toBe(true);
   });
 
-  // Rails-verified (vendored Rails 8.1, sqlite3, extend_queries installed):
-  // a deterministic Serialized(Encrypted) attribute WITH previous schemes
-  // raises NoMethodError on any plaintext lookup — the expansion's
-  // AdditionalValue reaches Type::Serialized#serialize, the JSON coder's
-  // as_json traversal descends into the AV's @type (a bare previous-scheme
-  // EncryptedAttributeType), and ActiveModel::Type::Value#as_json raises
-  // (value.rb:145). No SQL is generated, so no scheme/key material can land
-  // in a bind. Our Type#toJSON mirrors that raise for JSON.stringify.
+  // Rails-verified (vendored Rails, sqlite3, extend_queries installed): with
+  // previous schemes, plaintext lookups raise NoMethodError — the expansion's
+  // AdditionalValue reaches Type::Serialized#serialize and the JSON coder's
+  // as_json traversal hits ActiveModel::Type::Value#as_json (value.rb:145)
+  // via the AV's @type. No SQL is generated, so no scheme/key material can
+  // land in a bind.
   it("raises NoMethodError when a previous-scheme candidate reaches the serialized coder", async () => {
     await expect(PreviousSchemeSerializedBook.findBy({ name: "Dune" })).rejects.toThrow(
       NoMethodError,

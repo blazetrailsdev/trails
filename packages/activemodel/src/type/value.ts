@@ -109,12 +109,10 @@ export abstract class Type<T = unknown> {
     throw new NoMethodError("Unimplemented");
   }
 
-  // Rails' JSON encoder reaches every nested object's `as_json`, so a type
-  // buried inside a value being coder-dumped hits the raise above
-  // (value.rb:145) — e.g. a previous-scheme AdditionalValue reaching
-  // Type::Serialized#serialize. `JSON.stringify`'s analogous hook is
-  // `toJSON`; without it, stringify would silently dump the type's
-  // internals (scheme/key material) into the payload instead of raising.
+  // `JSON.stringify`'s analogue of the `as_json` hook Rails' JSON encoder
+  // reaches on every nested object: a type buried inside a coder-dumped value
+  // must hit the value.rb:145 raise, not silently dump its internals
+  // (scheme/key material) into the payload.
   toJSON(): never {
     return this.asJson();
   }
