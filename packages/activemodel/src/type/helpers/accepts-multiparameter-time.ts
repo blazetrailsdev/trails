@@ -122,7 +122,9 @@ export class AcceptsMultiparameterTime {
       // domain (month 13, mday 32, hour 25 — verified on Ruby 3.3), which AR
       // surfaces as MultiparameterAssignmentErrors. Roll over only inside that
       // accepted domain; otherwise raise to match Time's strictness.
-      const midnight24 = hour === 24 && minute === 0 && wholeSecond === 0 && totalNanoseconds === 0;
+      // Ruby requires min and whole sec to be 0 at hour 24 but accepts a
+      // fractional second: Time.utc(2004,1,1,24,0,0.1) → 2004-01-02 00:00:00.1.
+      const midnight24 = hour === 24 && minute === 0 && wholeSecond === 0;
       if (
         month >= 1 &&
         month <= 12 &&
