@@ -635,8 +635,6 @@ describe("HasManyThroughAssociationsTest", () => {
   });
 
   it("pushing a persisted record with unsaved changes saves those changes", async () => {
-    // Same gate as the `concat` case above — Rails runs both entry points
-    // through `insert_record`, so `push` must save a dirty persisted target too.
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("michael").id);
     person.writeAttribute("first_name", "Bongo");

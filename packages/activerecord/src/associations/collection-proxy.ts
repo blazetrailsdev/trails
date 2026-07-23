@@ -2324,20 +2324,14 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // write a null owner FK (the owner has no id yet) and double-insert
           // once the autosave runs.
           if (this._record.isNewRecord()) return true;
-          // Save the target record if it's new. Mirrors Rails' concat (<<) which
-          // always raises on validation failure (raise_on_validation_error? == true).
-          if (record.isNewRecord()) {
-            if (bang) {
-              await record.saveBang(); // raises RecordInvalid if invalid
-            } else {
-              await record.saveBang(); // << always raises on new-record failure
-            }
-          } else if (record.hasChangesToSave) {
-            // Second arm of Rails' `record.new_record? || record.has_changes_to_save?`
-            // gate (has_many_through_association.rb:27): a persisted-but-dirty target
-            // is saved before the join row is written, and `return unless super`
-            // leaves it out of the target when that save fails.
-            if (bang) {
+          // Mirrors HasManyThroughAssociation#insert_record's
+          // `if record.new_record? || record.has_changes_to_save?; return unless super`
+          // (has_many_through_association.rb:26-29): a new *or* persisted-but-dirty
+          // target is saved before the join row is written, and a save that merely
+          // returns false leaves the record out of the target. A new record always
+          // raises instead, as concat (<<) does (raise_on_validation_error? == true).
+          if (record.isNewRecord() || record.hasChangesToSave) {
+            if (bang || record.isNewRecord()) {
               await record.saveBang();
             } else if (!(await record.save())) {
               return false;
