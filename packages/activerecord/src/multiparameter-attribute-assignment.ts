@@ -67,7 +67,11 @@ export function extractMultiparameterCallstack(attrs: Record<string, unknown>): 
       } else {
         castValue = isBlank(value) ? null : value;
       }
-      if (!(name in multiparams)) multiparams[name] = Object.create(null);
+      // Inner parts maps use a normal prototype: their keys are regex-guaranteed
+      // digits (no pollution vector), and the hash is written to the attribute,
+      // where a null-prototype object would make String(hash) throw for
+      // non-date columns (Rails' hash.to_s never raises).
+      if (!(name in multiparams)) multiparams[name] = {};
       multiparams[name][pos] = castValue;
     } else {
       regular[key] = value;

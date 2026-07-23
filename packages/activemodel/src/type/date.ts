@@ -148,11 +148,10 @@ export class DateType extends ValueType<DateCastResult> {
   protected valueFromMultiparameterAssignment(
     values: Record<number, unknown>,
   ): Temporal.PlainDate | null {
-    // Rails' `super` (AcceptsMultiparameterTime's Time assembly, which rolls
-    // within-range overflow like Time.local: Nov 31 → Dec 1); the wrapper's
-    // cast(pdt) round-trip is the `new_date` narrowing via castValue's
-    // PlainDateTime branch.
-    return new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
+    // Rails' `super` — AcceptsMultiparameterTime's Time assembly, which rolls
+    // within-range overflow like Time.local (Nov 31 → Dec 1).
+    const time = new AcceptsMultiparameterTime(this).cast(values) as Temporal.PlainDate | null;
+    return time && this.newDate(time.year, time.month, time.day);
   }
 
   /**
