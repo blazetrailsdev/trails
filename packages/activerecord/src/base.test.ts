@@ -24,6 +24,18 @@ import { withTimezoneConfig } from "./test-helper.js";
 import { IntegerType, Type } from "@blazetrails/activemodel";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { Company as CanonicalCompany } from "./test-helpers/models/company.js";
+import { PostRecord } from "./test-helpers/models/post.js";
+import { Subscriber } from "./test-helpers/models/subscriber.js";
+// Aliased: bespoke in-test `class Developer` declarations below would
+// otherwise collide and get esbuild-renamed (Developer2 → "developer2s").
+import {
+  Developer as CanonicalDeveloper,
+  SubDeveloper,
+  SymbolIgnoredDeveloper,
+  AttributedDeveloper,
+} from "./test-helpers/models/developer.js";
+import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
 
@@ -37,8 +49,7 @@ describe("BasicsTest", () => {
   });
 
   it("table name based on model name", () => {
-    class User extends Base {}
-    expect(User.tableName).toBe("users");
+    expect(PostRecord.tableName).toBe("posts");
   });
 
   it("switching between table name", () => {
@@ -240,24 +251,6 @@ describe("BasicsTest", () => {
     expect(AbstractModel.abstractClass).toBe(true);
   });
 
-  it("initialize with invalid attribute", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-      }
-    }
-    // Mirrors Rails: constructing with a genuinely-unknown key raises
-    // UnknownAttributeError (attribute_assignment.rb:56-58), carrying the key.
-    let error: unknown;
-    try {
-      new User({ name: "test", unknown: "value" } as any);
-    } catch (e) {
-      error = e;
-    }
-    expect((error as { name?: string })?.name).toBe("UnknownAttributeError");
-    expect((error as { attribute?: string })?.attribute).toBe("unknown");
-  });
-
   it("many mutations", async () => {
     class User extends Base {
       static {
@@ -393,12 +386,8 @@ describe("BasicsTest", () => {
   });
 
   it("columns should obey set primary key", () => {
-    class User extends Base {
-      static {
-        this.primaryKey = "uuid";
-      }
-    }
-    expect(User.primaryKey).toBe("uuid");
+    const pk = Subscriber.columnsHash()[Subscriber.primaryKey as string];
+    expect(pk.name, "nick should be primary key").toBe("nick");
   });
   it("comparison with different objects", () => {
     class Post extends Base {
@@ -634,16 +623,6 @@ describe("BasicsTest", () => {
 
     const topic = Topic.instantiate(attrs, { author_name: new Typecast() }) as any;
     expect(topic.author_name).toBe("t.lo");
-  });
-
-  it("typecasting aliases", async () => {
-    class Post extends Base {
-      static {
-        this.attribute("views", "integer");
-      }
-    }
-    const p = new Post({ views: "3" } as any);
-    expect((p as any).views).toBe(3);
   });
 
   it("dont clear inheritance column when setting explicitly", () => {
@@ -1483,15 +1462,15 @@ describe("BasicsTest", () => {
     expect(User.tableName).toBe("custom_table");
   });
   it("set table name with inheritance", () => {
-    class Parent extends Base {
-      static {
-        this.tableName = "custom_parents";
+    // Rails: anonymous Class.new(ActiveRecord::Base) with `def k.name; "Foo";
+    // end` and `def k.table_name; super + "ks"; end`.
+    class k extends Base {
+      static get tableName(): string {
+        return super.tableName + "ks";
       }
     }
-    class Child extends Parent {}
-    // In Rails, STI children inherit the parent's table name
-    // but non-STI children compute their own
-    expect(Parent.tableName).toBe("custom_parents");
+    Object.defineProperty(k, "name", { value: "Foo" });
+    expect(k.tableName).toBe("foosks");
   });
   it("sequence name with abstract class", () => {
     class AbstractModel extends Base {
@@ -1621,34 +1600,34 @@ describe("BasicsTest", () => {
     expect(NonExistentTable.attributeNames()).toEqual([]);
   });
   it("table name with 2 abstract subclasses", () => {
-    class AbstractBase extends Base {
+    class FirstAbstractClass extends Base {
       static {
         this.abstractClass = true;
       }
     }
-    class AbstractMiddle extends AbstractBase {
+    class SecondAbstractClass extends FirstAbstractClass {
       static {
         this.abstractClass = true;
       }
     }
-    class Concrete extends AbstractMiddle {}
-    expect(Concrete.tableName).toBe("concretes");
+    class Photo extends SecondAbstractClass {}
+    expect(Photo.tableName).toBe("photos");
   });
   it.skipIf(adapterType !== "postgres")("column types on queries on postgresql", async () => {
     const pgAdapter = Base.connection;
     const result = await pgAdapter.execQuery("SELECT 1 AS test");
     expect(result.columnTypes["test"]).toBeInstanceOf(IntegerType);
   });
-  it("ignored columns are not present in columns_hash", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("secret", "string");
-        this.ignoredColumns = ["secret"];
-      }
-    }
-    // ignoredColumns is set
-    expect(User.ignoredColumns).toContain("secret");
+  it("ignored columns are not present in columns_hash", async () => {
+    const conn = Base.connection;
+    const cacheColumns = await conn.schemaCache.columnsHash(
+      conn.pool,
+      CanonicalDeveloper.tableName,
+    );
+    expect(Object.keys(cacheColumns ?? {})).toContain("first_name");
+    expect(Object.keys(CanonicalDeveloper.columnsHash())).not.toContain("first_name");
+    expect(Object.keys(SubDeveloper.columnsHash())).not.toContain("first_name");
+    expect(Object.keys(SymbolIgnoredDeveloper.columnsHash())).not.toContain("first_name");
   });
   it(".columns_hash raises an error if the record has an empty table name", () => {
     class FirstAbstractClass extends Base {
@@ -1695,16 +1674,14 @@ describe("BasicsTest", () => {
     expect(User.columnNames()).not.toContain("secret");
     expect("secret" in u).toBe(false);
   });
-  it("when ignored attribute is loaded, cast type should be preferred over DB type", () => {
-    class User extends Base {
-      static {
-        this.attribute("name", "string");
-        this.attribute("age", "integer");
-        this.ignoredColumns = ["age"];
-      }
-    }
-    expect(User.columnNames()).not.toContain("age");
-    expect(User.hasAttributeDefinition("age")).toBe(true);
+  it("when ignored attribute is loaded, cast type should be preferred over DB type", async () => {
+    const developer = await AttributedDeveloper.create();
+    await developer.updateColumn("name", "name");
+
+    const loadedDeveloper = await AttributedDeveloper.where({ id: developer.id })
+      .select("*")
+      .first();
+    expect(loadedDeveloper!.name).toBe("Developer: name");
   });
   // Rails base_test.rb: ColumnNamesCachedDeveloper sets ignored_columns and
   // asserts the ignored column is absent from column_names. column_names is
@@ -2118,16 +2095,6 @@ describe("BasicsTest", () => {
     expect(company.hasAttribute("age")).toBe(false);
   });
 
-  it("bignum", async () => {
-    class Company extends Base {
-      static {
-        this.attribute("rating", "big_integer");
-      }
-    }
-    const c = await Company.create({ rating: 9007199254740991 });
-    expect(Number(c.rating)).toBe(9007199254740991);
-  });
-
   it("clear cache when setting table name", () => {
     class MyModel extends Base {}
     MyModel.tableName = "my_table";
@@ -2183,13 +2150,10 @@ describe("BasicsTest", () => {
     await expect(Post.find("1 OR 1=1" as any)).rejects.toThrow();
   });
 
-  it("unicode column name", () => {
-    class M extends Base {
-      static {
-        this.attribute("名前", "string");
-      }
-    }
-    expect(M.hasAttributeDefinition("名前")).toBe(true);
+  it("unicode column name", async () => {
+    class Weird extends Base {}
+    const weird = await Weird.create({ なまえ: "たこ焼き仮面" });
+    expect((weird as any).なまえ).toBe("たこ焼き仮面");
   });
 });
 
@@ -2226,6 +2190,40 @@ describe("BasicsTest", () => {
       }
     }
     expect(User.tableName).toBe("app_users");
+  });
+});
+
+describe("BasicsTest", () => {
+  fixtures(["companies", "topics"]);
+
+  it("initialize with invalid attribute", () => {
+    let ex: MultiparameterAssignmentErrors | undefined;
+    try {
+      new CanonicalTopic({
+        title: "test",
+        "written_on(4i)": "16",
+        "written_on(5i)": "24",
+        "written_on(6i)": "00",
+      } as never);
+    } catch (e) {
+      ex = e as MultiparameterAssignmentErrors;
+    }
+    expect(ex).toBeInstanceOf(MultiparameterAssignmentErrors);
+    expect(ex!.errors.length).toBe(1);
+    expect((ex!.errors[0] as AttributeAssignmentError).attribute).toBe("written_on");
+  });
+
+  it("typecasting aliases", async () => {
+    const topic = await CanonicalTopic.select("10 as tenderlove").first();
+    expect((topic as any).tenderlove).toBe(10);
+  });
+
+  it("bignum", async () => {
+    let company = await CanonicalCompany.find(1);
+    (company as any).rating = 2147483648;
+    await company.save();
+    company = await CanonicalCompany.find(1);
+    expect((company as any).rating).toBe(2147483648);
   });
 });
 
