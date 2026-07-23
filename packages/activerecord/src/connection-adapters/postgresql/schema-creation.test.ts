@@ -143,9 +143,12 @@ describe("PostgreSQL SchemaCreation", () => {
     expect(
       await s().addColumnOptionsBang("n", { as: "a||b", stored: true, column: col }),
     ).toContain("STORED");
-    expect(() => s().addColumnOptionsBang("n", { as: "a||b", stored: false, column: col })).toThrow(
-      "VIRTUAL",
-    );
+    // async wrapper: the visitor surface is Promise-returning, but the
+    // VIRTUAL guard (_pgGeneratedClause) currently throws synchronously —
+    // rejects.toThrow covers both shapes.
+    await expect(async () =>
+      s().addColumnOptionsBang("n", { as: "a||b", stored: false, column: col }),
+    ).rejects.toThrow("VIRTUAL");
   });
 
   it("visitExclusionConstraintDefinition: deferrable true → DEFERRABLE without INITIALLY", () => {
