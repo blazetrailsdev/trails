@@ -872,7 +872,7 @@ function clearStiSubclassLocalCaches(sub: SchemaHost): void {
     if (sharesStiBaseTable(deeper)) {
       clearStiSubclassLocalCaches(deeper);
     } else {
-      reloadSchemaMemosAndRecurse(deeper);
+      reloadSchemaFromCache.call(deeper);
     }
   }
 }
@@ -905,28 +905,24 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
     reloadSchemaFromCache.call(getStiBase(this) as SchemaHost);
     return;
   }
-  reloadSchemaMemosAndRecurse(this);
-}
-
-function reloadSchemaMemosAndRecurse(host: SchemaHost): void {
-  host._columnsHash = undefined;
-  host._columns = undefined;
-  host._returningColumnsForInsertCache = undefined;
-  host._attributesBuilder = undefined;
-  host._schemaLoaded = false;
-  host._virtualAttributesReconciled = false;
-  host._schemaRevision = (host._schemaRevision ?? 0) + 1;
-  (host as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
-  (host as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-  clearAttributeNamesMemo(host);
-  if (Object.prototype.hasOwnProperty.call(host, "_attributeDefinitions")) {
-    scrubSchemaSourcedDefinitions(host);
+  this._columnsHash = undefined;
+  this._columns = undefined;
+  this._returningColumnsForInsertCache = undefined;
+  this._attributesBuilder = undefined;
+  this._schemaLoaded = false;
+  this._virtualAttributesReconciled = false;
+  this._schemaRevision = (this._schemaRevision ?? 0) + 1;
+  (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
+  (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
+  clearAttributeNamesMemo(this);
+  if (Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) {
+    scrubSchemaSourcedDefinitions(this);
   }
-  for (const sub of (host as { subclasses?: SchemaHost[] }).subclasses ?? []) {
+  for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
     if (isStiSubclass(sub) && sharesStiBaseTable(sub)) {
       clearStiSubclassLocalCaches(sub);
     } else {
-      reloadSchemaMemosAndRecurse(sub);
+      reloadSchemaFromCache.call(sub);
     }
   }
 }
