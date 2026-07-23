@@ -83,7 +83,9 @@ import {
   UniqueReply as HmUniqueReply,
   SillyUniqueReply as HmSillyUniqueReply,
 } from "../test-helpers/models/reply.js";
-import { Ship as HmShip } from "../test-helpers/models/ship.js";
+import { Ship as HmShip, FamousShip } from "../test-helpers/models/ship.js";
+import { FamousPirate } from "../test-helpers/models/pirate.js";
+import { Reference as HmReference } from "../test-helpers/models/reference.js";
 import { ShipPart as HmShipPart } from "../test-helpers/models/ship-part.js";
 import { Treasure as HmTreasure } from "../test-helpers/models/treasure.js";
 import { SubStiPost as HmSubStiPost } from "../test-helpers/models/post.js";
@@ -640,6 +642,7 @@ describe("HasManyAssociationsTest", () => {
   registerModel(HmFirm);
   registerModel(Client);
   registerModel(Developer);
+  registerModel(AuditLog);
   registerModel(Project);
   enableSti(Company);
   registerSubclass(HmFirm);
@@ -655,6 +658,16 @@ describe("HasManyAssociationsTest", () => {
   it("counting with single hash", async () => {
     const firm = (await HmFirm.first()) as any;
     expect(await firm.plainClients.where({ name: "Microsoft" }).count()).toBe(1);
+  });
+
+  it("counting with counter sql", async () => {
+    const firm = (await HmFirm.first()) as any;
+    expect(await firm.clients.count()).toBe(3);
+  });
+
+  it("counting with column name and hash", async () => {
+    const firm = (await HmFirm.first()) as any;
+    expect(await firm.plainClients.count("name")).toBe(3);
   });
 
   it("counting with association limit", async () => {
@@ -697,6 +710,87 @@ describe("HasManyAssociationsTest", () => {
     const firm = (await HmFirm.first()) as any;
     const client = await firm.clientsLikeMs.first();
     expect(client.name).toBe("Microsoft");
+  });
+
+  it("finding default orders", async () => {
+    const firm = (await HmFirm.first()) as any;
+    expect((await firm.clients.first()).name).toBe("Summit");
+  });
+
+  it("finding with different class name and order", async () => {
+    const firm = (await HmFirm.first()) as any;
+    expect((await firm.clientsSortedDesc.first()).name).toBe("Apex");
+  });
+
+  it("finding with condition hash", async () => {
+    const firm = (await HmFirm.first()) as any;
+    expect((await firm.clientsLikeMsWithHashConditions.first()).name).toBe("Microsoft");
+  });
+
+  it("collection size after building", async () => {
+    const company = companies("first_firm") as any;
+    company.clientsOfFirm.build({ name: "Another Client" });
+    company.clientsOfFirm.build({ name: "Yet Another Client" });
+    expect(await company.clientsOfFirm.size()).toBe(4);
+    expect(new Set(await company.clientsOfFirm).size).toBe(4);
+  });
+
+  it("build many via block", async () => {
+    const company = companies("first_firm") as any;
+
+    let newClients: any[] = [];
+    await assertQueriesCount(0, false, async () => {
+      newClients = company.clientsOfFirm.build(
+        [{ name: "Another Client" }, { name: "Another Client II" }],
+        (client: any) => {
+          client.name = "changed";
+        },
+      );
+    });
+
+    expect(newClients.length).toBe(2);
+    expect(newClients[0].name).toBe("changed");
+    expect(newClients[newClients.length - 1].name).toBe("changed");
+  });
+
+  it("create without loading association", async () => {
+    const firstFirm = companies("first_firm") as any;
+
+    expect(await firstFirm.clientsOfFirm.size()).toBe(2);
+    firstFirm.clientsOfFirm.reset();
+
+    await assertQueriesCount(3, false, async () => {
+      await firstFirm.clientsOfFirm.create({ name: "Superstars" });
+    });
+
+    expect(await firstFirm.clientsOfFirm.size()).toBe(3);
+  });
+
+  it("create many", async () => {
+    const company = companies("first_firm") as any;
+    await company.clientsOfFirm.create([{ name: "Another Client" }, { name: "Another Client II" }]);
+    await company.clientsOfFirm.reload();
+    expect(await company.clientsOfFirm.size()).toBe(4);
+  });
+
+  it("replace with new", async () => {
+    const firm = (await HmFirm.first()) as any;
+    firm.clients = [companies("second_client"), Client.new({ name: "New Client" })];
+    await firm.save();
+    await firm.reload();
+    const clients = await firm.clients;
+    expect(clients.length).toBe(2);
+    expect(clients.some((c: any) => c.isEqual(companies("first_client")))).toBe(false);
+  });
+
+  it("association size calculation works with default scoped selects when not previously fetched", async () => {
+    const firm = (await HmFirm.createBang({ name: "Firm" })) as any;
+    for (let i = 0; i < 5; i++) {
+      await firm.developersWithSelect.push(await Developer.createBang({ name: "Developer" }));
+    }
+
+    const sameFirm = (await HmFirm.find(firm.id)) as any;
+    expect(await sameFirm.developersWithSelect.size()).toBe(5);
   });
 
   it("find ids", async () => {
@@ -1360,11 +1454,13 @@ describe("HasManyAssociationsTest", () => {
   });
 
   it("update all respects association scope", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "Old", body: "body" });
-    await HmPost.where({ author_id: author.id }).updateAll({ title: "Updated" });
-    const posts = await HmPost.where({ author_id: author.id });
-    expect(posts.every((p: any) => p.title === "Updated")).toBe(true);
+    registerModel(HmPerson);
+    registerModel(HmReference);
+    const person = HmPerson.new() as any;
+    person.first_name = "Naruto";
+    await person.references.push(HmReference.new());
+    await person.saveBang();
+    expect(await person.references.updateAll({ favorite: true })).toBe(1);
   });
 
   it("no sql should be fired if association already loaded", async () => {
@@ -1490,19 +1586,42 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.length).toBe(1);
   });
   it("default scope on relations is not cached", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    const posts1 = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
+    let counter = 0;
+    class DefaultScopeCounterComment extends Base {
+      static {
+        this.tableName = "comments";
+        this.belongsTo("post", { className: "DefaultScopeCounterPost", foreignKey: "post_id" });
+        this.defaultScope((q: any) => {
+          counter += 1;
+          return q.where(`id = ${counter}`);
+        });
+      }
+    }
+    class DefaultScopeCounterPost extends Base {
+      declare comments: AssociationProxy<DefaultScopeCounterComment>;
+
+      static {
+        this.tableName = "posts";
+        this.hasMany("comments", {
+          className: "DefaultScopeCounterComment",
+          foreignKey: "post_id",
+        });
+      }
+    }
+    registerModel(DefaultScopeCounterComment);
+    registerModel(DefaultScopeCounterPost);
+    await DefaultScopeCounterPost.create({ title: "Welcome", body: "body" });
+    expect(counter).toBe(0);
+    const post = (await DefaultScopeCounterPost.first()) as any;
+    expect(counter).toBe(0);
+    const queries = await captureSql(async () => {
+      await post.comments.toArray();
     });
-    expect(posts1.length).toBe(1);
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts2 = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
+    post.comments.reset();
+    const queries2 = await captureSql(async () => {
+      await post.comments.toArray();
     });
-    expect(posts2.length).toBe(2);
+    expect(queries2).not.toEqual(queries);
   });
   it("add record to collection should change its updated at", async () => {
     registerModel(HmShip);
@@ -2107,44 +2226,6 @@ describe("HasManyAssociationsTest", () => {
     const reloaded2 = await CcResetAuthor.find(author.id!);
     expect((reloaded2 as any).posts_count).toBe(2);
   });
-  it("counting with counter sql", async () => {
-    class CcSqlAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class CcSqlPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CcSqlAuthor);
-    registerModel(CcSqlPost);
-    const author = await CcSqlAuthor.create({ name: "Alice" });
-    await CcSqlPost.create({ author_id: author.id, title: "A", body: "body" });
-    await CcSqlPost.create({ author_id: author.id, title: "B", body: "body" });
-    const count = await CcSqlPost.where({ author_id: author.id }).count();
-    expect(count).toBe(2);
-  });
-  it("counting with column name and hash", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const withTitle = posts.filter((p: any) => p.title === "A");
-    expect(withTitle.length).toBe(1);
-  });
   it("finding array compatibility", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
@@ -2332,71 +2413,6 @@ describe("HasManyAssociationsTest", () => {
       expect(e.message).toMatch(/readonly/i);
     }
   });
-  it("finding default orders", async () => {
-    class DefOrdAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class DefOrdPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DefOrdAuthor);
-    registerModel(DefOrdPost);
-    const author = await DefOrdAuthor.create({ name: "Alice" });
-    await DefOrdPost.create({ author_id: author.id, title: "First", body: "body" });
-    await DefOrdPost.create({ author_id: author.id, title: "Second", body: "body" });
-    const posts = await loadHasMany(author, "def_ord_posts", {
-      className: "DefOrdPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(2);
-  });
-  it("finding with different class name and order", async () => {
-    class DiffNameAuthor extends Base {
-      declare name: string | null;
-      declare articles: AssociationProxy<DiffNameArticle>;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-        this.hasMany("articles", {
-          className: "DiffNameArticle",
-          foreignKey: "author_id",
-        });
-      }
-    }
-    class DiffNameArticle extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(DiffNameAuthor);
-    registerModel(DiffNameArticle);
-    const author = await DiffNameAuthor.create({ name: "Alice" });
-    await DiffNameArticle.create({ author_id: author.id, title: "A", body: "body" });
-    await DiffNameArticle.create({ author_id: author.id, title: "B", body: "body" });
-    const articles = await loadHasMany(author, "articles", {
-      className: "DiffNameArticle",
-      foreignKey: "author_id",
-    });
-    expect(articles.length).toBe(2);
-  });
   it("finding with foreign key", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
@@ -2409,17 +2425,6 @@ describe("HasManyAssociationsTest", () => {
     expect((posts[0] as any).title).toBe("A");
   });
 
-  it("finding with condition hash", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "match", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "other", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    const filtered = posts.filter((p: any) => p.title === "match");
-    expect(filtered.length).toBe(1);
-  });
   it("finding using primary key", async () => {
     class PkAuthor extends Base {
       declare name: string | null;
@@ -2780,44 +2785,6 @@ describe("HasManyAssociationsTest", () => {
     const xPosts = posts.filter((p: any) => p.title === "X");
     expect(xPosts.length).toBe(2);
   });
-  it("find scoped grouped having", async () => {
-    class GrpAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class GrpPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(GrpAuthor);
-    registerModel(GrpPost);
-    const author = await GrpAuthor.create({ name: "Alice" });
-    await GrpPost.create({ author_id: author.id, title: "A", body: "body" });
-    await GrpPost.create({ author_id: author.id, title: "A", body: "body" });
-    await GrpPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "grp_posts", {
-      className: "GrpPost",
-      foreignKey: "author_id",
-    });
-    // Group by title and filter
-    const grouped: Record<string, number> = {};
-    for (const p of posts) {
-      const t = (p as any).title;
-      grouped[t] = (grouped[t] || 0) + 1;
-    }
-    expect(grouped["A"]).toBe(2);
-    expect(grouped["B"]).toBe(1);
-  });
   it("default select", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
@@ -3078,73 +3045,6 @@ describe("HasManyAssociationsTest", () => {
     const post = BuildNoLoadPost.new({ author_id: author.id, title: "Built" });
     expect(post.isNewRecord()).toBe(true);
     expect((post as any).author_id).toBe(Number(author.id));
-  });
-
-  it("build many via block", async () => {
-    class BuildManyBlockAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class BuildManyBlockPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(BuildManyBlockAuthor);
-    registerModel(BuildManyBlockPost);
-    const author = await BuildManyBlockAuthor.create({ name: "Alice" });
-    const posts = ["A", "B", "C"].map((title) => {
-      const post = BuildManyBlockPost.new({ author_id: author.id });
-      post.title = title;
-      return post;
-    });
-    expect(posts.length).toBe(3);
-    expect(posts.every((p) => p.isNewRecord())).toBe(true);
-    expect((posts[0] as any).title).toBe("A");
-  });
-
-  it("create without loading association", async () => {
-    class CreateNoLoadAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class CreateNoLoadPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CreateNoLoadAuthor);
-    registerModel(CreateNoLoadPost);
-    const author = await CreateNoLoadAuthor.create({ name: "Alice" });
-    const post = await CreateNoLoadPost.create({
-      author_id: author.id,
-      title: "Created",
-      body: "body",
-    });
-    expect(post.isNewRecord()).toBe(false);
-    const posts = await loadHasMany(author, "create_no_load_posts", {
-      className: "CreateNoLoadPost",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
   });
 
   it("create followed by save does not load target", async () => {
@@ -5309,30 +5209,11 @@ describe("HasManyAssociationsTest", () => {
     expect((post as any).title).toBe("Init");
   });
   it("attributes are set when initialized from has many null relationship", async () => {
-    class NullRelAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class NullRelPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(NullRelAuthor);
-    registerModel(NullRelPost);
-    // Building a post with null FK (no parent)
-    const post = NullRelPost.new({ author_id: null as any, title: "Orphan" });
-    expect((post as any).author_id).toBeNull();
-    expect((post as any).title).toBe("Orphan");
+    registerModel(HmCar);
+    registerModel(HmBulb);
+    const car = HmCar.new({ name: "honda" }) as any;
+    const bulb = await car.bulbs.where({ name: "headlight" }).firstOrInitialize();
+    expect(bulb.name).toBe("headlight");
   });
   it("replace returns target", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
@@ -5729,29 +5610,15 @@ describe("HasManyAssociationsTest", () => {
     expect(post.isDestroyed()).toBe(true);
   });
   it("passes custom context validation to validate children", async () => {
-    class CtxValAuthor extends Base {
-      declare name: string | null;
+    registerModel(FamousPirate);
+    registerModel(FamousShip);
+    const pirate = FamousPirate.new() as any;
+    const ship = FamousShip.new() as any;
+    await pirate.famousShips.push(ship);
 
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class CtxValPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(CtxValAuthor);
-    registerModel(CtxValPost);
-    const author = await CtxValAuthor.create({ name: "Alice" });
-    const post = await CtxValPost.create({ author_id: author.id, title: "Valid", body: "body" });
-    expect(post.isPersisted()).toBe(true);
+    expect(await pirate.isValid()).toBe(true);
+    expect(await pirate.isValid("conference")).toBe(false);
+    expect(ship.errors.get("name")[0]).toBe("can't be blank");
   });
   it("association with instance dependent scope", async () => {
     class InstScopeAuthor extends Base {
@@ -5944,33 +5811,6 @@ describe("HasManyAssociationsTest", () => {
     });
     expect(oldPosts.length).toBe(0);
     expect(newPosts.length).toBe(1);
-  });
-  it("association size calculation works with default scoped selects when not previously fetched", async () => {
-    class SizeCalcAuthor extends Base {
-      declare name: string | null;
-
-      static {
-        this._tableName = "authors";
-        this.attribute("name", "string");
-      }
-    }
-    class SizeCalcPost extends Base {
-      declare author_id: number | null;
-      declare title: string | null;
-
-      static {
-        this._tableName = "posts";
-        this.attribute("author_id", "integer");
-        this.attribute("title", "string");
-      }
-    }
-    registerModel(SizeCalcAuthor);
-    registerModel(SizeCalcPost);
-    const author = await SizeCalcAuthor.create({ name: "Alice" });
-    await SizeCalcPost.create({ author_id: author.id, title: "A", body: "body" });
-    await SizeCalcPost.create({ author_id: author.id, title: "B", body: "body" });
-    const count = await SizeCalcPost.where({ author_id: author.id }).count();
-    expect(count).toBe(2);
   });
   it("prevent double firing the before save callback of new object when the parent association saved in the callback", async () => {
     class DblFireAuthor extends Base {
@@ -6470,18 +6310,6 @@ describe("HasManyAssociationsTest", () => {
     expect(posts.every((p) => p.isNewRecord())).toBe(true);
   });
 
-  it("collection size after building", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "Saved", body: "body" });
-    const newPost = HmPost.new({ author_id: author.id, title: "Built" });
-    expect(newPost.isNewRecord()).toBe(true);
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(1);
-  });
-
   it("collection not empty after building", async () => {
     const author = await HmAuthor.create({ name: "Alice" });
     await HmPost.create({ author_id: author.id, title: "A", body: "body" });
@@ -6513,17 +6341,6 @@ describe("HasManyAssociationsTest", () => {
     const post = await HmPost.create({ author_id: author.id, title: "Created", body: "body" });
     expect(post.isNewRecord()).toBe(false);
     expect(post.id).toBeDefined();
-  });
-
-  it("create many", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    await HmPost.create({ author_id: author.id, title: "A", body: "body" });
-    await HmPost.create({ author_id: author.id, title: "B", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.length).toBe(2);
   });
 
   it("create with bang on has many when parent is new raises", async () => {
@@ -6581,19 +6398,6 @@ describe("HasManyAssociationsTest", () => {
       foreignKey: "author_id",
     });
     expect(remaining.length).toBe(1);
-  });
-
-  it("replace with new", async () => {
-    const author = await HmAuthor.create({ name: "Alice" });
-    const oldPost = await HmPost.create({ author_id: author.id, title: "Old", body: "body" });
-    await oldPost.destroy();
-    const newPost = await HmPost.create({ author_id: author.id, title: "New", body: "body" });
-    const posts = await loadHasMany(author, "posts", {
-      className: "Post",
-      foreignKey: "author_id",
-    });
-    expect(posts.some((p: any) => p.id === newPost.id)).toBe(true);
-    expect(posts.some((p: any) => p.id === oldPost.id)).toBe(false);
   });
 
   it("replace with same content", async () => {
@@ -6683,6 +6487,13 @@ describe("HasManyAssociationsTest", () => {
     await HmAuthor.loadSchema();
     await HmPost.loadSchema();
     await HmFirstPost.loadSchema();
+  });
+
+  it("find scoped grouped having", async () => {
+    const david = authors("david") as any;
+    const mary = authors("mary") as any;
+    expect((await david.popularGroupedPosts).length).toBe(2);
+    expect((await mary.popularGroupedPosts).length).toBe(0);
   });
 
   it("collection proxy respects default scope", async () => {
