@@ -649,8 +649,8 @@ export function _returningColumnsForInsert(
   // carry no auto-increment metadata and the PK fallback below covers them.
   // Rails memoizes into @_returning_columns_for_insert (model_schema.rb:437)
   // and clears it in reload_schema_from_cache; the `||=` is mirrored here, with
-  // the clear in resetColumnInformation (what trails' reloadSchemaFromCache
-  // delegates to). Ruby class instance variables are NOT inherited, so that
+  // the clear in reloadSchemaFromCache (which resetColumnInformation calls).
+  // Ruby class instance variables are NOT inherited, so that
   // memo is genuinely per-class -- hence the own-property check: a plain static
   // read walks the JS prototype chain and would hand a subclass on a different
   // table the base's list.
@@ -831,7 +831,29 @@ export function resetColumnInformation(this: SchemaHost): void {
   // here (lazy reinit on next access) mirrors that; reload_schema_from_cache
   // itself leaves the cache alone.
   (this as { _findByStatementCache?: unknown })._findByStatementCache = undefined;
-  // STI subclasses share the base's defs. Redirect the reset to the base
+  // Mirrors Rails reset_column_information's
+  // `schema_cache.clear_data_source_cache!(table_name)` (model_schema.rb): drop
+  // the connection's per-table reflected columns so the next load re-reads from
+  // the database. trails bakes the resolved cast type into each cached Column,
+  // so this is also what lets a toggled `emulate_booleans` re-resolve
+  // tinyint(1) columns; without it the stale boolean/integer type would survive.
+  // This clear (and the find-by reset above) live ONLY here, not in
+  // reloadSchemaFromCache — Rails' protected reload_schema_from_cache nils
+  // class-level schema ivars without touching the schema cache.
+  clearAdapterDataSourceCache(this);
+  reloadSchemaFromCache.call(this);
+}
+
+/**
+ * @internal
+ * Mirrors: ActiveRecord::ModelSchema#reload_schema_from_cache — the narrow,
+ * cache-preserving invalidation (nils the class-level schema memos so the next
+ * load re-reflects, from the still-warm schema cache). Rails recurses over
+ * `subclasses`; trails instead bumps `_schemaRevision`, which every STI
+ * subclass overlay checks, so descendants re-sync lazily without recursion.
+ */
+export function reloadSchemaFromCache(this: SchemaHost): void {
+  // STI subclasses share the base's defs. Redirect the reload to the base
   // so schema-sourced defs and accessors are actually cleared; clear the
   // subclass-local caches too so any forked metadata is dropped.
   if (isStiSubclass(this)) {
@@ -863,7 +885,7 @@ export function resetColumnInformation(this: SchemaHost): void {
         }
       }
     }
-    resetColumnInformation.call(getStiBase(this) as SchemaHost);
+    reloadSchemaFromCache.call(getStiBase(this) as SchemaHost);
     return;
   }
   this._columnsHash = undefined;
@@ -879,13 +901,6 @@ export function resetColumnInformation(this: SchemaHost): void {
   this._schemaRevision = (this._schemaRevision ?? 0) + 1;
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-  // Mirrors Rails reset_column_information's
-  // `schema_cache.clear_data_source_cache!(table_name)` (model_schema.rb): drop
-  // the connection's per-table reflected columns so the next load re-reads from
-  // the database. trails bakes the resolved cast type into each cached Column,
-  // so this is also what lets a toggled `emulate_booleans` re-resolve
-  // tinyint(1) columns; without it the stale boolean/integer type would survive.
-  clearAdapterDataSourceCache(this);
   if (!Object.prototype.hasOwnProperty.call(this, "_attributeDefinitions")) return;
   for (const [name, def] of Array.from(this._attributeDefinitions)) {
     if ((def.userProvided ?? true) === false || def.source === "schema") {
@@ -1746,32 +1761,6 @@ function yamlEncoder(this: SchemaHost): AttributeSetCoder {
 /** @internal */
 function initializeLoadSchemaMonitor(this: SchemaHost): void {
   // no-op: JS is single-threaded; no Monitor/Mutex needed
-}
-
-/** @internal */
-export function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
-  this._columnsHash = undefined;
-  this._columns = undefined;
-  this._attributesBuilder = undefined;
-  this._returningColumnsForInsertCache = undefined;
-  (this as { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
-  this._schemaLoaded = false;
-  (this as { _schemaLoadPromise?: unknown })._schemaLoadPromise = undefined;
-  clearAttributeNamesMemo(this);
-  if (!recursive) return;
-  const descendants = (this as { descendants?: SchemaHost[] }).descendants ?? [];
-  for (const sub of descendants) {
-    for (const key of [
-      "_columnsHash",
-      "_columns",
-      "_attributesBuilder",
-      "_returningColumnsForInsertCache",
-      "_cachedDefaultAttributes",
-      "_schemaLoaded",
-    ]) {
-      if (Object.prototype.hasOwnProperty.call(sub, key)) Reflect.deleteProperty(sub, key);
-    }
-  }
 }
 
 /** @internal */
