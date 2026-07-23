@@ -331,13 +331,6 @@ class AdapterSchemaSource implements SchemaSource {
   }
 }
 
-/**
- * Runs `pattern.test(value)` without the g/y-flag `lastIndex` footgun. A
- * `global`/`sticky` regex advances `lastIndex` on each `.test()`, so repeated
- * calls with a user-configured ignore pattern would alternate true/false;
- * strip those flags into a fresh regex so the test is stateless. Mirrors Rails'
- * `Regexp#match?`, which never mutates match state.
- */
 export function statelessTest(pattern: RegExp, value: string): boolean {
   const safe =
     pattern.global || pattern.sticky
