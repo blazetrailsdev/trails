@@ -124,8 +124,11 @@ export class PostgreSQLDatabaseTasks {
     return this.encoding();
   }
 
-  collation(): string | null {
-    return (this.configurationHash.collation as string) ?? null;
+  async collation(): Promise<string> {
+    const conn = (await this.connection()) as DatabaseAdapter & {
+      collation(): Promise<string>;
+    };
+    return conn.collation();
   }
 
   async purge(): Promise<void> {

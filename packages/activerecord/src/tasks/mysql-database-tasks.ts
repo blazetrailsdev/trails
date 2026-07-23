@@ -117,8 +117,11 @@ export class MySQLDatabaseTasks {
     return String(this.configurationHash.encoding ?? "utf8mb4");
   }
 
-  collation(): string | null {
-    return (this.configurationHash.collation as string) ?? null;
+  async collation(): Promise<string> {
+    const conn = (await this.connection()) as DatabaseAdapter & {
+      collation(): Promise<string>;
+    };
+    return conn.collation();
   }
 
   async structureDump(filename: string, extraFlags?: string | string[] | null): Promise<void> {
