@@ -9,7 +9,7 @@
  */
 
 import { NotImplementedError } from "../../errors.js";
-import { SchemaDumper } from "../../schema-dumper.js";
+import { SchemaDumper, statelessTest } from "../../schema-dumper.js";
 import { pgDatetimeConfig } from "./pg-datetime-config.js";
 import {
   TableDefinition as AbstractTableDefinition,
@@ -97,7 +97,7 @@ export class ExclusionConstraintDefinition {
   }
 
   exportNameOnSchemaDump(): boolean {
-    return this.name != null && !SchemaDumper.exclIgnorePattern.test(this.name);
+    return this.name != null && !statelessTest(SchemaDumper.exclIgnorePattern, this.name);
   }
 }
 
@@ -133,7 +133,7 @@ export class UniqueConstraintDefinition {
   }
 
   exportNameOnSchemaDump(): boolean {
-    return this.name != null && !SchemaDumper.uniqueIgnorePattern.test(this.name);
+    return this.name != null && !statelessTest(SchemaDumper.uniqueIgnorePattern, this.name);
   }
 
   definedFor(

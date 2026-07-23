@@ -1,4 +1,5 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect, vi, afterEach } from "vitest";
+import { SchemaDumper } from "../../schema-dumper.js";
 import {
   ExclusionConstraintDefinition,
   UniqueConstraintDefinition,
@@ -39,9 +40,29 @@ describe("ExclusionConstraintDefinition", () => {
     });
     expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
   });
+
+  describe("with a g-flagged exclIgnorePattern", () => {
+    afterEach(() => {
+      SchemaDumper.exclIgnorePattern = /^excl_rails_[0-9a-f]{10}$/;
+    });
+
+    it("exportNameOnSchemaDump is stable across repeated calls", () => {
+      SchemaDumper.exclIgnorePattern = /^excl_rails_[0-9a-f]{10}$/g;
+      const autoNamed = new ExclusionConstraintDefinition("t", "x WITH =", {
+        name: "excl_rails_74c9160f55",
+      });
+      expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
+      expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
+      expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
+    });
+  });
 });
 
 describe("UniqueConstraintDefinition", () => {
+  afterEach(() => {
+    SchemaDumper.uniqueIgnorePattern = /^uniq_rails_[0-9a-f]{10}$/;
+  });
+
   it("exposes options as accessors", () => {
     const defn = new UniqueConstraintDefinition("orders", "position", {
       name: "unique_position",
@@ -69,6 +90,16 @@ describe("UniqueConstraintDefinition", () => {
     const autoNamed = new UniqueConstraintDefinition("t", "col", {
       name: "uniq_rails_1e07660b77",
     });
+    expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
+  });
+
+  it("exportNameOnSchemaDump is stable across repeated calls with a g-flagged uniqueIgnorePattern", () => {
+    SchemaDumper.uniqueIgnorePattern = /^uniq_rails_[0-9a-f]{10}$/g;
+    const autoNamed = new UniqueConstraintDefinition("t", "col", {
+      name: "uniq_rails_1e07660b77",
+    });
+    expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
+    expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
     expect(autoNamed.exportNameOnSchemaDump()).toBe(false);
   });
 
