@@ -82,6 +82,7 @@ describe("TransactionTest", () => {
       "rollback dirty changes",
       "rollback dirty changes multiple saves",
       "rollback dirty changes then retry save",
+      "rollback dirty changes then retry save on new record with autosave association",
       "rolling back in a callback rollbacks before save",
       "restore frozen state after double destroy",
       "restore new record after double save",
