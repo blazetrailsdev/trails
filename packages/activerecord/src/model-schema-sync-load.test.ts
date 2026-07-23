@@ -299,9 +299,6 @@ describe("sync loadSchema / columnsHash", () => {
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     Circle.columnsHash();
 
-    // Fork every schema memo onto the subclass (as ignoredColumns= or direct
-    // assignment would) — a base reset must delete the own props so the
-    // subclass re-inherits fresh caches instead of serving stale data.
     const memoKeys = [
       "_columnsHash",
       "_columns",
@@ -318,7 +315,6 @@ describe("sync loadSchema / columnsHash", () => {
     for (const key of memoKeys) {
       expect(Object.prototype.hasOwnProperty.call(Circle, key), key).toBe(false);
     }
-    // Re-reflection through the base shines through the prototype chain.
     expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
   });
 
@@ -339,8 +335,6 @@ describe("sync loadSchema / columnsHash", () => {
     SpecialPost.columnsHash();
     expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
 
-    // Rails' reload_schema_from_cache recurses over subclasses — the non-STI
-    // descendant's own memos must be nil'd by a reset on the base.
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Post);
 
     expect((SpecialPost as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
