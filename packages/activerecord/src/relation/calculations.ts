@@ -704,6 +704,11 @@ async function groupedCompositeAssoc(
   for (const n of groupNodes) manager.group(n);
   foldSelectValuesForHaving(rel, manager);
   applyHavingToManager(rel, manager);
+  // Rails `execute_grouped_calculation` does not special-case key arity — it
+  // runs `select_all` on the relation's own arel, so order_values ride along
+  // for composite FKs too. Without the ORDER BY, LIMIT/OFFSET pick arbitrary
+  // groups on PG/MySQL.
+  rel._applyOrderToManager(manager, table);
 
   if (rel._limitValue !== null) manager.take(rel._limitValue);
   if (rel._offsetValue !== null) manager.skip(rel._offsetValue);
