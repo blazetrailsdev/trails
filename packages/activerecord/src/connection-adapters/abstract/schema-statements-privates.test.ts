@@ -254,17 +254,17 @@ describe("SchemaStatements privates (PR 8)", () => {
     expect(ss.findJoinTableName("cats", "dogs")).toBe("cats_dogs");
   });
 
-  it("addTimestampsForAlter produces ADD fragments with precision when adapter supports it", () => {
+  it("addTimestampsForAlter produces ADD fragments with precision when adapter supports it", async () => {
     const ss = makeStatements({ supportsDatetimeWithPrecision: () => true });
-    const frags = ss.addTimestampsForAlter("users");
+    const frags = await ss.addTimestampsForAlter("users");
     expect(frags).toHaveLength(2);
     expect(frags[0]).toContain("DATETIME(6)");
     expect(frags[1]).toContain("DATETIME(6)");
   });
 
-  it("addTimestampsForAlter respects explicit null option", () => {
+  it("addTimestampsForAlter respects explicit null option", async () => {
     const ss = makeStatements();
-    const frags = ss.addTimestampsForAlter("users", { null: true });
+    const frags = await ss.addTimestampsForAlter("users", { null: true });
     expect(frags[0]).not.toContain("NOT NULL");
   });
 

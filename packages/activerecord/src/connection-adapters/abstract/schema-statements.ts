@@ -987,7 +987,7 @@ export class SchemaStatements {
     // the combined ALTER TABLE; non-bulk adapters fall back to two sequential addColumn calls.
     // trails' SQLite3Adapter still defines its own addTimestamps override for direct callers.
     if ((this.adapter as any).supportsBulkAlter?.() === true) {
-      const fragments = this.addTimestampsForAlter(tableName, options);
+      const fragments = await this.addTimestampsForAlter(tableName, options);
       await this.adapter.execute(`ALTER TABLE ${this._qt(tableName)} ${fragments.join(", ")}`);
       return;
     }
@@ -2660,15 +2660,18 @@ export class SchemaStatements {
   }
 
   /** @internal */
-  addTimestampsForAlter(tableName: string, options: ColumnOptions = {}): string[] {
+  async addTimestampsForAlter(tableName: string, options: ColumnOptions = {}): Promise<string[]> {
     const opts: ColumnOptions = { ...options };
     if (opts.null == null) opts.null = false;
     if (!("precision" in opts) && (this.adapter as any).supportsDatetimeWithPrecision?.()) {
       opts.precision = 6;
     }
+    // Await both fragments: `this` may be the SchemaStatements mixin host
+    // (sync addColumnForAlter) or the PG adapter itself, whose
+    // addColumnForAlter is async (regtype default pre-resolution).
     return [
-      this.addColumnForAlter(tableName, "created_at", "datetime", opts),
-      this.addColumnForAlter(tableName, "updated_at", "datetime", opts),
+      await this.addColumnForAlter(tableName, "created_at", "datetime", opts),
+      await this.addColumnForAlter(tableName, "updated_at", "datetime", opts),
     ];
   }
 
