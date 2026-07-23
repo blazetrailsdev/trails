@@ -15,6 +15,7 @@ import { performMerge } from "./relation/spawn-methods.js";
 import { reverseSqlOrder } from "./relation/query-methods.js";
 import { CpkOrder } from "./test-helpers/models/cpk.js";
 import { AssociationRelation } from "./association-relation.js";
+import { AliasTracker } from "./associations/alias-tracker.js";
 
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Post as CanonPost } from "./test-helpers/models/post.js";
@@ -899,5 +900,20 @@ describe("inspect wrapper class name", () => {
   // flip "" into " DESC".
   it("treats a blank string order as no order when reversing", () => {
     expect(CanonPost.order("").reverseOrder().toSql()).toMatch(/ORDER BY .*\bid\b.* DESC/i);
+  });
+});
+
+describe("aliasTracker (trails)", () => {
+  fixtures([]);
+
+  it("returns an AliasTracker seeded with the relation table and joins", () => {
+    const tracker = CanonPost.all().aliasTracker();
+    expect(tracker).toBeInstanceOf(AliasTracker);
+    expect(tracker.aliases.get("posts")).toBe(1);
+
+    const table = new ArelTable("comments");
+    const join = new Nodes.InnerJoin(table, new Nodes.On(new Nodes.SqlLiteral("1=1")));
+    const seeded = CanonPost.all().aliasTracker([join]);
+    expect(seeded.aliasedTableFor(table, "comments_posts").right).toBe("comments_posts");
   });
 });

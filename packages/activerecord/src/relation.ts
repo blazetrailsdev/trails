@@ -6466,12 +6466,8 @@ export class Relation<T extends Base> {
     return this._limitValue !== null || this._offsetValue !== null;
   }
 
-  aliasTracker(): Record<string, number> {
-    const tracker: Record<string, number> = {};
-    for (const join of this._joinClauses) {
-      tracker[join.table] = (tracker[join.table] ?? 0) + 1;
-    }
-    return tracker;
+  aliasTracker(joins: Nodes.Node[] = [], aliases?: Map<string, number>): AliasTracker {
+    return AliasTracker.create(this.model.connectionPool(), this.table.name, joins, aliases);
   }
 
   preloadAssociations(): AssociationSpec[] {

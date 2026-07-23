@@ -128,27 +128,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
-    "rubyName": "alias_tracker",
-    "call": "connection_pool",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1307-1309 builds `Associations::AliasTracker.create(model.connection_pool, table.name, joins, aliases)`; trails relation.ts:6465-6471 builds a bare join-count map and never touches the AliasTracker class (which exists at associations/alias-tracker.ts:60). Divergence tracked in story relation-alias-tracker-bypasses-class."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "alias_tracker",
-    "call": "create",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1307-1309 builds `Associations::AliasTracker.create(model.connection_pool, table.name, joins, aliases)`; trails relation.ts:6465-6471 builds a bare join-count map and never touches the AliasTracker class (which exists at associations/alias-tracker.ts:60). Divergence tracked in story relation-alias-tracker-bypasses-class."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
-    "rubyName": "alias_tracker",
-    "call": "model",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1307-1309 builds `Associations::AliasTracker.create(model.connection_pool, table.name, joins, aliases)`; trails relation.ts:6465-6471 builds a bare join-count map and never touches the AliasTracker class (which exists at associations/alias-tracker.ts:60). Divergence tracked in story relation-alias-tracker-bypasses-class."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation.ts",
     "rubyName": "all_attributes?",
     "call": "attribute_aliases",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -2482,14 +2461,14 @@
     "tsFile": "relation.ts",
     "rubyName": "none?",
     "call": "empty?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag \u2014 the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag — the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "none?",
     "call": "present?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag \u2014 the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:378-383 returns true for @none, else falls through to `empty?` (issues a query) or super on args/block (`present?` guard); trails relation.ts:6227-6229 isNone reads only the `_isNone` flag — the empty?-query fallback is unported. Omission tracked in story relation-none-predicate-misses-empty-fallback."
   },
   {
     "package": "activerecord",
@@ -2671,21 +2650,21 @@
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "call",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "each",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "includes_values",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
@@ -2699,14 +2678,14 @@
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "preload_values",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
     "tsFile": "relation.ts",
     "rubyName": "preload_associations",
     "call": "strict_loading_value",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader \u2014 the value reads are direct field spreads."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails relation.rb:1321-1328 concatenates preload_values/includes_values and runs Preloader.new(...).call per spec under the strict_loading_value scope; trails relation.ts:6473-6475 returns the merged `[..._preloadAssociations, ..._includesAssociations]` list and the load path consuming it invokes the preloader — the value reads are direct field spreads."
   },
   {
     "package": "activerecord",
