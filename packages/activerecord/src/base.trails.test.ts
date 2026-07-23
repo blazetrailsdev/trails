@@ -424,19 +424,22 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
     const first = Firm.columnsHash();
     expect(Firm.columnsHash()).toBe(first);
 
-    // The virtual-attribute reconciliation path clears only the base's
-    // `_columnsHash`/`_schemaLoaded`; the next load re-applies the reflected
-    // columns and must not leave the subclass on its pre-reflection memo.
-    const internals = Company as unknown as {
+    // The end state `reflectColumnNames` leaves behind when it warms a cold
+    // shared cache (model-schema.ts): only the BASE's `_columnsHash`/`_columns`/
+    // `_schemaLoaded` are dropped, subclasses are untouched. Simulated rather
+    // than driven through `reconcileVirtualAttributes(true)` because that
+    // function short-circuits on `cachedColumnNames` — in this suite the shared
+    // cache is always warm, so the clearing branch is unreachable from a test.
+    const base = Company as unknown as {
       _columnsHash?: unknown;
       _columns?: unknown;
       _schemaLoaded?: boolean;
-      _schemaLoadPromise?: Promise<void>;
     };
-    internals._columnsHash = undefined;
-    internals._columns = undefined;
-    internals._schemaLoaded = false;
-    internals._schemaLoadPromise = undefined;
+    base._columnsHash = undefined;
+    base._columns = undefined;
+    base._schemaLoaded = false;
+    // The next load re-applies the reflected columns; it must not leave the
+    // subclass on its pre-reflection memo.
     expect(Company.columnNames()).toContain("rating");
 
     const rebuilt = Firm.columnsHash();

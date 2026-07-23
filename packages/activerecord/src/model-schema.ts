@@ -329,6 +329,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
       ...(fn != null ? { defaultFunction: fn } : {}),
     };
   }
+  if (ownsMemo && memoHost._schemaLoaded) memoHost._columnsHash = result;
   return result;
 }
 
