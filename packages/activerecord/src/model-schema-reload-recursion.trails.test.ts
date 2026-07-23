@@ -26,11 +26,6 @@ const own = <T>(host: object, key: string): T | undefined =>
   Object.prototype.hasOwnProperty.call(host, key) ? (host as Record<string, T>)[key] : undefined;
 
 describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () => {
-  // trails fidelity gap: Rails' reload_schema_from_cache recurses `subclasses.each`
-  // reaching EVERY descendant. A subclass that owns its `table_name` sits under an
-  // STI subclass but carries an independent schema, so it must be reloaded in full
-  // — not merely have its local STI overlay caches cleared, which leaves its own
-  // `_schemaLoadPromise` / `_schemaRevision` memos stale.
   it("invalidates an own-table descendant's schema memos when an STI ancestor reloads", async () => {
     class Shape extends Base {
       static override tableName = "shapes";
@@ -50,19 +45,43 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
       (klass as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     }
 
-    // Reflect on the own-table descendant FIRST, so it owns its schema-load
-    // promise (rather than inheriting the base's).
     await Ticket.loadSchema();
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeDefined();
     const revisionBefore = own<number>(Ticket, "_schemaRevision");
 
-    // Reload from an STI ancestor (Rails: a `lockingColumn=` / `ignoredColumns=`
-    // change on Shape drives this). Every descendant must be invalidated.
     reloadSchemaFromCache.call(Shape as never);
 
-    // On current main the own-table descendant only gets its local caches
-    // cleared, so its load-promise memo survives and it never re-reflects.
     expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeUndefined();
     expect(own<number>(Ticket, "_schemaRevision")).toBe((revisionBefore ?? 0) + 1);
+  });
+
+  it("reloads an own-table descendant in full when it is the reload target, without redirecting to the STI base", async () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Circle extends Shape {}
+    registerSubclass(Circle);
+    class Ticket extends Circle {
+      static override tableName = "tickets";
+    }
+    registerSubclass(Ticket);
+
+    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    for (const klass of [Shape, Circle, Ticket]) {
+      (klass as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    }
+
+    await Ticket.loadSchema();
+    const ticketRevisionBefore = own<number>(Ticket, "_schemaRevision");
+    const shapeRevisionBefore = own<number>(Shape, "_schemaRevision");
+
+    reloadSchemaFromCache.call(Ticket as never);
+
+    expect(own<Promise<void>>(Ticket, "_schemaLoadPromise")).toBeUndefined();
+    expect(own<number>(Ticket, "_schemaRevision")).toBe((ticketRevisionBefore ?? 0) + 1);
+    expect(own<number>(Shape, "_schemaRevision")).toBe(shapeRevisionBefore);
   });
 });

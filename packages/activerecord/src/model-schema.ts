@@ -868,13 +868,6 @@ function clearStiSubclassLocalCaches(sub: SchemaHost): void {
   if (Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")) {
     scrubSchemaSourcedDefinitions(sub);
   }
-  // Rails' recursion reaches every descendant; deeper STI subclasses fork
-  // the same way, so walk them too. A descendant that owns its `table_name`
-  // (breaking out of the shared STI table) is NOT a forked overlay of the
-  // base's schema — clearing its local caches would leave its own `_schemaLoaded`
-  // / `_schemaRevision` / load-promise memos stale. Re-enter the full reload for
-  // it instead (safe: `reloadSchemaMemosAndRecurse` only walks down, never
-  // redirects back up to the shared base, so no loop).
   for (const deeper of (sub as { subclasses?: SchemaHost[] }).subclasses ?? []) {
     if (sharesStiBaseTable(deeper)) {
       clearStiSubclassLocalCaches(deeper);
@@ -884,17 +877,9 @@ function clearStiSubclassLocalCaches(sub: SchemaHost): void {
   }
 }
 
-/**
- * True when `klass` shares its STI base's table (a genuine STI overlay whose
- * schema is the base's). False when `klass` (or an intermediate ancestor) sets
- * its own `table_name`, so it carries an independent schema even though an STI
- * ancestor exists — such a class must be reloaded in full, not treated as a
- * forked overlay.
- */
 function sharesStiBaseTable(klass: SchemaHost): boolean {
-  const base = getStiBase(klass as unknown as object) as unknown as typeof Base;
-  if ((base as unknown as SchemaHost) === klass) return true;
-  return (klass as unknown as typeof Base).tableName === base.tableName;
+  const base = getStiBase(klass) as unknown as SchemaHost;
+  return base === klass || base.tableName === klass.tableName;
 }
 
 /**
@@ -913,19 +898,8 @@ function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
   }
 }
 
-/**
- * @internal
- * Mirrors: ActiveRecord::ModelSchema#reload_schema_from_cache — the narrow,
- * cache-preserving invalidation (nils the class-level schema memos so the next
- * load re-reflects, from the still-warm schema cache), recursing over tracked
- * subclasses as Rails does (`subclasses.each`, model_schema.rb:566).
- */
+/** @internal */
 export function reloadSchemaFromCache(this: SchemaHost): void {
-  // STI subclasses share the base's defs. Redirect the reload to the base
-  // so schema-sourced defs and accessors are actually cleared; clear the
-  // subclass-local caches too so any forked metadata is dropped. A descendant
-  // that owns its `table_name` does NOT share the base's schema, so it must
-  // reload in full rather than redirect (which would loop back to the base).
   if (isStiSubclass(this) && sharesStiBaseTable(this)) {
     clearStiSubclassLocalCaches(this);
     reloadSchemaFromCache.call(getStiBase(this) as SchemaHost);
@@ -934,12 +908,6 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
   reloadSchemaMemosAndRecurse(this);
 }
 
-/**
- * The reload body proper: nil this class's schema memos, bump the revision so
- * subclass overlays resync, and recurse over tracked subclasses (Rails'
- * `subclasses.each`). Split out from {@link reloadSchemaFromCache} so the
- * own-table branch can re-enter it directly without the STI redirect.
- */
 function reloadSchemaMemosAndRecurse(host: SchemaHost): void {
   host._columnsHash = undefined;
   host._columns = undefined;
@@ -947,27 +915,13 @@ function reloadSchemaMemosAndRecurse(host: SchemaHost): void {
   host._attributesBuilder = undefined;
   host._schemaLoaded = false;
   host._virtualAttributesReconciled = false;
-  // Invalidate every STI subclass overlay built from the pre-reset definitions.
-  // The defs Map below is mutated IN PLACE, so neither map identity nor key
-  // coverage can detect that a subclass's overlay is stale — only this counter
-  // can. Mirrors Rails resetting the class and its descendants.
   host._schemaRevision = (host._schemaRevision ?? 0) + 1;
   (host as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (host as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
-  // Rails' reload_schema_from_cache also nils @attribute_names / @column_names
-  // (on the class and, via recursion, its descendants); the helper clears the
-  // memos for the receiver and every descendant in one pass.
   clearAttributeNamesMemo(host);
   if (Object.prototype.hasOwnProperty.call(host, "_attributeDefinitions")) {
     scrubSchemaSourcedDefinitions(host);
   }
-  // Rails: `subclasses.each { |descendant| descendant.send(:reload_schema_from_cache) }`.
-  // A subclass that shares this base's STI table gets its local forks cleared
-  // directly rather than via a recursive call — recursing into one would
-  // redirect right back to this base (the branch above) and loop; its
-  // shared-overlay resync rides the `_schemaRevision` bump. Any other subclass
-  // (non-STI, or an STI descendant with its own `table_name`) carries an
-  // independent schema and recurses in full, as in Rails.
   for (const sub of (host as { subclasses?: SchemaHost[] }).subclasses ?? []) {
     if (isStiSubclass(sub) && sharesStiBaseTable(sub)) {
       clearStiSubclassLocalCaches(sub);
