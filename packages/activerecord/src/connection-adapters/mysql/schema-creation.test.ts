@@ -11,6 +11,7 @@ import {
   AlterTable,
 } from "../abstract/schema-definitions.js";
 import { TableDefinition as MyTd } from "./schema-definitions.js";
+import { Column } from "./column.js";
 
 describe("MySQL::SchemaCreation", () => {
   const sc = new SchemaCreation();
@@ -47,7 +48,7 @@ describe("MySQL::SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition generates SET DEFAULT", async () => {
-    const col = new ColumnDefinition("status", "string", {});
+    const col = new Column("status", null, { sqlType: "varchar(255)", type: "string" });
     const def = new ChangeColumnDefaultDefinition(col, "active");
     expect(await (sc as any).visitChangeColumnDefaultDefinition(def)).toMatch(
       /ALTER COLUMN `status` SET DEFAULT/,
@@ -55,7 +56,7 @@ describe("MySQL::SchemaCreation", () => {
   });
 
   it("visitChangeColumnDefaultDefinition generates DROP DEFAULT when null:false + null value", async () => {
-    const col = new ColumnDefinition("status", "string", { null: false });
+    const col = new Column("status", null, { sqlType: "varchar(255)", type: "string" }, false);
     const def = new ChangeColumnDefaultDefinition(col, null);
     expect(await (sc as any).visitChangeColumnDefaultDefinition(def)).toBe(
       "ALTER COLUMN `status` DROP DEFAULT",

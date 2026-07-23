@@ -588,7 +588,7 @@ describe("AbstractMysqlAdapter#buildChangeColumnDefaultDefinition (#1568)", () =
 
   it("preserves the column's null option on the built ColumnDefinition", async () => {
     const cd = await build(makeChangeColumnTextColumn({ null_: false }), "x");
-    expect(cd.column.options.null).toBe(false);
+    expect(cd.column.null).toBe(false);
   });
 });
 

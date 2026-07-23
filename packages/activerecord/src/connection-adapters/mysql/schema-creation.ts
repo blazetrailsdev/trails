@@ -284,7 +284,7 @@ export class SchemaCreation extends AbstractSchemaCreation {
     o: ChangeColumnDefaultDefinition,
   ): Promise<string> {
     let sql = `ALTER COLUMN ${this.adapter.quoteIdentifier(o.column.name)} `;
-    if (o.default == null && o.column.options.null === false) {
+    if (o.default == null && !o.column.null) {
       sql += "DROP DEFAULT";
     } else {
       sql += `SET DEFAULT ${await this.adapter.quoteDefaultExpression(o.default, o.column)}`;

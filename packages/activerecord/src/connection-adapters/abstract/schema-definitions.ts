@@ -1,5 +1,6 @@
 import { ABSTRACT_SCHEMA_QUOTER } from "./quoting.js";
 import type { SchemaQuoter } from "./assert-schema-adapter.js";
+import type { Column } from "../column.js";
 import { singularize, pluralize, getCrypto } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
 import { SchemaDumper } from "../../schema-dumper.js";
@@ -397,7 +398,7 @@ export class ChangeColumnDefinition {
 export class ChangeColumnDefaultDefinition {
   readonly default: unknown;
   constructor(
-    readonly column: ColumnDefinition,
+    readonly column: Column,
     defaultValue: unknown,
   ) {
     this.default = defaultValue;
