@@ -1,6 +1,7 @@
 import { describe, it, expect, beforeAll, afterAll } from "vitest";
 import { fixtures } from "../test-helpers/fixtures.js";
-import { ExtendedDeterministicQueries } from "./extended-deterministic-queries.js";
+import { ExtendedDeterministicQueries, AdditionalValue } from "./extended-deterministic-queries.js";
+import { NoMethodError } from "@blazetrails/activemodel";
 import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
@@ -10,7 +11,7 @@ import {
   EncryptedUniquenessValidator,
 } from "./extended-deterministic-uniqueness-validator.js";
 import { UniquenessValidator } from "../validations.js";
-import { getAttributeType } from "./encryptable-record.js";
+import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
 import "../encryption.js";
 import { Base } from "../base.js";
@@ -32,7 +33,7 @@ const PREVIOUS_KEY = Buffer.alloc(32, "y").toString("base64");
  * EncryptedAttributeType, or the expansion ciphertext diverges from the
  * write path and the lookup silently misses.
  */
-function buildSerializedBook() {
+function buildSerializedBook({ previousSchemes = false } = {}) {
   class EncryptedSerializedBook extends Base {
     static {
       this._tableName = "books";
@@ -40,13 +41,17 @@ function buildSerializedBook() {
       this.attribute("name", "string");
       // supportUnencryptedData: false removes the raw-plaintext candidate
       // from the expansion, so the lookup can only succeed through a
-      // correctly-serialized ciphertext candidate; the previous scheme keeps
-      // `previousTypes` non-empty so expansion actually runs.
+      // correctly-serialized ciphertext candidate. A previous scheme makes
+      // `previousTypes` non-empty so query expansion actually runs — but in
+      // Rails that combination RAISES (see the raise test below), so the
+      // lookup tests use the no-previous-schemes variant.
       this.encrypts("name", {
         deterministic: true,
         key: TEST_KEY,
         supportUnencryptedData: false,
-        previousSchemes: [new Scheme({ deterministic: true, key: PREVIOUS_KEY })],
+        ...(previousSchemes
+          ? { previousSchemes: [new Scheme({ deterministic: true, key: PREVIOUS_KEY })] }
+          : {}),
       });
       this.serialize("name", { coder: "json" });
     }
@@ -56,6 +61,7 @@ function buildSerializedBook() {
 
 describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails extras)", () => {
   let EncryptedSerializedBook: ReturnType<typeof buildSerializedBook>;
+  let PreviousSchemeSerializedBook: ReturnType<typeof buildSerializedBook>;
 
   const savedConfig = {
     extendQueries: Configurable.config.extendQueries,
@@ -84,6 +90,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     installExtendedQueriesIfConfigured();
 
     EncryptedSerializedBook = buildSerializedBook();
+    PreviousSchemeSerializedBook = buildSerializedBook({ previousSchemes: true });
     // Warm the books table once so the first create doesn't race the
     // test-adapter's schema-recovery path (see the port suite's note).
     await EncryptedSerializedBook.where("1=1");
@@ -115,8 +122,36 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     expect(await EncryptedSerializedBook.exists({ name: "Dune" })).toBe(true);
   });
 
+  // Rails-verified (vendored Rails 8.1, sqlite3, extend_queries installed):
+  // a deterministic Serialized(Encrypted) attribute WITH previous schemes
+  // raises NoMethodError on any plaintext lookup — the expansion's
+  // AdditionalValue reaches Type::Serialized#serialize, the JSON coder's
+  // as_json traversal descends into the AV's @type (a bare previous-scheme
+  // EncryptedAttributeType), and ActiveModel::Type::Value#as_json raises
+  // (value.rb:145). No SQL is generated, so no scheme/key material can land
+  // in a bind. Our Type#toJSON mirrors that raise for JSON.stringify.
+  it("raises NoMethodError when a previous-scheme candidate reaches the serialized coder", async () => {
+    await expect(PreviousSchemeSerializedBook.findBy({ name: "Dune" })).rejects.toThrow(
+      NoMethodError,
+    );
+    await expect(PreviousSchemeSerializedBook.where({ name: "Dune" }).first()).rejects.toThrow(
+      NoMethodError,
+    );
+
+    // The mechanism, pinned directly: Serialized#serialize(AV) raises inside
+    // coder.dump before any payload exists — the dumped-AV JSON (which would
+    // embed previous-scheme internals) is never produced.
+    const fullType = getAttributeType(PreviousSchemeSerializedBook, "name") as {
+      serialize(v: unknown): unknown;
+    };
+    const prevType = encryptedTypeOf(getAttributeType(PreviousSchemeSerializedBook, "name"))!
+      .previousTypes[0];
+    const av = new AdditionalValue("Dune", prevType);
+    expect(() => fullType.serialize(av)).toThrow(NoMethodError);
+  });
+
   it("uniqueness ciphertext generation serializes through the full resolved type", () => {
-    const fullType = getAttributeType(EncryptedSerializedBook, "name") as {
+    const fullType = getAttributeType(PreviousSchemeSerializedBook, "name") as {
       serialize(v: unknown): unknown;
     };
     // The resolved type is the outer Serialized wrapper, not the bare
@@ -124,7 +159,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     expect(fullType).not.toBeInstanceOf(EncryptedAttributeType);
 
     const candidates = EncryptedUniquenessValidator.allCiphertextsFor(
-      EncryptedSerializedBook,
+      PreviousSchemeSerializedBook,
       "name",
       "Dune",
     );
@@ -137,7 +172,7 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     // resolved type, so the raw candidate encrypts to the write-path
     // ciphertext (coder dump applied before encryption).
     const arelAttr = (
-      EncryptedSerializedBook as unknown as {
+      PreviousSchemeSerializedBook as unknown as {
         arelTable: { get(name: string): { typeCaster: unknown } };
       }
     ).arelTable.get("name");
