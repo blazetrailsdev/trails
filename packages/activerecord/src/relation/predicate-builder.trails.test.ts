@@ -1,10 +1,11 @@
 import { describe, it, expect } from "vitest";
 import { testConnection } from "@blazetrails/arel/src/test-helpers/connection.js";
 import { IntegerType } from "@blazetrails/activemodel";
-import { Table, Visitors } from "@blazetrails/arel";
+import { Nodes, Table, Visitors } from "@blazetrails/arel";
+import { fixtures } from "../test-helpers/fixtures.js";
 import { Company, Firm } from "../test-helpers/models/company.js";
 import { Author } from "../test-helpers/models/author.js";
-import { fixtures } from "../test-helpers/fixtures.js";
+import { PriceEstimate } from "../test-helpers/models/price-estimate.js";
 import { escapeRegExp, quoteTableName, quoteColumnName } from "../test-helpers/quote-regex.js";
 import { PredicateBuilder } from "./predicate-builder.js";
 import { TableMetadata } from "../table-metadata.js";
@@ -70,5 +71,40 @@ describe("PredicateBuilder nested-hash recursion skips dot re-normalization", ()
       ),
     );
     expect(sql).not.toContain(quoteTableName("comments.body"));
+  });
+});
+
+type HasWhereClause = { _whereClause: { predicates: Nodes.Node[] } };
+
+describe("association hash expansion grouping shape", () => {
+  const { treasures, cars, comments } = fixtures([
+    "authors",
+    "authorAddresses",
+    "posts",
+    "comments",
+    "treasures",
+    "cars",
+    "priceEstimates",
+  ]);
+
+  it("multi-type polymorphic value emits OR of AND-reduced groups in one Grouping", () => {
+    const rel = PriceEstimate.where({
+      estimateOf: [treasures("diamond"), cars("honda")],
+    }) as unknown as HasWhereClause;
+    const preds = rel._whereClause.predicates;
+    expect(preds).toHaveLength(1);
+    expect(preds[0]).toBeInstanceOf(Nodes.Grouping);
+    const or = (preds[0] as Nodes.Grouping).expr as Nodes.Or;
+    expect(or).toBeInstanceOf(Nodes.Or);
+    expect(or.children).toHaveLength(2);
+    for (const child of or.children) expect(child).toBeInstanceOf(Nodes.And);
+  });
+
+  it("through-association single query group stays flat, without an And wrapper", () => {
+    const rel = Author.where({ comments: comments("greetings") }) as unknown as HasWhereClause;
+    const preds = rel._whereClause.predicates;
+    expect(preds).toHaveLength(1);
+    expect(preds[0]).not.toBeInstanceOf(Nodes.And);
+    expect(preds[0]).not.toBeInstanceOf(Nodes.Grouping);
   });
 });
