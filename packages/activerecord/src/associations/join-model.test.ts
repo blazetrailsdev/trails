@@ -1134,8 +1134,12 @@ describe("AssociationsJoinModelTest", () => {
     });
   });
 
-  it.skip("polymorphic has many going through join model with custom select and joins", async () => {
-    // trails does not support association extension blocks (add_joins_and_select)
+  it("polymorphic has many going through join model with custom select and joins", async () => {
+    const post = await Post.find(posts("welcome").id);
+    const loadedTags = await (post as any).tags.addJoinsAndSelect();
+    const tag = loadedTags[0];
+    expect(tag.id).toBe(tags("general").id);
+    expect(() => void tag.author_id).not.toThrow();
   });
 
   it("polymorphic has many going through join model with custom foreign key", async () => {

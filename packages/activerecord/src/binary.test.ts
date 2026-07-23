@@ -1,8 +1,13 @@
 import { describe, it, expect } from "vitest";
+import { readFile } from "fs/promises";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { Binary } from "./test-helpers/models/binary.js";
 
 describe("BinaryTest", () => {
+  // Rails' ASSETS_ROOT fixture files, vendored verbatim from
+  // vendor/rails/activerecord/test/assets/.
+  const FIXTURES = ["flowers.jpg", "example.log", "test.txt"];
+
   fixtures({});
 
   it("mixed encoding", async () => {
@@ -21,11 +26,23 @@ describe("BinaryTest", () => {
     expect(name).toBe("いただきます！");
   });
 
-  it.skip("load save", () => {
-    // PERMANENT-SKIP: Ruby-only — reads binary asset files (flowers.jpg,
-    // example.log, test.txt) from ASSETS_ROOT via File.read. Porting needs the
-    // asset fixtures plus filesystem reads, which this package's hard rules
-    // exclude (no node:* imports).
+  it("load save", async () => {
+    await Binary.deleteAll();
+
+    for (const filename of FIXTURES) {
+      const data = new Uint8Array(
+        await readFile(new URL(`./test-helpers/assets/${filename}`, import.meta.url)),
+      );
+
+      const bin = Binary.new({ data });
+      expect(new Uint8Array(bin.data)).toEqual(data);
+
+      await bin.saveBang();
+      expect(new Uint8Array(bin.data)).toEqual(data);
+
+      await bin.reload();
+      expect(new Uint8Array(bin.data)).toEqual(data);
+    }
   });
 
   it("unicode input casting", async () => {

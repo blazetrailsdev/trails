@@ -619,13 +619,12 @@ export async function performFindOrCreateByBang(
   conditions: Record<string, unknown>,
   extra?: Record<string, unknown>,
 ): Promise<any> {
-  const records = await this.where(conditions).limit(1).toArray();
-  if (records.length > 0) return records[0];
-  return this._modelClass.createBang({
-    ...this.scopeForCreate(),
-    ...conditions,
-    ...extra,
-  });
+  // Rails (relation.rb:238): find_by(attributes) || create_or_find_by!(attributes)
+  // — the create leg rides create_or_find_by! so a concurrent insert that wins
+  // the race is recovered via its RecordNotUnique rescue instead of raising.
+  const existing = await (this as any).findBy(conditions);
+  if (existing) return existing;
+  return performCreateOrFindByBang.call(this, conditions, extra);
 }
 
 export async function performCreateOrFindByBang(

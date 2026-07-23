@@ -61,13 +61,16 @@ describe("LeftOuterJoinAssociationTest", () => {
   registerModel(Reference);
   registerModel(Job);
 
-  it.skip("merging multiple left joins from different associations", () => {
-    // BLOCKED: cross-model merge gap (relation/merger.ts). Rails:
-    //   Author.joins(:posts).merge(Post.left_joins(:comments).merge(Comment.left_joins(:ratings)))
-    // raises `ambiguous column name: posts.author_id` because the merged
-    // left-joins from sibling model relations are not re-aliased across model
-    // classes the way merger.rb does. Tracked: RFC 0030 story
-    // left-joins-cross-model-merge.
+  it("merging multiple left joins from different associations", async () => {
+    const count = await Author.joins("posts")
+      .merge(Post.leftJoins("comments").merge(Comment.leftJoins("ratings")))
+      .count();
+    expect(count).toBe(17);
+
+    const outerCount = await Author.leftJoins("posts")
+      .merge(Post.leftJoins("comments").merge(Comment.leftJoins("ratings")))
+      .count();
+    expect(outerCount).toBe(17);
   });
 
   it("construct finder sql applies aliases tables on association conditions", async () => {

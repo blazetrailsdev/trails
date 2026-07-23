@@ -430,6 +430,130 @@ export const UNPORTED_FILES: UnportedFile[] = [
       "niche case. (The find_by sibling at :849 uses SimpleDelegator too, but is currently matched " +
       "by a plain-object trails test, so it stays counted — its delegation behavior is untested.)",
   },
+  // --- Permanently not-portable: residual-skip-tail-sweep (RFC 0030) ---
+  {
+    testFile: "associations/has_one_associations_test.rb",
+    tests: [
+      "has one proxy should not respond to private methods",
+      "has one proxy should respond to private methods via send",
+    ],
+    reason:
+      "Ruby private-method visibility / `send` private dispatch on association proxies " +
+      "has no TypeScript runtime equivalent.",
+  },
+  {
+    testFile: "associations/has_one_through_associations_test.rb",
+    tests: [
+      "has one through proxy should not respond to private methods",
+      "has one through proxy should respond to private methods via send",
+    ],
+    reason:
+      "Ruby private-method visibility / `send` private dispatch on association proxies " +
+      "has no TypeScript runtime equivalent.",
+  },
+  {
+    testFile: "scoping/default_scoping_test.rb",
+    tests: ["default scoping with threads", "default scope is threadsafe"],
+    reason:
+      "Real OS threads (Thread.new / Concurrent::CyclicBarrier); no single-threaded " +
+      "Node.js equivalent.",
+  },
+  {
+    testFile: "locking_test.rb",
+    tests: ["no locks no wait"],
+    reason:
+      "Thread-based `duel` racing two `joinable: false` transactions on one row and " +
+      "asserting wall-clock ordering; no single-threaded JS equivalent.",
+  },
+  {
+    testFile: "query_cache_test.rb",
+    tests: ["query cache does not allow sql key mutation"],
+    reason:
+      "Asserts Ruby FrozenError on in-place mutation of the frozen sql payload string; " +
+      "JS strings are immutable by value, so the mutation cannot exist.",
+  },
+  {
+    testFile: "query_cache_test.rb",
+    tests: ["query serialized active record", "query serialized string"],
+    reason:
+      "Ruby YAML `serialize` coder round-trip of an AR record (use_yaml_unsafe_load); " +
+      "no JS YAML AR-record (un)safe-load equivalent.",
+  },
+  {
+    testFile: "core_test.rb",
+    tests: ["inspect singleton instance"],
+    reason:
+      "Ruby per-object singleton class rendering (`#<Class:#<Topic:0x...>>`); JS has " +
+      "no singleton-class concept and no AR code participates in that rendering.",
+  },
+  {
+    testFile: "inherited_test.rb",
+    tests: ["super before filter attributes", "super after filter attributes"],
+    reason:
+      "Ruby `inherited` lifecycle-hook `super` ordering around filter_attributes; TS has " +
+      "no class-inheritance hook (ruby-module-semantics, see api-compare conventions.ts).",
+  },
+  {
+    testFile: "tasks/database_tasks_test.rb",
+    tests: ["raises an error when called with protected environment which name is a symbol"],
+    reason:
+      "Ruby Symbol env names (symbol→string coercion in protected_environments); env " +
+      "names are plain strings in TS.",
+  },
+  {
+    testFile: "scoping/named_scoping_test.rb",
+    tests: ["find all should behave like select"],
+    reason:
+      "Asserts Ruby Array#select == Array#find_all alias equivalence on the materialized " +
+      "relation; JS arrays have only .filter, so there is no distinct method to compare.",
+  },
+  {
+    testFile: "relation/where_test.rb",
+    tests: ["where with rational for string column"],
+    reason: "Ruby Rational literal cast to a string column; JS has no Rational.",
+  },
+  {
+    testFile: "relation/with_test.rb",
+    tests: ["common table expressions are unsupported"],
+    reason:
+      "Rails' else-branch for adapters lacking CTE support; every adapter trails " +
+      "exercises (SQLite/PG/MySQL) supports CTEs, so the branch is unreachable.",
+  },
+  {
+    testFile: "connection_adapters/standalone_connection_test.rb",
+    tests: ["async fallback"],
+    reason:
+      "select_all(async: true) returns a FutureResult::Complete from the thread-backed " +
+      "load_async infrastructure, which is excluded (see the future_result.rb entry).",
+  },
+  {
+    testFile: "adapters/postgresql/uuid_test.rb",
+    tests: [
+      "schema dumper for uuid primary key default in legacy migration",
+      "schema dumper for uuid primary key with default nil in legacy migration",
+    ],
+    reason:
+      "Pre-1.0: ActiveRecord::Migration[5.0] legacy version-compatibility semantics are " +
+      "out of scope (matches the migration/compatibility exclusion). The non-legacy " +
+      "schema-dump emission is covered by the passing sibling tests.",
+  },
+  // --- Deferred: tracked by focused RFC 0030 stories; remove when they converge ---
+  {
+    testFile: "adapters/postgresql/timestamp_test.rb",
+    tests: ["group by date"],
+    reason:
+      "Deferred: grouped-calculation result keys are String()-ified (Record) while Rails " +
+      "keys are type-cast objects (assert_kind_of Time). Tracked: RFC 0030 story " +
+      "grouped-calculation-typed-keys — remove this entry when it converges.",
+  },
+  {
+    testFile: "associations/nested_through_associations_test.rb",
+    tests: ["has many through with sti on nested through reflection"],
+    reason:
+      "Deferred: 3-level nested-through with an STI-scoped intermediate reflection " +
+      "direct-loads empty. Tracked: RFC 0030 story nested-through-sti-reflection-load — " +
+      "remove this entry when it converges.",
+  },
   // --- Permanently not-portable: scattered YAML/Marshal serialization ---
   {
     testFile: "adapters/postgresql/hstore_test.rb",
