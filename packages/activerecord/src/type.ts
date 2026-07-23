@@ -59,11 +59,8 @@ let _registry = new AdapterSpecificRegistry();
 let _defaultValue: Type | undefined;
 let _currentAdapterResolver: (() => AdapterNameSource) | undefined;
 
-/**
- * The subset of `ActiveRecord::Base` that adapter-name resolution reads.
- */
 export interface AdapterNameSource {
-  connectionDbConfig?: () => { adapter?: string } | undefined;
+  connectionDbConfig: () => { adapter?: string } | undefined;
 }
 
 _registry.register("big_integer", BigIntegerType, { override: false });
@@ -98,9 +95,6 @@ export function setRegistry(r: AdapterSpecificRegistry): void {
   _defaultValue = undefined;
 }
 
-// Called by Base (base.ts) to supply `ActiveRecord::Base` itself, which Rails'
-// private `current_adapter_name` references directly; a resolver keeps type.ts
-// free of an import cycle back into base.ts.
 export function setCurrentAdapterResolver(resolver: () => AdapterNameSource): void {
   _currentAdapterResolver = resolver;
 }
@@ -133,17 +127,13 @@ export function defaultValue(): Type {
  * Mirrors: ActiveRecord::Type.adapter_name_from
  */
 export function adapterNameFrom(model: AdapterNameSource): AdapterName {
-  // Rails reads `model.connection_db_config.adapter` and lets the missing-pool
-  // error propagate. Here `lookup()` calls this on every type resolution —
-  // including at module load, before any connection is established — so an
-  // unconfigured model degrades to the sqlite default instead of raising.
+  let configAdapter: string | undefined;
   try {
-    const configAdapter = model.connectionDbConfig?.()?.adapter;
-    if (configAdapter != null) return adapterNameFromConfig(configAdapter);
+    configAdapter = model.connectionDbConfig()?.adapter;
   } catch {
-    // no pool configured for this model yet
+    return "sqlite";
   }
-  return "sqlite";
+  return adapterNameFromConfig(configAdapter);
 }
 
 // currentAdapterName is private in Rails — exposed here for api:compare parity only.

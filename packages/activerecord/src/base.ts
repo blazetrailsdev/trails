@@ -34,7 +34,7 @@ import {
   type AttributeOptions,
   type TransactionalCallbackConditions,
 } from "@blazetrails/activemodel";
-import { setCurrentAdapterResolver } from "./type.js"; // also registers AR type overrides into AM's type registry
+import { setCurrentAdapterResolver } from "./type.js";
 import { Table, UpdateManager, DeleteManager, Nodes, sql as arelSql } from "@blazetrails/arel";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import type { ExplainOption } from "./connection-adapters/abstract/database-statements.js";
@@ -5200,9 +5200,6 @@ _setGlobalIdModelFinder((name: string) => {
   return undefined;
 });
 
-// Mirrors: `ActiveRecord::Type.current_adapter_name`, which is
-// `adapter_name_from(ActiveRecord::Base)` (type.rb:54-56). type.ts cannot import
-// base.ts (base.ts imports it), so Base installs itself as the resolver here.
 setCurrentAdapterResolver(() => Base);
 
 // Wire Base into DatabaseTasks so migrationConnection() works synchronously
