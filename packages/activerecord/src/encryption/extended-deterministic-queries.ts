@@ -3,10 +3,9 @@ import { ADDITIONAL_VALUE_BRAND, EncryptedAttributeType } from "./encrypted-attr
 import { getAttributeType, encryptedTypeOf } from "./encryptable-record.js";
 
 /**
- * The minimal surface AdditionalValue needs from its type. Rails passes the
- * full resolved `type_for_attribute` type here — which for a
- * Serialized(Encrypted(...)) attribute is the outer Type::Serialized, not the
- * inner EncryptedAttributeType — so the field can't be typed as the latter.
+ * What AdditionalValue needs from its type. Rails passes the full resolved
+ * `type_for_attribute` type here — for a Serialized(Encrypted(...)) attribute
+ * that's the outer Type::Serialized, not EncryptedAttributeType.
  */
 export interface SerializableType {
   serialize(value: unknown): unknown;
@@ -130,12 +129,10 @@ export class EncryptedQuery {
     let modified = false;
 
     for (const attrName of encryptedAttrs) {
-      // Rails resolves `type = owner.type_for_attribute(name)` — the FULL
-      // delegated type (extended_deterministic_queries.rb:58-62). For a
-      // Serialized(Encrypted(...)) attribute the coder must dump BEFORE
-      // encryption, matching the write path; `deterministic`/`previous_types`
-      // reach the inner EncryptedAttributeType via DelegateClass delegation
-      // in Rails, via encryptedTypeOf here.
+      // Rails serializes through the FULL `type_for_attribute` type
+      // (extended_deterministic_queries.rb:58-62); `deterministic`/
+      // `previous_types` reach the inner EncryptedAttributeType via
+      // DelegateClass delegation there, via encryptedTypeOf here.
       const fullType = getAttributeType(model, attrName) as SerializableType | undefined;
       const type = encryptedTypeOf(fullType);
       if (!fullType || !type) continue;
@@ -213,9 +210,9 @@ export class EncryptedQuery {
     // still preserving the raw plaintext when unencrypted data remains queryable
     // during migration (support_unencrypted_data).
     // The current-scheme candidate serializes through the FULL resolved type
-    // (coder applied before encryption) so the ciphertext matches the write
-    // path; previous-scheme candidates serialize through the bare previous
-    // EncryptedAttributeTypes, exactly as Rails' delegated `previous_types` do.
+    // (coder dumped before encryption, matching the write path); previous-
+    // scheme candidates use the bare previous EncryptedAttributeTypes, as
+    // Rails' delegated `previous_types` do.
     const results: Array<AdditionalValue | unknown> = [new AdditionalValue(plaintext, fullType)];
     for (const prev of type.previousTypes) {
       results.push(new AdditionalValue(plaintext, prev));

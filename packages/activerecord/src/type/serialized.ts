@@ -298,11 +298,10 @@ export class Serialized extends ValueType {
   }
 
   cast(value: unknown): unknown {
-    // Encryption AdditionalValue instances pass through cast unchanged so
-    // serialize() can unwrap them — same contract as
-    // EncryptedAttributeType.cast (see the brand's doc there). Needed here
-    // because a Serialized(Encrypted(...)) attribute's resolved type is this
-    // wrapper, so query expansion's AVs hit it first.
+    // Encryption AdditionalValues pass through cast unchanged so serialize()
+    // can unwrap them — the same contract as EncryptedAttributeType.cast,
+    // needed here because a Serialized(Encrypted(...)) attribute's resolved
+    // type is this wrapper.
     if (isAdditionalValue(value)) return value;
     // Rails: ActiveModel::Type::Helpers::Mutable#cast is always
     // `deserialize(serialize(value))`. Serializing first means a value the
@@ -315,10 +314,9 @@ export class Serialized extends ValueType {
   serialize(value: unknown): unknown {
     if (value === null || value === undefined) return null;
     // Unwrap encryption AdditionalValues to their pre-computed ciphertext
-    // (computed through this full type at AV construction) instead of
-    // feeding the AV object to the coder. Mirrors what Rails'
-    // ExtendedEncryptableType prepend does for a bare EncryptedAttributeType;
-    // the AV-wrapped current value is a trails invention (Rails keeps the
+    // instead of feeding the AV object to the coder — mirrors Rails'
+    // ExtendedEncryptableType prepend on the bare EncryptedAttributeType. The
+    // AV-wrapped current-scheme value is a trails invention (Rails keeps the
     // plaintext raw), so the wrapper type must honor it too.
     if (isAdditionalValue(value)) return (value as { value: unknown }).value;
     if (this.isDefaultValue(value)) return null;

@@ -5,8 +5,10 @@ import { EncryptedAttributeType } from "./encrypted-attribute-type.js";
 import { Scheme } from "./scheme.js";
 import { Configurable } from "./configurable.js";
 import { installExtendedQueriesIfConfigured } from "./install.js";
-import { ExtendedDeterministicUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
-import { EncryptedUniquenessValidator } from "./extended-deterministic-uniqueness-validator.js";
+import {
+  ExtendedDeterministicUniquenessValidator,
+  EncryptedUniquenessValidator,
+} from "./extended-deterministic-uniqueness-validator.js";
 import { UniquenessValidator } from "../validations.js";
 import { getAttributeType } from "./encryptable-record.js";
 // Side-effect: registers encryptionHooks so Base.encrypts() is wired up.
