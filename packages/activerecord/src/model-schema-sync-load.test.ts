@@ -274,8 +274,6 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    // The subclass's OWN stale caches are deleted so the base's freshly built
-    // (load-time-filtered) _columnsHash shines through via the prototype chain.
     expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(false);
     expect(Object.prototype.hasOwnProperty.call(Circle, "_columns")).toBe(false);
     expect(

@@ -256,12 +256,6 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   // load_schema! raises TableNotSpecified for abstract (table-less) classes.
   loadSchema.call(this as SchemaHost);
 
-  // Load-time filtering (Rails load_schema!, model_schema.rb:587-594):
-  // loadSchema populated `_columnsHash` already filtered by `ignoredColumns`,
-  // so a read is just the memo — mirroring Rails' `load_schema unless
-  // @columns_hash; @columns_hash`. Exception: an STI subclass with its OWN
-  // `ignoredColumns` — the memo lives on the STI base, filtered by the base's
-  // set, so the subclass's set must still be honored at read time below.
   const memoHost = this as unknown as SchemaHost;
   const hasOwnIgnored =
     isStiSubclass(this) && Object.prototype.hasOwnProperty.call(this, "_ignoredColumns");
@@ -1170,8 +1164,6 @@ function applyColumnsHash(
   }
 
   const ignored = new Set(host._ignoredColumns ?? []);
-  // Rails load_schema!: `@columns_hash = columns_hash.except(*ignored_columns)`
-  // — the filtered hash is built once here at load time and memoized below.
   const filteredHash: Record<string, unknown> = {};
   for (const [name, column] of Object.entries(hash)) {
     if (ignored.has(name)) {
@@ -1307,9 +1299,6 @@ function applyColumnsHash(
   };
   invalidate(host, { deleteOwn: false });
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
-  // Rails load_schema! stores the filtered hash eagerly (`@columns_hash =
-  // columns_hash.except(*ignored_columns)`); `columns` derives lazily from it
-  // (`@columns ||= columns_hash.values`).
   host._columnsHash = filteredHash;
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
@@ -1645,11 +1634,8 @@ export function sequenceName(this: SchemaHost, value?: string | null): string | 
 
 export function ignoredColumns(this: SchemaHost, value?: string[]): string[] {
   if (value !== undefined) {
-    // Rails' ignored_columns= runs reload_schema_from_cache BEFORE storing the
-    // new list (model_schema.rb:366-368), so `columns`/`columns_hash`/
-    // `column_names` all rebuild against it on the next read.
     reloadSchemaFromCache.call(this);
-    this._ignoredColumns = value;
+    this._ignoredColumns = value.map(String);
     for (const col of value) {
       if (col in this.prototype) {
         Object.defineProperty(this.prototype, col, {
@@ -1757,19 +1743,7 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
   // no-op: JS is single-threaded; no Monitor/Mutex needed
 }
 
-/**
- * Mirrors Rails' `reload_schema_from_cache` (model_schema.rb:553-568): drop the
- * class-level schema-derived memos on `this` and, recursively, its descendants
- * so the next read re-runs `loadSchema` — which applies the `ignoredColumns`
- * filter at load time (`applyColumnsHash`). Unlike `resetColumnInformation`,
- * this does NOT clear the adapter's schema cache (Rails' reload reads from the
- * still-warm cache — that's the "from_cache" in the name), so the next load
- * re-reflects synchronously. Descendants get their own props DELETED (not
- * assigned) so they re-inherit the freshly rebuilt caches via the prototype
- * chain, matching the STI invalidation pattern in `resetColumnInformation`.
- *
- * @internal
- */
+/** @internal */
 function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   this._columnsHash = undefined;
   this._columns = undefined;
@@ -1778,7 +1752,6 @@ function reloadSchemaFromCache(this: SchemaHost, recursive = true): void {
   (this as { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   this._schemaLoaded = false;
   (this as { _schemaLoadPromise?: unknown })._schemaLoadPromise = undefined;
-  // Rails nils @attribute_names recursively too.
   clearAttributeNamesMemo(this);
   if (!recursive) return;
   const descendants = (this as { descendants?: SchemaHost[] }).descendants ?? [];
