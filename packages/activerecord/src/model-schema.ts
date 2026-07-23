@@ -43,6 +43,31 @@ function reflectionAdapter(klass: any): any {
   return threadedConnectionFor(klass) ?? klass.connection;
 }
 
+// `getStiBase` climbs to the TOPMOST `_inheritanceColumn` ancestor, which is the
+// wrong schema host as soon as an intermediate descendant claims its own table
+// (Shape → Circle → Ticket → VIPTicket, Ticket = "tickets"): the schema host for
+// VIPTicket is Ticket, not Shape. Walk to the topmost ancestor that still shares
+// the receiver's table instead.
+function stiSchemaHost<T extends { tableName: string }>(klass: T): T {
+  if (!isStiSubclass(klass)) return klass;
+  const table = klass.tableName;
+  let host = klass;
+  let current = Object.getPrototypeOf(klass) as (T & { _abstractClass?: boolean }) | null;
+  while (current && current !== (Function.prototype as unknown)) {
+    if (getAbstractClass.call(current as any)) break;
+    let ancestorTable: string | undefined;
+    try {
+      ancestorTable = current.tableName;
+    } catch {
+      break;
+    }
+    if (ancestorTable !== table) break;
+    host = current;
+    current = Object.getPrototypeOf(current) as typeof current;
+  }
+  return host;
+}
+
 /**
  * Schema metadata for ActiveRecord models — table name, primary key,
  * columns, content columns, SQL helpers, and table creation.
@@ -263,12 +288,8 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
     return memoHost._columnsHash as Record<string, ColumnLike>;
   }
 
-  // STI-aware adapter + table resolution: adapter may live on the base
-  // OR the concrete subclass. Use the same candidate-list logic the
-  // schema loader uses so `Circle.columnsHash()` can still pull the
-  // cached Column objects from Shape's adapter.
   const klass = this;
-  const stiTarget = isStiSubclass(klass) ? getStiBase(klass) : klass;
+  const stiTarget = stiSchemaHost(klass);
   const candidates = stiTarget === klass ? [klass] : [stiTarget, klass];
   let adapter: DatabaseAdapterLike | null = null;
   for (const cand of candidates) {
@@ -339,7 +360,7 @@ type DatabaseAdapterLike = { schemaCache?: unknown };
  * columns that carry no client-side default anyway.
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
-  const target = isStiSubclass(klass) ? getStiBase(klass) : klass;
+  const target = stiSchemaHost(klass);
   const cachedFrom = (conn: { schemaCache?: unknown } | null | undefined) => {
     const cache = conn?.schemaCache as
       | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
@@ -711,7 +732,7 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
 
   // STI: write cache to the base so subclasses inherit via prototype
   // chain, and a base reset propagates automatically.
-  const cacheHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
+  const cacheHost = stiSchemaHost(this);
   cacheHost._attributesBuilder = new AttributeSetBuilder(types, defaults);
   // If we are an STI subclass, resetDefaultAttributes() may have placed an
   // own-property shadow of `undefined` on `this` to block stale inheritance.
@@ -734,7 +755,7 @@ export function columns(this: SchemaHost): any[] {
   if (this._columns) return this._columns;
   loadSchema.call(this);
   const hash = getColumnsHash(this);
-  const cacheHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
+  const cacheHost = stiSchemaHost(this);
   cacheHost._columns = Object.values(hash);
   return cacheHost._columns;
 }
@@ -1013,8 +1034,9 @@ function rebuildStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
  * set identical — so key coverage would wrongly report the overlay as fresh.
  */
 export function syncStiSubclassAttributeDefinitions(host: SchemaHost): void {
-  if (!isStiSubclass(host)) return;
-  syncStiSubclassOverlay(host, getStiBase(host) as SchemaHost);
+  const base = stiSchemaHost(host);
+  if (base === host) return;
+  syncStiSubclassOverlay(host, base);
 }
 
 function syncStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
@@ -1052,12 +1074,7 @@ export function loadSchema(this: SchemaHost): void {
     );
   }
 
-  // The class that actually owns the schema load — the STI base when
-  // `this` is a subclass. We set `_schemaLoaded` only on the workHost
-  // so subclasses inherit the flag via the prototype chain. Assigning
-  // on the subclass would shadow the base flag and prevent re-reflection
-  // when the base is reset. Delete any stale own-flag on the subclass.
-  const workHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
+  const workHost = stiSchemaHost(this);
   if (workHost !== this && Object.prototype.hasOwnProperty.call(this, "_schemaLoaded")) {
     delete this._schemaLoaded;
   }
@@ -1381,11 +1398,7 @@ function applyColumnsHash(
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (getAbstractClass.call(this as any)) return;
-  // STI subclasses inherit the base's attribute defs — reflect onto the
-  // STI base without forking. Use whichever class has the adapter
-  // configured (base in normal Rails setup, but tolerate subclass-only
-  // configuration).
-  const schemaHost = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
+  const schemaHost = stiSchemaHost(this);
 
   let startingAdapter: SchemaHost["connection"] | undefined;
   let adapterOwner: SchemaHost | undefined;
@@ -1563,7 +1576,7 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
  * @internal
  */
 export async function reconcileVirtualAttributes(this: SchemaHost, reflect = false): Promise<void> {
-  const host = isStiSubclass(this) ? (getStiBase(this) as SchemaHost) : this;
+  const host = stiSchemaHost(this);
   if (host._virtualAttributesReconciled) return;
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
@@ -1584,10 +1597,7 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
  */
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   if (getAbstractClass.call(host as any)) return false;
-  // STI subclasses share the base's table and attribute defs. Reflecting
-  // on a subclass would fork _attributeDefinitions; instead, apply
-  // reflection to the STI base so subclasses inherit it.
-  const schemaHost = isStiSubclass(host) ? (getStiBase(host) as SchemaHost) : host;
+  const schemaHost = stiSchemaHost(host);
   // Adapter may be configured on the base OR on the subclass. Try base
   // first (Rails-normal), fall back to the originating host. Access can
   // throw when no pool is configured; treat as "no adapter".
