@@ -30,9 +30,10 @@ export class KeyProvider {
   }
 
   decryptionKeys(message: Message): Key[] {
-    const keyId = headerString(message.headers.encryptedDataKeyId);
-    if (keyId != null) {
-      return this.keysGroupedById().get(keyId) ?? [];
+    // Ruby truthiness: nil and false fall back to @keys; anything else is a reference.
+    const rawKeyId = message.headers.encryptedDataKeyId as unknown;
+    if (rawKeyId != null && rawKeyId !== false) {
+      return this.keysGroupedById().get(headerString(rawKeyId)!) ?? [];
     }
     return this._keys;
   }
