@@ -1,7 +1,3 @@
-// Trails-only tests (no Rails counterpart) for the MismatchedForeignKey
-// query_parser-aware setQuery overload (errors.rb:275). Rails has no unit
-// test for this path; it is exercised indirectly through MySQL adapter
-// integration tests.
 import { describe, expect, it } from "vitest";
 
 import { MismatchedForeignKey, StatementInvalid } from "./errors.js";
@@ -36,6 +32,15 @@ describe("MismatchedForeignKey setQuery (trails-only)", () => {
       "Column `car_id` on table `engines` does not match column `id` on `cars`",
     );
     expect(rebuilt.message).toContain("which has type `bigint`");
+    expect(rebuilt.stack).toBe(original.stack);
+    expect((rebuilt as MismatchedForeignKey).fkDetails).toEqual({
+      table: "engines",
+      foreignKey: "car_id",
+      targetTable: "cars",
+      primaryKey: "id",
+      primaryKeySqlType: "bigint",
+      primaryKeyType: "bigint",
+    });
   });
 
   it("falls back to the plain setQuery assign when sql was supplied at construction", () => {

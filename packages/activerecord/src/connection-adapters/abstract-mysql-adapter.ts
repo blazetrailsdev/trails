@@ -1564,9 +1564,6 @@ export class AbstractMysqlAdapter extends AbstractAdapter {
     binds: unknown[],
     cause: unknown,
   ): MismatchedForeignKey {
-    // Mirrors Rails' `if sql / else query_parser` split: on the sql-less
-    // translation path (with_raw_connection calls translateExceptionClass
-    // with sql: null), FK-detail parsing is deferred until setQuery.
     if (sql) {
       const details = this.mismatchedForeignKeyDetails(message, sql);
       return new MismatchedForeignKey({ message, sql, binds, cause, ...details });

@@ -265,8 +265,6 @@ export class StatementInvalid extends AdapterError {
     this._querySet = options?.sql != null;
   }
 
-  // Returns StatementInvalid (not `this`) because MismatchedForeignKey's
-  // query_parser overload rebuilds and returns a NEW exception, as Rails does.
   setQuery(sql: string, binds: unknown[]): StatementInvalid {
     if (!this._querySet) {
       this.sql = sql;
@@ -455,11 +453,6 @@ export interface MismatchedForeignKeyOptions {
   primaryKey?: string;
   primaryKeySqlType?: string;
   primaryKeyType?: string;
-  /**
-   * Mirrors Rails' `query_parser:` option (errors.rb:248): when the error is
-   * built without SQL (the `with_raw_connection` translation path), the parser
-   * defers FK-detail extraction until `setQuery` supplies the statement.
-   */
   queryParser?: (sql: string) => Partial<MismatchedForeignKeyOptions>;
 }
 
@@ -527,14 +520,6 @@ export class MismatchedForeignKey extends StatementInvalid {
     };
   }
 
-  /**
-   * Mirrors: MismatchedForeignKey#set_query (errors.rb:275)
-   *
-   * When built without SQL but with a `queryParser`, rebuilds the exception
-   * with the parsed FK details now that the statement is known. `stack`
-   * assignment is the TS analogue of Rails' `set_backtrace backtrace`, and
-   * `cause:` is threaded explicitly because TS has no `$!` implicit cause.
-   */
   override setQuery(sql: string, binds: unknown[]): StatementInvalid {
     if (this._queryParser && !this._querySet) {
       const exception = new MismatchedForeignKey({
