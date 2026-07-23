@@ -194,17 +194,17 @@ export function unscoped<T extends typeof Base, R>(
 }
 
 /**
- * Are there attributes associated with this scope? Overrides the base
- * `Scoping::ClassMethods#scope_attributes?` (current scope only) with the
- * default-scope arms, so a model with a `default_scope` seeds its `where`
- * equalities onto new records even with no current scope. The third arm —
- * Rails' `respond_to?(:default_scope)` — covers the method-form override
- * (`def self.default_scope`) rather than the private `default_scope { }`
- * macro, which instead appends to `defaultScopes`.
+ * Are there attributes associated with this scope? Rails' third arm,
+ * `respond_to?(:default_scope)`, covers only the method-form override
+ * (`def self.default_scope`) — the `default_scope { }` macro is private, so it
+ * registers in `defaultScopes` instead.
  *
  * Mirrors: ActiveRecord::Scoping::Default::ClassMethods#scope_attributes?
  */
-export function isScopeAttributes(this: any): boolean {
+export function isScopeAttributes(this: {
+  currentScope?: unknown;
+  defaultScopes?: DefaultScope[];
+}): boolean {
   return (
     baseIsScopeAttributes.call(this) || isDefaultScopes.call(this) || hasDefaultScopeOverride(this)
   );

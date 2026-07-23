@@ -110,15 +110,13 @@ function setValueFor(map: WeakMap<object, any>, modelClass: object, value: any):
 // ---------------------------------------------------------------------------
 
 interface ScopingHost {
-  constructor: { isScopeAttributes?(): boolean; currentScope?: any };
+  constructor: { isScopeAttributes(): boolean };
   assignAttributes?(attrs: Record<string, unknown>): void;
 }
 
 export function populateWithCurrentScopeAttributes(this: ScopingHost): void {
   const klass = this.constructor as any;
-  // Rails: `return unless self.class.scope_attributes?` — the Default override
-  // makes this true for a default-scoped model with no current scope too.
-  if (!klass.isScopeAttributes?.()) return;
+  if (!klass.isScopeAttributes()) return;
   const attrs = scopeAttributes.call(klass);
   if (attrs && Object.keys(attrs).length > 0 && this.assignAttributes) {
     this.assignAttributes(attrs);

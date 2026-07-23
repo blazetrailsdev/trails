@@ -6,7 +6,6 @@
  */
 import { describe, it, expect } from "vitest";
 import "../index.js";
-import { Base } from "../base.js";
 import {
   Developer,
   DeveloperOrderedBySalary,
@@ -31,9 +30,5 @@ describe("scopeAttributes?", () => {
       expect(Developer.isScopeAttributes()).toBe(true);
     });
     expect(Developer.isScopeAttributes()).toBe(false);
-  });
-
-  it("is inherited by Base subclasses", () => {
-    expect(typeof Base.isScopeAttributes).toBe("function");
   });
 });

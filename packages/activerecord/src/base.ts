@@ -587,12 +587,7 @@ async function performClassUpdate(
  * only write scope attrs for keys NOT in the explicit set.
  */
 function _shouldApplyScopeAttributes(ctor: typeof Base): boolean {
-  // `scope_attributes?` (Scoping::Default::ClassMethods) — a default scope
-  // seeds its `where` equalities onto new records too, not only an explicit
-  // current scope. The all_queries flag is irrelevant here: `all` (and thus
-  // `scope_for_create`) applies every default scope, so both all_queries and
-  // non-all_queries `where` conditions propagate on create.
-  return (ctor as any).isScopeAttributes();
+  return ctor.isScopeAttributes();
 }
 
 /**
