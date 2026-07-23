@@ -67,7 +67,7 @@ describe("NullRelationTest", () => {
       expect(await Developer.none().size()).toBe(0);
       expect(await Developer.none().count()).toBe(0);
       expect(await Developer.none().isEmpty()).toBe(true);
-      expect(Developer.none().isNone()).toBe(true);
+      expect(await Developer.none().isNone()).toBe(true);
       expect(await Developer.none().isAny()).toBe(false);
       expect(await Developer.none().isOne()).toBe(false);
       expect(await Developer.none().isMany()).toBe(false);

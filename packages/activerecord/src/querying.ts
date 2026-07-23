@@ -668,12 +668,10 @@ export function isOne<T extends typeof Base>(this: T): Promise<boolean> {
 }
 
 /**
- * Mirrors: ActiveRecord::Querying#none? — Rails' `none?` (no block/args) falls
- * through to `empty?`. (Relation#isNone is the distinct null-relation predicate,
- * so this delegates to `all().empty?` rather than to it.)
+ * Mirrors: ActiveRecord::Querying#none? — delegates to all().none?
  */
 export function isNone<T extends typeof Base>(this: T): Promise<boolean> {
-  return this.all().isEmpty();
+  return this.all().isNone();
 }
 
 /**

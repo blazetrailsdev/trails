@@ -105,11 +105,6 @@ describe("DelegationTest", () => {
     // a method silently dropped from querying.ts/base.ts fails the test.
     //
     // Intentionally excluded:
-    //   - `isNone`: Rails QUERYING_METHODS' `none?` is the no-records predicate,
-    //     which trails delegates as `isEmpty` (see querying.ts isEmpty doc:
-    //     "Rails' `none?` … falls through to `empty?`"). `Relation#isNone()` is
-    //     a separate null-relation predicate (`_isNone`), intentionally not a
-    //     class-level querying delegator.
     //   - `withCte`: trails' class-level name for Rails' `with`; only the `with`
     //     alias exists on the Relation, so we sweep `with` (the Rails
     //     QUERYING_METHODS name) below — `withCte` is the same delegator.

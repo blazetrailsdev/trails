@@ -1406,9 +1406,20 @@ describe("RelationTest", () => {
 
   it("none?", async () => {
     const postsRel = Post.all();
-    expect(await postsRel.isNone()).toBe(false);
+    await assertQueriesCount(1, false, async () => {
+      expect(await postsRel.isNone()).toBe(false); // Uses COUNT()
+    });
+
     expect(postsRel.isLoaded).toBe(false);
-    expect(postsRel.isLoaded).toBe(false);
+
+    // Rails' block form (`posts.none? { |p| ... }`) loads the relation once and
+    // answers via Enumerable#none?; the `===`-pattern form has no JS analogue.
+    await assertQueriesCount(1, false, async () => {
+      expect(await postsRel.isNone((p) => (p.id as number) < 0)).toBe(true);
+      expect(await postsRel.isNone((p) => p.id === 1)).toBe(false);
+    });
+
+    expect(postsRel.isLoaded).toBe(true);
   });
 
   it("one", async () => {

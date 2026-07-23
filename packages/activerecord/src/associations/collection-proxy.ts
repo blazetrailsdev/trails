@@ -3258,9 +3258,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#none?
    */
-  // @ts-expect-error Rails Relation#none? fires a query (Enumerable#none?
-  //   via each); our Relation#isNone only checks the NullRelation flag, so the
-  //   CollectionProxy override widens the param/return to the collection form.
   async isNone(predicate?: (record: T) => boolean): Promise<boolean> {
     if (predicate !== undefined) {
       const records = await this.loadTarget();
