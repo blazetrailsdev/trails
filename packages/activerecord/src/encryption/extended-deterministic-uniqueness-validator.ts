@@ -119,23 +119,17 @@ export class EncryptedUniquenessValidator {
    * check for duplicates across scheme migrations.
    */
   static allCiphertextsFor(klass: any, attribute: string, value: unknown): unknown[] {
-    // The current-scheme candidate serializes through the FULL
-    // `type_for_attribute` type (coder dumped before encryption, matching the
-    // write path); gating reaches the inner type via encryptedTypeOf — Rails'
-    // DelegateClass delegation.
+    // Rails shape: the current-scheme candidate stays as raw plaintext at
+    // index 0 (the PredicateBuilder serializes it through the attribute's
+    // resolved type); only previous-scheme candidates are
+    // AdditionalValue-wrapped. Gating reaches the inner type via
+    // encryptedTypeOf — Rails' DelegateClass delegation.
     const fullType = getAttributeType(klass, attribute) as SerializableType | undefined;
     const type = encryptedTypeOf(fullType);
     if (!fullType || !type?.deterministic) {
       return [value];
     }
 
-    const results: Array<unknown | AdditionalValue> = [];
-    results.push(new AdditionalValue(value, fullType));
-
-    for (const prevType of type.previousTypes) {
-      results.push(new AdditionalValue(value, prevType));
-    }
-
-    return results;
+    return [value, ...type.previousTypes.map((prevType) => new AdditionalValue(value, prevType))];
   }
 }

@@ -123,13 +123,27 @@ describe("ActiveRecord::Encryption::ExtendedDeterministicQueriesTest (trails ext
     // EncryptedAttributeType — the delegation the expansion must honor.
     expect(fullType).not.toBeInstanceOf(EncryptedAttributeType);
 
-    const [current] = EncryptedUniquenessValidator.allCiphertextsFor(
+    const candidates = EncryptedUniquenessValidator.allCiphertextsFor(
       EncryptedSerializedBook,
       "name",
       "Dune",
-    ) as Array<{ value: unknown }>;
-    // Deterministic encryption: the expansion candidate must equal the
-    // write-path ciphertext (coder dump applied before encryption).
-    expect(current.value).toEqual(fullType.serialize("Dune"));
+    );
+    // Rails shape: raw plaintext first, AdditionalValues only for previous
+    // schemes. The current-scheme candidate is serialized downstream by the
+    // PredicateBuilder through the attribute's resolved type.
+    expect(candidates[0]).toBe("Dune");
+    expect(candidates.length).toBeGreaterThan(1);
+    // The type the PredicateBuilder serializes IN-list scalars through
+    // (HomogeneousIn#castedValues → attribute typeCaster) must be the full
+    // resolved type, so the candidate matches the write-path ciphertext
+    // (coder dump applied before encryption). Deterministic encryption makes
+    // the equality check meaningful.
+    const arelAttr = (
+      EncryptedSerializedBook as unknown as {
+        arelTable: { get(name: string): { typeCaster: unknown } };
+      }
+    ).arelTable.get("name");
+    const caster = arelAttr.typeCaster as { serialize(v: unknown): unknown };
+    expect(caster.serialize("Dune")).toEqual(fullType.serialize("Dune"));
   });
 });

@@ -103,20 +103,6 @@ function canonicalKey(value: unknown): string {
  */
 const NONSERIALIZABLE_SENTINEL = "\u0000serialized:";
 
-// Global-registry copy of encryption's ADDITIONAL_VALUE_BRAND
-// (encrypted-attribute-type.ts). Resolved via Symbol.for rather than an
-// import because encrypted-attribute-type.ts imports this module — the same
-// cycle the brand exists to break.
-const ADDITIONAL_VALUE_BRAND = Symbol.for("activerecord.encryption.AdditionalValue");
-
-function isAdditionalValue(value: unknown): boolean {
-  return (
-    typeof value === "object" &&
-    value !== null &&
-    (value as Record<symbol, unknown>)[ADDITIONAL_VALUE_BRAND] === true
-  );
-}
-
 /**
  * Recursively unwraps `toHash()`-bearing objects and sorts plain-object keys so
  * the resulting structure has a canonical, insertion-order-independent shape.
@@ -298,11 +284,6 @@ export class Serialized extends ValueType {
   }
 
   cast(value: unknown): unknown {
-    // Encryption AdditionalValues pass through cast unchanged so serialize()
-    // can unwrap them — the same contract as EncryptedAttributeType.cast,
-    // needed here because a Serialized(Encrypted(...)) attribute's resolved
-    // type is this wrapper.
-    if (isAdditionalValue(value)) return value;
     // Rails: ActiveModel::Type::Helpers::Mutable#cast is always
     // `deserialize(serialize(value))`. Serializing first means a value the
     // coder can't round-trip (e.g. a non-Hash string like "somedata" through
@@ -313,12 +294,6 @@ export class Serialized extends ValueType {
 
   serialize(value: unknown): unknown {
     if (value === null || value === undefined) return null;
-    // Unwrap encryption AdditionalValues to their pre-computed ciphertext
-    // instead of feeding the AV object to the coder — mirrors Rails'
-    // ExtendedEncryptableType prepend on the bare EncryptedAttributeType. The
-    // AV-wrapped current-scheme value is a trails invention (Rails keeps the
-    // plaintext raw), so the wrapper type must honor it too.
-    if (isAdditionalValue(value)) return (value as { value: unknown }).value;
     if (this.isDefaultValue(value)) return null;
     const dumped = this.coder.dump(value);
     if (this.subtype.serialize) {
