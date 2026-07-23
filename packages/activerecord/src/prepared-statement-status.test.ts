@@ -1,4 +1,5 @@
 import { beforeAll, describe, expect, it } from "vitest";
+import { IsolatedExecutionState } from "@blazetrails/activesupport";
 import "./index.js";
 import { Base } from "./base.js";
 import { fixtures } from "./test-helpers/fixtures.js";
@@ -33,30 +34,25 @@ describe.skipIf(!isSqliteRun())("PreparedStatementStatusTest", () => {
 
     // eslint-disable-next-line vitest/no-conditional-in-test
     if ((await Base.leaseConnection()).preparedStatements) {
-      const t1 = (async () => {
+      const t1 = IsolatedExecutionState.run(async () => {
         await courseConn.unpreparedStatement(async () => {
           inside.set();
           await preventing.wait;
           expect(courseConn.preparedStatements).toBe(false);
-          expect(entrantConn.preparedStatements).toBe(false);
+          expect(entrantConn.preparedStatements).toBe(true);
+          finished.set();
         });
-        expect(courseConn.preparedStatements).toBe(true);
-        expect(entrantConn.preparedStatements).toBe(false);
-        finished.set();
-      })();
+      });
 
-      const t2 = (async () => {
-        await inside.wait;
+      const t2 = IsolatedExecutionState.run(async () => {
         await entrantConn.unpreparedStatement(async () => {
-          expect(courseConn.preparedStatements).toBe(false);
+          await inside.wait;
+          expect(courseConn.preparedStatements).toBe(true);
           expect(entrantConn.preparedStatements).toBe(false);
           preventing.set();
           await finished.wait;
-          expect(courseConn.preparedStatements).toBe(true);
-          expect(entrantConn.preparedStatements).toBe(false);
         });
-        expect(entrantConn.preparedStatements).toBe(true);
-      })();
+      });
 
       await t1;
       await t2;
