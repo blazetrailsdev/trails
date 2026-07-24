@@ -387,11 +387,23 @@ export class PredicateBuilder {
    * JS object keys can't be arrays, so the composite shape is a separate
    * method (with a matching `Relation#where(cols, tuples)` overload) — but
    * only as an adapter: it zips `cols` with each tuple into the plain-hash
-   * shape and delegates, so dot-notation splitting, associated-table
-   * re-rooting, bind construction and the grouping tree are all inherited
-   * from that branch rather than re-implemented. `cols.length === 1` takes
-   * the same route and lands on a single `IN (...)`, matching Rails'
-   * one-element-key collapse (predicate_builder.rb:87-90).
+   * shape and delegates, so associated-table re-rooting, bind construction
+   * and the grouping tree are inherited from that branch rather than
+   * re-implemented. `cols.length === 1` takes the same route and lands on a
+   * single `IN (...)`, matching Rails' one-element-key collapse
+   * (predicate_builder.rb:87-90).
+   *
+   * Deviation: it delegates via `buildFromHash`, not `expand_from_hash`, so
+   * `convert_dot_notation_to_hash` is re-applied per tuple and a qualified
+   * column (`"comments.post_id"`) resolves against the associated table.
+   * Rails runs that conversion once at the top of `build_from_hash`
+   * (predicate_builder.rb:24-25) and its Array-key branch recurses straight
+   * into `expand_from_hash` (predicate_builder.rb:96), so a dotted string
+   * inside an Array key falls through to `self[key, value]` and yields a
+   * literal, broken attribute name. Qualified composite columns are a
+   * deliberate trails extension (#5186) that the `where(cols, tuples)`
+   * surface is expected to support; routing them here keeps that behavior
+   * on one code path instead of a second dot-splitting implementation.
    *
    * Tuples containing `null` / `undefined` are filtered out: SQL
    * tuple-equality treats any null component as a non-match, whereas
@@ -433,13 +445,12 @@ export class PredicateBuilder {
     const validTuples = tuples.filter((t) => t.every((v) => v !== null && v !== undefined));
     if (validTuples.length === 0) return null;
     if (cols.length === 1) {
-      return this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) })[0];
+      return andReduceToOneNode(this.buildFromHash({ [cols[0]]: validTuples.map((t) => t[0]) }));
     }
     const queryGroups = validTuples.map((tuple) =>
       this.buildFromHash(Object.fromEntries(cols.map((col, i) => [col, tuple[i]]))),
     );
-    const nodes = this.groupingQueries(queryGroups);
-    return nodes.length === 1 ? nodes[0] : new Nodes.Grouping(nodes.reduce((l, r) => l.and(r)));
+    return andReduceToOneNode(this.groupingQueries(queryGroups));
   }
 
   registerHandler(
@@ -588,6 +599,20 @@ function extractAggregateAttr(object: unknown, attr: string, tryBang: boolean): 
     );
   }
   return object;
+}
+
+/**
+ * Collapse an expansion's predicates into the single node `buildComposite`
+ * has to return. `buildFromHash` / `groupingQueries` both yield a `Node[]`
+ * whose entries are ANDed by the where clause, and either can exceed one
+ * entry for a single key — a `composed_of` key with a multi-column mapping
+ * expands to one predicate per mapped column (buildFromHashAggregate). So
+ * fold with `and` rather than indexing, which would silently drop the rest.
+ */
+function andReduceToOneNode(nodes: Nodes.Node[]): Nodes.Node {
+  return nodes.length === 1
+    ? nodes[0]
+    : new Nodes.Grouping(nodes.reduce((left, right) => left.and(right)));
 }
 
 function describeAggregateValue(object: unknown): string {

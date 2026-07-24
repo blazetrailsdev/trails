@@ -17,6 +17,7 @@ import { fixtures } from "../test-helpers/fixtures.js";
 import { CpkBook, CpkOrder, CpkAuthor, CpkChapter } from "../test-helpers/models/cpk.js";
 import { Post } from "../test-helpers/models/post.js";
 import { Comment } from "../test-helpers/models/comment.js";
+import { Customer, Address } from "../test-helpers/models/customer.js";
 
 describe("Relation#where — composite-key form", () => {
   // Rails creates the CPK rows inline with `Cpk::Book.create!` — no cpk
@@ -25,7 +26,9 @@ describe("Relation#where — composite-key form", () => {
   fixtures([]);
 
   beforeAll(() => {
-    [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment].forEach((m) => registerModel(m));
+    [CpkBook, CpkOrder, CpkAuthor, CpkChapter, Post, Comment, Customer].forEach((m) =>
+      registerModel(m),
+    );
   });
 
   it("compiles `where(['c1','c2'], [[v1a,v1b], [v2a,v2b]])` to OR-of-AND of column equalities", async () => {
@@ -224,6 +227,23 @@ describe("Relation#where — composite-key form", () => {
     await CpkBook.create({ id: [author.id, 100], title: "by-record" });
     const matched = await (CpkBook as any).where(["author_id", "id"], [[author, 100]]).toArray();
     expect(matched.map((r: any) => r.title)).toEqual(["by-record"]);
+  });
+
+  it("single-column composite over a composed_of key keeps every mapped column's predicate", () => {
+    // An aggregate key expands to one predicate per mapped column
+    // (expand_from_hash's aggregated_with? branch, predicate_builder.rb:124-141),
+    // so the delegation returns a multi-node array for a single key. Folding
+    // with `and` — rather than taking [0] — is what keeps city/country from
+    // being silently dropped alongside street.
+    const rel = (Customer as any).all();
+    const node: any = rel.predicateBuilder.buildComposite(
+      ["address"],
+      [[new Address("Funny Street", "Scary Town", "Loony Land")]],
+    );
+    const sql = (Customer as any).all().where(node).toSql();
+    expect(sql).toMatch(/address_street/);
+    expect(sql).toMatch(/address_city/);
+    expect(sql).toMatch(/address_country/);
   });
 
   it("Relation#where(single array arg) routes to the sanitized-conditions form, not composite", () => {
