@@ -18,6 +18,8 @@ import {
 } from "@blazetrails/activemodel";
 import * as ArType from "../../type.js";
 
+import { Array as OidArray } from "./oid/array.js";
+import { RangeType } from "./oid/range.js";
 import { Date as OidDate } from "./oid/date.js";
 import { DecimalWithoutScale } from "../../type/decimal-without-scale.js";
 import { HashLookupTypeMap } from "../../type/hash-lookup-type-map.js";
@@ -57,6 +59,11 @@ ArType.register("money", Money, { override: false });
 ArType.register("point", Point, { override: false });
 ArType.register("uuid", Uuid, { override: false });
 ArType.register("xml", Xml, { override: false });
+
+// Mirrors: postgresql_adapter.rb:1166-1167. Rails scopes these to
+// `adapter: :postgresql`; "postgres" is trails' normalized name for that family.
+ArType.addModifier({ array: true }, OidArray, { adapter: "postgres" });
+ArType.addModifier({ range: true }, RangeType, { adapter: "postgres" });
 
 /**
  * Mirrors: PostgreSQLAdapter.extract_limit — `$1.to_i if sql_type =~ /\((.*)\)/`.

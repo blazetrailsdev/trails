@@ -110,6 +110,15 @@ export function register(
   _registry.register(typeName, klass, options, block);
 }
 
+/** Mirrors: ActiveRecord::Type.add_modifier */
+export function addModifier(
+  options: Record<string, unknown>,
+  klass: new (subtype: Type) => Type,
+  registrationOptions?: { adapter?: string },
+): void {
+  _registry.addModifier(options, klass, registrationOptions);
+}
+
 export function lookup(
   symbol: string,
   options?: { adapter?: string; [key: string]: unknown },
