@@ -17,6 +17,7 @@ import type { AbstractAdapter as DatabaseAdapter } from "../connection-adapters/
 import type {
   TableDefinition,
   AddIndexOptions,
+  AddForeignKeyOptions,
 } from "../connection-adapters/abstract/schema-definitions.js";
 import type { SchemaStatements } from "../connection-adapters/abstract/schema-statements.js";
 import type { ColumnSpec } from "./schema-types.js";
@@ -143,6 +144,16 @@ class TableBuilder {
   }
   json(name: string, o?: ColOpts): void {
     this.col(name, "json", o);
+  }
+
+  /**
+   * schema.rb's `t.foreign_key :to_table, column:, primary_key:, name:`. The
+   * constraint is carried on the TableDefinition, so every adapter emits it
+   * inline in the CREATE TABLE — the only form SQLite accepts (it has no
+   * `ALTER TABLE … ADD CONSTRAINT`).
+   */
+  foreignKey(toTable: string, opts: Partial<AddForeignKeyOptions> = {}): void {
+    this.t.foreignKey(toTable, opts);
   }
 
   index(columns: string | string[], opts: IndexOpts = {}): void {
@@ -1686,6 +1697,7 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
 
   await define("fk_test_has_fk", {}, (t) => {
     t.integer("fk_id", { null: false });
+    t.foreignKey("fk_test_has_pk", { column: "fk_id", name: "fk_name", primaryKey: "pk_id" });
   });
 
   await define("fk_object_to_point_tos", {}, (t) => {});

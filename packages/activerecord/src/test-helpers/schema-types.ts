@@ -99,6 +99,18 @@ export interface IndexSpec {
   adapters?: readonly string[];
 }
 
+/**
+ * A table-level foreign key, mirroring Rails' `t.foreign_key :to_table,
+ * column:, primary_key:, name:`. Emitted inline in the CREATE TABLE — the only
+ * form SQLite accepts (it has no `ALTER TABLE … ADD CONSTRAINT`).
+ */
+export interface ForeignKeySpec {
+  toTable: string;
+  column: string;
+  primaryKey?: string;
+  name?: string;
+}
+
 export interface WrappedTableSchema {
   columns: Record<string, ColumnSpec>;
   /**
@@ -119,12 +131,17 @@ export interface WrappedTableSchema {
    * (mirrors Rails' `t.index`). Names default to Rails' `index_<table>_on_<cols>`.
    */
   indexes?: IndexSpec[];
+  /**
+   * Table-level foreign keys, emitted inline in the CREATE TABLE (mirrors
+   * Rails' `t.foreign_key`).
+   */
+  foreignKeys?: ForeignKeySpec[];
 }
 export type TableSchema = Record<string, ColumnSpec> | WrappedTableSchema;
 export type Schema = Record<string, TableSchema>;
 
 /** @internal */
-const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes"]);
+const WRAPPER_KEYS = new Set(["columns", "primaryKey", "indexes", "foreignKeys"]);
 
 /** @internal */
 export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema {
@@ -139,16 +156,17 @@ export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema
   //
   // Rule:
   //   1. `columns` is present and an object map.
-  //   2. At least one of `primaryKey` / `indexes` is present (the
-  //      disambiguator from the legacy shape).
-  //   3. Any present `primaryKey` / `indexes` is wrapper-shaped.
+  //   2. At least one of `primaryKey` / `indexes` / `foreignKeys` is present
+  //      (the disambiguator from the legacy shape).
+  //   3. Any present `primaryKey` / `indexes` / `foreignKeys` is wrapper-shaped.
   //   4. No other top-level keys.
   if (!table || typeof table !== "object") return false;
   const candidate = (table as { columns?: unknown }).columns;
   if (!candidate || typeof candidate !== "object") return false;
   const hasPk = "primaryKey" in table;
   const hasIndexes = "indexes" in table;
-  if (!hasPk && !hasIndexes) return false;
+  const hasForeignKeys = "foreignKeys" in table;
+  if (!hasPk && !hasIndexes && !hasForeignKeys) return false;
   if (hasPk) {
     const pk = (table as { primaryKey?: unknown }).primaryKey;
     // Validate primaryKey is the wrapper-shaped value; otherwise this is a
@@ -157,6 +175,9 @@ export function isWrappedSchema(table: TableSchema): table is WrappedTableSchema
     if (Array.isArray(pk) && !pk.every((v) => typeof v === "string")) return false;
   }
   if (hasIndexes && !Array.isArray((table as { indexes?: unknown }).indexes)) return false;
+  if (hasForeignKeys && !Array.isArray((table as { foreignKeys?: unknown }).foreignKeys)) {
+    return false;
+  }
   for (const key of Object.keys(table)) {
     if (!WRAPPER_KEYS.has(key)) return false;
   }

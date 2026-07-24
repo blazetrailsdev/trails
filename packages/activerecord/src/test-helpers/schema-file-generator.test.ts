@@ -182,6 +182,52 @@ describe("generateSchemaFile (MySQL adapter)", () => {
   });
 });
 
+const FK_SCHEMA: Schema = {
+  fk_test_has_pk: { columns: { pk_id: { type: "integer", null: false } }, primaryKey: ["pk_id"] },
+  fk_test_has_fk: {
+    columns: { fk_id: { type: "integer", null: false } },
+    foreignKeys: [
+      { toTable: "fk_test_has_pk", column: "fk_id", primaryKey: "pk_id", name: "fk_name" },
+    ],
+  },
+};
+
+describe("generateSchemaFile foreign keys", () => {
+  const written: string[] = [];
+
+  const generate = async (adapterName?: string): Promise<string> => {
+    const filePath = await generateSchemaFile(FK_SCHEMA, adapterName);
+    written.push(filePath);
+    return (await getFsAsync()).readFileSync(filePath, "utf-8");
+  };
+
+  afterAll(async () => {
+    const fs = await getFsAsync();
+    for (const filePath of written) {
+      try {
+        fs.unlinkSync(filePath);
+      } catch {
+        /* already gone */
+      }
+    }
+  });
+
+  it("emits t.foreignKey inside the create-table block", async () => {
+    const content = await generate();
+    expect(content).toContain(
+      '    t.foreignKey("fk_test_has_pk", {"column":"fk_id","primaryKey":"pk_id","name":"fk_name"});',
+    );
+  });
+
+  it("drops referencing tables up front on the force-recreate adapters", async () => {
+    const content = await generate("postgres");
+    const drop = content.indexOf('ctx.dropTable("fk_test_has_fk", { ifExists: true })');
+    const createParent = content.indexOf('ctx.createTable("fk_test_has_pk"');
+    expect(drop).toBeGreaterThan(-1);
+    expect(drop).toBeLessThan(createParent);
+  });
+});
+
 describe("generateSchemaFile single-column integer PK id type per adapter", () => {
   const SCHEMA: Schema = {
     gadgets: { columns: { gadget_id: "integer", name: "string" }, primaryKey: ["gadget_id"] },

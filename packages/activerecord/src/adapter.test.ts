@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeAll, beforeEach, afterEach, afterAll } from "vitest";
+import { describe, it, expect, vi, beforeAll, beforeEach, afterEach } from "vitest";
 import { Nodes } from "@blazetrails/arel";
 import { Notifications } from "@blazetrails/activesupport";
 import { ArgumentError } from "@blazetrails/activemodel";
@@ -22,7 +22,6 @@ import {
 } from "./index.js";
 import { Result } from "./result.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { adapterType, inMemoryDb } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
@@ -533,55 +532,17 @@ describe("AdapterTest", () => {
 });
 
 // Rails declares `fixtures :fk_test_has_pk` and a real `foreign_key` on
-// fk_test_has_fk. defineSchema can't express FK constraints (see test-schema.ts
-// header), so we add it via raw DDL once per worker and tear it down after,
-// then drive the tables directly (Rails sets `use_transactional_tests = false`).
+// fk_test_has_fk, which the canonical schema now declares too, so the tables
+// ride the boot-laid schema and are driven directly (Rails sets
+// `use_transactional_tests = false`).
 describe("AdapterForeignKeyTest", () => {
   fixtures({}, { useTransactionalTests: false });
-
-  const addFkSql = (): string =>
-    "ALTER TABLE fk_test_has_fk ADD CONSTRAINT fk_name " +
-    "FOREIGN KEY (fk_id) REFERENCES fk_test_has_pk (pk_id)";
-  const dropFkSql = (): string =>
-    adapterType === "mysql"
-      ? "ALTER TABLE fk_test_has_fk DROP FOREIGN KEY fk_name"
-      : "ALTER TABLE fk_test_has_fk DROP CONSTRAINT IF EXISTS fk_name";
 
   const cleanup = async (): Promise<void> => {
     await Base.connection.executeMutation("DELETE FROM fk_test_has_fk");
     await Base.connection.executeMutation("DELETE FROM fk_test_has_pk");
   };
 
-  beforeAll(async () => {
-    if (adapterType === "sqlite") {
-      // SQLite can't `ALTER TABLE … ADD CONSTRAINT`, so create the FK inline
-      // (Rails' schema.rb declares the foreign_key). SQLite enforces it because
-      // the adapter sets `PRAGMA foreign_keys=ON` by default.
-      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_fk");
-      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_pk");
-      await Base.connection.executeMutation(
-        "CREATE TABLE fk_test_has_pk (pk_id INTEGER NOT NULL PRIMARY KEY)",
-      );
-      await Base.connection.executeMutation(
-        "CREATE TABLE fk_test_has_fk (id INTEGER PRIMARY KEY AUTOINCREMENT, " +
-          "fk_id INTEGER NOT NULL, FOREIGN KEY (fk_id) REFERENCES fk_test_has_pk (pk_id))",
-      );
-      return;
-    }
-    // `fk_test_has_pk`/`fk_test_has_fk` ride the boot-laid canonical schema
-    // (both integer keys, so the FK types match). schema.rb declares a real
-    // `foreign_key` on them, which our canonical loader can't express, so add
-    // the constraint here via raw DDL and drop it in afterAll.
-    await Base.connection.execute(dropFkSql()).catch(() => {});
-    await Base.connection.execute(addFkSql());
-  });
-  afterAll(async () => {
-    if (adapterType === "sqlite") {
-      await rebuildCanonicalTables(Base.connection, ["fk_test_has_pk", "fk_test_has_fk"]);
-      return;
-    }
-    await Base.connection.execute(dropFkSql()).catch(() => {});
-  });
   beforeEach(cleanup);
   afterEach(cleanup);
 
@@ -604,7 +565,8 @@ describe("AdapterForeignKeyTest", () => {
       static {
         this.tableName = "fk_test_has_fk";
         // Declare fk_id so the constructor assignment is a known name under
-        // strict writeFromUser (the raw-created FK table is not schema-warmed);
+        // strict writeFromUser — this anonymous class has never been
+        // schema-warmed, and Ruby's lazy column load has no sync analogue here;
         // otherwise the value is dropped and the INSERT hits NOT NULL before FK.
         this.attribute("fk_id", "integer");
       }
