@@ -25,15 +25,27 @@
  *     lacks `then`; awaiting it would not resolve to the array, so its
  *     `.toArray()` is load-bearing. (Skipped when type info is unavailable.)
  *
- * The receiver's *syntactic* shape is no longer gated: identifier bindings
+ * The receiver's *syntactic* shape is mostly ungated: identifier bindings
  * (`await davids` for a `const davids = Author.where(...)`), member reads, and
  * cached association accessors are all matched, not just fresh query-method
  * spawns. The old call-expression-only narrowing (PR #4281) worked around
  * `stripThenable` deleting `.then` from a relation *instance in place*, which
  * left reused/memoized bindings un-awaitable while still typing as thenable.
  * PR #4968 made `stripThenable` return a then-less `Proxy` view and leave the
- * original binding awaitable, so every thenable-typed binding resolves to its
- * array under `await` again — the thenable-type gate alone is now sufficient.
+ * original binding awaitable, so an *external* thenable-typed binding resolves
+ * to its array under `await` again: if such a binding were a stripped view it
+ * would type as `LoadedRelation` (then-less), and gate 2 would exclude it.
+ *
+ * The one receiver shape that stays excluded is `this` (and `super`). A method
+ * invoked on the then-less view runs with `this` bound to that view — the
+ * `get` trap's receiver argument only rebinds accessors, not method calls
+ * (see `relation/thenable.ts`) — so inside e.g. `destroyAll()` called as
+ * `(await rel.load()).destroyAll()`, `await this` would resolve to the view,
+ * not the array. Unlike an external binding, `this`'s static type inside the
+ * class is always the live (thenable) relation and can never narrow to the
+ * stripped view, so gate 2 cannot catch it. `this.toArray()` runs correctly on
+ * the view (only the thenable protocol is defeated, not ordinary method calls),
+ * so it is left as-is.
  *
  * For an autofixing rule a missed warning is cheap; a wrong fix is not.
  *
@@ -122,9 +134,15 @@ const rule = {
         if (property.type !== "Identifier" || property.name !== "toArray") return;
         // `.toArray(arg)` is not the relation accessor — leave it alone.
         if (node.arguments.length !== 0) return;
-        // `await super` is a syntax error, so stripping `.toArray()` off a
-        // `super.toArray()` receiver would emit uncompilable code — skip it.
-        if (callee.object.type === "Super") return;
+        // Skip `this`/`super` receivers. `await super` is a syntax error, so
+        // stripping the suffix off `super.toArray()` emits uncompilable code.
+        // `this.toArray()` is unsound to convert: a method invoked on the
+        // then-less view that `stripThenable` returns from `load`/`reload`/
+        // `presence` runs with `this` bound to that view (its `then` is
+        // `undefined`), so `await this` resolves to the view object, not the
+        // array — and `this`'s static type can never reflect that it might be
+        // the stripped view, so `receiverIsThenable` cannot catch it. See header.
+        if (callee.object.type === "Super" || callee.object.type === "ThisExpression") return;
         // Only flag the directly-awaited position — the one spot where the
         // suffix is provably redundant for a thenable.
         if (!isDirectlyAwaited(node)) return;

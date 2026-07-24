@@ -568,7 +568,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
   override limit(value: number | null): Relation<T> | Promise<T[]> {
     if (this._chainWalker) return Relation.prototype.limit.call(this, value) as Relation<T>;
     return (async () => {
-      const records = await this;
+      const records = await this.toArray();
       // null = "clear the limit" (matches Relation#limit). Without
       // this guard, `records.slice(0, null)` returns an empty array.
       return value === null ? records : records.slice(0, value);
@@ -600,7 +600,7 @@ export class DisableJoinsAssociationRelation<T extends Base> extends Relation<T>
       ).findNthWithLimit(0, limit ?? 1);
       return limit === undefined ? (rows[0] ?? null) : rows;
     }
-    const records = await this;
+    const records = await this.toArray();
     return limit === undefined ? (records[0] ?? null) : records.slice(0, limit);
   }
 }

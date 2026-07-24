@@ -44,6 +44,11 @@ tester.run("prefer-await-relation", rule, {
     // `super` — `await super` is a syntax error, so a `super.toArray()` receiver
     // is left alone rather than rewritten to uncompilable code.
     { code: "class R extends B { async f() { return await super.toArray(); } }" },
+    // `this` inside a relation method — a method invoked on the then-less view
+    // returned by load/reload/presence binds `this` to that view, whose `then`
+    // is undefined, so `await this` would resolve to the view, not the array;
+    // `this`'s type can never narrow to the stripped view. Left alone. See header.
+    { code: "class R { async f() { return await this.toArray(); } }" },
     // No `reload().toArray()` case here: reload() returns a then-stripped
     // LoadedRelation whose `.toArray()` is load-bearing, but that exclusion is
     // the thenable-type gate's job — untestable without type info, so it is
@@ -56,12 +61,6 @@ tester.run("prefer-await-relation", rule, {
       code: "async function f(rel: any) { await rel.toArray(); }",
       errors: [{ messageId: "preferAwait" }],
       output: "async function f(rel: any) { await rel; }",
-    },
-    // `this` inside a relation method
-    {
-      code: "class R { async f() { return await this.toArray(); } }",
-      errors: [{ messageId: "preferAwait" }],
-      output: "class R { async f() { return await this; } }",
     },
     // member read — a cached association proxy is awaitable again
     {
