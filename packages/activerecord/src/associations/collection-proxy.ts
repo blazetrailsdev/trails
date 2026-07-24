@@ -1990,13 +1990,13 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    * adoption — otherwise `return this` would call the proxy's `then` and
    * load the target, breaking Rails' "push does not load target" invariant.
    */
-  async push(...records: T[]): Promise<this> {
+  async push(...records: T[]): Promise<Omit<this, "then">> {
     this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     // Through association (including HABTM): create join records
     if (this._assocDef.options.through) {
       await this._pushThrough(records);
-      return stripThenable(this._proxySelf ?? this) as this;
+      return stripThenable(this._proxySelf ?? this);
     }
 
     // Mirror Rails CollectionAssociation#concat: a new-record owner loads the
@@ -2108,7 +2108,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     } else {
       await this.transaction(concatRecords);
     }
-    return stripThenable(this._proxySelf ?? this) as this;
+    return stripThenable(this._proxySelf ?? this);
   }
 
   /**
@@ -2539,7 +2539,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   /**
    * Alias for push.
    */
-  async concat(...records: T[]): Promise<this> {
+  async concat(...records: T[]): Promise<Omit<this, "then">> {
     return this.push(...records);
   }
 
@@ -4157,7 +4157,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
    *
    * Mirrors: ActiveRecord::Associations::CollectionProxy#append
    */
-  async append(...records: T[]): Promise<this> {
+  async append(...records: T[]): Promise<Omit<this, "then">> {
     return this.push(...records);
   }
 
