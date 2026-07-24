@@ -1878,31 +1878,6 @@ async function buildCanonicalRegistry(): Promise<CanonicalTableDef[]> {
     t.string("name");
   });
 
-  await define("n_authors", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("n_categories", {}, (t) => {
-    t.string("name");
-  });
-
-  await define("n_comments", {}, (t) => {
-    t.integer("post_id");
-  });
-
-  await define("n_posts", {}, (t) => {
-    t.integer("author_id");
-  });
-
-  await define("n_taggings", {}, (t) => {
-    t.integer("post_id");
-    t.integer("tag_id");
-  });
-
-  await define("n_tags", {}, (t) => {
-    t.string("name");
-  });
-
   await define("nested_nested_users", {}, (t) => {
     t.string("name");
   });
