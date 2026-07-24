@@ -240,6 +240,11 @@ const SKIP_CALLS = new Set([
   // Collection / Enumerable. Idioms with a differently-named JS analogue come
   // from the shared JS_ENUMERABLE_ALIASES table (RFC 0025) so this noise list
   // and compare.ts's wide ratchet can't drift; same-named idioms stay literal.
+  // Deriving from the table's keys intentionally widens this set beyond what it
+  // listed before (adds one?/member?/collect_concat/index/find_index/concat):
+  // all are Enumerable idioms that port to a native JS method, i.e. the same
+  // noise the literal entries already skip. This lint is advisory (no ratchet),
+  // so the widening only affects its manual report.
   ...JS_ENUMERABLE_ALIASES.keys(),
   "map",
   "flat_map",
