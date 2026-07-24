@@ -64,8 +64,9 @@ function schema(): SchemaStatements {
 }
 
 const RESERVED_TABLES = ["values", "group", "distinct_select", "distinct", "select", "order"];
-// The subset of the above that TEST_SCHEMA declares, restored on teardown.
-const CANONICAL_RESERVED_TABLES = ["group", "select", "distinct", "distinct_select", "values"];
+// `order` is the one name here TEST_SCHEMA does not declare; the rest are
+// canonical, so teardown must hand them back in their canonical shape.
+const CANONICAL_RESERVED_TABLES = RESERVED_TABLES.filter((t) => t !== "order");
 
 // Mirrors Rails `setup`: rebuild the five reserved-word tables before each
 // test via `create_table`. `references` adds the `*_id` column and the
@@ -94,13 +95,10 @@ beforeEach(async () => {
   ]);
 });
 
-// Mirrors Rails teardown: drop the tables so the bespoke per-test shapes built
-// above don't leak into sibling files sharing the worker DB. Rails can stop
-// there (its teardown runs against a per-process DB rebuilt from schema.rb);
-// we additionally restore the canonical shapes, because `group`/`select`/
-// `distinct`/`distinct_select`/`values` are canonical TEST_SCHEMA tables and a
-// later file in the same worker that reads one would otherwise trip
-// `repairWorkerSchema`. `order` is not canonical — dropping it is the end of it.
+// Mirrors Rails teardown: drop the tables so the bespoke per-test shapes don't
+// leak into sibling files sharing the worker DB. Rails can stop there; we then
+// hand the canonical names back in their TEST_SCHEMA shape, since a later file
+// in the same worker reading one would otherwise trip `repairWorkerSchema`.
 afterAll(async () => {
   const conn = schema();
   await conn.dropTable("values", "group", "distinct_select", "distinct", "select", "order", {
