@@ -122,4 +122,38 @@ describe("reloadSchemaFromCache recursion — non-STI descendant under STI", () 
     expect(own<number>(Ticket, "_schemaRevision")).toBe((ticketRevisionBefore ?? 0) + 1);
     expect(own<number>(Shape, "_schemaRevision")).toBe(shapeRevisionBefore);
   });
+
+  it("does not redirect across an abstract intermediate ancestor that inherits the base table", async () => {
+    class Shape extends Base {
+      static override tableName = "tickets";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Mediator extends Shape {
+      static {
+        this.abstractClass = true;
+      }
+    }
+    class Ticket extends Mediator {}
+    registerSubclass(Ticket);
+
+    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    for (const klass of [Shape, Ticket]) {
+      (klass as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    }
+
+    await Ticket.loadSchema();
+    const ticketRevisionBefore = own<number>(Ticket, "_schemaRevision");
+    const shapeRevisionBefore = own<number>(Shape, "_schemaRevision");
+
+    // The abstract Mediator inherits tableName "tickets", so a bare
+    // immediate-parent table comparison would redirect the reload to
+    // stiSchemaHost(Ticket) — which stops at the abstract boundary and returns
+    // Ticket — recursing on Ticket forever. Ticket is its own host here.
+    reloadSchemaFromCache.call(Ticket as never);
+
+    expect(own<number>(Ticket, "_schemaRevision")).toBe((ticketRevisionBefore ?? 0) + 1);
+    expect(own<number>(Shape, "_schemaRevision")).toBe(shapeRevisionBefore);
+  });
 });

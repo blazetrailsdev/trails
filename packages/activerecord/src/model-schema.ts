@@ -934,15 +934,16 @@ function invalidateStiDescendantColumnMemos(host: SchemaHost): void {
   }
 }
 
+// A shared-table STI overlay is one whose schema host is a proper ancestor,
+// i.e. `stiSchemaHost` climbs off the receiver. Defining it in terms of the
+// same resolver `reloadSchemaFromCache` redirects to keeps the gate and the
+// redirect target from ever disagreeing — a bare immediate-parent table
+// comparison would part ways with `stiSchemaHost` across an abstract ancestor
+// (which `stiSchemaHost` treats as a host boundary), redirecting to `this` and
+// recursing forever.
 function sharesStiBaseTable(klass: SchemaHost): boolean {
   if (!isStiSubclass(klass)) return true;
-  const parent = Object.getPrototypeOf(klass) as SchemaHost | null;
-  if (!parent || parent === (Function.prototype as unknown)) return true;
-  try {
-    return parent.tableName === klass.tableName;
-  } catch {
-    return false;
-  }
+  return stiSchemaHost(klass) !== klass;
 }
 
 /**
