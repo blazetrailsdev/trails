@@ -15,12 +15,13 @@
 //                (from extract-ruby-tests.rb, e.g. "message_pack_test.rb").
 //                Consumed by isTestFileUnported() → test:compare.
 //                Omit when there is no corresponding Rails test file.
-//   `package`  — (optional) scopes a `pattern` entry to one api-compare
-//                package. Required when the same source basename exists in
-//                more than one package — e.g. `core_ext/name_error.rb`
-//                lives in both activesupport and did_you_mean and the
-//                exclusion should only apply to one. Unscoped patterns
-//                match across all packages.
+//   `package`  — (optional) scopes a `pattern` (source-path) or whole-file
+//                `testFile` (test-path) match to one package. Required when the
+//                same basename exists in more than one package — e.g.
+//                `core_ext/name_error.rb` lives in both activesupport and
+//                did_you_mean, and `railtie_test.rb` at the test-root of both
+//                globalid and activemodel — where the exclusion applies to only
+//                one. Unscoped entries match across all packages.
 //
 // Most entries set both (source and test excluded together).
 // Test-only entries (GVL, Rake, dbconsole, Ruby serialization) set only
@@ -28,16 +29,14 @@
 // are being actively ported.
 
 export type UnportedFile = { reason: string } &
-  // `package` is only valid alongside `pattern`: it scopes the source-path
-  // substring match to one api-compare package. testFile-only and per-test
-  // entries operate on Ruby test paths which the test extractor already
-  // namespaces per-package, so `package` would have no effect there.
+  // `package` scopes a source-path (`pattern`) or whole-file test-path
+  // (`testFile` without `tests`) match to one package. Per-test entries
+  // (`tests:`) match on the test description, so scoping is pointless there.
   (| { pattern: string; testFile?: string; tests?: never; package?: string }
-    | { pattern?: string; testFile: string; tests?: never }
-    // Per-test exclusion: test-only — never affects api:compare.
-    // Only the listed Ruby test descriptions are dropped from test:compare counts.
-    // `className` narrows the match to a specific Ruby *Test class within the file,
-    // enabling exclusion of GVL-only subclasses that share test names with portable ones.
+    | { pattern?: string; testFile: string; tests?: never; package?: string }
+    // `className` narrows a per-test exclusion to one Ruby *Test class within
+    // the file, so a GVL-only subclass can be dropped while a portable sibling
+    // sharing a test name stays counted. Per-test entries never touch api:compare.
     | { pattern?: never; testFile: string; className?: string; tests: string[] }
   );
 
@@ -682,12 +681,20 @@ export const UNPORTED_FILES: UnportedFile[] = [
   },
   // --- globalid: Rails::Railtie wiring ---
   {
-    testFile: "railtie_test.rb",
+    testFile: "/railtie_test.rb",
+    package: "globalid",
     reason:
-      "Exercises Rails::Railtie boot wiring for GlobalID — `app_id`, " +
-      "`expires_in`, verifier secret derivation from Rails.application. " +
-      "Trails has no Railtie analogue; wiring happens via the package-local " +
-      "`wire.ts` side-effect import and explicit `setApp` / verifier setters.",
+      "Exercises the `global_id` Railtie initializer through a full " +
+      "`Rails::Application` boot (`@app.initialize!`) under " +
+      "`ActiveSupport::Testing::Isolation` — GlobalID.app defaulting, " +
+      "`config.global_id.app`/`expires_in` injection, and verifier key " +
+      "derivation from `app.key_generator`. Unlike activemodel/trailties, " +
+      "globalid has not yet ported its railtie to a `Trailtie` " +
+      "(activesupport's `BaseRailtie`); its wiring is a `wire.ts` side-effect " +
+      "plus explicit `setApp`/verifier setters, and there is no " +
+      "`Rails::Application` boot harness for these tests to drive. Porting " +
+      "globalid's railtie to a `Trailtie` would let this file re-enter " +
+      "accounting — tracked as a follow-up story.",
   },
   // --- globalid: module-based `only:` filters (Ruby modules have no TS analogue) ---
   {
@@ -1133,9 +1140,11 @@ export function isSourceUnported(file: string, pkg?: string): boolean {
   });
 }
 
-export function isTestFileUnported(testFile: string): boolean {
+export function isTestFileUnported(testFile: string, pkg?: string): boolean {
   return UNPORTED_FILES.some((e) => {
     if (!e.testFile || e.tests) return false;
+    const scope = "package" in e ? e.package : undefined;
+    if (scope !== undefined && pkg !== undefined && scope !== pkg) return false;
     const p = e.testFile;
     // A leading "/" anchors the pattern to a path boundary: match the exact
     // basename (`testFile === p.slice(1)`, for top-level files with no dir

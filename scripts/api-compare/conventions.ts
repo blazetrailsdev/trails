@@ -52,7 +52,7 @@ export function snakeToCamel(name: string): string {
  * that distinction (and avoids needing per-package overrides for every
  * framework that ships a `railtie.rb` or a `railties/` directory).
  */
-const PATH_SEGMENT_ALIASES: Record<string, string> = {
+export const PATH_SEGMENT_ALIASES: Record<string, string> = {
   railtie: "trailtie",
   railties: "trailties",
 };

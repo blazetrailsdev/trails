@@ -66,6 +66,7 @@ import { classifyGateMismatch, type GateMismatchKind } from "./gates.js";
 import { buildHistogram, diffHistograms, type KindDelta } from "./assertion-kinds.js";
 import { assertionValueMismatch, type ValueDelta } from "./assertion-values.js";
 import { isTestCaseUnported, isTestFileUnported } from "../api-compare/unported-files.js";
+import { PATH_SEGMENT_ALIASES } from "../api-compare/conventions.js";
 import { PACKAGES } from "../api-compare/config.js";
 import { SpellChecker } from "../../packages/did-you-mean/src/spell-checker.js";
 
@@ -111,7 +112,7 @@ function enforceGateZero(results: { package: string; totalGateMismatch: number }
 // Helpers
 // ---------------------------------------------------------------------------
 
-function rubyToConventionTs(rubyFile: string, pkg: string): string {
+export function rubyToConventionTs(rubyFile: string, pkg: string): string {
   if (pkg === "rack") {
     const dir = path.dirname(rubyFile);
     const base = path.basename(rubyFile, ".rb").replace(/^spec_/, "");
@@ -121,11 +122,23 @@ function rubyToConventionTs(rubyFile: string, pkg: string): string {
   }
 
   const dir = path.dirname(rubyFile);
-  const base = path.basename(rubyFile, ".rb").replace(/_test$/, "");
+  const rawBase = path.basename(rubyFile, ".rb").replace(/_test$/, "");
+  // Trails renames `railtie`/`railties` path segments to `trailtie`/`trailties`
+  // (their classes are not `Rails::Railtie` subclasses) — apply the same
+  // alias table the source-path mapper uses so ported `trailtie.test.ts` files
+  // are credited, not counted as unmapped.
+  const base = PATH_SEGMENT_ALIASES[rawBase] ?? rawBase;
   const kebab = base.replace(/_/g, "-");
   const tsFile = kebab + ".test.ts";
 
-  let tsDir = dir === "." ? "" : dir.replace(/_/g, "-");
+  let tsDir =
+    dir === "."
+      ? ""
+      : dir
+          .split("/")
+          .map((d) => PATH_SEGMENT_ALIASES[d] ?? d)
+          .join("/")
+          .replace(/_/g, "-");
 
   // Rails uses ERB; we use TSE (Trails Server Embedded) — map erb paths to tse
   tsDir = tsDir.replace(/\berb\b/g, "tse");
@@ -508,7 +521,7 @@ function main() {
     const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
     for (const file of pkgInfo.files) {
-      if (isTestFileUnported(file.file)) continue;
+      if (isTestFileUnported(file.file, pkg)) continue;
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
@@ -540,7 +553,7 @@ function main() {
     let tsUnmapped = 0;
 
     for (const file of pkgInfo.files) {
-      if (isTestFileUnported(file.file)) continue;
+      if (isTestFileUnported(file.file, pkg)) continue;
       const conventionTs = rubyToConventionTs(file.file, pkg);
       const exists = lookup.allFiles.has(conventionTs);
 
@@ -864,7 +877,7 @@ function main() {
 
     results.push({
       package: pkg,
-      rubyFiles: pkgInfo.files.filter((f) => !isTestFileUnported(f.file)).length,
+      rubyFiles: pkgInfo.files.filter((f) => !isTestFileUnported(f.file, pkg)).length,
       tsMapped,
       tsUnmapped,
       totalRubyTests: totalRuby,
