@@ -16,6 +16,7 @@ import { quoteDefaultExpression } from "./connection-adapters/abstract/quoting.j
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { repairWorkerSchema } from "./test-helpers/schema-repair.js";
 import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
@@ -1494,6 +1495,10 @@ describe("MigrationTest", () => {
         expect(await connection.indexExists("values", "value")).toBe(false);
       } finally {
         await connection.dropTable("values", { ifExists: true });
+        // `values` is canonical: the bespoke shape above replaced it, so put
+        // the canonical one back rather than leaving the shared worker DB
+        // short a table for whichever file runs next.
+        await rebuildCanonicalTables(connection, ["values"]);
       }
     });
   });
@@ -1515,6 +1520,10 @@ describe("MigrationTest", () => {
         expect(await connection.indexExists("values", "value")).toBe(false);
       } finally {
         await connection.dropTable("values", { ifExists: true });
+        // `values` is canonical: the bespoke shape above replaced it, so put
+        // the canonical one back rather than leaving the shared worker DB
+        // short a table for whichever file runs next.
+        await rebuildCanonicalTables(connection, ["values"]);
       }
     });
   });

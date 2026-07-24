@@ -42,9 +42,13 @@
  *
  * Exemptions live in `eslint/require-canonical-rebuild-exclude.json`, on the
  * same pattern `require-table-teardown-raw-sql-exclude.json` uses, split into
- * two groups: `memoryScoped` files own a private `:memory:` adapter, never
- * touch the shared per-worker database, and are permanently exempt; `backlog`
- * files really do leave a canonical table dropped and are ratcheted to zero.
+ * two permanently-exempt groups: `privateAdapter` files own their own adapter
+ * (a `:memory:` database, or a throwaway file under a per-test tmpdir), so a
+ * canonical table they drop cannot drift the shared per-worker database;
+ * `nonExecuting` files name a canonical table in a drop that never reaches a
+ * database — SQL captured for assertion, or a hand-rolled fake adapter.
+ * Neither is backlog: a file that really leaves a canonical table dropped is
+ * fixed, not listed.
  */
 
 import { calledName, staticString, rawDropNames, SQL_SINKS } from "./require-table-teardown.mjs";
@@ -93,7 +97,7 @@ const rule = {
     ],
     messages: {
       missingRebuild:
-        'Canonical table `{{table}}` is dropped but never restored in this file. Add `await rebuildCanonicalTables(adapter, ["{{table}}"])` after the drop. A canonical table left dropped drifts the shared per-worker database for every file that runs next. If this file owns a private `:memory:` adapter it cannot drift the shared database — add it to the `memoryScoped` group in eslint/require-canonical-rebuild-exclude.json.',
+        'Canonical table `{{table}}` is dropped but never restored in this file. Add `await rebuildCanonicalTables(adapter, ["{{table}}"])` after the drop. A canonical table left dropped drifts the shared per-worker database for every file that runs next. If this file owns a private adapter (`:memory:` or a tmpdir file) it cannot drift the shared database — add it to the `privateAdapter` group in eslint/require-canonical-rebuild-exclude.json.',
     },
   },
 
