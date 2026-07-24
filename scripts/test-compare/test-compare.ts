@@ -474,7 +474,7 @@ function main() {
     const rubyPathToFileCount = new Map<string, number>();
     const rubyDescToFileCount = new Map<string, number>();
     for (const file of pkgInfo.files) {
-      if (isTestFileUnported(file.file)) continue;
+      if (isTestFileUnported(file.file, pkg)) continue;
       const seenPaths = new Set<string>();
       const seenDescs = new Set<string>();
       for (const tc of file.testCases) {
@@ -506,7 +506,7 @@ function main() {
     let tsUnmapped = 0;
 
     for (const file of pkgInfo.files) {
-      if (isTestFileUnported(file.file)) continue;
+      if (isTestFileUnported(file.file, pkg)) continue;
       const conventionTs = rubyToConventionTs(file.file, pkg);
       const exists = lookup.allFiles.has(conventionTs);
 
@@ -830,7 +830,7 @@ function main() {
 
     results.push({
       package: pkg,
-      rubyFiles: pkgInfo.files.filter((f) => !isTestFileUnported(f.file)).length,
+      rubyFiles: pkgInfo.files.filter((f) => !isTestFileUnported(f.file, pkg)).length,
       tsMapped,
       tsUnmapped,
       totalRubyTests: totalRuby,

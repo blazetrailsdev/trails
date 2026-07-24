@@ -1,6 +1,11 @@
 import { describe, it, expect } from "vitest";
 
-import { isSourceUnported, UNPORTED_FILES, type UnportedFile } from "./unported-files.js";
+import {
+  isSourceUnported,
+  isTestFileUnported,
+  UNPORTED_FILES,
+  type UnportedFile,
+} from "./unported-files.js";
 
 describe("isSourceUnported package scoping", () => {
   it("matches an unscoped pattern across every package", () => {
@@ -26,13 +31,25 @@ describe("isSourceUnported package scoping", () => {
 });
 
 describe("UNPORTED_FILES schema", () => {
-  it("only uses `package` on entries that also have a `pattern`", () => {
-    // testFile-only entries operate on test paths, where the test-extractor
-    // already namespaces by package — `package` would be redundant there.
+  it("only uses `package` on entries with a `pattern` or a whole-file `testFile`", () => {
+    // `package` scopes a source-path (`pattern`) or a whole-file test-path
+    // (`testFile` without `tests`) exclusion to one package. Per-test entries
+    // (`tests:`) match on the test description, so scoping there is pointless.
     for (const entry of UNPORTED_FILES as UnportedFile[]) {
       if (entry.package !== undefined) {
-        expect(entry.pattern, `entry ${JSON.stringify(entry)} must have a pattern`).toBeTruthy();
+        expect(
+          entry.pattern || (entry.testFile && !entry.tests),
+          `entry ${JSON.stringify(entry)} must have a pattern or whole-file testFile`,
+        ).toBeTruthy();
       }
     }
+  });
+
+  it("scopes the globalid railtie_test.rb exclusion so activemodel's is still counted", () => {
+    // Regression: a bare `railtie_test.rb` substring-matched activemodel's and
+    // railties' railtie_test.rb too, silently dropping ported files.
+    expect(isTestFileUnported("railtie_test.rb", "globalid")).toBe(true);
+    expect(isTestFileUnported("railtie_test.rb", "activemodel")).toBe(false);
+    expect(isTestFileUnported("railties/railtie_test.rb", "trailties")).toBe(false);
   });
 });
