@@ -42,10 +42,7 @@ const cteSym = (name: string) => Symbol(name) as unknown as string;
 describeIfSupports("common_table_expressions", "WithTest", () => {
   fixtures(["comments", "posts", "companies"]);
   // `comments`/`posts`/`companies` ride the boot-laid canonical schema (RFC 0059
-  // Phase 1); per-file `repairWorkerSchema` (test-setup-dy.ts) restores the
-  // canonical shape of any table a sibling file drifted on the shared worker DB
-  // — e.g. a reduced `comments` (no STI `type` column) — before this suite runs,
-  // so no defensive recreate is needed.
+  // Phase 1), so no defensive recreate is needed.
 
   it("with when hash is passed as an argument", async () => {
     const relation = Post.with({

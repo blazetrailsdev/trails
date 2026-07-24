@@ -252,7 +252,7 @@ describeIfMysql("Mysql2Adapter (trails extensions)", () => {
     // canonical table through the canonical loader rather than hand-rolling its
     // DDL. It is left in place afterwards on purpose: this suite shares the
     // per-worker database with every other file, and dropping a canonical table
-    // here is exactly the shape drift `repairWorkerSchema` has to clean up.
+    // here is exactly the shape drift RFC 0070 burned down.
     await rebuildCanonicalTables(adapter, ["subscribers"]);
     const result = await adapter.execQuery("SELECT * FROM subscribers WHERE 1=0");
     expect(result).toBeInstanceOf(Result);

@@ -12,8 +12,7 @@ import { Author } from "../test-helpers/models/author.js";
 describe("OrderTest", () => {
   const { authors } = fixtures(["authors", "authorAddresses"]);
   // `authors`/`author_addresses`/`books` ride the boot-laid canonical schema
-  // (RFC 0059 Phase 1); per-file `repairWorkerSchema` restores any sibling
-  // drift, so no defensive recreate is needed here.
+  // (RFC 0059 Phase 1), so no defensive recreate is needed here.
   registerModel(Author);
   registerModel(Book);
 

@@ -17,8 +17,6 @@ import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/a
 import { Migration } from "./migration.js";
 import { fixtures } from "./test-helpers/fixtures.js";
 import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
-import { repairWorkerSchema } from "./test-helpers/schema-repair.js";
-import { TEST_SCHEMA } from "./test-helpers/test-schema.js";
 import { TableDefinition } from "./connection-adapters/abstract/schema-definitions.js";
 import { SchemaCreation as PgSchemaCreation } from "./connection-adapters/postgresql/schema-creation.js";
 import { SchemaCreation as MysqlSchemaCreation } from "./connection-adapters/mysql/schema-creation.js";
@@ -146,8 +144,8 @@ afterEach(async () => {
 // `memberships`, `values`, …) are deliberately NOT in this list: dropping a
 // canonical table would corrupt siblings that ride it. The two ReservedWords
 // tests below force-create a bespoke `values(value)` over the canonical
-// `values` shape, so restore any drifted canonical table via
-// `repairWorkerSchema` after the bespoke drops.
+// `values` shape, so hand that canonical table back in its canonical shape
+// after the bespoke drops.
 afterAll(async () => {
   const { adapter, ctx } = await freshContext();
   const o = { ifExists: true } as const;
@@ -180,7 +178,7 @@ afterAll(async () => {
   await ctx.dropTable("things", o);
   await ctx.dropTable("widgets", o);
   await ctx.dropTable("wtx_test", o);
-  await repairWorkerSchema(adapter, TEST_SCHEMA);
+  await rebuildCanonicalTables(adapter, ["values"]);
 });
 
 function internalMetadataExistsSql(kind: typeof adapterType): string {
