@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import {
   type BodyHashRecord,
   type BodyPin,
+  comparePinKeys,
   currentDigests,
   diffPins,
   findDuplicateKeys,
@@ -35,6 +36,27 @@ function pin(over: Partial<BodyPin> = {}): BodyPin {
 describe("keyOf", () => {
   it("keys on package + rubyFile + rubyName", () => {
     expect(keyOf(record())).toBe("activerecord persistence.rb save");
+  });
+});
+
+describe("comparePinKeys", () => {
+  it("orders by code unit, not ICU collation", () => {
+    const bang = pin({ rubyName: "permit!" });
+    const under = pin({ rubyName: "permit_any_in_array" });
+    // "!" (0x21) < "_" (0x5f) by code unit; ICU demotes punctuation to a
+    // secondary difference and can order these either way.
+    expect(comparePinKeys(bang, under)).toBeLessThan(0);
+    expect(comparePinKeys(under, bang)).toBeGreaterThan(0);
+    expect(comparePinKeys(bang, bang)).toBe(0);
+  });
+
+  it("sorts a manifest the same way regardless of locale collation", () => {
+    const keys = ["permit!", "permit_all", "permitted?", "Permit"];
+    const sorted = keys
+      .map((rubyName) => pin({ rubyName }))
+      .sort(comparePinKeys)
+      .map((p) => p.rubyName);
+    expect(sorted).toEqual(["Permit", "permit!", "permit_all", "permitted?"]);
   });
 });
 
