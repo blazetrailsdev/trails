@@ -431,13 +431,20 @@ function emitCallbackInvocationsManifest(): void {
   const libPaths = libPathsManifest();
   // Scoped to ActiveRecord (the ESLint rule scopes to packages/activerecord/src).
   const libDir = libPaths.activerecord;
-  // Map (not plain object) so a TS method name like `constructor` can't collide
-  // with Object.prototype and short-circuit the accumulator lookup.
+  const pkgDir = PACKAGE_DIRS.activerecord;
+  // Keys are file-qualified `<repo-rel-ts-path>#<tsName>` so a callback
+  // requirement sourced from ONE Rails class only lands on the specific ported
+  // method whose Rails source fires `_run_<event>_callbacks` — a same-named
+  // method in another file (e.g. a `super`-only `initializeDup`) is not
+  // constrained. Map (not plain object) so a TS method name like `constructor`
+  // can't collide with Object.prototype and short-circuit the lookup.
   const methods = new Map<string, Set<string>>();
   if (libDir && fs.existsSync(libDir)) {
     const rubyFiles: string[] = [];
     walkRubyFiles(libDir, rubyFiles);
     for (const rubyAbs of rubyFiles) {
+      const rubyRel = path.relative(libDir, rubyAbs).split(path.sep).join("/");
+      const tsRel = path.posix.join(pkgDir, rubyFileToTs(rubyRel).split(path.sep).join("/"));
       const perMethod = callbackEventsInRuby(fs.readFileSync(rubyAbs, "utf8"));
       for (const [rubyMethod, events] of perMethod) {
         for (const tsName of callbackTsNames(rubyMethod)) {
@@ -447,8 +454,9 @@ function emitCallbackInvocationsManifest(): void {
           // init-callback contract is checked on the specific named ports
           // (initWithAttributes, initializeDup) instead.
           if (tsName === "constructor") continue;
-          let set = methods.get(tsName);
-          if (!set) methods.set(tsName, (set = new Set()));
+          const key = `${tsRel}#${tsName}`;
+          let set = methods.get(key);
+          if (!set) methods.set(key, (set = new Set()));
           for (const ev of events) set.add(ev);
         }
       }
