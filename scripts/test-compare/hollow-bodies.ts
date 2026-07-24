@@ -131,6 +131,7 @@ export function formatReport(findings: HollowFinding[], totalTests: number): str
   for (const f of findings) byReason.set(f.reason, (byReason.get(f.reason) ?? 0) + 1);
 
   lines.push(`Hollow-body sweep: ${findings.length} findings across ${totalTests} tests`);
+  if (findings.length === 0) return lines[0];
   for (const [reason, count] of [...byReason].sort((a, b) => b[1] - a[1])) {
     lines.push(`  ${reason}: ${count}`);
   }

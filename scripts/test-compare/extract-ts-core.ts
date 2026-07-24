@@ -149,10 +149,10 @@ function countAssertions(
 
 /**
  * Test-double callees whose callback argument is MEANT to be a no-op — a
- * silenced logger, a stubbed method. Counting those as hollow-body evidence
- * flags healthy tests.
+ * silenced logger (`mockImplementation(() => {})`), a stub. Counting those as
+ * hollow-body evidence flags healthy tests.
  */
-const NOOP_CALLBACK_SINKS = /^(mockImplementation(Once)?|fn|spyOn)$/;
+const NOOP_CALLBACK_SINKS = /^(?:mockImplementation(?:Once)?|fn)$/;
 
 /**
  * Function callbacks passed as arguments to calls inside a test's subtree,
@@ -408,6 +408,7 @@ export function extractTestsFromSource(content: string, relativePath: string): T
     if (inlineGate) gate = mergeGate(gate, inlineGate);
     const finalGate = gate ? finalizeGate(gate) : undefined;
     const { kinds: assertionKinds, values: assertionValues } = collectAssertionKinds(node, helpers);
+    const callbacks = countCallbacks(node);
     fileInfo.testCases.push({
       path: [...currentAncestors, title].join(" > "),
       description: title,
@@ -419,14 +420,9 @@ export function extractTestsFromSource(content: string, relativePath: string): T
       assertionCount: countAssertions(node, helpers),
       assertionKinds,
       assertionValues,
-      ...(() => {
-        const cb = countCallbacks(node);
-        return {
-          emptyCallbacks: cb.empty,
-          callbackCount: cb.total,
-          bodyMutations: cb.mutations,
-        };
-      })(),
+      emptyCallbacks: callbacks.empty,
+      callbackCount: callbacks.total,
+      bodyMutations: callbacks.mutations,
       pending,
       ...(finalGate ? { gate: finalGate } : {}),
     });

@@ -31,7 +31,9 @@ async function main(): Promise<void> {
         "never exercises, so it passes against a broken implementation. Write the body " +
         "against the vendored Rails original; NEVER rename the test to match the body.",
     );
-    throw new Error(`${findings.length} hollow test bodies`);
+    // `process.exitCode` rather than `exit(1)` so stdout flushes first — the
+    // report IS the failure message. Matches test-compare.ts's CLI convention.
+    process.exitCode = 1;
   }
 }
 

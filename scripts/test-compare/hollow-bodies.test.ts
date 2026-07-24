@@ -1,6 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { extractTestsFromSource } from "./extract-ts-core.js";
-import { findHollowTests, worstOffenders } from "./hollow-bodies.js";
+import { findHollowTests, formatReport, worstOffenders } from "./hollow-bodies.js";
 import type { HollowFinding } from "./hollow-bodies.js";
 
 function sweep(source: string): HollowFinding[] {
@@ -112,6 +112,10 @@ describe("hollow-body detector", () => {
       });
     `);
     expect(findings).toEqual([]);
+  });
+
+  it("reports a clean sweep on one line", () => {
+    expect(formatReport([], 27828)).toBe("Hollow-body sweep: 0 findings across 27828 tests");
   });
 
   it("ranks offenders by finding count", () => {

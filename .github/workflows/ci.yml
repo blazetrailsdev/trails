@@ -384,6 +384,16 @@ jobs:
       - uses: ./.github/actions/setup-pnpm
       - run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm lint
+      # test:compare matches our tests to Rails BY NAME, so a test whose name
+      # promises a behaviour its body never exercises reports coverage it does
+      # not provide (PR #4892). The tree is clean, so this is a zero-tolerance
+      # gate rather than a ratchet. Lives here rather than in `preflight`:
+      # that job deliberately never installs pnpm, and this needs the workspace
+      # deps (tsx, typescript, tinyglobby). `!cancelled()` so a `pnpm lint`
+      # failure can't skip it.
+      - name: Hollow test bodies
+        if: ${{ !cancelled() }}
+        run: pnpm test:hollow
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
   # work; GitHub bills every job rounded UP to a whole minute, so running them
@@ -498,14 +508,6 @@ jobs:
             exit 1
           fi
           echo "No new or modified docs/activerecord trackers."
-
-      # test:compare matches our tests to Rails BY NAME, so a test whose name
-      # promises a behaviour its body never exercises reports coverage it does
-      # not provide (PR #4892). The tree is clean, so this is a zero-tolerance
-      # gate rather than a ratchet.
-      - name: Hollow Test Bodies
-        if: ${{ !cancelled() }}
-        run: pnpm test:hollow
 
       # PR attribution check. Scoped to deanmarano-authored PRs: the project
       # forbids Claude attribution in *his* PR descriptions and commits (see
