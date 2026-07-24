@@ -21,7 +21,7 @@
  *
  * Usage:
  *   npx tsx scripts/test-compare/test-compare.ts [--missing] [--json]
- *     [--incomplete] [--gates] [--sort-extra] [--min-extra=N]
+ *     [--incomplete] [--gates] [--check] [--sort-extra] [--min-extra=N]
  *     [--package activesupport]
  *
  *   --incomplete  In the per-file table, hide files that are fully complete
@@ -34,6 +34,10 @@
  *                 missing-gate / wrong-gate / over-gated). Advisory: does not
  *                 affect the matched/skipped/percent counts. Always emitted to
  *                 the JSON artifact regardless of this flag.
+ *   --check       Hard-zero CI gate: exit non-zero if the gate-mismatch count
+ *                 for an enforced package (GATE_ENFORCED_PACKAGES — activerecord
+ *                 only) is non-zero. No baseline, no exclude-list. Combine with
+ *                 --gates so the CI log carries the per-test breakdown too.
  *   --assertions  Print the assertion-count-mismatch report — matched,
  *                 implemented tests whose trails port has a different assertion-
  *                 call count than its Rails counterpart. Scoped to activerecord
@@ -73,6 +77,35 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 // `assertionCount` everywhere, but we only surface the mismatch metric (summary
 // tokens, `--assertions` section, JSON) here so it can't leak into other totals.
 const ASSERTION_REPORT_PACKAGES = new Set(["activerecord"]);
+
+export const GATE_ENFORCED_PACKAGES = new Set(["activerecord"]);
+
+export function gateMismatchOffenders<T extends { package: string; totalGateMismatch: number }>(
+  results: T[],
+): T[] {
+  return results.filter((r) => GATE_ENFORCED_PACKAGES.has(r.package) && r.totalGateMismatch > 0);
+}
+
+function enforceGateZero(results: { package: string; totalGateMismatch: number }[]): void {
+  const enforced = results.filter((r) => GATE_ENFORCED_PACKAGES.has(r.package));
+  if (enforced.length === 0) {
+    console.error("");
+    console.error(
+      `✗ --check found no enforced package to gate (expected one of: ${[...GATE_ENFORCED_PACKAGES].join(", ")}).`,
+    );
+    console.error("  The gate can't be scoped away — drop the --package filter or fix the wiring.");
+    process.exit(1);
+  }
+  const offenders = enforced.filter((r) => r.totalGateMismatch > 0);
+  if (offenders.length === 0) return;
+  console.error("");
+  console.error("✗ gate-mismatch check failed (hard zero, no baseline):");
+  for (const r of offenders) {
+    console.error(`  ${r.package}: ${r.totalGateMismatch} gate-mismatch (must be 0)`);
+  }
+  console.error("  Run `pnpm test:compare -- --gates` for the per-test breakdown.");
+  process.exit(1);
+}
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -360,6 +393,7 @@ function main() {
   const jsonOutput = args.includes("--json");
   const showIncomplete = args.includes("--incomplete");
   const showGates = args.includes("--gates");
+  const checkGates = args.includes("--check");
   const showAssertions = args.includes("--assertions");
   const sortExtra = args.includes("--sort-extra");
   let minExtra = 0;
@@ -857,6 +891,7 @@ function main() {
 
   if (jsonOutput) {
     console.log(`Written to ${outPath}`);
+    if (checkGates) enforceGateZero(results);
     return;
   }
 
@@ -1164,6 +1199,8 @@ function main() {
     `  Overall: ${grandImplemented}/${grandRuby} tests (${grandPct}%)${grandDetailStr}  |  ${grandMapped}/${grandFiles} files  |  ${grandMisplaced} misplaced`,
   );
   console.log(`${"=".repeat(90)}\n`);
+
+  if (checkGates) enforceGateZero(results);
 }
 
 /** Compact one-line rendering of a gate for the --gates report. */
