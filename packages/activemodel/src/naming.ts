@@ -105,6 +105,46 @@ export class ModelName {
   }
 
   /**
+   * Mirrors Rails `@name == other` (String#==). When comparing to
+   * another `ModelName`, both the bare name AND namespace segments
+   * must match — so `ModelName("Post")` and
+   * `ModelName("Post", { namespace: "Blog" })` are NOT equal. When
+   * comparing to a string, only `.name` is matched (a plain string
+   * can't express a namespace).
+   */
+  equals(other: unknown): boolean {
+    if (other instanceof ModelName) {
+      if (this.name !== other.name) return false;
+      return sameSegments(this.namespace, other.namespace);
+    }
+    return typeof other === "string" && this.name === other;
+  }
+
+  /**
+   * Mirrors Rails `@name <=> other` (String#<=>). Returns `-1`, `0`,
+   * or `1`. Throws `ArgumentError` for non-string / non-ModelName
+   * arguments. For ModelName-to-ModelName, compares the full
+   * identity (name + namespace) so namespace-differing models sort
+   * distinctly; for ModelName-to-string, compares `.name` only.
+   */
+  compare(other: unknown): -1 | 0 | 1 {
+    if (other instanceof ModelName) {
+      // Single string compare over the full `::`-qualified constant path —
+      // matches Rails' `String#<=>` on `@name` (e.g. "Admin::Other" <
+      // "Blog::Post" by first segment, regardless of bare-name ordering).
+      const l = ModelName._qualified(this);
+      const r = ModelName._qualified(other);
+      if (l === r) return 0;
+      return l < r ? -1 : 1;
+    }
+    if (typeof other === "string") {
+      if (this.name === other) return 0;
+      return this.name < other ? -1 : 1;
+    }
+    throw new ArgumentError("comparison of ModelName with non-string failed");
+  }
+
+  /**
    * Mirrors Rails `@name.match?(regexp)`. Returns whether the class
    * name matches the given regex (boolean — this is `match?` semantic,
    * not the integer position that Ruby `=~` returns).
@@ -147,6 +187,11 @@ export class ModelName {
    * returns that full path (`"Blog::Post"`) to match Rails.
    */
   toString(): string {
+    return this.name;
+  }
+
+  /** Implicit coercion hook so `String(mn)`, `"${mn}"`, `mn + ""` all work. */
+  [Symbol.toPrimitive](_hint: string): string {
     return this.name;
   }
 
@@ -281,11 +326,6 @@ export class ModelName {
     this.singularRouteKey = singularize(this.routeKey);
   }
 
-  /** Implicit coercion hook so `String(mn)`, `"${mn}"`, `mn + ""` all work. */
-  [Symbol.toPrimitive](_hint: string): string {
-    return this.name;
-  }
-
   get human(): string {
     if (!this._klass) return this._humanFallback;
 
@@ -358,46 +398,6 @@ export class ModelName {
    */
   static addUncountable(word: string): void {
     Inflections.instance("en").uncountable(word);
-  }
-
-  /**
-   * Mirrors Rails `@name == other` (String#==). When comparing to
-   * another `ModelName`, both the bare name AND namespace segments
-   * must match — so `ModelName("Post")` and
-   * `ModelName("Post", { namespace: "Blog" })` are NOT equal. When
-   * comparing to a string, only `.name` is matched (a plain string
-   * can't express a namespace).
-   */
-  equals(other: unknown): boolean {
-    if (other instanceof ModelName) {
-      if (this.name !== other.name) return false;
-      return sameSegments(this.namespace, other.namespace);
-    }
-    return typeof other === "string" && this.name === other;
-  }
-
-  /**
-   * Mirrors Rails `@name <=> other` (String#<=>). Returns `-1`, `0`,
-   * or `1`. Throws `ArgumentError` for non-string / non-ModelName
-   * arguments. For ModelName-to-ModelName, compares the full
-   * identity (name + namespace) so namespace-differing models sort
-   * distinctly; for ModelName-to-string, compares `.name` only.
-   */
-  compare(other: unknown): -1 | 0 | 1 {
-    if (other instanceof ModelName) {
-      // Single string compare over the full `::`-qualified constant path —
-      // matches Rails' `String#<=>` on `@name` (e.g. "Admin::Other" <
-      // "Blog::Post" by first segment, regardless of bare-name ordering).
-      const l = ModelName._qualified(this);
-      const r = ModelName._qualified(other);
-      if (l === r) return 0;
-      return l < r ? -1 : 1;
-    }
-    if (typeof other === "string") {
-      if (this.name === other) return 0;
-      return this.name < other ? -1 : 1;
-    }
-    throw new ArgumentError("comparison of ModelName with non-string failed");
   }
 
   private static _qualified(mn: ModelName): string {

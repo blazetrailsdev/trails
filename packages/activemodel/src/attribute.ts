@@ -181,6 +181,16 @@ export abstract class Attribute {
     return this._hasValue;
   }
 
+  equals(other: Attribute): boolean {
+    const typeEqual = this.type === other.type || this.type.constructor === other.type.constructor;
+    return (
+      this.constructor === other.constructor &&
+      this.name === other.name &&
+      this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
+      typeEqual
+    );
+  }
+
   originalValueForDatabase(): unknown {
     if (this.originalAttribute !== null) {
       return this.originalAttribute.originalValueForDatabase();
@@ -217,16 +227,6 @@ export abstract class Attribute {
     this._hasValue = true;
     this._cachedValueForDatabase = undefined;
     this._hasValueForDatabase = false;
-  }
-
-  equals(other: Attribute): boolean {
-    const typeEqual = this.type === other.type || this.type.constructor === other.type.constructor;
-    return (
-      this.constructor === other.constructor &&
-      this.name === other.name &&
-      this.valueBeforeTypeCast === other.valueBeforeTypeCast &&
-      typeEqual
-    );
   }
 
   withUserDefault(value: unknown): Attribute {

@@ -31,11 +31,54 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "Arel::Table": { "[]": ["get"] },
   // active_model/errors.rb:229 `def [](attribute)` → errors.ts `get`.
   "ActiveModel::Errors": { "[]": ["get"] },
-  // attribute_set/builder.rb:110 `def [](key)` → builder.ts `LazyAttributeHash#get`.
-  "ActiveModel::AttributeSet::LazyAttributeHash": { "[]": ["get"] },
+  // attribute_set/builder.rb:110 `def [](key)` → builder.ts `LazyAttributeHash#get`,
+  // :114 `def []=(key, value)` → `set` (a faithful delegate-hash write, unlike
+  // AttributeSet's `set` below). The class is declared at builder.rb:94 directly
+  // under `module ActiveModel`, so its fqn is NOT nested under `AttributeSet`.
+  "ActiveModel::LazyAttributeHash": { "[]": ["get"], "[]=": ["set"] },
   // attribute_set.rb:16 `def [](name)` → attribute-set.ts `getAttribute` (NOT the
-  // Map-compat `get` invention at attribute-set.ts:296).
+  // Map-compat `get` invention at attribute-set.ts:296). `[]=` (attribute_set.rb:20)
+  // stays UNMAPPED: attribute-set.ts:302 `set` accepts a bare value and wraps it in
+  // an `Attribute`, so it is the Map-compat sibling of `get`, not the `[]=` port.
   "ActiveModel::AttributeSet": { "[]": ["getAttribute"] },
+  // attribute.rb:115 `def ==(other)` → attribute.ts:222 `equals`.
+  "ActiveModel::Attribute": { "==": ["equals"] },
+  // type/value.rb:121 `def ==(other)` → type/value.ts:222 `equals`.
+  "ActiveModel::Type::Value": { "==": ["equals"] },
+  // error.rb:190 `def ==(other)` → error.ts:357 `equals`.
+  "ActiveModel::Error": { "==": ["equals"] },
+  // naming.rb:151 `delegate :==, :===, :<=>, …, to: :name` → naming.ts:371 `equals`
+  // and :386 `compare`. `===` / `=~` share that line but have no TS member, so they
+  // stay unmapped.
+  "ActiveModel::Name": { "==": ["equals"], "<=>": ["compare"] },
+  // association_relation.rb:14 `def ==(other)` → association-relation.ts:247 `equals`.
+  "ActiveRecord::AssociationRelation": { "==": ["equals"] },
+  // reflection.rb:440 `def ==(other_aggregation)` → reflection.ts:608 `equals`
+  // (on `MacroReflection`, declared reflection.rb:369).
+  "ActiveRecord::Reflection::MacroReflection": { "==": ["equals"] },
+  // relation/from_clause.rb:21 `def ==(other)` → relation/from-clause.ts:32 `equals`.
+  "ActiveRecord::Relation::FromClause": { "==": ["equals"] },
+  // connection_adapters/mysql/type_metadata.rb:18 `def ==(other)` →
+  // connection-adapters/mysql/type-metadata.ts:40 `equals`.
+  "ActiveRecord::ConnectionAdapters::MySQL::TypeMetadata": { "==": ["equals"] },
+  // connection_adapters/postgresql/type_metadata.rb:20 `def ==(other)` →
+  // connection-adapters/postgresql/type-metadata.ts:37 `equals`.
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::TypeMetadata": { "==": ["equals"] },
+  // connection_adapters/postgresql/utils.rb:30 `def ==(o)` →
+  // connection-adapters/postgresql/utils.ts:32 `Name#equals`.
+  "ActiveRecord::ConnectionAdapters::PostgreSQL::Name": { "==": ["equals"] },
+  // connection_adapters/statement_pool.rb:23 `def [](key)` / :31 `def []=(sql, stmt)`
+  // → connection-adapters/statement-pool.ts:44 `get` / :53 `set`.
+  "ActiveRecord::ConnectionAdapters::StatementPool": { "[]": ["get"], "[]=": ["set"] },
+  // encryption/properties.rb:20 `delegate :[], to: :data` / :50 `def []=(key, value)`
+  // → encryption/properties.ts:23 `get` / :27 `set`.
+  "ActiveRecord::Encryption::Properties": { "[]": ["get"], "[]=": ["set"] },
+  // result.rb:148 `def [](idx)` → result.ts:177 `at` (Result declares no `at` in
+  // Ruby, so the name is free).
+  "ActiveRecord::Result": { "[]": ["at"] },
+  // result.rb:58 `def ==(other)` / :80 `def [](column)` → result.ts:73 `equals` /
+  // :52 `get` on `IndexedRow`.
+  "ActiveRecord::Result::IndexedRow": { "==": ["equals"], "[]": ["get"] },
 };
 
 /**
