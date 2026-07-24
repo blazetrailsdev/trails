@@ -145,6 +145,10 @@ export class Errors<TBase extends object = object> {
     return matches;
   }
 
+  get(attribute: string): string[] {
+    return this._errors.filter((e) => e.attribute === attribute).map((e) => e.message);
+  }
+
   get attributeNames(): string[] {
     return [...new Set(this._errors.map((e) => e.attribute))];
   }
@@ -334,10 +338,6 @@ export class Errors<TBase extends object = object> {
     return [attribute, resolvedType, opts];
   }
 
-  get base(): TBase | null {
-    return this._base;
-  }
-
   /**
    * Makes `Errors` iterable so `for (const e of errors)`, `[...errors]`,
    * and `Array.from(errors)` all work. Mirrors Rails' `include Enumerable`
@@ -350,8 +350,8 @@ export class Errors<TBase extends object = object> {
     return this._errors[Symbol.iterator]();
   }
 
-  get(attribute: string): string[] {
-    return this._errors.filter((e) => e.attribute === attribute).map((e) => e.message);
+  get base(): TBase | null {
+    return this._base;
   }
 
   on(attribute: string): string[] {

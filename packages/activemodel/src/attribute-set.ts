@@ -57,6 +57,13 @@ export class AttributeSet {
     this.attributes = attributes;
   }
 
+  /**
+   * Get the Attribute instance for a name.
+   */
+  getAttribute(name: string): Attribute {
+    return this.attributes.get(name) ?? this.defaultAttribute(name);
+  }
+
   castTypes(): Record<string, import("./type/value.js").Type> {
     const result: Record<string, import("./type/value.js").Type> = {};
     for (const [name, attr] of this.attributes) {
@@ -281,13 +288,6 @@ export class AttributeSet {
       err.name = "FrozenError";
       throw err;
     }
-  }
-
-  /**
-   * Get the Attribute instance for a name.
-   */
-  getAttribute(name: string): Attribute {
-    return this.attributes.get(name) ?? this.defaultAttribute(name);
   }
 
   /**

@@ -160,6 +160,11 @@ export class Table extends Node {
     return this.from().having(expr);
   }
 
+  get(name: string, table?: Attribute["relation"]): Attribute {
+    const resolved = this.klass?._attributeAliases?.[name] ?? name;
+    return new Attribute(table ?? this, resolved);
+  }
+
   /**
    * Mirrors: Arel::Table#hash — only name (Rails excludes aliases to avoid loops).
    */
@@ -185,22 +190,17 @@ export class Table extends Node {
     return (this.typeCaster as TypeCaster).typeCastForDatabase(attrName, value);
   }
 
-  typeForAttribute(name: string): unknown {
-    return (this.typeCaster as TypeCaster).typeForAttribute(name);
-  }
-
   /** Rails: `private attr_reader :type_caster` (table.rb:115). An aliased table
    *  is a `TableAlias` wrapping this one and delegates its caster back here
    *  (table_alias.rb:22-24), so no external reader is needed. */
   private readonly typeCaster: unknown;
 
-  isAbleToTypeCast(): boolean {
-    return this.typeCaster != null;
+  typeForAttribute(name: string): unknown {
+    return (this.typeCaster as TypeCaster).typeForAttribute(name);
   }
 
-  get(name: string, table?: Attribute["relation"]): Attribute {
-    const resolved = this.klass?._attributeAliases?.[name] ?? name;
-    return new Attribute(table ?? this, resolved);
+  isAbleToTypeCast(): boolean {
+    return this.typeCaster != null;
   }
 
   attr(name: string): Attribute {
