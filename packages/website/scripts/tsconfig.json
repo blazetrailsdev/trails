@@ -1,0 +1,19 @@
+{
+  // Deliberately standalone rather than `extends: "../tsconfig.json"`: that
+  // chain resolves through the generated `.svelte-kit/tsconfig.json`, which
+  // does not exist until `svelte-kit sync` runs. Extending it makes `tsc -p`
+  // here fail with TS5083 on a fresh checkout, and these build scripts must
+  // type-check independently of the SvelteKit sync step.
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "strict": true,
+    "noEmit": true,
+    "skipLibCheck": true,
+    "allowJs": true,
+    "resolveJsonModule": true,
+    "isolatedModules": true
+  },
+  "include": ["**/*.ts", "**/*.mjs"]
+}
