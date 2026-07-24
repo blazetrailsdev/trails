@@ -4,7 +4,7 @@
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "affected_rows",
     "call": "clear",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql/database_statements.rb:189-193 reads cmd_tuples then `result.clear`s the libpq buffer; trails database-statements.ts:231-233 returns `result.rowCount ?? 0` — node-postgres results are GC'd, there is no clear to call."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql/database_statements.rb:189-193 reads cmd_tuples then `result.clear`s the libpq buffer; trails database-statements.ts:231-233 returns `result.rowCount ?? 0` \u2014 node-postgres results are GC'd, there is no clear to call."
   },
   {
     "package": "activerecord",
@@ -88,13 +88,6 @@
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/database-statements.ts",
-    "rubyName": "warning_ignored?",
-    "call": "exclude?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

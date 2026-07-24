@@ -25,6 +25,11 @@ export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
   // and conventions.test.ts fails on an alias the conventions already produce.
   ["include?", ["has"]],
   ["member?", ["has"]],
+  // ActiveSupport's `exclude?` is `!include?`, so the whole call's analogue is
+  // the negated containment call — `!xs.includes(y)` / `!set.has(y)`. Same
+  // negation precedent as `none? → some/every` above. (The convention
+  // candidate for a method NAMED `exclude?` is `excludes`, so no overlap.)
+  ["exclude?", ["includes", "has"]],
   ["key?", ["has"]],
   ["has_key?", ["has"]],
   ["select", ["filter"]],

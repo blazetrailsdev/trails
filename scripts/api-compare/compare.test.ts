@@ -290,6 +290,12 @@ describe("jsEnumerableAliases", () => {
     expect(jsEnumerableAliases("select")).toContain("filter");
   });
 
+  it("treats a negated containment call as exclude?'s analogue", () => {
+    // ActiveSupport's `exclude?` is `!include?`; ports spell it
+    // `!xs.includes(y)` (query-methods.ts) or `!set.has(y)`.
+    expect(jsEnumerableAliases("exclude?")).toEqual(["includes", "has"]);
+  });
+
   it("returns an empty list for a name with no JS analogue", () => {
     expect(jsEnumerableAliases("run_callbacks")).toEqual([]);
   });
