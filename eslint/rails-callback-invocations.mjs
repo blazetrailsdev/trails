@@ -136,9 +136,7 @@ const rule = {
 
     const check = (fnNode, name, reportNode) => {
       if (!name) return;
-      // File-qualified lookup: a requirement only applies to the ported method
-      // whose Rails source actually fires the callback. Fall back to a bare-name
-      // entry for back-compat with any manifest that predates file-qualification.
+      // File-qualified entry first; bare-name is a back-compat fallback.
       const required = manifest[`${rel}#${name}`] ?? manifest[name];
       if (!required || required.length === 0) return;
       if (exclude.has(`${rel}#${name}`)) return;

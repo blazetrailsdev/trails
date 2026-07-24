@@ -90,11 +90,8 @@ tester.run("rails-callback-invocations", rule, {
       filename: excludedFile,
       code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,
     },
-    // File-scoped lookup: a same-named method in a DIFFERENT in-scope file has
-    // no `<rel>#destroy` manifest entry, so it is not constrained even though it
-    // fires no callbacks. This is the whole point of file-qualification: a
-    // requirement sourced from persistence.ts must not leak onto other files'
-    // `destroy` (e.g. a `super`-only override).
+    // File-scoped lookup: a same-named method in a different in-scope file has
+    // no `<rel>#destroy` entry, so it is not constrained despite firing nothing.
     {
       filename: path.join(REPO_ROOT, "packages/activerecord/src/relation.ts"),
       code: `export function destroy(this: any) { return this._reallyDestroy(); }\n`,

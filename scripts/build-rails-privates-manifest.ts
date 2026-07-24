@@ -432,12 +432,11 @@ function emitCallbackInvocationsManifest(): void {
   // Scoped to ActiveRecord (the ESLint rule scopes to packages/activerecord/src).
   const libDir = libPaths.activerecord;
   const pkgDir = PACKAGE_DIRS.activerecord;
-  // Keys are file-qualified `<repo-rel-ts-path>#<tsName>` so a callback
-  // requirement sourced from ONE Rails class only lands on the specific ported
-  // method whose Rails source fires `_run_<event>_callbacks` — a same-named
-  // method in another file (e.g. a `super`-only `initializeDup`) is not
-  // constrained. Map (not plain object) so a TS method name like `constructor`
-  // can't collide with Object.prototype and short-circuit the lookup.
+  // Keys are file-qualified `<repo-rel-ts-path>#<tsName>` so a requirement
+  // sourced from one Rails class only lands on the ported method whose Rails
+  // source fires `_run_<event>_callbacks`, not on same-named methods elsewhere.
+  // Map (not plain object) so a TS name like `constructor` can't collide with
+  // Object.prototype and short-circuit the lookup.
   const methods = new Map<string, Set<string>>();
   if (libDir && fs.existsSync(libDir)) {
     const rubyFiles: string[] = [];
