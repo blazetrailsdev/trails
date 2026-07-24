@@ -90,11 +90,41 @@ jobs:
           # Cross-cutting paths force every per-package gate true. Anything
           # here affects all packages: workspace topology, root tooling
           # config, shared scripts, this workflow, composite actions.
-          # NOTE: the blanket `scripts/` here also matches scripts/tasks/, which
-          # is NOT cross-cutting; it is carved back out of the infra sweep below
-          # (see `infra_files`) so a tasks-CLI-only change stays off the Rails
-          # matrix. Keep that exclusion in sync if this pattern changes.
+          # NOTE: the blanket `scripts/` here also matches subtrees that are
+          # NOT cross-cutting; they are carved back out of the infra sweep
+          # below (see `INFRA_CARVEOUT_RE` / `infra_files`). Keep that
+          # exclusion in sync if this pattern changes.
           INFRA_RE='^(pnpm-lock\.yaml$|pnpm-workspace\.yaml$|package\.json$|tsconfig[^/]*\.json$|vitest[^/]*\.config\.ts$|scripts/|\.github/workflows/ci\.yml$|\.github/actions/)'
+          # Paths that INFRA_RE's blanket `scripts/` sweeps up but which are
+          # single-consumer (or consumed by no CI job at all). Each is stripped
+          # from `infra_files` so a change confined to it does NOT force every
+          # per-package gate true. Classification (verify before adding more):
+          #   tasks/            - tests ride unit-tests only (UNIT_TESTS_PKGS_RE)
+          #   guides-typecheck/ - guides-typecheck job + unit-tests self-test;
+          #                       listed in GUIDES_PKGS_RE and UNIT_TESTS_PKGS_RE
+          #   {api,test,fixtures,schema}-compare/, and the manifest builders
+          #                     - rails-comparison only; listed in COMPARISON_RE
+          #   parity/           - parity jobs, which gate on labels/schedule
+          #                       only and consult no path regex
+          #   ci/               - gh-api-retry.sh runs in preflight;
+          #                       coverage-summary.mjs only in the `if: false`
+          #                       coverage jobs
+          #   test-deps/        - rails-test-deps.ts runs in `prelint`, i.e.
+          #                       inside the lint job
+          #   rails-find/, sync-stats/, phase-g-hunt/, fixtures-inventory/,
+          #   __fixtures__/, strip-asany*
+          #                     - local-dev tooling; no CI job runs them, and
+          #                       their vitest files are in no job's include
+          #                       list (unit-tests names its paths explicitly,
+          #                       ci.yml:604).
+          # The last three groups need no regex addition because preflight and
+          # lint have no path gate at all — they run on every non-docs-only
+          # change, so carving cannot skip them. `pnpm lint` is `eslint .`, so
+          # it also still lints every carved subtree.
+          # Deliberately NOT carved (genuinely cross-cutting): typecheck.mjs
+          # (root `pnpm typecheck`), start-worktree.sh, and the remaining
+          # top-level scripts/*.ts one-offs.
+          INFRA_CARVEOUT_RE='^scripts/((tasks|ci|guides-typecheck|rails-find|sync-stats|phase-g-hunt|fixtures-inventory|test-deps|__fixtures__|api-compare|test-compare|fixtures-compare|schema-compare|parity)/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins|strip-asany)(\.test)?\.ts$)'
           # AR workspace deps: arel/activemodel/activesupport/globalid/
           # did-you-mean (per packages/activerecord/package.json). Also
           # consumes @blazetrails/trails-tsc at runtime via the tsc-wrapper
@@ -136,16 +166,22 @@ jobs:
           # leaf packages (arel/activemodel/activesupport) and the
           # scripts/guides-typecheck self-test. Rack is excluded here — it
           # runs in the leaf-tests job.
-          # scripts/tasks/ also rides on this gate since it's bundled into the
-          # same vitest invocation as the leaf packages and guides-typecheck.
-          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/tasks/)'
+          # scripts/tasks/ and scripts/guides-typecheck/ also ride on this gate
+          # since they're bundled into the same vitest invocation as the leaf
+          # packages (ci.yml:604) — and both are carved out of the infra sweep
+          # (INFRA_CARVEOUT_RE), so this clause is what keeps their self-tests
+          # running on a subtree-only change.
+          UNIT_TESTS_PKGS_RE='^(packages/(arel|activemodel|activesupport)/|scripts/(tasks|guides-typecheck)/)'
           # guides_affected gates the Guides Code Type Check job, which
           # compiles fenced TS blocks in packages/website/docs/guides/**.
           # Today guides only import @blazetrails/activerecord,
           # @blazetrails/activemodel, and @blazetrails/activesupport — plus
           # AR's transitive type deps. Confirmed via:
           #   grep -rhE "from ['\"]@blazetrails/[a-z-]+" packages/website/docs/guides
-          GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|did-you-mean|trails-tsc)/|packages/website/docs/guides/)'
+          # scripts/guides-typecheck/ is the job's own implementation and is
+          # carved out of the infra sweep (INFRA_CARVEOUT_RE), so it must be
+          # named here or a checker-only change would stop running the checker.
+          GUIDES_PKGS_RE='^(packages/(activerecord|activemodel|activesupport|arel|globalid|did-you-mean|trails-tsc)/|packages/website/docs/guides/|scripts/guides-typecheck/)'
           # website_affected gates the Website build (SvelteKit + typedoc +
           # VitePress). Scoped narrowly to packages/website/ — package-source
           # changes alone don't trigger it. To run the site build on a PR
@@ -155,7 +191,8 @@ jobs:
           WEBSITE_PKGS_RE='^packages/website/'
           # comparison_affected gates the Rails API/Test Comparison job. That
           # job is only meaningful when Rails-port package source, the compare
-          # tooling (scripts/{api,test,fixtures}-compare/), or the vendored
+          # tooling (scripts/{api,test,fixtures,schema}-compare/ and the Rails
+          # manifest builders), or the vendored
           # upstream Ruby sources changed — plus cross-cutting infra (INFRA_RE)
           # below. A scripts/tasks-only, website-only, or other tooling-only
           # change can't move any comparison output, so it skips.
@@ -167,7 +204,8 @@ jobs:
           # docs/ruby-ts-conventions.md (checked by api:conventions --check in
           # the job); the scripts/api-compare/ clause keeps that drift check
           # gated on. As with the package gates, infra_files (which carves out
-          # scripts/tasks/) feeds the INFRA_RE half of the OR.
+          # the single-consumer scripts/ subtrees) feeds the INFRA_RE half of
+          # the OR.
           # docs/ruby-ts-conventions.md is ALSO matched directly: it's the
           # generated artifact the conventions check guards, and the docs_only
           # logic above (`:234`) deliberately keeps a hand-edit of it
@@ -175,7 +213,13 @@ jobs:
           # PR that edits ONLY that file matches neither INFRA_RE nor the
           # package/vendor clauses, so without this it would skip the very
           # check the docs_only exception was built to preserve.
-          COMPARISON_RE='^(packages/|scripts/(api|test|fixtures)-compare/|vendor/|docs/ruby-ts-conventions\.md$)'
+          # schema-compare/ (the Schema comparison step, ci.yml:1272) and the
+          # two Rails manifest builders + their shared mixin resolver (the
+          # privates/file-structure steps, ci.yml:1279/1293) are named
+          # explicitly: all are carved out of the infra sweep
+          # (INFRA_CARVEOUT_RE), so this clause is the only thing that still
+          # runs rails-comparison on a change confined to them.
+          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
@@ -268,15 +312,14 @@ jobs:
                   echo "website_affected=false"      >> "$GITHUB_OUTPUT"
                   echo "comparison_affected=false"   >> "$GITHUB_OUTPUT"
                 else
-                  # scripts/tasks/ is the tasks-management CLI. Its tests ride
-                  # ONLY on the unit-tests vitest run (UNIT_TESTS_PKGS_RE), never
-                  # on the Rails suites — so it must not count as cross-cutting
-                  # infra. Drop it from the infra sweep here so a tasks-only
-                  # change doesn't trip INFRA_RE's blanket `scripts/` and force
-                  # every package gate true (the whole Rails matrix). Per-package
-                  # gates below still see the full $files list, so a tasks change
-                  # correctly flips unit_tests_affected via UNIT_TESTS_PKGS_RE.
-                  infra_files=$(echo "$files" | grep -vE '^scripts/tasks/' || true)
+                  # Drop the single-consumer scripts/ subtrees (see
+                  # INFRA_CARVEOUT_RE above) from the infra sweep so a change
+                  # confined to them doesn't trip INFRA_RE's blanket `scripts/`
+                  # and force every package gate true (the whole Rails matrix).
+                  # Per-package gates below still see the full $files list, so
+                  # each carved subtree still flips its own consuming job's gate
+                  # via that gate's regex.
+                  infra_files=$(echo "$files" | grep -vE "$INFRA_CARVEOUT_RE" || true)
                   set_gate() {
                     local name="$1" re="$2"
                     if echo "$infra_files" | grep -qE "$INFRA_RE" || echo "$files" | grep -qE "$re"; then
