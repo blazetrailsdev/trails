@@ -684,10 +684,17 @@ export const UNPORTED_FILES: UnportedFile[] = [
     testFile: "/railtie_test.rb",
     package: "globalid",
     reason:
-      "Exercises Rails::Railtie boot wiring for GlobalID — `app_id`, " +
-      "`expires_in`, verifier secret derivation from Rails.application. " +
-      "Trails has no Railtie analogue; wiring happens via the package-local " +
-      "`wire.ts` side-effect import and explicit `setApp` / verifier setters.",
+      "Exercises the `global_id` Railtie initializer through a full " +
+      "`Rails::Application` boot (`@app.initialize!`) under " +
+      "`ActiveSupport::Testing::Isolation` — GlobalID.app defaulting, " +
+      "`config.global_id.app`/`expires_in` injection, and verifier key " +
+      "derivation from `app.key_generator`. Unlike activemodel/trailties, " +
+      "globalid has not yet ported its railtie to a `Trailtie` " +
+      "(activesupport's `BaseRailtie`); its wiring is a `wire.ts` side-effect " +
+      "plus explicit `setApp`/verifier setters, and there is no " +
+      "`Rails::Application` boot harness for these tests to drive. Porting " +
+      "globalid's railtie to a `Trailtie` would let this file re-enter " +
+      "accounting — tracked as a follow-up story.",
   },
   // --- globalid: module-based `only:` filters (Ruby modules have no TS analogue) ---
   {
