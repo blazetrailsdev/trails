@@ -2392,30 +2392,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   fixtures([]);
 
   function makeModels() {
-    class Pirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-      }
-    }
-    class Bird extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "birds";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("Pirate", Pirate);
-    registerModel("Bird", Bird);
-    Associations.hasMany.call(Pirate, "birds", { autosave: true });
-    acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });
-    return { Pirate, Bird };
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    return { Pirate: CanonicalPirate, Bird: CanonicalBird };
   }
 
   it("valid adding with nested attributes", async () => {
@@ -2674,18 +2653,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
 describe("TestAutosaveAssociationsInGeneral", () => {
   fixtures([]);
   it("autosave works even when other callbacks update the parent model", async () => {
-    class Ship extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
+    class CallbackPirate extends Base {
       declare catchphrase: string | null;
+      declare ship: CanonicalShip | null;
 
       static {
         this._tableName = "pirates";
@@ -2693,18 +2663,13 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.beforeSave(function (record: any) {
           record.catchphrase = "Ahoy!";
         });
+        this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
       }
     }
-    registerModel("Ship", Ship);
-    registerModel("Pirate", Pirate);
-    Associations.hasOne.call(Pirate, "ship", {
-      autosave: true,
-      foreignKey: "pirate_id",
-      className: "Ship",
-    });
+    registerModel("CallbackPirate", CallbackPirate);
 
-    const pirate = await Pirate.create({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "Pearl" });
+    const pirate = await CallbackPirate.create({ catchphrase: "Yarr" });
+    const ship = new CanonicalShip({ name: "Pearl" });
     cacheAssoc(pirate, "ship", ship);
     pirate.catchphrase = "trigger save";
     await pirate.save();
@@ -3233,7 +3198,7 @@ describe("TestAutosaveAssociationsInGeneral", () => {
 
   it("should not add the same callbacks multiple times for has and belongs to many", async () => {
     let saveCount = 0;
-    class Parrot extends Base {
+    class DupCbParrot extends Base {
       declare name: string | null;
 
       static {
@@ -3244,28 +3209,31 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         });
       }
     }
-    class Pirate extends Base {
+    class DupCbPirate extends Base {
       declare catchphrase: string | null;
+      declare parrots: AssociationProxy<DupCbParrot>;
 
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
+        this.hasAndBelongsToMany("parrots", {
+          autosave: true,
+          className: "DupCbParrot",
+          joinTable: "parrots_pirates",
+          foreignKey: "pirate_id",
+          associationForeignKey: "parrot_id",
+        });
       }
     }
-    registerModel("Parrot", Parrot);
-    registerModel("Pirate", Pirate);
-    Associations.hasAndBelongsToMany.call(Pirate, "parrots", {
-      autosave: true,
-      className: "Parrot",
-      joinTable: "parrots_pirates",
-    });
+    registerModel("DupCbParrot", DupCbParrot);
+    registerModel("DupCbPirate", DupCbPirate);
     // Calling addAutosaveAssociationCallbacks a second time must not duplicate callbacks
-    const reflection = (Pirate as any)._reflectOnAssociation("parrots");
+    const reflection = (DupCbPirate as any)._reflectOnAssociation("parrots");
     expect(reflection).toBeDefined();
-    addAutosaveAssociationCallbacks(Pirate, reflection);
+    addAutosaveAssociationCallbacks(DupCbPirate, reflection);
 
-    const pirate = await Pirate.create({ catchphrase: "Arrr" });
-    const parrot = await Parrot.create({ name: "Polly" });
+    const pirate = await DupCbPirate.create({ catchphrase: "Arrr" });
+    const parrot = await DupCbParrot.create({ name: "Polly" });
     saveCount = 0; // reset after create (create triggers beforeSave)
     const proxy = association(pirate, "parrots");
     await proxy.push(parrot);
@@ -3332,25 +3300,39 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
   fixtures([]);
 
   function makeModels() {
-    class Pirate extends Base {
+    class GcPirate extends Base {
       declare catchphrase: string | null;
+      declare ships: AssociationProxy<GcShip>;
 
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
+        this.hasMany("ships", {
+          autosave: true,
+          className: "GcShip",
+          foreignKey: "pirate_id",
+        });
       }
     }
-    class Ship extends Base {
+    class GcShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
+      declare pirate: GcPirate | null;
+      declare parts: AssociationProxy<GcPart>;
 
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
+        this.belongsTo("pirate", { className: "GcPirate", foreignKey: "pirate_id" });
+        this.hasMany("parts", {
+          autosave: true,
+          className: "GcPart",
+          foreignKey: "ship_id",
+        });
       }
     }
-    class Part extends Base {
+    class GcPart extends Base {
       declare name: string | null;
       declare ship_id: number | null;
 
@@ -3361,14 +3343,10 @@ describe("TestHasManyAutosaveAssociationWhichItselfHasAutosaveAssociations", () 
         this.validates("name", { presence: true });
       }
     }
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    registerModel("Part", Part);
-    Associations.hasMany.call(Pirate, "ships", { autosave: true });
-    Associations.belongsTo.call(Ship, "pirate");
-
-    Associations.hasMany.call(Ship, "parts", { autosave: true });
-    return { Pirate, Ship, Part };
+    registerModel("GcPirate", GcPirate);
+    registerModel("GcShip", GcShip);
+    registerModel("GcPart", GcPart);
+    return { Pirate: GcPirate, Ship: GcShip, Part: GcPart };
   }
 
   it("when grandchild marked_for_destruction, saving parent should destroy grandchild", async () => {
@@ -3665,25 +3643,29 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
   fixtures([]);
 
   function makeModels() {
-    class Pirate extends Base {
+    class GgPirate extends Base {
       declare catchphrase: string | null;
+      declare ship: GgShip | null;
 
       static {
         this._tableName = "pirates";
         this.attribute("catchphrase", "string");
+        this.hasOne("ship", { autosave: true, className: "GgShip", foreignKey: "pirate_id" });
       }
     }
-    class Ship extends Base {
+    class GgShip extends Base {
       declare name: string | null;
       declare pirate_id: number | null;
+      declare part: GgPart | null;
 
       static {
         this._tableName = "ships";
         this.attribute("name", "string");
         this.attribute("pirate_id", "integer");
+        this.hasOne("part", { autosave: true, className: "GgPart", foreignKey: "ship_id" });
       }
     }
-    class Part extends Base {
+    class GgPart extends Base {
       declare name: string | null;
       declare ship_id: number | null;
 
@@ -3694,12 +3676,10 @@ describe("TestHasOneAutosaveAssociationWhichItselfHasAutosaveAssociations", () =
         this.validates("name", { presence: true });
       }
     }
-    registerModel("Pirate", Pirate);
-    registerModel("Ship", Ship);
-    registerModel("Part", Part);
-    Associations.hasOne.call(Pirate, "ship", { autosave: true });
-    Associations.hasOne.call(Ship, "part", { autosave: true });
-    return { Pirate, Ship, Part };
+    registerModel("GgPirate", GgPirate);
+    registerModel("GgShip", GgShip);
+    registerModel("GgPart", GgPart);
+    return { Pirate: GgPirate, Ship: GgShip, Part: GgPart };
   }
 
   it("when great-grandchild marked_for_destruction, saving parent should destroy great-grandchild", async () => {
@@ -3858,18 +3838,9 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
 
   it("autosave new record with after create callback", async () => {
     const log: string[] = [];
-    class Ship extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "ships";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-      }
-    }
-    class Pirate extends Base {
+    class AcPirate extends Base {
       declare catchphrase: string | null;
+      declare ship: CanonicalShip | null;
 
       static {
         this._tableName = "pirates";
@@ -3877,18 +3848,13 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.afterCreate(() => {
           log.push("pirate_created");
         });
+        this.hasOne("ship", { autosave: true, foreignKey: "pirate_id", className: "Ship" });
       }
     }
-    registerModel("Ship", Ship);
-    registerModel("Pirate", Pirate);
-    Associations.hasOne.call(Pirate, "ship", {
-      autosave: true,
-      foreignKey: "pirate_id",
-      className: "Ship",
-    });
+    registerModel("AcPirate", AcPirate);
 
-    const pirate = new Pirate({ catchphrase: "Yarr" });
-    const ship = new Ship({ name: "Pearl" });
+    const pirate = new AcPirate({ catchphrase: "Yarr" });
+    const ship = new CanonicalShip({ name: "Pearl" });
     cacheAssoc(pirate, "ship", ship);
     await pirate.save();
     expect(log).toContain("pirate_created");
@@ -4420,30 +4386,9 @@ describe("TestDefaultAutosaveAssociationOnAHasManyAssociationWithAcceptsNestedAt
   fixtures([]);
 
   function makeModels() {
-    class Pirate extends Base {
-      declare catchphrase: string | null;
-
-      static {
-        this._tableName = "pirates";
-        this.attribute("catchphrase", "string");
-      }
-    }
-    class Bird extends Base {
-      declare name: string | null;
-      declare pirate_id: number | null;
-
-      static {
-        this._tableName = "birds";
-        this.attribute("name", "string");
-        this.attribute("pirate_id", "integer");
-        this.validates("name", { presence: true });
-      }
-    }
-    registerModel("Pirate", Pirate);
-    registerModel("Bird", Bird);
-    Associations.hasMany.call(Pirate, "birds", { autosave: true });
-    acceptsNestedAttributesFor(Pirate, "birds", { allowDestroy: true });
-    return { Pirate, Bird };
+    registerModel(CanonicalPirate);
+    registerModel(CanonicalBird);
+    return { Pirate: CanonicalPirate, Bird: CanonicalBird };
   }
 
   it("errors details should be set for invalid nested", async () => {
