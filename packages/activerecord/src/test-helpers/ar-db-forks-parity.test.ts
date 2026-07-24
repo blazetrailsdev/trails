@@ -4,23 +4,26 @@ import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, resolveForkCount } from "./ar-db-forks-default.js";
 import { workerForkCount } from "./ar-db-slots.js";
 
-// vitest.config.ts sizes the real fork pool (`poolOptions.forks.maxForks`) and
-// ar-db-slots.ts sizes the advisory-slot pool; both need the same effective
-// worker count, but the config is loaded before any workspace package is built
-// and so cannot import the activesupport-backed module. They share
-// resolveForkCount() from the dependency-free ar-db-forks-default.ts — this
-// file is the guard that keeps them there: the matrix pins workerForkCount()
-// to the shared helper across the precedence combinations, and the source
-// check fails if the config re-inlines its own parse/clamp instead of calling
-// the helper (the drift that PR #5243's first review round caught by hand).
-//
-// The config is checked as source rather than imported: it sits outside this
-// package's tsconfig rootDir and is CommonJS importing ESM-only
-// `vitest/config`, so `tsc --build` cannot take it into the program.
+const sourcePath = (relative: string): string =>
+  decodeURIComponent(new URL(relative, import.meta.url).pathname);
 
-const CONFIG_PATH = decodeURIComponent(
-  new URL("../../../../vitest.config.ts", import.meta.url).pathname,
-);
+const CONFIG_PATH = sourcePath("../../../../vitest.config.ts");
+const HELPER_PATH = sourcePath("./ar-db-forks-default.ts");
+
+async function readSource(path: string): Promise<string> {
+  const fs = await getFsAsync();
+  if (!fs.readFile) throw new Error("fs adapter has no async readFile");
+  return fs.readFile(path, "utf8");
+}
+
+function stripComments(source: string): string {
+  // Line-based on purpose: a `/* ... */` sweep would swallow the config's
+  // glob strings ("packages/*/dx-tests/**") along with the code between them.
+  return source
+    .split("\n")
+    .filter((line) => !/^\s*(\/\/|\/\*|\*)/.test(line))
+    .join("\n");
+}
 
 let cores = 64;
 const HOST_CORES = 64;
@@ -78,8 +81,6 @@ describe("ar-db fork count parity", () => {
   for (const { name, env, expected } of matrix) {
     it(`workerForkCount() matches the config's fork count: ${name}`, () => {
       setEnv(env);
-      // What vitest.config.ts computes: the shared helper against its own
-      // host reading (node os), pinned here to the same core count.
       const configForks = resolveForkCount(process.env, Math.max(cores - 1, 1));
       expect(configForks).toBe(expected);
       expect(workerForkCount()).toBe(configForks);
@@ -103,19 +104,22 @@ describe("ar-db fork count parity", () => {
   });
 
   it("vitest.config.ts derives maxForks from the shared helper, not its own parse", async () => {
-    const fs = await getFsAsync();
-    const source = await fs.readFile!(CONFIG_PATH, "utf8");
-    const code = source
-      .split("\n")
-      .filter((line) => !line.trim().startsWith("//"))
-      .join("\n");
+    const code = stripComments(await readSource(CONFIG_PATH));
 
-    expect(code).toContain("const TEST_FORKS = resolveForkCount(process.env, _hostForkCap);");
-    expect(code).toContain("const _hostForkCap = Math.max(os.availableParallelism() - 1, 1);");
-    expect(code).toContain("poolOptions: { forks: { maxForks: TEST_FORKS } }");
-    // The env vars may only be named inside the shared helper; a re-inlined
-    // parse here is exactly the drift this test exists to catch.
-    expect(code).not.toContain("process.env.TRAILS_TEST_FORKS");
-    expect(code).not.toContain("process.env.AR_DB_FORKS");
+    expect(code).toMatch(
+      /import\s*\{[^}]*\bresolveForkCount\b[^}]*\}\s*from\s*"[^"]*ar-db-forks-default\.js"/,
+    );
+    expect(code).toMatch(/const\s+TEST_FORKS\s*=\s*resolveForkCount\(\s*process\.env\s*,/);
+    expect(code).toMatch(/maxForks:\s*TEST_FORKS\b/);
+    expect(code).toMatch(/Math\.max\(\s*os\.availableParallelism\(\)\s*-\s*1\s*,\s*1\s*\)/);
+    expect(code).not.toMatch(/\bTRAILS_TEST_FORKS\b/);
+    expect(code).not.toMatch(/\bAR_DB_FORKS\b/);
+  });
+
+  it("the shared helper module imports nothing, so the config can load it unbuilt", async () => {
+    const code = stripComments(await readSource(HELPER_PATH));
+
+    expect(code).not.toMatch(/^\s*import\b/m);
+    expect(code).not.toMatch(/\brequire\(/);
   });
 });
