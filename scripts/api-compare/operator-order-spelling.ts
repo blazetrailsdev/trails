@@ -81,11 +81,41 @@ export const OPERATOR_SPELLING_BY_FQN: Record<string, Record<string, string[]>> 
   "ActiveRecord::Result::IndexedRow": { "==": ["equals"], "[]": ["get"] },
 };
 
+// `fqn#operator` keys this process has actually resolved. A key that is never
+// resolved during a full manifest build is DEAD — the fqn (or the operator on
+// it) does not exist in the Ruby API extract, so the entry silently does
+// nothing. That is not hypothetical: the original
+// `ActiveModel::AttributeSet::LazyAttributeHash` key never matched, because
+// builder.rb:94 declares the class directly under `module ActiveModel`.
+const usedKeys = new Set<string>();
+
 /**
  * TS spelling candidates for a Ruby operator method on a given class, or
  * `undefined` when `name` is not an operator or the class has no verified entry.
  */
 export function operatorSpelling(fqn: string, name: string): string[] | undefined {
   if (!OPERATORS.has(name)) return undefined;
-  return OPERATOR_SPELLING_BY_FQN[fqn]?.[name];
+  const spelling = OPERATOR_SPELLING_BY_FQN[fqn]?.[name];
+  if (spelling) usedKeys.add(`${fqn}#${name}`);
+  return spelling;
+}
+
+/**
+ * `fqn#operator` keys never resolved since the last {@link resetOperatorSpellingUsage}.
+ * Meaningful only after a FULL pass over the Ruby API (the manifest build), where
+ * anything left over is a typo'd fqn or an operator the class no longer defines.
+ */
+export function unusedOperatorSpellings(): string[] {
+  const unused: string[] = [];
+  for (const [fqn, ops] of Object.entries(OPERATOR_SPELLING_BY_FQN)) {
+    for (const op of Object.keys(ops)) {
+      if (!usedKeys.has(`${fqn}#${op}`)) unused.push(`${fqn}#${op}`);
+    }
+  }
+  return unused;
+}
+
+/** Clears resolution tracking, so a second pass starts from a clean slate. */
+export function resetOperatorSpellingUsage(): void {
+  usedKeys.clear();
 }

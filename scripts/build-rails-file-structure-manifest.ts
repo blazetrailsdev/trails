@@ -27,7 +27,10 @@ import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
 import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 import { mergeBySourceLine } from "./api-compare/source-order.js";
-import { operatorSpelling } from "./api-compare/operator-order-spelling.js";
+import {
+  operatorSpelling,
+  unusedOperatorSpellings,
+} from "./api-compare/operator-order-spelling.js";
 import { resolveMixinParent } from "./rails-file-structure-mixins.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -323,6 +326,18 @@ for (const k of Object.keys(manifest.files).sort()) {
   sortedFiles[k] = out;
 }
 const final: Manifest = { files: sortedFiles };
+
+// Every package has been visited, so an operator entry that never resolved names
+// a class/operator the Ruby extract does not have — a dead entry that silently
+// enforces nothing.
+const deadOperatorEntries = unusedOperatorSpellings();
+if (deadOperatorEntries.length > 0) {
+  console.warn(
+    `[build-rails-file-structure-manifest] ${deadOperatorEntries.length} dead OPERATOR_SPELLING_BY_FQN ` +
+      `entr${deadOperatorEntries.length === 1 ? "y" : "ies"} (fqn/operator absent from the Ruby API): ` +
+      `${deadOperatorEntries.join(", ")} — fix the fqn or drop the entry.`,
+  );
+}
 
 writeJsonManifest(OUT, final);
 const fileCount = Object.keys(final.files).length;

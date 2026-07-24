@@ -1,5 +1,10 @@
 import { describe, it, expect } from "vitest";
-import { operatorSpelling, OPERATOR_SPELLING_BY_FQN } from "./operator-order-spelling.js";
+import {
+  operatorSpelling,
+  OPERATOR_SPELLING_BY_FQN,
+  resetOperatorSpellingUsage,
+  unusedOperatorSpellings,
+} from "./operator-order-spelling.js";
 import { OPERATORS } from "./conventions.js";
 
 describe("operatorSpelling", () => {
@@ -46,6 +51,16 @@ describe("operatorSpelling", () => {
   it("returns undefined for a non-operator name", () => {
     expect(operatorSpelling("Arel::Table", "having")).toBeUndefined();
     expect(operatorSpelling("Arel::Table", "hash")).toBeUndefined();
+  });
+
+  it("reports entries never resolved so a typo'd fqn cannot stay silent", () => {
+    resetOperatorSpellingUsage();
+    expect(unusedOperatorSpellings()).toContain("Arel::Table#[]");
+    operatorSpelling("Arel::Table", "[]");
+    expect(unusedOperatorSpellings()).not.toContain("Arel::Table#[]");
+    // A key nobody looked up stays reported — this is the dead-entry signal.
+    expect(unusedOperatorSpellings()).toContain("ActiveModel::Errors#[]");
+    resetOperatorSpellingUsage();
   });
 
   it("only keys operators recognised by api-compare's OPERATORS set", () => {
