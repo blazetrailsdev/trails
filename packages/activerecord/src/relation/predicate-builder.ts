@@ -377,14 +377,6 @@ export class PredicateBuilder {
     return this.table.type(columnName).cast(value);
   }
 
-  buildRangePredicate(attribute: Nodes.Attribute, range: Range): Nodes.Node {
-    // Same force-equality precedence `build` applies (predicate_builder.rb:57-69).
-    if (this.table.type(attribute.name).isForceEquality?.(range) === true) {
-      return attribute.eq(this.buildBindAttribute(attribute.name, range));
-    }
-    return this.rangeHandler.call(attribute, range);
-  }
-
   /**
    * Build a composite-key predicate. For `cols.length > 1`:
    *
