@@ -273,6 +273,36 @@ function frameworkBase(model: typeof Base): typeof Base | null {
 }
 
 /**
+ * Guard against a bespoke inline model silently shadowing a canonical one.
+ *
+ * The model registry is global and is never torn down between tests, so
+ * `registerModel("Author", BespokeAuthor)` inside one test overwrites the name
+ * for every LATER test in the file — a later test naming the canonical `Author`
+ * as an association target then resolves to the bespoke class. The failure mode
+ * is a wrong value, not an error (a through-chain collapses from length 3 to 1),
+ * so it never announces itself.
+ *
+ * We throw only when the name is owned by a canonical model (present in the
+ * autoload index) AND a *different* class is being registered under it.
+ * Re-registering the same canonical class (its own self-registration, or an
+ * autoload fault-in) is legitimate and passes, as does any bespoke name the
+ * canonical index doesn't claim.
+ * @internal
+ */
+function guardCanonicalNameShadow(name: string, model: typeof Base): void {
+  const canonical = canonicalModelAutoloadIndex?.get(name);
+  if (canonical && canonical !== model) {
+    throw new Error(
+      `registerModel(${JSON.stringify(name)}, …) would shadow the canonical model ` +
+        `of the same name in the global registry. Because the registry is never torn ` +
+        `down between tests, this poisons every later test that resolves ${JSON.stringify(name)} ` +
+        `as an association target. Use the canonical model, or register the bespoke class ` +
+        `under a distinct, non-canonical name.`,
+    );
+  }
+}
+
+/**
  * Register a model class for association resolution.
  *
  * Three forms:
@@ -310,6 +340,7 @@ export function registerModel(
   }
   if (typeof nameOrModel === "string") {
     if (!model) throw new Error("registerModel(name, model) requires a model class");
+    guardCanonicalNameShadow(nameOrModel, model);
     modelRegistry.set(nameOrModel, model);
     model._modelsByName.set(nameOrModel, model);
     // Attach registry key so counter-cache pending-map lookup can match it.
@@ -318,6 +349,7 @@ export function registerModel(
     model._registryKeys = keys;
     flushPendingCounterCacheColumns(model);
   } else {
+    guardCanonicalNameShadow(nameOrModel.name, nameOrModel);
     modelRegistry.set(nameOrModel.name, nameOrModel);
     nameOrModel._modelsByName.set(nameOrModel.name, nameOrModel);
     // A namespaced model carries its Ruby module path via `static moduleName`;
