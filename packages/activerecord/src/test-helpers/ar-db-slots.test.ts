@@ -9,7 +9,7 @@ import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 let cores = 64;
 const HOST_CORES = 64;
 
-const ENV_KEYS = ["AR_DB_FORKS", "AR_DB_SLOTS"] as const;
+const ENV_KEYS = ["TRAILS_TEST_FORKS", "AR_DB_FORKS", "AR_DB_SLOTS"] as const;
 
 describe("ar-db-slots", () => {
   beforeAll(() => {
@@ -38,7 +38,10 @@ describe("ar-db-slots", () => {
     }
   });
 
+  // TRAILS_TEST_FORKS outranks AR_DB_FORKS, so it has to be cleared for every
+  // case that exercises the latter — a dev box may well have it exported.
   function setEnv(forks?: string, slots?: string): void {
+    delete process.env.TRAILS_TEST_FORKS;
     if (forks === undefined) delete process.env.AR_DB_FORKS;
     else process.env.AR_DB_FORKS = forks;
     if (slots === undefined) delete process.env.AR_DB_SLOTS;
@@ -65,6 +68,24 @@ describe("ar-db-slots", () => {
     it("treats a non-numeric value as the default fork count", () => {
       setEnv("auto");
       expect(workerForkCount()).toBe(DEFAULT_FORKS);
+    });
+
+    it("prefers TRAILS_TEST_FORKS over AR_DB_FORKS", () => {
+      setEnv("8");
+      process.env.TRAILS_TEST_FORKS = "3";
+      expect(workerForkCount()).toBe(3);
+    });
+
+    it("reads TRAILS_TEST_FORKS when AR_DB_FORKS is unset", () => {
+      setEnv(undefined);
+      process.env.TRAILS_TEST_FORKS = "2";
+      expect(workerForkCount()).toBe(2);
+    });
+
+    it("takes the single-worker path for TRAILS_TEST_FORKS=1", () => {
+      setEnv("8");
+      process.env.TRAILS_TEST_FORKS = "1";
+      expect(workerForkCount()).toBe(1);
     });
 
     it("clamps the request to the host's core count minus one", () => {

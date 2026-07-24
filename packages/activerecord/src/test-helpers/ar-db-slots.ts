@@ -1,7 +1,9 @@
 /**
  * Advisory-slot pool sizing for the parallel AR DB test harness.
  *
- * `AR_DB_FORKS` is the vitest worker count. The requested value is clamped
+ * `TRAILS_TEST_FORKS` / `AR_DB_FORKS` request the vitest worker count, in that
+ * precedence order — the same order vitest.config.ts uses to size the real
+ * fork pool. The requested value is clamped
  * here to the host's `numCpus - 1` (the same ceiling vitest derives), so the
  * pool sized here tracks the workers that actually start. The advisory-lock
  * **slot pool** — the set of per-worker
@@ -51,13 +53,20 @@ function hostForkCap(): number | null {
 }
 
 /**
- * Effective vitest worker count — the `AR_DB_FORKS` request clamped to
+ * Effective vitest worker count — the request clamped to
  * {@link hostForkCap}, so it is correct regardless of who calls it. The env
- * var can only lower the count, never raise it past the host. Non-numeric or
+ * vars can only lower the count, never raise it past the host. Non-numeric or
  * non-positive (unset, "auto", "0") falls back to {@link DEFAULT_FORKS}.
+ *
+ * Precedence must stay identical to vitest.config.ts's `TEST_FORKS`
+ * (TRAILS_TEST_FORKS > AR_DB_FORKS > DEFAULT_FORKS, then the host clamp):
+ * that value becomes `poolOptions.forks.maxForks`, so any divergence means
+ * the pool is sized against a worker count that never starts — and the
+ * single-worker bypass in test-setup-worker-db.ts would miss a
+ * `TRAILS_TEST_FORKS=1` solo run.
  */
 export function workerForkCount(): number {
-  const n = parseInt(process.env.AR_DB_FORKS ?? "", 10);
+  const n = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
   const requested = Number.isFinite(n) && n > 0 ? n : DEFAULT_FORKS;
   const cap = hostForkCap();
   return cap === null ? requested : Math.min(requested, cap);
