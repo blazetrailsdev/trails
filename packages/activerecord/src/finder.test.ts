@@ -14,6 +14,7 @@ import {
 import { sql as arelSql } from "@blazetrails/arel";
 
 import { fixtures } from "./test-helpers/fixtures.js";
+import { postFixtureData } from "./test-helpers/fixtures/posts.js";
 import "./test-helpers/canonical-model-index.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
@@ -1504,6 +1505,7 @@ describe("FinderTest", () => {
   const { posts } = fixtures(["posts"]);
   registerModel(CanonicalPost);
   const Post = CanonicalPost;
+  const rid = (r: unknown) => (r as { id: number }).id;
 
   it("find by empty in condition", async () => {
     const results = await Post.where({ title: [] });
@@ -1512,18 +1514,18 @@ describe("FinderTest", () => {
 
   it("find with nil inside set passed for one attribute", async () => {
     const results = await Post.where({ title: [posts("welcome").title, null] });
-    expect(results.map((r: any) => r.id)).toEqual([posts("welcome").id]);
+    expect(results.map(rid)).toEqual([rid(posts("welcome"))]);
   });
 
   it("find_by with associations", async () => {
     const found = await Post.findBy({ title: posts("welcome").title });
     expect(found).not.toBeNull();
-    expect((found as any).id).toBe(posts("welcome").id);
+    expect(rid(found)).toBe(rid(posts("welcome")));
   });
 
   it("first have determined order by default", async () => {
     const first = await Post.first();
-    expect((first as any).id).toBe(posts("welcome").id);
+    expect(rid(first)).toBe(rid(posts("welcome")));
   });
 
   it("find without primary key", async () => {
@@ -1551,10 +1553,10 @@ describe("FinderTest", () => {
 
   it("find by on relation with large number", async () => {
     expect(await Post.where("1=1").findBy({ id: 999999999 })).toBeNull();
-    const found = await Post.where({ id: [posts("welcome").id, 999999999] }).findBy({
-      id: posts("welcome").id,
+    const found = await Post.where({ id: [rid(posts("welcome")), 999999999] }).findBy({
+      id: rid(posts("welcome")),
     });
-    expect((found as any).id).toBe(posts("welcome").id);
+    expect(rid(found)).toBe(rid(posts("welcome")));
   });
 
   // Rails: test "find_by! raises RecordNotFound if the record is missing"
@@ -1577,13 +1579,15 @@ describe("FinderTest", () => {
   });
 
   it("joins dont clobber id", async () => {
-    const first = await Post.where(`posts.id = ${posts("welcome").id}`).first();
-    expect((first as any).id).toBe(posts("welcome").id);
+    const first = await Post.where(`posts.id = ${rid(posts("welcome"))}`).first();
+    expect(rid(first)).toBe(rid(posts("welcome")));
   });
 
   it("named bind variables with quotes", async () => {
-    const results = await Post.where({ title: posts("authorless").title });
-    expect(results.map((r: any) => r.id)).toEqual([posts("authorless").id]);
+    const quoted = posts("authorless").title;
+    expect(quoted).toContain("'");
+    const results = await Post.where({ title: quoted });
+    expect(results.map(rid)).toEqual([rid(posts("authorless"))]);
   });
 
   it("find by one attribute bang with blank defined", async () => {
@@ -1592,11 +1596,9 @@ describe("FinderTest", () => {
 
   it("select rows", async () => {
     const results = await Post.all();
-    expect(results.length).toBe(11);
+    expect(results.length).toBe(Object.keys(postFixtureData).length);
   });
 
-  // Rails creates a row here on purpose: the point is that `where(id: nil)`
-  // still finds nothing afterwards.
   it("find ignores previously inserted record", async () => {
     await Post.create({ title: "test", body: "it out", author_id: 0 });
     expect(await Post.where({ id: null })).toEqual([]);
@@ -1604,9 +1606,9 @@ describe("FinderTest", () => {
 
   it("find by one attribute with several options", async () => {
     const found = await Post.order("id DESC")
-      .where(`id != ${posts("welcome").id}`)
+      .where(`id != ${rid(posts("welcome"))}`)
       .findBy({ title: posts("thinking").title });
-    expect((found as any).id).toBe(posts("thinking").id);
+    expect(rid(found)).toBe(rid(posts("thinking")));
   });
 });
 
