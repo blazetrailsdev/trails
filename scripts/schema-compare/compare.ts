@@ -354,6 +354,25 @@ export function optionRegressions(
   return options.length > ceiling ? options : [];
 }
 
+/**
+ * Splits findings into the disjoint buckets the reporter prints and counts.
+ * `shape` is the non-fatal type-level warnings (SHAPE / UNPORTED) only — OPTION
+ * findings live in `option` / `optionFatal`, so a `shape` count never
+ * double-counts them, and `option` (soft) ∩ `optionFatal` is empty.
+ */
+export function partitionFindings(
+  findings: readonly Finding[],
+  ceiling: number = OPTION_DEBT_CEILING,
+): { shape: Finding[]; option: Finding[]; optionFatal: Finding[] } {
+  const optionFindings = findings.filter((f) => f.verdict === "OPTION");
+  const optionFatal = optionRegressions(findings, ceiling);
+  return {
+    shape: findings.filter((f) => !isFatal(f) && f.verdict !== "OPTION"),
+    option: optionFatal.length > 0 ? [] : optionFindings,
+    optionFatal,
+  };
+}
+
 export async function main(): Promise<void> {
   const source = await readFile(SCHEMA_RB, "utf8");
   const railsTables = parseSchemaRb(source);
@@ -371,7 +390,6 @@ export async function main(): Promise<void> {
   }
 
   const findings = compareSchemas(TEST_SCHEMA, railsTables);
-  const soft = findings.filter((f) => !isFatal(f));
 
   if (process.argv.includes("--write")) {
     const invented = findings.filter(isFatal);
@@ -407,15 +425,13 @@ export async function main(): Promise<void> {
   }
 
   const { regressions, known, stale } = applyBaseline(findings, await readBaseline());
-  const optionFatal = optionRegressions(findings);
+  const { shape, option, optionFatal } = partitionFindings(findings);
   const optionCount = findings.filter((f) => f.verdict === "OPTION").length;
 
   for (const finding of regressions) console.log(formatFinding(finding));
   for (const finding of optionFatal) console.log(formatFinding(finding));
   if (process.argv.includes("--verbose")) {
-    for (const finding of soft) {
-      if (!optionFatal.includes(finding)) console.log(formatFinding(finding));
-    }
+    for (const finding of [...shape, ...option]) console.log(formatFinding(finding));
   }
   for (const key of stale) {
     console.log(
@@ -426,7 +442,7 @@ export async function main(): Promise<void> {
   console.log(
     `\n${Object.keys(TEST_SCHEMA).length} TEST_SCHEMA tables vs ${railsTables.size} schema.rb tables — ` +
       `new-inventions=${regressions.length} baselined=${known.length} ` +
-      `option-divergences=${optionCount} (ceiling ${OPTION_DEBT_CEILING}) shape-warnings=${soft.length}` +
+      `option-divergences=${optionCount} (ceiling ${OPTION_DEBT_CEILING}) shape-warnings=${shape.length}` +
       (process.argv.includes("--verbose") ? "" : " (--verbose to list shape warnings)"),
   );
 

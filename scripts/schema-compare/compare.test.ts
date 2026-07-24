@@ -8,6 +8,7 @@ import {
   normalizeRailsDefault,
   optionMismatches,
   optionRegressions,
+  partitionFindings,
   readBaseline,
   unresolvedCallSites,
 } from "./compare.js";
@@ -380,6 +381,33 @@ describe("optionRegressions", () => {
   it("turns every option finding fatal once the ceiling is exceeded", () => {
     expect(optionRegressions(findings, 1).map((f) => f.column)).toEqual(["a", "b"]);
     expect(optionRegressions(findings, 0).map((f) => f.column)).toEqual(["a", "b"]);
+  });
+});
+
+describe("partitionFindings", () => {
+  const findings: Finding[] = [
+    { verdict: "INVENTED-TABLE", table: "t", detail: "" },
+    { verdict: "SHAPE", table: "t", column: "a", detail: "" },
+    { verdict: "UNPORTED-COLUMN", table: "t", column: "b", detail: "" },
+    { verdict: "OPTION", table: "t", column: "c", detail: "" },
+    { verdict: "OPTION", table: "t", column: "d", detail: "" },
+  ];
+
+  it("keeps OPTION findings out of the shape-warning bucket", () => {
+    const { shape } = partitionFindings(findings, 2);
+    expect(shape.map((f) => f.column)).toEqual(["a", "b"]);
+  });
+
+  it("routes OPTION findings to the soft bucket while within the ceiling", () => {
+    const { option, optionFatal } = partitionFindings(findings, 2);
+    expect(option.map((f) => f.column)).toEqual(["c", "d"]);
+    expect(optionFatal).toEqual([]);
+  });
+
+  it("moves OPTION findings to the fatal bucket once the ceiling is exceeded", () => {
+    const { option, optionFatal } = partitionFindings(findings, 1);
+    expect(option).toEqual([]);
+    expect(optionFatal.map((f) => f.column)).toEqual(["c", "d"]);
   });
 });
 
