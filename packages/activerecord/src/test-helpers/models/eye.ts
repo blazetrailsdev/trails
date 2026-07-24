@@ -2,15 +2,8 @@
 import { Base } from "../../base.js";
 import { acceptsNestedAttributesFor } from "../../nested-attributes.js";
 
-/**
- * Rails reads `iris` through the plain association reader, which loads the
- * target on a cold cache (`Association#load_target` — `find_target?` only
- * skips the query while the owner is *building*). The trails reader returns a
- * Promise on that path, so callbacks resolve it before touching the record;
- * `after_*` callbacks are awaited by the chain, keeping the read faithful.
- */
-function irisReader(eye: Eye): Promise<Iris | null> {
-  return Promise.resolve(eye.association("iris").reader as Iris | null | Promise<Iris | null>);
+function read<T extends Base>(eye: Eye, name: string): Promise<T | null> {
+  return Promise.resolve(eye.association(name).reader as T | null | Promise<T | null>);
 }
 
 export class Eye extends Base {
@@ -26,30 +19,30 @@ export class Eye extends Base {
 
   static {
     this.afterCreate(async function (this: Eye) {
-      const iris = await irisReader(this);
+      const iris = await read<Iris>(this, "iris");
       if (iris) this.afterCreateCallbacksStack.push(!iris.isPersisted());
     });
     this.afterUpdate(async function (this: Eye) {
-      const iris = await irisReader(this);
+      const iris = await read<Iris>(this, "iris");
       if (iris) this.afterUpdateCallbacksStack.push(iris.hasChangesToSave);
     });
     this.afterSave(async function (this: Eye) {
-      const iris = await irisReader(this);
+      const iris = await read<Iris>(this, "iris");
       if (iris) this.afterSaveCallbacksStack.push(iris.hasChangesToSave);
     });
 
     this.hasOne("iris");
 
     this.afterCreate(async function (this: Eye) {
-      const iris = await irisReader(this);
+      const iris = await read<Iris>(this, "iris");
       if (iris) this.afterCreateCallbacksStack.push(!iris.isPersisted());
     });
     this.afterUpdate(async function (this: Eye) {
-      const iris = await irisReader(this);
+      const iris = await read<Iris>(this, "iris");
       if (iris) this.afterUpdateCallbacksStack.push(iris.hasChangesToSave);
     });
     this.afterSave(async function (this: Eye) {
-      const iris = await irisReader(this);
+      const iris = await read<Iris>(this, "iris");
       if (iris) this.afterSaveCallbacksStack.push(iris.hasChangesToSave);
     });
 
@@ -59,12 +52,7 @@ export class Eye extends Base {
     });
 
     this.beforeSave(async function (this: Eye) {
-      const iris = await Promise.resolve(
-        this.association("irisWithReadOnlyForeignKey").reader as
-          | IrisWithReadOnlyForeignKey
-          | null
-          | Promise<IrisWithReadOnlyForeignKey | null>,
-      );
+      const iris = await read<IrisWithReadOnlyForeignKey>(this, "irisWithReadOnlyForeignKey");
       if (iris && this.overrideIrisWithReadOnlyForeignKeyColor) {
         iris.color = "blue";
       }
