@@ -1329,8 +1329,6 @@ describe("ReflectionTest", () => {
     const tagsRef = reflectOnAssociation(Author, "tags") as ThroughReflection;
     expect(tagsRef.isNested()).toBe(true);
 
-    // Only goes :through once, but the through_reflection is a
-    // has_and_belongs_to_many, so this is a nested through association
     const postCommentsRef = reflectOnAssociation(Category, "postComments") as ThroughReflection;
     expect(postCommentsRef.isNested()).toBe(true);
   });
