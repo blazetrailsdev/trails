@@ -151,10 +151,8 @@ const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
   has: (value) => value !== "super",
 };
 
-// The Ruby-Enumerable-idiom knowledge (differently-named JS analogues) lives in
-// one shared module so lint-calls.ts's noise list and this wide call ratchet
-// can't drift apart (RFC 0025). Re-exported so existing importers of these
-// names from compare.ts (compare.test.ts, the redundancy guard) keep working.
+// Re-exported from the shared idiom table so existing importers (compare.test.ts,
+// the redundancy guard) keep resolving these names from compare.ts.
 export { JS_ENUMERABLE_ALIASES, jsEnumerableAliases };
 
 /**

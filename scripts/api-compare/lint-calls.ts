@@ -237,10 +237,9 @@ const SKIP_CALLS = new Set([
   "yield",
   "require",
   "require_relative",
-  // Collection / Enumerable. The differently-named-JS-analogue idioms
-  // (any?/select/include?/…) come from the shared JS_ENUMERABLE_ALIASES table
-  // (RFC 0025) so this noise list and compare.ts's wide call ratchet can't
-  // drift; the same-named or analogue-less idioms below stay as literals.
+  // Collection / Enumerable. Idioms with a differently-named JS analogue come
+  // from the shared JS_ENUMERABLE_ALIASES table (RFC 0025) so this noise list
+  // and compare.ts's wide ratchet can't drift; same-named idioms stay literal.
   ...JS_ENUMERABLE_ALIASES.keys(),
   "map",
   "flat_map",
