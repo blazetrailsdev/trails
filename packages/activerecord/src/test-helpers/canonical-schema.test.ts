@@ -6,6 +6,7 @@ import type { FkSafeDropOrderHost } from "./canonical-schema.js";
 import {
   ensureCanonicalTables,
   fkSafeDropOrder,
+  fkSafeDropPlan,
   loadCanonicalSchema,
   rebuildCanonicalTables,
 } from "./canonical-schema.js";
@@ -87,6 +88,29 @@ describe("rebuildCanonicalTables", () => {
     }
   });
 
+  test("drops a foreign key reaching in from a table it is not rebuilding", async () => {
+    const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
+    const sqlite = adapter as unknown as BetterSQLite3Adapter;
+    try {
+      await loadCanonicalSchema(adapter);
+      const canonical = await dumpSchema(adapter);
+
+      // A test-added FK from a table outside the rebuild set: no drop order can
+      // work around it, so the rebuild has to drop the constraint itself.
+      await sqlite.addForeignKey("lessons_students", "fk_test_has_pk", {
+        column: "lesson_id",
+        primaryKey: "pk_id",
+      });
+      expect(await sqlite.foreignKeys("lessons_students")).toHaveLength(1);
+
+      await rebuildCanonicalTables(adapter, ["fk_test_has_pk"]);
+      expect(await sqlite.foreignKeys("lessons_students")).toEqual([]);
+      expect(await dumpSchema(adapter)).toBe(canonical);
+    } finally {
+      await sqlite.close();
+    }
+  });
+
   test("throws on an unknown canonical table name", async () => {
     const adapter = new BetterSQLite3Adapter(":memory:") as unknown as AbstractAdapter;
     try {
@@ -106,7 +130,8 @@ describe("fkSafeDropOrder", () => {
   function host(tables: string[], fks: Record<string, string[]> = {}): FkSafeDropOrderHost {
     return {
       tables: async () => tables,
-      foreignKeys: async (name) => (fks[name] ?? []).map((toTable) => ({ toTable })),
+      foreignKeys: async (name) =>
+        (fks[name] ?? []).map((toTable) => ({ toTable, name: `fk_${name}_${toTable}` })),
     };
   }
 
@@ -156,6 +181,47 @@ describe("fkSafeDropOrder", () => {
   test("falls back to input order for a cycle", async () => {
     const order = await fkSafeDropOrder(host(["a", "b"], { a: ["b"], b: ["a"] }), ["a", "b"]);
     expect(order).toEqual(["a", "b"]);
+  });
+
+  test("reports the constraint that closes a cycle", async () => {
+    const plan = await fkSafeDropPlan(host(["a", "b"], { a: ["b"], b: ["a"] }), ["a", "b"]);
+    expect(plan.order).toEqual(["a", "b"]);
+    expect(plan.blockers).toEqual([{ fromTable: "b", name: "fk_b_a" }]);
+  });
+
+  test("reports a foreign key reaching in from outside the dropped set", async () => {
+    // `outside` is not being dropped, so no order among a/b can help: PG and
+    // MySQL refuse to drop `a` while its constraint is live.
+    const plan = await fkSafeDropPlan(host(["a", "b", "outside"], { outside: ["a"], b: ["a"] }), [
+      "a",
+      "b",
+    ]);
+    expect(plan.order).toEqual(["b", "a"]);
+    expect(plan.blockers).toEqual([{ fromTable: "outside", name: "fk_outside_a" }]);
+  });
+
+  test("does not scan outside tables when the dropped set holds no foreign key", async () => {
+    const calls: string[] = [];
+    const base = host(["a", "b", "outside"], { outside: ["a"] });
+    const plan = await fkSafeDropPlan(
+      {
+        tables: base.tables,
+        foreignKeys: async (name) => {
+          calls.push(name);
+          return base.foreignKeys(name);
+        },
+      },
+      ["a", "b"],
+    );
+    expect(calls).toEqual(["a", "b"]);
+    expect(plan.blockers).toEqual([]);
+  });
+
+  test("scans outside tables anyway when scanInbound is requested", async () => {
+    const plan = await fkSafeDropPlan(host(["a", "b", "outside"], { outside: ["a"] }), ["a", "b"], {
+      scanInbound: true,
+    });
+    expect(plan.blockers).toEqual([{ fromTable: "outside", name: "fk_outside_a" }]);
   });
 });
 

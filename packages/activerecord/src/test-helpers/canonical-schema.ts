@@ -2087,56 +2087,115 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
   (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
 }
 
-/** Minimal slice of the schema-statement surface {@link fkSafeDropOrder} needs. */
+/** Minimal slice of the schema-statement surface {@link fkSafeDropPlan} needs. */
 export interface FkSafeDropOrderHost {
   tables(): Promise<string[]>;
-  foreignKeys(tableName: string): Promise<readonly { readonly toTable: string }[]>;
+  foreignKeys(
+    tableName: string,
+  ): Promise<readonly { readonly toTable: string; readonly name: string }[]>;
 }
 
 /**
- * Order `names` so every table is dropped before any table it references,
- * i.e. referencing tables first.
+ * A foreign key that has to be dropped before the plan's order can run: either
+ * it points into the drop set from a table outside it (no ordering among the
+ * dropped tables can help — PG/MySQL refuse the `DROP TABLE` outright), or it
+ * closes a cycle among the dropped tables (which has no safe order at all).
+ */
+export interface FkDropBlocker {
+  readonly fromTable: string;
+  readonly name: string;
+}
+
+/** Drop order plus the constraints that must be removed first. */
+export interface FkSafeDropPlan {
+  readonly order: string[];
+  readonly blockers: readonly FkDropBlocker[];
+}
+
+/**
+ * Plan the drop of `names`: order them so every table is dropped before any
+ * table it references (referencing tables first), and list the foreign keys
+ * that no ordering can work around and so must be removed first.
  *
- * Registry order cannot stand in for this: it is roughly alphabetical, not
- * topological — `lessons_students` is registered before `students`, so merely
- * reversing it drops the target before its referencer. The canonical registry
- * declares no foreign keys of its own, but a test may add one (e.g.
+ * Registry order cannot stand in for the ordering: it is roughly alphabetical,
+ * not topological — `lessons_students` is registered before `students`, so
+ * merely reversing it drops the target before its referencer. The canonical
+ * registry declares no foreign keys of its own, but a test may add one (e.g.
  * `addForeignKey("lessons_students", "students")` in the abstract-mysql-adapter
- * schema tests), so the order is derived from the FKs the database actually
+ * schema tests), so the plan is derived from the FKs the database actually
  * holds rather than from anything declared here.
  *
- * FKs are read only for tables that currently exist, and only for the tables
- * being dropped — an adapter with no FK introspection reports none and the
- * input order is preserved. A cycle (mutually-referencing tables) has no safe
- * order; those tables keep their input order, which is what dropping them
- * without this helper would have done anyway.
+ * Two shapes have no safe order and surface as `blockers` instead:
+ *
+ * - an FK from a table *outside* `names` into one inside it — PG and MySQL
+ *   refuse to drop a referenced table however the drops are sequenced;
+ * - a cycle among the dropped tables — the back edge is reported and the
+ *   remaining (acyclic) edges still shape the order.
+ *
+ * Suspending referential integrity is not an alternative for the inbound case:
+ * `disableReferentialIntegrity` covers MySQL/SQLite, but PG's `DISABLE TRIGGER
+ * ALL` still refuses to let a referenced table be dropped, so the constraint
+ * has to go regardless.
+ *
+ * FKs are read only for tables that currently exist, and by default only for
+ * the tables being dropped: finding inbound FKs means introspecting every
+ * *other* live table (hundreds, for the canonical schema), so that scan is
+ * skipped unless the drop set itself reported at least one foreign key. On an
+ * FK-free database this costs exactly what it did before. The trade-off is
+ * deliberate and one-sided: a drop set whose tables hold no FK of their own but
+ * are pointed at from outside is not detected — pass `scanInbound` to force the
+ * scan when a caller knows that shape is possible.
  *
  * @internal
  */
-export async function fkSafeDropOrder(
+export async function fkSafeDropPlan(
   ss: FkSafeDropOrderHost,
   names: readonly string[],
-): Promise<string[]> {
-  if (names.length < 2) return [...names];
+  { scanInbound = false }: { scanInbound?: boolean } = {},
+): Promise<FkSafeDropPlan> {
+  if (names.length === 0) return { order: [], blockers: [] };
   const inSet = new Set(names);
   const existing = new Set(await ss.tables());
-  const referencedBy = new Map<string, string[]>();
+  const edges = new Map<string, { toTable: string; name: string }[]>();
+  let sawForeignKey = false;
   for (const name of names) {
     if (!existing.has(name)) continue;
-    const targets = (await ss.foreignKeys(name))
-      .map((fk) => fk.toTable)
-      .filter((t) => t !== name && inSet.has(t));
-    if (targets.length > 0) referencedBy.set(name, targets);
+    const fks = await ss.foreignKeys(name);
+    if (fks.length > 0) sawForeignKey = true;
+    const targets = fks.filter((fk) => fk.toTable !== name && inSet.has(fk.toTable));
+    if (targets.length > 0) {
+      edges.set(
+        name,
+        targets.map((fk) => ({ toTable: fk.toTable, name: fk.name })),
+      );
+    }
   }
-  if (referencedBy.size === 0) return [...names];
+  if (!sawForeignKey && !scanInbound) return { order: [...names], blockers: [] };
+
+  const blockers: FkDropBlocker[] = [];
+  for (const table of existing) {
+    if (inSet.has(table)) continue;
+    for (const fk of await ss.foreignKeys(table)) {
+      if (inSet.has(fk.toTable)) blockers.push({ fromTable: table, name: fk.name });
+    }
+  }
+  if (edges.size === 0) return { order: [...names], blockers };
 
   const ordered: string[] = [];
   const emitted = new Set<string>();
   const onPath = new Set<string>();
   const visit = (name: string): void => {
-    if (emitted.has(name) || onPath.has(name)) return;
+    if (emitted.has(name)) return;
     onPath.add(name);
-    for (const target of referencedBy.get(name) ?? []) visit(target);
+    for (const edge of edges.get(name) ?? []) {
+      // A target still on the current path closes a cycle: no drop order can
+      // satisfy this edge, so report the constraint and ignore the edge.
+      if (onPath.has(edge.toTable)) {
+        blockers.push({ fromTable: name, name: edge.name });
+        continue;
+      }
+      visit(edge.toTable);
+    }
     onPath.delete(name);
     emitted.add(name);
     ordered.push(name);
@@ -2144,7 +2203,20 @@ export async function fkSafeDropOrder(
   // Referencers are emitted after their targets, so walk in input order and
   // reverse: the result drops referencers first.
   for (const name of names) visit(name);
-  return ordered.reverse();
+  return { order: ordered.reverse(), blockers };
+}
+
+/**
+ * {@link fkSafeDropPlan}'s order alone, for callers that have already dealt
+ * with (or provably cannot have) blocking foreign keys.
+ *
+ * @internal
+ */
+export async function fkSafeDropOrder(
+  ss: FkSafeDropOrderHost,
+  names: readonly string[],
+): Promise<string[]> {
+  return (await fkSafeDropPlan(ss, names)).order;
 }
 
 /**
@@ -2210,10 +2282,18 @@ export async function rebuildCanonicalTables(
   const defs = registry.filter((d) => wanted.has(d.name));
   if (defs.length === 0) return;
   const { ss, typeMap } = await prepareSchema(adapter);
-  for (const name of await fkSafeDropOrder(
+  const plan = await fkSafeDropPlan(
     ss,
     defs.map((d) => d.name),
-  )) {
+  );
+  // An FK reaching in from a table nobody asked for (or one closing a cycle)
+  // has no drop order that works; drop the constraint itself first. The
+  // referencing table keeps its shape — only the constraint is lost, and a
+  // canonical table's own FKs come back with the recreate below.
+  for (const blocker of plan.blockers) {
+    await ss.removeForeignKey(blocker.fromTable, { name: blocker.name, ifExists: true });
+  }
+  for (const name of plan.order) {
     await ss.dropTable(name, { ifExists: true });
   }
   for (const def of defs) {
