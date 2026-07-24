@@ -173,8 +173,11 @@ export function acceptsNestedAttributesFor(
   if (!(modelClass as any)._nestedSaveWrapped) {
     (modelClass as any)._nestedSaveWrapped = true;
 
-    modelClass.prototype.save = async function (this: Base): Promise<boolean> {
-      const result = await originalSave.call(this);
+    modelClass.prototype.save = async function (
+      this: Base,
+      options?: { validate?: boolean; touch?: boolean },
+    ): Promise<boolean> {
+      const result = await originalSave.call(this, options);
       if (!result) return false;
 
       await processNestedAttributes(this);

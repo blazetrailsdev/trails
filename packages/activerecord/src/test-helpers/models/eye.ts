@@ -13,33 +13,38 @@ export class Eye extends Base {
   afterSaveCallbacksStack: boolean[] = [];
   overrideIrisWithReadOnlyForeignKeyColor: boolean = false;
 
+  /**
+   * Rails reads `iris` directly in these callbacks. The trails has_one reader
+   * is async, so a callback running while the association is unloaded would see
+   * a thenable rather than a record; read the loaded target instead (an
+   * unloaded has_one on a just-created owner has no persisted row anyway).
+   */
+  private get irisTarget(): Iris | null {
+    const assoc = this.association("iris");
+    return assoc.isLoaded() ? (assoc.target as Iris | null) : null;
+  }
+
   static {
     this.afterCreate(function (this: Eye) {
-      if ((this as any).iris)
-        this.afterCreateCallbacksStack.push(!(this as any).iris.isPersisted());
+      if (this.irisTarget) this.afterCreateCallbacksStack.push(!this.irisTarget.isPersisted());
     });
     this.afterUpdate(function (this: Eye) {
-      if ((this as any).iris)
-        this.afterUpdateCallbacksStack.push((this as any).iris.hasChangesToSave);
+      if (this.irisTarget) this.afterUpdateCallbacksStack.push(this.irisTarget.hasChangesToSave);
     });
     this.afterSave(function (this: Eye) {
-      if ((this as any).iris)
-        this.afterSaveCallbacksStack.push((this as any).iris.hasChangesToSave);
+      if (this.irisTarget) this.afterSaveCallbacksStack.push(this.irisTarget.hasChangesToSave);
     });
 
     this.hasOne("iris");
 
     this.afterCreate(function (this: Eye) {
-      if ((this as any).iris)
-        this.afterCreateCallbacksStack.push(!(this as any).iris.isPersisted());
+      if (this.irisTarget) this.afterCreateCallbacksStack.push(!this.irisTarget.isPersisted());
     });
     this.afterUpdate(function (this: Eye) {
-      if ((this as any).iris)
-        this.afterUpdateCallbacksStack.push((this as any).iris.hasChangesToSave);
+      if (this.irisTarget) this.afterUpdateCallbacksStack.push(this.irisTarget.hasChangesToSave);
     });
     this.afterSave(function (this: Eye) {
-      if ((this as any).iris)
-        this.afterSaveCallbacksStack.push((this as any).iris.hasChangesToSave);
+      if (this.irisTarget) this.afterSaveCallbacksStack.push(this.irisTarget.hasChangesToSave);
     });
 
     this.hasOne("irisWithReadOnlyForeignKey", {
