@@ -115,11 +115,12 @@ method:
   so ordering logic is **not** reimplemented — the ESLint rule stays the
   single authority and would correct any slotting disagreement.
 - **Signature**: parameter names from `MethodInfo.params` (camelCased via the
-  conventions map), all typed as the loosest honest type the generator can
-  emit (`unknown`), return type `never` is wrong for a stub that will be
-  implemented — use `unknown` (or `Promise<unknown>` when the Ruby body's
-  call set is dominated by known-async ported callees; keep this heuristic
-  advisory and trivially overridable by the implementer).
+  conventions map), each typed `unknown` — the loosest honest type. Return
+  type `unknown` too, not `never`: the stub will be implemented, and `never`
+  would let call sites typecheck against a body that is going away.
+  (`Promise<unknown>` when the Ruby body's call set is dominated by
+  known-async ported callees; this heuristic is advisory and trivially
+  overridable by the implementer.)
 - **Body**: a single `throw new NotImplementedError(...)` preceded by the
   mandatory `@nie` annotation (see next section) — the
   `nie-requires-annotation` ESLint rule fails any bare throw.
@@ -137,6 +138,18 @@ must ALSO be excluded from the parity percentage until their `@nie TODO`
 disposition is cleared (the extractor already emits `calls` per TS method;
 a body whose only statement is the annotated throw is mechanically
 recognizable and reported in its own "stubbed" column, not "matched").
+
+**Ratchet interaction.** A stub is a newly name-matched pair whose body makes
+none of its expected calls, so on the next `--wide-calls` run every one of
+its tags surfaces as a NEW wide mismatch — which would turn
+`api:calls:wide` red. This is handled, not accidental: the stub's
+`@missingRailsCall` tags flow straight into `--emit-baselines`, so the same
+PR that adds the stub also adds the matching baseline rows (the ratchet has
+always permitted curated additions; only unexplained ones fail). The
+`unported (api:build stub)` reason string keeps these rows distinguishable
+from bucket-(b) equivalence entries, so the burndown dashboards can subtract
+them. Stub pairs are likewise excluded from `body-pins --pin-all` — a pin
+asserts a verified port (RFC 0025 lifecycle), which a throwing stub is not.
 
 ### Which NotImplementedError
 
@@ -232,6 +245,17 @@ On every run, for every **existing** matched method, `api:build`:
 - **Same Ruby call flagged twice** (one call → two TS candidates produces
   duplicate keys in the artifact): deduped exactly as `reseed()` dedupes,
   one tag per Ruby name.
+- **Coexistence with `@internal`.** A Rails-private method can carry both
+  tags in one block; they are orthogonal (`@internal` marks visibility,
+  `@missingRailsCall` marks call-set state). But privates are advisory-only
+  throughout the compare tooling — neither gate ratchets them — so
+  `--emit-baselines` skips tags on `@internal`/private members, mirroring
+  the lints' full-surface-only artifacts.
+- **Website rendering.** The tag is machinery, not user documentation:
+  register it as a suppressed block tag in the TypeDoc config (and in
+  `jsdoc/check-tag-names` if that lint is ever enabled) so it never renders
+  on the docs site, the same way `@internal` is excluded via
+  `excludeInternal`.
 
 ## Relationship to the lints — recommendation
 
@@ -246,7 +270,10 @@ Three options for the exclude JSON after migration:
    derived from the tags (recommended). `api:build --emit-baselines` walks
    the tags and writes `call-mismatches-wide-exclude/` and
    `call-mismatches-exclude.json` in the existing schema and `compareKeys`
-   order. `lint-call-mismatches{,-wide}.ts` and both CI jobs are untouched;
+   order. Routing between the two needs no tag-side marker: the narrow
+   population is a strict subset of the wide one, so a tag emits a narrow
+   row iff its Ruby call is in `SIGNIFICANT_CALLS` and the package passes
+   `narrowCallsApplies` (activerecord-only today) — one tag, both baselines. `lint-call-mismatches{,-wide}.ts` and both CI jobs are untouched;
    the only-shrink ratchet semantics are preserved wholesale (a stale JSON
    row now means a stale tag — same red gate, same fix, but the fix is a
    JSDoc edit next to the code). A small CI drift check
