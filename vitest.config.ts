@@ -376,13 +376,22 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-ddl-profile.ts"]
               : []),
           ],
-          // No retries on any backend. PG/MySQL used to run `retry: 2` to mask
-          // shared-per-worker-DB intermittents; both sources are now closed —
-          // canonical-table shape drift is repaired systemically by
-          // repairWorkerSchema, and leaked bespoke tables are gone by
-          // construction (the `require-table-teardown` raw-SQL exclude list is
-          // empty). A red PG/MySQL run is therefore a real regression or a real
-          // flake to track, not something to paper over.
+          // No retries, on any backend. PG/MySQL used to run `retry: 2` to mask
+          // intermittents from the shared per-worker DB. Both sources of those
+          // are now closed: canonical-table shape drift is repaired
+          // systemically by repairWorkerSchema, and bespoke tables — which
+          // repairWorkerSchema does NOT cover — are gone, the RFC 0019
+          // canonical burndown having taken require-canonical-schema-exclude
+          // from 70 files to 0 (the rule was then retired in #4540) with
+          // require-table-teardown standing guard on what remains.
+          //
+          // Removal was attempted once before, in #4136, and reverted: at that
+          // point the burndown was still mid-flight at 70 files and bespoke
+          // tables promptly drifted. Do not restore the retry without first
+          // establishing that a genuinely new flake class exists — the point of
+          // running at 0 is that describeIfPg/describeIfMysql backend-only
+          // failures, which SQLite never exercises, now surface as red instead
+          // of being silently absorbed.
           retry: 0,
           // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
