@@ -2044,9 +2044,12 @@ describe("TestDefaultAutosaveAssociationOnABelongsToAssociation", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("Author", Author);
-    registerModel("Post", Post);
-    Associations.belongsTo.call(Post, "author", { autosave: true });
+    registerModel("BelongsToAutosaveAuthor", Author);
+    registerModel("BelongsToAutosavePost", Post);
+    Associations.belongsTo.call(Post, "author", {
+      autosave: true,
+      className: "BelongsToAutosaveAuthor",
+    });
     return { Author, Post };
   }
 
@@ -2984,12 +2987,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("Book", Book);
-    registerModel("Author", Author);
+    registerModel("CallbacksOnceBook", Book);
+    registerModel("CallbacksOnceAuthor", Author);
     Associations.hasMany.call(Author, "books", {
       autosave: true,
       foreignKey: "author_id",
-      className: "Book",
+      className: "CallbacksOnceBook",
     });
 
     const author = await Author.create({ name: "Test" });
@@ -3066,12 +3069,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("Author", Author);
-    registerModel("Post", Post);
+    registerModel("BelongsToCallbacksOnceAuthor", Author);
+    registerModel("BelongsToCallbacksOncePost", Post);
     Associations.belongsTo.call(Post, "author", {
       autosave: true,
       foreignKey: "author_id",
-      className: "Author",
+      className: "BelongsToCallbacksOnceAuthor",
     });
 
     const author = new Author({ name: "New Author" });
@@ -3107,12 +3110,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("Author", Author);
-    registerModel("Post", Post);
+    registerModel("DefaultBelongsToAuthor", Author);
+    registerModel("DefaultBelongsToPost", Post);
     // No `autosave:` option — exercises the default-on registration path.
     Associations.belongsTo.call(Post, "author", {
       foreignKey: "author_id",
-      className: "Author",
+      className: "DefaultBelongsToAuthor",
     });
 
     const author = new Author({ name: "New Author" });
@@ -3326,12 +3329,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("Author", Author);
-    registerModel("Post", Post);
+    registerModel("DuplicateCallbacksBelongsToAuthor", Author);
+    registerModel("DuplicateCallbacksBelongsToPost", Post);
     Associations.belongsTo.call(Post, "author", {
       autosave: true,
       foreignKey: "author_id",
-      className: "Author",
+      className: "DuplicateCallbacksBelongsToAuthor",
     });
     const reflection = (Post as any)._reflectOnAssociation("author");
     addAutosaveAssociationCallbacks(Post, reflection);
@@ -3367,12 +3370,12 @@ describe("TestAutosaveAssociationsInGeneral", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("Book", Book);
-    registerModel("Author", Author);
+    registerModel("DuplicateCallbacksHasManyBook", Book);
+    registerModel("DuplicateCallbacksHasManyAuthor", Author);
     Associations.hasMany.call(Author, "books", {
       autosave: true,
       foreignKey: "author_id",
-      className: "Book",
+      className: "DuplicateCallbacksHasManyBook",
     });
     const reflection = (Author as any)._reflectOnAssociation("books");
     addAutosaveAssociationCallbacks(Author, reflection);
@@ -3921,12 +3924,12 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("author_id", "integer");
       }
     }
-    registerModel("Author", Author);
-    registerModel("Post", Post);
+    registerModel("NewRecordBelongsToAuthor", Author);
+    registerModel("NewRecordBelongsToPost", Post);
     Associations.belongsTo.call(Post, "author", {
       autosave: false,
       foreignKey: "author_id",
-      className: "Author",
+      className: "NewRecordBelongsToAuthor",
     });
 
     const author = new Author({ name: "Unsaved" });
@@ -3993,12 +3996,12 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("name", "string");
       }
     }
-    registerModel("Book", Book);
-    registerModel("Author", Author);
+    registerModel("NewRecordHasManyBook", Book);
+    registerModel("NewRecordHasManyAuthor", Author);
     Associations.hasMany.call(Author, "books", {
       autosave: false,
       foreignKey: "author_id",
-      className: "Book",
+      className: "NewRecordHasManyBook",
     });
 
     const author = await Author.create({ name: "test" });
@@ -4083,19 +4086,22 @@ describe("TestDefaultAutosaveAssociationOnNewRecord", () => {
         this.attribute("body", "string");
         this.attribute("author_id", "integer");
         this.hasMany("comments", {
-          className: "Comment",
+          className: "HabtmAutosaveComment",
           foreignKey: "post_id",
         });
         this.hasAndBelongsToMany("categories", {
-          className: "Category",
+          className: "HabtmAutosaveCategory",
           joinTable: "categories_posts",
           foreignKey: "post_id",
+          // The join-table column is derived from `className`, which no longer
+          // matches the canonical "Category" name the table was built for.
+          associationForeignKey: "category_id",
           autosave: true,
         });
       }
     }
-    registerModel("Comment", Comment);
-    registerModel("Category", Category);
+    registerModel("HabtmAutosaveComment", Comment);
+    registerModel("HabtmAutosaveCategory", Category);
     registerModel("PostWithAfterCreateCallback", PostWithAfterCreateCallback);
     // Registered after the association so the habtm autosave after_create
     // callback fires first — matching Rails, where `has_and_belongs_to_many`
