@@ -9,7 +9,7 @@ import {
   Visitors,
   EmptyJoinError,
 } from "./index.js";
-import { testConnection } from "./test-helpers/connection.js";
+import { testConnection, fakeRecordConnection } from "./test-helpers/connection.js";
 
 describe("SelectManagerTest", () => {
   const users = new Table("users");
@@ -795,13 +795,6 @@ describe("SelectManagerTest", () => {
         .where(users.get("age").gt(18));
       expect(mgr.toSql()).toContain("AND");
     });
-
-    it("handles database-specific statements", () => {
-      const mgr = new SelectManager(users);
-      mgr.lock();
-      const sql = mgr.toSql();
-      expect(sql).toContain("FOR UPDATE");
-    });
   });
 
   describe("update", () => {
@@ -1415,6 +1408,22 @@ describe("SelectManagerTest", () => {
       mgr.where(users.get("id").eq(10));
       mgr.where(users.get("id").eq(11));
       expect(mgr.whereSql()?.value).toBe('WHERE "users"."id" = 10 AND "users"."id" = 11');
+    });
+
+    // Rails swaps `Table.engine.lease_connection.visitor` for the duration of the
+    // test; RFC 0007 deleted that global, so the PostgreSQL visitor is selected
+    // through `whereSql`'s `engine` argument instead — the only remaining path.
+    it("handles database-specific statements", () => {
+      const pgEngine = {
+        connection: { visitor: new Visitors.PostgreSQL(fakeRecordConnection) },
+      };
+      const mgr = new SelectManager();
+      mgr.from(users);
+      mgr.where(users.get("id").eq(10));
+      mgr.where(users.get("name").matches("foo%"));
+      expect(mgr.whereSql(pgEngine)?.value).toBe(
+        `WHERE "users"."id" = 10 AND "users"."name" ILIKE 'foo%'`,
+      );
     });
 
     it("returns nil when there are no wheres", () => {
