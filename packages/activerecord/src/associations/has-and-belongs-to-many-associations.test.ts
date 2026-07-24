@@ -1,7 +1,7 @@
 /**
  * Mirrors Rails activerecord/test/cases/associations/has_and_belongs_to_many_associations_test.rb
  */
-import { describe, it, expect, beforeAll, vi } from "vitest";
+import { describe, it, expect, afterAll, beforeAll, vi } from "vitest";
 import { Base, registerModel, AssociationTypeMismatch, ReadOnlyRecord } from "../index.js";
 import { assertNoQueries, assertQueriesCount } from "../testing/query-assertions.js";
 import { fixtures } from "../test-helpers/fixtures.js";
@@ -37,7 +37,7 @@ import { Computer } from "../test-helpers/models/computer.js";
 import { PublisherArticle, PublisherMagazine } from "../test-helpers/models/publisher.js";
 import { Professor } from "../test-helpers/models/professor.js";
 import { Course } from "../test-helpers/models/course.js";
-import { setupSecondPool } from "../test-helpers/setup-second-pool.js";
+import { setupSecondPool, teardownSecondPool } from "../test-helpers/setup-second-pool.js";
 import { isSqliteRun } from "../test-helpers/sqlite-template.js";
 
 // Test-file-local models mirroring the Rails fixture file's inline class
@@ -1194,6 +1194,10 @@ describe("HasAndBelongsToManyAssociationsTest", () => {
     expect(await (professor as any).courses.count()).toBe(0);
     await expect((professor as any).courses.push(course)).resolves.not.toThrow();
     expect(await (professor as any).courses.count()).toBe(1);
+  });
+
+  afterAll(async () => {
+    if (isSqliteRun()) await teardownSecondPool();
   });
 
   it("habtm scope can unscope", async () => {

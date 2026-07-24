@@ -67,3 +67,20 @@ export async function setupSecondPool(): Promise<void> {
   ]);
   await rebuildCanonicalTables(primary, ["entrants"]);
 }
+
+/**
+ * Undoes `setupSecondPool`'s primary-database surgery: Rails' two-database
+ * split dies with the process, but ours shares one primary database with every
+ * sibling suite in the worker, so the dropped tables must be put back.
+ *
+ * @internal
+ */
+export async function teardownSecondPool(): Promise<void> {
+  await rebuildCanonicalTables(Base.connection, [
+    "colleges",
+    "courses",
+    "professors",
+    "courses_professors",
+    "entrants",
+  ]);
+}

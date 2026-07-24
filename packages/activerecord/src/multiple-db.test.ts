@@ -1,9 +1,9 @@
-import { beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it } from "vitest";
 import "./index.js";
 import { Base } from "./base.js";
 import { StatementInvalid } from "./errors.js";
 import { fixtures } from "./test-helpers/fixtures.js";
-import { setupSecondPool } from "./test-helpers/setup-second-pool.js";
+import { setupSecondPool, teardownSecondPool } from "./test-helpers/setup-second-pool.js";
 import { isSqliteRun } from "./test-helpers/sqlite-template.js";
 import { ARUnit2Model } from "./test-helpers/models/arunit2-model.js";
 import { Course } from "./test-helpers/models/course.js";
@@ -20,6 +20,10 @@ describe.skipIf(!isSqliteRun())("MultipleDbTest", () => {
   fixtures({}, { useTransactionalTests: false });
   beforeAll(async () => {
     await setupSecondPool();
+  });
+
+  afterAll(async () => {
+    await teardownSecondPool();
   });
 
   // Rails: `fixtures :colleges, :courses, :entrants`.
