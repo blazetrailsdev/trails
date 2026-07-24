@@ -23,13 +23,6 @@
   {
     "package": "activesupport",
     "tsFile": "enumerable-utils.ts",
-    "rubyName": "index_by",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "enumerable-utils.ts",
     "rubyName": "many?",
     "call": "any?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

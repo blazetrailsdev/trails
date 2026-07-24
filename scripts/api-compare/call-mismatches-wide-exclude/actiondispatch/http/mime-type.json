@@ -2,22 +2,8 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/mime-type.ts",
-    "rubyName": "fetch",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
     "rubyName": "initialize",
     "call": "new",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
-    "rubyName": "lookup_by_extension",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -37,27 +23,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/mime-type.ts",
-    "rubyName": "match?",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
-    "rubyName": "parse",
-    "call": "blank?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
-    "rubyName": "parse",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
     "rubyName": "parse",
     "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -72,29 +37,8 @@
   {
     "package": "actiondispatch",
     "tsFile": "http/mime-type.ts",
-    "rubyName": "ref",
-    "call": "to_s",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails mime_type.rb:285-287 returns `symbol || to_s`; trails mime-type.ts:194-196 returns `this.symbol` only — the to_s fallback for symbol-less types is unported. Omission tracked in story actionpack-omissions-from-wide-verify."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
     "rubyName": "register",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
-    "rubyName": "register",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
-    "rubyName": "register",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -103,12 +47,5 @@
     "rubyName": "register_alias",
     "call": "register",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/mime-type.ts",
-    "rubyName": "to_str",
-    "call": "to_s",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails mime_type.rb:277-279 defines the string-duck `to_str` as `to_s`; trails' toString (mime-type.ts:181-183) serves both roles — Ruby's implicit-conversion protocol has no JS analogue, so no separate to_s call exists."
   }
 ]

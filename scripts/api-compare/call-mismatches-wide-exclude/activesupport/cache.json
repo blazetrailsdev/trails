@@ -3,13 +3,6 @@
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "_instrument",
-    "call": "blank?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "_instrument",
     "call": "call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -32,13 +25,6 @@
     "tsFile": "cache.ts",
     "rubyName": "expanded_key",
     "call": "to_param",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "expanded_key",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -101,13 +87,6 @@
     "package": "activesupport",
     "tsFile": "cache.ts",
     "rubyName": "normalize_options",
-    "call": "each",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cache.rb:901-910 loops OPTION_ALIASES with each/key?; trails cache/store.ts:451-463 inlines the single expires_in alias family with explicit null checks."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "normalize_options",
     "call": "key?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cache.rb:901-910 loops OPTION_ALIASES with each/key?; trails cache/store.ts:451-463 inlines the single expires_in alias family with explicit null checks."
   },
@@ -137,13 +116,6 @@
     "tsFile": "cache.ts",
     "rubyName": "write_multi",
     "call": "transform_keys",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "cache.ts",
-    "rubyName": "write_multi_entries",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

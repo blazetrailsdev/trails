@@ -147,8 +147,41 @@ const SIGNIFICANT_CALLS = new Set([
 // stories land. The existing noise-suppression gates inside significantMissingCalls
 // (isPortedWithArgs, mapCall, "TS makes NONE of the mapped candidates") still
 // apply, so this is not the raw missing-call diff.
-const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
-  has: (value) => value !== "super",
+//
+// Ruby calls whose FAITHFUL JS port emits no call at all — the receiver is
+// consumed by a native language construct (a template literal, a for-of loop, a
+// truthiness test). No alias in JS_ENUMERABLE_ALIASES can ever match one of these,
+// because there is no callee to record: the wide gate would baseline every
+// occurrence forever, diluting its signal exactly the way `super` did before it was
+// excluded (see WIDE_SIGNIFICANT_CALLS below). These are therefore suppressed from
+// the wide significant set (RFC 0025). Each name is justified by the non-call
+// construct it becomes.
+//
+// DELIBERATELY NOT suppressed — `size`, `empty?`, `first`, `last`: these read as
+// plain Array/property idioms (`xs.length`, `xs.length === 0`, `xs[0]`, `xs.at(-1)`)
+// but on an ActiveRecord::Relation/association receiver they are real methods with
+// query-triggering bodies — `Relation#size` is `loaded? ? records.length : count(:all)`
+// and `#empty?` is `loaded? ? records.empty? : !exists?` (relation.rb), `#first`/`#last`
+// dispatch to `find_nth_with_limit`/`find_last` (finder_methods.rb; trails ports these
+// as `performFirst`/`performLast`). A single global set has no receiver-type
+// distinction, so suppressing them would make a TS port that rewrites a relation
+// `.first`/`.size` into indexing a preloaded array (dropping the query trigger)
+// permanently invisible to the wide gate — exactly the fidelity gap it exists to
+// catch. Same reason `delete` (Map#delete), `merge`, `fetch` — all real JS call
+// forms — stay in.
+export const WIDE_NO_JS_CALL_FORM = new Set([
+  "to_s", // template literal / implicit String() coercion — `${x}`
+  "each", // for...of loop — no .forEach callee
+  "present?", // truthiness (`x != null && x !== ""`)
+  "blank?", // truthiness (`!x`)
+]);
+
+// Opt-in WIDE significant set (RFC 0047): admits EVERY ported Ruby call name as
+// significant, except `super` (which the module-mixin port structurally drops —
+// see the SIGNIFICANT_CALLS comment above) and the WIDE_NO_JS_CALL_FORM names
+// (whose faithful port is a non-call construct, so no alias can ever match).
+export const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
+  has: (value) => value !== "super" && !WIDE_NO_JS_CALL_FORM.has(value),
 };
 
 // Re-exported from the shared idiom table so existing importers (compare.test.ts,

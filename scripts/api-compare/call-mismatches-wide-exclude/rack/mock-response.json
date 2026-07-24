@@ -10,13 +10,6 @@
     "package": "rack",
     "tsFile": "mock-response.ts",
     "rubyName": "identify_cookie_attributes",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "mock-response.ts",
-    "rubyName": "identify_cookie_attributes",
     "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -25,13 +18,6 @@
     "tsFile": "mock-response.ts",
     "rubyName": "identify_cookie_attributes",
     "call": "store",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "mock-response.ts",
-    "rubyName": "parse_cookies_from_header",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

@@ -25,7 +25,7 @@
     "tsFile": "connection-adapters/abstract/connection-pool/queue.ts",
     "rubyName": "can_remove_no_wait?",
     "call": "size",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails queue.rb:93-95 reads `@queue.size`; trails queue.ts:278-280 reads `this._queue.length`."
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

@@ -3,13 +3,6 @@
     "package": "actiondispatch",
     "tsFile": "middleware/exception-wrapper.ts",
     "rubyName": "build_backtrace",
-    "call": "each",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails exception_wrapper.rb:254-275 decorates backtrace locations with compiled ActionView template methods (each/map/key?/to_s/method_name over PathRegistry resolvers); trails exception-wrapper.ts:297-299 returns `this.traces` — there are no compiled template methods in trails, so the whole decoration loop is inapplicable."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/exception-wrapper.ts",
-    "rubyName": "build_backtrace",
     "call": "key?",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails exception_wrapper.rb:254-275 decorates backtrace locations with compiled ActionView template methods (each/map/key?/to_s/method_name over PathRegistry resolvers); trails exception-wrapper.ts:297-299 returns `this.traces` — there are no compiled template methods in trails, so the whole decoration loop is inapplicable."
   },
@@ -33,13 +26,6 @@
     "rubyName": "build_backtrace",
     "call": "new",
     "reason": "Constructor idiom: Ruby `X.new` ports to TS `new X()`, which extractCalls records as a construction/type reference rather than a named call. The construction is present in the port. Cluster-vetted: representative entries in this cluster were read against the vendored Rails body; the rest share the same mechanism and were classified by it, not line-diffed individually."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/exception-wrapper.ts",
-    "rubyName": "build_backtrace",
-    "call": "to_s",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails exception_wrapper.rb:254-275 decorates backtrace locations with compiled ActionView template methods (each/map/key?/to_s/method_name over PathRegistry resolvers); trails exception-wrapper.ts:297-299 returns `this.traces` — there are no compiled template methods in trails, so the whole decoration loop is inapplicable."
   },
   {
     "package": "actiondispatch",

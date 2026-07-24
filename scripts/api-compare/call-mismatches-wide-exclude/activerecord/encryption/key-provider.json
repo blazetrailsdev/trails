@@ -4,7 +4,7 @@
     "tsFile": "encryption/key-provider.ts",
     "rubyName": "encryption_key",
     "call": "last",
-    "reason": "Equivalent (bucket b): Rails key_provider.rb:21 reads `@keys.last`; trails key-provider.ts expresses the same read as `_keys[_keys.length - 1]` — JS arrays have no `.last`, so the call can never appear. The store_key_references tap itself is ported (PR #5143)."
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

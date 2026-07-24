@@ -16,13 +16,6 @@
   {
     "package": "globalid",
     "tsFile": "uri/gid.ts",
-    "rubyName": "build",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "uri/gid.ts",
     "rubyName": "set_model_components",
     "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -53,20 +46,6 @@
     "tsFile": "uri/gid.ts",
     "rubyName": "validate_app",
     "call": "parse",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "uri/gid.ts",
-    "rubyName": "validate_component",
-    "call": "blank?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "globalid",
-    "tsFile": "uri/gid.ts",
-    "rubyName": "validate_model_id_section",
-    "call": "blank?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

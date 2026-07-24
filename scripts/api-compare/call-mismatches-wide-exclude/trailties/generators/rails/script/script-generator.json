@@ -4,6 +4,6 @@
     "tsFile": "generators/rails/script/script-generator.ts",
     "rubyName": "depth",
     "call": "size",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails script_generator.rb:13-15 reads `class_path.size + 1`; trails script-generator.ts:23-25 reads `classPathParts.length + 1`."
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

@@ -66,13 +66,6 @@
     "package": "activerecord",
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "delete",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "delete",
     "call": "update_columns",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -96,13 +89,6 @@
     "rubyName": "foreign_key_present?",
     "call": "primary_key",
     "reason": "Satisfied via the extracted foreignKeyPresentFor helper (foreign-association.ts), which reads klass.primaryKey — same delegation as CollectionAssociation#foreignKeyPresent."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "nullify_owner_attributes",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -193,13 +179,6 @@
     "tsFile": "associations/has-one-association.ts",
     "rubyName": "replace",
     "call": "transaction_if",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/has-one-association.ts",
-    "rubyName": "set_owner_attributes",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

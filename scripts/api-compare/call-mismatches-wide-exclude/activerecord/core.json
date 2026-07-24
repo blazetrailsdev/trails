@@ -164,13 +164,6 @@
     "package": "activerecord",
     "tsFile": "core.ts",
     "rubyName": "find_by",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "find_by",
     "call": "unsupported_value?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -226,36 +219,22 @@
   {
     "package": "activerecord",
     "tsFile": "core.ts",
-    "rubyName": "init_attributes",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
     "rubyName": "init_internals",
     "call": "define_attribute_methods",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:834-849 caches `klass.primary_key` into @primary_key and calls `klass.define_attribute_methods`; trails core.ts:753-771 initializes the same flags but reads primaryKey lazily from the class and defines attribute methods at declare() time \u2014 neither call appears in initInternals."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:834-849 caches `klass.primary_key` into @primary_key and calls `klass.define_attribute_methods`; trails core.ts:753-771 initializes the same flags but reads primaryKey lazily from the class and defines attribute methods at declare() time — neither call appears in initInternals."
   },
   {
     "package": "activerecord",
     "tsFile": "core.ts",
     "rubyName": "init_internals",
     "call": "primary_key",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:834-849 caches `klass.primary_key` into @primary_key and calls `klass.define_attribute_methods`; trails core.ts:753-771 initializes the same flags but reads primaryKey lazily from the class and defines attribute methods at declare() time \u2014 neither call appears in initInternals."
+    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails core.rb:834-849 caches `klass.primary_key` into @primary_key and calls `klass.define_attribute_methods`; trails core.ts:753-771 initializes the same flags but reads primaryKey lazily from the class and defines attribute methods at declare() time — neither call appears in initInternals."
   },
   {
     "package": "activerecord",
     "tsFile": "core.ts",
     "rubyName": "inspect_with_attributes",
     "call": "filter_map",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "core.ts",
-    "rubyName": "inspect_with_attributes",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

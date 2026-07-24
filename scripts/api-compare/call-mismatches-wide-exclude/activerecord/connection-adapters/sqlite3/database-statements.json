@@ -74,7 +74,7 @@
     "tsFile": "connection-adapters/sqlite3/database-statements.ts",
     "rubyName": "perform_query",
     "call": "empty?",
-    "reason": "Deliberate deviation: the branch axis is `stmt.reader && !isWrite` (not `column_count.zero?`) and the no-row branch returns `[]` directly rather than `ActiveRecord::Result.empty`, so `binds.empty?` / empty-Result construction is not mirrored."
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
@@ -102,7 +102,7 @@
     "tsFile": "connection-adapters/sqlite3/database-statements.ts",
     "rubyName": "returning_column_values",
     "call": "first",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails sqlite3/database_statements.rb:135-137 reads `result.rows.first`; trails sqlite3/database-statements.ts:285-287 reads `result.rows[0]`."
+    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",
