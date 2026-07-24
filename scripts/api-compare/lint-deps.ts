@@ -161,6 +161,24 @@ export function collectDirectImports(sf: ts.SourceFile, tsImport: string): Set<s
   return names;
 }
 
+export function collectImportAliases(sf: ts.SourceFile, tsImport: string): Map<string, string> {
+  const aliases = new Map<string, string>();
+  for (const stmt of sf.statements) {
+    if (!ts.isImportDeclaration(stmt)) continue;
+    const specifier = (stmt.moduleSpecifier as ts.StringLiteral).text;
+    if (!isImportFromPackage(specifier, tsImport)) continue;
+    const bindings = stmt.importClause?.namedBindings;
+    if (bindings && ts.isNamedImports(bindings)) {
+      for (const el of bindings.elements) {
+        if (el.propertyName && el.propertyName.text !== el.name.text) {
+          aliases.set(el.name.text, el.propertyName.text);
+        }
+      }
+    }
+  }
+  return aliases;
+}
+
 // Visits every top-level "taint candidate" — a binding whose body or
 // initializer could (transitively) use the dep, making the binding
 // itself a wrapper that callers should inherit credit from.
@@ -200,16 +218,26 @@ export function collectTaintedSymbols(
   tsImport: string,
   tsIdentifiers: string[],
   dep: string,
-): Set<ts.Symbol> {
+): { tainted: Set<ts.Symbol>; taintedRefs: Map<ts.Symbol, Set<string>> } {
   const checker = program.getTypeChecker();
   const knownIds = new Set(tsIdentifiers);
   const tainted = new Set<ts.Symbol>();
+  const taintedRefs = new Map<ts.Symbol, Set<string>>();
   const directCache = new Map<ts.SourceFile, Set<string>>();
+  const aliasCache = new Map<ts.SourceFile, Map<string, string>>();
   const getDirect = (sf: ts.SourceFile): Set<string> => {
     let s = directCache.get(sf);
     if (!s) {
       s = collectDirectImports(sf, tsImport);
       directCache.set(sf, s);
+    }
+    return s;
+  };
+  const getAlias = (sf: ts.SourceFile): Map<string, string> => {
+    let s = aliasCache.get(sf);
+    if (!s) {
+      s = collectImportAliases(sf, tsImport);
+      aliasCache.set(sf, s);
     }
     return s;
   };
@@ -228,23 +256,43 @@ export function collectTaintedSymbols(
     changed = false;
     for (const { sf, name, body, anchor } of candidates) {
       const sym = checker.getSymbolAtLocation(name);
-      if (!sym || tainted.has(sym)) continue;
-      if (
-        methodUsesDepImport(body, getDirect(sf), knownIds, dep, sf, anchor, {
+      if (!sym) continue;
+      const refs = new Set<string>();
+      const uses = methodUsesDepImport(
+        body,
+        getDirect(sf),
+        knownIds,
+        dep,
+        sf,
+        anchor,
+        {
           checker,
           taintedSymbols: tainted,
+          taintedRefs,
           // A lint-deps-ignore opt-out should not taint the wrapper —
           // otherwise an "uses raw SQL; no Arel needed" helper would
           // grant credit to every caller and hide real violations.
           skipIgnoreAnnotation: true,
-        })
-      ) {
+        },
+        refs,
+        getAlias(sf),
+      );
+      if (!uses) continue;
+      if (!tainted.has(sym)) {
         tainted.add(sym);
         changed = true;
       }
+      let acc = taintedRefs.get(sym);
+      if (!acc) {
+        acc = new Set();
+        taintedRefs.set(sym, acc);
+      }
+      const before = acc.size;
+      for (const r of refs) acc.add(r);
+      if (acc.size > before) changed = true;
     }
   }
-  return tainted;
+  return { tainted, taintedRefs };
 }
 
 function analyzeTsDepUsage(
@@ -269,7 +317,13 @@ function analyzeTsDepUsage(
 
   const checker = program.getTypeChecker();
   const knownIds = new Set(tsIdentifiers);
-  const taintedSymbols = collectTaintedSymbols(program, pkgSrcDir, tsImport, tsIdentifiers, dep);
+  const { tainted: taintedSymbols, taintedRefs } = collectTaintedSymbols(
+    program,
+    pkgSrcDir,
+    tsImport,
+    tsIdentifiers,
+    dep,
+  );
 
   for (const sourceFile of program.getSourceFiles()) {
     if (!isPkgSourceFile(sourceFile, pkgSrcDir)) continue;
@@ -280,6 +334,7 @@ function analyzeTsDepUsage(
     // tsDepMap.get(rubyFileToTs(...)) lookup misses.
     const relPath = path.relative(pkgSrcDir, sourceFile.fileName).split(path.sep).join("/");
     const importedNames = collectDirectImports(sourceFile, tsImport);
+    const aliasMap = collectImportAliases(sourceFile, tsImport);
 
     const methodMap = new Map<string, TsMethodDepInfo>();
     visitMethodDeclarations(sourceFile, (name, methodNode, anchor) => {
@@ -291,8 +346,9 @@ function analyzeTsDepUsage(
         dep,
         sourceFile,
         anchor,
-        { checker, taintedSymbols },
+        { checker, taintedSymbols, taintedRefs },
         refs,
+        aliasMap,
       );
       const existing = methodMap.get(name);
       if (existing === undefined) {
@@ -396,6 +452,7 @@ export function hasLintDepsIgnore(node: ts.Node, dep: string, sourceFile: ts.Sou
 export interface TransitiveContext {
   checker: ts.TypeChecker;
   taintedSymbols: Set<ts.Symbol>;
+  taintedRefs?: Map<ts.Symbol, Set<string>>;
   // Suppresses lint-deps-ignore detection. Used during taint
   // computation so an opt-out helper doesn't spuriously taint callers.
   skipIgnoreAnnotation?: boolean;
@@ -410,8 +467,10 @@ export function methodUsesDepImport(
   anchor: ts.Node = node,
   transitive?: TransitiveContext,
   collectRefs?: Set<string>,
+  aliasMap?: Map<string, string>,
 ): boolean {
   if (!transitive?.skipIgnoreAnnotation && hasLintDepsIgnore(anchor, dep, sourceFile)) return true;
+  const recordRef = (name: string) => collectRefs?.add(aliasMap?.get(name) ?? name);
   let found = false;
   // Walk top-down so we can distinguish:
   //   - signature type positions (param/return/typeParam of the function
@@ -427,7 +486,8 @@ export function methodUsesDepImport(
     if (ts.isPropertyAccessExpression(n) && ts.isIdentifier(n.expression)) {
       if (importedNames.has(n.expression.text)) {
         found = true;
-        collectRefs?.add(n.name.text);
+        recordRef(n.name.text);
+        if (aliasMap?.has(n.expression.text)) recordRef(n.expression.text);
         if (!collectRefs) return;
       }
     }
@@ -443,7 +503,7 @@ export function methodUsesDepImport(
           if (!inType || inSignatureType) {
             if (importedNames.has(n.text) || knownIdentifiers.has(n.text)) {
               found = true;
-              collectRefs?.add(n.text);
+              recordRef(n.text);
               if (!collectRefs) return;
             }
             if (transitive && transitive.taintedSymbols.size > 0) {
@@ -453,7 +513,12 @@ export function methodUsesDepImport(
                   sym.flags & ts.SymbolFlags.Alias ? transitive.checker.getAliasedSymbol(sym) : sym;
                 if (transitive.taintedSymbols.has(resolved)) {
                   found = true;
-                  collectRefs?.add(n.text);
+                  const wrapperRefs = transitive.taintedRefs?.get(resolved);
+                  if (collectRefs && wrapperRefs && wrapperRefs.size > 0) {
+                    for (const r of wrapperRefs) collectRefs.add(r);
+                  } else {
+                    recordRef(n.text);
+                  }
                   if (!collectRefs) return;
                 }
               }
