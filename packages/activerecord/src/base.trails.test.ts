@@ -14,6 +14,7 @@ import { Temporal } from "@blazetrails/activesupport/temporal";
 import { Type } from "@blazetrails/activemodel";
 import { fixtures } from "./test-helpers/fixtures.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
+import { reconcileVirtualAttributes, loadSchema } from "./model-schema.js";
 
 describe("quoteSqlValue", () => {
   it("emits bare decimal for bigint (not quoted string)", () => {
@@ -438,25 +439,33 @@ describe("ignored columns follow Rails' value-keyed attribute set (trails)", () 
         this.ignoredColumns = ["rating"];
       }
     }
+    (loadSchema as (this: unknown) => void).call(Company);
     const first = Firm.columnsHash();
     expect(Firm.columnsHash()).toBe(first);
 
-    // The end state `reflectColumnNames` leaves behind when it warms a cold
-    // shared cache (model-schema.ts): only the BASE's `_columnsHash`/`_columns`/
-    // `_schemaLoaded` are dropped, subclasses are untouched. Simulated rather
-    // than driven through `reconcileVirtualAttributes(true)` because that
-    // function short-circuits on `cachedColumnNames` — in this suite the shared
-    // cache is always warm, so the clearing branch is unreachable from a test.
+    const cache = Company.connection.schemaCache as unknown as {
+      clearDataSourceCacheBang(conn: unknown, name: string): void;
+      getCachedColumnsHash(name: string): unknown;
+    };
+    cache.clearDataSourceCacheBang(null, "companies");
+    expect(cache.getCachedColumnsHash("companies")).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(Company, "_schemaLoaded")).toBe(true);
+
+    await (reconcileVirtualAttributes as (this: unknown, reflect: boolean) => Promise<void>).call(
+      Company,
+      true,
+    );
+
     const base = Company as unknown as {
       _columnsHash?: unknown;
       _columns?: unknown;
       _schemaLoaded?: boolean;
     };
-    base._columnsHash = undefined;
-    base._columns = undefined;
-    base._schemaLoaded = false;
-    // The next load re-applies the reflected columns; it must not leave the
-    // subclass on its pre-reflection memo.
+    expect(base._schemaLoaded).toBe(false);
+    expect(base._columnsHash).toBeUndefined();
+    expect(base._columns).toBeUndefined();
+    expect(Object.prototype.hasOwnProperty.call(Company, "_columnNamesMemo")).toBe(false);
+
     expect(Company.columnNames()).toContain("rating");
 
     const rebuilt = Firm.columnsHash();
