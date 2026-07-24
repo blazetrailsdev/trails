@@ -2,8 +2,8 @@
  * OS adapter — mirrors the Rails adapter pattern.
  *
  * Exposes the few runtime surfaces higher-level packages need (`tmpdir`,
- * `platform`, `cwd`) so they can avoid importing `node:os` / `process`
- * directly.
+ * `platform`, `cwd`, `availableParallelism`) so they can avoid importing
+ * `node:os` / `process` directly.
  */
 
 export interface OsAdapter {
@@ -16,6 +16,12 @@ export interface OsAdapter {
    * relative paths resolved against.
    */
   cwd(): string;
+  /**
+   * Number of logical CPUs available to this process. On Node this is
+   * `os.availableParallelism()`. Runtimes without the notion should return
+   * their best estimate of usable concurrency (never less than 1).
+   */
+  availableParallelism(): number;
 }
 
 const registry = new Map<string, OsAdapter>();
@@ -30,7 +36,11 @@ export function registerOsAdapter(name: string, adapter: OsAdapter): void {
 let nodeAttempted = false;
 let nodeAsyncPromise: Promise<boolean> | null = null;
 
-type NodeOs = { tmpdir: () => string; platform: () => string };
+type NodeOs = {
+  tmpdir: () => string;
+  platform: () => string;
+  availableParallelism: () => number;
+};
 
 function wrap(os: NodeOs): OsAdapter {
   return {
@@ -41,6 +51,7 @@ function wrap(os: NodeOs): OsAdapter {
       if (proc && typeof proc.cwd === "function") return proc.cwd();
       throw new Error("process.cwd() is unavailable in this runtime");
     },
+    availableParallelism: () => os.availableParallelism(),
   };
 }
 

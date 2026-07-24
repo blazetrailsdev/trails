@@ -21,10 +21,10 @@
  * (e.g. hot-module reloading in vitest watch mode) returns the same slot
  * without opening a second connection or consuming an additional lock.
  *
- * AR_DB_FORKS: vitest worker count, clamped to the host's numCpus - 1 by
- * vitest.config.ts. The advisory-slot pool is sized separately, with headroom
- * over that count — see test-helpers/ar-db-slots.ts (override with
- * AR_DB_SLOTS).
+ * TRAILS_TEST_FORKS / AR_DB_FORKS: the requested vitest worker count, clamped
+ * to the host's numCpus - 1 by workerForkCount() itself (via the OS adapter).
+ * The advisory-slot pool is sized separately, with headroom over that count —
+ * see test-helpers/ar-db-slots.ts (override with AR_DB_SLOTS).
  */
 
 import pg from "pg";
