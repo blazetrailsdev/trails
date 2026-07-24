@@ -15,6 +15,7 @@ import { Base, RecordNotFound, registerModel } from "./index.js";
 import "./relation.js";
 import { Associations } from "./associations.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { SchemaStatements } from "./connection-adapters/abstract/schema-statements.js";
 import { assertNoQueries } from "./testing/query-assertions.js";
 import { defineFixtures, defineJoinTableFixtures } from "./test-helpers/define-fixtures.js";
@@ -63,6 +64,8 @@ function schema(): SchemaStatements {
 }
 
 const RESERVED_TABLES = ["values", "group", "distinct_select", "distinct", "select", "order"];
+// The subset of the above that TEST_SCHEMA declares, restored on teardown.
+const CANONICAL_RESERVED_TABLES = ["group", "select", "distinct", "distinct_select", "values"];
 
 // Mirrors Rails `setup`: rebuild the five reserved-word tables before each
 // test via `create_table`. `references` adds the `*_id` column and the
@@ -91,13 +94,19 @@ beforeEach(async () => {
   ]);
 });
 
-// Mirrors Rails teardown: drop the tables so they don't leak into sibling
-// files sharing the worker DB.
+// Mirrors Rails teardown: drop the tables so the bespoke per-test shapes built
+// above don't leak into sibling files sharing the worker DB. Rails can stop
+// there (its teardown runs against a per-process DB rebuilt from schema.rb);
+// we additionally restore the canonical shapes, because `group`/`select`/
+// `distinct`/`distinct_select`/`values` are canonical TEST_SCHEMA tables and a
+// later file in the same worker that reads one would otherwise trip
+// `repairWorkerSchema`. `order` is not canonical — dropping it is the end of it.
 afterAll(async () => {
   const conn = schema();
   await conn.dropTable("values", "group", "distinct_select", "distinct", "select", "order", {
     ifExists: true,
   });
+  await rebuildCanonicalTables(Base.connection, CANONICAL_RESERVED_TABLES);
 });
 
 // Mirrors the Rails private `create_test_fixtures` loader: seed only the named
