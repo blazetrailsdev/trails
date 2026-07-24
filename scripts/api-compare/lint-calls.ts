@@ -276,7 +276,6 @@ const SKIP_CALLS = new Set([
   "match",
   "scan",
   "sort",
-  "sort_by",
   "min",
   "max",
   "sum",
