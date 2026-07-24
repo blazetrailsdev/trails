@@ -426,8 +426,7 @@ describe("SchemaAdapter TM delegation", () => {
     // The model runs on `Base.connection`; spy on that same adapter — it's what
     // TM dispatches `withinNewTransaction` against.
     const testAdapter = Base.connection;
-    const realAdapter = Base.connection;
-    const spy = vi.spyOn(realAdapter, "withinNewTransaction");
+    const spy = vi.spyOn(testAdapter, "withinNewTransaction");
     class Item extends Base {
       static {
         this.attribute("id", "integer");
@@ -492,7 +491,7 @@ describe("SchemaAdapter TM delegation", () => {
         this.adapter = testAdapter;
       }
     }
-    // Force a defineSchema-like priming so concurrent creates don't race on DDL.
+    // Prime schema reflection up front so concurrent creates don't race on it.
     await Item.create({ name: "prime" });
 
     const observed: Array<{ inside: unknown }> = [];
