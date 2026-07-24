@@ -121,7 +121,6 @@ describeIfPg("PostgreSQLAdapter", () => {
     vi.restoreAllMocks();
     try {
       await adapter.exec(`DROP TABLE IF EXISTS ex, ex2 CASCADE`);
-      await adapter.exec(`DROP TABLE IF EXISTS "CamelCase" CASCADE`);
     } catch {
       // ignore cleanup errors
     }
@@ -233,12 +232,7 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     it("primary key works tables containing capital letters", async () => {
-      await adapter.exec(`CREATE TABLE "CamelCase" (id serial primary key)`);
-      try {
-        expect(await adapter.primaryKey("CamelCase")).toBe("id");
-      } finally {
-        await adapter.exec(`DROP TABLE IF EXISTS "CamelCase" CASCADE`);
-      }
+      expect(await adapter.primaryKey("CamelCase")).toBe("id");
     });
 
     it("non standard primary key", async () => {
