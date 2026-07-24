@@ -55,6 +55,33 @@ CI runs `tsx scripts/api-compare/conventions-doc.ts --check` and fails if it
 drifts, so it is always current — never hand-edit it, change the rule in
 `conventions.ts` instead.
 
+### Body pins (source-hash pinning)
+
+`scripts/api-compare/body-pins.json` records, per name-matched pair, the
+normalized digest of the vendored Rails body the TS method was ported against.
+`pnpm api:pins` (CI: `Body-pins gate`) then reports **DRIFT** when a bump to
+`vendor/rails` changes a pinned body, and **STALE** when a pinned method is
+removed or renamed.
+
+**Floor policy: hybrid.** Every matched pair is pinned at the current vendored
+digest (the `--pin-all` floor — the tree we ship against is the de-facto
+baseline), so a Rails bump surfaces every changed body immediately. A floor pin
+carries no `reason` and is only a "this is what we were built against" claim,
+not a verified-faithful one. Convergence and port stories **upgrade** pins to
+real claims by re-pinning with the verification recorded:
+
+```sh
+API_COMPARE_FORCE=1 pnpm api:compare   # refresh output/body-hashes.json
+pnpm tsx scripts/api-compare/body-pins.ts --pin activerecord/lib/active_record/relation.rb
+```
+
+Run that as the **last step of any convergence/port story**, once the port is
+verified faithful against `vendor/rails`, and set the entry's `reason` to the
+story id or PR that verified it. Re-pinning preserves an existing `reason`, so
+only floor pins need one added. When a Rails bump reports drift, re-verify the
+port against the new upstream body before re-pinning — never re-pin to silence
+the gate.
+
 Secondary signal: `pnpm test:types` — Vitest typecheck suites in
 `packages/*/dx-tests/` that pin the public type contract and encode DX gaps
 as assertions. When a gap closes, the assertion flips. A dedicated

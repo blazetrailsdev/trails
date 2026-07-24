@@ -35,6 +35,10 @@
  * insensitive to indentation, blank lines, and comments — only a change to the
  * code the body runs moves it.
  *
+ * Adopted policy is HYBRID: the manifest is seeded with a `--pin-all` floor, and
+ * convergence/port stories upgrade individual pins to verified claims via
+ * `--pin <file>` plus a `reason`. See CONTRIBUTING.md "Body pins".
+ *
  * Usage:
  *   tsx body-pins.ts --pin <ruby-file>   # pin/re-pin all pairs in one Ruby file
  *   tsx body-pins.ts --pin-all           # pin/re-pin every matched pair (floor)
