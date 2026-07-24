@@ -167,17 +167,30 @@ function specNullable(spec: SpecOptions): boolean {
   return spec.null ?? true;
 }
 
+function displayPrecision(precision: number | null | undefined): string {
+  return precision === null ? "nil" : (precision ?? "—").toString();
+}
+
 /**
  * Column-option divergences between a schema.rb column and its TEST_SCHEMA
- * counterpart. `limit`, `precision`, and `scale` are compared only where a side
- * states them (an omitted value is the type/adapter default on both sides);
- * `null` and `default` are compared through their Rails defaults.
+ * counterpart. `null` and `default` are compared through their Rails defaults
+ * (omitted `null:` is nullable; see {@link normalizeRailsDefault}); `limit`,
+ * `precision`, and `scale` are compared verbatim, where an omitted value is the
+ * type/adapter default on both sides and `precision: nil` stays distinct from
+ * an omitted precision.
+ *
+ * Two cases are tolerated rather than flagged, mirroring how {@link typesAgree}
+ * already accepts adapter-chosen spellings:
+ *   - a `**splat` option list (`dynamicOptions`) whose keys the parser never
+ *     saw — comparing that partial evidence would manufacture false findings;
+ *   - `precision: null` on the TEST_SCHEMA side paired with a function default,
+ *     the documented bare-DATETIME request that suppresses MySQL's
+ *     auto-precision upgrade for `DEFAULT CURRENT_TIMESTAMP`.
  */
 export function optionMismatches(rails: RailsColumnOptions, spec: ColumnSpec): string[] {
-  // A `**splat` in the Rails options list means we never saw the real keys;
-  // comparing partial evidence would manufacture false divergences.
   if (rails.dynamicOptions) return [];
   const opts = specOptions(spec);
+  const specDefault = normalizeSpecDefault(opts);
   const detail: string[] = [];
 
   if (railsNullable(rails) !== specNullable(opts)) {
@@ -188,25 +201,15 @@ export function optionMismatches(rails: RailsColumnOptions, spec: ColumnSpec): s
       detail.push(`${key}: schema.rb ${rails[key] ?? "—"}, TEST_SCHEMA ${opts[key] ?? "—"}`);
     }
   }
-  // `precision: null` on the TEST_SCHEMA side paired with a function default is
-  // the documented bare-DATETIME request that suppresses MySQL's auto-precision
-  // upgrade for `DEFAULT CURRENT_TIMESTAMP` — an adapter-driven choice, not a
-  // divergence, even when schema.rb omits precision (mirrors typesAgree's
-  // tolerance of adapter-chosen spellings).
-  const precisionIsAdapterDriven = opts.precision === null && normalizeSpecDefault(opts) === "fn";
-  // precision distinguishes `nil` (an explicit bare-DATETIME request) from an
-  // omitted value, so null and undefined are not collapsed.
-  if (
-    !precisionIsAdapterDriven &&
-    ("precision" in rails ? rails.precision : undefined) !== opts.precision
-  ) {
+  const precisionIsAdapterDriven = opts.precision === null && specDefault === "fn";
+  const railsPrecision = "precision" in rails ? rails.precision : undefined;
+  if (!precisionIsAdapterDriven && railsPrecision !== opts.precision) {
     detail.push(
-      `precision: schema.rb ${rails.precision === null ? "nil" : (rails.precision ?? "—")}, ` +
-        `TEST_SCHEMA ${opts.precision === null ? "nil" : (opts.precision ?? "—")}`,
+      `precision: schema.rb ${displayPrecision(railsPrecision)}, ` +
+        `TEST_SCHEMA ${displayPrecision(opts.precision)}`,
     );
   }
   const railsDefault = normalizeRailsDefault(rails.default);
-  const specDefault = normalizeSpecDefault(opts);
   if (railsDefault !== specDefault) {
     detail.push(`default: schema.rb ${railsDefault}, TEST_SCHEMA ${specDefault}`);
   }
