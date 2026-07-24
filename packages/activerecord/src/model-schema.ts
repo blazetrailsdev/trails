@@ -247,6 +247,18 @@ export interface ColumnLike {
   [key: string]: unknown;
 }
 
+/**
+ * DEVIATION (trails): Rails gives EVERY class its own `@columns_hash`/`@columns`
+ * — `inherited` nils the child's ivars (model_schema.rb:574-580) and each
+ * `load_schema!` re-filters `schema_cache.columns_hash(table_name)` by that
+ * class's own `ignored_columns` (:587-594). Ruby classes inherit no ivars, so
+ * there is no base-owns/subclass-inherits split to port. trails memoizes on the
+ * STI base (the schema-host redirect) and carves out only subclasses that
+ * declared their own `ignoredColumns`, because they filter a different column
+ * set than the base does. Converging the rest is story-sized: flipping this to
+ * plain `isStiSubclass(host)` passes everything except
+ * model-schema-sync-load.test.ts:261-280, which asserts the shared memo.
+ */
 function ownsColumnMemo(host: SchemaHost): boolean {
   return isStiSubclass(host) && Object.prototype.hasOwnProperty.call(host, "_ignoredColumns");
 }
