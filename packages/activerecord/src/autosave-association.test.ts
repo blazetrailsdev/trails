@@ -32,6 +32,7 @@ import { Parrot as CanonicalParrot } from "./test-helpers/models/parrot.js";
 import { Bird as CanonicalBird } from "./test-helpers/models/bird.js";
 import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { Invoice } from "./test-helpers/models/invoice.js";
+import { Eye, Iris, IrisWithReadOnlyForeignKey } from "./test-helpers/models/eye.js";
 import { LineItem } from "./test-helpers/models/line-item.js";
 import {
   markForDestruction,
@@ -997,6 +998,11 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
     record.association(name).setTarget(value as any);
   }
   fixtures([]);
+  beforeAll(() => {
+    registerModel(Eye);
+    registerModel(Iris);
+    registerModel(IrisWithReadOnlyForeignKey);
+  });
 
   beforeAll(() => {
     registerModel(CanonicalFirm);
@@ -1141,154 +1147,24 @@ describe("TestDefaultAutosaveAssociationOnAHasOneAssociation", () => {
   });
 
   it("callbacks firing order on create", async () => {
-    const log: string[] = [];
-    class CbFirm extends Base {
-      declare name: string | null;
-      declare cbAccount: CbAccount | null;
-      declare loadHasOne: (name: "cbAccount") => Promise<CbAccount | null>;
-
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.beforeSave(function () {
-          log.push("before_save");
-        });
-        this.afterCreate(function () {
-          log.push("after_create");
-        });
-        this.afterSave(function () {
-          log.push("after_save");
-        });
-        this.hasOne("cbAccount", {
-          autosave: true,
-          className: "CbAccount",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    class CbAccount extends Base {
-      declare credit_limit: number | null;
-      declare firm_id: number | null;
-
-      static {
-        this._tableName = "accounts";
-        this.attribute("credit_limit", "integer");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    registerModel("CbFirm", CbFirm);
-    registerModel("CbAccount", CbAccount);
-    const firm = new CbFirm({ name: "LLC" });
-    const account = new CbAccount({ credit_limit: 100 });
-    cacheAssoc(firm, "cbAccount", account);
-    await firm.save();
-    expect(log).toContain("before_save");
-    expect(log).toContain("after_create");
-    expect(log).toContain("after_save");
-    // before_save should come before after_create
-    expect(log.indexOf("before_save")).toBeLessThan(log.indexOf("after_create"));
-    // after_create before after_save
-    expect(log.indexOf("after_create")).toBeLessThan(log.indexOf("after_save"));
-    // child should be persisted
-    expect(account.isNewRecord()).toBe(false);
+    const eye = await Eye.create({ irisAttributes: { color: "honey" } });
+    expect(eye.afterCreateCallbacksStack).toEqual([true, false]);
   });
+
   it("callbacks firing order on update", async () => {
-    const log: string[] = [];
-    class CuFirm extends Base {
-      declare name: string | null;
-      declare cuAccount: CuAccount | null;
-      declare loadHasOne: (name: "cuAccount") => Promise<CuAccount | null>;
-
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.beforeSave(function () {
-          log.push("before_save");
-        });
-        this.afterUpdate(function () {
-          log.push("after_update");
-        });
-        this.afterSave(function () {
-          log.push("after_save");
-        });
-        this.hasOne("cuAccount", {
-          autosave: true,
-          className: "CuAccount",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    class CuAccount extends Base {
-      declare credit_limit: number | null;
-      declare firm_id: number | null;
-
-      static {
-        this._tableName = "accounts";
-        this.attribute("credit_limit", "integer");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    registerModel("CuFirm", CuFirm);
-    registerModel("CuAccount", CuAccount);
-    const firm = await CuFirm.create({ name: "LLC" });
-    log.length = 0;
-    firm.name = "Updated LLC";
-    const account = new CuAccount({ credit_limit: 200 });
-    cacheAssoc(firm, "cuAccount", account);
-    await firm.save();
-    expect(log).toContain("before_save");
-    expect(log).toContain("after_update");
-    expect(log).toContain("after_save");
-    expect(log.indexOf("before_save")).toBeLessThan(log.indexOf("after_update"));
-    expect(log.indexOf("after_update")).toBeLessThan(log.indexOf("after_save"));
-    expect(account.isNewRecord()).toBe(false);
+    const eye = await Eye.create({ irisAttributes: { color: "honey" } });
+    await eye.update({ irisAttributes: { color: "green" } });
+    expect(eye.afterUpdateCallbacksStack).toEqual([true, false]);
   });
+
   it("callbacks firing order on save", async () => {
-    const log: string[] = [];
-    class CsFirm extends Base {
-      declare name: string | null;
-      declare csAccount: CsAccount | null;
-      declare loadHasOne: (name: "csAccount") => Promise<CsAccount | null>;
+    const eye = await Eye.create({ irisAttributes: { color: "honey" } });
+    expect(eye.afterSaveCallbacksStack).toEqual([false, false]);
 
-      static {
-        this._tableName = "companies";
-        this.attribute("name", "string");
-        this.beforeSave(function () {
-          log.push("before_save");
-        });
-        this.afterSave(function () {
-          log.push("after_save");
-        });
-        this.hasOne("csAccount", {
-          autosave: true,
-          className: "CsAccount",
-          foreignKey: "firm_id",
-        });
-      }
-    }
-    class CsAccount extends Base {
-      declare credit_limit: number | null;
-      declare firm_id: number | null;
-
-      static {
-        this._tableName = "accounts";
-        this.attribute("credit_limit", "integer");
-        this.attribute("firm_id", "integer");
-      }
-    }
-    registerModel("CsFirm", CsFirm);
-    registerModel("CsAccount", CsAccount);
-    const firm = await CsFirm.create({ name: "LLC" });
-    log.length = 0;
-    const account = new CsAccount({ credit_limit: 10 });
-    cacheAssoc(firm, "csAccount", account);
-    firm.name = "Updated";
-    await firm.save();
-    expect(log).toContain("before_save");
-    expect(log).toContain("after_save");
-    expect(log.indexOf("before_save")).toBeLessThan(log.indexOf("after_save"));
-    expect(account.isNewRecord()).toBe(false);
+    await eye.update({ irisAttributes: { color: "blue" } });
+    expect(eye.afterSaveCallbacksStack).toEqual([false, false, false, false]);
   });
+
   it("callbacks on child when parent autosaves child", async () => {
     const log: string[] = [];
     class CbParent extends Base {
