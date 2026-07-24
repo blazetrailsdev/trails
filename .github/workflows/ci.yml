@@ -124,8 +124,8 @@ jobs:
           # tooling's vitest suites — api-compare, test-compare,
           # fixtures-compare, test-deps, rails-find, parity and the top-level
           # scripts/*.test.ts files — so every one of those is also listed in
-          # UNIT_TESTS_PKGS_RE, while schema-compare's and parity/query/node's
-          # suites are steps of rails-comparison (COMPARISON_RE).
+          # UNIT_TESTS_PKGS_RE, while schema-compare's suite is a step of
+          # rails-comparison (COMPARISON_RE).
           # scripts/ci-suite-coverage.test.ts enforces that pairing: it fails
           # if a tooling test file is neither named in a ci.yml vitest
           # invocation nor on its KNOWN_UNRUN list.
@@ -242,11 +242,7 @@ jobs:
           # explicitly: all are carved out of the infra sweep
           # (INFRA_CARVEOUT_RE), so this clause is the only thing that still
           # runs rails-comparison on a change confined to them.
-          # parity/query/node/ is here for the same reason: its two runner
-          # suites need built package dists (assert-packages-built.ts), and
-          # rails-comparison is the only affected-gated job that runs
-          # `pnpm build`.
-          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|parity/query/node/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$)'
+          COMPARISON_RE='^(packages/|scripts/((api|test|fixtures|schema)-compare/|(build-rails-privates-manifest|build-rails-file-structure-manifest|rails-file-structure-mixins)\.ts$)|vendor/|docs/ruby-ts-conventions\.md$)'
           force_all_affected() {
             echo "activerecord_affected=true" >> "$GITHUB_OUTPUT"
             echo "actionpack_affected=true"   >> "$GITHUB_OUTPUT"
@@ -675,12 +671,13 @@ jobs:
       # they resolve @blazetrails/* through package `main` entries, so the
       # dist/ trees have to exist before vitest starts.
       - run: pnpm build
-      # The scripts/* suites here are the compare/parity tooling's own unit
-      # tests. They need neither Ruby nor a `pnpm build`, so they ride this
-      # cheap job. Two suites are deliberately elsewhere: scripts/schema-compare
-      # (parses the real vendored test/schema/schema.rb) and
-      # scripts/parity/query/node (needs built package dists) both run as steps
-      # of rails-comparison, which fetches vendor/ and builds.
+      # The scripts/* suites added here are the compare tooling's own unit
+      # tests; none needs Ruby or the `pnpm build` above (that step exists for
+      # parity/query/node, which #5264 already wired in — the whole
+      # scripts/parity tree now passes, so one filter covers it).
+      # scripts/schema-compare is the one suite that belongs elsewhere: it
+      # parses the REAL vendored test/schema/schema.rb, so it runs as a step of
+      # rails-comparison, the job that fetches vendor/.
       - run: >
           pnpm vitest run
           packages/arel
@@ -693,12 +690,10 @@ jobs:
           scripts/fixtures-compare
           scripts/test-deps
           scripts/rails-find
-          scripts/parity/query/diff.test.ts
-          scripts/parity/schema
+          scripts/parity
           scripts/strip-asany.test.ts
           scripts/rails-file-structure-mixins.test.ts
           scripts/ci-suite-coverage.test.ts
-          scripts/parity/query/node
 
   # Consolidated leaf-test job. The cheapest sub-minute leaf suites — rack
   # (~27 s), actionview (~26 s), tse-compiler (~22 s), and the DX type tests
@@ -1368,12 +1363,6 @@ jobs:
         # signal after the vendor:fetch step above — hence here rather than in
         # the unit-tests job, where the rest of the compare tooling's tests run.
         run: pnpm vitest run scripts/schema-compare
-      - name: Parity query runner tests
-        # scripts/parity/query/node/{dump,ar_dump}.test.ts spawn the runners,
-        # which resolve @blazetrails/* through package `main` -> dist/index.js
-        # (assert-packages-built.ts). This job's `pnpm build` step above is what
-        # makes them runnable; unit-tests does not build.
-        run: pnpm vitest run scripts/parity/query/node
       - name: Dependency lint
         run: pnpm exec tsx scripts/api-compare/lint-deps.ts
       - name: Rails-private JSDoc lint
@@ -1740,7 +1729,6 @@ jobs:
                 rails-comparison)
                   # Legitimate skip when no comparison-relevant path changed
                   # (no packages/**, scripts/{api,test,fixtures,schema}-compare/**,
-                  # scripts/parity/query/node/**,
                   # vendor/**, or cross-cutting infra).
                   [ "$COMPARISON_AFFECTED" = "false" ] && continue
                   ;;
