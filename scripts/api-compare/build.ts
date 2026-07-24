@@ -202,8 +202,17 @@ export function reconcileFileText(
 
   const visit = (node: ts.Node): void => {
     let name: string | null = null;
+    // KNOWN LIMITATION: expectations are keyed by bare identifier name per
+    // file (mirroring compare.ts's tsCallsByFileName), so two same-named
+    // methods in one file (STI siblings, mixin + host, get/set accessor
+    // pairs) are reconciled against the SAME expected-call set. Unlike the
+    // lints this tool writes to source, so a shared name can stamp tags onto
+    // a sibling they don't belong to — qualify by class if this ever bites.
     if (
-      (ts.isFunctionDeclaration(node) || ts.isMethodDeclaration(node) || ts.isGetAccessor(node)) &&
+      (ts.isFunctionDeclaration(node) ||
+        ts.isMethodDeclaration(node) ||
+        ts.isGetAccessor(node) ||
+        ts.isSetAccessor(node)) &&
       node.name &&
       ts.isIdentifier(node.name)
     ) {

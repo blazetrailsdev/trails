@@ -92,6 +92,15 @@ describe("reconcileFileText", () => {
     expect(second.text).toBeNull();
   });
 
+  it("reconciles set accessors (extract-ts-api extracts them into the artifact)", () => {
+    const src = ["export class Foo {", "  set name(v: string) {}", "}"].join("\n");
+    const expectations = new Map([
+      ["name", { rubyName: "name=", calls: new Set(["write_attribute"]) }],
+    ]);
+    const { text } = reconcileFileText("foo.ts", src, expectations, () => "why");
+    expect(text!).toContain("@missingRailsCall write_attribute — why");
+  });
+
   it("removes a tags-only JSDoc entirely once all calls converge", () => {
     const src = [
       "export class Foo {",
