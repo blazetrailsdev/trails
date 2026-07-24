@@ -24,6 +24,7 @@
 import * as fs from "fs";
 import * as path from "path";
 import { fileURLToPath } from "url";
+import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 // @ts-expect-error — .mjs rule module has no type declarations.
 import { macroOfCall, siteKey, repoRel } from "../eslint/no-standalone-associations.mjs";
 
@@ -73,7 +74,7 @@ async function main(): Promise<void> {
   }
 
   const arr = [...keys].sort();
-  fs.writeFileSync(OUT_PATH, JSON.stringify(arr, null, 2) + "\n");
+  writeJsonManifest(OUT_PATH, arr);
   console.log(`Wrote ${OUT_PATH}: ${arr.length} grandfathered sites`);
 }
 

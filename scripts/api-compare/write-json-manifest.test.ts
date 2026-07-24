@@ -151,4 +151,17 @@ describe("manifest emitters", () => {
       );
     }
   });
+
+  it("ratchet/exclude generators emit via writeJsonManifest", () => {
+    const generators = [
+      "generate-no-explicit-any-allowlist.ts",
+      "generate-fixture-parity-exclude.ts",
+      "generate-standalone-associations-exclude.ts",
+    ];
+    for (const name of generators) {
+      const src = fs.readFileSync(path.join(REPO_ROOT, "scripts", name), "utf8");
+      expect(src, `${name} must emit via writeJsonManifest`).toMatch(/\bwriteJsonManifest\b/);
+      expect(src, `${name} must not hand-format JSON`).not.toMatch(/JSON\.stringify/);
+    }
+  });
 });

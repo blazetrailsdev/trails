@@ -15,9 +15,8 @@
  * Output: eslint/test-fixture-parity-exclude.json (committed).
  * Run via `pnpm fixture-parity-baseline:refresh`.
  */
-// fs/path bare per convention; sync fs acceptable in a one-shot CLI generator.
-import * as fs from "fs";
 import * as path from "path";
+import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
 
 // Capture the full violation set: neutralize the committed exclude so already
 // excluded files are still re-evaluated (otherwise the baseline can never grow
@@ -41,7 +40,7 @@ async function main(): Promise<void> {
   }
 
   const arr = [...files].sort();
-  fs.writeFileSync(OUT_PATH, JSON.stringify(arr, null, 2) + "\n");
+  writeJsonManifest(OUT_PATH, arr);
   console.log(`Wrote ${OUT_PATH}: ${arr.length} excluded files`);
 }
 
