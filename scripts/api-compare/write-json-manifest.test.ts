@@ -4,7 +4,11 @@ import * as os from "os";
 import * as path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
-import { writeJsonManifest } from "./write-json-manifest.js";
+import {
+  writeJsonManifest,
+  beginManifestBatch,
+  flushManifestBatch,
+} from "./write-json-manifest.js";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PRETTIER_BIN = path.join(REPO_ROOT, "node_modules/.bin/prettier");
@@ -84,6 +88,48 @@ describe("writeJsonManifest", () => {
     const out = tmpManifest();
     writeJsonManifest(out, SAMPLE);
     expect(JSON.parse(fs.readFileSync(out, "utf8"))).toEqual(SAMPLE);
+  });
+
+  it("buffers writes in memory until flush, then formats every path", () => {
+    const a = tmpManifest();
+    const b = tmpManifest();
+    beginManifestBatch();
+    writeJsonManifest(a, SAMPLE);
+    writeJsonManifest(b, SAMPLE);
+    // Nothing touches disk until the batch flushes.
+    expect(fs.existsSync(a)).toBe(false);
+    expect(fs.existsSync(b)).toBe(false);
+    flushManifestBatch();
+    expect(prettierCheck(a)).toBe(true);
+    expect(prettierCheck(b)).toBe(true);
+  });
+
+  it("leaves the tracked file untouched when a batch is abandoned before flush", () => {
+    const out = tmpManifest();
+    fs.writeFileSync(out, "sentinel\n");
+    beginManifestBatch();
+    writeJsonManifest(out, SAMPLE);
+    // A throw between begin and flush must not churn the committed bytes.
+    expect(fs.readFileSync(out, "utf8")).toBe("sentinel\n");
+    flushManifestBatch();
+    expect(prettierCheck(out)).toBe(true);
+  });
+
+  it("leaves no temp files beside a committed manifest", () => {
+    const out = tmpManifest();
+    writeJsonManifest(out, SAMPLE);
+    const strays = fs.readdirSync(path.dirname(out)).filter((f) => f.includes(".tmp."));
+    expect(strays).toEqual([]);
+  });
+
+  it("batches to output byte-identical to the immediate path", () => {
+    const immediate = tmpManifest();
+    writeJsonManifest(immediate, SAMPLE);
+    const batched = tmpManifest();
+    beginManifestBatch();
+    writeJsonManifest(batched, SAMPLE);
+    flushManifestBatch();
+    expect(fs.readFileSync(batched, "utf8")).toBe(fs.readFileSync(immediate, "utf8"));
   });
 });
 

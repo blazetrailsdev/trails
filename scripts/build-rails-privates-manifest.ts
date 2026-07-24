@@ -31,7 +31,11 @@ import * as path from "path";
 import { fileURLToPath } from "url";
 import { rubyMethodToTs, rubyFileToTs } from "./api-compare/conventions.js";
 import { libPathsManifest } from "../vendor/sources.js";
-import { writeJsonManifest } from "./api-compare/write-json-manifest.js";
+import {
+  writeJsonManifest,
+  beginManifestBatch,
+  flushManifestBatch,
+} from "./api-compare/write-json-manifest.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -53,6 +57,10 @@ const PACKAGE_DIRS: Record<string, string> = {
 const RAILS_API_PATH = path.join(ROOT, "scripts/api-compare/output/rails-api.json");
 const OUT = path.join(ROOT, "eslint/rails-private-methods.json");
 
+// This script emits three manifests per run. Collect their writes and format
+// them all in one prettier spawn (~330ms of startup, once instead of thrice).
+beginManifestBatch();
+
 // The deprecation-parity manifest scans the vendored Ruby source directly and
 // does NOT depend on rails-api.json, so emit it up front — before the early
 // exit below that fires when rails-api.json is missing.
@@ -65,6 +73,7 @@ emitCallbackInvocationsManifest();
 
 if (!fs.existsSync(RAILS_API_PATH)) {
   writeJsonManifest(OUT, { files: {} });
+  flushManifestBatch();
   console.warn(
     `[build-rails-privates-manifest] ${RAILS_API_PATH} missing; wrote empty manifest. ` +
       `Run \`pnpm api:compare\` to regenerate with real data.`,
@@ -224,6 +233,7 @@ for (const k of Object.keys(manifest.files).sort()) sortedFiles[k] = manifest.fi
 const final: Manifest = { files: sortedFiles };
 
 writeJsonManifest(OUT, final);
+flushManifestBatch();
 const fileCount = Object.keys(final.files).length;
 const fileNames = Object.values(final.files).reduce((n, a) => n + a.length, 0);
 console.log(`Wrote ${OUT} — ${fileCount} files (${fileNames} names)`);
