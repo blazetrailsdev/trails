@@ -273,31 +273,21 @@ function frameworkBase(model: typeof Base): typeof Base | null {
 }
 
 /**
- * Guard against a bespoke inline model silently shadowing a canonical one.
- *
- * The model registry is global and is never torn down between tests, so
- * `registerModel("Author", BespokeAuthor)` inside one test overwrites the name
- * for every LATER test in the file — a later test naming the canonical `Author`
- * as an association target then resolves to the bespoke class. The failure mode
- * is a wrong value, not an error (a through-chain collapses from length 3 to 1),
- * so it never announces itself.
- *
- * We throw only when the name is owned by a canonical model (present in the
- * autoload index) AND a *different* class is being registered under it.
- * Re-registering the same canonical class (its own self-registration, or an
- * autoload fault-in) is legitimate and passes, as does any bespoke name the
- * canonical index doesn't claim.
+ * Throw when a bespoke class is registered under a name a canonical model
+ * already owns. The registry is global and never torn down between tests, so
+ * such a shadow silently poisons every later test that resolves the name as an
+ * association target (a wrong value, not an error). Fires only when the name is
+ * in the canonical autoload index AND the class differs, so re-registering the
+ * canonical class itself (self-registration or autoload fault-in) still passes.
  * @internal
  */
 function guardCanonicalNameShadow(name: string, model: typeof Base): void {
   const canonical = canonicalModelAutoloadIndex?.get(name);
   if (canonical && canonical !== model) {
     throw new Error(
-      `registerModel(${JSON.stringify(name)}, …) would shadow the canonical model ` +
-        `of the same name in the global registry. Because the registry is never torn ` +
-        `down between tests, this poisons every later test that resolves ${JSON.stringify(name)} ` +
-        `as an association target. Use the canonical model, or register the bespoke class ` +
-        `under a distinct, non-canonical name.`,
+      `registerModel(${JSON.stringify(name)}, …) would shadow the canonical model of the ` +
+        `same name in the global registry, poisoning every later test that resolves it as an ` +
+        `association target. Use the canonical model, or a distinct non-canonical name.`,
     );
   }
 }

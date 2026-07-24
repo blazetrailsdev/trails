@@ -48,9 +48,6 @@ import { fixtures } from "./test-helpers/fixtures.js";
 fixtures(["topics"]);
 
 describe("ReflectionTest", () => {
-  // Bespoke reconstruction: the canonical Author/Book have no books/profile/
-  // chapters associations, so these use non-canonical names to avoid shadowing
-  // the canonical models in the global registry (see the registerModel guard).
   function makeModels() {
     class RfAuthor extends Base {
       declare name: string | null;
@@ -413,8 +410,6 @@ describe("ReflectionTest", () => {
     expect(ref!.macro).toBe("hasOne");
   });
   it("has many through reflection", () => {
-    // Bespoke reconstruction under non-canonical names — the canonical
-    // Subscriber/Subscription have their own (different) association graph.
     class RfSubscriber extends Base {
       declare name: string | null;
       declare subscriptions: AssociationProxy<RfSubscription>;
@@ -463,8 +458,6 @@ describe("ReflectionTest", () => {
   });
 
   it("has and belongs to many reflection", () => {
-    // Rails: Category.reflections["posts"].macro == :has_and_belongs_to_many;
-    // Category.reflect_on_all_associations(:habtm).first.name == :posts.
     expect(reflectOnAssociation(Category, "posts")!.macro).toBe("hasAndBelongsToMany");
     const refs = reflectOnAllAssociations(Category, "hasAndBelongsToMany");
     expect(refs.length).toBeGreaterThanOrEqual(1);
@@ -568,8 +561,6 @@ describe("ReflectionTest", () => {
     expect(ref!.klass).toBe(RfAddress);
   });
   it("reflection klass with same demodularized different modularized name", async () => {
-    // Non-canonical namespaces so the bespoke classes don't shadow the canonical
-    // Admin::User / NestedUser in the global registry.
     class RfNestedUser extends Base {
       declare name: string | null;
 
@@ -660,24 +651,30 @@ describe("ReflectionTest", () => {
     expect(specialRef.associationPrimaryKey).toBe("isbn");
   });
   it("association primary key raises when missing primary key", () => {
-    // Rails: create(:has_many, :edge, nil, {}, Author).association_primary_key
-    // raises — the canonical Edge table has no primary key.
-    const reflection = createReflection("hasMany", "edge", null, {}, Author);
-    expect(() => (reflection as AssociationReflection).associationPrimaryKey).toThrow(
-      UnknownPrimaryKey,
-    );
+    const reflection = createReflection(
+      "hasMany",
+      "edge",
+      null,
+      {},
+      Author,
+    ) as AssociationReflection;
+    expect(() => reflection.associationPrimaryKey).toThrow(UnknownPrimaryKey);
+
+    class ThroughSub extends ThroughReflection {
+      get sourceReflection(): AssociationReflection {
+        return reflection;
+      }
+    }
+    const through = new ThroughSub(reflection);
+    expect(() => through.associationPrimaryKey).toThrow(UnknownPrimaryKey);
   });
   it("active record primary key raises when missing primary key", () => {
-    // Rails: create(:has_many, :author, nil, {}, Edge).active_record_primary_key
-    // raises — Edge (the owning record) has no primary key.
     const reflection = createReflection("hasMany", "author", null, {}, Edge);
     expect(() => (reflection as AssociationReflection).activeRecordPrimaryKey).toThrow(
       UnknownPrimaryKey,
     );
   });
   it("foreign type", () => {
-    // Rails: Sponsor.reflect_on_association(:sponsorable/:thing).foreign_type;
-    // :sponsor_club has no foreign_type. Canonical Sponsor mirrors this exactly.
     const polyRef = reflectOnAssociation(Sponsor, "sponsorable");
     expect(polyRef!.foreignType).toBe("sponsorable_type");
     const thingRef = reflectOnAssociation(Sponsor, "thing");
@@ -686,9 +683,6 @@ describe("ReflectionTest", () => {
     expect(normalRef!.foreignType).toBeNull();
   });
   it("default association validation", () => {
-    // Rails builds the reflection directly off canonical Firm via
-    // Reflection.create and checks validate? — has_many defaults on, the
-    // singular macros default off.
     expect(createReflection("hasMany", "clients", null, {}, Firm).validate).toBe(true);
     expect(createReflection("hasOne", "client", null, {}, Firm).validate).toBe(false);
     expect(createReflection("belongsTo", "client", null, {}, Firm).validate).toBe(false);
@@ -733,8 +727,6 @@ describe("ReflectionTest", () => {
     // UNPORTED: Ruby Symbol type for className has no JS equivalent.
   });
   it("class for class name", () => {
-    // Rails: create(:has_many, :clients, nil, { class_name: Client }, Firm)
-    // raises ArgumentError because a class was passed instead of a string.
     expect(() =>
       createReflection(
         "hasMany",
@@ -850,8 +842,6 @@ describe("ReflectionTest", () => {
     expect(ref!.joinTable).toBe("product_categories");
   });
   it("includes accepts strings", async () => {
-    // Rails: Hotel.create!; hotel.departments.create!; department.chefs.create!;
-    // Hotel.includes(["departments" => "chefs"]).first.chefs — canonical models.
     const hotel = await CanonicalHotel.create({});
     const dept = await Department.create({ hotel_id: hotel.id });
     await Chef.create({ department_id: dept.id });
@@ -1456,7 +1446,6 @@ describe("ReflectionTest", () => {
   });
 
   it("includes accepts symbols", async () => {
-    // Canonical Hotel/Department/Chef (Rails `[departments: :chefs]`).
     const hotel = await CanonicalHotel.create({});
     const dept = await Department.create({ hotel_id: hotel.id });
     const chef = await Chef.create({ department_id: dept.id });
@@ -1540,8 +1529,6 @@ describe("ReflectionTest", () => {
   });
 
   it("using query constraints warns about changing behavior", () => {
-    // Canonical Firm — the guard rejects the queryConstraints option regardless
-    // of the association graph already declared on Firm.
     expect(() =>
       Associations.hasMany.call(Firm, "clients", {
         queryConstraints: ["firm_id", "firm_name"],
