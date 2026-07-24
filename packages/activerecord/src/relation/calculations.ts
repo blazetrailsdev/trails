@@ -472,9 +472,9 @@ async function singleAggregate(
 }
 
 /**
- * Every calculation arm (including all of `perform_count`'s managers) runs
- * `select_all` on the relation's own arel, and
- * `build_arel` emits `arel.having(having_clause.ast) unless having_clause.empty?`
+ * Every calculation arm — including each of `performCount`'s managers — runs
+ * `select_all` on the relation's own arel, and `build_arel` emits
+ * `arel.having(having_clause.ast) unless having_clause.empty?`
  * unconditionally — with or without a GROUP BY (query_methods.rb:1756). Our arms
  * project explicitly instead of reusing `build_arel`, so the having clause has to
  * be re-applied by hand.

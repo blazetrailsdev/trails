@@ -293,16 +293,17 @@ describe("ungrouped calculation HAVING", () => {
   it("emits HAVING with no GROUP BY on the count paths", async () => {
     const { Account } = await import("./test-helpers/models/account.js");
     const total = (await Account.count()) as number;
+    const credited = (await Account.where("credit_limit IS NOT NULL").count()) as number;
     expect(total).toBeGreaterThan(1);
-    // Plain COUNT(*), COUNT(DISTINCT pk) and the limited count-subquery path all
-    // build their own managers; each has to carry the having clause.
+    expect(credited).toBeGreaterThan(1);
+
     expect(await Account.having("count(*) > 1").count()).toBe(total);
     expect(await Account.having("count(*) > 100000").count()).toBe(0);
+
+    expect(await Account.having("count(*) > 1").count("credit_limit")).toBe(credited);
+    expect(await Account.having("count(*) > 100000").count("credit_limit")).toBe(0);
+
     expect(await Account.distinct().having("count(*) > 1").count()).toBe(total);
     expect(await Account.distinct().having("count(*) > 100000").count()).toBe(0);
-    // The limited count-subquery path also carries the clause (Rails puts it in
-    // the inner query, per `build_count_subquery`), but it can't be asserted
-    // here: that inner query projects `1 AS one`, and SQLite rejects a HAVING
-    // clause on a non-aggregate query outright.
   });
 });
