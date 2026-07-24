@@ -1174,18 +1174,6 @@ export class Base extends Model {
     typeName?: string | Type | AttributeOptions,
     options?: AttributeOptions,
   ): void {
-    // Shared-table STI subclasses share the schema host's `_attributeDefinitions`
-    // — matching Rails' `ActiveRecord::Inheritance` where `attribute_types` is a
-    // shared `class_attribute`. Route the registration through the schema host so
-    // `Circle.attribute("radius", ...)` lands on `Shape._attributeDefinitions`
-    // instead of forking a subclass-local map that later schema reflection on the
-    // host wouldn't see. An own-table descendant IS its own host, so its
-    // declarations stay on itself.
-    const schemaHost = ModelSchema.stiSchemaHost(this as unknown as { tableName: string });
-    if ((schemaHost as unknown as typeof Base) !== this) {
-      (schemaHost as unknown as typeof Base).attribute(name, typeName, options);
-      return;
-    }
     super.attribute(name, typeName, options);
     // Rails' `attribute` ends in `reload_schema_from_cache`, which nils
     // `@attribute_names` recursively.
@@ -1364,7 +1352,10 @@ export class Base extends Model {
    */
   static async loadSchema(this: typeof Base): Promise<void> {
     const state = this as unknown as { _schemaLoadPromise?: Promise<void> };
-    if (!state._schemaLoadPromise) {
+    if (
+      !Object.prototype.hasOwnProperty.call(this, "_schemaLoadPromise") ||
+      !state._schemaLoadPromise
+    ) {
       state._schemaLoadPromise = (ModelSchema.loadSchemaFromAdapter as any).call(this);
     }
     try {
@@ -1373,11 +1364,6 @@ export class Base extends Model {
       state._schemaLoadPromise = undefined;
       throw e;
     }
-    // An STI subclass INHERITS the base's `_schemaLoadPromise`, so it awaits the
-    // base's load and `applyColumnsHash` never runs with this subclass as the
-    // originating host. Re-sync its overlay here, or a subclass that forked
-    // `_attributeDefinitions` stays pinned to pre-reflection definitions.
-    ModelSchema.syncStiSubclassAttributeDefinitions(this as never);
   }
 
   /**
@@ -4584,10 +4570,7 @@ export class Base extends Model {
       return name;
     } else if (this.abstractClass) {
       return `${name}(abstract)`;
-    } else if (
-      !((this as { _schemaLoaded?: boolean })._schemaLoaded ?? false) &&
-      !this.isConnectedQ()
-    ) {
+    } else if (!ModelSchema.isSchemaLoaded.call(this as never) && !this.isConnectedQ()) {
       return `${name} (call '${name}.load_schema' to load schema informations)`;
     }
     // Schema is loaded (or a live connection is available): list the columns'

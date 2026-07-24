@@ -12,8 +12,6 @@ import {
   type Type,
 } from "@blazetrails/activemodel";
 import {
-  isStiSubclass,
-  getStiBase,
   isBaseClass,
   baseClass,
   getAbstractClass,
@@ -43,29 +41,64 @@ function reflectionAdapter(klass: any): any {
   return threadedConnectionFor(klass) ?? klass.connection;
 }
 
-// `getStiBase` climbs to the TOPMOST `_inheritanceColumn` ancestor, which is the
-// wrong schema host as soon as an intermediate descendant claims its own table
-// (Shape → Circle → Ticket → VIPTicket, Ticket = "tickets"): the schema host for
-// VIPTicket is Ticket, not Shape. Walk to the topmost ancestor that still shares
-// the receiver's table instead.
-export function stiSchemaHost<T extends { tableName: string }>(klass: T): T {
-  if (!isStiSubclass(klass)) return klass;
-  const table = klass.tableName;
-  let host = klass;
-  let current = Object.getPrototypeOf(klass) as (T & { _abstractClass?: boolean }) | null;
-  while (current && current !== (Function.prototype as unknown)) {
-    if (getAbstractClass.call(current as any)) break;
-    let ancestorTable: string | undefined;
-    try {
-      ancestorTable = current.tableName;
-    } catch {
+/**
+ * Global so `_schemaRevision` values stay comparable ACROSS the prototype
+ * chain — {@link schemaStaleAgainstAncestors} depends on that ordering.
+ *
+ * @internal
+ */
+let schemaEpoch = 0;
+
+function nextSchemaEpoch(): number {
+  return ++schemaEpoch;
+}
+
+function ownProp<K extends keyof SchemaHost>(host: SchemaHost, key: K): SchemaHost[K] | undefined {
+  return Object.prototype.hasOwnProperty.call(host, key) ? host[key] : undefined;
+}
+
+/**
+ * Stands in for Rails reaching descendants through DescendantsTracker's
+ * `inherited` hook (model_schema.rb:566-570); JS has no equivalent for classes
+ * that never called `registerSubclass`.
+ *
+ * Memoized against {@link schemaEpoch}: this runs on every schema-memo read,
+ * including the `new Model()` hot path, and nothing can go stale without some
+ * class stamping a fresh epoch.
+ *
+ * @internal
+ */
+export function schemaStaleAgainstAncestors(host: SchemaHost): boolean {
+  const cached = ownProp(host, "_staleCheck");
+  if (cached && cached.epoch === schemaEpoch) return cached.stale;
+
+  const own = ownProp(host, "_schemaRevision") ?? 0;
+  let stale = false;
+  let current = Object.getPrototypeOf(host) as SchemaHost | null;
+  while (current && (current as unknown) !== Function.prototype) {
+    if ((ownProp(current, "_schemaRevision") ?? 0) > own) {
+      stale = true;
       break;
     }
-    if (ancestorTable !== table) break;
-    host = current;
-    current = Object.getPrototypeOf(current) as typeof current;
+    current = Object.getPrototypeOf(current) as SchemaHost | null;
   }
-  return host;
+  host._staleCheck = { epoch: schemaEpoch, stale };
+  return stale;
+}
+
+/**
+ * Ruby class ivars are not inherited, but JS `static` members ARE — a bare
+ * `this._columnsHash` read on a subclass would see the base's memo and skip the
+ * subclass's own `load_schema!` (model_schema.rb:587-597).
+ *
+ * @internal
+ */
+function ownSchemaMemo<K extends keyof SchemaHost>(
+  host: SchemaHost,
+  key: K,
+): SchemaHost[K] | undefined {
+  if (!Object.prototype.hasOwnProperty.call(host, key)) return undefined;
+  return schemaStaleAgainstAncestors(host) ? undefined : host[key];
 }
 
 /**
@@ -238,7 +271,7 @@ export function columnNames(this: typeof Base): string[] {
     : undefined;
   if (memo && memo.revision === (host._schemaRevision ?? 0)) return memo.names as string[];
   const names = this.columns().map((c: { name: string }) => c.name);
-  if (host._schemaLoaded) {
+  if (ownSchemaMemo(host, "_schemaLoaded")) {
     const frozen = Object.freeze(names);
     host._columnNamesMemo = { revision: host._schemaRevision ?? 0, names: frozen };
     return frozen as string[];
@@ -273,30 +306,6 @@ export interface ColumnLike {
 }
 
 /**
- * DEVIATION (trails): Rails gives EVERY class its own `@columns_hash`/`@columns`
- * — `inherited` nils the child's ivars (model_schema.rb:574-580) and each
- * `load_schema!` re-filters `schema_cache.columns_hash(table_name)` by that
- * class's own `ignored_columns` (:587-594). Ruby classes inherit no ivars, so
- * there is no base-owns/subclass-inherits split to port. trails memoizes on the
- * STI base (the schema-host redirect) and carves out only subclasses that
- * declared their own `ignoredColumns`, because they filter a different column
- * set than the base does. Converging the rest is story-sized: flipping this to
- * plain `isStiSubclass(host)` passes everything except
- * model-schema-sync-load.test.ts:261-280, which asserts the shared memo.
- */
-function ownsColumnMemo(host: SchemaHost): boolean {
-  return isStiSubclass(host) && Object.prototype.hasOwnProperty.call(host, "_ignoredColumns");
-}
-
-function columnMemo<K extends "_columnsHash" | "_columns">(
-  host: SchemaHost,
-  key: K,
-): SchemaHost[K] | undefined {
-  if (ownsColumnMemo(host) && !Object.prototype.hasOwnProperty.call(host, key)) return undefined;
-  return host[key];
-}
-
-/**
  * Return a hash of column definitions keyed by name.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#columns_hash
@@ -305,29 +314,22 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   // load_schema! raises TableNotSpecified for abstract (table-less) classes.
   loadSchema.call(this as SchemaHost);
 
-  const memoHost = this as unknown as SchemaHost;
-  const ownsMemo = ownsColumnMemo(memoHost);
-  const memo = columnMemo(memoHost, "_columnsHash");
-  if (memo != null) return memo as Record<string, ColumnLike>;
+  const memoized = ownSchemaMemo(this as unknown as SchemaHost, "_columnsHash");
+  if (memoized != null) return memoized as Record<string, ColumnLike>;
 
   const klass = this;
-  const stiTarget = stiSchemaHost(klass);
-  const candidates = stiTarget === klass ? [klass] : [stiTarget, klass];
   let adapter: DatabaseAdapterLike | null = null;
-  for (const cand of candidates) {
-    try {
-      adapter = reflectionAdapter(cand) as DatabaseAdapterLike;
-    } catch {
-      adapter = null;
-    }
-    if (adapter) break;
+  try {
+    adapter = reflectionAdapter(klass) as DatabaseAdapterLike;
+  } catch {
+    adapter = null;
   }
   const cache = adapter?.schemaCache as
     | {
         getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined;
       }
     | undefined;
-  const table = stiTarget.tableName;
+  const table = klass.tableName;
   // Gate on the same map we read (`_columnsHash` via getCachedColumnsHash),
   // not `isCached` (which checks `_columns`): a populated `_columns` without a
   // matching `_columnsHash` entry would otherwise pass the guard, return
@@ -342,7 +344,6 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
         if (ignored.has(k)) continue;
         filtered[k] = v;
       }
-      if (ownsMemo && memoHost._schemaLoaded) memoHost._columnsHash = filtered;
       return filtered;
     }
   }
@@ -362,7 +363,6 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
       ...(fn != null ? { defaultFunction: fn } : {}),
     };
   }
-  if (ownsMemo && memoHost._schemaLoaded) memoHost._columnsHash = result;
   return result;
 }
 
@@ -384,12 +384,11 @@ type DatabaseAdapterLike = { schemaCache?: unknown };
  * columns that carry no client-side default anyway.
  */
 export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike> {
-  const target = stiSchemaHost(klass);
   const cachedFrom = (conn: { schemaCache?: unknown } | null | undefined) => {
     const cache = conn?.schemaCache as
       | { getCachedColumnsHash?: (t: string) => Record<string, ColumnLike> | undefined }
       | undefined;
-    return cache?.getCachedColumnsHash?.(target.tableName);
+    return cache?.getCachedColumnsHash?.(klass.tableName);
   };
   // Read the warm schema cache off an already-available connection — the
   // threaded (in-query) one, else a connection the pool has already leased.
@@ -397,8 +396,8 @@ export function cachedColumnsHash(klass: typeof Base): Record<string, ColumnLike
   // hot `new Model()` path and never forces a permanent checkout.
   try {
     const hash =
-      cachedFrom(threadedConnectionFor(target)) ??
-      cachedFrom(connectionPool.call(target).activeConnection as { schemaCache?: unknown } | null);
+      cachedFrom(threadedConnectionFor(klass)) ??
+      cachedFrom(connectionPool.call(klass).activeConnection as { schemaCache?: unknown } | null);
     if (hash) return hash;
   } catch {
     /* fall through */
@@ -598,15 +597,10 @@ interface SchemaHost {
   _attributesBuilder?: any;
   _schemaLoaded?: boolean;
   _virtualAttributesReconciled?: boolean;
-  /**
-   * Bumped whenever this class's reflected attribute definitions are
-   * invalidated or rebuilt. STI subclasses stamp the value they last synced
-   * their overlay against, mirroring Rails' `reset_column_information`
-   * invalidating the class AND its descendants (model_schema.rb).
-   */
+  /** Global epoch stamped on reflect/invalidate; see {@link schemaEpoch}. @internal */
   _schemaRevision?: number;
-  /** Base `_schemaRevision` this subclass's overlay was built from. @internal */
-  _stiOverlaySyncedAt?: number;
+  /** Memoized {@link schemaStaleAgainstAncestors} result. @internal */
+  _staleCheck?: { epoch: number; stale: boolean };
   /** Rails' `@column_names` memo, revision-stamped. @internal */
   _columnNamesMemo?: { revision: number; names: readonly string[] };
   connection: any;
@@ -739,7 +733,8 @@ export function nextSequenceValue(this: SchemaHost): number | null {
  * definitions, excluding PK columns from defaults.
  */
 export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
-  if (this._attributesBuilder) return this._attributesBuilder;
+  const ownBuilder = ownSchemaMemo(this, "_attributesBuilder");
+  if (ownBuilder) return ownBuilder;
 
   const pk = this.primaryKey;
   const pkSet = new Set(Array.isArray(pk) ? pk : [pk]);
@@ -754,37 +749,18 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
     }
   }
 
-  // STI: write cache to the base so subclasses inherit via prototype
-  // chain, and a base reset propagates automatically.
-  const cacheHost = stiSchemaHost(this);
-  cacheHost._attributesBuilder = new AttributeSetBuilder(types, defaults);
-  // If we are an STI subclass, resetDefaultAttributes() may have placed an
-  // own-property shadow of `undefined` on `this` to block stale inheritance.
-  // Now that cacheHost has a fresh builder, remove the shadow so subsequent
-  // calls on this STI subclass find cacheHost's builder via prototype chain
-  // instead of rebuilding on every access.
-  if (cacheHost !== this && Object.prototype.hasOwnProperty.call(this, "_attributesBuilder")) {
-    delete this._attributesBuilder;
-  }
-  return cacheHost._attributesBuilder;
+  this._attributesBuilder = new AttributeSetBuilder(types, defaults);
+  return this._attributesBuilder;
 }
 
 /**
  * Rails: @columns ||= columns_hash.values.freeze
  */
 export function columns(this: SchemaHost): any[] {
-  const memo = columnMemo(this, "_columns");
-  if (memo) return memo;
-  if (ownsColumnMemo(this)) {
-    const own = Object.values((this as unknown as typeof Base).columnsHash());
-    if (this._schemaLoaded) this._columns = own;
-    return own;
-  }
-  loadSchema.call(this);
-  const hash = getColumnsHash(this);
-  const cacheHost = stiSchemaHost(this);
-  cacheHost._columns = Object.values(hash);
-  return cacheHost._columns;
+  const ownColumns = ownSchemaMemo(this, "_columns");
+  if (ownColumns) return ownColumns;
+  this._columns = Object.values(columnsHash.call(this as unknown as typeof Base));
+  return this._columns;
 }
 
 export function attributeSetCoder(this: SchemaHost): AttributeSetCoder {
@@ -893,54 +869,6 @@ export function resetColumnInformation(this: SchemaHost): void {
 }
 
 /**
- * Drop an STI subclass's own (forked) schema caches so it re-inherits the
- * base's freshly-rebuilt ones via the prototype chain. Deletes own properties
- * rather than assigning undefined/false, so no shadowing survives, and scrubs
- * schema-sourced entries from any subclass-forked `_attributeDefinitions`
- * (from a prior attribute() / decorateAttributes / encrypts call) — without
- * this, schema defs leak past the reset on subclasses that forked their own
- * map.
- */
-function clearStiSubclassLocalCaches(sub: SchemaHost): void {
-  for (const key of [
-    "_columnsHash",
-    "_columns",
-    "_attributesBuilder",
-    "_schemaLoaded",
-    "_cachedDefaultAttributes",
-    "_virtualAttributesReconciled",
-    "_returningColumnsForInsertCache",
-  ]) {
-    if (Object.prototype.hasOwnProperty.call(sub, key)) Reflect.deleteProperty(sub, key);
-  }
-  if (Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")) {
-    scrubSchemaSourcedDefinitions(sub);
-  }
-  for (const deeper of (sub as { subclasses?: SchemaHost[] }).subclasses ?? []) {
-    if (sharesStiBaseTable(deeper)) {
-      clearStiSubclassLocalCaches(deeper);
-    } else {
-      reloadSchemaFromCache.call(deeper);
-    }
-  }
-}
-
-function invalidateStiDescendantColumnMemos(host: SchemaHost): void {
-  for (const sub of (host as { subclasses?: SchemaHost[] }).subclasses ?? []) {
-    if (!sharesStiBaseTable(sub)) continue;
-    for (const key of ["_columnsHash", "_columns"]) {
-      if (Object.prototype.hasOwnProperty.call(sub, key)) Reflect.deleteProperty(sub, key);
-    }
-    invalidateStiDescendantColumnMemos(sub);
-  }
-}
-
-function sharesStiBaseTable(klass: SchemaHost): boolean {
-  const base = getStiBase(klass) as unknown as SchemaHost;
-  return base === klass || base.tableName === klass.tableName;
-}
-
-/**
  * Drop schema-sourced attribute defs (and their generated accessors) so the
  * next load re-reflects them; user-declared defs (source === "user") are
  * preserved, matching Rails where user-provided attributes survive reload.
@@ -958,18 +886,13 @@ function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
 
 /** @internal */
 export function reloadSchemaFromCache(this: SchemaHost): void {
-  if (isStiSubclass(this) && sharesStiBaseTable(this)) {
-    clearStiSubclassLocalCaches(this);
-    reloadSchemaFromCache.call(getStiBase(this) as SchemaHost);
-    return;
-  }
   this._columnsHash = undefined;
   this._columns = undefined;
   this._returningColumnsForInsertCache = undefined;
   this._attributesBuilder = undefined;
   this._schemaLoaded = false;
   this._virtualAttributesReconciled = false;
-  this._schemaRevision = (this._schemaRevision ?? 0) + 1;
+  this._schemaRevision = nextSchemaEpoch();
   (this as SchemaHost & { _cachedDefaultAttributes?: unknown })._cachedDefaultAttributes = null;
   (this as SchemaHost & { _schemaLoadPromise?: Promise<void> })._schemaLoadPromise = undefined;
   clearAttributeNamesMemo(this);
@@ -977,11 +900,7 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
     scrubSchemaSourcedDefinitions(this);
   }
   for (const sub of (this as { subclasses?: SchemaHost[] }).subclasses ?? []) {
-    if (isStiSubclass(sub) && sharesStiBaseTable(sub)) {
-      clearStiSubclassLocalCaches(sub);
-    } else {
-      reloadSchemaFromCache.call(sub);
-    }
+    reloadSchemaFromCache.call(sub);
   }
 }
 
@@ -997,108 +916,8 @@ export function reloadSchemaFromCache(this: SchemaHost): void {
  * For a full async reflection (fetching from the adapter if the cache
  * isn't populated), call `Base.loadSchema()` (base.ts).
  */
-/**
- * Rebuild an STI subclass's `_attributeDefinitions` as a per-subclass OVERLAY
- * over the base's freshly reflected map.
- *
- * Rails keeps attribute types per class: `_default_attributes` is memoized per
- * class, seeded from `columns_hash`, and then replays that class's own pending
- * modifications (ActiveModel::AttributeRegistration#_default_attributes,
- * ActiveRecord::Attributes). So a subclass `normalizes` / `attribute` must not
- * reach the base or its siblings, and must survive a reflection/reload.
- *
- * Only applies when the subclass actually forked its map. A subclass that never
- * declared anything must keep INHERITING the base map: installing the base map
- * as an own property of the subclass fools the copy-on-write guard in
- * `decorateAttributes` (`hasOwnProperty(this, "_attributeDefinitions")`), so a
- * later `normalizes` would decorate the base's definitions in place.
- */
-const rebuildingOverlays = new WeakSet<object>();
-
-function rebuildStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
-  // Replaying a decorator can re-enter schema loading — the enum decorator calls
-  // `columnForAttribute`, which calls `loadSchema`, which syncs overlays. Without
-  // this guard that cycle recurses until the stack blows.
-  if (rebuildingOverlays.has(sub as object)) return;
-  const baseDefs = base._attributeDefinitions;
-  const subDefs = sub._attributeDefinitions;
-  if (
-    !(baseDefs instanceof Map) ||
-    !(subDefs instanceof Map) ||
-    subDefs === baseDefs ||
-    !Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")
-  ) {
-    return;
-  }
-
-  const overlay = new Map(baseDefs);
-  // Precedence: subclass user-provided entries win over base non-user entries;
-  // otherwise the (reflected) base entry wins.
-  for (const [name, def] of subDefs) {
-    const existing = baseDefs.get(name);
-    const subIsUser = (def.userProvided ?? true) === true;
-    const baseIsUser = existing ? (existing.userProvided ?? true) === true : false;
-    if (!existing || (subIsUser && !baseIsUser)) {
-      overlay.set(name, def);
-    }
-  }
-  // Seeding from the base map drops subclass decorations — a `normalizes`d
-  // schema column is `userProvided: false` on BOTH sides, so the precedence rule
-  // above cannot carry it. Rails re-applies the pending-decorator chain on every
-  // rebuild for exactly this reason; replay the subclass's own decorators so the
-  // decoration survives reflection and reload.
-  // Stamp and install BEFORE replaying: a decorator that re-enters `loadSchema`
-  // must see the fresh overlay and a synced stamp, not recurse into another rebuild.
-  sub._attributeDefinitions = overlay;
-  sub._stiOverlaySyncedAt = base._schemaRevision ?? 0;
-  rebuildingOverlays.add(sub as object);
-  try {
-    replayOwnPendingDecorators(sub as never, overlay);
-  } finally {
-    rebuildingOverlays.delete(sub as object);
-  }
-}
-
-/**
- * Re-sync a subclass overlay whose base has been re-reflected since it was
- * built. `_schemaLoaded` lives on the STI base, so `loadSchema` early-returns on
- * the subclass and would otherwise leave the overlay pinned to stale (or, after
- * a `resetColumnInformation`, missing) definitions.
- *
- * Staleness is detected by `_schemaRevision`, not by inspecting the maps: a
- * reset mutates the base's definitions Map IN PLACE, so map identity is stable,
- * and a re-reflection can change a column's type/default while leaving the key
- * set identical — so key coverage would wrongly report the overlay as fresh.
- */
-export function syncStiSubclassAttributeDefinitions(host: SchemaHost): void {
-  const base = stiSchemaHost(host);
-  if (base === host) return;
-  syncStiSubclassOverlay(host, base);
-}
-
-function syncStiSubclassOverlay(sub: SchemaHost, base: SchemaHost): void {
-  const baseDefs = base._attributeDefinitions;
-  const subDefs = sub._attributeDefinitions;
-  if (!(baseDefs instanceof Map) || !(subDefs instanceof Map) || subDefs === baseDefs) return;
-  if (!Object.prototype.hasOwnProperty.call(sub, "_attributeDefinitions")) return;
-  // Own-property check: a subclass that never synced would otherwise INHERIT a
-  // stamp through the prototype chain and wrongly skip its first rebuild.
-  const stamped = Object.prototype.hasOwnProperty.call(sub, "_stiOverlaySyncedAt")
-    ? sub._stiOverlaySyncedAt
-    : undefined;
-  if (stamped === (base._schemaRevision ?? 0)) return;
-  rebuildStiSubclassOverlay(sub, base);
-}
-
 export function loadSchema(this: SchemaHost): void {
-  if (this._schemaLoaded) {
-    // `_schemaLoaded` lives on the STI base, so a subclass inherits it and
-    // returns here even when the base was reset and re-reflected since the
-    // subclass built its overlay. Re-sync first, or the overlay stays pinned to
-    // the pre-reset definitions forever.
-    syncStiSubclassAttributeDefinitions(this);
-    return;
-  }
+  if (ownSchemaMemo(this, "_schemaLoaded")) return;
 
   // Rails ModelSchema#load_schema!: `raise TableNotSpecified unless table_name`.
   // Rails' `table_name` is nil for an abstract class; ours computes an inferred
@@ -1111,14 +930,9 @@ export function loadSchema(this: SchemaHost): void {
     );
   }
 
-  const workHost = stiSchemaHost(this);
-  if (workHost !== this && Object.prototype.hasOwnProperty.call(this, "_schemaLoaded")) {
-    delete this._schemaLoaded;
-  }
-
   const reflected = loadSchemaFromCacheSync(this);
   if (reflected) {
-    workHost._schemaLoaded = true;
+    this._schemaLoaded = true;
     return;
   }
 
@@ -1136,24 +950,21 @@ export function loadSchema(this: SchemaHost): void {
   // to the bind for a tableless model in the meantime is harmless — there is
   // no DB column type to cast through.
   let pkStillMissing = false;
-  if (workHost._attributeDefinitions.size > 0) {
-    const pks = Array.isArray(workHost.primaryKey)
-      ? workHost.primaryKey
-      : workHost.primaryKey != null
-        ? [workHost.primaryKey]
+  if (this._attributeDefinitions.size > 0) {
+    const pks = Array.isArray(this.primaryKey)
+      ? this.primaryKey
+      : this.primaryKey != null
+        ? [this.primaryKey]
         : [];
-    if (pks.some((pk) => !workHost._attributeDefinitions.has(pk))) {
+    if (pks.some((pk) => !this._attributeDefinitions.has(pk))) {
       pkStillMissing = true;
     }
   }
 
-  // Fallback: no schema cache — synthesize a columnsHash view on the
-  // work host so subclasses don't fork _columnsHash (which would persist
-  // past a later base reflection).
-  if (!workHost._columnsHash && workHost._attributeDefinitions.size > 0) {
+  if (!ownSchemaMemo(this, "_columnsHash") && this._attributeDefinitions.size > 0) {
     const hash: Record<string, unknown> = {};
-    const ignored = new Set(workHost._ignoredColumns ?? []);
-    for (const [name, def] of workHost._attributeDefinitions) {
+    const ignored = new Set(this._ignoredColumns ?? []);
+    for (const [name, def] of this._attributeDefinitions) {
       if (ignored.has(name)) continue;
       if (def.virtual) continue;
       const fn = def.defaultFunction ?? null;
@@ -1165,14 +976,14 @@ export function loadSchema(this: SchemaHost): void {
         ...(fn != null ? { defaultFunction: fn } : {}),
       };
     }
-    workHost._columnsHash = hash;
+    this._columnsHash = hash;
   }
-  if (!pkStillMissing) workHost._schemaLoaded = true;
+  if (!pkStillMissing) this._schemaLoaded = true;
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
-  const memo = columnMemo(host, "_columnsHash");
-  if (memo != null) return memo;
+  const own = ownSchemaMemo(host, "_columnsHash");
+  if (own != null) return own;
   const ch = (host as any).columnsHash;
   if (typeof ch === "function") return ch.call(host) ?? {};
   return {};
@@ -1211,41 +1022,18 @@ function reflectedTypeForColumn(
  * cache) to `_attributeDefinitions`. Shared by sync `loadSchema` and
  * async `loadSchemaFromAdapter`.
  *
- * STI note: for STI subclasses, `host` is the STI base, so the base's
- * `_ignoredColumns` governs which columns get accessors on the shared
- * prototype. Per-subclass `ignoredColumns` is still honored at read
- * time in `columnsHash()` (filters the returned hash), but it cannot
- * retroactively remove a prototype accessor already defined on the
- * base — a consequence of TypeScript not having Ruby's method_missing.
- * Subclass `attribute()` calls route through the STI base (see base.ts),
- * so that flow doesn't create forked-map shadowing.
- *
- * `encrypts()` does NOT: it is per-class, like `normalizes`. Rails mutates
- * the receiver's `encrypted_attributes` `class_attribute` and calls
- * `encrypt_attribute`/`decorate_attributes` on that class
- * (encryption/encryptable_record.rb), and `_default_attributes` replays the
- * superclass's modifications before only the class's own pending decorators
- * (activemodel attribute_registration.rb). So a subclass `encrypts` must
- * decorate the subclass alone.
- *
- * Per-class decorators are therefore EXPECTED to fork the map:
- * `decorateAttributes` copy-on-writes it onto the calling class and
- * `rebuildStiSubclassOverlay` keeps the subclass overlay in sync with the
- * base. Do not add new decorators to the STI redirect list to avoid that
- * fork — routing a per-class decorator to the base is what leaked the
- * decorated type onto the base and its siblings.
+ * `host` is always the class the load was triggered on: every class reflects
+ * its OWN `table_name` into its own definitions and prototype
+ * (model_schema.rb:587-597).
  */
+// The enum decorator calls `columnForAttribute`, which calls `loadSchema`;
+// without this guard that cycle recurses until the stack blows.
+const replayingDecorators = new WeakSet<object>();
+
 function applyColumnsHash(
   host: SchemaHost,
   adapter: { lookupCastTypeFromColumn?: (c: unknown) => unknown },
   hash: Record<string, unknown>,
-  /**
-   * Class the load was originally triggered on. Differs from `host` in
-   * STI: reflection lands on the base, but any caches the subclass
-   * already populated (`_columns`, `_columnsHash`, `_attributesBuilder`)
-   * would otherwise stay stale indefinitely.
-   */
-  originatingHost?: SchemaHost,
 ): void {
   if (!Object.prototype.hasOwnProperty.call(host, "_attributeDefinitions")) {
     host._attributeDefinitions = new Map(host._attributeDefinitions);
@@ -1261,14 +1049,6 @@ function applyColumnsHash(
       // per base.test.ts semantics.
       if (Object.prototype.hasOwnProperty.call(host.prototype, name)) {
         delete host.prototype[name];
-      }
-      // STI: also strip a subclass-owned accessor if the originating
-      // host declared the attribute on itself, or `"col" in record` on
-      // the subclass would still return true.
-      if (originatingHost && originatingHost !== host) {
-        if (Object.prototype.hasOwnProperty.call(originatingHost.prototype, name)) {
-          delete originatingHost.prototype[name];
-        }
       }
       const existing = host._attributeDefinitions.get(name);
       if (!existing || (existing.userProvided ?? true) === false) {
@@ -1365,29 +1145,10 @@ function applyColumnsHash(
     _columnsHash?: unknown;
     _columns?: unknown;
   };
-  const invalidate = (h: SchemaHost, { deleteOwn }: { deleteOwn: boolean }) => {
-    if (deleteOwn) {
-      // Delete own properties so `h` inherits freshly-rebuilt caches
-      // from its prototype chain (used for the STI subclass case).
-      for (const key of [
-        "_attributesBuilder",
-        "_cachedDefaultAttributes",
-        "_columnsHash",
-        "_columns",
-      ]) {
-        if (Object.prototype.hasOwnProperty.call(h, key)) Reflect.deleteProperty(h, key);
-      }
-      return;
-    }
-    const bag = h as CacheBag;
-    bag._attributesBuilder = undefined;
-    bag._cachedDefaultAttributes = null;
-    bag._columnsHash = undefined;
-    bag._columns = undefined;
-  };
-  invalidate(host, { deleteOwn: false });
-  if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
-  invalidateStiDescendantColumnMemos(host);
+  const bag = host as CacheBag;
+  bag._attributesBuilder = undefined;
+  bag._cachedDefaultAttributes = null;
+  bag._columns = undefined;
   host._columnsHash = filteredHash;
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
@@ -1406,21 +1167,30 @@ function applyColumnsHash(
   const reflectedColumnNames = Object.keys(hash).filter((n) => !ignored.has(n));
   encryptionHooks.requireOriginalColumnsAfterReflection?.(host, reflectedColumnNames);
 
-  // Reflection may change a column's metadata/type/default without changing the
-  // key set, so bump before rebuilding overlays from the new definitions.
-  host._schemaRevision = (host._schemaRevision ?? 0) + 1;
-
-  if (originatingHost && originatingHost !== host) {
-    rebuildStiSubclassOverlay(originatingHost, host);
-    encryptionHooks.applyPendingEncryptions(originatingHost);
-    // Recompute the reflected column set against the subclass's own
-    // `ignoredColumns` — an STI subclass may ignore a different set than its
-    // base, so reusing the base's `reflectedColumnNames` could check against the
-    // wrong ignore-set.
-    const originatingIgnored = new Set(originatingHost._ignoredColumns ?? []);
-    const originatingReflected = Object.keys(hash).filter((n) => !originatingIgnored.has(n));
-    encryptionHooks.requireOriginalColumnsAfterReflection?.(originatingHost, originatingReflected);
+  // Mirrors ActiveModel::AttributeRegistration#_default_attributes rebuilding
+  // from `columns_hash` and replaying the pending chain, so a `normalizes` /
+  // `serialize` decoration survives the overwrite above. Restricted to reflected
+  // columns: `_attributeDefinitions` is trails' eager type cache, not Rails'
+  // `_default_attributes`, so replaying a NON-column attribute here would fire
+  // guards Rails only raises when the default set is built (enum.rb:240-245).
+  if (!replayingDecorators.has(host as object)) {
+    replayingDecorators.add(host as object);
+    try {
+      const reflectedDefs = new Map(
+        Object.keys(filteredHash)
+          .filter((n) => host._attributeDefinitions.has(n))
+          .map((n) => [n, host._attributeDefinitions.get(n)] as const),
+      );
+      replayOwnPendingDecorators(host as never, reflectedDefs as never);
+      for (const [name, def] of reflectedDefs) host._attributeDefinitions.set(name, def);
+    } finally {
+      replayingDecorators.delete(host as object);
+    }
   }
+
+  // Reflection may change a column's type/default without changing the key set,
+  // so the revision stamps cannot infer staleness from key coverage.
+  host._schemaRevision = nextSchemaEpoch();
 }
 
 /**
@@ -1437,26 +1207,17 @@ function applyColumnsHash(
  */
 export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   if (getAbstractClass.call(this as any)) return;
-  const schemaHost = stiSchemaHost(this);
-
   let startingAdapter: SchemaHost["connection"] | undefined;
-  let adapterOwner: SchemaHost | undefined;
-  const candidates: SchemaHost[] = schemaHost === this ? [schemaHost] : [schemaHost, this];
-  for (const cand of candidates) {
-    try {
-      startingAdapter = reflectionAdapter(cand);
-    } catch {
-      startingAdapter = undefined;
-    }
-    if (startingAdapter) {
-      adapterOwner = cand;
-      break;
-    }
+  try {
+    startingAdapter = reflectionAdapter(this);
+  } catch {
+    startingAdapter = undefined;
   }
-  if (!startingAdapter || !adapterOwner) return;
+  if (!startingAdapter) return;
+  const adapterOwner = this;
   const cache = startingAdapter.schemaCache;
   if (!cache) return;
-  const table = schemaHost.tableName;
+  const table = this.tableName;
   // Resolve a target for schemaCache lookups. If `.pool` is an actual ConnectionPool
   // (has `withConnection`), wrap startingAdapter in a FakePool — mirroring
   // Rails' BoundSchemaReflection.for_lone_connection. On lone-connection
@@ -1503,7 +1264,7 @@ export async function loadSchemaFromAdapter(this: SchemaHost): Promise<void> {
   }
   if (currentAdapter !== startingAdapter) return;
 
-  applyColumnsHash(schemaHost, startingAdapter, hash, this);
+  applyColumnsHash(this, startingAdapter, hash);
 }
 
 /**
@@ -1563,7 +1324,7 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
           // drop does not bump `_schemaRevision`, so also drop the name memos
           // stamped against the synthesized view — otherwise `columnNames()`
           // keeps serving the pre-warm list.
-          if (host._schemaLoaded) {
+          if (ownSchemaMemo(host, "_schemaLoaded")) {
             host._schemaLoaded = false;
             host._columnsHash = undefined;
             host._columns = undefined;
@@ -1615,8 +1376,8 @@ async function reflectColumnNames(host: SchemaHost): Promise<Set<string> | null>
  * @internal
  */
 export async function reconcileVirtualAttributes(this: SchemaHost, reflect = false): Promise<void> {
-  const host = stiSchemaHost(this);
-  if (host._virtualAttributesReconciled) return;
+  const host = this;
+  if (ownSchemaMemo(host, "_virtualAttributesReconciled")) return;
   const real = reflect ? await reflectColumnNames(host) : cachedColumnNames(host);
   if (!real) return;
   for (const [name, def] of host._attributeDefinitions) {
@@ -1636,29 +1397,22 @@ export async function reconcileVirtualAttributes(this: SchemaHost, reflect = fal
  */
 function loadSchemaFromCacheSync(host: SchemaHost): boolean {
   if (getAbstractClass.call(host as any)) return false;
-  const schemaHost = stiSchemaHost(host);
-  // Adapter may be configured on the base OR on the subclass. Try base
-  // first (Rails-normal), fall back to the originating host. Access can
-  // throw when no pool is configured; treat as "no adapter".
+  // Access can throw when no pool is configured; treat as "no adapter".
   let adapter: SchemaHost["connection"] | undefined;
-  const candidates = schemaHost === host ? [schemaHost] : [schemaHost, host];
-  for (const cand of candidates) {
-    try {
-      adapter = reflectionAdapter(cand);
-    } catch {
-      adapter = undefined;
-    }
-    if (adapter) break;
+  try {
+    adapter = reflectionAdapter(host);
+  } catch {
+    adapter = undefined;
   }
   if (!adapter) return false;
   const cache = adapter.schemaCache;
   if (!cache || typeof cache.getCachedColumnsHash !== "function") return false;
-  const table = schemaHost.tableName;
+  const table = host.tableName;
   // Gate on `_columnsHash` (the map we read) rather than `isCached`/`_columns`,
   // so an out-of-sync `_columns` entry can't pass the guard and yield undefined.
   const hash = cache.getCachedColumnsHash(table);
   if (!hash) return false;
-  applyColumnsHash(schemaHost, adapter, hash, host);
+  applyColumnsHash(host, adapter, hash);
   return true;
 }
 
@@ -1828,8 +1582,8 @@ function initializeLoadSchemaMonitor(this: SchemaHost): void {
 }
 
 /** @internal */
-function isSchemaLoaded(this: SchemaHost): boolean {
-  return this._schemaLoaded ?? false;
+export function isSchemaLoaded(this: SchemaHost): boolean {
+  return ownSchemaMemo(this, "_schemaLoaded") ?? false;
 }
 
 /** @internal */

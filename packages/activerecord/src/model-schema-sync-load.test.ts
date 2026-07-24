@@ -65,7 +65,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(hash.name.type).toBe("string");
   });
 
-  it("STI subclass reflection delegates to base, without forking defs", () => {
+  it("STI subclass reflects its own table into its own defs", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -79,12 +79,11 @@ describe("sync loadSchema / columnsHash", () => {
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
     (Circle as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
 
-    // Trigger load on subclass — must reflect on the STI base and
-    // subclass shares the base's map (same reference).
     Circle.columnsHash();
 
-    expect(Shape._attributeDefinitions.get("guid")?.source).toBe("schema");
-    expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
+    expect(Circle._attributeDefinitions.get("guid")?.source).toBe("schema");
+    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
+    expect(Shape._attributeDefinitions.has("guid")).toBe(false);
   });
 
   // D-Y-INCOMPATIBLE: D-Y installs Base.connectionHandler globally so Shape (which
@@ -144,7 +143,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(hash.secret).toBeUndefined();
   });
 
-  it("marks STI base as _schemaLoaded when subclass triggered reflection", () => {
+  it("marks the reflecting class as _schemaLoaded, not its STI base", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -156,10 +155,11 @@ describe("sync loadSchema / columnsHash", () => {
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
 
-    Circle.columnsHash(); // subclass triggers, but work lands on base
+    Circle.columnsHash();
 
-    expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
+    expect(Circle._attributeDefinitions.get("guid")?.source).toBe("schema");
   });
 
   it("resetColumnInformation scrubs schema-sourced defs from a subclass-forked map", () => {
@@ -191,7 +191,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect(Circle._attributeDefinitions.has("guid")).toBe(false);
   });
 
-  it("preserves subclass-declared attributes when unifying with STI base map", () => {
+  it("preserves subclass-declared attributes across the subclass's reflection", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -210,32 +210,13 @@ describe("sync loadSchema / columnsHash", () => {
 
     Circle.columnsHash();
 
-    // Merged: base reflects guid, subclass's radius survives.
     expect(Circle._attributeDefinitions.get("guid")?.source).toBe("schema");
     expect(Circle._attributeDefinitions.get("radius")?.userProvided).toBe(true);
-    expect(Shape._attributeDefinitions.get("radius")?.userProvided).toBe(true);
-    expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
+    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
+    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
   });
 
-  it("reflection deletes own-caches on subclass so base rebuilds shine through", () => {
-    class Shape extends Base {
-      static override tableName = "shapes";
-      static {
-        this.inheritanceColumn = "type";
-      }
-    }
-    class Circle extends Shape {}
-
-    (Circle as unknown as { _columnsHash: unknown })._columnsHash = { stale: true };
-    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
-    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
-
-    Circle.columnsHash();
-
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(false);
-  });
-
-  it("resetting the STI base propagates to subclasses (no stale _schemaLoaded shadow)", () => {
+  it("reflection replaces a stale own columnsHash on the reflecting class", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -246,18 +227,32 @@ describe("sync loadSchema / columnsHash", () => {
 
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+    Circle.resetColumnInformation();
 
-    // Load via subclass — flag should land on the base only.
+    expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
+  });
+
+  it("resetting the STI base propagates to subclasses", () => {
+    class Shape extends Base {
+      static override tableName = "shapes";
+      static {
+        this.inheritanceColumn = "type";
+      }
+    }
+    class Circle extends Shape {}
+
+    const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
+    (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
+
     Circle.columnsHash();
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(false);
-    expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
 
-    // Reset base — subclass inherits the reset via prototype chain.
+    registerSubclass(Circle);
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
     expect((Circle as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
-  it("invalidates subclass-local caches when reflection lands on STI base", () => {
+  it("reflection on an STI subclass rebuilds its own column caches", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -266,17 +261,12 @@ describe("sync loadSchema / columnsHash", () => {
     }
     class Circle extends Shape {}
 
-    // Pre-populate stale caches on the subclass.
-    (Circle as unknown as { _columnsHash: unknown })._columnsHash = { stale: true };
-    (Circle as unknown as { _columns: unknown })._columns = ["stale"];
-
     const cols = { guid: { sqlType: "uuid", name: "guid", default: null } };
     (Shape as unknown as { adapter: unknown }).adapter = makeAdapter(cols);
 
     Circle.columnsHash();
 
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_columns")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_columnsHash")).toBe(true);
     expect(
       Object.keys((Circle as unknown as { _columnsHash: Record<string, unknown> })._columnsHash),
     ).toEqual(["guid"]);
@@ -313,7 +303,7 @@ describe("sync loadSchema / columnsHash", () => {
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Shape);
 
     for (const key of memoKeys) {
-      expect(Object.prototype.hasOwnProperty.call(Circle, key), key).toBe(false);
+      expect((Circle as unknown as Record<string, unknown>)[key], key).toBeFalsy();
     }
     expect(Object.keys(Circle.columnsHash())).toEqual(["guid"]);
   });
@@ -341,7 +331,7 @@ describe("sync loadSchema / columnsHash", () => {
     expect((SpecialPost as unknown as { _columnsHash: unknown })._columnsHash == null).toBe(true);
   });
 
-  it("resetColumnInformation on STI subclass resets the STI base", () => {
+  it("resetColumnInformation on an STI subclass leaves the STI base alone", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -357,8 +347,8 @@ describe("sync loadSchema / columnsHash", () => {
 
     (resetColumnInformation as unknown as (this: typeof Base) => void).call(Circle);
 
-    expect(Shape._attributeDefinitions.has("guid")).toBe(false);
-    expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
+    expect(Shape._attributeDefinitions.has("guid")).toBe(true);
+    expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
   });
 
   it("resetColumnInformation drops schema-sourced defs but preserves user defs", () => {
