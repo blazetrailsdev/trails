@@ -334,8 +334,8 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
   let depth = 0;
   let pendingEach: { variable: string; names: string[] } | null = null;
 
-  for (const rawLine of lines) {
-    const line = stripComment(rawLine).trim();
+  for (let li = 0; li < lines.length; li++) {
+    const line = stripComment(lines[li]!).trim();
     if (line === "") continue;
 
     if (table === null) {
@@ -366,7 +366,15 @@ export function parseSchemaRbWithCoverage(source: string): ParseResult {
       const parenthesised = rest.startsWith("(");
       let braceBlock = false;
       if (parenthesised) {
-        const close = matchingParen(rest);
+        // `create_table(:measurements_concepcion, id: false, force: true,\n
+        //   options: "...")` wraps its argument list across physical lines;
+        // gather continuation lines until the `(` closes rather than dropping
+        // the table (the PG companion schema declares two tables this way).
+        let close = matchingParen(rest);
+        while (close === -1 && li + 1 < lines.length) {
+          rest += " " + stripComment(lines[++li]!).trim();
+          close = matchingParen(rest);
+        }
         if (close === -1) {
           unresolved.push(line);
           continue;

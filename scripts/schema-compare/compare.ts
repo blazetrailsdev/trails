@@ -20,13 +20,36 @@ import type {
 } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import { columnsOf } from "../../packages/activerecord/src/test-helpers/schema-types.js";
 import type { RailsColumnOptions, RailsTable } from "./parse-schema-rb.js";
-import { parseSchemaRb, parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
+import { parseSchemaRbWithCoverage } from "./parse-schema-rb.js";
 import { writeJsonManifest } from "../api-compare/write-json-manifest.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..", "..");
-const SCHEMA_RB = path.join(ROOT, "vendor/rails/activerecord/test/schema/schema.rb");
+const SCHEMA_DIR = path.join(ROOT, "vendor/rails/activerecord/test/schema");
 const BASELINE = path.join(HERE, "invented-baseline.json");
+
+/**
+ * The canonical schema sources. Rails declares most tables in `schema.rb` but
+ * puts adapter-scoped ones (PG's `uuid_*`, MySQL's `binary_fields`, ...) in
+ * per-adapter companions. All are canonical: a TEST_SCHEMA table mirroring any
+ * of them is NOT invented.
+ *
+ * This is NOT a Ruby load order. Rails loads `schema.rb` plus exactly ONE
+ * companion, chosen at runtime by the live connection's adapter name
+ * (`load_schema_helper.rb`) — the four companions never coexist in one process.
+ * We merge all four into a single canonical superset instead, which is why a
+ * table declared by more than one companion is treated as ambiguous rather than
+ * resolved to whichever file sorts first (see `loadRailsTables`). `schema.rb`
+ * leads only so a table it declares stays authoritative over a same-named
+ * companion table; the order among the companions carries no meaning.
+ */
+export const SCHEMA_FILES: readonly string[] = [
+  "schema.rb",
+  "postgresql_specific_schema.rb",
+  "mysql2_specific_schema.rb",
+  "sqlite_specific_schema.rb",
+  "trilogy_specific_schema.rb",
+];
 
 /**
  * Pre-existing invented entries, recorded so the gate ratchets: anything in
@@ -106,6 +129,13 @@ export interface Finding {
   table: string;
   column?: string;
   detail: string;
+  /**
+   * The canonical schema file the table was matched against (one of
+   * SCHEMA_FILES). Populated for findings on tables that DO exist in a Rails
+   * source, so an adapter-scoped table laid unconditionally by TEST_SCHEMA is
+   * distinguishable in the report. Absent for INVENTED-TABLE (no match).
+   */
+  source?: string;
 }
 
 export function isFatal(finding: Finding): boolean {
@@ -223,11 +253,14 @@ export function optionMismatches(rails: RailsColumnOptions, spec: ColumnSpec): s
 export function compareSchemas(
   testSchema: Schema,
   railsTables: ReadonlyMap<string, RailsTable>,
+  sources?: ReadonlyMap<string, string[]>,
+  ambiguous?: ReadonlySet<string>,
 ): Finding[] {
   const findings: Finding[] = [];
 
   for (const [tableName, tableSchema] of Object.entries(testSchema)) {
     const rails = railsTables.get(tableName);
+    const source = sources?.get(tableName)?.[0];
     if (!rails) {
       if (TABLE_ALLOW_LIST.has(tableName)) continue;
       findings.push({
@@ -237,6 +270,13 @@ export function compareSchemas(
       });
       continue;
     }
+
+    // A table with several colliding companion variants has no single column
+    // set: its type/options/presence differ by adapter and we cannot tell which
+    // one TEST_SCHEMA targets. INVENTED-COLUMN still fires — against the union,
+    // so a column real on any adapter is spared — but SHAPE, OPTION, and
+    // UNPORTED-COLUMN would be phantom, so they are suppressed for these tables.
+    const merged = ambiguous?.has(tableName) ?? false;
 
     const tsColumns = columnsOf(tableSchema);
     for (const [columnName, spec] of Object.entries(tsColumns)) {
@@ -254,16 +294,19 @@ export function compareSchemas(
           table: tableName,
           column: columnName,
           detail: "not declared in the schema.rb create_table block",
+          source,
         });
         continue;
       }
+      if (merged) continue;
       const tsType = specType(spec);
       if (!typesAgree(railsColumn.type, tsType)) {
         findings.push({
           verdict: "SHAPE",
           table: tableName,
           column: columnName,
-          detail: `schema.rb says ${railsColumn.type}, TEST_SCHEMA says ${tsType}`,
+          detail: `${source ?? "schema.rb"} says ${railsColumn.type}, TEST_SCHEMA says ${tsType}`,
+          source,
         });
         // A type divergence makes the options incomparable (a limit on a
         // string means nothing against an integer), so stop at the type.
@@ -276,10 +319,12 @@ export function compareSchemas(
           table: tableName,
           column: columnName,
           detail: mismatches.join("; "),
+          source,
         });
       }
     }
 
+    if (merged) continue;
     for (const columnName of rails.columns.keys()) {
       if (columnName in tsColumns) continue;
       if (rails.primaryKeyColumns.has(columnName)) continue;
@@ -287,7 +332,8 @@ export function compareSchemas(
         verdict: "UNPORTED-COLUMN",
         table: tableName,
         column: columnName,
-        detail: "declared in schema.rb, absent from TEST_SCHEMA",
+        detail: `declared in ${source ?? "schema.rb"}, absent from TEST_SCHEMA`,
+        source,
       });
     }
   }
@@ -297,7 +343,65 @@ export function compareSchemas(
 
 function formatFinding(finding: Finding): string {
   const target = finding.column ? `${finding.table}.${finding.column}` : finding.table;
-  return `${isFatal(finding) ? "FAIL" : "warn"}  ${finding.verdict.padEnd(15)} ${target} — ${finding.detail}`;
+  const scope = finding.source && finding.source !== "schema.rb" ? ` [${finding.source}]` : "";
+  return `${isFatal(finding) ? "FAIL" : "warn"}  ${finding.verdict.padEnd(15)} ${target}${scope} — ${finding.detail}`;
+}
+
+export interface LoadedSchema {
+  tables: Map<string, RailsTable>;
+  /** Every file that declared each table, in scan order (schema.rb first). */
+  sources: Map<string, string[]>;
+  /**
+   * Tables declared by two or more companions with no schema.rb definition.
+   * Rails would load exactly one of those variants (per adapter), so their
+   * column sets legitimately differ and we cannot know which one TEST_SCHEMA
+   * targets. Membership is still canonical, but per-column type/option/presence
+   * diffs against an arbitrary merge would be phantom, so the comparator
+   * suppresses them (see `compareSchemas`).
+   */
+  ambiguous: Set<string>;
+  unresolved: string[];
+}
+
+/**
+ * Parses every canonical schema source into one table map — a superset across
+ * all adapters — recording which files declared each table. `schema.rb` is
+ * authoritative: when it declares a table, a same-named companion table neither
+ * overrides its columns nor makes it ambiguous. Companions that collide with
+ * each other union their columns (so a column real on any adapter is canonical)
+ * and mark the table ambiguous. Unresolved call sites are collected for the
+ * caller to abort on.
+ */
+export async function loadRailsTables(): Promise<LoadedSchema> {
+  const tables = new Map<string, RailsTable>();
+  const sources = new Map<string, string[]>();
+  const unresolved: string[] = [];
+  for (const file of SCHEMA_FILES) {
+    const source = await readFile(path.join(SCHEMA_DIR, file), "utf8");
+    const parsed = parseSchemaRbWithCoverage(source);
+    for (const site of parsed.unresolved) unresolved.push(`${file}: ${site}`);
+    for (const [name, table] of parsed.tables) {
+      const existing = tables.get(name);
+      if (!existing) {
+        tables.set(name, table);
+        sources.set(name, [file]);
+        continue;
+      }
+      sources.get(name)!.push(file);
+      // schema.rb (always first when present) stays authoritative; only
+      // cross-companion collisions union their columns into the superset.
+      if (sources.get(name)![0] === "schema.rb") continue;
+      for (const [column, def] of table.columns) {
+        if (!existing.columns.has(column)) existing.columns.set(column, def);
+      }
+    }
+  }
+  const ambiguous = new Set(
+    [...sources]
+      .filter(([, files]) => files.length > 1 && files[0] !== "schema.rb")
+      .map(([n]) => n),
+  );
+  return { tables, sources, ambiguous, unresolved };
 }
 
 /**
@@ -374,22 +478,20 @@ export function partitionFindings(
 }
 
 export async function main(): Promise<void> {
-  const source = await readFile(SCHEMA_RB, "utf8");
-  const railsTables = parseSchemaRb(source);
+  const { tables: railsTables, sources, ambiguous, unresolved } = await loadRailsTables();
 
   // Trust the parser before trusting its verdicts.
-  const unresolved = unresolvedCallSites(source);
   if (unresolved.length > 0) {
     console.error(
-      `schema.rb has ${unresolved.length} create_table call site(s) the parser could not ` +
-        `resolve to a table name:\n${unresolved.map((l) => `  ${l}`).join("\n")}\n\n` +
+      `the canonical schema files have ${unresolved.length} create_table call site(s) the ` +
+        `parser could not resolve to a table name:\n${unresolved.map((l) => `  ${l}`).join("\n")}\n\n` +
         `Every verdict would be unreliable, so nothing is reported. Teach ` +
         `scripts/schema-compare/parse-schema-rb.ts the new create_table form.`,
     );
     process.exit(1);
   }
 
-  const findings = compareSchemas(TEST_SCHEMA, railsTables);
+  const findings = compareSchemas(TEST_SCHEMA, railsTables, sources, ambiguous);
 
   if (process.argv.includes("--write")) {
     const invented = findings.filter(isFatal);
@@ -433,6 +535,28 @@ export async function main(): Promise<void> {
   if (process.argv.includes("--verbose")) {
     for (const finding of [...shape, ...option]) console.log(formatFinding(finding));
   }
+  // A TEST_SCHEMA table whose only canonical home is a per-adapter companion is
+  // being laid on every adapter, not just the one Rails scopes it to — surface
+  // that so a reviewer can weigh it, even though it is not INVENTED. Tables
+  // declared by several colliding companions get a sharper note: their
+  // per-column diffs were suppressed because no single variant is authoritative.
+  const adapterScoped = Object.keys(TEST_SCHEMA)
+    .filter((name) => {
+      const files = sources.get(name);
+      return files !== undefined && files[0] !== "schema.rb";
+    })
+    .sort();
+  for (const name of adapterScoped) {
+    const files = sources.get(name)!;
+    if (ambiguous.has(name)) {
+      console.log(
+        `note  MULTIPLE-SOURCES ${name} [${files.join(", ")}] — canonical; ` +
+          `per-column diffs suppressed (variants differ by adapter)`,
+      );
+    } else {
+      console.log(`note  ADAPTER-SCOPED  ${name} [${files[0]}] — canonical, laid unconditionally`);
+    }
+  }
   for (const key of stale) {
     console.log(
       `note  BASELINE-STALE  ${key} — no longer invented; drop it with pnpm schema:compare:reseed`,
@@ -440,7 +564,7 @@ export async function main(): Promise<void> {
   }
 
   console.log(
-    `\n${Object.keys(TEST_SCHEMA).length} TEST_SCHEMA tables vs ${railsTables.size} schema.rb tables — ` +
+    `\n${Object.keys(TEST_SCHEMA).length} TEST_SCHEMA tables vs ${railsTables.size} canonical-schema tables — ` +
       `new-inventions=${regressions.length} baselined=${known.length} ` +
       `option-divergences=${optionCount} (ceiling ${OPTION_DEBT_CEILING}) shape-warnings=${shape.length}` +
       (process.argv.includes("--verbose") ? "" : " (--verbose to list shape warnings)"),
