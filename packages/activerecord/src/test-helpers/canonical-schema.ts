@@ -2075,6 +2075,66 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
   (adapter as { clearCacheBang?: () => void }).clearCacheBang?.();
 }
 
+/** Minimal slice of the schema-statement surface {@link fkSafeDropOrder} needs. */
+export interface FkSafeDropOrderHost {
+  tables(): Promise<string[]>;
+  foreignKeys(tableName: string): Promise<readonly { readonly toTable: string }[]>;
+}
+
+/**
+ * Order `names` so every table is dropped before any table it references,
+ * i.e. referencing tables first.
+ *
+ * Registry order cannot stand in for this: it is roughly alphabetical, not
+ * topological — `lessons_students` is registered before `students`, so merely
+ * reversing it drops the target before its referencer. The canonical registry
+ * declares no foreign keys of its own, but a test may add one (e.g.
+ * `addForeignKey("lessons_students", "students")` in the abstract-mysql-adapter
+ * schema tests), so the order is derived from the FKs the database actually
+ * holds rather than from anything declared here.
+ *
+ * FKs are read only for tables that currently exist, and only for the tables
+ * being dropped — an adapter with no FK introspection reports none and the
+ * input order is preserved. A cycle (mutually-referencing tables) has no safe
+ * order; those tables keep their input order, which is what dropping them
+ * without this helper would have done anyway.
+ *
+ * @internal
+ */
+export async function fkSafeDropOrder(
+  ss: FkSafeDropOrderHost,
+  names: readonly string[],
+): Promise<string[]> {
+  if (names.length < 2) return [...names];
+  const inSet = new Set(names);
+  const existing = new Set(await ss.tables());
+  const referencedBy = new Map<string, string[]>();
+  for (const name of names) {
+    if (!existing.has(name)) continue;
+    const targets = (await ss.foreignKeys(name))
+      .map((fk) => fk.toTable)
+      .filter((t) => t !== name && inSet.has(t));
+    if (targets.length > 0) referencedBy.set(name, targets);
+  }
+  if (referencedBy.size === 0) return [...names];
+
+  const ordered: string[] = [];
+  const emitted = new Set<string>();
+  const onPath = new Set<string>();
+  const visit = (name: string): void => {
+    if (emitted.has(name) || onPath.has(name)) return;
+    onPath.add(name);
+    for (const target of referencedBy.get(name) ?? []) visit(target);
+    onPath.delete(name);
+    emitted.add(name);
+    ordered.push(name);
+  };
+  // Referencers are emitted after their targets, so walk in input order and
+  // reverse: the result drops referencers first.
+  for (const name of names) visit(name);
+  return ordered.reverse();
+}
+
 /**
  * Drop and recreate a named subset of canonical tables, restoring each to its
  * full canonical shape — the `create_table`-based equivalent of
@@ -2100,10 +2160,11 @@ export async function rebuildCanonicalTables(
   const defs = registry.filter((d) => wanted.has(d.name));
   if (defs.length === 0) return;
   const { ss, typeMap } = await prepareSchema(adapter);
-  // Drop in reverse registry order (FK-referencing tables before their targets),
-  // then recreate forward so targets exist first.
-  for (const def of [...defs].reverse()) {
-    await ss.dropTable(def.name, { ifExists: true });
+  for (const name of await fkSafeDropOrder(
+    ss,
+    defs.map((d) => d.name),
+  )) {
+    await ss.dropTable(name, { ifExists: true });
   }
   for (const def of defs) {
     await runTable(adapter, ss, typeMap, def);
