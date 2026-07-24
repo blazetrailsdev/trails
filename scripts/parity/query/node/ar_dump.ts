@@ -80,7 +80,7 @@ function describe(v: unknown): string {
   return name ?? typeof v;
 }
 
-function assertBuilt(): void {
+function assertPackagesBuilt(): void {
   // All four packages contribute to the AR query surface; if any dist/ is
   // missing, model load will fail with a cryptic module-not-found error.
   // Check all four up-front with a clear hint.
@@ -117,7 +117,7 @@ async function main(): Promise<void> {
     }
   }
 
-  assertBuilt();
+  assertPackagesBuilt();
 
   const frozenTs = frozenAt ?? DEFAULT_FROZEN_AT;
   const frozenMs = new Date(frozenTs).getTime();
@@ -128,7 +128,7 @@ async function main(): Promise<void> {
   const tmpDir = mkdtempSync(join(tmpdir(), "parity-ar-node-"));
   const clock = FakeTimers.install({ now: frozenMs, toFake: ["Date"] });
 
-  // Imported dynamically, after assertBuilt() — static imports would resolve
+  // Imported dynamically, after assertPackagesBuilt() — static imports would resolve
   // (and fail) at module load, replacing the "missing dist/" hint with a bare
   // module-not-found. Specifiers are package names, not dist paths, so Node ESM
   // dedupes them with the fixture models' own imports to one module instance.

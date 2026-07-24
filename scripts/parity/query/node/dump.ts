@@ -84,7 +84,7 @@ function describe(v: unknown): string {
   return name ?? typeof v;
 }
 
-function assertArelBuilt(): void {
+function assertPackagesBuilt(): void {
   // These resolve via package "main" → packages/<pkg>/dist/index.js. tsx's own
   // loader doesn't help here: the fixture is a module on disk that Node
   // resolves through the normal package graph, not via the TS source. The
@@ -125,7 +125,7 @@ async function main(): Promise<void> {
     }
   }
 
-  assertArelBuilt();
+  assertPackagesBuilt();
 
   const frozenTs = frozenAt ?? DEFAULT_FROZEN_AT;
   const frozenMs = new Date(frozenTs).getTime();
@@ -139,7 +139,7 @@ async function main(): Promise<void> {
   // module-evaluation time (e.g. a translated `1.week.ago` analog).
   const clock = FakeTimers.install({ now: frozenMs, toFake: ["Date"] });
 
-  // Imported dynamically, after assertArelBuilt() — a static import would
+  // Imported dynamically, after assertPackagesBuilt() — a static import would
   // resolve (and fail) at module load, replacing the "run pnpm build" hint with
   // a bare module-not-found. Specifiers are the package names, not dist paths,
   // so Node ESM dedupes them with the fixture's own `@blazetrails/arel` import
