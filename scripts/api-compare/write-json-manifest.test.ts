@@ -4,7 +4,11 @@ import * as os from "os";
 import * as path from "path";
 import { execFileSync } from "child_process";
 import { fileURLToPath } from "url";
-import { writeJsonManifest } from "./write-json-manifest.js";
+import {
+  writeJsonManifest,
+  beginManifestBatch,
+  flushManifestBatch,
+} from "./write-json-manifest.js";
 
 const REPO_ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "../..");
 const PRETTIER_BIN = path.join(REPO_ROOT, "node_modules/.bin/prettier");
@@ -84,6 +88,30 @@ describe("writeJsonManifest", () => {
     const out = tmpManifest();
     writeJsonManifest(out, SAMPLE);
     expect(JSON.parse(fs.readFileSync(out, "utf8"))).toEqual(SAMPLE);
+  });
+
+  it("defers formatting until flush inside a batch, then formats every path", () => {
+    const a = tmpManifest();
+    const b = tmpManifest();
+    beginManifestBatch();
+    writeJsonManifest(a, SAMPLE);
+    writeJsonManifest(b, SAMPLE);
+    // Bytes are on disk immediately, but unformatted until the batch flushes.
+    expect(prettierCheck(a)).toBe(false);
+    expect(prettierCheck(b)).toBe(false);
+    flushManifestBatch();
+    expect(prettierCheck(a)).toBe(true);
+    expect(prettierCheck(b)).toBe(true);
+  });
+
+  it("batches to output byte-identical to the immediate path", () => {
+    const immediate = tmpManifest();
+    writeJsonManifest(immediate, SAMPLE);
+    const batched = tmpManifest();
+    beginManifestBatch();
+    writeJsonManifest(batched, SAMPLE);
+    flushManifestBatch();
+    expect(fs.readFileSync(batched, "utf8")).toBe(fs.readFileSync(immediate, "utf8"));
   });
 });
 
