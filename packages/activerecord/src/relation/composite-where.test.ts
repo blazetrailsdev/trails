@@ -162,18 +162,13 @@ describe("Relation#where — composite-key form", () => {
 
   it("single-column composite values flow through the column type as binds, not inlined literals", () => {
     // Regression: the single-column branch used `attribute.in(rawValues)`,
-    // whose values become Arel::Nodes::Casted and are inlined untyped —
-    // so a string "2" for an integer column stayed a string, and the SQL
-    // carried literals instead of bind placeholders (breaking
-    // compileWithBinds / prepared-statement caching). Rails routes the
-    // same shape through ArrayHandler → HomogeneousIn, which casts each
-    // value through the resolved column's type and emits real binds.
+    // which inlines untyped `Casted` literals — so a string "2" for an
+    // integer column stayed a string and never became a bind (breaking
+    // compileWithBinds / prepared-statement caching).
     const rel = (Post as any).all();
     const node: any = rel.predicateBuilder.buildComposite(["comments.post_id"], [["1"], ["2"]]);
     expect(node.constructor.name).toBe("HomogeneousIn");
     expect(node.castedValues).toEqual([1, 2]);
-    // Binds render as placeholders before substitution; the substituted
-    // form carries the cast integers, not the raw quoted strings.
     const sql = (Post as any).all().where(node).toSql();
     expect(sql).toMatch(/IN \(1,\s*2\)/);
   });
@@ -194,8 +189,8 @@ describe("Relation#where — composite-key form", () => {
   it("single-column composite uses IN(...) (not OR-chain) for compactness", () => {
     const rel = (CpkBook as any).all();
     const node = rel.predicateBuilder.buildComposite(["author_id"], [[1], [2], [3]]);
-    // The HomogeneousIn node renders as `author_id IN (1, 2, 3)` (bind
-    // placeholders, substituted by `toSql`); an OR-chain would render as
+    // The HomogeneousIn node renders as `author_id IN (?, ?, ?)`, which
+    // `toSql` substitutes to `IN (1, 2, 3)`; an OR-chain would render as
     // `author_id = 1 OR author_id = 2 OR author_id = 3`.
     expect(node.constructor.name).toBe("HomogeneousIn");
     const sql = (CpkBook as any).all().where(node).toSql();
