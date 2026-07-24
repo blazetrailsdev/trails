@@ -85,7 +85,7 @@ describe("RelationTest", () => {
   it("reload", async () => {
     await CanonPost.create({ title: "reltest-reload", body: "b" });
     const rel = CanonPost.all();
-    await rel.toArray();
+    await rel;
     expect(rel.isLoaded).toBe(true);
     await rel.reload();
     expect(rel.isLoaded).toBe(true);
@@ -597,7 +597,7 @@ describe("RelationTest", () => {
     expect(await mergedAuthorsWithCommentedPostsRelation.count()).toBe(
       manualCommentsOnPostThatHaveAuthor.length,
     );
-    expect((await mergedAuthorsWithCommentedPostsRelation.toArray()).length).toBe(
+    expect((await mergedAuthorsWithCommentedPostsRelation).length).toBe(
       manualCommentsOnPostThatHaveAuthor.length,
     );
   });
@@ -644,8 +644,6 @@ describe("RelationTest", () => {
       .pluck("id");
 
     expect(await postsWithJoinsAndMerges.count()).toBe(postsWithAuthorAndCategorizations.length);
-    expect((await postsWithJoinsAndMerges.toArray()).length).toBe(
-      postsWithAuthorAndCategorizations.length,
-    );
+    expect((await postsWithJoinsAndMerges).length).toBe(postsWithAuthorAndCategorizations.length);
   });
 });

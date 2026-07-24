@@ -17,7 +17,7 @@ export class Invoice extends Base {
     this.hasMany("shippingLines", { autosave: true });
     this.beforeSave(async function (this: any, record?: any) {
       const self = record ?? this;
-      const lineItems = await association(self, "lineItems").toArray();
+      const lineItems = await association(self, "lineItems");
       self.balance = lineItems
         .map((i: any) => i.amount)
         .filter((a: any) => a != null)

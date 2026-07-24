@@ -109,7 +109,7 @@ describeIfMysql("Mysql2Adapter", () => {
     // the absence of double quotes), proves the capture path was used.
     it("Relation#explain on MySQL re-executes an already-loaded relation", async () => {
       const relation = Author.where({ id: authors("david").id });
-      await relation.toArray(); // prime the load cache
+      await relation; // prime the load cache
       const plan = await relation.explain();
       expect(plan).toContain("`authors`");
       expect(plan).not.toMatch(/"authors"/);

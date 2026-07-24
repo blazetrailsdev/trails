@@ -107,7 +107,7 @@ describe("DisableJoinsAssociationScope", () => {
     }) as DisableJoinsAssociationRelation<Base>;
     expect(built).toBeInstanceOf(DisableJoinsAssociationRelation);
 
-    const records = await built.toArray();
+    const records = await built;
     expect(records.map((r: any) => r.body).sort()).toEqual(["c1", "c2"]);
   });
 
@@ -130,7 +130,7 @@ describe("DisableJoinsAssociationScope", () => {
       if (typeof sql === "string") observed.push(sql);
     });
     try {
-      const records = await built.toArray();
+      const records = await built;
       expect(records.length).toBe(1);
       expect((records[0] as any).body).toBe("c1");
     } finally {
@@ -181,7 +181,7 @@ describe("DisableJoinsAssociationScope", () => {
       klass: reflection.klass,
     }) as DisableJoinsAssociationRelation<Base>;
 
-    const records = await built.toArray();
+    const records = await built;
     expect(records.map((r: any) => r.body)).toEqual(["from-a", "from-b"]);
   });
 
@@ -213,7 +213,7 @@ describe("DisableJoinsAssociationScope", () => {
     (djar as any)._whereClause.predicates.push(
       ...(DjsPost as any).where({ id: [post1.id, post2.id] })._whereClause.predicates,
     );
-    const loaded = await djar.toArray();
+    const loaded = await djar;
     expect(loaded.map((p: any) => p.title)).toEqual(["p2", "p1"]);
   });
 });

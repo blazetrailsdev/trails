@@ -97,7 +97,7 @@ describe("UpdateAllTest", () => {
   it("update all with scope", async () => {
     const tag = tags("general");
     await Post.taggedWith(tag.id as number).updateAll({ title: "rofl" });
-    const taggedPosts = await Post.taggedWith(tag.id as number).toArray();
+    const taggedPosts = await Post.taggedWith(tag.id as number);
     expect(taggedPosts.length).toBeGreaterThan(0);
     taggedPosts.forEach((post: any) => expect(post.title).toBe("rofl"));
   });
@@ -116,7 +116,7 @@ describe("UpdateAllTest", () => {
   it("update all with group by", async () => {
     const minimumCommentsCount = 2;
     await Post.mostCommented(minimumCommentsCount).updateAll({ title: "ig" });
-    const updatedPosts = await Post.mostCommented(minimumCommentsCount).toArray();
+    const updatedPosts = await Post.mostCommented(minimumCommentsCount);
     expect(updatedPosts.length).toBeGreaterThan(0);
     updatedPosts.forEach((post: any) => expect(post.title).toBe("ig"));
 

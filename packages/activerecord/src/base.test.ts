@@ -1059,7 +1059,7 @@ describe("BasicsTest", () => {
     // Rails: assert_equal bulbs_of_car, car.bulbs.includes(:car)
     // AssociationRelation (includes chain off proxy) returns same rows as plain Relation
     const assocRelation = (car as any).bulbs.includes("car");
-    const relationResults = await bulbsOfCar.toArray();
+    const relationResults = await bulbsOfCar;
     const assocResults = await assocRelation.toArray();
     expect(relationResults).toHaveLength(1);
     expect(assocResults.map((r: any) => r.id).sort()).toEqual(

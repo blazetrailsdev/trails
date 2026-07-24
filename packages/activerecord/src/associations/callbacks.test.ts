@@ -286,7 +286,7 @@ describe("AssociationCallbacksTest", () => {
     const proxy = association(author, "posts");
     const p = new (Post as any)({ title: "Blocked", body: "Body", author_id: author.id });
     await proxy.push(p);
-    const posts = await proxy.toArray();
+    const posts = await proxy;
     expect(posts.length).toBe(0);
   });
 
@@ -414,7 +414,7 @@ describe("AssociationCallbacksTest", () => {
     const proxy = association(author, "posts");
     const p = new (Post as any)({ title: "abc", body: "Body", author_id: author.id });
     await proxy.push(p);
-    expect((await proxy.toArray()).length).toBe(0);
+    expect((await proxy).length).toBe(0);
   });
 
   it("has many callbacks halt execution when abort is trown when removing from association", async () => {
@@ -422,12 +422,12 @@ describe("AssociationCallbacksTest", () => {
     const author = await Author.create({ name: "David" });
     const p = await (Post as any).create({ title: "abc", body: "Body", author_id: author.id });
     const proxy = association(author, "posts");
-    expect((await proxy.toArray()).length).toBe(1);
+    expect((await proxy).length).toBe(1);
     // Rails passes the bare id to `destroy` (not `delete`): the abortable
     // before_remove loop shares remove_records with delete, so an abort leaves
     // the record (and its DB row) in place.
     await proxy.destroy(p.id);
-    expect((await proxy.toArray()).length).toBe(1);
+    expect((await proxy).length).toBe(1);
     expect(await (Post as any).exists(p.id)).toBe(true);
   });
 
@@ -447,10 +447,10 @@ describe("AssociationCallbacksTest", () => {
     });
     const p2 = await (Post as any).create({ title: "keep", body: "Body", author_id: author.id });
     const proxy = association(author, "posts");
-    expect((await proxy.toArray()).length).toBe(2);
+    expect((await proxy).length).toBe(2);
     await proxy.delete(p1, p2);
     // p1 must NOT have been removed even though its own before_remove passed.
-    expect((await proxy.toArray()).length).toBe(2);
+    expect((await proxy).length).toBe(2);
   });
 
   it("has many callbacks with create!", async () => {
@@ -506,7 +506,7 @@ describe("AssociationCallbacksTest", () => {
     } catch {
       // swallowed, like Rails' `rescue Exception`
     }
-    expect((await proxy.toArray()).length).toBe(0);
+    expect((await proxy).length).toBe(0);
   });
 
   it("after_add callback throwing abort propagates (not swallowed)", async () => {
@@ -652,7 +652,7 @@ describe("AssociationCallbacksTest", () => {
     // david + jamis (+ poor_jamis) are joined to active_record via the
     // developers_projects fixtures, so clear() actually removes rows — and
     // must do so without firing the before/after remove callbacks.
-    expect((await proxy.toArray()).length).toBeGreaterThan(0);
+    expect((await proxy).length).toBeGreaterThan(0);
     await proxy.clear();
     expect(activerecord.developersLog).toEqual([]);
   });
@@ -665,7 +665,7 @@ describe("AssociationCallbacksTest", () => {
     const callbackLog = ["before_adding<new>", "after_adding<new>"];
     expect(project.developersLog).toEqual(callbackLog);
     expect(await project.save()).toBe(true);
-    expect((await proxy.toArray()).length).toBe(1);
+    expect((await proxy).length).toBe(1);
     expect(project.developersLog).toEqual(callbackLog);
   });
 });

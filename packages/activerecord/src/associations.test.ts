@@ -1932,7 +1932,7 @@ describe("AssociationsTest", () => {
 
   it("should construct new finder sql after create", async () => {
     const person = Person.new({ first_name: "clark" });
-    expect(await association(person, "readers").toArray()).toEqual([]);
+    expect(await association(person, "readers")).toEqual([]);
     await person.save();
     const reader = await Reader.create({
       person,
@@ -1943,7 +1943,7 @@ describe("AssociationsTest", () => {
 
   it("subselect", async () => {
     const author = authors("david");
-    const favs = await association(author, "authorFavorites").toArray();
+    const favs = await association(author, "authorFavorites");
     const fav2 = await association(author, "authorFavorites").where({
       author: Author.where({ id: author.id }),
     });
@@ -2025,7 +2025,7 @@ describe("AssociationsTest", () => {
     const firm = new Firm({ name: "A New Firm, Inc" });
     await firm.save();
     // forcing to load all clients
-    for (const _ of await firm.clients.toArray()) {
+    for (const _ of await firm.clients) {
       void _;
     }
     expect(await firm.clients.isEmpty()).toBe(true);
@@ -2050,7 +2050,7 @@ describe("AssociationsTest", () => {
     await comment.save();
     await association(blogPost, "comments").push(comment);
 
-    const comments = await association(blogPost, "comments").toArray();
+    const comments = await association(blogPost, "comments");
     expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
     expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
@@ -2205,7 +2205,7 @@ describe("AssociationsTest", () => {
     await association(blogPost, "comments").push(comment);
 
     expect(comment.isPersisted()).toBe(true);
-    const comments = await association(blogPost, "comments").toArray();
+    const comments = await association(blogPost, "comments");
     expect(comments.map((c: any) => c.id)).toContain((comment as any).id);
     expect(Number((comment as any).blog_post_id)).toBe(Number((blogPost as any).id));
     expect((comment as any).blog_id).toBe((blogPost as any).blog_id);
@@ -2235,7 +2235,7 @@ describe("AssociationsTest", () => {
     await association(blogPost, "tags").push(tag);
 
     await blogPost.reload();
-    const reloadedTags = await association(blogPost, "tags").toArray();
+    const reloadedTags = await association(blogPost, "tags");
     expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
     expect(reloadedTags.map((t: any) => t.id)).not.toContain((noiseTag as any).id);
     const join = await ShardedBlogPostTag.where({
@@ -2262,7 +2262,7 @@ describe("AssociationsTest", () => {
 
     expect(tag.isPersisted()).toBe(true);
     await blogPost.reload();
-    const reloadedTags = await association(blogPost, "tags").toArray();
+    const reloadedTags = await association(blogPost, "tags");
     expect(reloadedTags.map((t: any) => t.id)).toContain((tag as any).id);
     const join = await ShardedBlogPostTag.where({
       blog_post_id: (blogPost as any).id,
@@ -2276,16 +2276,16 @@ describe("AssociationsTest", () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
     let comment = shardedComments("great_comment_blog_post_one");
 
-    expect(await association(blogPost, "comments").toArray()).not.toHaveLength(0);
+    expect(await association(blogPost, "comments")).not.toHaveLength(0);
     await association(blogPost, "comments").replace([]);
 
     comment = (await ShardedComment.find((comment as any).id)) as never;
     expect((comment as any).blog_post_id).toBeNull();
     expect((comment as any).blog_id).toBeNull();
 
-    expect(await association(blogPost, "comments").toArray()).toHaveLength(0);
+    expect(await association(blogPost, "comments")).toHaveLength(0);
     await blogPost.reload();
-    expect(await association(blogPost, "comments").toArray()).toHaveLength(0);
+    expect(await association(blogPost, "comments")).toHaveLength(0);
   });
 
   it("assign persisted composite foreign key belongs to association", async () => {
@@ -2450,7 +2450,7 @@ describe("AssociationsTest", () => {
       const blogPost = shardedBlogPosts("great_post_blog_one");
       let error: unknown;
       try {
-        await association(blogPost, "commentsWithoutSingleColumnQueryConstraints").toArray();
+        await association(blogPost, "commentsWithoutSingleColumnQueryConstraints");
       } catch (e) {
         error = e;
       }
@@ -2475,7 +2475,7 @@ describe("AssociationsTest", () => {
       const blogPost = shardedBlogPosts("great_post_blog_one");
       let error: unknown;
       try {
-        await association(blogPost, "commentsWithoutMultipleColumnQueryConstraints").toArray();
+        await association(blogPost, "commentsWithoutMultipleColumnQueryConstraints");
       } catch (e) {
         error = e;
       }
@@ -2505,7 +2505,7 @@ describe("AssociationsTest", () => {
       const blogPost = shardedBlogPosts("great_post_blog_one");
       let error: unknown;
       try {
-        await association(blogPost, "commentsWithCompositePkOwner").toArray();
+        await association(blogPost, "commentsWithCompositePkOwner");
       } catch (e) {
         error = e;
       }
@@ -2520,13 +2520,13 @@ describe("AssociationsTest", () => {
 
   it("nullify composite has many through association", async () => {
     const blogPost = shardedBlogPosts("great_post_blog_one");
-    expect((await association(blogPost, "tags").toArray()).length).toBeGreaterThan(0);
+    expect((await association(blogPost, "tags")).length).toBeGreaterThan(0);
 
     await association(blogPost, "tags").replace([]);
 
-    expect(await association(blogPost, "tags").toArray()).toEqual([]);
+    expect(await association(blogPost, "tags")).toEqual([]);
     await association(blogPost, "tags").reload();
-    expect(await association(blogPost, "tags").toArray()).toEqual([]);
+    expect(await association(blogPost, "tags")).toEqual([]);
     expect(
       await ShardedBlogPostTag.where({
         blog_post_id: (blogPost as any).id,

@@ -60,16 +60,14 @@ describe("RelationScopingTest", () => {
   it("scope breaks caching on collections", async () => {
     let author = authors("david");
     await author.reload();
-    const ids = (await association(author, "specialPostsWithDefaultScope").toArray()).map(
-      (p: any) => p.id,
-    );
+    const ids = (await association(author, "specialPostsWithDefaultScope")).map((p: any) => p.id);
     expect(ids.map(Number).sort((a, b) => a - b)).toEqual([1, 5, 6]);
     const scopedPosts = await SpecialPostWithDefaultScope.unscoped(async () => {
       author = authors("david");
       await author.reload();
       return association(author, "specialPostsWithDefaultScope").toArray();
     });
-    const expected = (await association(author, "posts").toArray())
+    const expected = (await association(author, "posts"))
       .map((p: any) => p.id)
       .sort((a: number, b: number) => (a < b ? -1 : a > b ? 1 : 0));
     expect(
@@ -374,7 +372,7 @@ describe("RelationScopingTest", () => {
   it("scoping is correctly restored", async () => {
     await Comment.unscoped(async () => {
       await SpecialComment.unscoped(async () => {
-        await SpecialComment.created().toArray();
+        await SpecialComment.created();
       });
     });
     expect(Comment.currentScope).toBeNull();

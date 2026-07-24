@@ -146,7 +146,7 @@ describe("BindParameterTest", () => {
 
     const cap = captureSelectSql();
     const topics = Topic.where({ id: 1 });
-    expect((await topics.toArray()).map((t: any) => Number(t.id))).toEqual([1]);
+    expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
     cap.stop();
 
     const key = conn.sqlKey(cap.sqls.at(-1));
@@ -166,7 +166,7 @@ describe("BindParameterTest", () => {
     try {
       const cap = captureSelectSql();
       const topics = Topic.where({ id: 1 });
-      expect((await topics.toArray()).map((t: any) => Number(t.id))).toEqual([1]);
+      expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
       cap.stop();
 
       expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
@@ -231,7 +231,7 @@ describe("BindParameterTest", () => {
     const cap = captureSelectSql();
     const topics = Topic.where({ id: [1, 3] });
     expect(
-      (await topics.toArray()).map((t: any) => Number(t.id)).sort((a: number, b: number) => a - b),
+      (await topics).map((t: any) => Number(t.id)).sort((a: number, b: number) => a - b),
     ).toEqual([1, 3]);
     cap.stop();
 
@@ -252,7 +252,7 @@ describe("BindParameterTest", () => {
     // BoundSqlLiteral (preparable), so the statement IS pooled (assert_includes,
     // bind_parameter_test.rb:100-107).
     const topics = Topic.where("topics.id = ?", 1);
-    expect((await topics.toArray()).map((t: any) => Number(t.id))).toEqual([1]);
+    expect((await topics).map((t: any) => Number(t.id))).toEqual([1]);
     cap.stop();
 
     expect(statementCacheKeys(conn)).toContain(conn.sqlKey(cap.sqls.at(-1)));
@@ -427,7 +427,7 @@ describe("BindParameterTest", () => {
     let sql = `SELECT ${table}.* FROM ${table} WHERE (${pk} IN (${bindParams(conn, [1, 2, 3])}) OR ${pk} IS NULL)`;
     const authors = Author.where({ id: [1, 2, 3, null] });
     expect(conn.toSql(authors.arel())).toBe(sql);
-    expect((await authors.toArray()).length).toBe(3);
+    expect((await authors).length).toBe(3);
 
     // Rails' middle assertion (`where(id: [1, 2, 3, 2**63])` → `IN (1, 2, 3)`)
     // tests that an over-range integer is excluded from the array condition.

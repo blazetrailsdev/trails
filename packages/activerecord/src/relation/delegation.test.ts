@@ -446,7 +446,7 @@ describe("DelegationTest", () => {
       // Same loaded relation, so index()/rindex() see the cached instances and
       // identity comparison matches.
       const relation = Comment.all();
-      const records = await relation.toArray();
+      const records = await relation;
       const mid = records[Math.floor(records.length / 2)];
       expect(await relation.index(mid)).toBe(records.findIndex((c) => c.id === mid.id));
       expect(await relation.rindex((c: any) => c.id === mid.id)).toBe(

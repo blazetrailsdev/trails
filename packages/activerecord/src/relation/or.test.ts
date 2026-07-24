@@ -190,9 +190,7 @@ describe("OrTest", () => {
       ...(await author.posts.toArray()),
       ...(await Post.where({ title: "I don't have any comments" })),
     ];
-    expect(byId(await actual.toArray()).map((p: any) => p.id)).toEqual(
-      byId(expected).map((p: any) => p.id),
-    );
+    expect(byId(await actual).map((p: any) => p.id)).toEqual(byId(expected).map((p: any) => p.id));
   });
 
   it("or with scope on association", async () => {

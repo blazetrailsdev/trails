@@ -531,7 +531,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries", async () => {
     const posts = Post.all();
-    await posts.toArray(); // load
+    await posts; // load
     const total = Number(await Post.count());
     let batchCount = 0;
     await assertQueriesCount(0, false, async () => {
@@ -545,7 +545,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries with order argument", async () => {
     const allPosts = Post.all().order("id asc");
-    await allPosts.toArray(); // load
+    await allPosts; // load
     const total = Number(await Post.count());
     let batchCount = 0;
     await assertQueriesCount(0, false, async () => {
@@ -559,7 +559,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries with start and end arguments", async () => {
     const allPosts = Post.all().order("id asc");
-    const loadedPosts = await allPosts.toArray();
+    const loadedPosts = await allPosts;
     const startId = loadedPosts[1].id as number;
     const finishId = loadedPosts[loadedPosts.length - 2].id as number;
     let batchCount = 0;
@@ -578,7 +578,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries with start and end arguments and reverse order", async () => {
     const allPosts = Post.all().order("id asc");
-    const loadedPosts = await allPosts.toArray();
+    const loadedPosts = await allPosts;
     const startId = loadedPosts[loadedPosts.length - 2].id as number;
     const finishId = loadedPosts[1].id as number;
     let batchCount = 0;
@@ -598,7 +598,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded can return an enum", async () => {
     const allPosts = Post.all();
-    await allPosts.toArray(); // load
+    await allPosts; // load
     const total = Number(await Post.count());
     let batchCount = 0;
     await assertQueriesCount(0, false, async () => {
@@ -612,7 +612,7 @@ describe("EachTest", () => {
 
   it("in batches when loaded runs no queries when batching over cpk model", async () => {
     const incorrectlySorted = CpkOrder.order({ shop_id: "asc", id: "desc" });
-    await incorrectlySorted.toArray(); // load
+    await incorrectlySorted; // load
     const correctlySorted = await CpkOrder.order({ shop_id: "desc", id: "asc" });
     const expected = correctlySorted.slice(1, correctlySorted.length - 1);
     const startId = (expected[0] as any).id;
@@ -640,7 +640,7 @@ describe("EachTest", () => {
     });
     try {
       const orderedPosts = Post.order("id desc");
-      await orderedPosts.toArray(); // load
+      await orderedPosts; // load
       const expected = await Post.order("id desc");
       const collected: any[] = [];
       for await (const post of orderedPosts

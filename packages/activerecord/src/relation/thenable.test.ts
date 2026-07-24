@@ -127,7 +127,7 @@ describe("Thenable", () => {
     // The view is not a copy: loading through it marked the original loaded,
     // and both read the same records.
     expect(davids.isLoaded).toBe(true);
-    expect(await first.toArray()).toEqual(await davids.toArray());
+    expect(await first.toArray()).toEqual(await davids);
   });
 
   it("chaining load off a loaded relation does not nest views", async () => {

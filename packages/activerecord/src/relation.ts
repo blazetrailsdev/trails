@@ -6220,7 +6220,7 @@ export class Relation<T extends Base> {
    */
   async equals(other: Relation<T>): Promise<boolean> {
     const a = await this.toArray();
-    const b = await other.toArray();
+    const b = await other;
     if (a.length !== b.length) return false;
     return a.every((rec, i) => rec.isEqual(b[i]));
   }

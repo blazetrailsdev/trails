@@ -85,7 +85,7 @@ export class Preloader {
    */
   async materialize(): Promise<void> {
     if (this._materialized) return;
-    this._tree.preloadedRecords = await (this.records as Relation<Base>).toArray();
+    this._tree.preloadedRecords = await (this.records as Relation<Base>);
     this._materialized = true;
   }
 

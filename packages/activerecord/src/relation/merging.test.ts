@@ -225,7 +225,7 @@ describe("RelationMergingTest", () => {
     // both so the comparison is between records, mirroring Rails' sync read.
     const expected = await (await Post.find(1)).lastComment;
     for (const rel of relations) {
-      const posts = await rel.toArray();
+      const posts = await rel;
       const post = posts.find((p: any) => Number(p.id) === 1);
       expect((await (post as any).lastComment)?.id).toEqual((expected as any)?.id);
     }

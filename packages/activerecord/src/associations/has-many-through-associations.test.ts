@@ -2256,7 +2256,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("through scope is affected by unscoping", async () => {
     const author = authors("david");
-    const expected = ids(await association(author, "comments").toArray());
+    const expected = ids(await association(author, "comments"));
 
     const inside = await FirstPost.unscoped(async () => {
       return association(author, "commentsOnFirstPosts").toArray();
@@ -2268,7 +2268,7 @@ describe("HasManyThroughAssociationsTest", () => {
 
   it("through scope isnt affected by scoping", async () => {
     const author = authors("david");
-    const expected = ids(await association(author, "commentsOnFirstPosts").toArray());
+    const expected = ids(await association(author, "commentsOnFirstPosts"));
 
     const inside = await FirstPost.where({ id: 2 }).scoping(async () => {
       association(author, "commentsOnFirstPosts").reset();

@@ -37,7 +37,7 @@ describe("DeleteAllTest", () => {
     const davids = Author.where({ name: "David" });
 
     // Force load
-    expect(await davids.toArray()).toEqual([authors("david")]);
+    expect(await davids).toEqual([authors("david")]);
     expect(davids.isLoaded).toBe(true);
 
     const destroyed = await davids.destroyAll();
@@ -45,7 +45,7 @@ describe("DeleteAllTest", () => {
     expect(destroyed[0].id).toBe(authors("david").id);
     expect(destroyed[0].isDestroyed()).toBe(true);
 
-    expect(await davids.toArray()).toEqual([]);
+    expect(await davids).toEqual([]);
   });
 
   it("delete all", async () => {
@@ -72,20 +72,20 @@ describe("DeleteAllTest", () => {
     const davids = Author.where({ name: "David" });
 
     // Force load
-    expect(await davids.toArray()).toEqual([authors("david")]);
+    expect(await davids).toEqual([authors("david")]);
     expect(davids.isLoaded).toBe(true);
 
     const before = (await Author.count()) as number;
     await davids.deleteAll();
     expect(await Author.count()).toBe(before - 1);
 
-    expect(await davids.toArray()).toEqual([]);
+    expect(await davids).toEqual([]);
     expect(davids.isLoaded).toBe(true);
   });
 
   it("delete all with group by and having", async () => {
     const minimumCommentsCount = 2;
-    const postsToBeDeleted = await Post.mostCommented(minimumCommentsCount).toArray();
+    const postsToBeDeleted = await Post.mostCommented(minimumCommentsCount);
     expect(postsToBeDeleted.length).toBeGreaterThan(0);
 
     const before = (await Post.count()) as number;
