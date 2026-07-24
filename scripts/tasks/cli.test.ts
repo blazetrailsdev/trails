@@ -42,6 +42,7 @@ import {
   prLocDelta,
   uncheckedCheckboxes,
   commitAndPush,
+  extractMarkdownlintViolations,
   depCyclePath,
   editFrontmatter,
   finalize,
@@ -1427,6 +1428,87 @@ describe("commitAndPush (git mutation flow)", () => {
     expect(seen).not.toContain("push");
     expect(seen.filter((l) => l === "reset").length).toBe(1);
     expect(seen.filter((l) => l === "clean").length).toBe(1);
+  });
+
+  const MARKDOWNLINT_STDERR = [
+    "markdownlint-cli2 v0.18.1 (markdownlint v0.38.0)",
+    "Finding: rfcs/0025-x/stories/s.md !node_modules/**",
+    "Linting: 1 file(s)",
+    'rfcs/0025-x/stories/s.md:31:1 MD018/no-missing-space-atx No space after hash on atx style heading [Context: "#4869 (which fixed"]',
+    'rfcs/0025-x/stories/s.md:44 MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]',
+    "Summary: 2 error(s)",
+  ].join("\n");
+
+  it("extracts only the rule violations from markdownlint's chatter", () => {
+    expect(extractMarkdownlintViolations(MARKDOWNLINT_STDERR)).toEqual([
+      'rfcs/0025-x/stories/s.md:31:1 MD018/no-missing-space-atx No space after hash on atx style heading [Context: "#4869 (which fixed"]',
+      'rfcs/0025-x/stories/s.md:44 MD040/fenced-code-language Fenced code blocks should have a language specified [Context: "```"]',
+    ]);
+  });
+
+  it("exits with the markdownlint violations, not a git commit stack trace", () => {
+    const { seen, exit, lockDir } = setup();
+    const errors: string[] = [];
+    vi.spyOn(console, "error").mockImplementation((...a: unknown[]) => {
+      errors.push(a.map(String).join(" "));
+    });
+    const NEW_FILE = "/some/new-story.md";
+    const worktree = new Set<string>();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
+      if (label === "clean") worktree.delete(args[args.length - 1]);
+      if (label === "commit") throw pushError(MARKDOWNLINT_STDERR);
+      return "" as never;
+    });
+    expect(() =>
+      commitAndPush({
+        message: "new: 0025-x/s",
+        fileToStage: NEW_FILE,
+        createdPath: NEW_FILE,
+        mutator: () => worktree.add(NEW_FILE),
+        raceMessage: "lost the race, retry",
+        raceExitCode: 99,
+      }),
+    ).toThrow("exit 1");
+    expect(exit).toHaveBeenCalledWith(1);
+    const last = errors[errors.length - 1];
+    expect(last).toContain("MD018/no-missing-space-atx");
+    expect(last).toContain("rfcs/0025-x/stories/s.md:31:1");
+    expect(last).toContain("MD040/fenced-code-language");
+    expect(last).toMatch(/NOT the transient push race/);
+    expect(last).not.toContain("lost the race, retry");
+    expect(seen).not.toContain("push");
+    expect(worktree.size).toBe(0);
+    expect(existsSync(join(lockDir, "tasks-cli.lock"))).toBe(false);
+  });
+
+  it("re-raises a commit failure that carries no markdownlint violations", () => {
+    const { seen } = setup();
+    execFileSyncMock.mockImplementation((_file, args) => {
+      const label = args && args.length >= 3 ? args[2] : "";
+      if (label === "symbolic-ref") return "main" as never;
+      seen.push(label);
+      if (label === "diff-tree") return "story.md" as never;
+      if (label === "commit") throw pushError("validate: story frontmatter is invalid");
+      return "" as never;
+    });
+    let thrown: unknown;
+    try {
+      commitAndPush({
+        message: "test",
+        fileToStage: "/some/file.md",
+        mutator: () => {},
+        raceMessage: "no",
+        raceExitCode: 99,
+      });
+    } catch (e) {
+      thrown = e;
+    }
+    expect((thrown as { stderr?: string })?.stderr).toContain("story frontmatter is invalid");
+    expect(seen).not.toContain("push");
   });
 
   it("surfaces the underlying error (with stack) when a mutator throws, never a bare exit", () => {

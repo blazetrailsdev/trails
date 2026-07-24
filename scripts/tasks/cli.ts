@@ -366,11 +366,18 @@ function inGitTasks(): void {
 // the same repo but on a feature branch.
 function git(
   args: string[],
-  opts: { silent?: boolean; cwd?: string; env?: NodeJS.ProcessEnv } = {},
+  opts: {
+    silent?: boolean;
+    cwd?: string;
+    env?: NodeJS.ProcessEnv;
+    captureStderr?: boolean;
+  } = {},
 ): string {
   return execFileSync("git", ["-C", opts.cwd ?? TASKS_DIR, ...args], {
     encoding: "utf8",
-    stdio: opts.silent ? ["ignore", "pipe", "pipe"] : ["inherit", "pipe", "inherit"],
+    stdio: opts.silent
+      ? ["ignore", "pipe", "pipe"]
+      : ["inherit", "pipe", opts.captureStderr ? "pipe" : "inherit"],
     ...(opts.env ? { env: { ...process.env, ...opts.env } } : {}),
   }).trim();
 }
@@ -892,6 +899,15 @@ export class MutatorEarlyExit extends Error {
   }
 }
 
+const MARKDOWNLINT_VIOLATION = /^.+?:\d+(?::\d+)?\s+MD\d{3}\/\S+\s+\S/;
+
+export function extractMarkdownlintViolations(stderr: string): string[] {
+  return stderr
+    .split("\n")
+    .map((l) => l.trim())
+    .filter((l) => MARKDOWNLINT_VIOLATION.test(l));
+}
+
 // Pull-rebase → run mutator → commit → push, retrying once on
 // non-fast-forward. `mutator` is run inside each attempt so a rebased
 // index file is re-read between tries. Throws (and asks caller to
@@ -1047,7 +1063,11 @@ export function commitAndPush(opts: {
         // below (and, before the pre-read sync took the lock, occasionally
         // pushing a clobbered EMPTY commit before we could reset it away). The
         // CLI owns its own push; silence the hook's.
-        git(["commit", "-q", "-m", opts.message], { cwd, env: { RFCS_NO_AUTOPUSH: "1" } });
+        git(["commit", "-q", "-m", opts.message], {
+          cwd,
+          captureStderr: true,
+          env: { RFCS_NO_AUTOPUSH: "1" },
+        });
       } catch (e) {
         // Atomic rollback: a throw between the file write and the commit (a
         // prettier crash in formatFiles, a failed `git add`/`commit`, etc.)
@@ -1064,6 +1084,19 @@ export function commitAndPush(opts: {
         // releases the lock; the exit with its intended code happens below.
         if (e instanceof MutatorEarlyExit) {
           earlyExit = e;
+          break;
+        }
+        const violations = extractMarkdownlintViolations(
+          String((e as { stderr?: unknown }).stderr ?? ""),
+        );
+        if (violations.length > 0) {
+          console.error(
+            `error: markdownlint rejected the commit — the markdown body is invalid.\n` +
+              `  This is NOT the transient push race: retrying will fail identically.\n` +
+              `  Nothing was committed or pushed; fix the body below and re-run.\n` +
+              violations.map((v) => `  ${v}`).join("\n"),
+          );
+          earlyExit = new MutatorEarlyExit(1);
           break;
         }
         throw e;
