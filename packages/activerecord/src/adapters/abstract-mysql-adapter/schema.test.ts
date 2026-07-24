@@ -6,15 +6,7 @@ import { describeIfMysql, Mysql2Adapter, MYSQL_TEST_URL } from "./test-helper.js
 import { Base } from "../../base.js";
 import { rebuildCanonicalTables } from "../../test-helpers/canonical-schema.js";
 
-/**
- * Rails runs these tests against its own schema-loaded connection and never
- * drops a canonical table. Here each test lays the canonical table it needs on
- * the shared per-worker DB and drops it again, which would leave the table
- * missing for every sibling file on that DB (the `comment.test.ts` repair
- * firings). Restore the canonical shape once the suite is done. Uses a plain
- * adapter so the rebuild never runs under ANSI_QUOTES.
- */
-async function restoreCanonical(names: readonly string[]): Promise<void> {
+async function restoreCanonicalOnPlainAdapter(names: readonly string[]): Promise<void> {
   const restorer = new Mysql2Adapter(MYSQL_TEST_URL);
   try {
     await rebuildCanonicalTables(restorer, names);
@@ -32,7 +24,7 @@ describeIfMysql("Mysql2Adapter", () => {
     await adapter.close();
   });
   afterAll(async () => {
-    await restoreCanonical(["posts"]);
+    await restoreCanonicalOnPlainAdapter(["posts"]);
   });
 
   describe("SchemaTest", () => {
@@ -213,7 +205,7 @@ describeIfMysql("MySQLAnsiQuotesTest", () => {
     ansi = undefined;
   });
   afterAll(async () => {
-    await restoreCanonical(["students", "lessons_students", "topics"]);
+    await restoreCanonicalOnPlainAdapter(["students", "lessons_students", "topics"]);
   });
 
   it("primary key method with ansi quotes", async () => {
