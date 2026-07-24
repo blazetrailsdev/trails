@@ -41,8 +41,6 @@ const cteSym = (name: string) => Symbol(name) as unknown as string;
 // ==========================================================================
 describeIfSupports("common_table_expressions", "WithTest", () => {
   fixtures(["comments", "posts", "companies"]);
-  // `comments`/`posts`/`companies` ride the boot-laid canonical schema (RFC 0059
-  // Phase 1), so no defensive recreate is needed.
 
   it("with when hash is passed as an argument", async () => {
     const relation = Post.with({

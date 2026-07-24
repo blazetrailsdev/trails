@@ -97,8 +97,7 @@ beforeEach(async () => {
 
 // Mirrors Rails teardown: drop the tables so the bespoke per-test shapes don't
 // leak into sibling files sharing the worker DB. Rails can stop there; we then
-// hand the canonical names back in their TEST_SCHEMA shape, since a later file
-// in the same worker reading one would otherwise see the bespoke shape.
+// hand the canonical names back in their TEST_SCHEMA shape.
 afterAll(async () => {
   const conn = schema();
   await conn.dropTable("values", "group", "distinct_select", "distinct", "select", "order", {

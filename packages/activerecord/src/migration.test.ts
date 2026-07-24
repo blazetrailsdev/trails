@@ -144,8 +144,7 @@ afterEach(async () => {
 // `memberships`, `values`, …) are deliberately NOT in this list: dropping a
 // canonical table would corrupt siblings that ride it. The two ReservedWords
 // tests below force-create a bespoke `values(value)` over the canonical
-// `values` shape, so hand that canonical table back in its canonical shape
-// after the bespoke drops.
+// `values` shape.
 afterAll(async () => {
   const { adapter, ctx } = await freshContext();
   const o = { ifExists: true } as const;

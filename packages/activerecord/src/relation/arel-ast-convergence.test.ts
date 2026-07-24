@@ -98,7 +98,6 @@ describe("RFC 0022 arel-AST convergence (relation layer)", () => {
     // the derived-table subquery actually scopes the rows. Executes against
     // the active adapter (each CI lane runs its own backend).
     describe("executing through Relation#pluck", () => {
-      // `posts` rides the boot-laid canonical schema (RFC 0059 Phase 1).
       fixtures(["posts"]);
 
       it("scopes plucked rows to the from(subquery)", async () => {

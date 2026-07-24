@@ -35,8 +35,6 @@ describe("SelectTest", () => {
   // longer poisons the rollback (mirrors Rails, which runs these transactionally
   // with no opt-out).
   fixtures(["posts", "comments"]);
-  // `posts`/`comments` ride the boot-laid canonical schema (RFC 0059 Phase 1),
-  // so no defensive recreate is needed.
   const q = (name: string) => escapeRegExp(quoteTableName(name));
 
   it("select with nil argument", () => {
