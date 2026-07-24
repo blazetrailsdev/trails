@@ -24,12 +24,6 @@
  *     [--incomplete] [--gates] [--check] [--sort-extra] [--min-extra=N]
  *     [--package activesupport]
  *
- *   --check       Hard-zero CI gate: exit non-zero if the gate-mismatch count
- *                 for any enforced package (see GATE_ENFORCED_PACKAGES —
- *                 activerecord only) is non-zero. No baseline, no exclude-list.
- *                 Independent of --gates/--json; combine with --gates so the CI
- *                 log carries the per-test breakdown alongside the exit code.
- *
  *   --incomplete  In the per-file table, hide files that are fully complete
  *                 (every Ruby test matched in the convention TS file, no
  *                 wrong-describe). Misplaced tests are not in this file's
@@ -40,6 +34,10 @@
  *                 missing-gate / wrong-gate / over-gated). Advisory: does not
  *                 affect the matched/skipped/percent counts. Always emitted to
  *                 the JSON artifact regardless of this flag.
+ *   --check       Hard-zero CI gate: exit non-zero if the gate-mismatch count
+ *                 for an enforced package (GATE_ENFORCED_PACKAGES — activerecord
+ *                 only) is non-zero. No baseline, no exclude-list. Combine with
+ *                 --gates so the CI log carries the per-test breakdown too.
  *   --assertions  Print the assertion-count-mismatch report — matched,
  *                 implemented tests whose trails port has a different assertion-
  *                 call count than its Rails counterpart. Scoped to activerecord
@@ -80,32 +78,25 @@ const OUTPUT_DIR = path.join(SCRIPT_DIR, "output");
 // tokens, `--assertions` section, JSON) here so it can't leak into other totals.
 const ASSERTION_REPORT_PACKAGES = new Set(["activerecord"]);
 
-// Packages whose gate-mismatch count is a hard-zero CI gate (`--check`). Once
-// the four burndown clusters (missing-gate / wrong-gate / over-gated /
-// should-gate) reached zero for activerecord, this locks it in so it can't
-// silently regrow. Hard zero: no exclude-list, no baseline ratchet. Scoped to
-// activerecord only (RFC 0032 `ar-gate-fidelity-burndown`); other packages
-// stay report-only.
 export const GATE_ENFORCED_PACKAGES = new Set(["activerecord"]);
 
-/**
- * Pure selector for the hard-zero gate: the enforced packages (activerecord)
- * whose gate-mismatch count is non-zero. Empty array = gate passes.
- */
 export function gateMismatchOffenders<T extends { package: string; totalGateMismatch: number }>(
   results: T[],
 ): T[] {
   return results.filter((r) => GATE_ENFORCED_PACKAGES.has(r.package) && r.totalGateMismatch > 0);
 }
 
-/**
- * Hard-zero enforcement for `--check`: exit non-zero if any enforced package
- * has a non-zero gate-mismatch count. Prints the offending package(s) so the CI
- * log points straight at the regression; run `--gates` for the per-test
- * breakdown.
- */
 function enforceGateZero(results: { package: string; totalGateMismatch: number }[]): void {
-  const offenders = gateMismatchOffenders(results);
+  const enforced = results.filter((r) => GATE_ENFORCED_PACKAGES.has(r.package));
+  if (enforced.length === 0) {
+    console.error("");
+    console.error(
+      `✗ --check found no enforced package to gate (expected one of: ${[...GATE_ENFORCED_PACKAGES].join(", ")}).`,
+    );
+    console.error("  The gate can't be scoped away — drop the --package filter or fix the wiring.");
+    process.exit(1);
+  }
+  const offenders = enforced.filter((r) => r.totalGateMismatch > 0);
   if (offenders.length === 0) return;
   console.error("");
   console.error("✗ gate-mismatch check failed (hard zero, no baseline):");
