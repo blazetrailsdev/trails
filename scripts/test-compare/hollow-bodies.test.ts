@@ -114,6 +114,30 @@ describe("hollow-body detector", () => {
     expect(findings).toEqual([]);
   });
 
+  it("ignores a snake_case bang method", () => {
+    const findings = sweep(`
+      it("deep_merge! mutates the instance", () => {
+        h.deepMergeBang(other, (key, a, b) => a);
+        expect(h).toEqual(expected);
+      });
+    `);
+    expect(findings).toEqual([]);
+  });
+
+  // A bare "!" is prose, not a bang method — exempting on it would silently
+  // blind the no-mutation rule to any test title that ends in an exclamation.
+  it("does not treat a prose exclamation as a bang method", () => {
+    const findings = sweep(`
+      it("modifies the payload, success!", () => {
+        instrument("m", {}, (payload) => {
+          read(payload);
+        });
+        expect(events).toHaveLength(1);
+      });
+    `);
+    expect(findings.map((f) => f.reason)).toEqual(["no-mutation"]);
+  });
+
   it("reports a clean sweep on one line", () => {
     expect(formatReport([], 27828)).toBe("Hollow-body sweep: 0 findings across 27828 tests");
   });

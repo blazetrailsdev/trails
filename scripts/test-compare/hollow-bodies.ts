@@ -25,8 +25,13 @@ const YIELD_PROMISE =
  * of the six hollow tests #4892 exposed. Rails' originals mutate the yielded
  * payload; a body that writes to nothing at all cannot be testing this name.
  */
-/** Ruby bang methods mutate their receiver by the CALL, not by an assignment. */
-const BANG_METHOD = /(!|\bwith bang\b)/i;
+/**
+ * Ruby bang methods mutate their receiver by the CALL, not by an assignment.
+ * Anchored to the naming convention rather than a bare `!`: an exclamation mark
+ * anywhere in a title ("raises an error!") is prose, not a method name. A bang
+ * method reads as `deep_merge!` (snake_case token) or, ported, `…Bang`.
+ */
+const BANG_METHOD = /\w+_\w*!|\bbang\b/i;
 const MUTATION_PROMISE = /\b(for further modification|is changed during|modifies|mutates)\b/i;
 /**
  * Names that promise a raise. Used only to widen the zero-assertion rule — NOT

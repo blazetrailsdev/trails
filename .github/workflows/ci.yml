@@ -382,17 +382,20 @@ jobs:
     steps:
       - uses: actions/checkout@v5
       - uses: ./.github/actions/setup-pnpm
-      - run: pnpm install --frozen-lockfile --prefer-offline
+      - id: install
+        run: pnpm install --frozen-lockfile --prefer-offline
       - run: pnpm lint
       # test:compare matches our tests to Rails BY NAME, so a test whose name
       # promises a behaviour its body never exercises reports coverage it does
       # not provide (PR #4892). The tree is clean, so this is a zero-tolerance
       # gate rather than a ratchet. Lives here rather than in `preflight`:
       # that job deliberately never installs pnpm, and this needs the workspace
-      # deps (tsx, typescript, tinyglobby). `!cancelled()` so a `pnpm lint`
-      # failure can't skip it.
+      # deps (tsx, typescript, tinyglobby). The guard runs this step after a
+      # `pnpm lint` failure (independent reporting) but NOT after a failed
+      # install — without deps `pnpm test:hollow` would die on a missing tsx and
+      # mask the real failure with a confusing secondary one.
       - name: Hollow test bodies
-        if: ${{ !cancelled() }}
+        if: ${{ !cancelled() && steps.install.outcome == 'success' }}
         run: pnpm test:hollow
   # Consolidated sub-minute PR/push preflight checks. Each of prettier,
   # docs-AR-freeze, and pr-attribution does a few seconds of independent shell
