@@ -934,14 +934,6 @@ function invalidateStiDescendantColumnMemos(host: SchemaHost): void {
   }
 }
 
-// Whether `klass` is a shared-table STI overlay of its *nearest* STI ancestor.
-// Deliberately not `getStiBase(klass).tableName === klass.tableName`: getStiBase
-// keeps the TOPMOST `_inheritanceColumn` ancestor, so in a nested hierarchy
-// (Shape → Ticket, own table "tickets", STI re-enabled → Urgent, shares
-// "tickets") it reports Shape for Urgent and the table comparison then says
-// "own table" for a class that is a genuine overlay of Ticket. Comparing
-// against the immediate ancestor answers the question these callers actually
-// ask — does this class share its parent's schema host?
 function sharesStiBaseTable(klass: SchemaHost): boolean {
   if (!isStiSubclass(klass)) return true;
   const parent = Object.getPrototypeOf(klass) as SchemaHost | null;
@@ -971,13 +963,9 @@ function scrubSchemaSourcedDefinitions(host: SchemaHost): void {
 
 /** @internal */
 export function reloadSchemaFromCache(this: SchemaHost): void {
-  const host = isStiSubclass(this) && sharesStiBaseTable(this) ? stiSchemaHost(this) : this;
-  if (host !== this) {
+  if (isStiSubclass(this) && sharesStiBaseTable(this)) {
     clearStiSubclassLocalCaches(this);
-    // The full reload belongs on the schema host that actually owns the table —
-    // the topmost ancestor still sharing it — not on getStiBase's topmost STI
-    // ancestor, which may sit on a different table in a nested hierarchy.
-    reloadSchemaFromCache.call(host);
+    reloadSchemaFromCache.call(stiSchemaHost(this));
     return;
   }
   this._columnsHash = undefined;
