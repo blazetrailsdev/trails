@@ -703,7 +703,7 @@ jobs:
   coverage:
     name: Coverage (reporting-only)
     needs: changes
-    if: needs.changes.outputs.docs_only != 'true'
+    if: false
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -782,9 +782,7 @@ jobs:
   ar-sqlite-coverage:
     name: Active Record SQLite Coverage (reporting-only)
     needs: changes
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.activerecord_affected == 'true'
+    if: false
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 25
@@ -829,9 +827,7 @@ jobs:
   ar-cli-coverage:
     name: Active Record CLI Coverage (reporting-only)
     needs: changes
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      needs.changes.outputs.activerecord_affected == 'true'
+    if: false
     continue-on-error: true
     runs-on: ubuntu-latest
     # TRAILS_TEST_FORKS=1 serializes the cli suite onto one worker (see below),
@@ -905,10 +901,7 @@ jobs:
     # (the covered source) or tse-compiler (which its tests exercise) changed,
     # so this dedicated job doesn't add cost to unrelated PRs. Not in `ci`'s
     # `needs`, so a skip here never trips the all-jobs gate.
-    if: >-
-      needs.changes.outputs.docs_only != 'true' &&
-      (needs.changes.outputs.trails_tsc_affected == 'true' ||
-       needs.changes.outputs.tse_compiler_affected == 'true')
+    if: false
     continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 15
