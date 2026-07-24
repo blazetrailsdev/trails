@@ -2,8 +2,10 @@ import { describe, expect, test } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
+import type { FkSafeDropOrderHost } from "./canonical-schema.js";
 import {
   ensureCanonicalTables,
+  fkSafeDropOrder,
   loadCanonicalSchema,
   rebuildCanonicalTables,
 } from "./canonical-schema.js";
@@ -78,6 +80,65 @@ describe("rebuildCanonicalTables", () => {
     } finally {
       await (adapter as unknown as BetterSQLite3Adapter).close();
     }
+  });
+});
+
+describe("fkSafeDropOrder", () => {
+  // Stands in for the live database: `fks` maps a table to the tables it
+  // references, as `foreignKeys` would report them.
+  function host(tables: string[], fks: Record<string, string[]> = {}): FkSafeDropOrderHost {
+    return {
+      tables: async () => tables,
+      foreignKeys: async (name) => (fks[name] ?? []).map((toTable) => ({ toTable })),
+    };
+  }
+
+  test("drops a referencing table before its target", async () => {
+    // Registry order: lessons_students (referencer) is registered *before*
+    // students (target), so reversing registry order would drop students first.
+    const order = await fkSafeDropOrder(
+      host(["lessons_students", "students"], { lessons_students: ["students"] }),
+      ["lessons_students", "students"],
+    );
+    expect(order).toEqual(["lessons_students", "students"]);
+  });
+
+  test("keeps input order when no foreign keys are declared", async () => {
+    const order = await fkSafeDropOrder(host(["lessons_students", "students"]), [
+      "lessons_students",
+      "students",
+    ]);
+    expect(order).toEqual(["lessons_students", "students"]);
+  });
+
+  test("ignores foreign keys pointing outside the dropped set", async () => {
+    const order = await fkSafeDropOrder(host(["a", "b"], { a: ["elsewhere"], b: ["a"] }), [
+      "a",
+      "b",
+    ]);
+    expect(order).toEqual(["b", "a"]);
+  });
+
+  test("skips tables that do not exist yet", async () => {
+    const calls: string[] = [];
+    const base = host(["b"], { a: ["b"] });
+    const order = await fkSafeDropOrder(
+      {
+        tables: base.tables,
+        foreignKeys: async (name) => {
+          calls.push(name);
+          return base.foreignKeys(name);
+        },
+      },
+      ["a", "b"],
+    );
+    expect(calls).toEqual(["b"]);
+    expect(order).toEqual(["a", "b"]);
+  });
+
+  test("falls back to input order for a cycle", async () => {
+    const order = await fkSafeDropOrder(host(["a", "b"], { a: ["b"], b: ["a"] }), ["a", "b"]);
+    expect(order).toEqual(["a", "b"]);
   });
 });
 
