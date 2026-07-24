@@ -9,6 +9,7 @@ import {
   keyOf,
   missingScope,
   pinPairs,
+  prunePins,
 } from "./body-pins.js";
 
 function record(over: Partial<BodyHashRecord> = {}): BodyHashRecord {
@@ -164,5 +165,21 @@ describe("missingScope", () => {
 
   it("returns nothing when the artifact covers the expected set", () => {
     expect(missingScope({ packages: ["activerecord"], hashes: [] }, ["activerecord"])).toEqual([]);
+  });
+});
+
+describe("prunePins", () => {
+  it("drops pins whose pair no longer resolves and keeps the rest sorted", () => {
+    const records = [record(), record({ rubyFile: "core.rb", rubyName: "init" })];
+    const pins = [pin({ rubyFile: "core.rb", rubyName: "init" }), pin({ rubyName: "gone" }), pin()];
+    expect(prunePins(records, pins).map(keyOf)).toEqual([
+      "activerecord core.rb init",
+      "activerecord persistence.rb save",
+    ]);
+  });
+
+  it("preserves a pin that drifted rather than pruning it", () => {
+    const pins = [pin({ digest: "bbbb111111111111", reason: "story-x" })];
+    expect(prunePins([record()], pins)).toEqual(pins);
   });
 });

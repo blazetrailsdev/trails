@@ -82,6 +82,18 @@ only floor pins need one added. When a Rails bump reports drift, re-verify the
 port against the new upstream body before re-pinning — never re-pin to silence
 the gate.
 
+When the gate fails:
+
+- **DRIFT** — the vendored body changed. Re-verify the port, then re-pin that
+  file with `--pin`.
+- **STALE** — the pinned method was removed or renamed upstream (or the TS side
+  no longer name-matches). Once you have confirmed the pair is genuinely gone,
+  `pnpm tsx scripts/api-compare/body-pins.ts --prune` drops every unresolved pin
+  so the removal doesn't require hand-editing the generated manifest. `--prune`
+  never touches a drifted pin.
+- **PARTIAL scope** — the artifact was built with a `--package` filter; rebuild
+  with `API_COMPARE_FORCE=1 pnpm api:compare` before pinning or gating.
+
 Secondary signal: `pnpm test:types` — Vitest typecheck suites in
 `packages/*/dx-tests/` that pin the public type contract and encode DX gaps
 as assertions. When a gap closes, the assertion flips. A dedicated
