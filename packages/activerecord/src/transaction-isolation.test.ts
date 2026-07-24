@@ -13,7 +13,7 @@ describe("TransactionIsolationUnsupportedTest", () => {
   it.skipIf(adapterType !== "sqlite")("setting the isolation level raises an error", async () => {
     class Tag extends Base {
       static {
-        this.attribute("name", "string");
+        this._tableName = "tags";
       }
     }
     await expect(
@@ -43,14 +43,12 @@ describe("TransactionIsolationTest", () => {
   class Tag extends Base {
     static {
       this._tableName = "tags";
-      this.attribute("name", "string");
     }
   }
 
   class Tag2 extends Base {
     static {
       this._tableName = "tags";
-      this.attribute("name", "string");
     }
   }
 
