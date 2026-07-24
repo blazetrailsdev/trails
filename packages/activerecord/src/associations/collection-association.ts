@@ -744,24 +744,21 @@ export class CollectionAssociation extends Association {
    * ActiveRecord::Associations::CollectionAssociation#find_from_target?
    * (collection_association.rb:308): loaded, owner strict-loading-all,
    * reflection strict-loading, owner new record, or any target record
-   * new/changed. Kept in clause-parity with `CollectionProxy#isFindFromTarget`.
+   * new/changed.
    *
-   * Note the final clause is Rails' `record.changed?`, NOT `has_changes_to_save?`
-   * — different mutation sources (`mutations_from_user` vs
+   * The final clause is Rails' `record.changed?`, NOT `has_changes_to_save?` —
+   * different mutation sources (`mutations_from_user` vs
    * `mutations_from_database`), even though both currently resolve to
    * `_dirty.changed` here.
    *
-   * This method has no live callers: its only route in is the module-level
-   * `isFindFromTarget(proxy)` helper in collection-proxy.ts, which is reached
-   * solely from the module-level `findNthWithLimit` — itself referenced nowhere.
-   * The live implementation is `CollectionProxy#isFindFromTarget`, which reads
-   * the proxy's own `_target`/`_targetLoaded`. Kept here because api:compare
-   * maps `find_from_target?` to the Rails-layout file. Verified dead by making
-   * this body throw: 382 collection-proxy/has-many tests still pass.
+   * `loaded` falls back to this association's own `isLoaded()` and is only
+   * passed explicitly by `CollectionProxy#isFindFromTarget`, which borrows this body
+   * (Rails' proxy delegates to `@association.find_from_target?`) but tracks
+   * loadedness in its own `_targetLoaded`. Rails' method takes no argument.
    */
-  isFindFromTarget(): boolean {
+  isFindFromTarget(loaded?: boolean): boolean {
     return (
-      this.isLoaded() ||
+      (loaded ?? this.isLoaded()) ||
       (this.owner.isStrictLoading() && this.owner.isStrictLoadingAll()) ||
       !!this.reflection.options.strictLoading ||
       this.owner.isNewRecord() ||

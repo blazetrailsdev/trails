@@ -1,6 +1,6 @@
 import type { Base } from "../base.js";
 import { Relation } from "../relation.js";
-import { concatRecordsLoop } from "./collection-association.js";
+import { CollectionAssociation, concatRecordsLoop } from "./collection-association.js";
 import type { PrettyPrinter } from "../pretty-print.js";
 import type { AssociationRelation as AssociationRelationType } from "../association-relation.js";
 import {
@@ -3842,22 +3842,25 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
 
   /**
    * Whether find should read the in-memory target rather than querying the
-   * database. Canonical for the proxy path (the proxy owns `_target` and its
-   * loaded flag); the module-level `isFindFromTarget(proxy)` helper resolves
-   * here via `_association`. Mirrors
-   * ActiveRecord::Associations::CollectionAssociation#find_from_target?
-   * (collection_association.rb:308) — kept in clause-order parity with
-   * `CollectionAssociation#isFindFromTarget`.
+   * database. Mirrors `CollectionProxy#find_from_target?`
+   * (collection_proxy.rb:1154), a one-line delegation to
+   * `@association.find_from_target?` — this proxy *is* its own association, so
+   * the delegation borrows `CollectionAssociation`'s body directly instead of
+   * re-implementing the clause list, passing `_targetLoaded` as the loaded
+   * flag (the proxy's inherited `Relation#isLoaded` tracks something else).
+   *
+   * Deliberately NOT routed through `owner.association(name)`: that wrapper is
+   * a secondary copy whose loaded flag is synthesized from
+   * `Base#_associationCache`, so a merely-seeded (concat'd but unloaded) proxy
+   * surfaces there as loaded — making `find_from_target?` true where Rails says
+   * false. `_targetLoaded` is the proxy's own flag and the faithful one.
    *
    * @internal
    */
   isFindFromTarget(): boolean {
-    return (
-      this._targetLoaded ||
-      (this._record.isStrictLoading() && this._record.isStrictLoadingAll()) ||
-      !!this._assocDef.options.strictLoading ||
-      this._record.isNewRecord() ||
-      this._target.some((r) => r.isNewRecord() || !!(r as any).changed)
+    return CollectionAssociation.prototype.isFindFromTarget.call(
+      this as unknown as CollectionAssociation,
+      this._targetLoaded,
     );
   }
 
@@ -4309,53 +4312,4 @@ function primaryKeyToken(record: Base): string | null {
   }
   if (id == null) return null;
   return String(id);
-}
-
-/** @internal */
-function findNthWithLimit(
-  proxy: CollectionProxy<any>,
-  index: number,
-  limit: number,
-): Promise<any[]> {
-  if (isFindFromTarget(proxy)) {
-    // await target hydration before slicing — loadTarget() is async
-    return Promise.resolve((proxy as any).loadTarget?.()).then(() => {
-      const records = (proxy as any)._association?.target;
-      return Array.isArray(records) ? records.slice(index, index + limit) : [];
-    });
-  }
-  return (proxy as any).limit(limit).offset(index).toArray();
-}
-
-/** @internal */
-function findNthFromLast(proxy: CollectionProxy<any>, index: number): Promise<any> {
-  const records = (proxy as any)._association?.target;
-  if (Array.isArray(records)) {
-    // index=1 → last (records[-1]), index=2 → second-to-last (records[-2]), etc.
-    // Matches Rails: records[-index] == records[length - index]
-    return Promise.resolve(records[records.length - index] ?? null);
-  }
-  // Mirror finder-methods.ts: reverse order then take a positive offset
-  // (negative offset is not valid SQL on most adapters)
-  return (proxy as any)
-    .reverseOrder?.()
-    .offset(index - 1)
-    .limit(1)
-    .toArray()
-    .then((r: any[]) => r[0] ?? null);
-}
-
-/** @internal */
-function isNullScope(proxy: CollectionProxy<any>): boolean {
-  return !!(proxy as any)._association?.isNullScope?.();
-}
-
-/** @internal */
-function isFindFromTarget(proxy: CollectionProxy<any>): boolean {
-  return !!(proxy as any)._association?.isFindFromTarget?.();
-}
-
-/** @internal */
-function execQueries(proxy: CollectionProxy<any>): Promise<any[]> {
-  return proxy.loadTarget();
 }
