@@ -273,6 +273,30 @@ export interface ColumnLike {
 }
 
 /**
+ * DEVIATION (trails): Rails gives EVERY class its own `@columns_hash`/`@columns`
+ * — `inherited` nils the child's ivars (model_schema.rb:574-580) and each
+ * `load_schema!` re-filters `schema_cache.columns_hash(table_name)` by that
+ * class's own `ignored_columns` (:587-594). Ruby classes inherit no ivars, so
+ * there is no base-owns/subclass-inherits split to port. trails memoizes on the
+ * STI base (the schema-host redirect) and carves out only subclasses that
+ * declared their own `ignoredColumns`, because they filter a different column
+ * set than the base does. Converging the rest is story-sized: flipping this to
+ * plain `isStiSubclass(host)` passes everything except
+ * model-schema-sync-load.test.ts:261-280, which asserts the shared memo.
+ */
+function ownsColumnMemo(host: SchemaHost): boolean {
+  return isStiSubclass(host) && Object.prototype.hasOwnProperty.call(host, "_ignoredColumns");
+}
+
+function columnMemo<K extends "_columnsHash" | "_columns">(
+  host: SchemaHost,
+  key: K,
+): SchemaHost[K] | undefined {
+  if (ownsColumnMemo(host) && !Object.prototype.hasOwnProperty.call(host, key)) return undefined;
+  return host[key];
+}
+
+/**
  * Return a hash of column definitions keyed by name.
  *
  * Mirrors: ActiveRecord::ModelSchema::ClassMethods#columns_hash
@@ -282,11 +306,9 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
   loadSchema.call(this as SchemaHost);
 
   const memoHost = this as unknown as SchemaHost;
-  const hasOwnIgnored =
-    isStiSubclass(this) && Object.prototype.hasOwnProperty.call(this, "_ignoredColumns");
-  if (!hasOwnIgnored && memoHost._columnsHash != null) {
-    return memoHost._columnsHash as Record<string, ColumnLike>;
-  }
+  const ownsMemo = ownsColumnMemo(memoHost);
+  const memo = columnMemo(memoHost, "_columnsHash");
+  if (memo != null) return memo as Record<string, ColumnLike>;
 
   const klass = this;
   const stiTarget = stiSchemaHost(klass);
@@ -320,6 +342,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
         if (ignored.has(k)) continue;
         filtered[k] = v;
       }
+      if (ownsMemo && memoHost._schemaLoaded) memoHost._columnsHash = filtered;
       return filtered;
     }
   }
@@ -339,6 +362,7 @@ export function columnsHash(this: typeof Base): Record<string, ColumnLike> {
       ...(fn != null ? { defaultFunction: fn } : {}),
     };
   }
+  if (ownsMemo && memoHost._schemaLoaded) memoHost._columnsHash = result;
   return result;
 }
 
@@ -749,10 +773,13 @@ export function attributesBuilder(this: SchemaHost): AttributeSetBuilder {
  * Rails: @columns ||= columns_hash.values.freeze
  */
 export function columns(this: SchemaHost): any[] {
-  if (isStiSubclass(this) && Object.prototype.hasOwnProperty.call(this, "_ignoredColumns")) {
-    return Object.values((this as unknown as typeof Base).columnsHash());
+  const memo = columnMemo(this, "_columns");
+  if (memo) return memo;
+  if (ownsColumnMemo(this)) {
+    const own = Object.values((this as unknown as typeof Base).columnsHash());
+    if (this._schemaLoaded) this._columns = own;
+    return own;
   }
-  if (this._columns) return this._columns;
   loadSchema.call(this);
   const hash = getColumnsHash(this);
   const cacheHost = stiSchemaHost(this);
@@ -895,6 +922,16 @@ function clearStiSubclassLocalCaches(sub: SchemaHost): void {
     } else {
       reloadSchemaFromCache.call(deeper);
     }
+  }
+}
+
+function invalidateStiDescendantColumnMemos(host: SchemaHost): void {
+  for (const sub of (host as { subclasses?: SchemaHost[] }).subclasses ?? []) {
+    if (!sharesStiBaseTable(sub)) continue;
+    for (const key of ["_columnsHash", "_columns"]) {
+      if (Object.prototype.hasOwnProperty.call(sub, key)) Reflect.deleteProperty(sub, key);
+    }
+    invalidateStiDescendantColumnMemos(sub);
   }
 }
 
@@ -1134,7 +1171,8 @@ export function loadSchema(this: SchemaHost): void {
 }
 
 function getColumnsHash(host: SchemaHost): Record<string, unknown> {
-  if (host._columnsHash != null) return host._columnsHash;
+  const memo = columnMemo(host, "_columnsHash");
+  if (memo != null) return memo;
   const ch = (host as any).columnsHash;
   if (typeof ch === "function") return ch.call(host) ?? {};
   return {};
@@ -1349,6 +1387,7 @@ function applyColumnsHash(
   };
   invalidate(host, { deleteOwn: false });
   if (originatingHost && originatingHost !== host) invalidate(originatingHost, { deleteOwn: true });
+  invalidateStiDescendantColumnMemos(host);
   host._columnsHash = filteredHash;
 
   // Encryption still needs a post-reflection pass — not for type wrapping (the
