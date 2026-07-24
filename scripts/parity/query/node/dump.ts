@@ -205,13 +205,19 @@ async function main(): Promise<void> {
   } finally {
     clock.uninstall();
     // Close the adapter's SQLite handle before removing the temp dir — an open
-    // handle makes rmSync of the .db file fail on Windows.
+    // handle makes rmSync of the .db file fail on Windows. Two independent
+    // try/catches, matching ar_dump.ts and scripts/parity/schema/node/dump.ts:
+    // a throwing close() must not skip removeConnection().
     try {
       const a = Base.adapter as { close?: () => void };
       if (typeof a.close === "function") a.close();
+    } catch {
+      /* adapter unavailable or already closed */
+    }
+    try {
       Base.removeConnection();
     } catch {
-      /* connection never established, or already closed */
+      /* already removed or never opened */
     }
     try {
       rmSync(tmpDir, { recursive: true, force: true });
