@@ -38,7 +38,42 @@ Active across all Rails-mirroring packages (`arel`, `activesupport`,
 ## Measuring progress
 
 Primary signals: `pnpm run api:compare` (use `--package <name>` for one
-package) and `pnpm run test:compare`. "Misplaced" means tests exist but are in
+package) and `pnpm run test:compare`.
+
+**Before pushing, also run `pnpm api:calls:wide`** — the _wide_ call-mismatch
+ratchet is a separate CI step (`.github/workflows/ci.yml`, jobs "API comparison
+(wide calls)" + "Wide call-mismatches ratchet") that `pnpm api:compare` does
+**not** run: `api:compare` runs only the narrow call ratchet. Because the wide
+step runs only in CI, a PR that passes every local check can still fail the
+`rails-comparison` job (this happened in #5027). `pnpm api:calls:wide` runs the
+wide lint locally, but it lints an artifact that
+`scripts/api-compare/compare.ts --wide-calls` must regenerate first — so run
+`pnpm api:compare --wide-calls` (or `API_COMPARE_FORCE=1 pnpm api:compare
+--wide-calls` to bypass the cache) before it, or the lint checks a stale
+artifact.
+
+The wide baseline is **only-shrink**: it fails not just on a _new_ mismatch but
+on a _converged_ one. Fixing a real divergence makes the corresponding baseline
+entry stale and turns the gate red — e.g. #5027 added the `String` arm to
+`visit_Arel_Nodes_Over`, which started genuinely calling `quote_column_name`
+and made the baselined "omits quote_column_name" entry stale. **The fix is to
+delete the now-stale entry from the `call-mismatches-wide-exclude/` baseline,
+NOT to `--write`/reseed.** Reseeding (`pnpm api:calls:wide:reseed` /
+`lint-call-mismatches-wide.ts --write`) reorders and re-emits entries for
+untouched packages, producing an unreviewable diff — this churn hazard is
+tracked in the `wide-calls-exclude-reseed-reorders-untouched-packages` story.
+
+Any PR that converges a visitor or method body toward Rails can trip this, so
+run the wide ratchet locally whenever you change a ported method body.
+
+Decision (this story): the wide lint is deliberately **kept out of
+`pnpm api:compare`** and documented here instead. Folding it in would make the
+common narrow run pay for the wide-artifact regeneration on every invocation,
+and the two ratchets gate different artifacts against different baselines; a
+combined `api:gates` wrapper was considered and declined as premature — the doc
+pointer above is the intended fix.
+
+"Misplaced" means tests exist but are in
 the wrong file per Rails layout — they need to be moved, not rewritten. The
 per-file "Extra" column counts TS tests in the convention file that matched no
 Rails test — a large value flags a file that has ballooned with bespoke/non-Rails
