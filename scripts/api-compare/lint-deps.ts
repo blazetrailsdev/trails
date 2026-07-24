@@ -282,11 +282,14 @@ export function collectTaintedSymbols(
         tainted.add(sym);
         changed = true;
       }
-      const prev = taintedRefs.get(sym);
-      if (!prev || refs.size > prev.size) {
-        taintedRefs.set(sym, refs);
-        changed = true;
+      let acc = taintedRefs.get(sym);
+      if (!acc) {
+        acc = new Set();
+        taintedRefs.set(sym, acc);
       }
+      const before = acc.size;
+      for (const r of refs) acc.add(r);
+      if (acc.size > before) changed = true;
     }
   }
   return { tainted, taintedRefs };
