@@ -67,3 +67,22 @@ export async function setupSecondPool(): Promise<void> {
   ]);
   await rebuildCanonicalTables(primary, ["entrants"]);
 }
+
+/**
+ * Undoes `setupSecondPool`'s primary-database surgery.
+ *
+ * Rails' two-database split is per-process and disappears with the process;
+ * ours shares one primary database with every sibling suite in the worker, so
+ * the `arunit2`-only tables dropped above must be put back or later files
+ * (which never touch `courses`/`colleges`) observe a drifted schema.
+ *
+ * @internal
+ */
+export async function teardownSecondPool(): Promise<void> {
+  await rebuildCanonicalTables(Base.connection, [
+    "colleges",
+    "courses",
+    "professors",
+    "courses_professors",
+  ]);
+}
