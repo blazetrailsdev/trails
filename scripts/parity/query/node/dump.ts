@@ -20,11 +20,12 @@
 
 import Database from "better-sqlite3";
 import FakeTimers from "@sinonjs/fake-timers";
-import { readFileSync, mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname, basename } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
+import { assertPackagesBuilt } from "./assert-packages-built.js";
 
 function usage(): never {
   process.stderr.write(
@@ -84,25 +85,6 @@ function describe(v: unknown): string {
   return name ?? typeof v;
 }
 
-function assertPackagesBuilt(): void {
-  // These resolve via package "main" → packages/<pkg>/dist/index.js. tsx's own
-  // loader doesn't help here: the fixture is a module on disk that Node
-  // resolves through the normal package graph, not via the TS source. The
-  // runner compiles through a real sqlite3 adapter connection, so the whole
-  // activerecord chain has to be built, not just arel.
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const missing: string[] = [];
-  for (const pkg of ["activesupport", "activemodel", "arel", "activerecord"]) {
-    const dist = resolve(scriptDir, `../../../../packages/${pkg}/dist/index.js`);
-    if (!existsSync(dist)) missing.push(`@blazetrails/${pkg}`);
-  }
-  if (missing.length > 0) {
-    process.stderr.write(`parity dump (trails): missing dist/ for ${missing.join(", ")}\n`);
-    process.stderr.write("Run: pnpm build\n");
-    process.exit(1);
-  }
-}
-
 async function main(): Promise<void> {
   const {
     fixtureDir: fixtureDirRaw,
@@ -125,7 +107,7 @@ async function main(): Promise<void> {
     }
   }
 
-  assertPackagesBuilt();
+  assertPackagesBuilt("parity dump (trails)");
 
   const frozenTs = frozenAt ?? DEFAULT_FROZEN_AT;
   const frozenMs = new Date(frozenTs).getTime();

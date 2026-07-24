@@ -22,11 +22,12 @@
 
 import Database from "better-sqlite3";
 import FakeTimers from "@sinonjs/fake-timers";
-import { readFileSync, mkdtempSync, writeFileSync, rmSync, mkdirSync, existsSync } from "node:fs";
+import { readFileSync, mkdtempSync, writeFileSync, rmSync, mkdirSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve, dirname, basename } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { pathToFileURL } from "node:url";
 import type { CanonicalQuery } from "../../canonical/query-types.js";
+import { assertPackagesBuilt } from "./assert-packages-built.js";
 import type { Visitors } from "@blazetrails/arel";
 
 function usage(): never {
@@ -80,23 +81,6 @@ function describe(v: unknown): string {
   return name ?? typeof v;
 }
 
-function assertPackagesBuilt(): void {
-  // All four packages contribute to the AR query surface; if any dist/ is
-  // missing, model load will fail with a cryptic module-not-found error.
-  // Check all four up-front with a clear hint.
-  const scriptDir = dirname(fileURLToPath(import.meta.url));
-  const missing: string[] = [];
-  for (const pkg of ["activesupport", "activemodel", "arel", "activerecord"]) {
-    const dist = resolve(scriptDir, `../../../../packages/${pkg}/dist/index.js`);
-    if (!existsSync(dist)) missing.push(`@blazetrails/${pkg}`);
-  }
-  if (missing.length > 0) {
-    process.stderr.write(`parity ar_dump (trails): missing dist/ for ${missing.join(", ")}\n`);
-    process.stderr.write("Run: pnpm build\n");
-    process.exit(1);
-  }
-}
-
 async function main(): Promise<void> {
   const {
     fixtureDir: fixtureDirRaw,
@@ -117,7 +101,7 @@ async function main(): Promise<void> {
     }
   }
 
-  assertPackagesBuilt();
+  assertPackagesBuilt("parity ar_dump (trails)");
 
   const frozenTs = frozenAt ?? DEFAULT_FROZEN_AT;
   const frozenMs = new Date(frozenTs).getTime();
