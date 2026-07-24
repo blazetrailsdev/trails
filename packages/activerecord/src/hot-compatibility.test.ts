@@ -1,5 +1,5 @@
 // vendor/rails/activerecord/test/cases/hot_compatibility_test.rb
-import { describe, it, expect } from "vitest";
+import { describe, it, expect, afterEach } from "vitest";
 import { Base } from "./index.js";
 import type { AbstractAdapter as DatabaseAdapter } from "./connection-adapters/abstract-adapter.js";
 import { adapterType } from "./test-adapter.js";
@@ -21,6 +21,20 @@ function preparedStatementCacheSize(adapter: DatabaseAdapter): number {
 describe("HotCompatibilityTest", () => {
   // Rails `use_transactional_tests = false`: tests build/drop tables per test.
   fixtures({}, { useTransactionalTests: false });
+
+  // The bespoke `hot_compatibilities` table is dropped and recreated (via
+  // `force: true`) across the tests in this file. Under the shared per-worker
+  // Postgres DB, a server-side prepared plan cached against a prior incarnation
+  // of the table on ANY pooled connection would raise a raw `0A000` ("cached
+  // plan must not change result type") the next time that connection is
+  // re-leased and re-runs it — a flake `repairWorkerSchema` can't cover because
+  // the table is bespoke. Rails' `with_two_connections` sidesteps this by
+  // ending each PG test with `clear_all_connections!(:all)`; mirror that for
+  // every test here by disconnecting the pool (which deallocates all
+  // server-side statements), so no stale plan survives into the next test.
+  afterEach(async () => {
+    await Base.connectionPool().disconnectBang();
+  });
   // Rails' setup builds the table + model fresh per test (use_transactional_tests
   // = false). We mirror that with a helper that creates the table and a model
   // bound to a fresh adapter, returning both so the test can drive remove_column
