@@ -1515,7 +1515,7 @@ class ApiExtractor
   # Members of a `when *CONST` guard: `[:args_add_star, [], const_ref]`.
   def when_star_members(guard)
     return nil unless guard.is_a?(Array) && guard[0] == :args_add_star
-    resolve_const_symbol_array(guard[2])
+    resolve_const_symbol_array(const_name(guard[2]))
   end
 
   # The literal suffix after the `#{loop_var}` interpolation in a branch's first
@@ -1616,18 +1616,27 @@ class ApiExtractor
     found
   end
 
-  # Resolve a constant reference (`Relation::MULTI_VALUE_METHODS` or a bare
-  # `CONST`) to its recorded pure-symbol-array members, searching @const_symbol_arrays
-  # (which spans files) by matching the container path against stored FQNs.
-  def resolve_const_symbol_array(node)
-    name = const_name(node)
+  # Resolve a constant name (`Relation::MULTI_VALUE_METHODS` or a bare `CONST`)
+  # to its recorded pure-symbol-array members, searching @const_symbol_arrays
+  # (which spans files) by matching the container path against stored FQNs. A
+  # leading `::` forces an absolute lookup: the container is anchored to the top
+  # level (`fqn == container`, or the empty top level for `::CONST`) and the
+  # relative `end_with?` suffix match is skipped, honouring Ruby's rule that
+  # `::Foo::KEYS` binds to top-level `Foo`, never a nested `X::Foo`.
+  def resolve_const_symbol_array(name)
     return nil unless name
+    absolute = name.start_with?("::")
+    name = name[2..-1] if absolute
     parts = name.split("::")
     const = parts.last
     container = parts[0...-1].join("::")
     @const_symbol_arrays.each do |fqn, consts|
       next unless consts.key?(const)
-      next unless container.empty? || fqn == container || fqn.end_with?("::#{container}")
+      if absolute
+        next unless container.empty? ? fqn.empty? : fqn == container
+      else
+        next unless container.empty? || fqn == container || fqn.end_with?("::#{container}")
+      end
       return consts[const]
     end
     nil
@@ -1801,8 +1810,11 @@ class ApiExtractor
     if meth == "assert_valid_keys"
       traverse_for_symbols(args, keys)
       const_refs = []
-      traverse_for_consts(args, const_refs)
-      const_refs.each { |c| (consts[c] || []).each { |s| keys << s } }
+      traverse_for_consts(args, const_refs, keep_absolute: true)
+      const_refs.each do |c|
+        members = c.start_with?("::") ? resolve_const_symbol_array(c) : consts[c]
+        (members || []).each { |s| keys << s }
+      end
     elsif OPTION_READER_METHODS.include?(meth)
       syms = []
       traverse_for_symbols(args, syms)
