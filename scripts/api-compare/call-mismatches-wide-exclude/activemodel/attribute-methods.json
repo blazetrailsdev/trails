@@ -16,13 +16,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "alias_attribute",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "alias_attribute_method_definition",
     "call": "build_mangled_name",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -37,22 +30,8 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "alias_attribute_method_definition",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "attribute_alias",
     "call": "attribute_aliases",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails attribute_methods.rb:245-247 reads `attribute_aliases[name.to_s]`; trails attribute-methods.ts:367-369 reads `host._attributeAliases[name]` directly — JS string keys need no to_s coercion."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_alias",
-    "call": "to_s",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails attribute_methods.rb:245-247 reads `attribute_aliases[name.to_s]`; trails attribute-methods.ts:367-369 reads `host._attributeAliases[name]` directly — JS string keys need no to_s coercion."
   },
   {
@@ -67,13 +46,6 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "attribute_alias?",
     "call": "key?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "attribute_alias?",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -135,13 +107,6 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "define_attribute_method",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "define_attribute_method_pattern",
     "call": "define_proxy_call",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -156,29 +121,8 @@
   {
     "package": "activemodel",
     "tsFile": "attribute-methods.ts",
-    "rubyName": "define_attribute_method_pattern",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "define_attribute_methods",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
     "rubyName": "define_attribute_methods",
     "call": "generated_attribute_methods",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "define_attribute_methods",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -235,13 +179,6 @@
     "tsFile": "attribute-methods.ts",
     "rubyName": "generate_alias_attribute_methods",
     "call": "clear",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "attribute-methods.ts",
-    "rubyName": "generate_alias_attribute_methods",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

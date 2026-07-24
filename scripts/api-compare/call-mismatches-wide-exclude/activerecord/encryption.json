@@ -9,13 +9,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption.ts",
-    "rubyName": "configure",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption.ts",
     "rubyName": "context",
     "call": "default_context",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails contexts.rb:62-64 returns `current_custom_context || default_context`; trails encryption.ts:449-451 delegates to Contexts.context (encryption/context.ts), which performs the same custom-else-default read internally."
@@ -23,22 +16,8 @@
   {
     "package": "activerecord",
     "tsFile": "encryption.ts",
-    "rubyName": "current_custom_context",
-    "call": "last",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails contexts.rb:66-68 reads `custom_contexts&.last`; trails encryption.ts:454-456 delegates to Contexts.currentCustomContext, which reads the stack tail inside encryption/context.ts."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption.ts",
     "rubyName": "encrypted_attribute_was_declared",
     "call": "call",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption.ts",
-    "rubyName": "encrypted_attribute_was_declared",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -86,22 +65,8 @@
   {
     "package": "activerecord",
     "tsFile": "encryption.ts",
-    "rubyName": "try_to_decrypt_with_each",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption.ts",
     "rubyName": "with_encryption_context",
     "call": "default_context",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption.ts",
-    "rubyName": "with_encryption_context",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

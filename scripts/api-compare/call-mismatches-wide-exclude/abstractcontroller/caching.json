@@ -10,13 +10,6 @@
     "package": "abstractcontroller",
     "tsFile": "caching.ts",
     "rubyName": "combined_fragment_cache_key",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "abstractcontroller",
-    "tsFile": "caching.ts",
-    "rubyName": "combined_fragment_cache_key",
     "call": "map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

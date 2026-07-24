@@ -17,13 +17,6 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "construct_relation_for_exists",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "construct_relation_for_exists",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -39,27 +32,6 @@
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "construct_relation_for_exists",
     "call": "where!",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_last",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_nth",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_nth_from_last",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -115,35 +87,7 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_some",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_some",
-    "call": "present?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_some",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_some",
     "call": "table",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_some_ordered",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -171,21 +115,7 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_some_ordered",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_some_ordered",
     "call": "table",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_take",
-    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -227,20 +157,6 @@
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
     "rubyName": "find_with_ids",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_with_ids",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_with_ids",
     "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -254,22 +170,8 @@
   {
     "package": "activerecord",
     "tsFile": "relation/finder-methods.ts",
-    "rubyName": "find_with_ids",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
     "rubyName": "ordered_relation",
     "call": "asc",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "ordered_relation",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -299,20 +201,6 @@
     "rubyName": "raise_record_not_found_exception!",
     "call": "pluralize",
     "reason": "bucket (b) equivalent: name.pluralize / key.pluralize are invoked via the shared formatNotFoundAllMessage helper (same file, PR #4665), which composes the Rails message for both raiseRecordNotFoundExceptionBang and raiseNotFoundAll; the call moved out of the port body but is still made."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "raise_record_not_found_exception!",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/finder-methods.ts",
-    "rubyName": "raise_record_not_found_exception!",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

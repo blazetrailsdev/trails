@@ -24,13 +24,6 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "all_attributes?",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "all_attributes?",
     "call": "model",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -150,13 +143,6 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
     "call": "except",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -165,13 +151,6 @@
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
     "call": "fetch",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -269,21 +248,7 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_grouped_calculation",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
     "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_grouped_calculation",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -367,13 +332,6 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_simple_calculation",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_simple_calculation",
     "call": "lookup_cast_type_from_join_dependencies",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -403,13 +361,6 @@
     "tsFile": "relation/calculations.ts",
     "rubyName": "execute_simple_calculation",
     "call": "skip_query_cache_if_necessary",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "execute_simple_calculation",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -457,13 +408,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
-    "rubyName": "has_include?",
-    "call": "present?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
     "rubyName": "lookup_cast_type_from_join_dependencies",
     "call": "attribute_types",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -500,13 +444,6 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "perform_calculation",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "perform_calculation",
     "call": "primary_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -527,22 +464,8 @@
   {
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
-    "rubyName": "perform_calculation",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
     "rubyName": "select_for_count",
     "call": "arel_columns",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "select_for_count",
-    "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -619,21 +542,7 @@
     "package": "activerecord",
     "tsFile": "relation/calculations.ts",
     "rubyName": "type_cast_pluck_values",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "type_cast_pluck_values",
     "call": "try",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "type_for",
-    "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -649,13 +558,6 @@
     "rubyName": "type_for",
     "call": "split",
     "reason": "Name-collision false positive (story relation-delegation-rails-named-methods): exposing the `delegate ... to: :records` set under Rails names made `split`/`reverse`/`rindex` recognized ported method names, so this unrelated call to String#split / Array#reverse / String#rindex on a non-Relation receiver is flagged by the name-based wide call-set check."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/calculations.ts",
-    "rubyName": "type_for",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

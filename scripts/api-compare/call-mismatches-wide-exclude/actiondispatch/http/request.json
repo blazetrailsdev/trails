@@ -220,13 +220,6 @@
     "package": "actiondispatch",
     "tsFile": "http/request.ts",
     "rubyName": "request_parameters_list",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "http/request.ts",
-    "rubyName": "request_parameters_list",
     "call": "get_header",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

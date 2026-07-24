@@ -31,13 +31,6 @@
     "package": "activerecord",
     "tsFile": "associations/builder/belongs-to.ts",
     "rubyName": "touch_record",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "associations/builder/belongs-to.ts",
-    "rubyName": "touch_record",
     "call": "touch_later",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

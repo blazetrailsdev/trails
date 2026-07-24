@@ -24,13 +24,6 @@
     "package": "trailties",
     "tsFile": "generators/app-base.ts",
     "rubyName": "deduce_implied_options",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "generators/app-base.ts",
-    "rubyName": "deduce_implied_options",
     "call": "each_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

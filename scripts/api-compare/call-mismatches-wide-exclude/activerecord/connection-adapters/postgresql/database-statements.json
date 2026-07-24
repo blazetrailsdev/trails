@@ -44,13 +44,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
-    "rubyName": "handle_warnings",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "last_insert_id_result",
     "call": "internal_exec_query",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -73,13 +66,6 @@
     "package": "activerecord",
     "tsFile": "connection-adapters/postgresql/database-statements.ts",
     "rubyName": "perform_query",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/database-statements.ts",
-    "rubyName": "perform_query",
     "call": "sql_key",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -89,13 +75,6 @@
     "rubyName": "perform_query",
     "call": "synchronize",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/database-statements.ts",
-    "rubyName": "returning_column_values",
-    "call": "first",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql/database_statements.rb:208-210 reads `result.rows.first`; trails database-statements.ts:307-309 reads `result.rows[0]`."
   },
   {
     "package": "activerecord",

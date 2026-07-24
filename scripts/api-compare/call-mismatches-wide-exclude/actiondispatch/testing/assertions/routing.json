@@ -3,13 +3,6 @@
     "package": "actiondispatch",
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "assert_generates",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "assert_generates",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -37,29 +30,8 @@
   {
     "package": "actiondispatch",
     "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "assert_generates",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "assert_recognizes",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
     "rubyName": "assert_recognizes",
     "call": "merge",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "assert_recognizes",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -108,13 +80,6 @@
     "package": "actiondispatch",
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "recognized_request_for",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "recognized_request_for",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -123,13 +88,6 @@
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "recognized_request_for",
     "call": "parse",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "recognized_request_for",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

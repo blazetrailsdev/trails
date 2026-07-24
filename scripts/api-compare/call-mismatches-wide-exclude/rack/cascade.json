@@ -3,13 +3,6 @@
     "package": "rack",
     "tsFile": "cascade.ts",
     "rubyName": "call",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "cascade.ts",
-    "rubyName": "call",
     "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -18,13 +11,6 @@
     "tsFile": "cascade.ts",
     "rubyName": "initialize",
     "call": "add",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cascade.rb:21-27 iterates `apps.each { add app }`; trails cascade.ts:8-12 copies via spread and fills cascadeFor with a for-of loop — add()'s bookkeeping is inlined."
-  },
-  {
-    "package": "rack",
-    "tsFile": "cascade.ts",
-    "rubyName": "initialize",
-    "call": "each",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails cascade.rb:21-27 iterates `apps.each { add app }`; trails cascade.ts:8-12 copies via spread and fills cascadeFor with a for-of loop — add()'s bookkeeping is inlined."
   }
 ]

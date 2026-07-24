@@ -17,20 +17,6 @@
     "package": "activerecord",
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "expand_from_hash",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "expand_from_hash",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "expand_from_hash",
     "call": "flat_map",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -73,13 +59,6 @@
     "package": "activerecord",
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "expand_from_hash",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "expand_from_hash",
     "call": "stringify_keys",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -108,13 +87,6 @@
     "package": "activerecord",
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "grouping_queries",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "grouping_queries",
     "call": "one?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -123,13 +95,6 @@
     "tsFile": "relation/predicate-builder.ts",
     "rubyName": "handler_for",
     "call": "detect",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails predicate_builder.rb:185-187 is `@handlers.detect { klass === object }.last`; trails predicate-builder.ts:605-611 iterates the pairs with for-of + instanceof and returns the handler directly."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/predicate-builder.ts",
-    "rubyName": "handler_for",
-    "call": "last",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails predicate_builder.rb:185-187 is `@handlers.detect { klass === object }.last`; trails predicate-builder.ts:605-611 iterates the pairs with for-of + instanceof and returns the handler directly."
   },
   {

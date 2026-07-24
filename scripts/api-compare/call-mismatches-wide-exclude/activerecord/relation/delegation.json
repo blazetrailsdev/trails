@@ -37,13 +37,6 @@
   {
     "package": "activerecord",
     "tsFile": "relation/delegation.ts",
-    "rubyName": "generate_method",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/delegation.ts",
     "rubyName": "generate_relation_method",
     "call": "generate_method",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -68,13 +61,6 @@
     "rubyName": "include_relation_methods",
     "call": "include",
     "reason": "Mechanism divergence (story delegation-generated-methods-per-model-prototype-carrier): trails' per-model prototype-carrier port installs generated methods onto per-model Relation subclass prototypes (relationClassFor / GeneratedRelationMethods.includeInto) rather than replicating Rails' anonymous-module include, so the call-set differs by construction."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "relation/delegation.ts",
-    "rubyName": "initialize_relation_delegate_cache",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
     "package": "activerecord",

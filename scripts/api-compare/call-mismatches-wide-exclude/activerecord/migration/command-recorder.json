@@ -51,22 +51,8 @@
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_add_check_constraint",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_add_foreign_key",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_add_foreign_key",
-    "call": "last",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -100,29 +86,8 @@
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_create_table",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_drop_table",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_drop_table",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_drop_table",
-    "call": "size",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -142,27 +107,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_check_constraint",
-    "call": "last",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_check_constraint",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_column",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_remove_columns",
     "call": "has_key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -170,13 +114,6 @@
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_exclusion_constraint",
-    "call": "size",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_remove_foreign_key",
     "call": "delete",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -184,29 +121,8 @@
   {
     "package": "activerecord",
     "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_foreign_key",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
     "rubyName": "invert_remove_index",
     "call": "delete",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_index",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "invert_remove_unique_constraint",
-    "call": "blank?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -249,13 +165,6 @@
     "tsFile": "migration/command-recorder.ts",
     "rubyName": "record",
     "call": "inverse_of",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "migration/command-recorder.ts",
-    "rubyName": "replay",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

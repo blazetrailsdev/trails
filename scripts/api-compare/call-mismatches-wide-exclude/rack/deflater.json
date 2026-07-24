@@ -51,13 +51,6 @@
   {
     "package": "rack",
     "tsFile": "deflater.ts",
-    "rubyName": "call",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "deflater.ts",
     "rubyName": "initialize",
     "call": "fetch",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails deflater.rb:39-44 stores `@sync = options.fetch(:sync, true)` — key-present semantics; trails mirrors it with `opts.sync !== undefined ? opts.sync : true`, so an explicit `sync: null` stays null (falsy) and only an absent key takes the default. Converged; no Hash#fetch analogue in TS, hence the flagged call."
@@ -81,13 +74,6 @@
     "tsFile": "deflater.ts",
     "rubyName": "should_deflate?",
     "call": "match?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "deflater.ts",
-    "rubyName": "should_deflate?",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

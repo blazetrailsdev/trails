@@ -2,13 +2,6 @@
   {
     "package": "rack",
     "tsFile": "builder.ts",
-    "rubyName": "generate_map",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "rack",
-    "tsFile": "builder.ts",
     "rubyName": "load_file",
     "call": "fail",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

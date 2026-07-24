@@ -3,13 +3,6 @@
     "package": "activerecord",
     "tsFile": "sanitization.ts",
     "rubyName": "disallow_raw_sql!",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "disallow_raw_sql!",
     "call": "match?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -17,21 +10,7 @@
     "package": "activerecord",
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_array",
-    "call": "blank?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "sanitize_sql_array",
     "call": "collect",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "sanitize_sql_array",
-    "call": "first",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -73,13 +52,6 @@
     "package": "activerecord",
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_array",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "sanitize_sql_array",
     "call": "with_connection",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -88,13 +60,6 @@
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_for_assignment",
     "call": "sanitize_sql_array",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "sanitize_sql_for_conditions",
-    "call": "blank?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -115,13 +80,6 @@
     "package": "activerecord",
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_for_order",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "sanitize_sql_for_order",
     "call": "new",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
@@ -130,13 +88,6 @@
     "tsFile": "sanitization.ts",
     "rubyName": "sanitize_sql_for_order",
     "call": "sql",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "sanitization.ts",
-    "rubyName": "sanitize_sql_for_order",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

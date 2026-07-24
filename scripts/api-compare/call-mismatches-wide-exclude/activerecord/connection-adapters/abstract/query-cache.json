@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "connection-adapters/abstract/query-cache.ts",
-    "rubyName": "dirties_query_cache",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/abstract/query-cache.ts",
     "rubyName": "query_cache",
     "call": "compute_if_absent",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails query_cache.rb:187-191 calls `@thread_query_caches.compute_if_absent(IsolatedExecutionState.context)`; trails query-cache.ts:318-322 makes the same computeIfAbsent call with `executionContextId()` standing in for IsolatedExecutionState.context — the TS method is a getter, and the extractor records no calls for getters (its ts-api record carries no call set), so both reads go uncredited."

@@ -1,9 +1,0 @@
-[
-  {
-    "package": "activerecord",
-    "tsFile": "connection-adapters/postgresql/column.ts",
-    "rubyName": "virtual?",
-    "call": "present?",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails postgresql/column.rb:28-31 reads `@generated.present?`; trails postgresql/column.ts:104-106 isVirtual checks `this.generated !== null && this.generated !== \"\"` — the explicit spelling of present?."
-  }
-]

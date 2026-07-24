@@ -19,12 +19,5 @@
     "rubyName": "to_tag",
     "call": "merge",
     "reason": "to_tag ports XmlMini.to_tag: Rails' Hash#delete(:type)/#merge/#call/#to_s are satisfied by different TS idioms (immutable `{ ...options }` spread instead of merge, destructured `options.type` instead of delete, direct function invocation, and String()/keyToString()) — no behavioral omission."
-  },
-  {
-    "package": "activesupport",
-    "tsFile": "xml-mini.ts",
-    "rubyName": "to_tag",
-    "call": "to_s",
-    "reason": "to_tag ports XmlMini.to_tag: Rails' Hash#delete(:type)/#merge/#call/#to_s are satisfied by different TS idioms (immutable `{ ...options }` spread instead of merge, destructured `options.type` instead of delete, direct function invocation, and String()/keyToString()) — no behavioral omission."
   }
 ]

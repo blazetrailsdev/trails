@@ -23,13 +23,6 @@
   {
     "package": "activerecord",
     "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "psql_env",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
     "rubyName": "public_schema_config",
     "call": "merge",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -46,13 +39,6 @@
     "tsFile": "tasks/postgresql-database-tasks.ts",
     "rubyName": "purge",
     "call": "connection_handler",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "remove_sql_header_comments",
-    "call": "blank?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -81,13 +67,6 @@
     "tsFile": "tasks/postgresql-database-tasks.ts",
     "rubyName": "structure_dump",
     "call": "any?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "tasks/postgresql-database-tasks.ts",
-    "rubyName": "structure_dump",
-    "call": "blank?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

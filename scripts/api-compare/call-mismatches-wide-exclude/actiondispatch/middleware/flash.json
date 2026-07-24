@@ -9,13 +9,6 @@
   {
     "package": "actiondispatch",
     "tsFile": "middleware/flash.ts",
-    "rubyName": "commit_flash",
-    "call": "present?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "middleware/flash.ts",
     "rubyName": "flash=",
     "call": "set_header",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

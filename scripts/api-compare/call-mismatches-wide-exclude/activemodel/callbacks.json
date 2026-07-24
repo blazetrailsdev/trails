@@ -66,13 +66,6 @@
     "package": "activemodel",
     "tsFile": "callbacks.ts",
     "rubyName": "define_model_callbacks",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activemodel",
-    "tsFile": "callbacks.ts",
-    "rubyName": "define_model_callbacks",
     "call": "merge!",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }

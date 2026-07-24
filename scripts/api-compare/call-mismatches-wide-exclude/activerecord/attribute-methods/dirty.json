@@ -2,22 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "_touch_row",
-    "call": "each",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_before_last_save",
     "call": "original_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "attribute_before_last_save",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -30,22 +16,8 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "attribute_change_to_be_saved",
-    "call": "to_s",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:152-154 calls `mutations_from_database.change_to_attribute(attr_name.to_s)`; trails attribute-methods/dirty.ts:83-90 reads `record.changes[attr]` directly by string key."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "attribute_in_database",
     "call": "original_value",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "attribute_in_database",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {
@@ -58,13 +30,6 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "saved_change_to_attribute",
-    "call": "to_s",
-    "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails dirty.rb:98-100 calls `mutations_before_last_save.change_to_attribute(attr_name.to_s)`; trails attribute-methods/dirty.ts:34-39 reads `record.previousChanges[attr]` directly by string key."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "saved_change_to_attribute?",
     "call": "changed?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -72,22 +37,8 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "saved_change_to_attribute?",
-    "call": "to_s",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
     "rubyName": "will_save_change_to_attribute?",
     "call": "changed?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/dirty.ts",
-    "rubyName": "will_save_change_to_attribute?",
-    "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

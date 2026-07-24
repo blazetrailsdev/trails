@@ -10,13 +10,6 @@
     "package": "trailties",
     "tsFile": "generators/rails/controller/controller-generator.ts",
     "rubyName": "add_routes",
-    "call": "empty?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "generators/rails/controller/controller-generator.ts",
-    "rubyName": "add_routes",
     "call": "options",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

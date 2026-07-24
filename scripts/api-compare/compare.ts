@@ -146,8 +146,34 @@ const SIGNIFICANT_CALLS = new Set([
 // stories land. The existing noise-suppression gates inside significantMissingCalls
 // (isPortedWithArgs, mapCall, "TS makes NONE of the mapped candidates") still
 // apply, so this is not the raw missing-call diff.
+//
+// Ruby calls whose FAITHFUL JS port emits no call at all — the receiver is
+// consumed by a native language construct (a template literal, a for-of loop, a
+// property access, an index, a truthiness test). No alias in JS_ENUMERABLE_ALIASES
+// can ever match one of these, because there is no callee to record: the wide gate
+// would baseline every occurrence forever, diluting its signal exactly the way
+// `super` did before it was excluded (see WIDE_SIGNIFICANT_CALLS below). These are
+// therefore suppressed from the wide significant set (RFC 0025). Each name is
+// justified by the non-call construct it becomes. Names that DO have a JS call form
+// — `delete` (Map#delete), `merge` (Object.assign is a call; there is no operator),
+// `fetch` — are deliberately absent: suppressing them would hide a real dropped call.
+const WIDE_NO_JS_CALL_FORM = new Set([
+  "to_s", // template literal / implicit String() coercion — `${x}`
+  "each", // for...of loop — no .forEach callee
+  "empty?", // `.length === 0` / `.size === 0`
+  "first", // index `xs[0]`
+  "last", // index `xs.at(-1)`
+  "present?", // truthiness (`x != null && x !== ""`)
+  "blank?", // truthiness (`!x`)
+  "size", // `.length` property access (non-call)
+]);
+
+// Opt-in WIDE significant set (RFC 0047): admits EVERY ported Ruby call name as
+// significant, except `super` (which the module-mixin port structurally drops —
+// see the SIGNIFICANT_CALLS comment above) and the WIDE_NO_JS_CALL_FORM names
+// (whose faithful port is a non-call construct, so no alias can ever match).
 const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
-  has: (value) => value !== "super",
+  has: (value) => value !== "super" && !WIDE_NO_JS_CALL_FORM.has(value),
 };
 
 // Ruby Enumerable/Comparable calls whose faithful port is a native JS method

@@ -2,13 +2,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encrypted-attribute-type.ts",
-    "rubyName": "decrypt_as_text",
-    "call": "blank?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encrypted-attribute-type.ts",
     "rubyName": "decryption_options",
     "call": "compact",
     "reason": "Per-entry verified (RFC 0032 wide-entry verification): Rails encrypted_attribute_type.rb:158-160 builds `{key_provider:}.compact`; trails encrypted-attribute-type.ts:368-373 inserts the key conditionally instead of compacting."
@@ -32,27 +25,6 @@
     "tsFile": "encryption/encrypted-attribute-type.ts",
     "rubyName": "previous_schemes_including_clean_text",
     "call": "including",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encrypted-attribute-type.ts",
-    "rubyName": "serialize_with_oldest",
-    "call": "first",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encrypted-attribute-type.ts",
-    "rubyName": "serialize_with_oldest?",
-    "call": "present?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encrypted-attribute-type.ts",
-    "rubyName": "try_to_deserialize_with_previous_encrypted_types",
-    "call": "each",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]
