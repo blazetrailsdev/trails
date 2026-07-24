@@ -12,6 +12,14 @@ import { Base } from "./base.js";
 import { ConnectionNotDefined } from "./errors.js";
 import { Type, StringType } from "@blazetrails/activemodel";
 import "./connection-adapters/mysql2-adapter.js";
+import "./connection-adapters/postgresql/type-map-init.js";
+import { Bytea } from "./connection-adapters/postgresql/oid/bytea.js";
+import { Date as OidDate } from "./connection-adapters/postgresql/oid/date.js";
+import { DateTime as OidDateTime } from "./connection-adapters/postgresql/oid/date-time.js";
+import { Decimal as OidDecimal } from "./connection-adapters/postgresql/oid/decimal.js";
+import { Interval } from "./connection-adapters/postgresql/oid/interval.js";
+import { Money } from "./connection-adapters/postgresql/oid/money.js";
+import { Uuid } from "./connection-adapters/postgresql/oid/uuid.js";
 
 class GenericType extends Type<unknown> {
   readonly name: string = "generic";
@@ -114,6 +122,65 @@ describe("Type.lookup under a non-sqlite configuration", () => {
     stubAdapter("sqlite3");
     expect(lookup("foo")).toBeInstanceOf(GenericType);
     expect(lookup("foo")).not.toBeInstanceOf(AdapterType);
+  });
+});
+
+describe("the PostgreSQL OID registrations", () => {
+  it("resolve only under a postgres adapter", () => {
+    expect(lookup("money", { adapter: "postgres" })).toBeInstanceOf(Money);
+    expect(lookup("interval", { adapter: "postgres" })).toBeInstanceOf(Interval);
+    expect(lookup("uuid", { adapter: "postgres" })).toBeInstanceOf(Uuid);
+
+    expect(() => lookup("money", { adapter: "sqlite" })).toThrow("Unknown type :money");
+    expect(() => lookup("interval", { adapter: "mysql" })).toThrow("Unknown type :interval");
+  });
+
+  it("shadow the generic registrations of the same name under postgres", () => {
+    expect(lookup("date", { adapter: "postgres" })).toBeInstanceOf(OidDate);
+    expect(lookup("date", { adapter: "sqlite" })).not.toBeInstanceOf(OidDate);
+
+    expect(lookup("binary", { adapter: "postgres" })).toBeInstanceOf(Bytea);
+    expect(lookup("binary", { adapter: "sqlite" })).not.toBeInstanceOf(Bytea);
+
+    expect(lookup("datetime", { adapter: "postgres" })).toBeInstanceOf(OidDateTime);
+    expect(lookup("decimal", { adapter: "postgres" })).toBeInstanceOf(OidDecimal);
+  });
+
+  it("cover every type Rails registers for the postgresql adapter", () => {
+    // postgresql_adapter.rb:1168-1185, minus the two add_modifier lines.
+    for (const name of [
+      "bit",
+      "bit_varying",
+      "binary",
+      "cidr",
+      "date",
+      "datetime",
+      "decimal",
+      "enum",
+      "hstore",
+      "inet",
+      "interval",
+      "jsonb",
+      "money",
+      "point",
+      "legacy_point",
+      "uuid",
+      "vector",
+      "xml",
+    ]) {
+      expect(() => lookup(name, { adapter: "postgres" })).not.toThrow();
+    }
+  });
+
+  it("resolve for a model carrying a directly-assigned postgres adapter", () => {
+    const model = {
+      _adapter: { adapterName: "postgres" },
+      connectionDbConfig: () => {
+        throw new ConnectionNotDefined("No database connection defined.");
+      },
+    };
+    expect(adapterNameFrom(model)).toBe("postgres");
+    expect(lookup("interval", { adapter: adapterNameFrom(model) })).toBeInstanceOf(Interval);
   });
 });
 

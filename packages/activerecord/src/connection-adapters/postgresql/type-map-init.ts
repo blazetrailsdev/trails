@@ -29,11 +29,14 @@ import { Bit } from "./oid/bit.js";
 import { BitVarying } from "./oid/bit-varying.js";
 import { Bytea } from "./oid/bytea.js";
 import { Cidr } from "./oid/cidr.js";
+import { DateTime as OidDateTime } from "./oid/date-time.js";
 import { Decimal } from "./oid/decimal.js";
+import { Enum } from "./oid/enum.js";
 import { Hstore } from "./oid/hstore.js";
 import { Inet } from "./oid/inet.js";
 import { Interval } from "./oid/interval.js";
 import { Jsonb } from "./oid/jsonb.js";
+import { LegacyPoint } from "./oid/legacy-point.js";
 import { Macaddr } from "./oid/macaddr.js";
 import { Money } from "./oid/money.js";
 import { Oid } from "./oid/oid.js";
@@ -42,23 +45,30 @@ import { SpecializedString } from "./oid/specialized-string.js";
 import { Timestamp } from "./oid/timestamp.js";
 import { TimestampWithTimeZone } from "./oid/timestamp-with-time-zone.js";
 import { Uuid } from "./oid/uuid.js";
+import { Vector } from "./oid/vector.js";
 import { Xml } from "./oid/xml.js";
 
-// Mirrors: postgresql_adapter.rb:1168-1185. Deviation: registered for all
-// adapters, not `adapter: :postgresql` — PG-only tests declare these on models
-// whose connectionDbConfig() raises, so adapterNameFrom degrades to "sqlite"
-// and a scoped registration would read as Unknown type. Tracked separately.
-ArType.register("bit", Bit, { override: false });
-ArType.register("bit_varying", BitVarying, { override: false });
-ArType.register("cidr", Cidr, { override: false });
-ArType.register("hstore", Hstore, { override: false });
-ArType.register("inet", Inet, { override: false });
-ArType.register("interval", Interval, { override: false });
-ArType.register("jsonb", Jsonb, { override: false });
-ArType.register("money", Money, { override: false });
-ArType.register("point", Point, { override: false });
-ArType.register("uuid", Uuid, { override: false });
-ArType.register("xml", Xml, { override: false });
+// Mirrors: postgresql_adapter.rb:1168-1185. The two `add_modifier` lines that
+// open that block (array/range) are unported: trails has no registry
+// modifiers, and `attribute(..., array: true)` does not route through them.
+ArType.register("bit", Bit, { adapter: "postgres" });
+ArType.register("bit_varying", BitVarying, { adapter: "postgres" });
+ArType.register("binary", Bytea, { adapter: "postgres" });
+ArType.register("cidr", Cidr, { adapter: "postgres" });
+ArType.register("date", OidDate, { adapter: "postgres" });
+ArType.register("datetime", OidDateTime, { adapter: "postgres" });
+ArType.register("decimal", Decimal, { adapter: "postgres" });
+ArType.register("enum", Enum, { adapter: "postgres" });
+ArType.register("hstore", Hstore, { adapter: "postgres" });
+ArType.register("inet", Inet, { adapter: "postgres" });
+ArType.register("interval", Interval, { adapter: "postgres" });
+ArType.register("jsonb", Jsonb, { adapter: "postgres" });
+ArType.register("money", Money, { adapter: "postgres" });
+ArType.register("point", Point, { adapter: "postgres" });
+ArType.register("legacy_point", LegacyPoint, { adapter: "postgres" });
+ArType.register("uuid", Uuid, { adapter: "postgres" });
+ArType.register("vector", Vector, { adapter: "postgres" });
+ArType.register("xml", Xml, { adapter: "postgres" });
 
 // Mirrors: postgresql_adapter.rb:1166-1167. Rails scopes these to
 // `adapter: :postgresql`; "postgres" is trails' normalized name for that family.
