@@ -16,6 +16,8 @@ import * as path from "node:path";
 
 import { parser } from "typescript-eslint";
 
+import { writeJsonManifest } from "../api-compare/write-json-manifest.js";
+
 import type { FileDeps } from "./rails-test-deps.js";
 
 const ROOT = path.resolve(__dirname, "../..");
@@ -70,7 +72,7 @@ async function main(): Promise<void> {
     if (!hasAllKeys) excluded.push(path.posix.join("packages/activerecord/src", trailsRel));
   }
   excluded.sort();
-  fs.writeFileSync(OUT_PATH, JSON.stringify(excluded, null, 2) + "\n");
+  writeJsonManifest(OUT_PATH, excluded);
 
   console.log(`Rails test files declaring fixtures: ${candidates}`);
   console.log(`  scaffolding-only (no record refs, rule no-ops): ${scaffoldingOnly}`);
