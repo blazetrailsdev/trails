@@ -369,12 +369,6 @@ export default defineConfig({
               ? ["./packages/activerecord/src/test-setup-ddl-profile.ts"]
               : []),
           ],
-          // No retries on any backend. PG/MySQL used to run with retry: 2 to
-          // mask shared-per-worker-DB intermittents; repairWorkerSchema (PR
-          // #3351) fixed the canonical-table shape drift systemically and the
-          // two remaining runtime bespoke-table hazards were fixed in PRs
-          // #5228 and #5230. A red PG/MariaDB run is now a real regression or
-          // a real flake to track — do not restore the retry to re-mask it.
           retry: 0,
           // Large-schema beforeAll(defineSchema(...)) calls on MySQL issue
           // hundreds of CREATE TABLE statements (e.g. has-many-associations.test.ts
