@@ -2,10 +2,9 @@ import { describe, expect, test } from "vitest";
 import "../sqlite/better-sqlite3.js";
 import { BetterSQLite3Adapter } from "../connection-adapters/better-sqlite3-adapter.js";
 import type { AbstractAdapter } from "../connection-adapters/abstract-adapter.js";
-import type { FkSafeDropOrderHost } from "./canonical-schema.js";
+import type { FkSafeDropPlanHost } from "./canonical-schema.js";
 import {
   ensureCanonicalTables,
-  fkSafeDropOrder,
   fkSafeDropPlan,
   loadCanonicalSchema,
   rebuildCanonicalTables,
@@ -124,10 +123,10 @@ describe("rebuildCanonicalTables", () => {
   });
 });
 
-describe("fkSafeDropOrder", () => {
+describe("fkSafeDropPlan", () => {
   // Stands in for the live database: `fks` maps a table to the tables it
   // references, as `foreignKeys` would report them.
-  function host(tables: string[], fks: Record<string, string[]> = {}): FkSafeDropOrderHost {
+  function host(tables: string[], fks: Record<string, string[]> = {}): FkSafeDropPlanHost {
     return {
       tables: async () => tables,
       foreignKeys: async (name) =>
@@ -138,7 +137,7 @@ describe("fkSafeDropOrder", () => {
   test("drops a referencing table before its target", async () => {
     // Registry order: lessons_students (referencer) is registered *before*
     // students (target), so reversing registry order would drop students first.
-    const order = await fkSafeDropOrder(
+    const { order } = await fkSafeDropPlan(
       host(["lessons_students", "students"], { lessons_students: ["students"] }),
       ["lessons_students", "students"],
     );
@@ -146,7 +145,7 @@ describe("fkSafeDropOrder", () => {
   });
 
   test("keeps input order when no foreign keys are declared", async () => {
-    const order = await fkSafeDropOrder(host(["lessons_students", "students"]), [
+    const { order } = await fkSafeDropPlan(host(["lessons_students", "students"]), [
       "lessons_students",
       "students",
     ]);
@@ -154,7 +153,7 @@ describe("fkSafeDropOrder", () => {
   });
 
   test("ignores foreign keys pointing outside the dropped set", async () => {
-    const order = await fkSafeDropOrder(host(["a", "b"], { a: ["elsewhere"], b: ["a"] }), [
+    const { order } = await fkSafeDropPlan(host(["a", "b"], { a: ["elsewhere"], b: ["a"] }), [
       "a",
       "b",
     ]);
@@ -164,7 +163,7 @@ describe("fkSafeDropOrder", () => {
   test("skips tables that do not exist yet", async () => {
     const calls: string[] = [];
     const base = host(["b"], { a: ["b"] });
-    const order = await fkSafeDropOrder(
+    const { order } = await fkSafeDropPlan(
       {
         tables: base.tables,
         foreignKeys: async (name) => {
@@ -178,15 +177,10 @@ describe("fkSafeDropOrder", () => {
     expect(order).toEqual(["a", "b"]);
   });
 
-  test("falls back to input order for a cycle", async () => {
-    const order = await fkSafeDropOrder(host(["a", "b"], { a: ["b"], b: ["a"] }), ["a", "b"]);
-    expect(order).toEqual(["a", "b"]);
-  });
-
-  test("reports the constraint that closes a cycle", async () => {
+  test("falls back to input order for a cycle, reporting the constraint that closes it", async () => {
     const plan = await fkSafeDropPlan(host(["a", "b"], { a: ["b"], b: ["a"] }), ["a", "b"]);
     expect(plan.order).toEqual(["a", "b"]);
-    expect(plan.blockers).toEqual([{ fromTable: "b", name: "fk_b_a" }]);
+    expect(plan.blockers).toEqual([{ fromTable: "b", toTable: "a", name: "fk_b_a" }]);
   });
 
   test("reports a foreign key reaching in from outside the dropped set", async () => {
@@ -197,7 +191,7 @@ describe("fkSafeDropOrder", () => {
       "b",
     ]);
     expect(plan.order).toEqual(["b", "a"]);
-    expect(plan.blockers).toEqual([{ fromTable: "outside", name: "fk_outside_a" }]);
+    expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
   });
 
   test("does not scan outside tables when the dropped set holds no foreign key", async () => {
@@ -221,7 +215,7 @@ describe("fkSafeDropOrder", () => {
     const plan = await fkSafeDropPlan(host(["a", "b", "outside"], { outside: ["a"] }), ["a", "b"], {
       scanInbound: true,
     });
-    expect(plan.blockers).toEqual([{ fromTable: "outside", name: "fk_outside_a" }]);
+    expect(plan.blockers).toEqual([{ fromTable: "outside", toTable: "a", name: "fk_outside_a" }]);
   });
 });
 

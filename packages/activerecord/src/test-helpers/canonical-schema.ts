@@ -2088,7 +2088,7 @@ export async function loadCanonicalSchema(adapter: DatabaseAdapter): Promise<voi
 }
 
 /** Minimal slice of the schema-statement surface {@link fkSafeDropPlan} needs. */
-export interface FkSafeDropOrderHost {
+export interface FkSafeDropPlanHost {
   tables(): Promise<string[]>;
   foreignKeys(
     tableName: string,
@@ -2103,6 +2103,7 @@ export interface FkSafeDropOrderHost {
  */
 export interface FkDropBlocker {
   readonly fromTable: string;
+  readonly toTable: string;
   readonly name: string;
 }
 
@@ -2149,7 +2150,7 @@ export interface FkSafeDropPlan {
  * @internal
  */
 export async function fkSafeDropPlan(
-  ss: FkSafeDropOrderHost,
+  ss: FkSafeDropPlanHost,
   names: readonly string[],
   { scanInbound = false }: { scanInbound?: boolean } = {},
 ): Promise<FkSafeDropPlan> {
@@ -2176,7 +2177,9 @@ export async function fkSafeDropPlan(
   for (const table of existing) {
     if (inSet.has(table)) continue;
     for (const fk of await ss.foreignKeys(table)) {
-      if (inSet.has(fk.toTable)) blockers.push({ fromTable: table, name: fk.name });
+      if (inSet.has(fk.toTable)) {
+        blockers.push({ fromTable: table, toTable: fk.toTable, name: fk.name });
+      }
     }
   }
   if (edges.size === 0) return { order: [...names], blockers };
@@ -2191,7 +2194,7 @@ export async function fkSafeDropPlan(
       // A target still on the current path closes a cycle: no drop order can
       // satisfy this edge, so report the constraint and ignore the edge.
       if (onPath.has(edge.toTable)) {
-        blockers.push({ fromTable: name, name: edge.name });
+        blockers.push({ fromTable: name, toTable: edge.toTable, name: edge.name });
         continue;
       }
       visit(edge.toTable);
@@ -2204,19 +2207,6 @@ export async function fkSafeDropPlan(
   // reverse: the result drops referencers first.
   for (const name of names) visit(name);
   return { order: ordered.reverse(), blockers };
-}
-
-/**
- * {@link fkSafeDropPlan}'s order alone, for callers that have already dealt
- * with (or provably cannot have) blocking foreign keys.
- *
- * @internal
- */
-export async function fkSafeDropOrder(
-  ss: FkSafeDropOrderHost,
-  names: readonly string[],
-): Promise<string[]> {
-  return (await fkSafeDropPlan(ss, names)).order;
 }
 
 /**
@@ -2291,7 +2281,10 @@ export async function rebuildCanonicalTables(
   // referencing table keeps its shape — only the constraint is lost, and a
   // canonical table's own FKs come back with the recreate below.
   for (const blocker of plan.blockers) {
-    await ss.removeForeignKey(blocker.fromTable, { name: blocker.name, ifExists: true });
+    await ss.removeForeignKey(blocker.fromTable, {
+      name: blocker.name,
+      toTable: blocker.toTable,
+    });
   }
   for (const name of plan.order) {
     await ss.dropTable(name, { ifExists: true });
