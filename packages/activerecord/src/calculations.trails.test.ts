@@ -230,3 +230,63 @@ describe("multi-field grouped bigint sum", () => {
     expect(keys.every((k) => k[1] === 2n ** 62n)).toBe(true);
   });
 });
+
+// ==========================================================================
+// Grouped calculation HAVING — composite-FK belongs_to arm
+//
+// Rails routes every grouped calculation through `execute_grouped_calculation`,
+// which builds from the relation's own arel so `having_clause` rides along
+// regardless of key arity (calculations.rb:553-556). trails splits the
+// composite-FK belongs_to case into its own `groupedCompositeAssoc` arm, which
+// has no Rails counterpart to port a test from — this guards that the arm keeps
+// emitting HAVING.
+// ==========================================================================
+
+describe("grouped calculation HAVING on a composite-FK belongs_to", () => {
+  fixtures([]);
+
+  it("filters groups keyed by the associated composite-PK record", async () => {
+    const { CpkBook, CpkAuthor, CpkChapter } = await import("./test-helpers/models/cpk.js");
+    await CpkAuthor.create({ id: 1, name: "Author One" });
+    await CpkBook.create({ id: [1, 1], title: "Alpha", revision: 1 });
+    await CpkBook.create({ id: [1, 2], title: "Beta", revision: 2 });
+    await CpkChapter.create({ id: [1, 10], book_id: 1, title: "ch-1" });
+    await CpkChapter.create({ id: [1, 11], book_id: 1, title: "ch-2" });
+    await CpkChapter.create({ id: [1, 12], book_id: 2, title: "ch-3" });
+
+    const result = (await CpkChapter.group("book").having("COUNT(*) > 1").count()) as Map<
+      unknown,
+      number
+    >;
+
+    const entries = [...result.entries()] as [{ id: unknown[] } | null, number][];
+    expect(entries).toHaveLength(1);
+    expect(entries[0][0]?.id).toEqual([1, 1]);
+    expect(entries[0][1]).toBe(2);
+  });
+});
+
+// ==========================================================================
+// Ungrouped calculation HAVING
+//
+// `execute_simple_calculation` runs the relation's own arel (calculations.rb:485)
+// and `build_arel` emits `arel.having(having_clause.ast) unless
+// having_clause.empty?` with no GROUP BY guard (query_methods.rb:1756), so an
+// ungrouped `having(...)` reaches the SQL. Rails has no test for it — trails
+// projects explicitly instead of reusing `build_arel`, so the clause has to be
+// re-applied by hand and needs a guard.
+// ==========================================================================
+
+describe("ungrouped calculation HAVING", () => {
+  fixtures(["companies", "accounts"]);
+
+  it("emits HAVING with no GROUP BY and filters the single aggregate row", async () => {
+    const { Account } = await import("./test-helpers/models/account.js");
+    // The whole-table sum survives the satisfied predicate; the unsatisfied one
+    // drops the only row, leaving sum-of-no-rows.
+    const total = (await Account.sum("credit_limit")) as number;
+    expect(total).toBeGreaterThan(100);
+    expect(await Account.having("sum(credit_limit) > 100").sum("credit_limit")).toBe(total);
+    expect(await Account.having("sum(credit_limit) > 100000").sum("credit_limit")).toBe(0);
+  });
+});

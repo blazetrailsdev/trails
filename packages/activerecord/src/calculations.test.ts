@@ -482,8 +482,13 @@ describe("CalculationsTest", () => {
     expect(c.get(6)).toBe(105);
     expect(c.get(2)).toBe(60);
     expect(c.get(9)).toBe(53);
+    // firm_id=1 (sum=50) and the NULL group (sum=50) fail sum > 50
+    expect(c.has(1)).toBe(false);
+    expect(c.has(null)).toBe(false);
   });
 
+  // Rails skips this on PG/Oracle: only MySQL and SQLite let HAVING reference a
+  // SELECT alias (calculations_test.rb:451).
   it.skipIf(adapterType === "postgres")(
     "should group by summed field having condition from select",
     async () => {
@@ -491,6 +496,7 @@ describe("CalculationsTest", () => {
         .group("firm_id")
         .having("min_credit_limit > 50")
         .sum("credit_limit")) as Map<unknown, number>;
+      expect(c.get(1)).toBeUndefined();
       expect(c.get(2)).toBe(60);
       expect(c.get(9)).toBe(53);
     },
@@ -544,12 +550,11 @@ describe("CalculationsTest", () => {
   it("should group by summed field with conditions and having", async () => {
     const c = (await Account.where("firm_id > 1")
       .group("firm_id")
-      .having("sum(credit_limit) > 50")
+      .having("sum(credit_limit) > 60")
       .sum("credit_limit")) as Map<unknown, number>;
-    expect(c.get(6)).toBe(105);
-    expect(c.get(2)).toBe(60);
-    expect(c.get(9)).toBe(53);
     expect(c.get(1)).toBeUndefined();
+    expect(c.get(6)).toBe(105);
+    expect(c.get(2)).toBeUndefined();
   });
 
   it("should group by fields with table alias", async () => {
