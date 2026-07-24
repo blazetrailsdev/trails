@@ -16,6 +16,7 @@ import * as ts from "typescript";
 import type { ApiManifest, ClassInfo, MethodInfo } from "./types.js";
 import { OUTPUT_DIR, packageSrcDir } from "./config.js";
 import { rubyFileToTs, rubyMethodToTs } from "./conventions.js";
+import { JS_ENUMERABLE_ALIASES } from "./enumerable-idioms.js";
 
 function parseArgs() {
   const args = process.argv.slice(2);
@@ -236,32 +237,28 @@ const SKIP_CALLS = new Set([
   "yield",
   "require",
   "require_relative",
-  // Collection / Enumerable
+  // Collection / Enumerable. Idioms with a differently-named JS analogue come
+  // from the shared JS_ENUMERABLE_ALIASES table (RFC 0025) so this noise list
+  // and compare.ts's wide ratchet can't drift; same-named idioms stay literal.
+  // Deriving from the table's keys intentionally widens this set beyond what it
+  // listed before (adds one?/member?/collect_concat/index/find_index/concat):
+  // all are Enumerable idioms that port to a native JS method, i.e. the same
+  // noise the literal entries already skip. This lint is advisory (no ratchet),
+  // so the widening only affects its manual report.
+  ...JS_ENUMERABLE_ALIASES.keys(),
   "map",
-  "each",
-  "select",
-  "reject",
   "flat_map",
   "compact",
   "flatten",
   "reduce",
-  "inject",
-  "detect",
   "find",
-  "collect",
   "filter_map",
-  "any?",
-  "all?",
-  "none?",
   "empty?",
   "size",
   "length",
   "count",
   "first",
   "last",
-  "include?",
-  "key?",
-  "has_key?",
   "keys",
   "fetch",
   "merge",
@@ -279,7 +276,6 @@ const SKIP_CALLS = new Set([
   "match",
   "scan",
   "sort",
-  "sort_by",
   "min",
   "max",
   "sum",
