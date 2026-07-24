@@ -22,6 +22,7 @@ import {
 } from "./index.js";
 import { Result } from "./result.js";
 import { fixtures } from "./test-helpers/fixtures.js";
+import { rebuildCanonicalTables } from "./test-helpers/canonical-schema.js";
 import { adapterType, inMemoryDb } from "./test-adapter.js";
 import { itIfSupports } from "./test-helpers/supports.js";
 import { establishFromTestConfig } from "./test-helpers/test-database-config.js";
@@ -576,8 +577,10 @@ describe("AdapterForeignKeyTest", () => {
   });
   afterAll(async () => {
     if (adapterType === "sqlite") {
-      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_fk");
-      await Base.connection.executeMutation("DROP TABLE IF EXISTS fk_test_has_pk");
+      // Hand both names back in their canonical TEST_SCHEMA shape: the bespoke
+      // FK-carrying tables above replaced the boot-laid ones, and a later file
+      // in the same worker reading them would otherwise trip repairWorkerSchema.
+      await rebuildCanonicalTables(Base.connection, ["fk_test_has_pk", "fk_test_has_fk"]);
       return;
     }
     await Base.connection.execute(dropFkSql()).catch(() => {});
