@@ -1,8 +1,8 @@
 import { describe, it, expect } from "vitest";
 import { Base } from "./base.js";
 
-describe("STI subclass attribute() routing", () => {
-  it("writes subclass attribute() calls to the STI base's _attributeDefinitions", () => {
+describe("STI subclass attribute() registration", () => {
+  it("keeps subclass attribute() calls on the subclass, not the STI base", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -15,13 +15,10 @@ describe("STI subclass attribute() routing", () => {
       }
     }
 
-    // Both classes see radius via the shared (base-owned) map.
-    expect(Shape._attributeDefinitions.has("radius")).toBe(true);
     expect(Circle._attributeDefinitions.has("radius")).toBe(true);
-    expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
+    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
 
-    // Circle didn't fork its own map.
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_attributeDefinitions")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_attributeDefinitions")).toBe(true);
   });
 
   it("still forks the STI base itself (non-subclass) on attribute() — unchanged", () => {
@@ -49,7 +46,7 @@ describe("STI subclass attribute() routing", () => {
     expect(Widget._attributeDefinitions.get("price")?.userProvided).toBe(true);
   });
 
-  it("STI subclass attribute declared AFTER base sees both attrs on the shared map", () => {
+  it("STI subclass attribute declared AFTER base inherits the base's attrs too", () => {
     class Shape extends Base {
       static override tableName = "shapes";
       static {
@@ -65,7 +62,7 @@ describe("STI subclass attribute() routing", () => {
 
     expect(Triangle._attributeDefinitions.get("name")?.type.name).toBe("string");
     expect(Triangle._attributeDefinitions.get("sides")?.type.name).toBe("integer");
-    expect(Shape._attributeDefinitions.get("sides")?.type.name).toBe("integer");
+    expect(Shape._attributeDefinitions.has("sides")).toBe(false);
   });
 
   it("STI subclass encrypts() stays on the subclass, unlike attribute()", async () => {
@@ -85,7 +82,6 @@ describe("STI subclass attribute() routing", () => {
     }
     class Cat extends Animal {}
 
-    // Unlike `attribute()` (which writes to the shared base-owned map above),
     // `encrypts` is per-class in Rails: `encrypted_attributes` is a
     // `class_attribute` and `encrypt_attribute` calls `decorate_attributes` on
     // the receiver, while `_default_attributes` replays the superclass's
@@ -103,7 +99,7 @@ describe("STI subclass attribute() routing", () => {
     expect(Dog._attributeDefinitions).not.toBe(Animal._attributeDefinitions);
   });
 
-  it("subclass attribute survives schema reflection on the STI base (end-to-end)", async () => {
+  it("subclass attribute survives the subclass's own schema reflection (end-to-end)", async () => {
     const { loadSchemaFromAdapter } = await import("./model-schema.js");
     const { ValueType } = await import("@blazetrails/activemodel");
 
@@ -119,10 +115,6 @@ describe("STI subclass attribute() routing", () => {
     }
     class Circle extends Shape {
       static {
-        // Subclass-authored attribute declared BEFORE schema reflection
-        // — the case previously documented as "STI note 2" (subclass
-        // fork would shadow later base reflection). With the routing
-        // fix this lives on the shared base map from the start.
         this.attribute("radius", "integer");
       }
     }
@@ -141,10 +133,11 @@ describe("STI subclass attribute() routing", () => {
     (Shape as unknown as { adapter: unknown }).adapter = adapter;
 
     await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Shape);
+    await (loadSchemaFromAdapter as unknown as (this: typeof Base) => Promise<void>).call(Circle);
 
-    expect(Shape._attributeDefinitions.get("radius")?.type.name).toBe("integer");
     expect(Shape._attributeDefinitions.get("guid")?.type.name).toBe("uuid");
-    expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
+    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
+    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
     expect(Circle._attributeDefinitions.get("radius")?.type.name).toBe("integer");
     expect(Circle._attributeDefinitions.get("guid")?.type.name).toBe("uuid");
   });
@@ -175,9 +168,9 @@ describe("STI subclass attribute() routing", () => {
     expect(Shape._attributeDefinitions.has("priority")).toBe(false);
     expect(Circle._attributeDefinitions.has("priority")).toBe(false);
 
-    // The shared-table subclass still routes to the base.
-    expect(Circle._attributeDefinitions).toBe(Shape._attributeDefinitions);
-    expect(Shape._attributeDefinitions.get("radius")?.type.name).toBe("integer");
+    expect(Circle._attributeDefinitions).not.toBe(Shape._attributeDefinitions);
+    expect(Shape._attributeDefinitions.has("radius")).toBe(false);
+    expect(Circle._attributeDefinitions.get("radius")?.type.name).toBe("integer");
 
     // Inherited (shared-ancestor) declarations remain visible on the descendant.
     expect(Ticket._attributeDefinitions.get("radius")?.type.name).toBe("integer");

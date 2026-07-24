@@ -666,7 +666,7 @@ describe("DefaultAttributesTest", () => {
 });
 
 describe("DefineAttributeSTITest", () => {
-  it("defineAttribute on STI subclass routes to the STI base", () => {
+  it("defineAttribute on STI subclass stays on the subclass", () => {
     const intType = typeRegistry.lookup("integer");
     class Animal extends Base {
       static {
@@ -676,14 +676,14 @@ describe("DefineAttributeSTITest", () => {
       }
     }
     class Dog extends (Animal as any) {}
-    // Defining on subclass should land on the base
     (Dog as any).defineAttribute("legs", intType, { default: 4 });
-    expect((Animal as any)._attributeDefinitions.has("legs")).toBe(true);
+    expect((Dog as any)._attributeDefinitions.has("legs")).toBe(true);
+    expect((Animal as any)._attributeDefinitions.has("legs")).toBe(false);
     const d = new (Dog as any)({});
     expect(d.legs).toBe(4);
   });
 
-  it("_defaultAttributes on STI subclass uses the base cache", () => {
+  it("_defaultAttributes is memoized per class, not shared with the STI base", () => {
     class Vehicle extends Base {
       static {
         this.attribute("speed", "integer", { default: 60 });
@@ -692,7 +692,9 @@ describe("DefineAttributeSTITest", () => {
     class Car extends (Vehicle as any) {}
     const baseDefaults = (Vehicle as any)._defaultAttributes();
     const subDefaults = (Car as any)._defaultAttributes();
-    expect(baseDefaults).toBe(subDefaults);
+    expect(subDefaults).not.toBe(baseDefaults);
+    expect(subDefaults.keys()).toEqual(baseDefaults.keys());
+    expect(subDefaults.fetchValue("speed")).toBe(60);
   });
 
   it("defineAttribute for id does not install an accessor", () => {

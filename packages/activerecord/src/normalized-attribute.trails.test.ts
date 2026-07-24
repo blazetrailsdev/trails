@@ -68,11 +68,10 @@ describe("STI subclass normalizes", () => {
     expect(defTypeFor(Company, "name").cast("  acme  ")).toBe("  acme  ");
   });
 
-  it("refreshes a subclass overlay whose key set is unchanged after a base reset", async () => {
+  it("re-reflects a subclass whose key set is unchanged after a base reset", async () => {
     await RefreshedCompany.loadSchema();
     await Company.loadSchema();
 
-    // Fork an overlay covering every reflected column.
     RefreshedCompany.normalizes("description", (value: unknown) => value);
     const defsOf = (klass: typeof Company) =>
       (klass as unknown as { _attributeDefinitions: Map<string, object> })._attributeDefinitions;
@@ -85,6 +84,9 @@ describe("STI subclass normalizes", () => {
     await Company.loadSchema();
     await RefreshedCompany.loadSchema();
 
-    expect(defsOf(RefreshedCompany).get("name")).toBe(defsOf(Company).get("name"));
+    expect(defsOf(RefreshedCompany)).not.toBe(defsOf(Company));
+    expect(defsOf(RefreshedCompany).get("name")).not.toBe(defsOf(Company).get("name"));
+    expect([...defsOf(Company).keys()].every((k) => defsOf(RefreshedCompany).has(k))).toBe(true);
+    expect(defTypeFor(RefreshedCompany, "description").cast("x")).toBe("x");
   });
 });

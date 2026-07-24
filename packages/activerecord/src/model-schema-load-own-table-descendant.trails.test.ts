@@ -88,20 +88,19 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
     ).toEqual(["id", "subject"]);
   });
 
-  it("redirects a shared-table subclass of an own-table descendant to that descendant", () => {
+  it("gives a shared-table subclass of an own-table descendant that descendant's columns", () => {
     const asked: string[] = [];
-    const { Shape, Ticket, VipTicket } = buildHierarchy(asked);
+    const { Shape, VipTicket } = buildHierarchy(asked);
 
     const hash = VipTicket.columnsHash();
 
     expect(Object.keys(hash).sort()).toEqual(["id", "subject"]);
-    expect((Ticket as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_schemaLoaded")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_attributeDefinitions")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_schemaLoaded")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(VipTicket, "_attributeDefinitions")).toBe(true);
     expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 
-  it("still redirects a genuine STI subclass to the base's shared table", () => {
+  it("gives a genuine STI subclass the base's shared table", () => {
     const asked: string[] = [];
     const { Shape, Circle } = buildHierarchy(asked);
 
@@ -109,8 +108,8 @@ describe("loadSchema — own-table descendant under an STI ancestor", () => {
 
     expect(Object.keys(hash).sort()).toEqual(["id", "sides", "type"]);
     expect(asked).not.toContain("tickets");
-    expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(true);
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(false);
-    expect(Object.prototype.hasOwnProperty.call(Circle, "_attributeDefinitions")).toBe(false);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_schemaLoaded")).toBe(true);
+    expect(Object.prototype.hasOwnProperty.call(Circle, "_attributeDefinitions")).toBe(true);
+    expect((Shape as unknown as { _schemaLoaded: boolean })._schemaLoaded).toBe(false);
   });
 });
