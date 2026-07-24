@@ -29,7 +29,7 @@
  */
 
 import { getOs } from "@blazetrails/activesupport";
-import { DEFAULT_FORKS } from "./ar-db-forks-default.js";
+import { DEFAULT_FORKS, resolveForkCount } from "./ar-db-forks-default.js";
 
 // Spare slots beyond the worker count. One is enough to cover a single
 // recycle overlap; two leaves margin for back-to-back recycles.
@@ -63,13 +63,11 @@ function hostForkCap(): number | null {
  * that value becomes `poolOptions.forks.maxForks`, so any divergence means
  * the pool is sized against a worker count that never starts — and the
  * single-worker bypass in test-setup-worker-db.ts would miss a
- * `TRAILS_TEST_FORKS=1` solo run.
+ * `TRAILS_TEST_FORKS=1` solo run. Both sides run the same
+ * {@link resolveForkCount}, and ar-db-forks-parity.test.ts holds them together.
  */
 export function workerForkCount(): number {
-  const n = parseInt(process.env.TRAILS_TEST_FORKS ?? process.env.AR_DB_FORKS ?? "", 10);
-  const requested = Number.isFinite(n) && n > 0 ? n : DEFAULT_FORKS;
-  const cap = hostForkCap();
-  return cap === null ? requested : Math.min(requested, cap);
+  return resolveForkCount(process.env, hostForkCap());
 }
 
 /**
