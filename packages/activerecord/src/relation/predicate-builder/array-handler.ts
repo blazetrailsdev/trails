@@ -91,7 +91,7 @@ export class ArrayHandler {
       return valuesPredicate === NullPredicate ? attribute.in([]) : (valuesPredicate as Nodes.Node);
     }
 
-    const rangePreds = ranges.map((r) => this.predicateBuilder.buildRangePredicate(attribute, r));
+    const rangePreds = ranges.map((r) => this.predicateBuilder.build(attribute, r));
     let result: Nodes.Node | typeof NullPredicate = valuesPredicate;
     for (const rp of rangePreds) {
       result = result === NullPredicate ? rp : groupedOr(result as Nodes.Node, rp);
