@@ -1292,10 +1292,13 @@ jobs:
           RAILS_STRUCTURE_REPORT: "1"
         run: pnpm exec tsx scripts/build-rails-file-structure-manifest.ts && pnpm exec eslint packages/arel/src packages/activemodel/src
       - name: Test comparison
-        # --gates prints the advisory adapter/feature gate-mismatch breakdown
+        # --gates prints the adapter/feature gate-mismatch breakdown
         # (should-gate / missing-gate / wrong-gate / over-gated) in the log.
-        # Non-failing: gate mismatches never affect the exit code.
-        run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts --gates
+        # --check arms the hard-zero gate: the step fails if activerecord's
+        # gate-mismatch count is non-zero (RFC 0032 ar-gate-fidelity-burndown,
+        # cluster `enforcement`). No baseline / exclude-list — the four burndown
+        # clusters are already at zero, so any regrowth turns CI red.
+        run: pnpm exec tsx scripts/test-compare/extract-ts-tests.ts && pnpm exec tsx scripts/test-compare/test-compare.ts --gates --check
       - name: Fixtures comparison
         run: pnpm exec tsx scripts/fixtures-compare/compare.ts --package activerecord --ci
       - name: Models comparison
