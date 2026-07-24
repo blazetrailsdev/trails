@@ -3,10 +3,11 @@ import path from "path";
 import os from "os";
 import { DEFAULT_FORKS } from "./packages/activerecord/src/test-helpers/ar-db-slots.js";
 
-// AR_DB_FORKS (read in test-setup-worker-db.ts) *requests* a vitest worker
+// AR_DB_FORKS (read in test-setup-worker-db.ts) requests a vitest worker
 // count; TEST_FORKS below is the effective one — the request clamped to the
-// host ceiling. The advisory-lock slot pool is sized SEPARATELY, with headroom
-// over that same effective count — see test-helpers/ar-db-slots.ts (slots =
+// host ceiling — and is republished as AR_DB_FORKS. The advisory-lock slot
+// pool is sized SEPARATELY, with headroom over that effective count — see
+// test-helpers/ar-db-slots.ts (slots =
 // workers + headroom, or an explicit AR_DB_SLOTS override). TRAILS_TEST_FORKS
 // caps the vitest worker count so that concurrent local worktrees don't
 // saturate the machine. Precedence: TRAILS_TEST_FORKS > AR_DB_FORKS >
@@ -99,13 +100,11 @@ const TEST_FORKS = Math.min(
   Number.isFinite(_parsedForks) && _parsedForks > 0 ? _parsedForks : DEFAULT_FORKS,
   _hostForkCap,
 );
-// Republish the EFFECTIVE count so ar-db-slots.ts sizes the advisory-slot pool
-// from the workers that actually start, not from the raw request. The clamp
-// exists only here: package sources may not import `node:os` (browser compat)
-// and the os-adapter exposes no `availableParallelism`, so a shared clamp
-// helper would have to live in a package and break that rule. This runs in the
-// vitest parent before globalSetup and before any worker forks, and workers
-// inherit the parent env.
+// Republish the effective count so ar-db-slots.ts sizes the slot pool from the
+// workers that actually start. The clamp lives only here because package
+// sources may not import `node:os` (browser compat) and the os-adapter exposes
+// no `availableParallelism`. Runs in the vitest parent before globalSetup and
+// before any worker forks; workers inherit the parent env.
 process.env.AR_DB_FORKS = String(TEST_FORKS);
 
 const alias = {

@@ -1022,10 +1022,8 @@ jobs:
           PGUSER: postgres
           PGPASSWORD: postgres
           PGDATABASE: rails_js_test
-          # AR_DB_FORKS is deliberately unset: vitest.config.ts and
-          # ar-db-slots.ts both clamp the requested fork count to the host's
-          # numCpus - 1, so worker count and advisory slot-DB pool track the
-          # runner's vCPU count without this workflow encoding it.
+          # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
+          # worker count and the slot-DB pool from the runner's vCPU count.
       # CLI E2E is not sharded — run it once, on shard 1 only, to avoid a
       # redundant double-run across the two legs.
       # PG_TEST_URL is the activerecord-cli E2E's own input (it drives the CLI's
@@ -1092,10 +1090,8 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_USER: root
           MYSQL_DATABASE: rails_js_test
-          # AR_DB_FORKS is deliberately unset: vitest.config.ts and
-          # ar-db-slots.ts both clamp the requested fork count to the host's
-          # numCpus - 1, so worker count and advisory slot-DB pool track the
-          # runner's vCPU count without this workflow encoding it.
+          # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
+          # worker count and the slot-DB pool from the runner's vCPU count.
       # No MySQL connection env: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       - run: pnpm vitest run packages/activerecord-cli
@@ -1162,10 +1158,8 @@ jobs:
           MYSQL_PORT: "3306"
           MYSQL_USER: root
           MYSQL_DATABASE: rails_js_test
-          # AR_DB_FORKS is deliberately unset: vitest.config.ts and
-          # ar-db-slots.ts both clamp the requested fork count to the host's
-          # numCpus - 1, so worker count and advisory slot-DB pool track the
-          # runner's vCPU count without this workflow encoding it.
+          # AR_DB_FORKS deliberately unset: vitest.config.ts derives both the
+          # worker count and the slot-DB pool from the runner's vCPU count.
       # No MySQL connection env: no mysql-happy-path E2E exists yet. This run
       # covers the SQLite E2E until a mysql suite lands and can be wired up.
       # CLI E2E is not sharded — run it once, on shard 1 only.

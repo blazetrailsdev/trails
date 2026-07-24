@@ -1,3 +1,4 @@
+import os from "node:os";
 import { afterEach, describe, expect, it } from "vitest";
 import { DEFAULT_FORKS, slotPoolSize, workerForkCount } from "./ar-db-slots.js";
 
@@ -44,11 +45,13 @@ describe("ar-db-slots", () => {
       expect(workerForkCount()).toBe(DEFAULT_FORKS);
     });
 
-    it("reads the effective count vitest.config.ts republishes", () => {
-      // vitest.config.ts overwrites AR_DB_FORKS with the host-clamped count,
-      // so a request of 8 on a 4-vCPU runner arrives here as 3.
-      setEnv("3");
-      expect(workerForkCount()).toBe(3);
+    // The value this process was started with, before any setEnv() below.
+    const inherited = saved.get("AR_DB_FORKS");
+
+    it("sees the host-clamped count vitest.config.ts republishes", () => {
+      expect(inherited).toBeDefined();
+      expect(Number(inherited)).toBeLessThanOrEqual(Math.max(os.availableParallelism() - 1, 1));
+      expect(Number(inherited)).toBeGreaterThan(0);
     });
   });
 
