@@ -46,7 +46,10 @@ describe("ar-db fork count parity", () => {
   });
 
   const saved = new Map<string, string | undefined>();
-  for (const k of ENV_KEYS) saved.set(k, process.env[k]);
+
+  beforeAll(() => {
+    for (const k of ENV_KEYS) saved.set(k, process.env[k]);
+  });
 
   afterEach(() => {
     cores = HOST_CORES;
