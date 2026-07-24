@@ -9,7 +9,9 @@
  */
 import { describe, it, expect, beforeAll, vi } from "vitest";
 import { Base } from "./index.js";
-import { typeRegistry } from "@blazetrails/activemodel";
+import { typeRegistry, StringType, IntegerType } from "@blazetrails/activemodel";
+import { Array as OidArray } from "./connection-adapters/postgresql/oid/array.js";
+import { RangeType } from "./connection-adapters/postgresql/oid/range.js";
 import { BigDecimal } from "@blazetrails/activesupport";
 
 import { registerModel } from "./associations.js";
@@ -349,26 +351,36 @@ describe("CustomPropertiesTest", () => {
     class Klass extends OverloadedType {
       static {
         this.attribute("my_array", "string", { limit: 50, array: true });
-        this.attribute("my_int_array", "integer", { array: true } as any);
+        this.attribute("my_int_array", "integer", { array: true });
       }
     }
 
-    const stringArray = Klass.typeForAttribute("my_array");
-    const intArray = Klass.typeForAttribute("my_int_array");
+    const stringArray = Klass.typeForAttribute("my_array") as OidArray;
+    const intArray = Klass.typeForAttribute("my_int_array") as OidArray;
     expect(stringArray).not.toEqual(intArray);
+    expect(stringArray).toBeInstanceOf(OidArray);
+    expect(stringArray.subtype).toBeInstanceOf(StringType);
+    expect(stringArray.subtype.limit).toBe(50);
+    expect(intArray).toBeInstanceOf(OidArray);
+    expect(intArray.subtype).toBeInstanceOf(IntegerType);
   });
 
   it.skipIf(adapterType !== "postgres")("range types can be specified", () => {
     class Klass extends OverloadedType {
       static {
         this.attribute("my_range", "string", { limit: 50, range: true });
-        this.attribute("my_int_range", "integer", { range: true } as any);
+        this.attribute("my_int_range", "integer", { range: true });
       }
     }
 
-    const stringRange = Klass.typeForAttribute("my_range");
-    const intRange = Klass.typeForAttribute("my_int_range");
+    const stringRange = Klass.typeForAttribute("my_range") as RangeType;
+    const intRange = Klass.typeForAttribute("my_int_range") as RangeType;
     expect(stringRange).not.toEqual(intRange);
+    expect(stringRange).toBeInstanceOf(RangeType);
+    expect(stringRange.subtype).toBeInstanceOf(StringType);
+    expect((stringRange.subtype as StringType).limit).toBe(50);
+    expect(intRange).toBeInstanceOf(RangeType);
+    expect(intRange.subtype).toBeInstanceOf(IntegerType);
   });
 
   it("attributes added after subclasses load are inherited", () => {

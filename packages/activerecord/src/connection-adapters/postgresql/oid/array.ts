@@ -32,7 +32,7 @@ function stableStringify(value: unknown): string {
 }
 
 export interface ArraySubtype {
-  readonly type?: string | (() => string);
+  readonly type?: string | (() => string | undefined);
   readonly limit?: number;
   readonly precision?: number;
   readonly scale?: number;
@@ -83,7 +83,7 @@ export class Array extends ValueType<unknown> {
    */
   override type(): string {
     const subtypeType = this.subtype.type;
-    if (typeof subtypeType === "function") return subtypeType.call(this.subtype);
+    if (typeof subtypeType === "function") return subtypeType.call(this.subtype) ?? "array";
     if (typeof subtypeType === "string") return subtypeType;
     return "array";
   }
