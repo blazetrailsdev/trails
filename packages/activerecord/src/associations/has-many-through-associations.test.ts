@@ -2534,8 +2534,11 @@ describe("HasManyThroughAssociationsTest", () => {
     await expect((order as any).chapters.toArray()).resolves.toBeInstanceOf(Array);
   });
 
-  // TS-only: insertRecord with validate false skips join record validation
-  it("insertRecord with validate false skips join record validation", async () => {
+  // TS-only: insertRecord with validate false still raises on an invalid join record.
+  // Rails' save_through_record (has_many_through_association.rb:81-85) takes
+  // neither `validate` nor `raise`; those reach only the target save via
+  // insert_record's `super`, so the join row is always a bang save.
+  it("insertRecord with validate false still raises on invalid join record", async () => {
     class IrpvTagging extends Base {
       declare taggable_id: number | null;
       declare taggable_type: string | null;
@@ -2548,7 +2551,7 @@ describe("HasManyThroughAssociationsTest", () => {
         this.attribute("taggable_id", "integer");
         this.attribute("taggable_type", "string");
         this.attribute("tag_id", "integer");
-        (this as any).validates((r: any) => {
+        (this as any).validate((r: any) => {
           r.errors.add("base", "Join always invalid");
         });
         this.belongsTo("tag", { className: "Tag", foreignKey: "tag_id" });
@@ -2577,9 +2580,8 @@ describe("HasManyThroughAssociationsTest", () => {
 
     const irpvPost = await IrpvPost.find(post.id);
     const assoc = (irpvPost as any).association("irpvTags");
-    const result = await assoc.insertRecord(tag, false, false);
-    expect(result).toBe(true);
-    expect(await IrpvTagging.where({ taggable_id: post.id }).count()).toBe(1);
+    await expect(assoc.insertRecord(tag, false, false)).rejects.toThrow(RecordInvalid);
+    expect(await IrpvTagging.where({ taggable_id: post.id }).count()).toBe(0);
   });
 
   // TS-only: loads through a join model

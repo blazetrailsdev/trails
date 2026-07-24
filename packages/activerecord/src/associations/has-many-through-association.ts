@@ -6,7 +6,6 @@ import {
   HasManyThroughNestedAssociationsAreReadonly,
 } from "./errors.js";
 import { compositeQueryConstraintsList } from "../persistence.js";
-import { raiseValidationError } from "../validations.js";
 import { underscore, singularize, camelize } from "@blazetrails/activesupport";
 import { resolveAssocClass, association as collectionProxyFor } from "../associations.js";
 import {
@@ -140,7 +139,7 @@ export class HasManyThroughAssociation extends HasManyAssociation {
     }
     // Rails' two-step: super.insert_record (above) saves the target; then
     // save_through_record builds + saves the join row via the through proxy.
-    return saveThroughRecord(this, record, validate, raise);
+    return saveThroughRecord(this, record);
   }
 
   /**
@@ -575,25 +574,20 @@ function throughScopeAttributes(assoc: HasManyThroughAssociation): Record<string
 }
 
 /** @internal */
-async function saveThroughRecord(
-  assoc: HasManyThroughAssociation,
-  record: Base,
-  validate = true,
-  raise = false,
-): Promise<boolean> {
-  // Mirrors Rails' has_many_through_association#save_through_record: build
-  // the join row (via the through proxy for HMT, or via habtm options for
-  // HABTM) and save it when it has pending changes. The `ensure`-clear evicts
-  // the per-record cache so the same target can be associated again later.
+async function saveThroughRecord(assoc: HasManyThroughAssociation, record: Base): Promise<boolean> {
+  // Mirrors Rails' has_many_through_association#save_through_record
+  // (has_many_through_association.rb:81-85): build the join row (via the
+  // through proxy for HMT, or via habtm options for HABTM) and `save!` it when
+  // it has pending changes. `save_through_record` takes neither `validate` nor
+  // `raise` — those only reach the *target* save via `insert_record`'s `super`
+  // — so an invalid join row is always fatal, even on the `concat`/`<<` path.
+  // The `ensure`-clear evicts the per-record cache so the same target can be
+  // associated again later.
   try {
     const joinRecord = buildThroughRecord(assoc, record);
     if (!joinRecord) return true;
     if (!joinRecord.changed) return true;
-    const saved = await (joinRecord as any).save({ validate });
-    if (!saved) {
-      if (raise) raiseValidationError(joinRecord);
-      return false;
-    }
+    await (joinRecord as any).saveBang();
     return true;
   } finally {
     throughRecordsCache(assoc).delete(record);
