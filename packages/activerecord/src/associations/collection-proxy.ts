@@ -1635,7 +1635,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     if (block) block(record);
     const saved = await record.save();
     if (!saved) return record;
-    await this._pushThrough([record], false, false, throughScope);
+    await this._pushThrough([record], false, throughScope);
     return record;
   }
 
@@ -2255,7 +2255,6 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
   private async _pushThrough(
     records: T[],
     skipCallbacks = false,
-    bang = false,
     throughScope?: unknown,
   ): Promise<void> {
     const ctor = this._record.constructor as typeof Base;
@@ -2324,14 +2323,16 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
           // write a null owner FK (the owner has no id yet) and double-insert
           // once the autosave runs.
           if (this._record.isNewRecord()) return true;
-          // Save the target record if it's new. Mirrors Rails' concat (<<) which
-          // always raises on validation failure (raise_on_validation_error? == true).
-          if (record.isNewRecord()) {
-            if (bang) {
-              await record.saveBang(); // raises RecordInvalid if invalid
-            } else {
-              await record.saveBang(); // << always raises on new-record failure
-            }
+          // Mirrors HasManyThroughAssociation#insert_record's
+          // `if record.new_record? || record.has_changes_to_save?; return unless super`
+          // (has_many_through_association.rb:26-29): a new *or* persisted-but-dirty
+          // target is saved before the join row is written. The save always raises:
+          // HMT's concat_records hard-codes `super(records, true)`
+          // (has_many_through_association.rb:40) for every alias of `<<`, so `raise`
+          // reaches CollectionAssociation#insert_record as true and the non-raising
+          // `record.save` branch is unreachable for a through reflection.
+          if (record.isNewRecord() || record.hasChangesToSave) {
+            await record.saveBang();
           }
           // Create the join record. A composite source FK arises when the join's
           // source belongs_to resolves a multi-column key — e.g. `belongs_to :tag`
@@ -4167,7 +4168,7 @@ export class CollectionProxy<T extends Base = Base> extends Relation<T> {
     this._ensureThroughWritable();
     this._raiseOnTypeMismatch(records);
     if (this._assocDef.options.through) {
-      await this._pushThrough(records, false, true);
+      await this._pushThrough(records);
       return;
     }
     // Non-through: push() assigns the FK and calls save() for each record.

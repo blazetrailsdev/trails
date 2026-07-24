@@ -634,6 +634,17 @@ describe("HasManyThroughAssociationsTest", () => {
     expect(person.readAttribute("first_name")).toBe("Bongo");
   });
 
+  it("pushing a persisted record with unsaved changes saves those changes", async () => {
+    const post = await Post.find(posts("thinking").id);
+    const person = await Person.find(people("michael").id);
+    person.writeAttribute("first_name", "Bongo");
+
+    await (post as any).people.push(person);
+
+    await person.reload();
+    expect(person.readAttribute("first_name")).toBe("Bongo");
+  });
+
   it("associate existing record twice should add to target twice", async () => {
     const post = await Post.find(posts("thinking").id);
     const person = await Person.find(people("david").id);
