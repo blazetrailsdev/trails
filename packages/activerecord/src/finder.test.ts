@@ -14,6 +14,7 @@ import {
 import { sql as arelSql } from "@blazetrails/arel";
 
 import { fixtures } from "./test-helpers/fixtures.js";
+import "./test-helpers/canonical-model-index.js";
 import { CpkBook } from "./test-helpers/models/cpk.js";
 import { adapterType } from "./test-adapter.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";

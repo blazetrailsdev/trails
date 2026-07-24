@@ -14,7 +14,7 @@ import { TableNotSpecified, ActiveRecordError } from "./errors.js";
 
 import { adapterType } from "./test-adapter.js";
 import { quoteColumnName } from "./test-helpers/quote-regex.js";
-import { registerModel } from "./associations.js";
+import { association } from "./associations.js";
 import { connectedToStack } from "./core.js";
 import { Range as ArRange } from "./connection-adapters/postgresql/oid/range.js";
 import { Notifications, Logger, TimeWithZone } from "@blazetrails/activesupport";
@@ -33,6 +33,9 @@ import {
   AttributedDeveloper,
 } from "./test-helpers/models/developer.js";
 import { Topic as CanonicalTopic } from "./test-helpers/models/topic.js";
+import { Car } from "./test-helpers/models/car.js";
+import { Bulb } from "./test-helpers/models/bulb.js";
+import "./test-helpers/canonical-model-index.js";
 import { MultiparameterAssignmentErrors, type AttributeAssignmentError } from "./errors.js";
 
 vi.stubEnv("AR_NO_AUTO_SCHEMA", "1");
@@ -676,15 +679,9 @@ describe("BasicsTest", () => {
   });
 
   it("incomplete schema loading", async () => {
-    class Topic extends Base {
-      static {
-        this.tableName = "topics";
-        this.attribute("content", "json");
-      }
-    }
-    registerModel(Topic);
+    const Topic = CanonicalTopic;
     const payload = { foo: 42 };
-    const topic = await Topic.create({ content: payload });
+    const topic = await Topic.create({ content: payload as any });
     expect((topic as any).content).toEqual(payload);
 
     Topic.resetColumnInformation();
@@ -1015,23 +1012,12 @@ describe("BasicsTest", () => {
   });
 
   it("equality of relation and collection proxy", async () => {
-    class Bulb extends Base {
-      static {
-        this.attribute("car_id", "integer");
-      }
-    }
-    class Car extends Base {
-      static {
-        this.hasMany("bulbs", { className: "Bulb", foreignKey: "car_id" });
-      }
-    }
-    registerModel("Bulb", Bulb);
-    registerModel("Car", Car);
     const car = await Car.create({});
-    await Bulb.create({ car_id: car.id });
+    await association(car, "bulbs").create({});
 
-    const proxyResults = await (car as any).bulbs.toArray();
-    const relationResults = await Bulb.where({ car_id: car.id });
+    const bulbsOfCar = Bulb.where({ car_id: car.id });
+    const proxyResults = await association(car, "bulbs");
+    const relationResults = await bulbsOfCar;
     expect(proxyResults).toHaveLength(1);
     expect(proxyResults.map((r: any) => r.id).sort()).toEqual(
       relationResults.map((r: any) => r.id).sort(),
@@ -1039,28 +1025,15 @@ describe("BasicsTest", () => {
   });
 
   it("equality of relation and association relation", async () => {
-    class Bulb extends Base {
-      static {
-        this.attribute("car_id", "integer");
-        this.belongsTo("car", { className: "Car", foreignKey: "car_id" });
-      }
-    }
-    class Car extends Base {
-      static {
-        this.hasMany("bulbs", { className: "Bulb", foreignKey: "car_id" });
-      }
-    }
-    registerModel("Bulb", Bulb);
-    registerModel("Car", Car);
     const car = await Car.create({});
-    await Bulb.create({ car_id: car.id });
+    await association(car, "bulbs").create({});
 
     const bulbsOfCar = Bulb.where({ car_id: car.id });
     // Rails: assert_equal bulbs_of_car, car.bulbs.includes(:car)
     // AssociationRelation (includes chain off proxy) returns same rows as plain Relation
-    const assocRelation = (car as any).bulbs.includes("car");
+    const assocRelation = association(car, "bulbs").includes("car");
     const relationResults = await bulbsOfCar;
-    const assocResults = await assocRelation.toArray();
+    const assocResults = await assocRelation;
     expect(relationResults).toHaveLength(1);
     expect(assocResults.map((r: any) => r.id).sort()).toEqual(
       relationResults.map((r: any) => r.id).sort(),
@@ -1068,26 +1041,13 @@ describe("BasicsTest", () => {
   });
 
   it("equality of collection proxy and association relation", async () => {
-    class Bulb extends Base {
-      static {
-        this.attribute("car_id", "integer");
-        this.belongsTo("car", { className: "Car", foreignKey: "car_id" });
-      }
-    }
-    class Car extends Base {
-      static {
-        this.hasMany("bulbs", { className: "Bulb", foreignKey: "car_id" });
-      }
-    }
-    registerModel("Bulb", Bulb);
-    registerModel("Car", Car);
     const car = await Car.create({});
-    await Bulb.create({ car_id: car.id });
+    await association(car, "bulbs").create({});
 
     // Rails: assert_equal car.bulbs, car.bulbs.includes(:car)
     // CollectionProxy and includes-chain produce the same underlying rows
-    const proxyResults = await (car as any).bulbs.toArray();
-    const assocRelResults = await (car as any).bulbs.includes("car").toArray();
+    const proxyResults = await association(car, "bulbs");
+    const assocRelResults = await association(car, "bulbs").includes("car");
     expect(proxyResults).toHaveLength(1);
     expect(proxyResults.map((r: any) => r.id).sort()).toEqual(
       assocRelResults.map((r: any) => r.id).sort(),
