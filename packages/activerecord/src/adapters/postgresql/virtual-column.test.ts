@@ -6,6 +6,7 @@ import { describeIfPg, PostgreSQLAdapter } from "./test-helper.js";
 import { itIfSupports } from "../../test-helpers/supports.js";
 import { FixtureSet } from "../../test-helpers/fixture-set.js";
 import { fixtures } from "../../test-helpers/fixtures.js";
+import { virtualColumnFixtureData } from "../../test-helpers/fixtures/virtual-columns.js";
 import { Base } from "../../index.js";
 import { SchemaDumper } from "../../schema-dumper.js";
 
@@ -129,11 +130,12 @@ describeIfPg("PostgreSQLAdapter", () => {
     });
 
     itIfSupports("virtual_columns", "build fixture sql", async () => {
-      const fixtures = await FixtureSet.createFixtures(adapter, VirtualColumn, {
-        one: { name: "hello" },
-        two: { name: "world" },
-      });
-      expect(Object.keys(fixtures).length).toBe(2);
+      const created = await FixtureSet.createFixtures(
+        adapter,
+        VirtualColumn,
+        virtualColumnFixtureData,
+      );
+      expect(Object.keys(created).length).toBe(2);
     });
   });
 });
