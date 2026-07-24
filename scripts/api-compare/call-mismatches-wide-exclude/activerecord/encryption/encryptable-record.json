@@ -72,13 +72,6 @@
   {
     "package": "activerecord",
     "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "cant_modify_encrypted_attributes_when_frozen",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "ciphertext_for",
     "call": "read_attribute_for_database",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
@@ -130,13 +123,6 @@
     "tsFile": "encryption/encryptable-record.ts",
     "rubyName": "encrypted_attribute?",
     "call": "encrypted_attributes",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "encryption/encryptable-record.ts",
-    "rubyName": "encrypted_attribute?",
-    "call": "include?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
   {

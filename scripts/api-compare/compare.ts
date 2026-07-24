@@ -150,6 +150,49 @@ const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
   has: (value) => value !== "super",
 };
 
+// Ruby Enumerable/Comparable calls whose faithful port is a native JS method
+// with a DIFFERENT name. `rubyMethodToTs` is a pure naming-convention mapper, so
+// it turns `any?` into ["isAny", "any"] and never into `some` — the wide gate
+// (which admits every call name) then flags
+// `_connections.some((c) => c.isConnected())` as failing to call `any?`, even
+// though it is the exact analogue. These aliases are consulted ONLY when
+// deciding whether the TS body already makes the call; they never widen which
+// Ruby calls are considered ported (see significantMissingCalls gate 2), so
+// adding one can never introduce a new mismatch.
+// Entries list ONLY the differently-named JS spelling: the convention name is
+// already a candidate, so `select → filter` needs just ["filter"]. Every alias
+// must be the whole call's analogue, not merely a plausible building block —
+// `min_by → reduce` would let any reduce anywhere silence a dropped min_by, so
+// such loose pairs are deliberately absent.
+export const JS_ENUMERABLE_ALIASES = new Map<string, string[]>([
+  ["any?", ["some"]],
+  ["all?", ["every"]],
+  ["none?", ["some", "every"]],
+  ["one?", ["filter"]],
+  ["include?", ["includes", "has"]],
+  ["member?", ["includes", "has"]],
+  ["key?", ["has"]],
+  ["has_key?", ["has"]],
+  ["select", ["filter"]],
+  ["reject", ["filter"]],
+  ["detect", ["find"]],
+  ["collect", ["map"]],
+  ["collect_concat", ["flatMap"]],
+  ["each", ["forEach"]],
+  ["inject", ["reduce"]],
+  ["index", ["indexOf", "findIndex"]],
+  ["find_index", ["indexOf"]],
+  ["sort_by", ["sort"]],
+  // Ruby Array#concat mutates the receiver; the JS port is `push(...xs)`
+  // (Array#concat returns a new array, so it is NOT the analogue).
+  ["concat", ["push"]],
+]);
+
+/** JS-native call names that count as making Ruby call `rubyCall`. */
+export function jsEnumerableAliases(rubyCall: string): string[] {
+  return JS_ENUMERABLE_ALIASES.get(rubyCall) ?? [];
+}
+
 /**
  * Core of the advisory calls-parity check (pure, exported for tests). For a
  * name-matched pair, returns the fidelity-critical Ruby body calls that are
@@ -162,7 +205,9 @@ const WIDE_SIGNIFICANT_CALLS: { has(value: string): boolean } = {
  *   2. only calls whose mapped TS candidate is a ported method that TAKES
  *      arguments somewhere (`isPortedWithArgs`) — excludes zero-arg attribute
  *      readers, which Ruby records as calls but TS accesses as `this.x`;
- *   3. flagged only when the TS body makes NONE of the mapped candidates.
+ *   3. flagged only when the TS body makes NONE of the mapped candidates, nor
+ *      any JS-native analogue of the Ruby call (`aliasCall`, e.g. `some` for
+ *      `any?`).
  */
 export function significantMissingCalls(
   rubyName: string,
@@ -171,6 +216,7 @@ export function significantMissingCalls(
   isPortedWithArgs: (tsName: string) => boolean,
   mapCall: (rubyCall: string) => string[] | null = rubyMethodToTs,
   significant: { has(value: string): boolean } = SIGNIFICANT_CALLS,
+  aliasCall: (rubyCall: string) => string[] = jsEnumerableAliases,
 ): string[] {
   const missing: string[] = [];
   for (const rc of rubyCalls) {
@@ -194,6 +240,7 @@ export function significantMissingCalls(
     if (!mapped || mapped.length === 0) continue;
     if (!mapped.some(isPortedWithArgs)) continue;
     if (mapped.some((c) => tsCalls.has(c))) continue;
+    if (aliasCall(rc).some((c) => tsCalls.has(c))) continue;
     missing.push(`${rc} → ${mapped.join("|")}`);
   }
   return missing;

@@ -72,13 +72,6 @@
   {
     "package": "activerecord",
     "tsFile": "model-schema.ts",
-    "rubyName": "content_columns",
-    "call": "reject",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "model-schema.ts",
     "rubyName": "derive_join_table_name",
     "call": "to_s",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

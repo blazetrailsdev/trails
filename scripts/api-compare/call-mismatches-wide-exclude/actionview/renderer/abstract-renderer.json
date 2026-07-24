@@ -51,13 +51,6 @@
   {
     "package": "actionview",
     "tsFile": "renderer/abstract-renderer.ts",
-    "rubyName": "merge_prefix_into_object_path",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actionview",
-    "tsFile": "renderer/abstract-renderer.ts",
     "rubyName": "prepend_formats",
     "call": "empty?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."

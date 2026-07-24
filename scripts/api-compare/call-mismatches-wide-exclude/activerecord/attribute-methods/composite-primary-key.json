@@ -2,22 +2,8 @@
   {
     "package": "activerecord",
     "tsFile": "attribute-methods/composite-primary-key.ts",
-    "rubyName": "id?",
-    "call": "all?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/composite-primary-key.ts",
     "rubyName": "id_before_type_cast",
     "call": "attribute_before_type_cast",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "activerecord",
-    "tsFile": "attribute-methods/composite-primary-key.ts",
-    "rubyName": "primary_key_values_present?",
-    "call": "all?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   }
 ]

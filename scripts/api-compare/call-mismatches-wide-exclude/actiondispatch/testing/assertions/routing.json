@@ -73,13 +73,6 @@
     "package": "actiondispatch",
     "tsFile": "testing/assertions/routing.ts",
     "rubyName": "assert_routing",
-    "call": "include?",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "actiondispatch",
-    "tsFile": "testing/assertions/routing.ts",
-    "rubyName": "assert_routing",
     "call": "key?",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },

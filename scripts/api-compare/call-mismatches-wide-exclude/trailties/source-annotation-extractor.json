@@ -66,13 +66,6 @@
     "package": "trailties",
     "tsFile": "source-annotation-extractor.ts",
     "rubyName": "find_in",
-    "call": "detect",
-    "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
-  },
-  {
-    "package": "trailties",
-    "tsFile": "source-annotation-extractor.ts",
-    "rubyName": "find_in",
     "call": "extensions",
     "reason": "Baseline (RFC 0047): wide call-set flag seeded when the wide ratchet landed; bucket (b) equivalent or (c) noise pending per-cluster burndown review."
   },
